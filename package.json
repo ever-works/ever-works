@@ -1,0 +1,69 @@
+{
+  "name": "ever-works",
+  "version": "0.1.0",
+  "description": "Ever Works - Open Directory Builder Platform",
+  "homepage": "https://ever.works",
+  "repository": {
+		"type": "git",
+		"url": "https://github.com/ever-co/ever-works.git"
+	},
+	"bugs": {
+		"url": "https://github.com/ever-co/ever-works/issues"
+	},
+  "author": {
+		"name": "Ever Co. LTD",
+		"email": "ever@ever.co",
+		"url": "https://ever.co"
+	},
+	"private": true,
+  "scripts": {
+		"dev": "turbo dev",		
+		"build": "turbo build",		
+		"prepare:husky": "npx husky install .husky",		
+		"lint": "turbo lint",
+		"type-check": "turbo type-check",
+		"clean": "turbo clean",
+		"format": "prettier --write \"**/*.{ts,tsx,md}\""
+	},  
+  "keywords": [],  
+  "devDependencies": {
+    "turbo": "^2.3.3",
+    "husky": "^9.0.11",
+		"prettier": "^3.2.5",
+		"prettier-eslint-cli": "^8.0.1",
+		"prettier-plugin-tailwindcss": "^0.5.11"
+  },
+  "engines": {
+		"node": ">=20",
+		"pnpm": ">=9.9.0"
+	},
+  "packageManager": "pnpm@9.15.3",
+  	"prettier": {
+		"printWidth": 120,
+		"singleQuote": true,
+		"semi": true,
+		"useTabs": true,
+		"tabWidth": 4,
+		"arrowParens": "always",
+		"trailingComma": "none",
+		"quoteProps": "as-needed",
+		"trimTrailingWhitespace": true,
+		"overrides": [
+			{
+				"files": "*.scss",
+				"options": {
+					"useTabs": false,
+					"tabWidth": 2
+				}
+			},
+			{
+				"files": "*.yml",
+				"options": {
+					"useTabs": false,
+					"tabWidth": 2
+				}
+			}
+		]
+	},
+  "snyk": true
+}
