@@ -7,7 +7,7 @@ export class GithubService {
 
     async createEmptyRepository(repo: string, description: string, owner: { apiKey: string }) {
         const octokit = new Octokit({ auth: owner.apiKey });
-        
+
         try {
             const res = await octokit.rest.repos.createForAuthenticatedUser({
                 name: repo,
@@ -38,6 +38,28 @@ export class GithubService {
             return data;
         } catch (err) {
             const msg = 'Failed to commit file to GitHub repository';
+            this.logger.error(msg, err.message);
+            throw new Error(msg);
+        }
+    }
+
+    /* should apply to both dirs and files */
+    async getContent(repo: string, path: string, owner: { name: string, apiKey: string }) {
+        const octokit = new Octokit({ auth: owner.apiKey });
+        console.log(owner.name, repo);
+        try {
+            const { data } = await octokit.request('GET /repos/{owner}/{repo}/contents/{path}', {
+                owner: owner.name,
+                repo: repo,
+                path: path,
+                headers: {
+                    'X-GitHub-Api-Version': '2022-11-28'
+                }
+            });
+
+            return data;
+        } catch (err) {
+            const msg = 'Failed to read content from GitHub repository';
             this.logger.error(msg, err.message);
             throw new Error(msg);
         }
