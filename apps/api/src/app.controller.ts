@@ -1,12 +1,13 @@
 import { Controller, Get } from '@nestjs/common';
-import { AppService } from './app.service';
+import { DataGeneratorService } from './data-generator/data-generator.service';
 
 @Controller()
 export class AppController {
-  constructor(private readonly appService: AppService) {}
+  constructor(private readonly dataGenerator: DataGeneratorService) {}
 
   @Get()
-  getHello(): string {
-    return this.appService.getHello();
+  async generateData() {
+    await this.dataGenerator.generate('awesome-timers');
+    return { success: true };
   }
 }
