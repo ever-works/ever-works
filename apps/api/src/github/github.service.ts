@@ -62,4 +62,17 @@ export class GithubService {
             throw new Error(msg);
         }
     }
+
+    async getUser(apiKey: string) {
+        const octokit = new Octokit({ auth: apiKey });
+
+        try {
+            const { data: user } = await octokit.rest.users.getAuthenticated();
+            return user;
+        } catch (err) {
+            const msg = 'Failed to fetch authenticated GitHub user';
+            this.logger.error(msg, err.message);
+            throw new Error(msg);
+        }
+    }
 }
