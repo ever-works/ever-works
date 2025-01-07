@@ -1,6 +1,12 @@
 import { Injectable } from '@nestjs/common';
 
-const data = [
+interface ItemData {
+    name: string;
+    description: string;
+    source_url: string;
+}
+
+const data: Array<ItemData> = [
     {
         name: 'Ever Clock',
         description: 'Open Time Tracking Platform (WIP)',
@@ -12,16 +18,26 @@ const data = [
         source_url: 'https://activitywatch.net/',
     },
     {
-        name: 'Timewrrior',
-        desciption: 'Commandline Time Tracking and Reporting.',
+        name: 'Timewarrior',
+        description: 'Commandline Time Tracking and Reporting.',
         source_url: 'https://github.com/GothenburgBitFactory/timewarrior',
 
-    }
+    },
+    {
+        name: 'Time Tracker',
+        description: 'Time Tracker, to be the best time tracker for browsers',
+        source_url: 'https://www.wfhg.cc/',
+    },
+    {
+        name: 'TomeTracker',
+        description: 'Time tracking app using localstorage.',
+        source_url: 'https://github.com/tommerty/TomeTracker',
+    },
 ]
 
 @Injectable()
 export class AiEngineService {
-    getItemsList() {
+    async getItemsList() {
         return data;
     }
 }

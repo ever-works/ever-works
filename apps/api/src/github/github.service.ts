@@ -23,7 +23,7 @@ export class GithubService {
         }
     }
 
-    async commitFile(repo: string, filename: string, content: string, owner: { name: string, apiKey: string }) {
+    async commitFile(repo: string, filename: string, content: string, message: string, owner: { name: string, apiKey: string }) {
         const octokit = new Octokit({ auth: owner.apiKey });
 
         try {
@@ -31,9 +31,11 @@ export class GithubService {
                 owner: owner.name,
                 repo,
                 content: Buffer.from(content).toString('base64'),
-                message: `update ${filename}`,
+                message,
                 path: filename,
             });
+
+            return data;
         } catch (err) {
             const msg = 'Failed to commit file to GitHub repository';
             this.logger.error(msg, err.message);

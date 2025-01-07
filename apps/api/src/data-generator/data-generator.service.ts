@@ -12,9 +12,7 @@ export class DataGeneratorService {
     ) {}
 
     async generate(name: string) {
-        const items = this.aiEngine.getItemsList();
-        // I guess we will get this info from currently authenticated user/
-        // in the future it could be an organization too
+        const items = await this.aiEngine.getItemsList();
         const owner = {
             apiKey: process.env.GITHUB_APIKEY
         };
@@ -23,9 +21,12 @@ export class DataGeneratorService {
         const { owner: { login } } = await this.githubService.createEmptyRepository(repo, `machine-readable data for ${name}`, owner);
 
         for (const item of items) {
-            const filename = slugify(item.name) + '.yml';
+            const filename = slugify(item.name, {
+                lower: true,
+                trim: true,
+            }) + '.yml';
             const content = stringify(item);
-            await this.githubService.commitFile(repo, filename, content, {
+            await this.githubService.commitFile(repo, filename, content, `create ${filename}`, {
                 ...owner,
                 name: login,
             });
