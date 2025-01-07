@@ -50,6 +50,12 @@ const data: Array<ItemData> = [
         description: 'AI productivity companion that captures and summarizes your day, organizes all relevant information within the right tool, and proactively surfaces the knowledge you need, when you need it.',
         source_url: 'https://www.timeos.ai',
         category: 'Commercial',
+    },
+    {
+        name: 'Invobook',
+        description: 'Self-hosted app for Time Tracking, Invoice Generation, Project & Client Management, built with Laravel & Filament.',
+        source_url: 'https://github.com/Hasnayeen/invobook',
+        category: 'Open Source',
     }
 ]
 

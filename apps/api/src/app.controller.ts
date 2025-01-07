@@ -24,4 +24,14 @@ export class AppController {
 
     return { success: true };
   }
+
+  @Post('sync')
+  async syncData(
+    @Body('name') name: string,
+    @Body('title') title: string,
+    @Body('description') description: string,
+  ) {
+    await this.dataGenerator.sync(name);
+    return { success: true };
+  }
 }
