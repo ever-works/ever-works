@@ -12,7 +12,6 @@ export class GithubService {
             const res = await octokit.rest.repos.createForAuthenticatedUser({
                 name: repo,
                 description,
-                private: true, // for now, I think it can be configurable
             });
 
             return res.data;
@@ -23,7 +22,7 @@ export class GithubService {
         }
     }
 
-    async commitFile(repo: string, filename: string, content: string, message: string, owner: { name: string, apiKey: string }) {
+    async createFile(repo: string, filepath: string, content: string, message: string, owner: { name: string, apiKey: string }) {
         const octokit = new Octokit({ auth: owner.apiKey });
 
         try {
@@ -32,7 +31,7 @@ export class GithubService {
                 repo,
                 content: Buffer.from(content).toString('base64'),
                 message,
-                path: filename,
+                path: filepath,
             });
 
             return data;

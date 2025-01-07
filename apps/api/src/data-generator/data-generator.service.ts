@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { stringify } from 'yaml';
+import { stringify as yamlStringify } from 'yaml';
 import slugify from 'slugify';
 import { AiEngineService } from '../ai-engine/ai-engine.service';
 import { GithubService } from '../github/github.service';
@@ -25,8 +25,9 @@ export class DataGeneratorService {
                 lower: true,
                 trim: true,
             }) + '.yml';
-            const content = stringify(item);
-            await this.githubService.commitFile(repo, filename, content, `create ${filename}`, {
+            const updatedAt = new Date();
+            const content = yamlStringify({ ...item, updated_at: updatedAt.toISOString() });
+            await this.githubService.createFile(repo, filename, content, `create ${filename}`, {
                 ...owner,
                 name: login,
             });
