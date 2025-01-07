@@ -11,13 +11,17 @@ export class DataGeneratorService {
         private readonly aiEngine: AiEngineService
     ) {}
 
-    async generate(name: string) {
+    getDataRepositoryName(name: string) {
+        return `${name}-data`;
+    }
+
+    async initialize(name: string) {
         const items = await this.aiEngine.getItemsList();
         const owner = {
             apiKey: process.env.GITHUB_APIKEY
         };
 
-        const repo = `${name}-data`;
+        const repo = this.getDataRepositoryName(name);
         const { owner: { login } } = await this.githubService.createEmptyRepository(repo, `machine-readable data for ${name}`, owner);
 
         for (const item of items) {

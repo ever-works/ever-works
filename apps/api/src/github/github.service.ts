@@ -45,7 +45,6 @@ export class GithubService {
     /* should apply to both dirs and files */
     async getContent(repo: string, path: string, owner: { name: string, apiKey: string }) {
         const octokit = new Octokit({ auth: owner.apiKey });
-        console.log(owner.name, repo);
         try {
             const { data } = await octokit.request('GET /repos/{owner}/{repo}/contents/{path}', {
                 owner: owner.name,
