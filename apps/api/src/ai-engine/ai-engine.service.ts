@@ -15,6 +15,12 @@ const data: Array<ItemData> = [
         category: 'Open Source'
     },
     {
+        name: 'Ever Team',
+        description: 'Open Work and Project Management Platform (including optional screenshots, Desktop & Mobile Apps, etc.)',
+        source_url: 'https://ever.team',
+        category: 'Open Source',
+    },
+    {
         name: 'ActivityWatch',
         description: 'Free and open-source automated time tracker. Cross-platform, extensible, privacy-focused.',
         source_url: 'https://activitywatch.net',
@@ -73,6 +79,12 @@ const data: Array<ItemData> = [
         name: 'Shion',
         description: 'Time Tracker.',
         source_url: 'https://shion.app',
+        category: 'Open Source',
+    },
+    {
+        name: 'Timestrap',
+        description: 'Time-tracking you can host anywhere. Full export support in multiple formats and easily extensible.',
+        source_url: 'https://timestrap.bythewood.me',
         category: 'Open Source',
     }
 ]

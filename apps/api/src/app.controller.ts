@@ -32,7 +32,12 @@ export class AppController {
     @Body('title') title: string,
     @Body('description') description: string,
   ) {
-    await this.dataGenerator.sync(name);
+    await this.dataGenerator.update(name);
+    await this.markdownGenerator.update({
+      name,
+      description,
+      title
+    });
     return { success: true };
   }
 

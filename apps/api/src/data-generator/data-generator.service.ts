@@ -47,7 +47,7 @@ export class DataGeneratorService {
         }
     }
 
-    async sync(name: string) {
+    async update(name: string) {
         const items = await this.aiEngine.getItemsList();
         const repo = this.getDataRepositoryName(name);
         const apiKey = process.env.GITHUB_APIKEY;
