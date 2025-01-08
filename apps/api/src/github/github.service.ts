@@ -12,6 +12,7 @@ export class GithubService {
             const res = await octokit.rest.repos.createForAuthenticatedUser({
                 name: repo,
                 description,
+                private: true,
             });
 
             return res.data;

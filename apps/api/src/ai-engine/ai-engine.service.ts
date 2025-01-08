@@ -68,6 +68,12 @@ const data: Array<ItemData> = [
         description: 'Log everything you do on the computer, for statistics, future reference and all-around fun!',
         source_url: 'https://github.com/selfspy/selfspy',
         category: 'Open Source',
+    },
+    {
+        name: 'Shion',
+        description: 'Time Tracker.',
+        source_url: 'https://shion.app',
+        category: 'Open Source',
     }
 ]
 
@@ -75,5 +81,19 @@ const data: Array<ItemData> = [
 export class AiEngineService {
     async getItemsList() {
         return data;
+    }
+
+    async getItemDetails() {
+        return (
+            `Lorem ipsum odor amet, consectetuer adipiscing elit. 
+            Augue lobortis tempus ridiculus phasellus platea quis.
+            Suspendisse enim auctor luctus phasellus pretium natoque laoreet.
+            Nulla sodales hac accumsan, enim potenti porttitor.
+            Finibus congue natoque placerat lacinia nibh ornare? Morbi netus curabitur, viverra maximus pulvinar efficitur natoque.
+            Sollicitudin nec porta libero, maecenas nam cursus.
+            Nascetur ridiculus praesent ac sagittis vel conubia gravida.
+            Ac tellus molestie vel ad praesent imperdiet.
+            Taciti vel sagittis nisl fermentum ornare senectus.`
+        );
     }
 }

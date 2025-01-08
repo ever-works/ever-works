@@ -17,11 +17,11 @@ export class AppController {
     @Body('description') description: string,
   ) {
     await this.dataGenerator.initialize(name);
-    await this.markdownGenerator.initialize({
+    /* await this.markdownGenerator.initialize({
       name,
       description,
       title
-    });
+    }); */
 
     return { success: true };
   }
