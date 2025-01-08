@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, Post } from '@nestjs/common';
 import { DataGeneratorService } from './data-generator/data-generator.service';
 import { MarkdownGeneratorService } from './markdown-generator/markdown-generator.service';
+import { MarkdownBuilder } from './markdown-generator/markdown-builder';
 
 @Controller()
 export class AppController {
@@ -33,5 +34,27 @@ export class AppController {
   ) {
     await this.dataGenerator.sync(name);
     return { success: true };
+  }
+
+  @Get('/markdown')
+  buildMd() {
+    const builder = new MarkdownBuilder();
+    builder
+      .h1("Hello world")
+      .paragraph("First usage of MarkdownBuilder")
+
+    const people = [ { name: 'Michał' }, { name: 'Paweł' } ];
+    builder.startList();
+    
+    for (const person of people) {
+      builder.startListItem();
+      builder.link(person.name, 'https://example.com');
+      builder.paragraph('Some text')
+      builder.end();
+    }
+
+    builder.end();
+    builder.paragraph("End paragraph");
+    return builder.build();
   }
 }

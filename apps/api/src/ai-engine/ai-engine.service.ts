@@ -56,6 +56,18 @@ const data: Array<ItemData> = [
         description: 'Self-hosted app for Time Tracking, Invoice Generation, Project & Client Management, built with Laravel & Filament.',
         source_url: 'https://github.com/Hasnayeen/invobook',
         category: 'Open Source',
+    },
+    {
+        name: 'Titra',
+        description: 'Modern open source project time tracking for freelancers and small teams.',
+        source_url: 'https://titra.io/en',
+        category: 'Open Source',
+    },
+    {
+        name: 'Selfspy',
+        description: 'Log everything you do on the computer, for statistics, future reference and all-around fun!',
+        source_url: 'https://github.com/selfspy/selfspy',
+        category: 'Open Source',
     }
 ]
 

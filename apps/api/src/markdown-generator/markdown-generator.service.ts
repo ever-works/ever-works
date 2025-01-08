@@ -12,19 +12,19 @@ export class MarkdownGeneratorService {
     ) {}
 
     async initialize({name, title, description}: { name: string, title: string, description: string }) {
-        const owner = {
-            apiKey: process.env.GITHUB_APIKEY
-        };
-        const repo = await this.githubService.createEmptyRepository(name, description, owner);
+        const apiKey = process.env.GITHUB_APIKEY;
+        const user = await this.githubService.getUser(apiKey);
+        const owner = { apiKey, name: user.login };
+        await this.githubService.createEmptyRepository(name, description, owner);
         const dataRepoName = this.dataGeneratorService.getDataRepositoryName(name);
-        const entries = await this.githubService.getContent(dataRepoName, '', { ...owner, name: repo.owner.login });
+        const entries = await this.githubService.getContent(dataRepoName, '', owner);
         if (!Array.isArray(entries)) {
             throw new Error('Invalid repository structure');
         }
 
         const data = {};
         for (const entry of entries) {
-            const file = await this.githubService.getContent(dataRepoName, entry.path, { ...owner, name: repo.owner.login });
+            const file = await this.githubService.getContent(dataRepoName, entry.path, owner);
             if (Array.isArray(file))
                 throw new Error('Unexpected directory');
 
@@ -43,7 +43,7 @@ export class MarkdownGeneratorService {
         }
 
         const markdown = this.createMarkdown({ name, title, description }, data);
-        await this.githubService.createFile(name, 'README.md', markdown, 'create README.md', { ...owner, name: repo.owner.login });
+        await this.githubService.createFile(name, 'README.md', markdown, 'create README.md', owner);
     }
 
     private createMarkdown(

@@ -24,7 +24,6 @@ export class GithubService {
 
     async createFile(repo: string, filepath: string, content: string, message: string, owner: { name: string, apiKey: string }) {
         const octokit = new Octokit({ auth: owner.apiKey });
-
         try {
             const { data } = await octokit.rest.repos.createOrUpdateFileContents({
                 owner: owner.name,
@@ -46,13 +45,10 @@ export class GithubService {
     async getContent(repo: string, path: string, owner: { name: string, apiKey: string }) {
         const octokit = new Octokit({ auth: owner.apiKey });
         try {
-            const { data } = await octokit.request('GET /repos/{owner}/{repo}/contents/{path}', {
+            const { data } = await octokit.rest.repos.getContent({
                 owner: owner.name,
-                repo: repo,
-                path: path,
-                headers: {
-                    'X-GitHub-Api-Version': '2022-11-28'
-                }
+                repo,
+                path,
             });
 
             return data;
