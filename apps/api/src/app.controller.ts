@@ -2,12 +2,14 @@ import { Body, Controller, Get, Param, Post } from '@nestjs/common';
 import { DataGeneratorService } from './data-generator/data-generator.service';
 import { MarkdownGeneratorService } from './markdown-generator/markdown-generator.service';
 import { MarkdownBuilder } from './markdown-generator/markdown-builder';
+import { WebsiteGeneratorService } from './website-generator/website-generator.service';
 
 @Controller()
 export class AppController {
   constructor(
     private readonly dataGenerator: DataGeneratorService,
-    private readonly markdownGenerator: MarkdownGeneratorService
+    private readonly markdownGenerator: MarkdownGeneratorService,
+    private readonly websiteGenerator: WebsiteGeneratorService
   ) {}
 
   @Post()
@@ -22,7 +24,7 @@ export class AppController {
       description,
       title
     });
-
+    await this.websiteGenerator.initialize();
     return { success: true };
   }
 

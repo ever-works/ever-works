@@ -5,9 +5,8 @@ import { Octokit } from 'octokit';
 export class GithubService {
     private readonly logger = new Logger('GithubService');
 
-    async createEmptyRepository(repo: string, description: string, owner: { apiKey: string }) {
-        const octokit = new Octokit({ auth: owner.apiKey });
-
+    async createEmptyRepository(repo: string, description: string, user: { apiKey: string }) {
+        const octokit = new Octokit({ auth: user.apiKey });
         try {
             const res = await octokit.rest.repos.createForAuthenticatedUser({
                 name: repo,
@@ -19,15 +18,15 @@ export class GithubService {
         } catch (err) {
             const msg = 'Failed to create empty repository on GitHub';
             this.logger.error(msg, err.message);
-            throw new Error(msg);
+            throw err;
         }
     }
 
-    async createFile(repo: string, filepath: string, content: string, message: string, owner: { name: string, apiKey: string }) {
-        const octokit = new Octokit({ auth: owner.apiKey });
+    async createFile(repo: string, filepath: string, content: string, message: string, user: { name: string, apiKey: string }) {
+        const octokit = new Octokit({ auth: user.apiKey });
         try {
             const { data } = await octokit.rest.repos.createOrUpdateFileContents({
-                owner: owner.name,
+                owner: user.name,
                 repo,
                 content: Buffer.from(content).toString('base64'),
                 message,
@@ -38,15 +37,15 @@ export class GithubService {
         } catch (err) {
             const msg = 'Failed to commit file to GitHub repository';
             this.logger.error(msg, err.message);
-            throw new Error(msg);
+            throw err;
         }
     }
 
-    async updateFile(repo: string, filepath: string, content: string, message: string, owner: { name: string, apiKey: string }) {
-        const octokit = new Octokit({ auth: owner.apiKey });
+    async updateFile(repo: string, filepath: string, content: string, message: string, user: { name: string, apiKey: string }) {
+        const octokit = new Octokit({ auth: user.apiKey });
         try {
             const { data: meta } = await octokit.rest.repos.getContent({
-                owner: owner.name,
+                owner: user.name,
                 repo,
                 path: filepath,
             });
@@ -56,7 +55,7 @@ export class GithubService {
             }
 
             const { data } = await octokit.rest.repos.createOrUpdateFileContents({
-                owner: owner.name,
+                owner: user.name,
                 repo,
                 content: Buffer.from(content).toString('base64'),
                 message,
@@ -68,16 +67,16 @@ export class GithubService {
         } catch (err) {
             const msg = 'Failed to commit file to GitHub repository';
             this.logger.error(msg, err.message);
-            throw new Error(msg);
+            throw err;
         }
     }
 
     /* should apply to both dirs and files */
-    async getContent(repo: string, path: string, owner: { name: string, apiKey: string }) {
-        const octokit = new Octokit({ auth: owner.apiKey });
+    async getContent(repo: string, path: string, user: { name: string, apiKey: string }) {
+        const octokit = new Octokit({ auth: user.apiKey });
         try {
             const { data } = await octokit.rest.repos.getContent({
-                owner: owner.name,
+                owner: user.name,
                 repo,
                 path,
             });
@@ -86,7 +85,7 @@ export class GithubService {
         } catch (err) {
             const msg = 'Failed to read content from GitHub repository';
             this.logger.error(msg, err.message);
-            throw new Error(msg);
+            throw err;
         }
     }
 
@@ -97,9 +96,22 @@ export class GithubService {
             const { data: user } = await octokit.rest.users.getAuthenticated();
             return user;
         } catch (err) {
-            const msg = 'Failed to fetch authenticated GitHub user';
-            this.logger.error(msg, err.message);
-            throw new Error(msg);
+            this.logger.error('Failed to fetch authenticated GitHub user', err.message);
+            throw err;
+        }
+    }
+
+    async forkRepo(owner: string, repo: string, user: { apiKey: string }) {
+        const octokit = new Octokit({ auth: user.apiKey });
+        try {
+            const { data } = await octokit.rest.repos.createFork({
+                owner,
+                repo,
+            });
+            return data;
+        } catch (err) {
+            this.logger.error('Failed to fork GitHub repository', err.message);
+            throw err;
         }
     }
 }
