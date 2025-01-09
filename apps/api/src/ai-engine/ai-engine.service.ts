@@ -86,6 +86,12 @@ const data: Array<ItemData> = [
         description: 'Time-tracking you can host anywhere. Full export support in multiple formats and easily extensible.',
         source_url: 'https://timestrap.bythewood.me',
         category: 'Open Source',
+    },
+    {
+        name: 'GNOME Time Tracker',
+        description: 'Hamster is time tracking for individuals. It helps you to keep track of how much time you have spent during the day on activities you choose to track.',
+        source_url: 'https://github.com/projecthamster/hamster',
+        category: 'Open Source',
     }
 ]
 

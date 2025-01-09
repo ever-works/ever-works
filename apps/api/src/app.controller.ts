@@ -27,7 +27,7 @@ export class AppController {
   }
 
   @Post('sync')
-  async syncData(
+  async updateData(
     @Body('name') name: string,
     @Body('title') title: string,
     @Body('description') description: string,

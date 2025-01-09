@@ -33,17 +33,21 @@ export class DataGeneratorService {
             const entrypath = join('entries', `${filename}.yml`);
             const updatedAt = new Date();
             const content = yamlStringify({ ...item, updated_at: updatedAt.toISOString() });
-            await this.githubService.createFile(repo, entrypath, content, `create ${filename}.yml`, {
-                ...owner,
-                name: login,
-            });
-
-            const mdpath = join('details', `${filename}.md`);
+            const detailpath = join('details', `${filename}.md`);
             const markdown = await this.aiEngine.getItemDetails();
-            await this.githubService.createFile(repo, mdpath, markdown, `create ${filename}.md`, {
-                ...owner,
-                name: login,
-            });
+
+            const requests = [
+                this.githubService.createFile(repo, entrypath, content, `create ${filename}.yml`, {
+                    ...owner,
+                    name: login,
+                }),
+                this.githubService.createFile(repo, detailpath, markdown, `create ${filename}.md`, {
+                    ...owner,
+                    name: login,
+                }),
+            ];
+
+            await Promise.all(requests);
         }
     }
 
@@ -69,11 +73,15 @@ export class DataGeneratorService {
             }
             const updatedAt = new Date();
             const content = yamlStringify({ ...item, updated_at: updatedAt.toISOString() });
-            await this.githubService.createFile(repo, entrypath, content, `create ${filename}.yml`, owner);
-
-            const mdpath = join('details', `${filename}.md`);
+            const detailpath = join('details', `${filename}.md`);
             const markdown = await this.aiEngine.getItemDetails();
-            await this.githubService.createFile(repo, mdpath, markdown, `create ${filename}.md`, owner);
+
+            const requests = [
+                this.githubService.createFile(repo, entrypath, content, `create ${filename}.yml`, owner),
+                this.githubService.createFile(repo, detailpath, markdown, `create ${filename}.md`, owner),
+            ];
+
+            await Promise.all(requests);
         }
     }
 }
