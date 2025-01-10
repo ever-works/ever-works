@@ -17,7 +17,7 @@ export class MarkdownGeneratorService {
         const owner = { apiKey, name: user.login };
         await this.githubService.createEmptyRepository(name, description, owner);
         const dataRepoName = this.dataGeneratorService.getDataRepositoryName(name);
-        const entries = await this.githubService.getContent(dataRepoName, 'entries', owner);
+        const entries = await this.githubService.getContent(dataRepoName, 'data', owner);
         if (!Array.isArray(entries)) {
             throw new Error('Invalid repository structure');
         }
@@ -51,7 +51,7 @@ export class MarkdownGeneratorService {
         const user = await this.githubService.getUser(apiKey);
         const owner = { apiKey, name: user.login };
         const dataRepoName = this.dataGeneratorService.getDataRepositoryName(name);
-        const entries = await this.githubService.getContent(dataRepoName, 'entries', owner);
+        const entries = await this.githubService.getContent(dataRepoName, 'data', owner);
         if (!Array.isArray(entries)) {
             throw new Error('Invalid repository structure');
         }

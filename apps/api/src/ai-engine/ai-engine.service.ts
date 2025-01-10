@@ -21,6 +21,12 @@ const data: Array<ItemData> = [
         category: 'Open Source',
     },
     {
+        name: 'Ever Gauzy',
+        description: 'Open Business Management Platform (ERP/CRM/HRM) with Time-Tracking functionality (including optional screenshots, Desktop Timer App, etc.)',
+        source_url: 'https://gauzy.co',
+        category: 'Open Source',
+    },
+    {
         name: 'ActivityWatch',
         description: 'Free and open-source automated time tracker. Cross-platform, extensible, privacy-focused.',
         source_url: 'https://activitywatch.net',
