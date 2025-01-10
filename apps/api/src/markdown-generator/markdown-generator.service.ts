@@ -1,7 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import { DataGeneratorService } from '../data-generator/data-generator.service';
 import { parse as yamlParse } from 'yaml';
+import * as fs from 'fs/promises';
+import * as path from 'path';
+import { DataGeneratorService } from '../data-generator/data-generator.service';
 import { GithubService } from '../github/github.service';
+import { GitService } from '../github/git.service';
 import type { ItemData } from '../ai-engine/ai-engine.service';
 
 @Injectable()
@@ -9,32 +12,30 @@ export class MarkdownGeneratorService {
     constructor(
         private readonly dataGeneratorService: DataGeneratorService,
         private readonly githubService: GithubService,
+        private readonly gitService: GitService,
     ) {}
 
-    async initialize({name, title, description}: { name: string, title: string, description: string }) {
-        const apiKey = process.env.GITHUB_APIKEY;
-        const user = await this.githubService.getUser(apiKey);
-        const owner = { apiKey, name: user.login };
-        await this.githubService.createEmptyRepository(name, description, owner);
-        const dataRepoName = this.dataGeneratorService.getDataRepositoryName(name);
-        const entries = await this.githubService.getContent(dataRepoName, 'data', owner);
-        if (!Array.isArray(entries)) {
-            throw new Error('Invalid repository structure');
-        }
+    async update({name, title, description}: { name: string, title: string, description: string }) {
+        const token = process.env.GITHUB_APIKEY;
+        const owner = await this.githubService.getUser(token);
+
+        const dataRepo = await this.githubService.clone(
+            owner.login, 
+            this.dataGeneratorService.getDataRepositoryName(name),
+            token,
+        );
+
+        const markdownRepo = await this.githubService.clone(owner.login, name, token);
 
         const data = {};
+        const entriesPath = path.join(dataRepo, 'data'); 
+        const entries = await fs.readdir(entriesPath);
+
         for (const entry of entries) {
-            const file = await this.githubService.getContent(dataRepoName, entry.path, owner);
-            if (Array.isArray(file))
-                throw new Error('Unexpected directory');
+            const file = await fs.readFile(path.join(entriesPath, entry), { encoding: 'utf-8' });
+            const obj: ItemData = yamlParse(file);
 
-            if (file.type !== 'file')
-                throw new Error('Expected file');
-
-            const content = Buffer.from(file.content, 'base64').toString('utf-8');
-            const obj: ItemData = yamlParse(content);
             const group = data[obj.category];
-
             if (group) {
                 group.push(obj);
             } else {
@@ -43,41 +44,21 @@ export class MarkdownGeneratorService {
         }
 
         const markdown = this.createMarkdown({ name, title, description }, data);
-        await this.githubService.createFile(name, 'README.md', markdown, 'create README.md', owner);
+        await fs.writeFile(path.join(markdownRepo, 'README.md'), markdown, { encoding: 'utf-8' });
+        await this.gitService.add(markdownRepo, '.');
+        await this.gitService.commit(markdownRepo, 'sync README.md');
+        await this.gitService.push(markdownRepo, token);
+
+        await Promise.all([
+            fs.rm(dataRepo, { recursive: true, force: true }),
+            fs.rm(markdownRepo, { recursive: true, force: true }),
+        ]);
     }
 
-    async update({name, title, description}: { name: string, title: string, description: string }) {
+    async initialize(data: { name: string, title: string, description: string }) {
         const apiKey = process.env.GITHUB_APIKEY;
-        const user = await this.githubService.getUser(apiKey);
-        const owner = { apiKey, name: user.login };
-        const dataRepoName = this.dataGeneratorService.getDataRepositoryName(name);
-        const entries = await this.githubService.getContent(dataRepoName, 'data', owner);
-        if (!Array.isArray(entries)) {
-            throw new Error('Invalid repository structure');
-        }
-
-        const data = {};
-        for (const entry of entries) {
-            const file = await this.githubService.getContent(dataRepoName, entry.path, owner);
-            if (Array.isArray(file))
-                throw new Error('Unexpected directory');
-
-            if (file.type !== 'file')
-                throw new Error('Expected file');
-
-            const content = Buffer.from(file.content, 'base64').toString('utf-8');
-            const obj: ItemData = yamlParse(content);
-            const group = data[obj.category];
-
-            if (group) {
-                group.push(obj);
-            } else {
-                data[obj.category] = [obj];
-            }
-        }
-
-        const markdown = this.createMarkdown({ name, title, description }, data);
-        await this.githubService.updateFile(name, 'README.md', markdown, 'update README.md', owner);
+        await this.githubService.createEmptyRepository(data.name, data.description, { apiKey });
+        await this.update(data);
     }
 
     private createMarkdown(

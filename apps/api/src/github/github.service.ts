@@ -1,9 +1,15 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Octokit } from 'octokit';
+import { GitService } from './git.service';
+import { randomUUID } from 'crypto'
+import { tmpdir } from 'os';
+import { join } from 'path';
 
 @Injectable()
 export class GithubService {
     private readonly logger = new Logger('GithubService');
+
+    constructor(private readonly gitService: GitService) { }
 
     async createEmptyRepository(repo: string, description: string, user: { apiKey: string }) {
         const octokit = new Octokit({ auth: user.apiKey });
@@ -20,6 +26,15 @@ export class GithubService {
             this.logger.error(msg, err.message);
             throw err;
         }
+    }
+
+    /* Clones GitHub repository to temporary location and returns absolute path */
+    async clone(owner: string, repo: string, token: string) {
+        const url = `https://github.com/${owner}/${repo}`;
+        const dir = join(tmpdir(), randomUUID());
+        await this.gitService.clone(url, dir, token);
+
+        return dir;
     }
 
     async createFile(repo: string, filepath: string, content: string, message: string, user: { name: string, apiKey: string }) {

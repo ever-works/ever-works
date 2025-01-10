@@ -1,13 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { stringify as yamlStringify } from 'yaml';
 import slugify from 'slugify';
+import { join } from 'path';
+import * as fs from 'fs/promises';
 import { AiEngineService } from '../ai-engine/ai-engine.service';
 import { GithubService } from '../github/github.service';
 import { GitService } from '../github/git.service';
-import { join } from 'path';
-import { tmpdir } from 'os';
-import * as fs from 'fs/promises';
-import { randomUUID } from 'crypto';
 
 @Injectable()
 export class DataGeneratorService {
@@ -19,14 +17,6 @@ export class DataGeneratorService {
 
     getDataRepositoryName(name: string): string {
         return `${name}-data`;
-    }
-
-    private async prepareRepository(owner: string, repo: string, token: string) {
-        const url = `https://github.com/${owner}/${repo}`;
-        const dir = join(tmpdir(), randomUUID());
-        await this.gitService.clone(url, dir, token);
-
-        return dir;
     }
 
     private async ensureDirectoriesExist(dir: string) {
@@ -46,11 +36,11 @@ export class DataGeneratorService {
         const ymlPath = join(dirs.ymlDir, `${filename}.yml`);
         const mdPath = join(dirs.mdDir, `${filename}.md`);
 
-        const content = yamlStringify({ ...item, updated_at: updatedAt.toISOString() });
+        const yaml = yamlStringify({ ...item, updated_at: updatedAt.toISOString() });
         const markdown = await this.aiEngine.getItemDetails();
 
         await Promise.all([
-            fs.writeFile(ymlPath, content, { encoding: 'utf-8' }),
+            fs.writeFile(ymlPath, yaml, { encoding: 'utf-8' }),
             fs.writeFile(mdPath, markdown, { encoding: 'utf-8' }),
         ]);
 
@@ -58,17 +48,13 @@ export class DataGeneratorService {
         await this.gitService.commit(dir, `add ${item.name}`);
     }
 
-    private async cleanupDirectory(dir: string) {
-        await fs.rm(dir, { recursive: true, force: true });
-    }
-
     async initialize(name: string) {
         const items = await this.aiEngine.getItemsList();
-        const token = process.env.GITHUB_APIKEY;
+        const token = process.env.GITHUB_APIKEY; // TODO: take access token from authenticated user object
         const owner = await this.githubService.getUser(token);
         const repo = this.getDataRepositoryName(name);
         await this.githubService.createEmptyRepository(repo, `machine-readable data for ${name}`, { apiKey: token });
-        const dest = await this.prepareRepository(owner.login, repo, token);
+        const dest = await this.githubService.clone(owner.login, repo, token);
         const dirs = await this.ensureDirectoriesExist(dest);
         const updatedAt = new Date();
 
@@ -77,15 +63,15 @@ export class DataGeneratorService {
         }
 
         await this.gitService.push(dest, token);
-        await this.cleanupDirectory(dest);
+        await fs.rm(dest, { recursive: true, force: true });
     }
 
     async update(name: string) {
         const items = await this.aiEngine.getItemsList();
-        const token = process.env.GITHUB_APIKEY;
+        const token = process.env.GITHUB_APIKEY; // TODO: take access token from authenticated user object
         const owner = await this.githubService.getUser(token);
         const repo = this.getDataRepositoryName(name);
-        const dest = await this.prepareRepository(owner.login, repo, token);
+        const dest = await this.githubService.clone(owner.login, repo, token);
         const dirs = await this.ensureDirectoriesExist(dest);
         const updatedAt = new Date();
 
@@ -100,6 +86,6 @@ export class DataGeneratorService {
         }
 
         await this.gitService.push(dest, token);
-        await this.cleanupDirectory(dest);
+        await fs.rm(dest, { recursive: true, force: true });
     }
 }
