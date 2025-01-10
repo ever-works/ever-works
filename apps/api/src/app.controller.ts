@@ -12,6 +12,17 @@ export class AppController {
     private readonly websiteGenerator: WebsiteGeneratorService
   ) {}
 
+
+  @Post('clone')
+  async clone(@Body('name') name: string,) {
+    try {
+      this.dataGenerator.initializeV2(name);
+    } catch (err) {
+      console.log(err);
+      throw err;
+    }
+  }
+
   @Post()
   async generateData(
     @Body('name') name: string,
@@ -24,7 +35,7 @@ export class AppController {
       description,
       title
     });
-    await this.websiteGenerator.initialize();
+    //await this.websiteGenerator.initialize();
     return { success: true };
   }
 

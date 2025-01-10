@@ -9,7 +9,7 @@ export interface ItemData {
 
 const data: Array<ItemData> = [
     {
-        name: 'Ever Clock',
+        name: 'Ever Cloc',
         description: 'Open Time Tracking Platform (WIP)',
         source_url: 'https://github.com/ever-co/ever-cloc',
         category: 'Open Source'
@@ -91,6 +91,12 @@ const data: Array<ItemData> = [
         name: 'GNOME Time Tracker',
         description: 'Hamster is time tracking for individuals. It helps you to keep track of how much time you have spent during the day on activities you choose to track.',
         source_url: 'https://github.com/projecthamster/hamster',
+        category: 'Open Source',
+    },
+    {
+        name: 'TimeTrex',
+        description: 'Taking the Work Out of Workforce Management. Automate your time & attendance, payroll and HR management in one easy-to-use platform',
+        source_url: 'https://www.timetrex.com',
         category: 'Open Source',
     }
 ]
