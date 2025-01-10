@@ -9,7 +9,7 @@ export class AppController {
   constructor(
     private readonly dataGenerator: DataGeneratorService,
     private readonly markdownGenerator: MarkdownGeneratorService,
-    private readonly websiteGenerator: WebsiteGeneratorService
+    private readonly websiteGenerator: WebsiteGeneratorService,
   ) {}
 
   @Post()
@@ -41,27 +41,5 @@ export class AppController {
       title
     });
     return { success: true };
-  }
-
-  @Get('/markdown')
-  buildMd() {
-    const builder = new MarkdownBuilder();
-    builder
-      .h1("Hello world")
-      .paragraph("First usage of MarkdownBuilder")
-
-    const people = [ { name: 'Michał' }, { name: 'Paweł' } ];
-    builder.startList();
-    
-    for (const person of people) {
-      builder.startListItem();
-      builder.link(person.name, 'https://example.com');
-      builder.paragraph('Some text')
-      builder.end();
-    }
-
-    builder.end();
-    builder.paragraph("End paragraph");
-    return builder.build();
   }
 }

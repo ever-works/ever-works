@@ -1,10 +1,10 @@
 import { Module } from '@nestjs/common';
 import { DataGeneratorService } from './data-generator.service';
 import { AiEngineModule } from '../ai-engine/ai-engine.module';
-import { GithubModule } from '../github/github.module';
+import { GitModule } from '../git/git.module';
 
 @Module({
-    imports: [AiEngineModule, GithubModule],
+    imports: [AiEngineModule, GitModule],
     providers: [DataGeneratorService],
     exports: [DataGeneratorService],
 })

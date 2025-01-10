@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { GithubService } from '../github/github.service';
+import { GithubService } from '../git/github.service';
 
 @Injectable()
 export class WebsiteGeneratorService {
@@ -8,6 +8,6 @@ export class WebsiteGeneratorService {
       ) {}
     
       initialize() {
-        return this.githubService.forkRepo('ever-co', 'ever-works-website', { apiKey: process.env.GITHUB_APIKEY });
+        return this.githubService.fork('ever-co', 'ever-works-website', process.env.GITHUB_APIKEY);
       }
 }

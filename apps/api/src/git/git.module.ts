@@ -3,7 +3,7 @@ import { GithubService } from './github.service';
 import { GitService } from './git.service';
 
 @Module({
-  providers: [GithubService, GitService],
-  exports: [GithubService, GitService],
+  providers: [GitService, GithubService],
+  exports: [GitService, GithubService],
 })
-export class GithubModule {}
+export class GitModule {}

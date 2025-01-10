@@ -121,15 +121,15 @@ export class AiEngineService {
 
     async getItemDetails() {
         return (
-            `Lorem ipsum odor amet, consectetuer adipiscing elit. 
-            Augue lobortis tempus ridiculus phasellus platea quis.
-            Suspendisse enim auctor luctus phasellus pretium natoque laoreet.
-            Nulla sodales hac accumsan, enim potenti porttitor.
-            Finibus congue natoque placerat lacinia nibh ornare? Morbi netus curabitur, viverra maximus pulvinar efficitur natoque.
-            Sollicitudin nec porta libero, maecenas nam cursus.
-            Nascetur ridiculus praesent ac sagittis vel conubia gravida.
-            Ac tellus molestie vel ad praesent imperdiet.
-            Taciti vel sagittis nisl fermentum ornare senectus.`
+            'Lorem ipsum odor amet, consectetuer adipiscing elit.\n' +
+            'Augue lobortis tempus ridiculus phasellus platea quis.\n' +
+            'Suspendisse enim auctor luctus phasellus pretium natoque laoreet.\n' +
+            'Nulla sodales hac accumsan, enim potenti porttitor.\n' +
+            'Finibus congue natoque placerat lacinia nibh ornare? Morbi netus curabitur, viverra maximus pulvinar efficitur natoque.\n' +
+            'Sollicitudin nec porta libero, maecenas nam cursus.\n' +
+            'Nascetur ridiculus praesent ac sagittis vel conubia gravida.\n' +
+            'Ac tellus molestie vel ad praesent imperdiet.\n' +
+            'Taciti vel sagittis nisl fermentum ornare senectus.\n'
         );
     }
 }

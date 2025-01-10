@@ -3,8 +3,8 @@ import { parse as yamlParse } from 'yaml';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { DataGeneratorService } from '../data-generator/data-generator.service';
-import { GithubService } from '../github/github.service';
-import { GitService } from '../github/git.service';
+import { GithubService } from '../git/github.service';
+import { GitService } from '../git/git.service';
 import type { ItemData } from '../ai-engine/ai-engine.service';
 
 @Injectable()
@@ -14,6 +14,12 @@ export class MarkdownGeneratorService {
         private readonly githubService: GithubService,
         private readonly gitService: GitService,
     ) {}
+
+    async initialize(data: { name: string, title: string, description: string }) {
+        const token = process.env.GITHUB_APIKEY;
+        await this.githubService.createEmptyRepository(data.name, data.description, token);
+        await this.update(data);
+    }
 
     async update({name, title, description}: { name: string, title: string, description: string }) {
         const token = process.env.GITHUB_APIKEY;
@@ -47,7 +53,7 @@ export class MarkdownGeneratorService {
         await fs.writeFile(path.join(markdownRepo, 'README.md'), markdown, { encoding: 'utf-8' });
         await this.gitService.add(markdownRepo, '.');
         await this.gitService.commit(markdownRepo, 'sync README.md');
-        await this.gitService.push(markdownRepo, token);
+        await this.githubService.push(markdownRepo, token);
 
         await Promise.all([
             fs.rm(dataRepo, { recursive: true, force: true }),
@@ -55,12 +61,7 @@ export class MarkdownGeneratorService {
         ]);
     }
 
-    async initialize(data: { name: string, title: string, description: string }) {
-        const apiKey = process.env.GITHUB_APIKEY;
-        await this.githubService.createEmptyRepository(data.name, data.description, { apiKey });
-        await this.update(data);
-    }
-
+    // TODO: replace with some library
     private createMarkdown(
         {name, title, description}: { name: string, title: string, description: string }, 
         data: { [c: string]: Array<ItemData> }

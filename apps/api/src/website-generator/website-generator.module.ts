@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
 import { WebsiteGeneratorService } from './website-generator.service';
-import { GithubModule } from '../github/github.module';
+import { GitModule } from '../git/git.module';
 
 @Module({
-  imports: [GithubModule],
+  imports: [GitModule],
   providers: [WebsiteGeneratorService],
   exports: [WebsiteGeneratorService],
 })

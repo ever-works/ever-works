@@ -3,11 +3,20 @@ import * as http from 'isomorphic-git/http/node';
 import * as fs from 'fs';
 import { Injectable } from "@nestjs/common";
 
+/*
+    'oauth2'         - GitLab
+    'x-access-token' - GitHub
+*/
+export interface IGitAuth {
+    username: 'x-access-token' | 'oauth2';
+    password: string;
+}
+
 @Injectable()
 export class GitService {
-    clone(url: string, dir: string, token: string) {
+    clone(url: string, dir: string, auth: IGitAuth) {
         return git.clone({
-            onAuth: () => ({ username: 'x-access-token', password: token }),
+            onAuth: () => auth,
             fs,
             http,
             dir,
@@ -34,9 +43,9 @@ export class GitService {
         });
     }
 
-    push(dir: string, token: string) {
+    push(dir: string, auth: IGitAuth) {
         return git.push({
-            onAuth: () => ({ username: 'x-access-token', password: token }), 
+            onAuth: () => auth, 
             fs,
             http,
             dir,
