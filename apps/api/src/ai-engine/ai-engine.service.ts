@@ -98,6 +98,12 @@ const data: Array<ItemData> = [
         description: 'Taking the Work Out of Workforce Management. Automate your time & attendance, payroll and HR management in one easy-to-use platform',
         source_url: 'https://www.timetrex.com',
         category: 'Open Source',
+    },
+    {
+        name: 'ULogMe',
+        description: 'Automatically collect and visualize usage statistics in Ubuntu/OSX environments.',
+        source_url: 'https://github.com/karpathy/ulogme',
+        category: 'Open Source',
     }
 ]
 

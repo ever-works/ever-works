@@ -21,17 +21,15 @@ export class DataGeneratorService {
         return `${name}-data`;
     }
 
-    async initializeV2(name: string) {
+    async initialize(name: string) {
         const items = await this.aiEngine.getItemsList();
-        const owner = {
-            name: process.env.GITHUB_LOGIN,
-            apiKey: process.env.GITHUB_APIKEY
-        };
+        const token = process.env.GITHUB_APIKEY;  // we will get it from currently authenticated user object
+        const owner = await this.githubService.getUser(token);
         const repo = this.getDataRepositoryName(name);
-        await this.githubService.createEmptyRepository(repo, `machine-readable data for ${name}`, owner);
-        const url = `https://github.com/${owner.name}/${repo}`;
+        await this.githubService.createEmptyRepository(repo, `machine-readable data for ${name}`, { apiKey: token });
+        const url = `https://github.com/${owner.login}/${repo}`;
         const dir = join(tmpdir(), randomUUID());
-        await this.gitService.clone(url, dir, owner.apiKey);
+        await this.gitService.clone(url, dir, token);
         const updatedAt = new Date();
 
         const ymlDir = join(dir, 'data');
@@ -53,83 +51,58 @@ export class DataGeneratorService {
             const writes = [
                 fs.writeFile(ymlPath, content, { encoding: 'utf-8' }),
                 fs.writeFile(mdPath, markdown, { encoding: 'utf-8' }),
-            ]
+            ];
  
             await Promise.all(writes);
             await this.gitService.add(dir, '.');
             await this.gitService.commit(dir, `add ${item.name}`);
         }
         
-        await this.gitService.push(dir, owner.apiKey);
+        await this.gitService.push(dir, token);
         await fs.rm(dir, { recursive: true, force: true });
-    }
-
-    async initialize(name: string) {
-        const items = await this.aiEngine.getItemsList();
-        const owner = {
-            apiKey: process.env.GITHUB_APIKEY
-        };
-
-        const repo = this.getDataRepositoryName(name);
-        const { owner: { login } } = await this.githubService.createEmptyRepository(repo, `machine-readable data for ${name}`, owner);
-
-        for (const item of items) {
-            const filename = slugify(item.name, {
-                lower: true,
-                trim: true,
-            });
-            const entrypath = join('entries', `${filename}.yml`);
-            const updatedAt = new Date();
-            const content = yamlStringify({ ...item, updated_at: updatedAt.toISOString() });
-            const detailpath = join('details', `${filename}.md`);
-            const markdown = await this.aiEngine.getItemDetails();
-
-            const requests = [
-                this.githubService.createFile(repo, entrypath, content, `create ${filename}.yml`, {
-                    ...owner,
-                    name: login,
-                }),
-                this.githubService.createFile(repo, detailpath, markdown, `create ${filename}.md`, {
-                    ...owner,
-                    name: login,
-                }),
-            ];
-
-            await Promise.all(requests);
-        }
     }
 
     async update(name: string) {
         const items = await this.aiEngine.getItemsList();
+        const token = process.env.GITHUB_APIKEY;  // we will get it from currently authenticated user object
+        const owner = await this.githubService.getUser(token);
         const repo = this.getDataRepositoryName(name);
-        const apiKey = process.env.GITHUB_APIKEY;
-        const user = await this.githubService.getUser(apiKey);
-        const owner = { apiKey, name: user.login };
+        const url = `https://github.com/${owner.login}/${repo}`;
+        const dir = join(tmpdir(), randomUUID());
+        await this.gitService.clone(url, dir, token);
+        const updatedAt = new Date();
 
-        const files = await this.githubService.getContent(repo, 'entries', owner);
-        if (!Array.isArray(files))
-            throw new Error('Unexpected repository structure');
+        const ymlDir = join(dir, 'data');
+        const mdDir = join(dir, 'details');
+
+        const files = await fs.readdir(ymlDir); // TODO: maybe replace with stream based fs.opendir and control number of returned files?
 
         for (const item of items) {
             const filename = slugify(item.name, {
                 lower: true,
                 trim: true,
             });
-            const entrypath = join('entries', `${filename}.yml`);
-            if (files.some(({ path }) => entrypath === path)) {
+
+            if (files.includes(filename + '.yml')) {
                 continue;
             }
-            const updatedAt = new Date();
+
+            const ymlPath = join(ymlDir, `${filename}.yml`);
+            const mdPath = join(mdDir, `${filename}.md`);
             const content = yamlStringify({ ...item, updated_at: updatedAt.toISOString() });
-            const detailpath = join('details', `${filename}.md`);
             const markdown = await this.aiEngine.getItemDetails();
 
-            const requests = [
-                this.githubService.createFile(repo, entrypath, content, `create ${filename}.yml`, owner),
-                this.githubService.createFile(repo, detailpath, markdown, `create ${filename}.md`, owner),
+            const writes = [
+                fs.writeFile(ymlPath, content, { encoding: 'utf-8' }),
+                fs.writeFile(mdPath, markdown, { encoding: 'utf-8' }),
             ];
-
-            await Promise.all(requests);
+ 
+            await Promise.all(writes);
+            await this.gitService.add(dir, '.');
+            await this.gitService.commit(dir, `add ${item.name}`);
         }
+        
+        await this.gitService.push(dir, token);
+        await fs.rm(dir, { recursive: true, force: true });
     }
 }
