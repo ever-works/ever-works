@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { stringify as yamlStringify } from 'yaml';
 import slugify from 'slugify';
 import { join } from 'path';
@@ -9,6 +9,8 @@ import { GitService } from '../git/git.service';
 
 @Injectable()
 export class DataGeneratorService {
+    private readonly logger = new Logger('DataGeneratorService');
+
     constructor(
         private readonly githubService: GithubService,
         private readonly gitService: GitService,
@@ -26,16 +28,23 @@ export class DataGeneratorService {
         const repo = this.getDataRepositoryName(name);
         await this.githubService.createEmptyRepository(repo, `machine-readable data for ${name}`, token);
         const dest = await this.githubService.clone(owner.login, repo, token);
-        const dirs = await this.ensureDirectoriesExist(dest);
-        const updatedAt = new Date();
 
-        for (const item of items) {
-            const filename = slugify(item.name, { lower: true, trim: true });
-            await this.processItem(item, filename, dirs, updatedAt, dest);
+        try {
+            const dirs = await this.ensureDirectoriesExist(dest);
+            const updatedAt = new Date();
+
+            for (const item of items) {
+                const filename = slugify(item.name, { lower: true, trim: true });
+                await this.processItem(item, filename, dirs, updatedAt, dest);
+            }
+
+            await this.githubService.push(dest, token);
+        } catch (err) {
+            this.logger.error('Failed to initialize data repository', err);
+            throw err;
+        } finally {
+            await fs.rm(dest, { recursive: true, force: true });
         }
-
-        await this.githubService.push(dest, token);
-        await fs.rm(dest, { recursive: true, force: true });
     }
 
     async update(name: string) {
@@ -44,21 +53,28 @@ export class DataGeneratorService {
         const owner = await this.githubService.getUser(token);
         const repo = this.getDataRepositoryName(name);
         const dest = await this.githubService.clone(owner.login, repo, token);
-        const dirs = await this.ensureDirectoriesExist(dest);
-        const updatedAt = new Date();
 
-        const existingFiles = new Set(await fs.readdir(dirs.ymlDir));
+        try {
+            const dirs = await this.ensureDirectoriesExist(dest);
+            const updatedAt = new Date();
 
-        for (const item of items) {
-            const filename = slugify(item.name, { lower: true, trim: true });
-            if (existingFiles.has(`${filename}.yml`)) {
-                continue;
+            const existingFiles = new Set(await fs.readdir(dirs.ymlDir));
+
+            for (const item of items) {
+                const filename = slugify(item.name, { lower: true, trim: true });
+                if (existingFiles.has(`${filename}.yml`)) {
+                    continue;
+                }
+                await this.processItem(item, filename, dirs, updatedAt, dest);
             }
-            await this.processItem(item, filename, dirs, updatedAt, dest);
-        }
 
-        await this.githubService.push(dest, token);
-        await fs.rm(dest, { recursive: true, force: true });
+            await this.githubService.push(dest, token);
+        } catch (err) {
+            this.logger.error('Failed to update data repository', err);
+            throw err;
+        } finally {
+            await fs.rm(dest, { recursive: true, force: true });
+        }
     }
 
     private async ensureDirectoriesExist(dir: string) {
