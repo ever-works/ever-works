@@ -110,6 +110,12 @@ const data: Array<ItemData> = [
         description: 'Automatically collect and visualize usage statistics in Ubuntu/OSX environments.',
         source_url: 'https://github.com/karpathy/ulogme',
         category: 'Open Source',
+    },
+    {
+        name: 'Traggo',
+        description: 'Self-hosted tag-based time tracking.',
+        source_url: 'https://traggo.net',
+        category: 'Open Source',
     }
 ]
 

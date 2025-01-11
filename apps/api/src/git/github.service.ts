@@ -36,8 +36,8 @@ export class GithubService extends GitProvider {
         }
     }
 
-    async getUser(apiKey: string) {
-        const octokit = new Octokit({ auth: apiKey });
+    async getUser(token: string) {
+        const octokit = new Octokit({ auth: token });
 
         try {
             const { data: user } = await octokit.rest.users.getAuthenticated();
