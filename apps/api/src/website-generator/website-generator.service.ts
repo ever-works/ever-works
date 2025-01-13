@@ -7,7 +7,12 @@ export class WebsiteGeneratorService {
         private readonly githubService: GithubService,
       ) {}
     
-      initialize() {
-        return this.githubService.fork('ever-co', 'ever-works-website', process.env.GITHUB_APIKEY);
+      initialize(name: string) {
+        return this.githubService.duplicate(
+          'ever-co',
+          'ever-works-website-template',
+          `${name}-website`,
+          process.env.GITHUB_APIKEY
+        );
       }
 }

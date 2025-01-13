@@ -48,17 +48,28 @@ export class GithubService extends GitProvider {
         }
     }
 
-    async fork(owner: string, repo: string, token: string) {
+    async fork(owner: string, repo: string, name: string, token: string) {
         const octokit = new Octokit({ auth: token });
         try {
             const { data } = await octokit.rest.repos.createFork({
                 owner,
                 repo,
+                name,
             });
             return data;
         } catch (err) {
             this.logger.error('Failed to fork GitHub repository', err.message);
             throw err;
         }
+    }
+
+    async duplicate(owner: string, repo: string, name: string, token: string) {
+        const duplicated = await this.createEmptyRepository(name, '', token);
+        const origin = duplicated.clone_url;
+
+        const originalDir = await this.clone(owner, repo, token);
+        await this.gitService.remoteRemove(originalDir, 'origin');
+        await this.gitService.remoteAdd(originalDir, 'origin', origin);
+        await this.push(originalDir, token);
     }
 }

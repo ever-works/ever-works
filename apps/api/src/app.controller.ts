@@ -24,7 +24,7 @@ export class AppController {
       description,
       title
     });
-    //await this.websiteGenerator.initialize();
+    await this.websiteGenerator.initialize(name);
     return { success: true };
   }
 

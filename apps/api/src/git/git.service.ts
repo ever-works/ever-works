@@ -43,6 +43,14 @@ export class GitService {
         });
     }
 
+    remoteRemove(dir: string, remote: string) {
+        return git.deleteRemote({ fs, dir, remote });
+    }
+
+    remoteAdd(dir: string, remote: string, url: string) {
+        return git.addRemote({ fs, dir, remote, url });
+    }
+
     push(dir: string, auth: IGitAuth) {
         return git.push({
             onAuth: () => auth, 
