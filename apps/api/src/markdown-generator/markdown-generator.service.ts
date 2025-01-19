@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { parse as yamlParse } from 'yaml';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { DataGeneratorService } from '../data-generator/data-generator.service';
+import { DataGeneratorService, Directory } from '../data-generator/data-generator.service';
 import { GithubService } from '../git/github.service';
 import { GitService } from '../git/git.service';
 import type { ItemData } from '../ai-engine/ai-engine.service';
@@ -15,22 +15,22 @@ export class MarkdownGeneratorService {
         private readonly gitService: GitService,
     ) { }
 
-    async initialize(data: { name: string, title: string, description: string }) {
+    async initialize(directory: Directory) {
         const token = process.env.GITHUB_APIKEY;
-        await this.githubService.createEmptyRepository(data.name, data.description, token);
-        await this.update(data);
+        await this.githubService.createEmptyRepository(directory.slug, directory.description, token);
+        await this.update(directory);
     }
 
-    async update({ name, title, description }: { name: string, title: string, description: string }) {
+    async update(directory: Directory) {
         const token = process.env.GITHUB_APIKEY;
         const owner = await this.githubService.getUser(token);
 
         const dataRepo = await this.githubService.clone(
             owner.login,
-            this.dataGeneratorService.getDataRepositoryName(name),
+            this.dataGeneratorService.getDataRepositoryName(directory.slug),
             token,
         );
-        const markdownRepo = await this.githubService.clone(owner.login, name, token);
+        const markdownRepo = await this.githubService.clone(owner.login, directory.slug, token);
 
         try {
             const data = {};
@@ -49,7 +49,7 @@ export class MarkdownGeneratorService {
                 }
             }
 
-            const markdown = this.createMarkdown({ name, title, description }, data);
+            const markdown = this.createMarkdown(directory, data);
             await fs.writeFile(path.join(markdownRepo, 'README.md'), markdown, { encoding: 'utf-8' });
             await this.gitService.add(markdownRepo, '.');
             await this.gitService.commit(markdownRepo, 'sync README.md');
@@ -66,11 +66,11 @@ export class MarkdownGeneratorService {
 
     // TODO: replace with some library
     private createMarkdown(
-        { name, title, description }: { name: string, title: string, description: string },
+        directory: Directory,
         data: { [c: string]: Array<ItemData> }
     ) {
-        let md = `# ${title}\n\n`;
-        md += `${description}\n\n`;
+        let md = `# ${directory.name}\n\n`;
+        md += `${directory.description}\n\n`;
 
         for (const category in data) {
             md += `## ${category}\n\n`;
