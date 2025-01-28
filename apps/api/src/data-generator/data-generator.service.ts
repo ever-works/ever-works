@@ -3,9 +3,15 @@ import { stringify as yamlStringify } from 'yaml';
 import slugify from 'slugify';
 import { join } from 'path';
 import * as fs from 'fs/promises';
-import { AiEngineService } from '../ai-engine/ai-engine.service';
+import { AiEngineService, ItemData } from '../ai-engine/ai-engine.service';
 import { GithubService } from '../git/github.service';
 import { GitService } from '../git/git.service';
+
+export interface Directory {
+    name: string;
+    slug: string;
+    description: string;
+}
 
 @Injectable()
 export class DataGeneratorService {
@@ -21,12 +27,12 @@ export class DataGeneratorService {
         return `${name}-data`;
     }
 
-    async initialize(name: string) {
-        const items = await this.aiEngine.getItemsList();
+    async initialize(directory: Directory, prompt: string) {
+        const items = await this.aiEngine.getItemsList({ prompt });
         const token = process.env.GITHUB_APIKEY; // TODO: take access token from authenticated user object
         const owner = await this.githubService.getUser(token);
-        const repo = this.getDataRepositoryName(name);
-        await this.githubService.createEmptyRepository(repo, `machine-readable data for ${name}`, token);
+        const repo = this.getDataRepositoryName(directory.slug);
+        await this.githubService.createEmptyRepository(repo, `machine-readable data for ${directory.slug}`, token);
         const dest = await this.githubService.clone(owner.login, repo, token);
 
         try {
@@ -47,11 +53,17 @@ export class DataGeneratorService {
         }
     }
 
-    async update(name: string) {
-        const items = await this.aiEngine.getItemsList();
+    async update(directory: Directory, prompt: string) {
+        const items = await this.aiEngine.getItemsList({ prompt });
+        items.push({ 
+            name: 'Test Sample',
+            category: 'None',
+            description: 'Best service ever',
+            source_url: 'https://example.com', 
+        });
         const token = process.env.GITHUB_APIKEY; // TODO: take access token from authenticated user object
         const owner = await this.githubService.getUser(token);
-        const repo = this.getDataRepositoryName(name);
+        const repo = this.getDataRepositoryName(directory.slug);
         const dest = await this.githubService.clone(owner.login, repo, token);
 
         try {
@@ -89,12 +101,12 @@ export class DataGeneratorService {
         return { ymlDir, mdDir };
     }
 
-    private async processItem(item: any, filename: string, dirs: { ymlDir: string; mdDir: string }, updatedAt: Date, dir: string) {
+    private async processItem(item: ItemData, filename: string, dirs: { ymlDir: string; mdDir: string }, updatedAt: Date, dir: string) {
         const ymlPath = join(dirs.ymlDir, `${filename}.yml`);
         const mdPath = join(dirs.mdDir, `${filename}.md`);
 
         const yaml = yamlStringify({ ...item, updated_at: updatedAt.toISOString() });
-        const markdown = await this.aiEngine.getItemDetails();
+        const markdown = await this.aiEngine.getItemDetails(item);
 
         await Promise.all([
             fs.writeFile(ymlPath, yaml, { encoding: 'utf-8' }),

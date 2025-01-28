@@ -1,8 +1,8 @@
 import { Body, Controller, Get, Param, Post } from '@nestjs/common';
-import { DataGeneratorService } from './data-generator/data-generator.service';
+import { DataGeneratorService, Directory } from './data-generator/data-generator.service';
 import { MarkdownGeneratorService } from './markdown-generator/markdown-generator.service';
-import { MarkdownBuilder } from './markdown-generator/markdown-builder';
 import { WebsiteGeneratorService } from './website-generator/website-generator.service';
+import slugify from 'slugify';
 
 @Controller()
 export class AppController {
@@ -15,31 +15,37 @@ export class AppController {
   @Post()
   async generateData(
     @Body('name') name: string,
-    @Body('title') title: string,
     @Body('description') description: string,
+    @Body('prompt') prompt: string,
+    @Body('slug') slug?: string,
   ) {
-    await this.dataGenerator.initialize(name);
-    await this.markdownGenerator.initialize({
+    const directory: Directory = {
       name,
       description,
-      title
-    });
-    //await this.websiteGenerator.initialize();
-    return { success: true };
+      slug: slug || slugify(name, { lower: true, trim: true }),
+    };
+
+    await this.dataGenerator.initialize(directory, prompt);
+    await this.markdownGenerator.initialize(directory);
+    await this.websiteGenerator.initialize(directory.slug);
+    return directory;
   }
 
   @Post('sync')
   async updateData(
     @Body('name') name: string,
-    @Body('title') title: string,
+    @Body('slug') slug: string,
     @Body('description') description: string,
+    @Body('prompt') prompt: string,
   ) {
-    await this.dataGenerator.update(name);
-    await this.markdownGenerator.update({
+    const directory: Directory = {
       name,
       description,
-      title
-    });
+      slug,
+    };
+
+    await this.dataGenerator.update(directory, prompt);
+    await this.markdownGenerator.update(directory);
     return { success: true };
   }
 }
