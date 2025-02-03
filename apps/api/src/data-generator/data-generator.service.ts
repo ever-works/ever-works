@@ -6,12 +6,8 @@ import * as fs from 'fs/promises';
 import { AiEngineService, ItemData } from '../ai-engine/ai-engine.service';
 import { GithubService } from '../git/github.service';
 import { GitService } from '../git/git.service';
-
-export interface Directory {
-    name: string;
-    slug: string;
-    description: string;
-}
+import { Directory } from '../entities/directory.entity';
+import { User } from '../entities/user.entity';
 
 @Injectable()
 export class DataGeneratorService {
@@ -21,20 +17,21 @@ export class DataGeneratorService {
         private readonly githubService: GithubService,
         private readonly gitService: GitService,
         private readonly aiEngine: AiEngineService
-    ) { }
+    ) {}
 
-    getDataRepositoryName(name: string): string {
-        return `${name}-data`;
-    }
-
-    async initialize(directory: Directory, prompt: string) {
+    async initialize(directory: Directory, user: User, prompt: string) {
         const items = await this.aiEngine.getItemsList({ prompt });
-        const token = process.env.GITHUB_APIKEY; // TODO: take access token from authenticated user object
-        const owner = await this.githubService.getUser(token);
-        const repo = this.getDataRepositoryName(directory.slug);
-        await this.githubService.createEmptyRepository(repo, `machine-readable data for ${directory.slug}`, token);
-        const dest = await this.githubService.clone(owner.login, repo, token);
+        const token = user.getGitToken();
+        const repo = directory.getDataRepo();
+        const description = `machine-readable data for ${directory.slug}`;
 
+        if (directory.organization) {
+            await this.githubService.createEmptyRepoAsOrg(directory.owner, repo, description, token);
+        } else {
+            await this.githubService.createEmptyRepo(repo, description, token);
+        }
+        
+        const dest = await this.githubService.clone(directory.owner, repo, token);
         try {
             const dirs = await this.ensureDirectoriesExist(dest);
             const updatedAt = new Date();
@@ -53,7 +50,7 @@ export class DataGeneratorService {
         }
     }
 
-    async update(directory: Directory, prompt: string) {
+    async update(directory: Directory, user: User, prompt: string) {
         const items = await this.aiEngine.getItemsList({ prompt });
         items.push({ 
             name: 'Test Sample',
@@ -61,10 +58,9 @@ export class DataGeneratorService {
             description: 'Best service ever',
             source_url: 'https://example.com', 
         });
-        const token = process.env.GITHUB_APIKEY; // TODO: take access token from authenticated user object
-        const owner = await this.githubService.getUser(token);
-        const repo = this.getDataRepositoryName(directory.slug);
-        const dest = await this.githubService.clone(owner.login, repo, token);
+        const token = user.getGitToken();
+        const repo = directory.getDataRepo();
+        const dest = await this.githubService.clone(directory.owner, repo, token);
 
         try {
             const dirs = await this.ensureDirectoriesExist(dest);

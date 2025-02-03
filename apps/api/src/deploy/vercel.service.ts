@@ -1,7 +1,8 @@
 import { Injectable } from "@nestjs/common";
 import { DeployProvider, IDeployService, VercelInput } from "./deploy.types";
 import { GithubService } from "../git/github.service";
-import { Directory } from "../data-generator/data-generator.service";
+import { Directory } from "../entities/directory.entity";
+import { User } from "../entities/user.entity";
 
 @Injectable()
 export class VercelService implements IDeployService {
@@ -9,8 +10,8 @@ export class VercelService implements IDeployService {
 
     constructor(private readonly githubService: GithubService) {}
 
-    async deploy({ data, owner, repo }: VercelInput, directory: Directory) {
-        const token = process.env.GITHUB_APIKEY;
+    async deploy({ data, owner, repo }: VercelInput, directory: Directory, user: User) {
+        const token = user.getGitToken();
         await this.githubService.setActionVariable({
             key: 'DEPLOY_PROVIDER',
             value: this.PROVIDER_ID,

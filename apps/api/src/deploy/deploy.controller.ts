@@ -1,6 +1,7 @@
 import { Body, Controller, Param, Post } from '@nestjs/common';
 import { VercelService } from './vercel.service';
-import { Directory } from '../data-generator/data-generator.service';
+import { Directory } from '../entities/directory.entity';
+import { User } from 'src/entities/user.entity';
 
 @Controller('deploy')
 export class DeployController {
@@ -9,20 +10,17 @@ export class DeployController {
     @Post('/:dirname/vercel')
     async toVercel(@Body('token') token: string, @Param('dirname') slug) {
         // some db query result:
-        const directory: Directory = {
-            name: '...',
-            description: '...',
-            slug,
-        }
+        const directory = await Directory.findMock(slug);
+        const user = await User.sessionMock();
 
         await this.vercelService.deploy({
             // TODO: replace with real username from user object:
-            owner: process.env.GITHUB_USERNAME,
-            repo: directory.slug + '-website',
+            owner: directory.owner,
+            repo: directory.getWebsiteRepo(),
             provider: 'vercel',
             data: {
                 token,
             }
-        }, directory);
+        }, directory, user);
     }
 }

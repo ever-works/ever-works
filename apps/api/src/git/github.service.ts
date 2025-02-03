@@ -20,21 +20,27 @@ export class GithubService extends GitProvider {
         return `https://github.com/${owner}/${repo}`;
     }
 
-    async createEmptyRepository(repo: string, description: string, token: string) {
+    async createEmptyRepoAsOrg(org: string, repo: string, description: string, token: string) {
         const octokit = new Octokit({ auth: token });
-        try {
-            const res = await octokit.rest.repos.createForAuthenticatedUser({
-                name: repo,
-                description,
-                private: true,
-            });
+        const res = await octokit.rest.repos.createInOrg({
+            org,
+            name: repo,
+            description,
+            private: true,  // for now
+        });
 
-            return res.data;
-        } catch (err) {
-            const msg = 'Failed to create empty repository on GitHub';
-            this.logger.error(msg, err.message);
-            throw err;
-        }
+        return res.data;
+    }
+
+    async createEmptyRepo(repo: string, description: string, token: string) {
+        const octokit = new Octokit({ auth: token });
+        const res = await octokit.rest.repos.createForAuthenticatedUser({
+            name: repo,
+            description,
+            private: true,  // for now
+        });
+
+        return res.data;
     }
 
     async getUser(token: string) {
@@ -65,7 +71,17 @@ export class GithubService extends GitProvider {
     }
 
     async duplicate(owner: string, repo: string, name: string, token: string) {
-        const duplicated = await this.createEmptyRepository(name, '', token);
+        const duplicated = await this.createEmptyRepo(name, '', token);
+        const origin = duplicated.clone_url;
+
+        const originalDir = await this.clone(owner, repo, token);
+        await this.gitService.remoteRemove(originalDir, 'origin');
+        await this.gitService.remoteAdd(originalDir, 'origin', origin);
+        await this.push(originalDir, token);
+    }
+    
+    async duplicateAsOrg(owner: string, repo: string, org: string, name: string, token: string) {
+        const duplicated = await this.createEmptyRepoAsOrg(org, name, '', token);
         const origin = duplicated.clone_url;
 
         const originalDir = await this.clone(owner, repo, token);
@@ -143,7 +159,7 @@ export class GithubService extends GitProvider {
     }
 
     async dispatchAction(
-        data: {  workflow: string, inputs?: { [x: string]: unknown }, branch: string, owner: string, repo: string, },
+        data: { workflow: string, inputs?: { [x: string]: unknown }, branch: string, owner: string, repo: string, },
         token: string
     ) {
         const octokit = new Octokit({
