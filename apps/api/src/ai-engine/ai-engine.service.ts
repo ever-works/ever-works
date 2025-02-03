@@ -132,7 +132,7 @@ export class AiEngineService {
             'Augue lobortis tempus ridiculus phasellus platea quis.\n' +
             'Suspendisse enim auctor luctus phasellus pretium natoque laoreet.\n' +
             'Nulla sodales hac accumsan, enim potenti porttitor.\n' +
-            '# Another section\n' +
+            '## Another section\n' +
             'Finibus congue natoque placerat lacinia nibh ornare? Morbi netus curabitur, viverra maximus pulvinar efficitur natoque.\n' +
             'Sollicitudin nec porta libero, maecenas nam cursus.\n' +
             'Nascetur ridiculus praesent ac sagittis vel conubia gravida.\n' +

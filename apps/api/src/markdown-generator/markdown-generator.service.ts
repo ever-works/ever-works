@@ -2,35 +2,44 @@ import { Injectable } from '@nestjs/common';
 import { parse as yamlParse } from 'yaml';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { DataGeneratorService, Directory } from '../data-generator/data-generator.service';
 import { GithubService } from '../git/github.service';
 import { GitService } from '../git/git.service';
 import type { ItemData } from '../ai-engine/ai-engine.service';
+import { Directory } from '../entities/directory.entity';
+import { User } from '../entities/user.entity';
 
 @Injectable()
 export class MarkdownGeneratorService {
     constructor(
-        private readonly dataGeneratorService: DataGeneratorService,
         private readonly githubService: GithubService,
         private readonly gitService: GitService,
-    ) { }
+    ) {}
 
-    async initialize(directory: Directory) {
-        const token = process.env.GITHUB_APIKEY;
-        await this.githubService.createEmptyRepository(directory.slug, directory.description, token);
-        await this.update(directory);
+    async initialize(directory: Directory, user: User) {
+        const token = user.getGitToken();
+
+        if (directory.organization) {
+            await this.githubService.createEmptyRepoAsOrg(
+                directory.owner,
+                directory.slug,
+                directory.description,
+                token
+            );
+        } else {
+            await this.githubService.createEmptyRepo(directory.slug, directory.description, token);
+        }
+        await this.update(directory, user);
     }
 
-    async update(directory: Directory) {
-        const token = process.env.GITHUB_APIKEY;
-        const owner = await this.githubService.getUser(token);
+    async update(directory: Directory, user: User) {
+        const token = user.getGitToken();
 
         const dataRepo = await this.githubService.clone(
-            owner.login,
-            this.dataGeneratorService.getDataRepositoryName(directory.slug),
+            directory.owner,
+            directory.getDataRepo(),
             token,
         );
-        const markdownRepo = await this.githubService.clone(owner.login, directory.slug, token);
+        const markdownRepo = await this.githubService.clone(directory.owner, directory.slug, token);
 
         try {
             const data = {};
