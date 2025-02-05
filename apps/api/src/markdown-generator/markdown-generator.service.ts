@@ -47,6 +47,9 @@ export class MarkdownGeneratorService {
             const entries = await fs.readdir(entriesPath);
 
             for (const entry of entries) {
+                if (path.extname(entry) !== '.yml')
+                    continue;
+
                 const file = await fs.readFile(path.join(entriesPath, entry), { encoding: 'utf-8' });
                 const obj: ItemData = yamlParse(file);
 

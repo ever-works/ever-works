@@ -19,7 +19,7 @@ export class AppController {
   async createDirectory(
     @Body('slug') slug: string,
     @Body('name') name: string,
-    @Body('slug') description: string,
+    @Body('description') description: string,
     @Body('owner') owner?: string,
   ) {
     const user = await User.sessionMock();
@@ -30,7 +30,7 @@ export class AppController {
       dir.owner = owner;
     } else {
       const owner = await this.githubService.getUser(user.getGitToken());
-      dir.owner = owner.name;
+      dir.owner = owner.login;
     }
     dir.name = name;
     dir.description = description;
