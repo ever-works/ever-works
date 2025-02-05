@@ -66,7 +66,7 @@ export class DataGeneratorService {
             const dirs = await this.ensureDirectoriesExist(dest);
             const updatedAt = new Date();
 
-            const existingFiles = new Set(await fs.readdir(dirs.ymlDir));
+            const existingFiles = new Set(await fs.readdir(dirs.dataDir));
 
             for (const item of items) {
                 const filename = slugify(item.name, { lower: true, trim: true });
@@ -85,21 +85,17 @@ export class DataGeneratorService {
         }
     }
 
+    /* it's still in seperated function in case we will need more dirs */
     private async ensureDirectoriesExist(dir: string) {
-        const ymlDir = join(dir, 'data');
-        const mdDir = join(dir, 'details');
+        const dataDir = join(dir, 'data');
+        await fs.mkdir(dataDir, { recursive: true });
 
-        await Promise.all([
-            fs.mkdir(ymlDir, { recursive: true }),
-            fs.mkdir(mdDir, { recursive: true }),
-        ]);
-
-        return { ymlDir, mdDir };
+        return { dataDir };
     }
 
-    private async processItem(item: ItemData, filename: string, dirs: { ymlDir: string; mdDir: string }, updatedAt: Date, dir: string) {
-        const ymlPath = join(dirs.ymlDir, `${filename}.yml`);
-        const mdPath = join(dirs.mdDir, `${filename}.md`);
+    private async processItem(item: ItemData, filename: string, dirs: { dataDir: string }, updatedAt: Date, dir: string) {
+        const ymlPath = join(dirs.dataDir, `${filename}.yml`);
+        const mdPath = join(dirs.dataDir, `${filename}.md`);
 
         const yaml = yamlStringify({ ...item, updated_at: updatedAt.toISOString() });
         const markdown = await this.aiEngine.getItemDetails(item);
