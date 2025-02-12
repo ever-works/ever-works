@@ -65,7 +65,6 @@ export class DataGeneratorService {
         try {
             const dirs = await this.ensureDirectoriesExist(dest);
             const updatedAt = new Date();
-
             const existingFiles = new Set(await fs.readdir(dirs.dataDir));
 
             for (const item of items) {

@@ -5,6 +5,7 @@ export interface ItemData {
     description: string;
     source_url: string;
     category: string;
+    slug?: string;
 }
 
 const data: Array<ItemData> = [
