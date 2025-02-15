@@ -121,6 +121,12 @@ export class MarkdownGeneratorService {
             builder.addSubHeader(categoryName);
 
             const items = groups[category];
+            items.sort((a, b) => {
+                if (a.featured && !b.featured) return -1;
+                if (!a.featured && b.featured) return 1;
+                return 0;
+            });
+
             for (const item of items) {
                 builder.addItem(item);
             }

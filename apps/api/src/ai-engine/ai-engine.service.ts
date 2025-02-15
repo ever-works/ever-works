@@ -3,6 +3,7 @@ import { Injectable } from '@nestjs/common';
 export interface ItemData {
     name: string;
     description: string;
+    featured?: boolean;
     source_url: string;
     category: string;
     slug?: string;
