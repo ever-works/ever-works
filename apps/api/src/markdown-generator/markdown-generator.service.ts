@@ -7,18 +7,16 @@ import { GitService } from '../git/git.service';
 import type { ItemData } from '../ai-engine/ai-engine.service';
 import { Directory } from '../entities/directory.entity';
 import { User } from '../entities/user.entity';
-import slugify from 'slugify';
-
-interface IDataConfig {
-    content_table?: boolean;
-}
+import { DataRepository } from '../data-generator/data-repository';
+import { ReadmeBuilder } from './readme-builder';
+import { MarkdownRepository } from './markdown-repository';
 
 @Injectable()
 export class MarkdownGeneratorService {
     constructor(
         private readonly githubService: GithubService,
         private readonly gitService: GitService,
-    ) { }
+    ) {}
 
     async initialize(directory: Directory, user: User) {
         const token = user.getGitToken();
@@ -36,114 +34,99 @@ export class MarkdownGeneratorService {
         await this.update(directory, user);
     }
 
-    async readConfig(dataDir: string): Promise<IDataConfig> {
-        const configPath = path.join(dataDir, 'config.yml');
-        try {
-            const config = await fs.readFile(configPath, { encoding: 'utf-8' });
-            return yamlParse(config);
-        } catch (err) {
-            if (err && err.code && err.code === 'ENOENT') {
-                return {};
-            }
-            throw err;
-        }
-    }
-
     async update(directory: Directory, user: User) {
         const token = user.getGitToken();
 
-        const dataRepo = await this.githubService.clone(
+        const markdownPath = await this.githubService.clone(directory.owner, directory.slug, token);
+        const dataPath = await this.githubService.clone(
             directory.owner,
             directory.getDataRepo(),
             token,
         );
-        const config = await this.readConfig(dataRepo);
 
-        const markdownRepo = await this.githubService.clone(directory.owner, directory.slug, token);
-        const markdowns = new Set<string>();
-        const markdownsPath = path.join(markdownRepo, 'details');
-
-        const entriesPath = path.join(dataRepo, 'data');
-        const entries = await fs.readdir(entriesPath);
+        const markdownRepo = new MarkdownRepository(markdownPath);
+        const dataRepo = new DataRepository(dataPath);
+        const markdowns = new Set<string>(); // will be needed to check if markdown exists before referencing them in README
 
         try {
-            const data = {};
-            for (const entry of entries) {
-                const entryPath = path.join(entriesPath, entry);
-                const extname = path.extname(entry);
+            const items = await fs.readdir(dataRepo.dataDir);
+           await markdownRepo.ensureDirectoriesExist();
+
+            const groups = {};
+            for (const item of items) {
+                const itemPath = path.join(dataRepo.dataDir, item);
+                const extname = path.extname(item);
 
                 if (extname === '.md') {
-                    await fs.mkdir(markdownsPath, { recursive: true });
-                    const copy = await fs.readFile(entryPath, { encoding: 'utf-8' });
-                    await fs.writeFile(path.join(markdownsPath, entry), copy, { encoding: 'utf-8' });
-                    markdowns.add(entry);
+                    await markdownRepo.copyMarkdownFromData(dataRepo.dataDir, item);
+                    markdowns.add(item);
                     continue;
                 }
 
                 if (extname !== '.yml')
                     continue;
 
-                const file = await fs.readFile(entryPath, { encoding: 'utf-8' });
+                const file = await fs.readFile(itemPath, { encoding: 'utf-8' });
                 const obj: ItemData = yamlParse(file);
-                obj.slug = path.basename(entry, path.extname(entry));
+                obj.slug = path.basename(item, extname);
 
-                const group = data[obj.category];
+                const group = groups[obj.category];
                 if (group) {
                     group.push(obj);
                 } else {
-                    data[obj.category] = [obj];
+                    groups[obj.category] = [obj];
                 }
             }
 
-            const markdown = this.createMarkdown(directory, markdowns, data, config);
-            await fs.writeFile(path.join(markdownRepo, 'README.md'), markdown, { encoding: 'utf-8' });
-            await this.gitService.add(markdownRepo, '.');
-            await this.gitService.commit(markdownRepo, 'sync README.md');
-            await this.githubService.push(markdownRepo, token);
+            const readme: string = await this.generateReadme(dataRepo, directory, markdowns, groups);
+            await markdownRepo.writeReadme(readme);
+            await this.gitService.add(markdownPath, '.');
+            await this.gitService.commit(markdownPath, 'sync README.md');
+            await this.githubService.push(markdownPath, token);
         } catch (err) {
             throw err;
         } finally {
             await Promise.all([
-                fs.rm(dataRepo, { recursive: true, force: true }),
-                fs.rm(markdownRepo, { recursive: true, force: true }),
+                dataRepo.cleanup(),
+                markdownRepo.cleanup(),
             ]);
         }
     }
 
-    // TODO: replace with some library
-    private createMarkdown(
+    private async generateReadme(
+        data: DataRepository,
         directory: Directory,
         markdowns: Set<string>,
-        data: { [c: string]: Array<ItemData> },
-        config: IDataConfig,
+        groups: Record<string, Array<ItemData>>
     ) {
-        let md = `# ${directory.name}\n\n`;
-        md += `${directory.description}\n\n`;
+        const config = await data.getConfig();
+        const builder = new ReadmeBuilder(markdowns);
+
+        builder.addHeader(directory.name);
+        builder.addParagraph(directory.description);
 
         if (config.content_table) {
-            md += '## Table of contents\n\n';
-            for (const category in data) {
-                md += `- [${category}](#${slugify(category)})\n`;
-            }
-            md += '\n';
+            const table = Object.keys(groups).map((slug) => {
+                const name = data.getCategoryName(slug);
+                return { name, slug };
+            });
+
+            builder.addSubHeader('Table of contents');
+            builder.addTableOfContents(table);
         }
 
-        for (const category in data) {
-            md += `## ${category}\n\n`;
-            const items = data[category];
+        for (const category in groups) {
+            const categoryName = data.getCategoryName(category);
+            builder.addSubHeader(categoryName);
 
+            const items = groups[category];
             for (const item of items) {
-                md += `- [${item.name}](${item.source_url}) - ${item.description}`;
-
-                if (item.slug && markdowns.has(`${item.slug}.md`))
-                    md += ` ([Read more](/details/${item.slug}.md))`;
-
-                md += '\n';
+                builder.addItem(item);
             }
 
-            md += '\n';
+            builder.addNewLine();
         }
 
-        return md;
+        return builder.build();
     }
 }
