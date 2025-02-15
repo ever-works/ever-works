@@ -49,32 +49,32 @@ export class MarkdownGeneratorService {
         const markdowns = new Set<string>(); // will be needed to check if markdown exists before referencing them in README
 
         try {
-            const items = await fs.readdir(dataRepo.dataDir);
+            const files = await fs.readdir(dataRepo.dataDir);
            await markdownRepo.ensureDirectoriesExist();
 
-            const groups = {};
-            for (const item of items) {
-                const itemPath = path.join(dataRepo.dataDir, item);
-                const extname = path.extname(item);
+            const groups = {};  // we want to group items by category, like: { 'open-source': [items], 'commercial': [items] }
+            for (const filename of files) {
+                const filePath = path.join(dataRepo.dataDir, filename);
+                const extname = path.extname(filename);
 
                 if (extname === '.md') {
-                    await markdownRepo.copyMarkdownFromData(dataRepo.dataDir, item);
-                    markdowns.add(item);
+                    await markdownRepo.copyMarkdownFromData(dataRepo.dataDir, filename);
+                    markdowns.add(filename);
                     continue;
                 }
 
                 if (extname !== '.yml')
                     continue;
 
-                const file = await fs.readFile(itemPath, { encoding: 'utf-8' });
-                const obj: ItemData = yamlParse(file);
-                obj.slug = path.basename(item, extname);
+                const rawYaml = await fs.readFile(filePath, 'utf-8');
+                const item: ItemData = yamlParse(rawYaml);
+                item.slug = path.basename(filename, extname);
 
-                const group = groups[obj.category];
+                const group = groups[item.category];
                 if (group) {
-                    group.push(obj);
+                    group.push(item);
                 } else {
-                    groups[obj.category] = [obj];
+                    groups[item.category] = [item];
                 }
             }
 
@@ -99,6 +99,7 @@ export class MarkdownGeneratorService {
         markdowns: Set<string>,
         groups: Record<string, Array<ItemData>>
     ) {
+        await data.getCategories(); // ensure categories are loaded
         const config = await data.getConfig();
         const builder = new ReadmeBuilder(markdowns);
 

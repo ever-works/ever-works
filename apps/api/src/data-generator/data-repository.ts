@@ -5,7 +5,15 @@ import { Category, ItemData } from "../ai-engine/ai-engine.service";
 
 export interface IDataConfig {
     content_table?: boolean;
+    item_name?: string;
+    items_name?: string;
 }
+
+export const DEFAULT_DATA_CONFIG: IDataConfig = {
+    content_table: false,
+    item_name: 'Item',
+    items_name: 'Items',
+};
 
 export class DataRepository {
     private config?: IDataConfig;
@@ -70,6 +78,12 @@ export class DataRepository {
 
     getCategoryName(id: string): string {
         return this.categories?.find(c => c.id === id)?.name || id;
+    }
+
+    async writeConfig(config: IDataConfig) {
+        this.config = config;
+        const str = yaml.stringify(config);
+        await fs.writeFile(this.configPath, str, 'utf-8');
     }
 
     async writeCategories(categories: Category[]) {

@@ -6,7 +6,7 @@ import { GithubService } from '../git/github.service';
 import { GitService } from '../git/git.service';
 import { Directory } from '../entities/directory.entity';
 import { User } from '../entities/user.entity';
-import { DataRepository } from './data-repository';
+import { DataRepository, DEFAULT_DATA_CONFIG } from './data-repository';
 
 @Injectable()
 export class DataGeneratorService {
@@ -36,6 +36,7 @@ export class DataGeneratorService {
         
         try {
             await data.ensureDirectoriesExist();
+            await data.writeConfig(DEFAULT_DATA_CONFIG);
             await data.writeCategories(categories);
 
             for (const item of items) {
