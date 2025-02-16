@@ -1,13 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { stringify as yamlStringify } from 'yaml';
 import slugify from 'slugify';
-import { join } from 'path';
 import * as fs from 'fs/promises';
 import { AiEngineService, ItemData } from '../ai-engine/ai-engine.service';
 import { GithubService } from '../git/github.service';
 import { GitService } from '../git/git.service';
 import { Directory } from '../entities/directory.entity';
 import { User } from '../entities/user.entity';
+import { DataRepository, DEFAULT_DATA_CONFIG } from './data-repository';
 
 @Injectable()
 export class DataGeneratorService {
@@ -20,7 +19,8 @@ export class DataGeneratorService {
     ) {}
 
     async initialize(directory: Directory, user: User, prompt: string) {
-        const items = await this.aiEngine.getItemsList({ prompt });
+        const categories = await this.aiEngine.getCategoryList();
+        const items = await this.aiEngine.getItemsList({ prompt, categories });
         const token = user.getGitToken();
         const repo = directory.getDataRepo();
         const description = `machine-readable data for ${directory.slug}`;
@@ -32,13 +32,16 @@ export class DataGeneratorService {
         }
         
         const dest = await this.githubService.clone(directory.owner, repo, token);
+        const data = new DataRepository(dest);
+        
         try {
-            const dirs = await this.ensureDirectoriesExist(dest);
-            const updatedAt = new Date();
+            await data.ensureDirectoriesExist();
+            await data.writeConfig(DEFAULT_DATA_CONFIG);
+            await data.writeCategories(categories);
 
             for (const item of items) {
-                const filename = slugify(item.name, { lower: true, trim: true });
-                await this.processItem(item, filename, dirs, updatedAt, dest);
+                item.slug = slugify(item.name, { lower: true, trim: true });
+                await this.processItem(data, item);
             }
 
             await this.githubService.push(dest, token);
@@ -46,34 +49,36 @@ export class DataGeneratorService {
             this.logger.error('Failed to initialize data repository', err);
             throw err;
         } finally {
-            await fs.rm(dest, { recursive: true, force: true });
+            await data.cleanup();
         }
     }
 
     async update(directory: Directory, user: User, prompt: string) {
-        const items = await this.aiEngine.getItemsList({ prompt });
-        items.push({ 
-            name: 'Test Sample',
-            category: 'None',
-            description: 'Best service ever',
-            source_url: 'https://example.com', 
-        });
         const token = user.getGitToken();
         const repo = directory.getDataRepo();
         const dest = await this.githubService.clone(directory.owner, repo, token);
+        const data = new DataRepository(dest);
+
+        const categories = await data.getCategories();
+        const items = await this.aiEngine.getItemsList({ prompt, categories });
+        // mock adding some new item:
+        items.push({ 
+            name: 'Test Sample',
+            category: 'testing',
+            description: 'Best service ever',
+            source_url: 'https://example.com', 
+        });
 
         try {
-            const dirs = await this.ensureDirectoriesExist(dest);
-            const updatedAt = new Date();
-
-            const existingFiles = new Set(await fs.readdir(dirs.dataDir));
+            await data.ensureDirectoriesExist();
+            const existingFiles = new Set(await fs.readdir(data.dataDir));
 
             for (const item of items) {
-                const filename = slugify(item.name, { lower: true, trim: true });
-                if (existingFiles.has(`${filename}.yml`)) {
+                item.slug = slugify(item.name, { lower: true, trim: true });
+                if (existingFiles.has(`${item.slug}.yml`)) {
                     continue;
                 }
-                await this.processItem(item, filename, dirs, updatedAt, dest);
+                await this.processItem(data, item);
             }
 
             await this.githubService.push(dest, token);
@@ -81,31 +86,19 @@ export class DataGeneratorService {
             this.logger.error('Failed to update data repository', err);
             throw err;
         } finally {
-            await fs.rm(dest, { recursive: true, force: true });
+            await data.cleanup();
         }
     }
 
-    /* it's still in seperated function in case we will need more dirs */
-    private async ensureDirectoriesExist(dir: string) {
-        const dataDir = join(dir, 'data');
-        await fs.mkdir(dataDir, { recursive: true });
-
-        return { dataDir };
-    }
-
-    private async processItem(item: ItemData, filename: string, dirs: { dataDir: string }, updatedAt: Date, dir: string) {
-        const ymlPath = join(dirs.dataDir, `${filename}.yml`);
-        const mdPath = join(dirs.dataDir, `${filename}.md`);
-
-        const yaml = yamlStringify({ ...item, updated_at: updatedAt.toISOString() });
+    private async processItem(data: DataRepository, item: ItemData) {
         const markdown = await this.aiEngine.getItemDetails(item);
 
         await Promise.all([
-            fs.writeFile(ymlPath, yaml, { encoding: 'utf-8' }),
-            fs.writeFile(mdPath, markdown, { encoding: 'utf-8' }),
+            data.writeItem(item),
+            data.writeMarkdown(item, markdown),
         ]);
 
-        await this.gitService.add(dir, '.');
-        await this.gitService.commit(dir, `add ${item.name}`);
+        await this.gitService.add(data.dir, '.');
+        await this.gitService.commit(data.dir, `add ${item.name}`);
     }
 }
