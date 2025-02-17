@@ -4,7 +4,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { GithubService } from '../git/github.service';
 import { GitService } from '../git/git.service';
-import type { ItemData } from '../ai-engine/ai-engine.service';
+import type { Category, ItemData } from '../ai-engine/ai-engine.service';
 import { Directory } from '../entities/directory.entity';
 import { User } from '../entities/user.entity';
 import { DataRepository } from '../data-generator/data-repository';
@@ -47,6 +47,7 @@ export class MarkdownGeneratorService {
         const markdownRepo = new MarkdownRepository(markdownPath);
         const dataRepo = new DataRepository(dataPath);
         const markdowns = new Set<string>(); // will be needed to check if markdown exists before referencing them in README
+        const categories = await this.loadCategories(dataRepo);
 
         try {
             const files = await fs.readdir(dataRepo.dataDir);
@@ -70,15 +71,23 @@ export class MarkdownGeneratorService {
                 const item: ItemData = yamlParse(rawYaml);
                 item.slug = path.basename(filename, extname);
 
-                const group = groups[item.category];
-                if (group) {
-                    group.push(item);
+                if (Array.isArray(item.category)) {
+                    item.category = item.category.map(category => this.populateCategory(category, categories));
                 } else {
-                    groups[item.category] = [item];
+                    item.category = [this.populateCategory(item.category, categories)];
+                }
+
+                for (const category of item.category) {
+                    const group = groups[category.id];
+                    if (group) {
+                        group.push(item);
+                    } else {
+                        groups[category.id] = [item];
+                    }
                 }
             }
 
-            const readme: string = await this.generateReadme(dataRepo, directory, markdowns, groups);
+            const readme: string = await this.generateReadme(dataRepo, directory, markdowns, groups, categories);
             await markdownRepo.writeReadme(readme);
             await this.gitService.add(markdownPath, '.');
             await this.gitService.commit(markdownPath, 'sync README.md');
@@ -97,9 +106,9 @@ export class MarkdownGeneratorService {
         data: DataRepository,
         directory: Directory,
         markdowns: Set<string>,
-        groups: Record<string, Array<ItemData>>
+        groups: Record<string, Array<ItemData>>,
+        categories: Map<string, Category>
     ) {
-        await data.getCategories(); // ensure categories are loaded
         const config = await data.getConfig();
         const builder = new ReadmeBuilder(markdowns);
 
@@ -117,8 +126,8 @@ export class MarkdownGeneratorService {
         }
 
         for (const category in groups) {
-            const categoryName = data.getCategoryName(category);
-            builder.addSubHeader(categoryName);
+            const categoryDetails = categories.get(category);
+            builder.addSubHeader(categoryDetails.name);
 
             const items = groups[category];
             items.sort((a, b) => {
@@ -135,5 +144,34 @@ export class MarkdownGeneratorService {
         }
 
         return builder.build();
+    }
+
+    private async loadCategories(data: DataRepository): Promise<Map<string, Category>> {
+        const list = await data.getCategories();
+        const categories = new Map<string, Category>();
+
+        for (const category of list) {
+            categories.set(category.id, category);
+        }
+
+        return categories;
+    }
+
+    private populateCategory(category: string | Category, categories: Map<string, Category>): Category {
+        const id = typeof category === 'string' ? category : category.id;
+        const populated = categories.get(id);
+        
+        if (populated) {
+            return populated;
+        }
+
+        if (typeof category === 'string') {
+            const result = { id, name: category };
+            categories.set(id, result);
+            return result;
+        }
+
+        categories.set(category.id, category);
+        return category
     }
 }
