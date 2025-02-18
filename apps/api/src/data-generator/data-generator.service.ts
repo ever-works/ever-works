@@ -3,7 +3,6 @@ import slugify from 'slugify';
 import * as fs from 'fs/promises';
 import { AiEngineService, ItemData } from '../ai-engine/ai-engine.service';
 import { GithubService } from '../git/github.service';
-import { GitService } from '../git/git.service';
 import { Directory } from '../entities/directory.entity';
 import { User } from '../entities/user.entity';
 import { DataRepository, DEFAULT_DATA_CONFIG } from './data-repository';
@@ -14,7 +13,6 @@ export class DataGeneratorService {
 
     constructor(
         private readonly githubService: GithubService,
-        private readonly gitService: GitService,
         private readonly aiEngine: AiEngineService
     ) {}
 
@@ -98,7 +96,7 @@ export class DataGeneratorService {
             data.writeMarkdown(item, markdown),
         ]);
 
-        await this.gitService.add(data.dir, '.');
-        await this.gitService.commit(data.dir, `add ${item.name}`);
+        await this.githubService.add(data.dir, '.');
+        await this.githubService.commit(data.dir, `add ${item.name}`);
     }
 }

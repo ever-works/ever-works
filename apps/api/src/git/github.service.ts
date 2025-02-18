@@ -1,16 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Octokit, RequestError } from 'octokit';
-import { GitService, IGitAuth } from './git.service';
-import { GitProvider } from './git.provider';
+import { GitProvider, IGitAuth } from './git.provider';
 import * as sodium from 'libsodium-wrappers';
 
 @Injectable()
 export class GithubService extends GitProvider {
     private readonly logger = new Logger('GithubService');
-
-    constructor(gitService: GitService) {
-        super(gitService);
-    }
 
     getAuth(token: string): IGitAuth {
         return { username: 'x-access-token', password: token };
@@ -75,8 +70,8 @@ export class GithubService extends GitProvider {
         const origin = duplicated.clone_url;
 
         const originalDir = await this.clone(owner, repo, token);
-        await this.gitService.remoteRemove(originalDir, 'origin');
-        await this.gitService.remoteAdd(originalDir, 'origin', origin);
+        await this.remoteRemove(originalDir, 'origin');
+        await this.remoteAdd(originalDir, 'origin', origin);
         await this.push(originalDir, token);
     }
     
@@ -85,8 +80,8 @@ export class GithubService extends GitProvider {
         const origin = duplicated.clone_url;
 
         const originalDir = await this.clone(owner, repo, token);
-        await this.gitService.remoteRemove(originalDir, 'origin');
-        await this.gitService.remoteAdd(originalDir, 'origin', origin);
+        await this.remoteRemove(originalDir, 'origin');
+        await this.remoteAdd(originalDir, 'origin', origin);
         await this.push(originalDir, token);
     }
 

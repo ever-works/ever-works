@@ -1,11 +1,21 @@
 import * as os from 'os';
 import * as path from 'path';
+import * as fs from 'fs';
+import * as http from 'isomorphic-git/http/node';
 import { randomUUID } from 'crypto';
-import { IGitAuth, GitService } from './git.service';
+import git from 'isomorphic-git';
+
+/*
+    'oauth2'         - GitLab
+    'x-access-token' - GitHub
+*/
+export interface IGitAuth {
+    username: 'x-access-token' | 'oauth2';
+    password: string;
+}
+
 
 export abstract class GitProvider {
-    constructor(protected readonly gitService: GitService) { }
-
     abstract getAuth(token: string): IGitAuth;
 
     abstract getURL(owner: string, repo: string): string;
@@ -15,13 +25,52 @@ export abstract class GitProvider {
         const dir = path.join(os.tmpdir(), randomUUID());
         const url = this.getURL(owner, repo);
         const auth = this.getAuth(token);
-        await this.gitService.clone(url, dir, auth);
+        await git.clone({
+            onAuth: () => auth,
+            fs,
+            http,
+            dir,
+            url,
+            singleBranch: true,
+        });
 
         return dir;
     }
 
+    add(dir: string, paths: string | string[]) {
+        return git.add({
+            fs,
+            filepath: paths,
+            dir,
+        })
+    }
+
+    commit(dir: string, message: string) {
+        return git.commit({
+            fs,
+            message,
+            committer: { name: process.env.GIT_NAME, email: process.env.GIT_EMAIL },
+            author: { name: process.env.GIT_NAME, email: process.env.GIT_EMAIL },
+            dir,
+        });
+    }
+
+    remoteRemove(dir: string, remote: string) {
+        return git.deleteRemote({ fs, dir, remote });
+    }
+
+    remoteAdd(dir: string, remote: string, url: string) {
+        return git.addRemote({ fs, dir, remote, url });
+    }
+
     push(dir: string, token: string) {
         const auth = this.getAuth(token);
-        return this.gitService.push(dir, auth);
+
+        return git.push({
+            onAuth: () => auth, 
+            fs,
+            http,
+            dir,
+        });
     }
 }

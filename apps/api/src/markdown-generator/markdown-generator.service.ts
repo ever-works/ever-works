@@ -3,21 +3,16 @@ import { parse as yamlParse } from 'yaml';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { GithubService } from '../git/github.service';
-import { GitService } from '../git/git.service';
 import type { Category, ItemData } from '../ai-engine/ai-engine.service';
 import { Directory } from '../entities/directory.entity';
 import { User } from '../entities/user.entity';
 import { DataRepository } from '../data-generator/data-repository';
 import { ReadmeBuilder } from './readme-builder';
 import { MarkdownRepository } from './markdown-repository';
-import slugify from 'slugify';
 
 @Injectable()
 export class MarkdownGeneratorService {
-    constructor(
-        private readonly githubService: GithubService,
-        private readonly gitService: GitService,
-    ) { }
+    constructor(private readonly githubService: GithubService) { }
 
     async initialize(directory: Directory, user: User) {
         const token = user.getGitToken();
@@ -90,8 +85,8 @@ export class MarkdownGeneratorService {
 
             const readme: string = await this.generateReadme(dataRepo, directory, markdowns, groups, categories);
             await markdownRepo.writeReadme(readme);
-            await this.gitService.add(markdownPath, '.');
-            await this.gitService.commit(markdownPath, 'sync README.md');
+            await this.githubService.add(markdownPath, '.');
+            await this.githubService.commit(markdownPath, 'sync README.md');
             await this.githubService.push(markdownPath, token);
         } catch (err) {
             throw err;
