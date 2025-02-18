@@ -1,9 +1,23 @@
+import slugify from "slugify";
 import { ItemData } from "../ai-engine/ai-engine.service";
 
 export class ReadmeBuilder {
+    private top: string = '';
     private content: string = '';
+    private isTocEnabled: boolean = false;
+    private readonly toc: string[] = []; // Table of Contents
 
-    constructor(private readonly markdowns: Set<string>) {}
+    constructor(private readonly markdowns: Set<string>) { }
+
+    setTitle(title: string) {
+        this.top += `# ${title}\n\n`;
+        return this;
+    }
+
+    setDescription(description: string) {
+        this.top += `${description}\n\n`;
+        return this;
+    }
 
     addHeader(header: string) {
         this.content += `# ${header}\n\n`;
@@ -12,6 +26,7 @@ export class ReadmeBuilder {
 
     addSubHeader(header: string) {
         this.content += `## ${header}\n\n`;
+        this.toc.push(header);
         return this;
     }
 
@@ -25,13 +40,24 @@ export class ReadmeBuilder {
         return this;
     }
 
-    addTableOfContents(table: Array<{ name?: string; slug: string }>) {
-        table.forEach((item) => {
-            this.content += `- [${item.name || item.slug}](#${item.slug})\n`;
-        });
-        this.content += '\n';
+    enableToC() {
+        this.isTocEnabled = true;
+        return this;
+    }
 
-        return this
+    private generateToC() {
+        let toc = '';
+
+        if (this.isTocEnabled) {
+            toc += '## Table of Contents\n\n';
+            this.toc.forEach((header) => {
+                const slug = slugify(header, { lower: true, trim: true });
+                toc += `- [${header}](#${slug})\n`;
+            });
+            toc += '\n';
+        }
+
+        return toc;
     }
 
     addItem(item: ItemData) {
@@ -43,7 +69,14 @@ export class ReadmeBuilder {
         return this;
     }
 
-    build() {
-        return this.content;
+    build(): string {
+        let result = this.top + '\n';
+        
+        if (this.isTocEnabled) {
+            result += this.generateToC();
+            result += '\n';
+        }
+
+        return result + this.content;
     }
 }

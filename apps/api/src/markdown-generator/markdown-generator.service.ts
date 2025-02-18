@@ -10,13 +10,14 @@ import { User } from '../entities/user.entity';
 import { DataRepository } from '../data-generator/data-repository';
 import { ReadmeBuilder } from './readme-builder';
 import { MarkdownRepository } from './markdown-repository';
+import slugify from 'slugify';
 
 @Injectable()
 export class MarkdownGeneratorService {
     constructor(
         private readonly githubService: GithubService,
         private readonly gitService: GitService,
-    ) {}
+    ) { }
 
     async initialize(directory: Directory, user: User) {
         const token = user.getGitToken();
@@ -51,7 +52,7 @@ export class MarkdownGeneratorService {
 
         try {
             const files = await fs.readdir(dataRepo.dataDir);
-           await markdownRepo.ensureDirectoriesExist();
+            await markdownRepo.ensureDirectoriesExist();
 
             const groups = {};  // we want to group items by category, like: { 'open-source': [items], 'commercial': [items] }
             for (const filename of files) {
@@ -112,17 +113,11 @@ export class MarkdownGeneratorService {
         const config = await data.getConfig();
         const builder = new ReadmeBuilder(markdowns);
 
-        builder.addHeader(directory.name);
-        builder.addParagraph(directory.description);
+        builder.setTitle(directory.name);
+        builder.setDescription(directory.description);
 
         if (config.content_table) {
-            const table = Object.keys(groups).map((slug) => {
-                const name = data.getCategoryName(slug);
-                return { name, slug };
-            });
-
-            builder.addSubHeader('Table of contents');
-            builder.addTableOfContents(table);
+            builder.enableToC();
         }
 
         for (const category in groups) {
@@ -160,7 +155,7 @@ export class MarkdownGeneratorService {
     private populateCategory(category: string | Category, categories: Map<string, Category>): Category {
         const id = typeof category === 'string' ? category : category.id;
         const populated = categories.get(id);
-        
+
         if (populated) {
             return populated;
         }
