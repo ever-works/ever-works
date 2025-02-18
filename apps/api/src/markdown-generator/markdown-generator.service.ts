@@ -86,7 +86,7 @@ export class MarkdownGeneratorService {
             const readme: string = await this.generateReadme(dataRepo, directory, markdowns, groups, categories);
             await markdownRepo.writeReadme(readme);
             await this.githubService.add(markdownPath, '.');
-            await this.githubService.commit(markdownPath, 'sync README.md');
+            await this.githubService.commit(markdownPath, 'sync README.md',  user.getCommitter());
             await this.githubService.push(markdownPath, token);
         } catch (err) {
             throw err;

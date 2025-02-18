@@ -21,6 +21,7 @@ export class GithubService extends GitProvider {
             org,
             name: repo,
             description,
+            auto_init: true,
             private: true,  // for now
         });
 
@@ -32,6 +33,7 @@ export class GithubService extends GitProvider {
         const res = await octokit.rest.repos.createForAuthenticatedUser({
             name: repo,
             description,
+            auto_init: true,
             private: true,  // for now
         });
 
@@ -107,7 +109,7 @@ export class GithubService extends GitProvider {
             auth: token,
         });
 
-        await sodium.ready
+        await sodium.ready;
         const binkey = sodium.from_base64(publicKey.key, sodium.base64_variants.ORIGINAL)
         const binsec = sodium.from_string(data.value);
         const encryptedBytes = sodium.crypto_box_seal(

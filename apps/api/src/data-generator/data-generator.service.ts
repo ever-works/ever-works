@@ -39,7 +39,7 @@ export class DataGeneratorService {
 
             for (const item of items) {
                 item.slug = slugify(item.name, { lower: true, trim: true });
-                await this.processItem(data, item);
+                await this.processItem(data, item, user);
             }
 
             await this.githubService.push(dest, token);
@@ -76,7 +76,7 @@ export class DataGeneratorService {
                 if (existingFiles.has(`${item.slug}.yml`)) {
                     continue;
                 }
-                await this.processItem(data, item);
+                await this.processItem(data, item, user);
             }
 
             await this.githubService.push(dest, token);
@@ -88,7 +88,7 @@ export class DataGeneratorService {
         }
     }
 
-    private async processItem(data: DataRepository, item: ItemData) {
+    private async processItem(data: DataRepository, item: ItemData, user: User) {
         const markdown = await this.aiEngine.getItemDetails(item);
 
         await Promise.all([
@@ -97,6 +97,6 @@ export class DataGeneratorService {
         ]);
 
         await this.githubService.add(data.dir, '.');
-        await this.githubService.commit(data.dir, `add ${item.name}`);
+        await this.githubService.commit(data.dir, `add ${item.name}`, user.getCommitter());
     }
 }

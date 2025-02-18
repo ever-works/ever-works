@@ -14,6 +14,10 @@ export interface IGitAuth {
     password: string;
 }
 
+interface ICommitter {
+    name?: string;
+    email?: string;
+}
 
 export abstract class GitProvider {
     abstract getAuth(token: string): IGitAuth;
@@ -45,12 +49,15 @@ export abstract class GitProvider {
         })
     }
 
-    commit(dir: string, message: string) {
+    commit(dir: string, message: string, committer: ICommitter = {}) {
+        committer.email = committer.email || process.env.GIT_EMAIL;
+        committer.name = committer.name || process.env.GIT_NAME
+
         return git.commit({
             fs,
             message,
-            committer: { name: process.env.GIT_NAME, email: process.env.GIT_EMAIL },
-            author: { name: process.env.GIT_NAME, email: process.env.GIT_EMAIL },
+            committer,
+            author: committer,
             dir,
         });
     }
