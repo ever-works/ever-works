@@ -30,10 +30,9 @@ export class MarkdownRepository {
         await fs.writeFile(filename, content, 'utf-8');
     }
 
-    async copyMarkdownFromData(sourceDir: string, filename: string) {
-        const sourcePath = path.join(sourceDir, filename);
-        const targetPath = path.join(this.detailsPath, filename);
-        const content = await fs.readFile(sourcePath, 'utf-8');
-        await fs.writeFile(targetPath, content, 'utf-8');
+    async writeDetails(slug: string, content: string) {
+        const filename = path.join(this.detailsPath, `${slug}.md`);
+        await  fs.writeFile(filename, content, 'utf-8');
+
     }
 }

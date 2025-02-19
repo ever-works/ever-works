@@ -21,7 +21,6 @@ export class GithubService extends GitProvider {
             org,
             name: repo,
             description,
-            auto_init: true,
             private: true,  // for now
         });
 
@@ -33,7 +32,6 @@ export class GithubService extends GitProvider {
         const res = await octokit.rest.repos.createForAuthenticatedUser({
             name: repo,
             description,
-            auto_init: true,
             private: true,  // for now
         });
 
@@ -75,6 +73,8 @@ export class GithubService extends GitProvider {
         await this.remoteRemove(originalDir, 'origin');
         await this.remoteAdd(originalDir, 'origin', origin);
         await this.push(originalDir, token);
+
+        return originalDir;
     }
     
     async duplicateAsOrg(owner: string, repo: string, org: string, name: string, token: string) {
@@ -85,6 +85,8 @@ export class GithubService extends GitProvider {
         await this.remoteRemove(originalDir, 'origin');
         await this.remoteAdd(originalDir, 'origin', origin);
         await this.push(originalDir, token);
+
+        return originalDir;
     }
 
     async repositoryPublickey(owner: string, repo: string, token: string) {

@@ -1,7 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { parse as yamlParse } from 'yaml';
 import * as fs from 'fs/promises';
-import * as path from 'path';
 import { GithubService } from '../git/github.service';
 import type { Category, ItemData } from '../ai-engine/ai-engine.service';
 import { Directory } from '../entities/directory.entity';
@@ -46,27 +44,18 @@ export class MarkdownGeneratorService {
         const categories = await this.loadCategories(dataRepo);
 
         try {
-            const files = await fs.readdir(dataRepo.dataDir);
+            const slugs = await fs.readdir(dataRepo.dataDir);
             await markdownRepo.ensureDirectoriesExist();
 
             const groups = {};  // we want to group items by category, like: { 'open-source': [items], 'commercial': [items] }
-            for (const filename of files) {
-                const filePath = path.join(dataRepo.dataDir, filename);
-                const extname = path.extname(filename);
-
-                if (extname === '.md') {
-                    await markdownRepo.copyMarkdownFromData(dataRepo.dataDir, filename);
-                    markdowns.add(filename);
-                    continue;
+            for (const slug of slugs) {
+                const markdown = await dataRepo.getMarkdown(slug);
+                if (markdown) {
+                    await markdownRepo.writeDetails(slug, markdown);
+                    markdowns.add(slug);
                 }
 
-                if (extname !== '.yml')
-                    continue;
-
-                const rawYaml = await fs.readFile(filePath, 'utf-8');
-                const item: ItemData = yamlParse(rawYaml);
-                item.slug = path.basename(filename, extname);
-
+                const item = await dataRepo.getItem(slug);
                 if (Array.isArray(item.category)) {
                     item.category = item.category.map(category => this.populateCategory(category, categories));
                 } else {
@@ -86,7 +75,7 @@ export class MarkdownGeneratorService {
             const readme: string = await this.generateReadme(dataRepo, directory, markdowns, groups, categories);
             await markdownRepo.writeReadme(readme);
             await this.githubService.add(markdownPath, '.');
-            await this.githubService.commit(markdownPath, 'sync README.md',  user.getCommitter());
+            await this.githubService.commit(markdownPath, 'sync README.md',  user.asCommitter());
             await this.githubService.push(markdownPath, token);
         } catch (err) {
             throw err;

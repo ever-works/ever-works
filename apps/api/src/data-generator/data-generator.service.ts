@@ -38,7 +38,7 @@ export class DataGeneratorService {
             await data.writeCategories(categories);
 
             for (const item of items) {
-                item.slug = slugify(item.name, { lower: true, trim: true });
+                item.slug = slugify(item.name, { lower: true });
                 await this.processItem(data, item, user);
             }
 
@@ -69,11 +69,11 @@ export class DataGeneratorService {
 
         try {
             await data.ensureDirectoriesExist();
-            const existingFiles = new Set(await fs.readdir(data.dataDir));
+            const existingItems = new Set(await fs.readdir(data.dataDir));
 
             for (const item of items) {
-                item.slug = slugify(item.name, { lower: true, trim: true });
-                if (existingFiles.has(`${item.slug}.yml`)) {
+                item.slug = slugify(item.name, { lower: true });
+                if (existingItems.has(item.slug)) {
                     continue;
                 }
                 await this.processItem(data, item, user);
@@ -90,6 +90,7 @@ export class DataGeneratorService {
 
     private async processItem(data: DataRepository, item: ItemData, user: User) {
         const markdown = await this.aiEngine.getItemDetails(item);
+        await data.createItemDir(item);
 
         await Promise.all([
             data.writeItem(item),
@@ -97,6 +98,6 @@ export class DataGeneratorService {
         ]);
 
         await this.githubService.add(data.dir, '.');
-        await this.githubService.commit(data.dir, `add ${item.name}`, user.getCommitter());
+        await this.githubService.commit(data.dir, `add ${item.name}`, user.asCommitter());
     }
 }

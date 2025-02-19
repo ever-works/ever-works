@@ -16,7 +16,7 @@ export class User {
         return process.env.GITHUB_APIKEY;
     }
 
-    getCommitter() {
+    asCommitter() {
         return { name: this.username, email: this.email };
     }
 }

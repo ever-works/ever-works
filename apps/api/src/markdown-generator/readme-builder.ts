@@ -62,7 +62,7 @@ export class ReadmeBuilder {
 
     addItem(item: ItemData) {
         this.content += `- [${item.name}](${item.source_url}) - ${item.description}`;
-        if (item.slug && this.markdowns.has(`${item.slug}.md`)) {
+        if (item.slug && this.markdowns.has(item.slug)) {
             this.content += ` ([Read more](/details/${item.slug}.md))`;
         }
         this.content += '\n';

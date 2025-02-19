@@ -2,6 +2,7 @@ import * as path from "path";
 import * as fs from 'fs/promises';
 import * as yaml from 'yaml';
 import { Category, ItemData } from "../ai-engine/ai-engine.service";
+import { format } from "date-fns";
 
 export interface IDataConfig {
     content_table?: boolean;
@@ -40,6 +41,10 @@ export class DataRepository {
         this.dataDir = path.join(dir, 'data');
     }
 
+    private getItemPath(slug: string) {
+        return path.join(this.dataDir, slug);
+    }
+
     async cleanup() {
         await fs.rm(this.dir, { recursive: true, force: true });
     }
@@ -76,6 +81,39 @@ export class DataRepository {
         return this.categories;
     }
 
+    async getItem(slug: string): Promise<ItemData> {
+        const ymlPath = path.join(this.getItemPath(slug), `${slug}.yml`);
+
+        try {
+            const content = await fs.readFile(ymlPath, 'utf-8');
+            const item = yaml.parse(content);
+
+            return { ...item, slug };
+        } catch (err) {
+            if (err?.code === 'ENOENT') {
+                const yamlPath = path.join(this.getItemPath(slug), `${slug}.yaml`);
+                const content = await fs.readFile(yamlPath, 'utf-8');
+                const item = yaml.parse(content);
+                
+                return { ...item, slug };
+            }
+            throw err;
+        }
+    }
+
+    async getMarkdown(slug: string): Promise<string | undefined> {
+        const mdPath = path.join(this.getItemPath(slug), `${slug}.md`);
+        try {
+            const md = await fs.readFile(mdPath, 'utf-8');
+            return md;
+        } catch (err) {
+            if (err?.code === 'ENOENT') {
+                return;
+            }
+            throw err;
+        }
+    }
+
     getCategoryName(id: string): string {
         return this.categories?.find(c => c.id === id)?.name || id;
     }
@@ -92,15 +130,21 @@ export class DataRepository {
         await fs.writeFile(this.categoriesPath, str, 'utf-8');
     }
 
+    async createItemDir(item: ItemData) {
+        const itemDir = path.join(this.dataDir, item.slug);
+        await fs.mkdir(itemDir, { recursive: true });
+    }
+
     async writeItem(item: ItemData) {
-        const updatedAt = new Date();
-        const str = yaml.stringify({ ...item, updated_at: updatedAt.toISOString() });
-        const filename = path.join(this.dataDir, `${item.slug}.yml`);
-        await fs.writeFile(filename, str, 'utf-8');
+        const { slug, ...rest } = item; // we don't want to write slug to the file
+        const updated_at = format(new Date(), "yyyy-MM-dd HH:mm");
+        const str = yaml.stringify({ ...rest, updated_at });
+        const filepath = path.join(this.getItemPath(item.slug), `${item.slug}.yml`);
+        await fs.writeFile(filepath, str, 'utf-8');
     }
 
     async writeMarkdown(item: ItemData, markdown: string) {
-        const filename = path.join(this.dataDir, `${item.slug}.md`);
-        await fs.writeFile(filename, markdown, 'utf-8');
+        const filepath = path.join(this.getItemPath(item.slug), `${item.slug}.md`);
+        await fs.writeFile(filepath, markdown, 'utf-8');
     }
 }
