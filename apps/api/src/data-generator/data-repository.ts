@@ -29,12 +29,15 @@ export class DataRepository {
          *      - config.yml
          *      - categories.yml
          *      - data/
-         *          - item1.yml
-         *          - item1.md?
-         *          - item1.mdx?
-         *          - item2.yml
+         *          - item1/
+         *              - item1.yml
+         *              - item1.md?
+         *              - item1.mdx?
+         *          - item2/
+         *              - item2.yml
          *          - ...
-         *          - itemN.yml
+         *          - itemN/
+         *              - itemN.yml
          */
         this.configPath = path.join(dir, 'config.yml');
         this.categoriesPath = path.join(dir, 'categories.yml');
