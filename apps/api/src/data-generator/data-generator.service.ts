@@ -14,7 +14,7 @@ export class DataGeneratorService {
     constructor(
         private readonly githubService: GithubService,
         private readonly aiEngine: AiEngineService
-    ) {}
+    ) { }
 
     async initialize(directory: Directory, user: User, prompt: string) {
         const categories = await this.aiEngine.getCategoryList();
@@ -28,13 +28,14 @@ export class DataGeneratorService {
         } else {
             await this.githubService.createEmptyRepo(repo, description, token);
         }
-        
+
         const dest = await this.githubService.clone(directory.owner, repo, token);
         const data = new DataRepository(dest);
-        
+
         try {
             await data.ensureDirectoriesExist();
             await Promise.all([
+                data.writeReadme(this.getDefaultReadme(directory)),
                 data.writeConfig(DEFAULT_DATA_CONFIG),
                 data.writeCategories(categories),
                 data.writeMarkdownTemplate(this.getHeader(directory), this.getFooter()),
@@ -65,11 +66,11 @@ export class DataGeneratorService {
         const categories = await data.getCategories();
         const items = await this.aiEngine.getItemsList({ prompt, categories });
         // mock adding some new item:
-        items.push({ 
+        items.push({
             name: 'Test Sample',
             category: 'testing',
             description: 'Best service ever',
-            source_url: 'https://example.com', 
+            source_url: 'https://example.com',
         });
 
         try {
@@ -106,9 +107,15 @@ export class DataGeneratorService {
         await this.githubService.commit(data.dir, `add ${item.name}`, user.asCommitter());
     }
 
+    private getDefaultReadme(directory: Directory) {
+        const markdownURL = this.githubService.getURL(directory.owner, directory.slug);
+        return `# ${directory.getDataRepo()}\n\n` +
+            `This repository holds data used to generate [${directory.slug}](${markdownURL}]\n\n`;
+    }
+
     private getHeader(directory: Directory) {
-        return `# ${directory.name}\n` +
-                `${directory.description}\n\n`;
+        return `# ${directory.name}\n\n` +
+            `${directory.description}\n\n`;
     }
 
     private getFooter() {

@@ -170,4 +170,9 @@ export class DataRepository {
         const filepath = path.join(this.getItemPath(item.slug), `${item.slug}.md`);
         await fs.writeFile(filepath, markdown, 'utf-8');
     }
+
+    async writeReadme(content: string) {
+        const filepath = path.join(this.dir, 'README.md');
+        await fs.writeFile(filepath, content, 'utf-8');
+    }
 }
