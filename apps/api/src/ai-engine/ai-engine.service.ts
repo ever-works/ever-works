@@ -1,19 +1,19 @@
 import { Injectable } from '@nestjs/common';
 
-export interface ItemData {
-    name: string;
-    description: string;
-    featured?: boolean;
-    source_url: string;
-    category: string;
-    slug?: string;
-}
-
 export interface Category {
     id: string;
     name: string;
     description?: string;
     icon_url?: string;
+}
+
+export interface ItemData {
+    name: string;
+    description: string;
+    featured?: boolean;
+    source_url: string;
+    category: string | string[] | Category | Category[];
+    slug?: string;
 }
 
 const data: Array<ItemData> = [

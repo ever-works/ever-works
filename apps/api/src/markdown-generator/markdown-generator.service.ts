@@ -1,10 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { parse as yamlParse } from 'yaml';
 import * as fs from 'fs/promises';
-import * as path from 'path';
 import { GithubService } from '../git/github.service';
-import { GitService } from '../git/git.service';
-import type { ItemData } from '../ai-engine/ai-engine.service';
+import type { Category, ItemData } from '../ai-engine/ai-engine.service';
 import { Directory } from '../entities/directory.entity';
 import { User } from '../entities/user.entity';
 import { DataRepository } from '../data-generator/data-repository';
@@ -13,10 +10,7 @@ import { MarkdownRepository } from './markdown-repository';
 
 @Injectable()
 export class MarkdownGeneratorService {
-    constructor(
-        private readonly githubService: GithubService,
-        private readonly gitService: GitService,
-    ) {}
+    constructor(private readonly githubService: GithubService) { }
 
     async initialize(directory: Directory, user: User) {
         const token = user.getGitToken();
@@ -47,41 +41,41 @@ export class MarkdownGeneratorService {
         const markdownRepo = new MarkdownRepository(markdownPath);
         const dataRepo = new DataRepository(dataPath);
         const markdowns = new Set<string>(); // will be needed to check if markdown exists before referencing them in README
+        const categories = await this.loadCategories(dataRepo);
 
         try {
-            const files = await fs.readdir(dataRepo.dataDir);
-           await markdownRepo.ensureDirectoriesExist();
+            const slugs = await fs.readdir(dataRepo.dataDir);
+            await markdownRepo.ensureDirectoriesExist();
 
             const groups = {};  // we want to group items by category, like: { 'open-source': [items], 'commercial': [items] }
-            for (const filename of files) {
-                const filePath = path.join(dataRepo.dataDir, filename);
-                const extname = path.extname(filename);
-
-                if (extname === '.md') {
-                    await markdownRepo.copyMarkdownFromData(dataRepo.dataDir, filename);
-                    markdowns.add(filename);
-                    continue;
+            for (const slug of slugs) {
+                const markdown = await dataRepo.getMarkdown(slug);
+                if (markdown) {
+                    await markdownRepo.writeDetails(slug, markdown);
+                    markdowns.add(slug);
                 }
 
-                if (extname !== '.yml')
-                    continue;
-
-                const rawYaml = await fs.readFile(filePath, 'utf-8');
-                const item: ItemData = yamlParse(rawYaml);
-                item.slug = path.basename(filename, extname);
-
-                const group = groups[item.category];
-                if (group) {
-                    group.push(item);
+                const item = await dataRepo.getItem(slug);
+                if (Array.isArray(item.category)) {
+                    item.category = item.category.map(category => this.populateCategory(category, categories));
                 } else {
-                    groups[item.category] = [item];
+                    item.category = [this.populateCategory(item.category, categories)];
+                }
+
+                for (const category of item.category) {
+                    const group = groups[category.id];
+                    if (group) {
+                        group.push(item);
+                    } else {
+                        groups[category.id] = [item];
+                    }
                 }
             }
 
-            const readme: string = await this.generateReadme(dataRepo, directory, markdowns, groups);
+            const readme: string = await this.generateReadme(dataRepo, directory, markdowns, groups, categories);
             await markdownRepo.writeReadme(readme);
-            await this.gitService.add(markdownPath, '.');
-            await this.gitService.commit(markdownPath, 'sync README.md');
+            await this.githubService.add(markdownPath, '.');
+            await this.githubService.commit(markdownPath, 'sync README.md',  user.asCommitter());
             await this.githubService.push(markdownPath, token);
         } catch (err) {
             throw err;
@@ -97,28 +91,22 @@ export class MarkdownGeneratorService {
         data: DataRepository,
         directory: Directory,
         markdowns: Set<string>,
-        groups: Record<string, Array<ItemData>>
+        groups: Record<string, Array<ItemData>>,
+        categories: Map<string, Category>
     ) {
-        await data.getCategories(); // ensure categories are loaded
         const config = await data.getConfig();
         const builder = new ReadmeBuilder(markdowns);
 
-        builder.addHeader(directory.name);
-        builder.addParagraph(directory.description);
+        builder.setTitle(directory.name);
+        builder.setDescription(directory.description);
 
         if (config.content_table) {
-            const table = Object.keys(groups).map((slug) => {
-                const name = data.getCategoryName(slug);
-                return { name, slug };
-            });
-
-            builder.addSubHeader('Table of contents');
-            builder.addTableOfContents(table);
+            builder.enableToC();
         }
 
         for (const category in groups) {
-            const categoryName = data.getCategoryName(category);
-            builder.addSubHeader(categoryName);
+            const categoryDetails = categories.get(category);
+            builder.addSubHeader(categoryDetails.name);
 
             const items = groups[category];
             items.sort((a, b) => {
@@ -135,5 +123,34 @@ export class MarkdownGeneratorService {
         }
 
         return builder.build();
+    }
+
+    private async loadCategories(data: DataRepository): Promise<Map<string, Category>> {
+        const list = await data.getCategories();
+        const categories = new Map<string, Category>();
+
+        for (const category of list) {
+            categories.set(category.id, category);
+        }
+
+        return categories;
+    }
+
+    private populateCategory(category: string | Category, categories: Map<string, Category>): Category {
+        const id = typeof category === 'string' ? category : category.id;
+        const populated = categories.get(id);
+
+        if (populated) {
+            return populated;
+        }
+
+        if (typeof category === 'string') {
+            const result = { id, name: category };
+            categories.set(id, result);
+            return result;
+        }
+
+        categories.set(category.id, category);
+        return category
     }
 }

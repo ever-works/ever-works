@@ -3,7 +3,6 @@ import slugify from 'slugify';
 import * as fs from 'fs/promises';
 import { AiEngineService, ItemData } from '../ai-engine/ai-engine.service';
 import { GithubService } from '../git/github.service';
-import { GitService } from '../git/git.service';
 import { Directory } from '../entities/directory.entity';
 import { User } from '../entities/user.entity';
 import { DataRepository, DEFAULT_DATA_CONFIG } from './data-repository';
@@ -14,7 +13,6 @@ export class DataGeneratorService {
 
     constructor(
         private readonly githubService: GithubService,
-        private readonly gitService: GitService,
         private readonly aiEngine: AiEngineService
     ) {}
 
@@ -40,8 +38,8 @@ export class DataGeneratorService {
             await data.writeCategories(categories);
 
             for (const item of items) {
-                item.slug = slugify(item.name, { lower: true, trim: true });
-                await this.processItem(data, item);
+                item.slug = slugify(item.name, { lower: true });
+                await this.processItem(data, item, user);
             }
 
             await this.githubService.push(dest, token);
@@ -71,14 +69,14 @@ export class DataGeneratorService {
 
         try {
             await data.ensureDirectoriesExist();
-            const existingFiles = new Set(await fs.readdir(data.dataDir));
+            const existingItems = new Set(await fs.readdir(data.dataDir));
 
             for (const item of items) {
-                item.slug = slugify(item.name, { lower: true, trim: true });
-                if (existingFiles.has(`${item.slug}.yml`)) {
+                item.slug = slugify(item.name, { lower: true });
+                if (existingItems.has(item.slug)) {
                     continue;
                 }
-                await this.processItem(data, item);
+                await this.processItem(data, item, user);
             }
 
             await this.githubService.push(dest, token);
@@ -90,15 +88,16 @@ export class DataGeneratorService {
         }
     }
 
-    private async processItem(data: DataRepository, item: ItemData) {
+    private async processItem(data: DataRepository, item: ItemData, user: User) {
         const markdown = await this.aiEngine.getItemDetails(item);
+        await data.createItemDir(item);
 
         await Promise.all([
             data.writeItem(item),
             data.writeMarkdown(item, markdown),
         ]);
 
-        await this.gitService.add(data.dir, '.');
-        await this.gitService.commit(data.dir, `add ${item.name}`);
+        await this.githubService.add(data.dir, '.');
+        await this.githubService.commit(data.dir, `add ${item.name}`, user.asCommitter());
     }
 }
