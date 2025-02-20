@@ -72,7 +72,7 @@ export class MarkdownGeneratorService {
                 }
             }
 
-            const readme: string = await this.generateReadme(dataRepo, directory, markdowns, groups, categories);
+            const readme: string = await this.generateReadme(dataRepo, markdowns, groups, categories);
             await markdownRepo.writeReadme(readme);
             await this.githubService.add(markdownPath, '.');
             await this.githubService.commit(markdownPath, 'sync README.md',  user.asCommitter());
@@ -89,16 +89,13 @@ export class MarkdownGeneratorService {
 
     private async generateReadme(
         data: DataRepository,
-        directory: Directory,
         markdowns: Set<string>,
         groups: Record<string, Array<ItemData>>,
         categories: Map<string, Category>
     ) {
         const config = await data.getConfig();
-        const builder = new ReadmeBuilder(markdowns);
-
-        builder.setTitle(directory.name);
-        builder.setDescription(directory.description);
+        const { header, footer } = await data.readMarkdownTemplate();
+        const builder = new ReadmeBuilder(header, footer);
 
         if (config.content_table) {
             builder.enableToC();
@@ -116,7 +113,7 @@ export class MarkdownGeneratorService {
             });
 
             for (const item of items) {
-                builder.addItem(item);
+                builder.addItem(item, { hasDetails: item.slug && markdowns.has(item.slug) });
             }
 
             builder.addNewLine();

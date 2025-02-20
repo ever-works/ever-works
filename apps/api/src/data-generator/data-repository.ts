@@ -21,6 +21,7 @@ export class DataRepository {
     private categories?: Category[];
     private readonly configPath: string;
     private readonly categoriesPath: string;
+    private readonly markdownTemplatePath: string;
     public readonly dataDir: string;
 
     constructor(public readonly dir: string) {
@@ -41,6 +42,7 @@ export class DataRepository {
          */
         this.configPath = path.join(dir, 'config.yml');
         this.categoriesPath = path.join(dir, 'categories.yml');
+        this.markdownTemplatePath = path.join(dir, 'markdown');
         this.dataDir = path.join(dir, 'data');
     }
 
@@ -53,7 +55,10 @@ export class DataRepository {
     }
 
     async ensureDirectoriesExist() {
-        await fs.mkdir(this.dataDir, { recursive: true });
+        await Promise.all([
+            fs.mkdir(this.markdownTemplatePath, { recursive: true }),
+            fs.mkdir(this.dataDir, { recursive: true })
+        ]);
     }
 
     async getConfig(): Promise<IDataConfig> {
@@ -138,6 +143,21 @@ export class DataRepository {
         await fs.mkdir(itemDir, { recursive: true });
     }
 
+    async writeMarkdownTemplate(header: string, footer: string) {
+        await Promise.all([
+            fs.writeFile(path.join(this.markdownTemplatePath, 'header.md'), header, 'utf-8'),
+            fs.writeFile(path.join(this.markdownTemplatePath, 'footer.md'), footer, 'utf-8'),
+        ]);
+    }
+
+    async readMarkdownTemplate() {
+        const [header, footer] = await Promise.all([
+            fs.readFile(path.join(this.markdownTemplatePath, 'header.md'), 'utf-8'),
+            fs.readFile(path.join(this.markdownTemplatePath, 'footer.md'), 'utf-8'),
+        ]);
+        return { header, footer };
+    }
+
     async writeItem(item: ItemData) {
         const { slug, ...rest } = item; // we don't want to write slug to the file
         const updated_at = format(new Date(), "yyyy-MM-dd HH:mm");
@@ -146,7 +166,7 @@ export class DataRepository {
         await fs.writeFile(filepath, str, 'utf-8');
     }
 
-    async writeMarkdown(item: ItemData, markdown: string) {
+    async writeItemMarkdown(item: ItemData, markdown: string) {
         const filepath = path.join(this.getItemPath(item.slug), `${item.slug}.md`);
         await fs.writeFile(filepath, markdown, 'utf-8');
     }

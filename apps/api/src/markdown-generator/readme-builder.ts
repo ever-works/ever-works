@@ -2,22 +2,14 @@ import slugify from "slugify";
 import { ItemData } from "../ai-engine/ai-engine.service";
 
 export class ReadmeBuilder {
-    private top: string = '';
     private content: string = '';
     private isTocEnabled: boolean = false;
     private readonly toc: string[] = []; // Table of Contents
 
-    constructor(private readonly markdowns: Set<string>) { }
-
-    setTitle(title: string) {
-        this.top += `# ${title}\n\n`;
-        return this;
-    }
-
-    setDescription(description: string) {
-        this.top += `${description}\n\n`;
-        return this;
-    }
+    constructor(
+        private readonly header: string,
+        private readonly footer: string,
+    ) {}
 
     addHeader(header: string) {
         this.content += `# ${header}\n\n`;
@@ -60,9 +52,9 @@ export class ReadmeBuilder {
         return toc;
     }
 
-    addItem(item: ItemData) {
+    addItem(item: ItemData, { hasDetails = false } = {}) {
         this.content += `- [${item.name}](${item.source_url}) - ${item.description}`;
-        if (item.slug && this.markdowns.has(item.slug)) {
+        if (hasDetails) {
             this.content += ` ([Read more](/details/${item.slug}.md))`;
         }
         this.content += '\n';
@@ -70,13 +62,13 @@ export class ReadmeBuilder {
     }
 
     build(): string {
-        let result = this.top + '\n';
+        let result = this.header + '\n';
         
         if (this.isTocEnabled) {
             result += this.generateToC();
             result += '\n';
         }
 
-        return result + this.content;
+        return result + this.content + '\n' + this.footer;
     }
 }

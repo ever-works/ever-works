@@ -34,8 +34,13 @@ export class DataGeneratorService {
         
         try {
             await data.ensureDirectoriesExist();
-            await data.writeConfig(DEFAULT_DATA_CONFIG);
-            await data.writeCategories(categories);
+            await Promise.all([
+                data.writeConfig(DEFAULT_DATA_CONFIG),
+                data.writeCategories(categories),
+                data.writeMarkdownTemplate(this.getHeader(directory), this.getFooter()),
+            ]);
+            await this.githubService.add(data.dir, '.');
+            await this.githubService.commit(data.dir, `init repository`, user.asCommitter());
 
             for (const item of items) {
                 item.slug = slugify(item.name, { lower: true });
@@ -94,10 +99,26 @@ export class DataGeneratorService {
 
         await Promise.all([
             data.writeItem(item),
-            data.writeMarkdown(item, markdown),
+            data.writeItemMarkdown(item, markdown),
         ]);
 
         await this.githubService.add(data.dir, '.');
         await this.githubService.commit(data.dir, `add ${item.name}`, user.asCommitter());
+    }
+
+    private getHeader(directory: Directory) {
+        return `# ${directory.name}\n` +
+                `${directory.description}\n\n`;
+    }
+
+    private getFooter() {
+        return "## License\n\n" +
+            "Shield: [![CC BY-SA 4.0][cc-by-sa-shield]][cc-by-sa]\n\n" +
+            "This work is licensed under a\n\n" +
+            "[Creative Commons Attribution-ShareAlike 4.0 International License][cc-by-sa].\n\n" +
+            "[![CC BY-SA 4.0][cc-by-sa-image]][cc-by-sa]\n\n" +
+            "[cc-by-sa]: http://creativecommons.org/licenses/by-sa/4.0/\n\n" +
+            "[cc-by-sa-image]: https://licensebuttons.net/l/by-sa/4.0/88x31.png\n\n" +
+            "[cc-by-sa-shield]: https://img.shields.io/badge/License-CC%20BY--SA%204.0-lightgrey.svg\n\n";
     }
 }
