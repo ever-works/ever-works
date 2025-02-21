@@ -1,7 +1,7 @@
 import * as path from "path";
 import * as fs from 'fs/promises';
 import * as yaml from 'yaml';
-import { Category, ItemData } from "../ai-engine/ai-engine.service";
+import { Category, ItemData, Tag } from "../ai-engine/ai-engine.service";
 import { format } from "date-fns";
 
 export interface IDataConfig {
@@ -21,6 +21,8 @@ export class DataRepository {
     private categories?: Category[];
     private readonly configPath: string;
     private readonly categoriesPath: string;
+    private readonly tagsPath: string;
+    private readonly markdownTemplatePath: string;
     public readonly dataDir: string;
 
     constructor(public readonly dir: string) {
@@ -28,6 +30,7 @@ export class DataRepository {
          *   File structure:
          *      - config.yml
          *      - categories.yml
+         *      - tags.yml
          *      - data/
          *          - item1/
          *              - item1.yml
@@ -41,6 +44,8 @@ export class DataRepository {
          */
         this.configPath = path.join(dir, 'config.yml');
         this.categoriesPath = path.join(dir, 'categories.yml');
+        this.tagsPath = path.join(dir, 'tags.yml');
+        this.markdownTemplatePath = path.join(dir, 'markdown');
         this.dataDir = path.join(dir, 'data');
     }
 
@@ -53,7 +58,10 @@ export class DataRepository {
     }
 
     async ensureDirectoriesExist() {
-        await fs.mkdir(this.dataDir, { recursive: true });
+        await Promise.all([
+            fs.mkdir(this.markdownTemplatePath, { recursive: true }),
+            fs.mkdir(this.dataDir, { recursive: true })
+        ]);
     }
 
     async getConfig(): Promise<IDataConfig> {
@@ -84,6 +92,18 @@ export class DataRepository {
         return this.categories;
     }
 
+    async getTags(): Promise<Tag[]> {
+        try {
+            const tags = await fs.readFile(this.tagsPath, 'utf-8');
+            return yaml.parse(tags);
+        } catch (err) {
+            if (err?.code === 'ENOENT') {
+                return [];
+            }
+            throw err;
+        }
+    }
+
     async getItem(slug: string): Promise<ItemData> {
         const ymlPath = path.join(this.getItemPath(slug), `${slug}.yml`);
 
@@ -97,7 +117,7 @@ export class DataRepository {
                 const yamlPath = path.join(this.getItemPath(slug), `${slug}.yaml`);
                 const content = await fs.readFile(yamlPath, 'utf-8');
                 const item = yaml.parse(content);
-                
+
                 return { ...item, slug };
             }
             throw err;
@@ -117,10 +137,6 @@ export class DataRepository {
         }
     }
 
-    getCategoryName(id: string): string {
-        return this.categories?.find(c => c.id === id)?.name || id;
-    }
-
     async writeConfig(config: IDataConfig) {
         this.config = config;
         const str = yaml.stringify(config);
@@ -133,9 +149,29 @@ export class DataRepository {
         await fs.writeFile(this.categoriesPath, str, 'utf-8');
     }
 
+    async writeTags(tags: Tag[]) {
+        const str = yaml.stringify(tags);
+        await fs.writeFile(this.tagsPath, str, 'utf-8');
+    }
+
     async createItemDir(item: ItemData) {
         const itemDir = path.join(this.dataDir, item.slug);
         await fs.mkdir(itemDir, { recursive: true });
+    }
+
+    async writeMarkdownTemplate(header: string, footer: string) {
+        await Promise.all([
+            fs.writeFile(path.join(this.markdownTemplatePath, 'header.md'), header, 'utf-8'),
+            fs.writeFile(path.join(this.markdownTemplatePath, 'footer.md'), footer, 'utf-8'),
+        ]);
+    }
+
+    async readMarkdownTemplate() {
+        const [header, footer] = await Promise.all([
+            fs.readFile(path.join(this.markdownTemplatePath, 'header.md'), 'utf-8'),
+            fs.readFile(path.join(this.markdownTemplatePath, 'footer.md'), 'utf-8'),
+        ]);
+        return { header, footer };
     }
 
     async writeItem(item: ItemData) {
@@ -146,8 +182,13 @@ export class DataRepository {
         await fs.writeFile(filepath, str, 'utf-8');
     }
 
-    async writeMarkdown(item: ItemData, markdown: string) {
+    async writeItemMarkdown(item: ItemData, markdown: string) {
         const filepath = path.join(this.getItemPath(item.slug), `${item.slug}.md`);
         await fs.writeFile(filepath, markdown, 'utf-8');
+    }
+
+    async writeReadme(content: string) {
+        const filepath = path.join(this.dir, 'README.md');
+        await fs.writeFile(filepath, content, 'utf-8');
     }
 }

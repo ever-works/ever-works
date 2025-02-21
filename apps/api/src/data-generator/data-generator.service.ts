@@ -14,11 +14,12 @@ export class DataGeneratorService {
     constructor(
         private readonly githubService: GithubService,
         private readonly aiEngine: AiEngineService
-    ) {}
+    ) { }
 
     async initialize(directory: Directory, user: User, prompt: string) {
         const categories = await this.aiEngine.getCategoryList();
-        const items = await this.aiEngine.getItemsList({ prompt, categories });
+        const tags = await this.aiEngine.getTagsList();
+        const items = await this.aiEngine.getItemsList({ prompt, categories, tags });
         const token = user.getGitToken();
         const repo = directory.getDataRepo();
         const description = `machine-readable data for ${directory.slug}`;
@@ -28,14 +29,21 @@ export class DataGeneratorService {
         } else {
             await this.githubService.createEmptyRepo(repo, description, token);
         }
-        
+
         const dest = await this.githubService.clone(directory.owner, repo, token);
         const data = new DataRepository(dest);
-        
+
         try {
             await data.ensureDirectoriesExist();
-            await data.writeConfig(DEFAULT_DATA_CONFIG);
-            await data.writeCategories(categories);
+            await Promise.all([
+                data.writeReadme(this.getDefaultReadme(directory)),
+                data.writeConfig(DEFAULT_DATA_CONFIG),
+                data.writeCategories(categories),
+                data.writeTags(tags),
+                data.writeMarkdownTemplate(this.getHeader(directory), this.getFooter()),
+            ]);
+            await this.githubService.add(data.dir, '.');
+            await this.githubService.commit(data.dir, `init repository`, user.asCommitter());
 
             for (const item of items) {
                 item.slug = slugify(item.name, { lower: true });
@@ -58,13 +66,15 @@ export class DataGeneratorService {
         const data = new DataRepository(dest);
 
         const categories = await data.getCategories();
-        const items = await this.aiEngine.getItemsList({ prompt, categories });
+        const tags = await data.getTags();
+        const items = await this.aiEngine.getItemsList({ prompt, categories, tags });
         // mock adding some new item:
-        items.push({ 
+        items.push({
             name: 'Test Sample',
             category: 'testing',
             description: 'Best service ever',
-            source_url: 'https://example.com', 
+            source_url: 'https://example.com',
+            tags: [ { name: 'Test', id: 'test' } ],
         });
 
         try {
@@ -94,10 +104,32 @@ export class DataGeneratorService {
 
         await Promise.all([
             data.writeItem(item),
-            data.writeMarkdown(item, markdown),
+            data.writeItemMarkdown(item, markdown),
         ]);
 
         await this.githubService.add(data.dir, '.');
         await this.githubService.commit(data.dir, `add ${item.name}`, user.asCommitter());
+    }
+
+    private getDefaultReadme(directory: Directory) {
+        const markdownURL = this.githubService.getURL(directory.owner, directory.slug);
+        return `# ${directory.getDataRepo()}\n\n` +
+            `This repository holds data used to generate [${directory.slug}](${markdownURL})\n\n`;
+    }
+
+    private getHeader(directory: Directory) {
+        return `# ${directory.name}\n\n` +
+            `${directory.description}\n\n`;
+    }
+
+    private getFooter() {
+        return "## License\n\n" +
+            "Shield: [![CC BY-SA 4.0][cc-by-sa-shield]][cc-by-sa]\n\n" +
+            "This work is licensed under a\n\n" +
+            "[Creative Commons Attribution-ShareAlike 4.0 International License][cc-by-sa].\n\n" +
+            "[![CC BY-SA 4.0][cc-by-sa-image]][cc-by-sa]\n\n" +
+            "[cc-by-sa]: http://creativecommons.org/licenses/by-sa/4.0/\n\n" +
+            "[cc-by-sa-image]: https://licensebuttons.net/l/by-sa/4.0/88x31.png\n\n" +
+            "[cc-by-sa-shield]: https://img.shields.io/badge/License-CC%20BY--SA%204.0-lightgrey.svg\n\n";
     }
 }
