@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import * as fs from 'fs/promises';
 import { GithubService } from '../git/github.service';
-import type { Category, ItemData } from '../ai-engine/ai-engine.service';
+import type { Category, ItemData, Tag } from '../ai-engine/ai-engine.service';
 import { Directory } from '../entities/directory.entity';
 import { User } from '../entities/user.entity';
 import { DataRepository } from '../data-generator/data-repository';
@@ -20,7 +20,7 @@ export class MarkdownGeneratorService {
                 directory.owner,
                 directory.slug,
                 directory.description,
-                token
+                token,
             );
         } else {
             await this.githubService.createEmptyRepo(directory.slug, directory.description, token);
@@ -42,6 +42,7 @@ export class MarkdownGeneratorService {
         const dataRepo = new DataRepository(dataPath);
         const markdowns = new Set<string>(); // will be needed to check if markdown exists before referencing them in README
         const categories = await this.loadCategories(dataRepo);
+        const tags = await this.loadTags(dataRepo);
 
         try {
             const slugs = await fs.readdir(dataRepo.dataDir);
@@ -56,6 +57,10 @@ export class MarkdownGeneratorService {
                 }
 
                 const item = await dataRepo.getItem(slug);
+                if (Array.isArray(item.tags)) {
+                    item.tags = item.tags.map(tag => this.populateTag(tag, tags));
+                }
+
                 if (Array.isArray(item.category)) {
                     item.category = item.category.map(category => this.populateCategory(category, categories));
                 } else {
@@ -133,6 +138,17 @@ export class MarkdownGeneratorService {
         return categories;
     }
 
+    private async loadTags(data: DataRepository): Promise<Map<string, Category>> {
+        const list = await data.getTags();
+        const tags = new Map<string, Category>();
+
+        for (const tag of list) {
+            tags.set(tag.id, tag);
+        }
+
+        return tags;
+    }
+
     private populateCategory(category: string | Category, categories: Map<string, Category>): Category {
         const id = typeof category === 'string' ? category : category.id;
         const populated = categories.get(id);
@@ -149,5 +165,24 @@ export class MarkdownGeneratorService {
 
         categories.set(category.id, category);
         return category
+    }
+
+    
+    private populateTag(tag: string | Tag, tags: Map<string, Tag>): Tag {
+        const id = typeof tag === 'string' ? tag : tag.id;
+        const populated = tags.get(id);
+
+        if (populated) {
+            return populated;
+        }
+
+        if (typeof tag === 'string') {
+            const result = { id, name: tag };
+            tags.set(id, result);
+            return result;
+        }
+
+        tags.set(tag.id, tag);
+        return tag;
     }
 }

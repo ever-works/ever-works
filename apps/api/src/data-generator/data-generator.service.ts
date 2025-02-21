@@ -18,7 +18,8 @@ export class DataGeneratorService {
 
     async initialize(directory: Directory, user: User, prompt: string) {
         const categories = await this.aiEngine.getCategoryList();
-        const items = await this.aiEngine.getItemsList({ prompt, categories });
+        const tags = await this.aiEngine.getTagsList();
+        const items = await this.aiEngine.getItemsList({ prompt, categories, tags });
         const token = user.getGitToken();
         const repo = directory.getDataRepo();
         const description = `machine-readable data for ${directory.slug}`;
@@ -38,6 +39,7 @@ export class DataGeneratorService {
                 data.writeReadme(this.getDefaultReadme(directory)),
                 data.writeConfig(DEFAULT_DATA_CONFIG),
                 data.writeCategories(categories),
+                data.writeTags(tags),
                 data.writeMarkdownTemplate(this.getHeader(directory), this.getFooter()),
             ]);
             await this.githubService.add(data.dir, '.');
@@ -64,13 +66,15 @@ export class DataGeneratorService {
         const data = new DataRepository(dest);
 
         const categories = await data.getCategories();
-        const items = await this.aiEngine.getItemsList({ prompt, categories });
+        const tags = await data.getTags();
+        const items = await this.aiEngine.getItemsList({ prompt, categories, tags });
         // mock adding some new item:
         items.push({
             name: 'Test Sample',
             category: 'testing',
             description: 'Best service ever',
             source_url: 'https://example.com',
+            tags: [ { name: 'Test', id: 'test' } ],
         });
 
         try {
@@ -110,7 +114,7 @@ export class DataGeneratorService {
     private getDefaultReadme(directory: Directory) {
         const markdownURL = this.githubService.getURL(directory.owner, directory.slug);
         return `# ${directory.getDataRepo()}\n\n` +
-            `This repository holds data used to generate [${directory.slug}](${markdownURL}]\n\n`;
+            `This repository holds data used to generate [${directory.slug}](${markdownURL})\n\n`;
     }
 
     private getHeader(directory: Directory) {

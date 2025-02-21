@@ -1,7 +1,7 @@
 import * as path from "path";
 import * as fs from 'fs/promises';
 import * as yaml from 'yaml';
-import { Category, ItemData } from "../ai-engine/ai-engine.service";
+import { Category, ItemData, Tag } from "../ai-engine/ai-engine.service";
 import { format } from "date-fns";
 
 export interface IDataConfig {
@@ -21,6 +21,7 @@ export class DataRepository {
     private categories?: Category[];
     private readonly configPath: string;
     private readonly categoriesPath: string;
+    private readonly tagsPath: string;
     private readonly markdownTemplatePath: string;
     public readonly dataDir: string;
 
@@ -29,6 +30,7 @@ export class DataRepository {
          *   File structure:
          *      - config.yml
          *      - categories.yml
+         *      - tags.yml
          *      - data/
          *          - item1/
          *              - item1.yml
@@ -42,6 +44,7 @@ export class DataRepository {
          */
         this.configPath = path.join(dir, 'config.yml');
         this.categoriesPath = path.join(dir, 'categories.yml');
+        this.tagsPath = path.join(dir, 'tags.yml');
         this.markdownTemplatePath = path.join(dir, 'markdown');
         this.dataDir = path.join(dir, 'data');
     }
@@ -89,6 +92,18 @@ export class DataRepository {
         return this.categories;
     }
 
+    async getTags(): Promise<Tag[]> {
+        try {
+            const tags = await fs.readFile(this.tagsPath, 'utf-8');
+            return yaml.parse(tags);
+        } catch (err) {
+            if (err?.code === 'ENOENT') {
+                return [];
+            }
+            throw err;
+        }
+    }
+
     async getItem(slug: string): Promise<ItemData> {
         const ymlPath = path.join(this.getItemPath(slug), `${slug}.yml`);
 
@@ -102,7 +117,7 @@ export class DataRepository {
                 const yamlPath = path.join(this.getItemPath(slug), `${slug}.yaml`);
                 const content = await fs.readFile(yamlPath, 'utf-8');
                 const item = yaml.parse(content);
-                
+
                 return { ...item, slug };
             }
             throw err;
@@ -122,10 +137,6 @@ export class DataRepository {
         }
     }
 
-    getCategoryName(id: string): string {
-        return this.categories?.find(c => c.id === id)?.name || id;
-    }
-
     async writeConfig(config: IDataConfig) {
         this.config = config;
         const str = yaml.stringify(config);
@@ -136,6 +147,11 @@ export class DataRepository {
         this.categories = categories;
         const str = yaml.stringify(categories);
         await fs.writeFile(this.categoriesPath, str, 'utf-8');
+    }
+
+    async writeTags(tags: Tag[]) {
+        const str = yaml.stringify(tags);
+        await fs.writeFile(this.tagsPath, str, 'utf-8');
     }
 
     async createItemDir(item: ItemData) {

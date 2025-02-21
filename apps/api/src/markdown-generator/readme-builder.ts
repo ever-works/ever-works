@@ -1,5 +1,5 @@
 import slugify from "slugify";
-import { ItemData } from "../ai-engine/ai-engine.service";
+import { ItemData, Tag } from "../ai-engine/ai-engine.service";
 
 export class ReadmeBuilder {
     private content: string = '';
@@ -52,10 +52,15 @@ export class ReadmeBuilder {
         return toc;
     }
 
-    addItem(item: ItemData, { hasDetails = false } = {}) {
+    addItem(item: ItemData, options: { hasDetails?: boolean } = {}) {
         this.content += `- [${item.name}](${item.source_url}) - ${item.description}`;
-        if (hasDetails) {
+        if (options.hasDetails) {
             this.content += ` ([Read more](/details/${item.slug}.md))`;
+        }
+
+        if (item.tags && item.tags.length > 0) {
+            const tags = item.tags.map(tag => `\`${tag.name}\``).join(' ');
+            this.content += ` ${tags}`;
         }
         this.content += '\n';
         return this;
