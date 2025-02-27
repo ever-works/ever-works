@@ -37,7 +37,7 @@ export class VercelService implements IDeployService {
 
         if (data.ghToken) {
             promises.push(this.githubService.setActionSecret({
-                key: 'GH_APIKEY',
+                key: 'GH_TOKEN',
                 value: data.ghToken,
                 owner,
                 repo,
