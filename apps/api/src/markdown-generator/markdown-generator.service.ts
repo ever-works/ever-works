@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import * as fs from 'fs/promises';
 import { GithubService } from '../git/github.service';
-import type { Category, ItemData, Tag } from '../ai-engine/ai-engine.service';
+import type { Category, Identifable, ItemData, Tag } from '../ai-engine/ai-engine.service';
 import { Directory } from '../entities/directory.entity';
 import { User } from '../entities/user.entity';
 import { DataRepository } from '../data-generator/data-repository';
@@ -39,7 +39,7 @@ export class MarkdownGeneratorService {
         );
 
         const markdownRepo = new MarkdownRepository(markdownPath);
-        const dataRepo = new DataRepository(dataPath);
+        const dataRepo = await DataRepository.create(dataPath);
         const markdowns = new Set<string>(); // will be needed to check if markdown exists before referencing them in README
         const categories = await this.loadCategories(dataRepo);
         const tags = await this.loadTags(dataRepo);
@@ -58,13 +58,13 @@ export class MarkdownGeneratorService {
 
                 const item = await dataRepo.getItem(slug);
                 if (Array.isArray(item.tags)) {
-                    item.tags = item.tags.map(tag => this.populateTag(tag, tags));
+                    item.tags = item.tags.map(tag => this.populate<Tag>(tag, tags));
                 }
 
                 if (Array.isArray(item.category)) {
-                    item.category = item.category.map(category => this.populateCategory(category, categories));
+                    item.category = item.category.map(category => this.populate<Category>(category, categories));
                 } else {
-                    item.category = [this.populateCategory(item.category, categories)];
+                    item.category = [this.populate(item.category, categories)];
                 }
 
                 for (const category of item.category) {
@@ -149,40 +149,22 @@ export class MarkdownGeneratorService {
         return tags;
     }
 
-    private populateCategory(category: string | Category, categories: Map<string, Category>): Category {
-        const id = typeof category === 'string' ? category : category.id;
-        const populated = categories.get(id);
+    /* Works with both tags and categories */
+    private populate<T extends Identifable>(value: string | T, collection: Map<string, T>): T {
+        const id = typeof value === 'string' ? value : value.id;
+        const populated = collection.get(id);
 
         if (populated) {
             return populated;
         }
 
-        if (typeof category === 'string') {
-            const result = { id, name: category };
-            categories.set(id, result);
+        if (typeof value === 'string') {
+            const result = { id, name: value } as T;
+            collection.set(id, result);
             return result;
         }
 
-        categories.set(category.id, category);
-        return category
-    }
-
-    
-    private populateTag(tag: string | Tag, tags: Map<string, Tag>): Tag {
-        const id = typeof tag === 'string' ? tag : tag.id;
-        const populated = tags.get(id);
-
-        if (populated) {
-            return populated;
-        }
-
-        if (typeof tag === 'string') {
-            const result = { id, name: tag };
-            tags.set(id, result);
-            return result;
-        }
-
-        tags.set(tag.id, tag);
-        return tag;
+        collection.set(value.id, value);
+        return value;
     }
 }

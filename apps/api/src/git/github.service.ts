@@ -157,6 +157,17 @@ export class GithubService extends GitProvider {
         }
     }
 
+    async getActionWorkflows(owner: string, repo: string, token: string) {
+        const octokit = new Octokit({ auth: token });
+
+        const { data } = await octokit.rest.actions.listRepoWorkflows({
+            owner,
+            repo,
+        });
+
+        return data;
+    }
+
     async dispatchAction(
         data: { workflow: string, inputs?: { [x: string]: unknown }, branch: string, owner: string, repo: string, },
         token: string

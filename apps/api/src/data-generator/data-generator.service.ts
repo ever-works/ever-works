@@ -5,7 +5,7 @@ import { AiEngineService, ItemData } from '../ai-engine/ai-engine.service';
 import { GithubService } from '../git/github.service';
 import { Directory } from '../entities/directory.entity';
 import { User } from '../entities/user.entity';
-import { DataRepository, DEFAULT_DATA_CONFIG } from './data-repository';
+import { DataRepository, DEFAULT_DATA_CONFIG, IDataConfig } from './data-repository';
 
 @Injectable()
 export class DataGeneratorService {
@@ -31,13 +31,13 @@ export class DataGeneratorService {
         }
 
         const dest = await this.githubService.clone(directory.owner, repo, token);
-        const data = new DataRepository(dest);
+        const data = await DataRepository.create(dest);
 
         try {
             await data.ensureDirectoriesExist();
             await Promise.all([
                 data.writeReadme(this.getDefaultReadme(directory)),
-                data.writeConfig(DEFAULT_DATA_CONFIG),
+                data.writeConfig(this.getDefaultConfig()),
                 data.writeCategories(categories),
                 data.writeTags(tags),
                 data.writeMarkdownTemplate(this.getHeader(directory), this.getFooter()),
@@ -46,7 +46,7 @@ export class DataGeneratorService {
             await this.githubService.commit(data.dir, `init repository`, user.asCommitter());
 
             for (const item of items) {
-                item.slug = slugify(item.name, { lower: true });
+                item.slug = slugify(item.name, { lower: true, trim: true });
                 await this.processItem(data, item, user);
             }
 
@@ -63,7 +63,7 @@ export class DataGeneratorService {
         const token = user.getGitToken();
         const repo = directory.getDataRepo();
         const dest = await this.githubService.clone(directory.owner, repo, token);
-        const data = new DataRepository(dest);
+        const data = await DataRepository.create(dest);
 
         const categories = await data.getCategories();
         const tags = await data.getTags();
@@ -82,7 +82,7 @@ export class DataGeneratorService {
             const existingItems = new Set(await fs.readdir(data.dataDir));
 
             for (const item of items) {
-                item.slug = slugify(item.name, { lower: true });
+                item.slug = slugify(item.name, { lower: true, trim: true });
                 if (existingItems.has(item.slug)) {
                     continue;
                 }
@@ -109,6 +109,11 @@ export class DataGeneratorService {
 
         await this.githubService.add(data.dir, '.');
         await this.githubService.commit(data.dir, `add ${item.name}`, user.asCommitter());
+    }
+
+    private getDefaultConfig(): IDataConfig {
+        const now = new Date();
+        return { ...DEFAULT_DATA_CONFIG, copyright_year: now.getFullYear() };
     }
 
     private getDefaultReadme(directory: Directory) {
