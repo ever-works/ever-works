@@ -1,4 +1,4 @@
-import { Body, Controller, Param, Post } from '@nestjs/common';
+import { Body, Controller, NotFoundException, Param, Post } from '@nestjs/common';
 import { VercelService } from './vercel.service';
 import { Directory } from '../entities/directory.entity';
 import { User } from 'src/entities/user.entity';
@@ -8,9 +8,16 @@ export class DeployController {
     constructor(private readonly vercelService: VercelService) {}
     
     @Post('/:dirname/vercel')
-    async toVercel(@Body('token') token: string, @Param('dirname') slug) {
+    async toVercel(
+        @Body('VERCEL_TOKEN') vercelToken: string | undefined,
+        @Body('GITHUB_TOKEN') ghToken: string | undefined,
+        @Param('dirname') slug: string
+    ) {
         // some db query result:
         const directory = await Directory.findMock(slug);
+        if (!directory) {
+            throw new NotFoundException('Directory not found');
+        }
         const user = await User.sessionMock();
 
         await this.vercelService.deploy({
@@ -19,7 +26,8 @@ export class DeployController {
             repo: directory.getWebsiteRepo(),
             provider: 'vercel',
             data: {
-                token,
+                vercelToken: vercelToken || process.env.VERCEL_TOKEN,
+                ghToken: ghToken || process.env.GITHUB_APIKEY,
             }
         }, directory, user);
     }

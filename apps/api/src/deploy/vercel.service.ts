@@ -12,15 +12,15 @@ export class VercelService implements IDeployService {
 
     async deploy({ data, owner, repo }: VercelInput, directory: Directory, user: User) {
         const token = user.getGitToken();
-        await this.githubService.setActionVariable({
-            key: 'DEPLOY_PROVIDER',
-            value: this.PROVIDER_ID,
-            owner,
-            repo,
-        }, token);
-
         const publicKey = await this.githubService.repositoryPublickey(owner, repo, token);
-        await Promise.all([
+
+        const promises = [
+            this.githubService.setActionVariable({
+                key: 'DEPLOY_PROVIDER',
+                value: this.PROVIDER_ID,
+                owner,
+                repo,
+            }, token),
             this.githubService.setActionSecret({
                 key: 'DATA_REPOSITORY',
                 value: `${directory.slug}-data`,
@@ -29,11 +29,22 @@ export class VercelService implements IDeployService {
             }, publicKey, token),
             this.githubService.setActionSecret({
                 key: 'VERCEL_TOKEN',
-                value: data.token,
+                value: data.vercelToken,
                 owner,
                 repo,
             }, publicKey, token)
-        ]);
+        ];
+
+        if (data.ghToken) {
+            promises.push(this.githubService.setActionSecret({
+                key: 'GH_APIKEY',
+                value: data.ghToken,
+                owner,
+                repo,
+            }, publicKey, token));
+        }
+
+        await Promise.all(promises);
 
         await this.githubService.dispatchAction({
             workflow: 'deploy_vercel.yaml',

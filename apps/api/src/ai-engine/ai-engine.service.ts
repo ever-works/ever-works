@@ -1,16 +1,16 @@
 import { Injectable } from '@nestjs/common';
 
-export interface Category {
+export interface Identifable {
     id: string;
     name: string;
+}
+
+export interface Category extends Identifable {
     description?: string;
     icon_url?: string;
 }
 
-export interface Tag {
-    id: string;
-    name: string;
-}
+export interface Tag extends Identifable {}
 
 export interface ItemData {
     name: string;

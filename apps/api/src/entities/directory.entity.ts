@@ -4,6 +4,7 @@ export class Directory {
     name: string;
     slug: string;
     owner: string;
+    companyName: string;
     organization: boolean;
     description: string;
 

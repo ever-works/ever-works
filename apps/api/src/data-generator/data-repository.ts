@@ -5,12 +5,15 @@ import { Category, ItemData, Tag } from "../ai-engine/ai-engine.service";
 import { format } from "date-fns";
 
 export interface IDataConfig {
+    company_name?: string;
     content_table?: boolean;
     item_name?: string;
     items_name?: string;
+    copyright_year?: number;
 }
 
 export const DEFAULT_DATA_CONFIG: IDataConfig = {
+    company_name: 'Acme',
     content_table: false,
     item_name: 'Item',
     items_name: 'Items',
@@ -19,13 +22,17 @@ export const DEFAULT_DATA_CONFIG: IDataConfig = {
 export class DataRepository {
     private config?: IDataConfig;
     private categories?: Category[];
-    private readonly configPath: string;
-    private readonly categoriesPath: string;
-    private readonly tagsPath: string;
-    private readonly markdownTemplatePath: string;
-    public readonly dataDir: string;
 
-    constructor(public readonly dir: string) {
+    private constructor(
+        public readonly dir: string,
+        private readonly configPath: string,
+        private categoriesPath: string,
+        private readonly tagsPath: string,
+        private readonly markdownTemplatePath: string,
+        public readonly dataDir: string,
+    ) { }
+
+    static async create(dir: string): Promise<DataRepository> {
         /*
          *   File structure:
          *      - config.yml
@@ -42,11 +49,42 @@ export class DataRepository {
          *          - itemN/
          *              - itemN.yml
          */
-        this.configPath = path.join(dir, 'config.yml');
-        this.categoriesPath = path.join(dir, 'categories.yml');
-        this.tagsPath = path.join(dir, 'tags.yml');
-        this.markdownTemplatePath = path.join(dir, 'markdown');
-        this.dataDir = path.join(dir, 'data');
+
+        const categoriesPath = await this.getCollectionPath(dir, 'categories');
+        const tagsPath = await this.getCollectionPath(dir, 'tags');
+
+        const repo = new DataRepository(
+            dir,
+            path.join(dir, 'config.yml'),
+            categoriesPath,
+            tagsPath,
+            path.join(dir, 'markdown'),
+            path.join(dir, 'data'),
+        );
+
+        return repo;
+    }
+
+    private static async shouldeUseDir(dir: string, type: 'categories' | 'tags') {
+        try {
+            const dirpath = path.join(dir, type);
+            const stat = await fs.stat(dirpath);
+            return stat.isDirectory();
+        } catch (err) {
+            if (err instanceof Error && 'code' in err && err.code === 'ENOENT') {
+                return false;
+            }
+            throw err;
+        }
+    }
+
+    private static async getCollectionPath(dir: string, type: 'categories' | 'tags') {
+        const useDir = await this.shouldeUseDir(dir, type);
+        const collectionPath = useDir
+            ? path.join(dir, type, `${type}.yml`)
+            : path.join(dir, `${type}.yml`);
+
+        return collectionPath;
     }
 
     private getItemPath(slug: string) {
