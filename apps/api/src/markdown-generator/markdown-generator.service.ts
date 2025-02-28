@@ -77,6 +77,11 @@ export class MarkdownGeneratorService {
                 }
             }
 
+            const license = await dataRepo.getLicense();
+            if (license) {
+                await markdownRepo.writeLicense(license);
+            }
+            
             const readme: string = await this.generateReadme(dataRepo, markdowns, groups, categories);
             await markdownRepo.writeReadme(readme);
             await this.githubService.add(markdownPath, '.');

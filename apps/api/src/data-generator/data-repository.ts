@@ -175,6 +175,19 @@ export class DataRepository {
         }
     }
 
+    async getLicense(): Promise<string | null> {
+        const licensePath = path.join(this.dir, 'LICENSE.md');
+        try {
+            const license = await fs.readFile(licensePath, 'utf-8');
+            return license;
+        } catch (err) {
+            if (err?.code === 'ENOENT') {
+                return null;
+            }
+            throw err;
+        }
+    }
+
     async writeConfig(config: IDataConfig) {
         this.config = config;
         const str = yaml.stringify(config);
@@ -227,6 +240,11 @@ export class DataRepository {
 
     async writeReadme(content: string) {
         const filepath = path.join(this.dir, 'README.md');
+        await fs.writeFile(filepath, content, 'utf-8');
+    }
+
+    async writeLicense(content: string) {
+        const filepath = path.join(this.dir, 'LICENSE.md');
         await fs.writeFile(filepath, content, 'utf-8');
     }
 }
