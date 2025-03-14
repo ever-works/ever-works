@@ -26,9 +26,8 @@ export class AiController {
         const user = await User.sessionMock();
         const dirRepo = await this.githubService.clone(directory.owner, directory.getDataRepo(), user.getGitToken());
         const data = await DataRepository.create(dirRepo);
-        const response = await this.agent.generateItems(body.message) as ItemData[];
+        const response = await this.agent.generateItems(directory.id, body.message) as ItemData[];
         const existing = await data.getItems();
-        console.log('Generated items:', response);
         const dedup = await this.agent.deduplicate(response, existing)
 
         return dedup;

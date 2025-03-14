@@ -4,11 +4,10 @@ import { MemorySaver } from "@langchain/langgraph";
 import { createReactAgent } from "@langchain/langgraph/prebuilt";
 import { HumanMessage } from "@langchain/core/messages";
 import { SystemMessagePromptTemplate } from "@langchain/core/prompts";
-import { StructuredOutputParser } from "@langchain/core/output_parsers";
 import { z } from "zod";
 import { randomUUID } from "crypto";
 import { formatDate } from 'date-fns';
-import { SearchWebTool } from "./tools";
+import { getLastSearches, RecentQueriesTool, SearchWebTool } from "./tools";
 import { ItemData } from "./ai-engine.service";
 import slugify from "slugify";
 
@@ -20,18 +19,21 @@ export class Agent {
         this.logger.log('Creating agent');
         const llm = this.getLLM();
         const checkpointer = new MemorySaver();
-        const tools = [SearchWebTool];
+        const tools = [RecentQueriesTool, SearchWebTool];
         const now = new Date();
 
         const template = SystemMessagePromptTemplate.fromTemplate(
             "You are an expert in building directories websites." +
-            "User may ask you about list of known software, tools, services, places etc." +
-            `Today is {day} the {datetime}.`
+            "User may ask you about list of known software, tools, services, places etc\n\n." +
+            "Your typical tool flow:\n" +
+            "1. Call 'recent_queries' tool and use it to generate new, unique search query.\n" +
+            "2. Call 'search_web' tool with generated query to get informations from the web.\n" +
+            `\nToday is {day} the {datetime}.`
         );
 
         const prompt = await template.format({
             day: formatDate(now, 'cccc'),
-            datetime: formatDate(now, 'yyyy-MM-dd HH:mm')
+            datetime: formatDate(now, 'yyyy-MM-dd HH:mm'),
         });
 
         const agent = createReactAgent({
@@ -87,15 +89,15 @@ export class Agent {
         return result;
     }
 
-    public async generateItems(message: string) {
+    public async generateItems(directoryId: string, message: string) {
         this.logger.log('Invoking agent with message: "' + message + '"');
+        this.logger.log('directoryId: ' + directoryId);
         const agent = await this.createAgent();
         const result = await agent.invoke(
-            { messages: [new HumanMessage(message)] },
-            { configurable: { thread_id: randomUUID() } }
+            { messages: [new HumanMessage(message)],  },
+            { configurable: { thread_id: randomUUID() }, metadata: { directoryId } }
         );
 
-        console.log(result);
         const generated = result.structuredResponse;
         this.logger.log(`Generated ${generated.items?.length || 0} items`);
         const items = generated.items || [];
