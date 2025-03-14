@@ -1,4 +1,4 @@
-const directories = new Map();
+const directories = new Map<string, Directory>();
 
 export class Directory {
     name: string;

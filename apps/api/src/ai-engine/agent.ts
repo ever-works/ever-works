@@ -2,32 +2,43 @@ import { Injectable, Logger } from "@nestjs/common";
 import { ChatOpenAI } from '@langchain/openai'
 import { MemorySaver } from "@langchain/langgraph";
 import { createReactAgent } from "@langchain/langgraph/prebuilt";
-import { SearchWebTool } from "./tools";
-import { SystemMessage, HumanMessage } from "@langchain/core/messages";
+import { HumanMessage } from "@langchain/core/messages";
+import { SystemMessagePromptTemplate } from "@langchain/core/prompts";
+import { StructuredOutputParser } from "@langchain/core/output_parsers";
 import { z } from "zod";
 import { randomUUID } from "crypto";
-import { format } from 'date-fns';
+import { formatDate } from 'date-fns';
+import { SearchWebTool } from "./tools";
+import { ItemData } from "./ai-engine.service";
+import slugify from "slugify";
 
 @Injectable()
 export class Agent {
     private readonly logger = new Logger(Agent.name);
 
-    private createAgent() {
+    private async createAgent() {
         this.logger.log('Creating agent');
         const llm = this.getLLM();
         const checkpointer = new MemorySaver();
         const tools = [SearchWebTool];
-        const day = format(new Date(), 'cccc');
-        const datetime = format(new Date(), 'yyyy-MM-dd HH:mm');
+        const now = new Date();
 
-        const prompt = `You are an expert in building directories websites. User may ask you about list of known software, tools, services, places etc
-        Today is ${day} the ${datetime}.`;
+        const template = SystemMessagePromptTemplate.fromTemplate(
+            "You are an expert in building directories websites." +
+            "User may ask you about list of known software, tools, services, places etc." +
+            `Today is {day} the {datetime}.`
+        );
+
+        const prompt = await template.format({ 
+            day: formatDate(now, 'cccc'), 
+            datetime: formatDate(now, 'yyyy-MM-dd HH:mm')
+        });
 
         const agent = createReactAgent({
             llm,
             checkpointer,
             tools,
-            prompt: new SystemMessage({ content: prompt }),
+            prompt,
             name: 'directory_generator',
             responseFormat: z.object({
                 items: z.array(z.object({
@@ -41,21 +52,60 @@ export class Agent {
         return agent;
     }
 
-    public async invoke(message: string) {
+    private transformItem(item: ItemData) {
+        return {
+            slug: slugify(item.name, { lower: true, trim: true }),
+            name: item.name,
+            description: item.description,
+        };
+    }
+
+    public async deduplicate(generated: ItemData[], existing: ItemData[]) {
+        const prompt = SystemMessagePromptTemplate.fromTemplate(
+            "Compare and return only items from input that doesn't already exist in data.\n\n" +
+            "input: ```{input}```\n\n" +
+            "data: ```{data}```\n\n"
+        );
+
+        const llm = this.getLLM().withStructuredOutput(z.object({
+            items: z.array(z.object({
+                slug: z.string(),
+                name: z.string(),
+                description: z.string(),
+            }))
+        }));
+        
+        const chain = prompt.pipe(llm)
+        const result = await chain.invoke({ 
+            input: JSON.stringify(generated.map(this.transformItem)), 
+            data: JSON.stringify(existing.map(this.transformItem)),
+        });
+
+        return result;
+    }
+
+    public async generateItems(message: string) {
         this.logger.log('Invoking agent with message: "' + message + '"');
-        const agent = this.createAgent();
+        const agent = await this.createAgent();
         const result = await agent.invoke(
             { messages: [new HumanMessage(message)] },
             { configurable: { thread_id: randomUUID() } }
         );
 
-        return result.structuredResponse;
+        console.log(result);
+        const generated = result.structuredResponse;
+        this.logger.log(`Generated ${generated.items?.length || 0} items`);
+        const items = generated.items || [];
+        const mapped = items.map(item => ({ ...item, slug: slugify(item.name, { lower: true, trim: true }) }));
+        console.log(mapped);
+
+        return mapped;
     }
 
     private getLLM() {
         const llm = new ChatOpenAI({
             model: 'gpt-4o-mini',
-            temperature: 0.2,
+            temperature: 0,
         });
 
         return llm;

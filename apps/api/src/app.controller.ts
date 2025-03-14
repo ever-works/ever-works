@@ -25,7 +25,7 @@ export class AppController {
     const user = await User.sessionMock();
     const dir = new Directory();
     dir.slug = slug;
-    dir.organization = (typeof owner === 'undefined') ? false : true;
+    dir.organization = typeof owner !== 'undefined';
     if (owner) {
       dir.owner = owner;
     } else {

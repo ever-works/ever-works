@@ -142,6 +142,18 @@ export class DataRepository {
         }
     }
 
+    async getItems() {
+        const items = await fs.readdir(this.dataDir, { withFileTypes: true });
+        const promises = items
+            .filter((item) => item.isDirectory())
+            .map(async (item) => {
+                const slug = item.name;
+                return this.getItem(slug);
+            });
+        
+        return Promise.all(promises);
+    }
+
     async getItem(slug: string): Promise<ItemData> {
         const ymlPath = path.join(this.getItemPath(slug), `${slug}.yml`);
 

@@ -8,7 +8,14 @@ import { WebsiteGeneratorModule } from './website-generator/website-generator.mo
 import { DeployModule } from './deploy/deploy.module';
 
 @Module({
-  imports: [DataGeneratorModule, AiEngineModule, GitModule, MarkdownGeneratorModule, WebsiteGeneratorModule, DeployModule],
+  imports: [
+    DataGeneratorModule,
+    AiEngineModule,
+    GitModule,
+    MarkdownGeneratorModule,
+    WebsiteGeneratorModule,
+    DeployModule
+  ],
   controllers: [AppController],
 })
 export class AppModule {}
