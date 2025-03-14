@@ -1,10 +1,10 @@
 import { Body, Controller, NotFoundException, Post } from "@nestjs/common";
 import { Agent } from "./agent";
-import { DataRepository } from "src/data-generator/data-repository";
-import { GithubService } from "src/git/github.service";
-import { User } from "src/entities/user.entity";
+import { DataRepository } from "../data-generator/data-repository";
+import { GithubService } from "../git/github.service";
+import { User } from "../entities/user.entity";
 import { ItemData } from "./ai-engine.service";
-import { Directory } from "src/entities/directory.entity";
+import { Directory } from "../entities/directory.entity";
 
 @Controller()
 export class AiController {

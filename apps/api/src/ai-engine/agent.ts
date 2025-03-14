@@ -29,8 +29,8 @@ export class Agent {
             `Today is {day} the {datetime}.`
         );
 
-        const prompt = await template.format({ 
-            day: formatDate(now, 'cccc'), 
+        const prompt = await template.format({
+            day: formatDate(now, 'cccc'),
             datetime: formatDate(now, 'yyyy-MM-dd HH:mm')
         });
 
@@ -45,6 +45,8 @@ export class Agent {
                     name: z.string(),
                     source_url: z.string().describe('The URL of item`s official website/repository'),
                     description: z.string(),
+                    category: z.string().optional().describe('The category of the item'),
+                    tags: z.array(z.string()).optional().describe('The tags of the item'),
                 })),
             }),
         });
@@ -68,16 +70,17 @@ export class Agent {
         );
 
         const llm = this.getLLM().withStructuredOutput(z.object({
-            items: z.array(z.object({
-                slug: z.string(),
-                name: z.string(),
-                description: z.string(),
-            }))
+            items: z.array(
+                z.object({
+                    slug: z.string(),
+                    name: z.string(),
+                    description: z.string(),
+                }))
         }));
-        
+
         const chain = prompt.pipe(llm)
-        const result = await chain.invoke({ 
-            input: JSON.stringify(generated.map(this.transformItem)), 
+        const result = await chain.invoke({
+            input: JSON.stringify(generated.map(this.transformItem)),
             data: JSON.stringify(existing.map(this.transformItem)),
         });
 
