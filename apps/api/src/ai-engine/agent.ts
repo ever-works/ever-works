@@ -65,28 +65,27 @@ export class Agent {
         };
     }
 
-    public async deduplicate(generated: ItemData[], existing: ItemData[]) {
+    public async compare(oldItem: ItemData, newItem: ItemData) {
+        this.logger.log('Comparing items: ' + oldItem.slug);
         const prompt = SystemMessagePromptTemplate.fromTemplate(
-            "Compare and return only items from input that doesn't already exist in data.\n\n" +
-            "input: ```{input}```\n\n" +
-            "data: ```{data}```\n\n"
+            "Compare two items' descriptions and return 'true' if new item is more relevant, " +
+            "contains more details, it shows more features and is more comprehensive.\n" +
+            "If items are similar enough or old item is better, return 'false'\n\n" +
+            "old: ```{old}```\n\n" +
+            "new: ```{new}```\n\n"
         );
 
         const llm = this.getLLM().withStructuredOutput(z.object({
-            items: z.array(
-                z.object({
-                    slug: z.string(),
-                    name: z.string(),
-                    description: z.string(),
-                }))
+            result: z.boolean(),
         }));
 
-        const chain = prompt.pipe(llm)
+        const chain = prompt.pipe(llm);
         const result = await chain.invoke({
-            input: JSON.stringify(generated.map(this.transformItem)),
-            data: JSON.stringify(existing.map(this.transformItem)),
+            old: JSON.stringify(this.transformItem(oldItem)),
+            new: JSON.stringify(this.transformItem(newItem)),
         });
 
+        this.logger.log(`New item for ${newItem.slug} is better: ${result.result}`);
         return result;
     }
 
@@ -98,7 +97,7 @@ export class Agent {
             return;
         }
 
-        const llm = this.getLLM();
+        const llm = this.getLLM(0.3); // for generating text it's fine to set higher temperature
         const prompt = SystemMessagePromptTemplate.fromTemplate(
             "Generate markdown for item.\n" +
             "name: {name}\n" +
@@ -135,10 +134,10 @@ export class Agent {
         return mapped;
     }
 
-    private getLLM() {
+    private getLLM(temperature = 0) {
         const llm = new ChatOpenAI({
             model: 'gpt-4o-mini',
-            temperature: 0,
+            temperature,
         });
 
         return llm;
