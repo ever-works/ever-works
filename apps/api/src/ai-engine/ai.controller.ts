@@ -15,10 +15,9 @@ export class AiController {
 
     @Post('ai')
     async invoke(
-        @Body('slug') slug: string,
-        @Body() body: { message: string }
+        @Body() body: { slug: string, message: string }
     ) {
-        const directory = await Directory.findMock(slug);
+        const directory = await Directory.findMock(body.slug);
         if (!directory) {
             throw new NotFoundException('Directory not found');
         }

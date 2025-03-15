@@ -7,9 +7,10 @@ import { SystemMessagePromptTemplate } from "@langchain/core/prompts";
 import { z } from "zod";
 import { randomUUID } from "crypto";
 import { formatDate } from 'date-fns';
-import { getLastSearches, RecentQueriesTool, SearchWebTool } from "./tools";
+import { RecentQueriesTool, SearchWebTool } from "./tools";
 import { ItemData } from "./ai-engine.service";
 import slugify from "slugify";
+import { tavily } from "@tavily/core";
 
 @Injectable()
 export class Agent {
@@ -28,7 +29,8 @@ export class Agent {
             "Your typical tool flow:\n" +
             "1. Call 'recent_queries' tool and use it to generate new, unique search query.\n" +
             "2. Call 'search_web' tool with generated query to get informations from the web.\n" +
-            `\nToday is {day} the {datetime}.`
+            "\n" +
+            `Today is {day} the {datetime}.`
         );
 
         const prompt = await template.format({
@@ -59,7 +61,6 @@ export class Agent {
     private transformItem(item: ItemData) {
         return {
             slug: slugify(item.name, { lower: true, trim: true }),
-            name: item.name,
             description: item.description,
         };
     }
@@ -87,6 +88,33 @@ export class Agent {
         });
 
         return result;
+    }
+
+    public async generateMarkdown(item: ItemData): Promise<string> {
+        const tvly = tavily({ apiKey: process.env.TAVILY_API_KEY });
+        const response = await tvly.extract([item.source_url], { includeImages: true });
+        const crawled = response.results[0];
+        if (!crawled) {
+            return;
+        }
+
+        const llm = this.getLLM();
+        const prompt = SystemMessagePromptTemplate.fromTemplate(
+            "Generate markdown for item.\n" +
+            "name: {name}\n" +
+            "description: {description}\n\n" +
+            "Use informations below:\n" +
+            "```{crawled}```"
+        );
+
+        const chain = prompt.pipe(llm);
+        const result = await chain.invoke({
+            name: item.name,
+            description: item.description,
+            crawled: JSON.stringify(crawled),
+        });
+
+        return result.content as string;
     }
 
     public async generateItems(directoryId: string, message: string) {
