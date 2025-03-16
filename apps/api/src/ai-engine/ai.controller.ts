@@ -3,13 +3,14 @@ import { Agent } from "./agent";
 import { DataRepository } from "../data-generator/data-repository";
 import { GithubService } from "../git/github.service";
 import { User } from "../entities/user.entity";
-import { ItemData } from "./ai-engine.service";
+import { AiEngineService, ItemData } from "./ai-engine.service";
 import { Directory } from "../entities/directory.entity";
 
 @Controller()
 export class AiController {
     constructor(
         private readonly githubService: GithubService,
+        private readonly aiEngineService: AiEngineService,
         private readonly agent: Agent
     ) {}
 
@@ -26,10 +27,10 @@ export class AiController {
         const dirRepo = await this.githubService.clone(directory.owner, directory.getDataRepo(), user.getGitToken());
         const data = await DataRepository.create(dirRepo);
         const existing = await data.getItems();
-        const response = await this.agent.generateItems(directory.id, body.message) as ItemData[];
+        const { items, categories, tags } = await this.aiEngineService.getItemsList(directory, body.message);
 
         const returned = [];
-        for (const item of response) {
+        for (const item of items) {
             const existingItem = existing.find(i => i.slug === item.slug);
             if (!existingItem) {
                 returned.push(item);
@@ -41,7 +42,7 @@ export class AiController {
             }
         }
 
-        return returned;
+        return { items: returned, categories, tags };
     }
 
     @Post('ai/markdown')

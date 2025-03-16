@@ -12,6 +12,14 @@ import { ItemData } from "./ai-engine.service";
 import slugify from "slugify";
 import { tavily } from "@tavily/core";
 
+export const ItemGeneratedSchema = z.object({
+    name: z.string(),
+    source_url: z.string().describe('The URL of item`s official website/repository'),
+    description: z.string(),
+    category: z.string().optional().describe('The category of the item'),
+    tags: z.array(z.string()).optional().describe('The tags of the item'),
+})
+
 @Injectable()
 export class Agent {
     private readonly logger = new Logger(Agent.name);
@@ -45,13 +53,7 @@ export class Agent {
             prompt,
             name: 'directory_generator',
             responseFormat: z.object({
-                items: z.array(z.object({
-                    name: z.string(),
-                    source_url: z.string().describe('The URL of item`s official website/repository'),
-                    description: z.string(),
-                    category: z.string().optional().describe('The category of the item'),
-                    tags: z.array(z.string()).optional().describe('The tags of the item'),
-                })),
+                items: z.array(ItemGeneratedSchema),
             }),
         });
 
@@ -89,11 +91,13 @@ export class Agent {
         return result;
     }
 
-    public async generateMarkdown(item: ItemData): Promise<string> {
+    public async generateMarkdown(item: ItemData): Promise<string | undefined> {
+        this.logger.log('Generating markdown for:  ' + item.slug);
         const tvly = tavily({ apiKey: process.env.TAVILY_API_KEY });
         const response = await tvly.extract([item.source_url], { includeImages: true });
         const crawled = response.results[0];
         if (!crawled) {
+            this.logger.warn('Failed to extract content for "' + item.slug + '" from URL: ' + item.source_url);
             return;
         }
 
@@ -121,7 +125,7 @@ export class Agent {
         this.logger.log('directoryId: ' + directoryId);
         const agent = await this.createAgent();
         const result = await agent.invoke(
-            { messages: [new HumanMessage(message)],  },
+            { messages: [new HumanMessage(message)], },
             { configurable: { thread_id: randomUUID() }, metadata: { directoryId } }
         );
 

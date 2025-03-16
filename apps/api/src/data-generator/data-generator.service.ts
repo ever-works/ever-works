@@ -17,9 +17,7 @@ export class DataGeneratorService {
     ) { }
 
     async initialize(directory: Directory, user: User, prompt: string) {
-        const categories = await this.aiEngine.getCategoryList();
-        const tags = await this.aiEngine.getTagsList();
-        const items = await this.aiEngine.getItemsList({ prompt, categories, tags });
+        const { categories, items, tags } = await this.aiEngine.getItemsList(directory, prompt);
         const token = user.getGitToken();
         const repo = directory.getDataRepo();
         const description = `machine-readable data for ${directory.slug}`;
@@ -68,15 +66,7 @@ export class DataGeneratorService {
 
         const categories = await data.getCategories();
         const tags = await data.getTags();
-        const items = await this.aiEngine.getItemsList({ prompt, categories, tags });
-        // mock adding some new item:
-        items.push({
-            name: 'Test Sample',
-            category: 'testing',
-            description: 'Best service ever',
-            source_url: 'https://example.com',
-            tags: [{ name: 'Test', id: 'test' }],
-        });
+        const { items } = await this.aiEngine.getItemsList(directory, prompt);
 
         try {
             await data.ensureDirectoriesExist();
@@ -100,14 +90,15 @@ export class DataGeneratorService {
     }
 
     private async processItem(data: DataRepository, item: ItemData, user: User) {
-        const markdown = await this.aiEngine.getItemDetails(item);
         await data.createItemDir(item);
+        const promises = [data.writeItem(item)];
 
-        await Promise.all([
-            data.writeItem(item),
-            data.writeItemMarkdown(item, markdown),
-        ]);
+        const markdown = await this.aiEngine.getItemDetails(item);
+        if (markdown) {
+         promises.push(data.writeItemMarkdown(item, markdown));
+        }
 
+        await Promise.all(promises);
         await this.githubService.add(data.dir, '.');
         await this.githubService.commit(data.dir, `add ${item.name}`, user.asCommitter());
     }
