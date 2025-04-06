@@ -1,137 +1,154 @@
 import { Injectable, Logger } from '@nestjs/common';
 import slugify from 'slugify';
-import * as fs from 'fs/promises';
-import { AiEngineService, ItemData } from '../ai-engine/ai-engine.service';
+import { Identifable, ItemData } from '../agent/types';
 import { GithubService } from '../git/github.service';
 import { Directory } from '../entities/directory.entity';
 import { User } from '../entities/user.entity';
 import { DataRepository, DEFAULT_DATA_CONFIG, IDataConfig } from './data-repository';
+import { Agent } from 'src/agent/agent';
+import { markdown } from 'src/agent/markdown';
+import { arrayDiff } from 'src/agent/utils';
 
 @Injectable()
 export class DataGeneratorService {
-    private readonly logger = new Logger('DataGeneratorService');
+   private readonly logger = new Logger('DataGeneratorService');
 
-    constructor(
-        private readonly githubService: GithubService,
-        private readonly aiEngine: AiEngineService
-    ) { }
+   constructor(
+      private readonly githubService: GithubService,
+   ) { }
 
-    async initialize(directory: Directory, user: User, prompt: string) {
-        const { categories, items, tags } = await this.aiEngine.getItemsList(directory, prompt);
-        const token = user.getGitToken();
-        const repo = directory.getDataRepo();
-        const description = `machine-readable data for ${directory.slug}`;
+   async initialize(directory: Directory, user: User, prompt: string) {
+      const agent = new Agent();
+      const { categories, items, tags } = await agent.generateItems(prompt, { maxQueries: 4, maxUrls: 16 });
+      const token = user.getGitToken();
+      const repo = directory.getDataRepo();
+      const description = `machine-readable data for ${directory.slug}`;
 
-        if (directory.organization) {
-            await this.githubService.createEmptyRepoAsOrg(directory.owner, repo, description, token);
-        } else {
-            await this.githubService.createEmptyRepo(repo, description, token);
-        }
+      if (directory.organization) {
+         await this.githubService.createEmptyRepoAsOrg(directory.owner, repo, description, token);
+      } else {
+         await this.githubService.createEmptyRepo(repo, description, token);
+      }
 
-        const dest = await this.githubService.clone(directory.owner, repo, token);
-        const data = await DataRepository.create(dest);
+      const dest = await this.githubService.clone(directory.owner, repo, token);
+      const data = await DataRepository.create(dest);
 
-        try {
-            await data.ensureDirectoriesExist();
-            await Promise.all([
-                data.writeReadme(this.getDefaultReadme(directory)),
-                data.writeLicense(this.getLicense()),
-                data.writeConfig(this.getDefaultConfig()),
-                data.writeCategories(categories),
-                data.writeTags(tags),
-                data.writeMarkdownTemplate(this.getHeader(directory), this.getFooter()),
-            ]);
-            await this.githubService.add(data.dir, '.');
-            await this.githubService.commit(data.dir, `init repository`, user.asCommitter());
+      try {
+         await data.ensureDirectoriesExist();
+         await Promise.all([
+            data.writeReadme(this.getDefaultReadme(directory)),
+            data.writeLicense(this.getLicense()),
+            data.writeConfig(this.getDefaultConfig()),
+            data.writeCategories(categories),
+            data.writeTags(tags),
+            data.writeMarkdownTemplate(this.getHeader(directory), this.getFooter()),
+         ]);
+         await this.githubService.add(data.dir, '.');
+         await this.githubService.commit(data.dir, `init repository`, user.asCommitter());
 
-            for (const item of items) {
-                item.slug = slugify(item.name, { lower: true, trim: true });
-                await this.processItem(data, item, user);
-            }
+         for (const item of items) {
+            item.slug = slugify(item.name, { lower: true, trim: true });
+            await this.processItem(data, item, user);
+         }
 
-            await this.githubService.push(dest, token);
-        } catch (err) {
-            this.logger.error('Failed to initialize data repository', err);
-            throw err;
-        } finally {
-            await data.cleanup();
-        }
-    }
+         await this.githubService.push(dest, token);
+      } catch (err) {
+         this.logger.error('Failed to initialize data repository', err);
+         throw err;
+      } finally {
+         await data.cleanup();
+      }
+   }
 
-    async update(directory: Directory, user: User, prompt: string) {
-        const token = user.getGitToken();
-        const repo = directory.getDataRepo();
-        const dest = await this.githubService.clone(directory.owner, repo, token);
-        const data = await DataRepository.create(dest);
+   async update(directory: Directory, user: User, prompt: string) {
+      const token = user.getGitToken();
+      const repo = directory.getDataRepo();
+      const agent = new Agent();
+      const dest = await this.githubService.clone(directory.owner, repo, token);
+      const data = await DataRepository.create(dest);
 
-        const categories = await data.getCategories();
-        const tags = await data.getTags();
-        const { items } = await this.aiEngine.getItemsList(directory, prompt);
+      try {
+         const categories = await data.getCategories();
+         const tags = await data.getTags();
+         const existingItems = await data.getItems();
+         const generated = await agent.generateNewItems(prompt, existingItems);
+   
+         await Promise.all([
+            data.writeCategories(this.merge(categories, generated.categories)),
+            data.writeTags(this.merge(tags, generated.tags)),
+         ]);
 
-        try {
-            await data.ensureDirectoriesExist();
-            const existingItems = new Set(await fs.readdir(data.dataDir));
+         //return generated.items;
 
-            for (const item of items) {
-                item.slug = slugify(item.name, { lower: true, trim: true });
-                if (existingItems.has(item.slug)) {
-                    continue;
-                }
-                await this.processItem(data, item, user);
-            }
+         await data.ensureDirectoriesExist();
 
-            await this.githubService.push(dest, token);
-        } catch (err) {
-            this.logger.error('Failed to update data repository', err);
-            throw err;
-        } finally {
-            await data.cleanup();
-        }
-    }
+         for (const item of generated.items) {
+            item.slug = slugify(item.name, { lower: true, trim: true });
+            await this.processItem(data, item, user);
+         }
 
-    private async processItem(data: DataRepository, item: ItemData, user: User) {
-        await data.createItemDir(item);
-        const promises = [data.writeItem(item)];
+         await this.githubService.push(dest, token);
+      } catch (err) {
+         this.logger.error('Failed to update data repository', err);
+         throw err;
+      } finally {
+         await data.cleanup();
+      }
+   }
 
-        const markdown = await this.aiEngine.getItemDetails(item);
-        if (markdown) {
-         promises.push(data.writeItemMarkdown(item, markdown));
-        }
+   private async processItem(data: DataRepository, item: ItemData, user: User) {
+      await data.createItemDir(item);
+      const promises = [data.writeItem(item)];
+      const md = await markdown(item);
+      if (md) {
+         promises.push(data.writeItemMarkdown(item, md));
+      }
 
-        await Promise.all(promises);
-        await this.githubService.add(data.dir, '.');
-        await this.githubService.commit(data.dir, `add ${item.name}`, user.asCommitter());
-    }
+      await Promise.all(promises);
+      await this.githubService.add(data.dir, '.');
+      await this.githubService.commit(data.dir, `add ${item.name}`, user.asCommitter());
+   }
 
-    private getDefaultConfig(): IDataConfig {
-        const now = new Date();
-        return { ...DEFAULT_DATA_CONFIG, copyright_year: now.getFullYear() };
-    }
+   private merge(a: Identifable[], b: Identifable[]) {
+      const map = new Map<string, Identifable>();
+      for (const item of a) {
+         map.set(item.id, item);
+      }
+      for (const item of b) {
+         map.set(item.id, item);
+      }
+      return Array.from(map.values());
+   }
 
-    private getDefaultReadme(directory: Directory) {
-        const markdownURL = this.githubService.getURL(directory.owner, directory.slug);
-        return `# ${directory.getDataRepo()}\n\n` +
-            `This repository holds data used to generate [${directory.slug}](${markdownURL})\n\n`;
-    }
+   private getDefaultConfig(): IDataConfig {
+      const now = new Date();
+      return { ...DEFAULT_DATA_CONFIG, copyright_year: now.getFullYear() };
+   }
 
-    private getHeader(directory: Directory) {
-        return `# ${directory.name}\n\n` +
-            `${directory.description}\n\n`;
-    }
+   private getDefaultReadme(directory: Directory) {
+      const markdownURL = this.githubService.getURL(directory.owner, directory.slug);
+      return `# ${directory.getDataRepo()}\n\n` +
+         `This repository holds data used to generate [${directory.slug}](${markdownURL})\n\n`;
+   }
 
-    private getFooter() {
-        return "## License\n\n" +
-            "Shield: [![CC BY-SA 4.0][cc-by-sa-shield]][cc-by-sa]\n\n" +
-            "This work is licensed under a\n\n" +
-            "[Creative Commons Attribution-ShareAlike 4.0 International License][cc-by-sa].\n\n" +
-            "[![CC BY-SA 4.0][cc-by-sa-image]][cc-by-sa]\n\n" +
-            "[cc-by-sa]: http://creativecommons.org/licenses/by-sa/4.0/\n\n" +
-            "[cc-by-sa-image]: https://licensebuttons.net/l/by-sa/4.0/88x31.png\n\n" +
-            "[cc-by-sa-shield]: https://img.shields.io/badge/License-CC%20BY--SA%204.0-lightgrey.svg\n\n";
-    }
+   private getHeader(directory: Directory) {
+      return `# ${directory.name}\n\n` +
+         `${directory.description}\n\n`;
+   }
 
-    private getLicense() {
-        return `Attribution-ShareAlike 4.0 International
+   private getFooter() {
+      return "## License\n\n" +
+         "Shield: [![CC BY-SA 4.0][cc-by-sa-shield]][cc-by-sa]\n\n" +
+         "This work is licensed under a\n\n" +
+         "[Creative Commons Attribution-ShareAlike 4.0 International License][cc-by-sa].\n\n" +
+         "[![CC BY-SA 4.0][cc-by-sa-image]][cc-by-sa]\n\n" +
+         "[cc-by-sa]: http://creativecommons.org/licenses/by-sa/4.0/\n\n" +
+         "[cc-by-sa-image]: https://licensebuttons.net/l/by-sa/4.0/88x31.png\n\n" +
+         "[cc-by-sa-shield]: https://img.shields.io/badge/License-CC%20BY--SA%204.0-lightgrey.svg\n\n";
+   }
+
+   private getLicense() {
+      return `Attribution-ShareAlike 4.0 International
 
 =======================================================================
 
@@ -558,5 +575,5 @@ the avoidance of doubt, this paragraph does not form part of the
 public licenses.
 
 Creative Commons may be contacted at creativecommons.org.`
-    }
+}
 }

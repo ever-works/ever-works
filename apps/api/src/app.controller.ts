@@ -1,10 +1,11 @@
-import { Body, Controller, NotFoundException, Post } from '@nestjs/common';
+import { Body, Controller, Logger, NotFoundException, Post } from '@nestjs/common';
 import { DataGeneratorService } from './data-generator/data-generator.service';
 import { MarkdownGeneratorService } from './markdown-generator/markdown-generator.service';
 import { WebsiteGeneratorService } from './website-generator/website-generator.service';
 import { Directory } from './entities/directory.entity';
 import { User } from './entities/user.entity';
 import { GithubService } from './git/github.service';
+import { Agent } from './agent/agent';
 
 @Controller()
 export class AppController {
@@ -14,6 +15,14 @@ export class AppController {
     private readonly websiteGenerator: WebsiteGeneratorService,
     private readonly githubService: GithubService,
   ) { }
+
+  @Post('queries')
+  async generateQueries(
+    @Body('task') task: string,
+  ) {
+    const agent = new Agent();
+    return agent.generateItems(task, { maxUrls: 16 });
+  }
 
   @Post('directories')
   async createDirectory(
@@ -70,8 +79,9 @@ export class AppController {
       throw new NotFoundException('Directory not found');
     }
 
-    await this.dataGenerator.update(directory, user, prompt);
-    await this.markdownGenerator.update(directory, user);
+    const result = await this.dataGenerator.update(directory, user, prompt);
+    return result;
+    //await this.markdownGenerator.update(directory, user);
 
     return directory;
   }

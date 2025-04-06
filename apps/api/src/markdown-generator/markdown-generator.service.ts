@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import * as fs from 'fs/promises';
 import { GithubService } from '../git/github.service';
-import type { Category, Identifable, ItemData, Tag } from '../ai-engine/ai-engine.service';
+import type { Category, Identifable, ItemData, Tag } from '../agent/types';
 import { Directory } from '../entities/directory.entity';
 import { User } from '../entities/user.entity';
 import { DataRepository } from '../data-generator/data-repository';

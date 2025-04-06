@@ -1,8 +1,8 @@
 import * as path from "path";
 import * as fs from 'fs/promises';
 import * as yaml from 'yaml';
-import { Category, ItemData, Tag } from "../ai-engine/ai-engine.service";
 import { format } from "date-fns";
+import { Category, ItemData, Tag } from "../agent/types";
 
 export interface IDataConfig {
     company_name?: string;

@@ -22,6 +22,7 @@
   "dependencies": {
     "@langchain/community": "^0.3.34",
     "@langchain/core": "^0.3.42",
+    "@langchain/deepseek": "^0.0.1",
     "@langchain/langgraph": "^0.2.54",
     "@langchain/openai": "^0.4.4",
     "@nestjs/bullmq": "^10.2.3",

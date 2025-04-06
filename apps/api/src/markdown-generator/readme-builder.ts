@@ -1,5 +1,5 @@
 import slugify from "slugify";
-import { ItemData, Tag } from "../ai-engine/ai-engine.service";
+import { ItemData } from "../agent/types";
 
 export class ReadmeBuilder {
     private content: string = '';
