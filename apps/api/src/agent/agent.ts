@@ -3,7 +3,7 @@ import { Identifable, ItemData } from "./types";
 import { markdown } from "./markdown";
 import { generateQueries } from "./queries";
 import { aggregateSearchResults, extractContent, searchWeb } from "./tavily";
-import { generateSubarray } from "./subagent";
+import { generateSubarray } from "./generator";
 import { arrayDiff, deduplicateByField } from "./utils";
 import { deduplicate, extractNewItems } from "./deduplicator";
 import { categorize } from "./categorize";

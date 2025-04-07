@@ -78,8 +78,6 @@ export class DataGeneratorService {
             data.writeTags(this.merge(tags, generated.tags)),
          ]);
 
-         //return generated.items;
-
          await data.ensureDirectoriesExist();
 
          for (const item of generated.items) {

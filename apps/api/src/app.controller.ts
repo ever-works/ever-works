@@ -79,9 +79,8 @@ export class AppController {
       throw new NotFoundException('Directory not found');
     }
 
-    const result = await this.dataGenerator.update(directory, user, prompt);
-    return result;
-    //await this.markdownGenerator.update(directory, user);
+    await this.dataGenerator.update(directory, user, prompt);
+    await this.markdownGenerator.update(directory, user);
 
     return directory;
   }
