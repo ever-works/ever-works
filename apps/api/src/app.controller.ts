@@ -1,11 +1,10 @@
-import { Body, Controller, Logger, NotFoundException, Post } from '@nestjs/common';
+import { Body, Controller, NotFoundException, Post } from '@nestjs/common';
 import { DataGeneratorService } from './data-generator/data-generator.service';
 import { MarkdownGeneratorService } from './markdown-generator/markdown-generator.service';
 import { WebsiteGeneratorService } from './website-generator/website-generator.service';
 import { Directory } from './entities/directory.entity';
 import { User } from './entities/user.entity';
 import { GithubService } from './git/github.service';
-import { Agent } from './agent/agent';
 
 @Controller()
 export class AppController {

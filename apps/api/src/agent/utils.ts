@@ -14,7 +14,7 @@ export function deduplicateByField(items: GeneratedItemWithSlug[], field: keyof 
  * Shows array difference. Useful for checking which items were excluded.
  *
  * @param bigger The larger array (usually input array for deduplication).
- * @param smaler The potentially smaller array (usually output of deduplication).
+ * @param smaller The potentially smaller array (usually output of deduplication).
  * @param key The key to compare items by.
  * @returns An array of excluded items.
  */

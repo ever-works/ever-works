@@ -62,6 +62,6 @@ export async function detectType(task: string) {
         .pipe(llm.withStructuredOutput(routerOutputSchema))
         .invoke({ task });
 
-    Logger.log(`Got route "${result.route}" with "${result.urls.length}" URLs`, 'Agent');
+    Logger.log(`Got route "${result.route}" with ${result.urls.length} URLs`, 'Agent');
     return result;
 }
