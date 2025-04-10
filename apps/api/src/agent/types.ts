@@ -1,14 +1,14 @@
-export interface Identifable {
+export interface Identifiable {
     id: string;
     name: string;
 }
 
-export interface Category extends Identifable {
+export interface Category extends Identifiable {
     description?: string;
     icon_url?: string;
 }
 
-export interface Tag extends Identifable { }
+export interface Tag extends Identifiable { }
 
 export interface ItemData {
     name: string;

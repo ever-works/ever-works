@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import slugify from 'slugify';
-import { Identifable, ItemData } from '../agent/types';
+import { Identifiable, ItemData } from '../agent/types';
 import { GithubService } from '../git/github.service';
 import { Directory } from '../entities/directory.entity';
 import { User } from '../entities/user.entity';
@@ -108,8 +108,8 @@ export class DataGeneratorService {
       await this.githubService.commit(data.dir, `add ${item.name}`, user.asCommitter());
    }
 
-   private merge(a: Identifable[], b: Identifable[]) {
-      const map = new Map<string, Identifable>();
+   private merge(a: Identifiable[], b: Identifiable[]) {
+      const map = new Map<string, Identifiable>();
       for (const item of a) {
          map.set(item.id, item);
       }

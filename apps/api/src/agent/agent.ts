@@ -1,5 +1,5 @@
 import { Logger } from "@nestjs/common";
-import { Identifable, ItemData } from "./types";
+import { Identifiable, ItemData } from "./types";
 import { markdown } from "./markdown";
 import { generateQueries } from "./queries";
 import { aggregateSearchResults, extractContent, searchWeb } from "./tavily";
@@ -71,7 +71,7 @@ export class Agent {
         return { queries, urls, items: categorized.map(this.toItemData), categories, tags };
     }
 
-    private mapUnique(names: string[]): Array<Identifable> {
+    private mapUnique(names: string[]): Array<Identifiable> {
         const unique = new Set(names);
         return Array.from(unique).map(name => ({ id: slugify(name, { lower: true, trim: true }), name }));
     }

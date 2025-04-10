@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import * as fs from 'fs/promises';
 import { GithubService } from '../git/github.service';
-import type { Category, Identifable, ItemData, Tag } from '../agent/types';
+import type { Category, Identifiable, ItemData, Tag } from '../agent/types';
 import { Directory } from '../entities/directory.entity';
 import { User } from '../entities/user.entity';
 import { DataRepository } from '../data-generator/data-repository';
@@ -155,7 +155,7 @@ export class MarkdownGeneratorService {
     }
 
     /* Works with both tags and categories */
-    private populate<T extends Identifable>(value: string | T, collection: Map<string, T>): T {
+    private populate<T extends Identifiable>(value: string | T, collection: Map<string, T>): T {
         const id = typeof value === 'string' ? value : value.id;
         const populated = collection.get(id);
 
