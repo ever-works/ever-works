@@ -16,14 +16,6 @@ export class AppController {
     private readonly githubService: GithubService,
   ) { }
 
-  @Post('queries')
-  async generateQueries(
-    @Body('task') task: string,
-  ) {
-    const agent = new Agent();
-    return agent.generateItems(task, { maxUrls: 16 });
-  }
-
   @Post('directories')
   async createDirectory(
     @Body('slug') slug: string,

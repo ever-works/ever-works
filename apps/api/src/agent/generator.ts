@@ -27,7 +27,7 @@ const outputSchema = z.object({
     ),
 });
 
-export async function generateSubarray(task: string, url: string, research: string) {
+export async function generateItemsSubarray(task: string, url: string, research: string) {
     Logger.log(`Generating items from ${url}`, 'Agent');
     const llm = new ChatOpenAI({
         model: 'gpt-4o',

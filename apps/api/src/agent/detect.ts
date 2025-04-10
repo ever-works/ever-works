@@ -10,7 +10,7 @@ const routes = {
 }
 
 function getKeys<T, K = keyof T>(obj: T) {
-    return Object.keys(obj) as [K];
+    return Object.keys(obj) as [K]; // hack to get correct type for Zod enum
 }
 
 const allowedRoutes = getKeys(routes);
@@ -40,17 +40,17 @@ function getRoutes(): string {
 }
 
 const routerOutputSchema = z.object({
-    route: z.enum(allowedRoutes).describe('The route '),
+    route: z.enum(allowedRoutes).describe('The route'),
     urls: z.array(z.string()).describe('URLs extracted from the task, feel free to leave empty if there are none'),
 });
 
 /**
- * Routes items to the correct specialized subagent based on their features and descriptions.
+ * Detect type of user's task, so you can route it to the correct subagent.
  *
  * @param task User's prompt.
  * @returns The route and URLs.
  */
-export async function router(task: string) {
+export async function detectType(task: string) {
     Logger.log(`Routing items`, 'Agent');
     const llm = new ChatOpenAI({
         model: 'gpt-4o',

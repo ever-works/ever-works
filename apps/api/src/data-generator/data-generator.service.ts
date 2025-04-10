@@ -7,7 +7,6 @@ import { User } from '../entities/user.entity';
 import { DataRepository, DEFAULT_DATA_CONFIG, IDataConfig } from './data-repository';
 import { Agent } from 'src/agent/agent';
 import { markdown } from 'src/agent/markdown';
-import { arrayDiff } from 'src/agent/utils';
 
 @Injectable()
 export class DataGeneratorService {
@@ -19,7 +18,7 @@ export class DataGeneratorService {
 
    async initialize(directory: Directory, user: User, prompt: string) {
       const agent = new Agent();
-      const { categories, items, tags } = await agent.generateItems(prompt, { maxQueries: 4, maxUrls: 16 });
+      const { categories, items, tags } = await agent.generateInitialItems(prompt, { maxQueries: 4, maxUrls: 16 });
       const token = user.getGitToken();
       const repo = directory.getDataRepo();
       const description = `machine-readable data for ${directory.slug}`;
@@ -77,6 +76,8 @@ export class DataGeneratorService {
             data.writeCategories(this.merge(categories, generated.categories)),
             data.writeTags(this.merge(tags, generated.tags)),
          ]);
+         await this.githubService.add(data.dir, '.');
+         await this.githubService.commit(data.dir, `update repository`, user.asCommitter());
 
          await data.ensureDirectoriesExist();
 
