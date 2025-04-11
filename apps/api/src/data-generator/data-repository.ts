@@ -1,8 +1,8 @@
 import * as path from "path";
 import * as fs from 'fs/promises';
 import * as yaml from 'yaml';
-import { Category, ItemData, Tag } from "../ai-engine/ai-engine.service";
 import { format } from "date-fns";
+import { Category, ItemData, Tag } from "../agent/types";
 
 export interface IDataConfig {
     company_name?: string;
@@ -142,6 +142,18 @@ export class DataRepository {
         }
     }
 
+    async getItems() {
+        const items = await fs.readdir(this.dataDir, { withFileTypes: true });
+        const promises = items
+            .filter((item) => item.isDirectory())
+            .map(async (item) => {
+                const slug = item.name;
+                return this.getItem(slug);
+            });
+        
+        return Promise.all(promises);
+    }
+
     async getItem(slug: string): Promise<ItemData> {
         const ymlPath = path.join(this.getItemPath(slug), `${slug}.yml`);
 
@@ -170,6 +182,19 @@ export class DataRepository {
         } catch (err) {
             if (err?.code === 'ENOENT') {
                 return;
+            }
+            throw err;
+        }
+    }
+
+    async getLicense(): Promise<string | null> {
+        const licensePath = path.join(this.dir, 'LICENSE.md');
+        try {
+            const license = await fs.readFile(licensePath, 'utf-8');
+            return license;
+        } catch (err) {
+            if (err?.code === 'ENOENT') {
+                return null;
             }
             throw err;
         }
@@ -227,6 +252,11 @@ export class DataRepository {
 
     async writeReadme(content: string) {
         const filepath = path.join(this.dir, 'README.md');
+        await fs.writeFile(filepath, content, 'utf-8');
+    }
+
+    async writeLicense(content: string) {
+        const filepath = path.join(this.dir, 'LICENSE.md');
         await fs.writeFile(filepath, content, 'utf-8');
     }
 }

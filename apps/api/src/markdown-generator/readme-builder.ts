@@ -1,5 +1,5 @@
 import slugify from "slugify";
-import { ItemData, Tag } from "../ai-engine/ai-engine.service";
+import { ItemData } from "../agent/types";
 
 export class ReadmeBuilder {
     private content: string = '';
@@ -53,6 +53,7 @@ export class ReadmeBuilder {
     }
 
     addItem(item: ItemData, options: { hasDetails?: boolean } = {}) {
+        // TODO: consider making featured items bolder (item.featured)
         this.content += `- [${item.name}](${item.source_url}) - ${item.description}`;
         if (options.hasDetails) {
             this.content += ` ([Read more](/details/${item.slug}.md))`;

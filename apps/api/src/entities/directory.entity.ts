@@ -1,12 +1,19 @@
-const directories = new Map();
+import { randomUUID } from "crypto";
+
+const directories = new Map<string, Directory>();
 
 export class Directory {
+    id: string;
     name: string;
     slug: string;
     owner: string;
     companyName: string;
     organization: boolean;
     description: string;
+    
+    constructor() {
+        this.id = randomUUID();
+    }
 
     static async createMock(directory: Directory) {
         directories.set(directory.slug, directory);
