@@ -43,6 +43,8 @@ If you want to init directory for organization, pass optional `owner` field:
 }
 ```
 
+> It's long running task - it may take from 5-10 minutes (mainly because I generate markdowns one by one in the loop - if you want to change it be careful with rate limits when doing things concurrently).
+
 6. Update GitHub repositories (generate new items) using a request to `http://localhost:3001/sync`
 ```json
 {
