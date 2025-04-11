@@ -85,7 +85,7 @@ export class DataGeneratorService {
             item.slug = slugify(item.name, { lower: true, trim: true });
             await this.processItem(data, item, user);
          }
-
+         // TODO: it should create PR (or multiple PRs) instead of pushing directly
          await this.githubService.push(dest, token);
       } catch (err) {
          this.logger.error('Failed to update data repository', err);

@@ -26,8 +26,8 @@ export class DeployController {
             repo: directory.getWebsiteRepo(),
             provider: 'vercel',
             data: {
-                vercelToken: vercelToken || process.env.VERCEL_TOKEN,
-                ghToken: ghToken || process.env.GITHUB_APIKEY,
+                vercelToken: vercelToken || process.env.VERCEL_TOKEN, // TODO: change it before going to prod
+                ghToken: ghToken || process.env.GITHUB_APIKEY, // TODO: change it before going to prod
             }
         }, directory, user);
     }

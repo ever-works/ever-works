@@ -123,6 +123,7 @@ export class MarkdownGeneratorService {
             });
 
             for (const item of items) {
+                // TODO: consider making featured items bolder inside ReadmeBuilder.addItem
                 builder.addItem(item, { hasDetails: item.slug && markdowns.has(item.slug) });
             }
 
