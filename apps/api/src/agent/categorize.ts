@@ -23,9 +23,9 @@ export const categorizeOutputSchema = z.object({
             slug: z.string(),
             name: z.string(),
             description: z.string(),
-            source_url: z.string().optional().describe('The URL of item`s official website/repository'),
-            category: z.string().optional().describe('The category of the item make it start with uppercase letter'),
-            tags: z.array(z.string()).optional().describe('The tags of the item make them start with uppercase letter'),
+            source_url: z.string().optional().nullable().describe('The URL of item`s official website/repository'),
+            category: z.string().optional().nullable().describe('The category of the item make it start with uppercase letter'),
+            tags: z.array(z.string()).optional().nullable().describe('The tags of the item make them start with uppercase letter'),
         })
     ),
 });
@@ -40,7 +40,7 @@ export const categorizeOutputSchema = z.object({
 export async function categorize(task: string, items: object[]): Promise<ItemData[]> {
     Logger.log(`Categorizing items with length: ${items.length}`, 'Agent');
     const llm = new ChatOpenAI({
-        model: 'gpt-4o',
+        model: 'gpt-4.1',
         temperature: 0.3,
     });
 

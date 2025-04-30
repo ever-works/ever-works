@@ -22,7 +22,7 @@ const outputSchema = z.object({
         z.object({
             name: z.string(),
             description: z.string(),
-            source_url: z.string().optional().describe('The URL of item`s official website/repository'),
+            source_url: z.string().optional().nullable().describe('The URL of item`s official website/repository'),
         })
     ),
 });
@@ -30,7 +30,7 @@ const outputSchema = z.object({
 export async function generateItemsSubarray(task: string, url: string, research: string) {
     Logger.log(`Generating items from ${url}`, 'Agent');
     const llm = new ChatOpenAI({
-        model: 'gpt-4o',
+        model: 'gpt-4.1',
         temperature: 0.0,
     });
 
