@@ -47,7 +47,7 @@ export async function generateQueries(
   Logger.log('Generating queries', 'Agent');
 
   const llm = new ChatOpenAI({
-    model: 'gpt-4.1',
+    model: process.env.OPENAI_MODEL || 'gpt-4.1',
     temperature: 0.6,
   });
 

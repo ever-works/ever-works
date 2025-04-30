@@ -74,7 +74,7 @@ const outputSchema = z.object({
 export async function deduplicate(task: string, items: object[]) {
     Logger.log(`Deduplicating items with length: ${items.length}`, 'Agent');
     const llm = new ChatOpenAI({
-        model: 'gpt-4.1',
+        model: process.env.OPENAI_MODEL || 'gpt-4.1',
         temperature: 0.0,
     });
 
@@ -93,7 +93,7 @@ export async function deduplicate(task: string, items: object[]) {
 export async function extractNewItems(existingItems: Partial<ItemData>[], newItems: Partial<ItemData>[]) {
     Logger.log(`Extracting new items with length: ${newItems.length}`, 'Agent');
     const llm = new ChatOpenAI({
-        model: 'gpt-4.1',
+        model: process.env.OPENAI_MODEL || 'gpt-4.1',
         temperature: 0.0,
     });
 

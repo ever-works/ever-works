@@ -44,7 +44,7 @@ export async function markdown(item: Partial<ItemData>): Promise<string> {
     }
 
     const llm = new ChatOpenAI({
-        model: 'gpt-4.1',
+        model: process.env.OPENAI_MODEL || 'gpt-4.1',
         temperature: 0.6,
     });
 

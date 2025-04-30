@@ -30,7 +30,7 @@ const outputSchema = z.object({
 export async function generateItemsSubarray(task: string, url: string, research: string) {
     Logger.log(`Generating items from ${url}`, 'Agent');
     const llm = new ChatOpenAI({
-        model: 'gpt-4.1',
+        model: process.env.OPENAI_MODEL || 'gpt-4.1',
         temperature: 0.0,
     });
 
