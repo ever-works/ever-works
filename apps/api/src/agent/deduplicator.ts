@@ -66,7 +66,7 @@ const outputSchema = z.object({
         z.object({
             name: z.string(),
             description: z.string(),
-            source_url: z.string().optional().nullable().describe('The URL of item`s official website/repository'),
+            source_url: z.string().nullable().describe('The URL of item`s official website/repository'),
         })
     ),
 });

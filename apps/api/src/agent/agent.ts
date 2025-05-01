@@ -2,11 +2,11 @@ import { Logger } from "@nestjs/common";
 import { Identifiable, ItemData } from "./types";
 import { markdown } from "./markdown";
 import { generateQueries } from "./queries";
-import { aggregateSearchResults, extractContent, searchWeb } from "./tavily";
+import { aggregateSearchResults, extractContent, filterUrls, searchWeb } from "./tavily";
 import { generateItemsSubarray } from "./generator";
 import { arrayDiff, deduplicateByField } from "./utils";
 import { deduplicate, extractNewItems } from "./deduplicator";
-import { categorize } from "./categorize";
+import { categorizeItems } from "./categorize";
 import slugify from "slugify";
 import { detectType } from "./detect";
 
@@ -48,7 +48,9 @@ export class Agent {
 
         const queries = await generateQueries(task, options.maxQueries);
         const searches = await Promise.all(queries.map(q => searchWeb(q)));
-        const urls = aggregateSearchResults(searches.flat(), options.maxUrls);
+        let urls = aggregateSearchResults(searches.flat(), options.maxUrls);
+        urls = await filterUrls(urls);
+
         const context = await extractContent(urls);
 
         // For each website we extract content from, we generate subarrays of items -> then we merge subarrays into one array (and later we need to deduplicate items)
@@ -56,16 +58,28 @@ export class Agent {
         const generated = subarrays.flat();
         const aggregated = deduplicateByField(deduplicateByField(generated, 'slug'), 'source_url');
         Logger.log(`Generated and aggregated ${aggregated.length} items`, 'Agent');
-        const deduplicated = await deduplicate(task, aggregated.map(i => ({ name: i.name, description: i.description, url: i.source_url })));
-        console.log(arrayDiff(aggregated, deduplicated, 'slug'));
+
+        // Remove duplicates using LLM
+        // const deduplicated = await deduplicate(task, aggregated.map(i => ({ name: i.name, description: i.description, url: i.source_url })));
+        // console.log(arrayDiff(aggregated, deduplicated, 'slug'));
         
         // Only filter for new items if we have existing items (initially we pass empty array)
-        let itemsToProcess = deduplicated;
+        let itemsToProcess = aggregated;
         if (existingItems.length > 0) {
-            itemsToProcess = await extractNewItems(existingItems, deduplicated);
+            itemsToProcess = await extractNewItems(existingItems, aggregated);
         }
 
-        const categorized = await categorize(task, itemsToProcess.map(i => ({ name: i.name, description: i.description, url: i.source_url })));
+        const categorized = await categorizeItems(
+            task,
+            itemsToProcess.map((i) => ({
+              name: i.name,
+              slug: i.slug,
+              description: i.description,
+              url: i.source_url,
+              category: i.category as string,
+              tags: i.tags as string[],
+            })),
+        );
         const categories = this.mapUnique(categorized.map(item => item.category as string));
         const tags = this.mapUnique(categorized.flatMap(item => item.tags as string[]));
         return { queries, urls, items: categorized.map(this.toItemData), categories, tags };
