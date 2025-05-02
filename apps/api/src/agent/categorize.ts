@@ -60,7 +60,7 @@ Instructions:
 - Preserve all other original item fields (slug, name, description, source_url, tags) in the output.`;
 
 // --- Helper Function ---
-function formatItemsForPrompt(items: InputItem[]): string {
+export function formatItemsForPrompt(items: InputItem[]): string {
   if (!items || items.length === 0) {
     return 'No items provided.';
   }

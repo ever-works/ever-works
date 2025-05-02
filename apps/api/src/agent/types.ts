@@ -20,11 +20,4 @@ export interface ItemData {
   tags: string[] | Tag[];
 }
 
-export interface InputItem {
-  slug: string;
-  name: string;
-  description: string;
-  source_url?: string | null;
-  category?: string | null;
-  tags?: string[] | null;
-}
+export type InputItem = Partial<ItemData>;

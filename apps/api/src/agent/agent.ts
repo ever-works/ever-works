@@ -5,7 +5,7 @@ import { generateQueries } from "./queries";
 import { aggregateSearchResults, extractContent, filterUrls, searchWeb } from "./tavily";
 import { generateItemsSubarray } from "./generator";
 import { arrayDiff, deduplicateByField } from "./utils";
-import { deduplicate, extractNewItems } from "./deduplicator";
+import { deduplicateItems, filterNewItems } from "./deduplicator";
 import { categorizeItems } from "./categorize";
 import slugify from "slugify";
 import { detectType } from "./detect";
@@ -60,13 +60,13 @@ export class Agent {
         Logger.log(`Generated and aggregated ${aggregated.length} items`, 'Agent');
 
         // Remove duplicates using LLM
-        // const deduplicated = await deduplicate(task, aggregated.map(i => ({ name: i.name, description: i.description, url: i.source_url })));
+        // const deduplicated = await deduplicateItems(task, aggregated.map(i => ({ name: i.name, description: i.description, url: i.source_url })));
         // console.log(arrayDiff(aggregated, deduplicated, 'slug'));
         
         // Only filter for new items if we have existing items (initially we pass empty array)
         let itemsToProcess = aggregated;
         if (existingItems.length > 0) {
-            itemsToProcess = await extractNewItems(existingItems, aggregated);
+            itemsToProcess = await filterNewItems(existingItems, aggregated);
         }
 
         const categorized = await categorizeItems(
