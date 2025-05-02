@@ -76,8 +76,8 @@ export class Agent {
               slug: i.slug,
               description: i.description,
               url: i.source_url,
-              category: i.category as string,
-              tags: i.tags as string[],
+              category: i.category,
+              tags: i.tags,
             })),
         );
         const categories = this.mapUnique(categorized.map(item => item.category as string));
