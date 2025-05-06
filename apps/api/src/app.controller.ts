@@ -12,7 +12,7 @@ import { WebsiteGeneratorService } from './website-generator/website-generator.s
 import { Directory } from './entities/directory.entity';
 import { User } from './entities/user.entity';
 import { GithubService } from './git/github.service';
-import { GenerateDataDto } from './validators/denerate-data.dto';
+import { GenerateDataDto } from './validators/generate-data.dto';
 import { CreateDirectoryDto } from './validators/create-directory.dto';
 
 @Controller()
