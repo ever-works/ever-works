@@ -25,15 +25,24 @@ export class DataGeneratorService {
   ) {}
 
   async initialize(directory: Directory, user: User, prompt: string) {
+    this.logger.log(
+      `Initializing data repository for directory: ${directory.slug} with prompt: "${prompt}"`,
+    );
     const agent = new Agent();
+    this.logger.debug('Generating initial items...');
     const { categories, items, tags } = await agent.generateInitialItems(
       prompt,
       { maxQueries: 4, maxUrls: 16 },
     );
+    this.logger.debug(
+      `Generated ${categories.length} categories, ${items.length} items, ${tags.length} tags.`,
+    );
+
     const token = user.getGitToken();
     const repo = directory.getDataRepo();
     const description = `machine-readable data for ${directory.slug}`;
 
+    this.logger.log(`Creating GitHub repository: ${directory.owner}/${repo}`);
     if (directory.organization) {
       await this.githubService.createEmptyRepoAsOrg(
         directory.owner,
@@ -44,11 +53,19 @@ export class DataGeneratorService {
     } else {
       await this.githubService.createEmptyRepo(repo, description, token);
     }
+    this.logger.log(
+      `Successfully created GitHub repository: ${directory.owner}/${repo}`,
+    );
 
+    this.logger.log(`Cloning repository ${directory.owner}/${repo}`);
     const dest = await this.githubService.clone(directory.owner, repo, token);
     const data = await DataRepository.create(dest);
+    this.logger.log(`Cloned repository to ${dest}`);
 
     try {
+      this.logger.debug(
+        'Ensuring directories exist and writing initial files...',
+      );
       await data.ensureDirectoriesExist();
       await Promise.all([
         data.writeReadme(this.getDefaultReadme(directory)),
@@ -64,13 +81,19 @@ export class DataGeneratorService {
         `init repository`,
         user.asCommitter(),
       );
+      this.logger.debug('Initial files written and committed.');
 
+      this.logger.log(`Processing ${items.length} items...`);
       for (const item of items) {
         item.slug = slugify(item.name, { lower: true, trim: true });
+        this.logger.debug(`Processing item: ${item.name} (slug: ${item.slug})`);
         await this.processItem(data, item, user);
       }
+      this.logger.log('All items processed.');
 
+      this.logger.log(`Pushing changes to ${directory.owner}/${repo}`);
       await this.githubService.push(dest, token);
+      this.logger.log('Successfully initialized and pushed data repository.');
     } catch (err) {
       this.logger.error('Failed to initialize data repository', err);
       throw err;
@@ -84,14 +107,23 @@ export class DataGeneratorService {
     user: User,
     createItemsGeneratorDto: CreateItemsGeneratorDto,
   ) {
+    this.logger.log(
+      `Initializing data repository (V2) for directory: ${directory.slug}`,
+    );
+    this.logger.debug(`Using DTO: ${JSON.stringify(createItemsGeneratorDto)}`);
+
     const generatedItems =
       await this.itemsGeneratorService.generateItemsGenerator(
         createItemsGeneratorDto,
       );
 
     if (!generatedItems) {
+      this.logger.error('Failed to generate items from ItemsGeneratorService.');
       throw new Error('Failed to generate items');
     }
+    this.logger.debug(
+      `Generated ${generatedItems.categories.length} categories, ${generatedItems.items.length} items, ${generatedItems.tags.length} tags.`,
+    );
 
     const { categories, items, tags } = generatedItems;
 
@@ -99,6 +131,7 @@ export class DataGeneratorService {
     const repo = directory.getDataRepo();
     const description = `machine-readable data for ${directory.slug}`;
 
+    this.logger.log(`Creating GitHub repository: ${directory.owner}/${repo}`);
     if (directory.organization) {
       await this.githubService.createEmptyRepoAsOrg(
         directory.owner,
@@ -109,11 +142,19 @@ export class DataGeneratorService {
     } else {
       await this.githubService.createEmptyRepo(repo, description, token);
     }
+    this.logger.log(
+      `Successfully created GitHub repository: ${directory.owner}/${repo}`,
+    );
 
+    this.logger.log(`Cloning repository ${directory.owner}/${repo}`);
     const dest = await this.githubService.clone(directory.owner, repo, token);
     const data = await DataRepository.create(dest);
+    this.logger.log(`Cloned repository to ${dest}`);
 
     try {
+      this.logger.debug(
+        'Ensuring directories exist and writing initial files...',
+      );
       await data.ensureDirectoriesExist();
       await Promise.all([
         data.writeReadme(this.getDefaultReadme(directory)),
@@ -129,19 +170,28 @@ export class DataGeneratorService {
         `init repository`,
         user.asCommitter(),
       );
+      this.logger.debug('Initial files written and committed.');
 
+      this.logger.log(`Processing ${items.length} items (V2)...`);
       for (const item of items) {
         item.slug = slugify(item.slug || item.name, {
           lower: true,
           trim: true,
         });
-
+        this.logger.debug(
+          `Processing item (V2): ${item.name} (slug: ${item.slug})`,
+        );
         await this.processItemV2(data, item, user);
       }
+      this.logger.log('All items processed (V2).');
 
+      this.logger.log(`Pushing changes to ${directory.owner}/${repo}`);
       await this.githubService.push(dest, token);
+      this.logger.log(
+        'Successfully initialized (V2) and pushed data repository.',
+      );
     } catch (err) {
-      this.logger.error('Failed to initialize data repository', err);
+      this.logger.error('Failed to initialize data repository (V2)', err);
       throw err;
     } finally {
       await data.cleanup();
@@ -149,18 +199,34 @@ export class DataGeneratorService {
   }
 
   async update(directory: Directory, user: User, prompt: string) {
+    this.logger.log(
+      `Updating data repository for directory: ${directory.slug} with prompt: "${prompt}"`,
+    );
     const token = user.getGitToken();
     const repo = directory.getDataRepo();
     const agent = new Agent();
+
+    this.logger.log(`Cloning repository ${directory.owner}/${repo}`);
     const dest = await this.githubService.clone(directory.owner, repo, token);
     const data = await DataRepository.create(dest);
+    this.logger.log(`Cloned repository to ${dest}`);
 
     try {
+      this.logger.debug('Fetching existing categories, tags, and items...');
       const categories = await data.getCategories();
       const tags = await data.getTags();
       const existingItems = await data.getItems();
-      const generated = await agent.generateNewItems(prompt, existingItems);
+      this.logger.debug(
+        `Fetched ${categories.length} categories, ${tags.length} tags, ${existingItems.length} existing items.`,
+      );
 
+      this.logger.debug('Generating new items based on prompt...');
+      const generated = await agent.generateNewItems(prompt, existingItems);
+      this.logger.debug(
+        `Generated ${generated.categories.length} new categories, ${generated.items.length} new items, ${generated.tags.length} new tags.`,
+      );
+
+      this.logger.debug('Merging and writing categories and tags...');
       await Promise.all([
         data.writeCategories(this.merge(categories, generated.categories)),
         data.writeTags(this.merge(tags, generated.tags)),
@@ -171,15 +237,24 @@ export class DataGeneratorService {
         `update repository`,
         user.asCommitter(),
       );
+      this.logger.debug('Categories and tags updated and committed.');
 
       await data.ensureDirectoriesExist();
 
+      this.logger.log(`Processing ${generated.items.length} new items...`);
       for (const item of generated.items) {
         item.slug = slugify(item.name, { lower: true, trim: true });
+        this.logger.debug(
+          `Processing new item: ${item.name} (slug: ${item.slug})`,
+        );
         await this.processItem(data, item, user);
       }
+      this.logger.log('All new items processed.');
+
+      this.logger.log(`Pushing changes to ${directory.owner}/${repo}`);
       // TODO: it should create PR (or multiple PRs) instead of pushing directly
       await this.githubService.push(dest, token);
+      this.logger.log('Successfully updated and pushed data repository.');
     } catch (err) {
       this.logger.error('Failed to update data repository', err);
       throw err;
@@ -193,45 +268,97 @@ export class DataGeneratorService {
     fullItem: NItemData,
     user: User,
   ) {
+    this.logger.debug(
+      `processItemV2: Starting for item slug ${fullItem.slug || fullItem.name}`,
+    );
     let { markdown_content, ...item } = fullItem;
 
+    this.logger.debug(
+      `processItemV2: Creating item directory for ${item.slug}`,
+    );
     await data.createItemDir(item);
     const promises = [data.writeItem(item)];
+    this.logger.debug(
+      `processItemV2: Queued writing item data for ${item.slug}`,
+    );
 
     // Fetch the item data
     if (!markdown_content) {
+      this.logger.debug(
+        `processItemV2: Markdown content not provided, fetching for ${item.slug}`,
+      );
       markdown_content = await markdown(item);
+      if (markdown_content) {
+        this.logger.debug(
+          `processItemV2: Fetched markdown content for ${item.slug}`,
+        );
+      } else {
+        this.logger.debug(
+          `processItemV2: No markdown content fetched for ${item.slug}`,
+        );
+      }
+    } else {
+      this.logger.debug(
+        `processItemV2: Markdown content provided for ${item.slug}`,
+      );
     }
 
     if (markdown_content) {
       promises.push(data.writeItemMarkdown(item, markdown_content));
+      this.logger.debug(
+        `processItemV2: Queued writing item markdown for ${item.slug}`,
+      );
     }
 
     await Promise.all(promises);
+    this.logger.debug(
+      `processItemV2: Item data and markdown (if any) written for ${item.slug}`,
+    );
     await this.githubService.add(data.dir, '.');
     await this.githubService.commit(
       data.dir,
       `add ${item.name}`,
       user.asCommitter(),
     );
+    this.logger.log(
+      `processItemV2: Committed item ${item.name} (slug: ${item.slug})`,
+    );
   }
 
   private async processItem(data: DataRepository, item: ItemData, user: User) {
+    this.logger.debug(
+      `processItem: Starting for item ${item.name} (slug: ${item.slug})`,
+    );
     await data.createItemDir(item);
+    this.logger.debug(`processItem: Created item directory for ${item.slug}`);
     const promises = [data.writeItem(item)];
+    this.logger.debug(`processItem: Queued writing item data for ${item.slug}`);
 
     // Fetch the item data
+    this.logger.debug(`processItem: Fetching markdown for ${item.slug}`);
     const md = await markdown(item);
     if (md) {
+      this.logger.debug(`processItem: Fetched markdown for ${item.slug}`);
       promises.push(data.writeItemMarkdown(item, md));
+      this.logger.debug(
+        `processItem: Queued writing item markdown for ${item.slug}`,
+      );
+    } else {
+      this.logger.debug(`processItem: No markdown fetched for ${item.slug}`);
     }
 
     await Promise.all(promises);
+    this.logger.debug(
+      `processItem: Item data and markdown (if any) written for ${item.slug}`,
+    );
     await this.githubService.add(data.dir, '.');
     await this.githubService.commit(
       data.dir,
       `add ${item.name}`,
       user.asCommitter(),
+    );
+    this.logger.log(
+      `processItem: Committed item ${item.name} (slug: ${item.slug})`,
     );
   }
 

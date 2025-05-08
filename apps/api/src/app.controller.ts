@@ -69,7 +69,7 @@ export class AppController {
     return directory;
   }
 
-  @Post('generate-new')
+  @Post('generate-v2')
   @HttpCode(HttpStatus.ACCEPTED) // Suggesting ACCEPTED as this might be a long-running task
   async generateItemsGenerator(
     @Body(

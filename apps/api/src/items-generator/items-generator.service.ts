@@ -598,16 +598,20 @@ Generated Queries:
           },
         };
 
+        // Stricter prompt for page relevance
         const prompt = PromptTemplate.fromTemplate(
-          `You are an expert content analyst. Assess the relevance of the following web page content to the topic: "{topicName}" (Description: "{topicDescription}").
+          `You are an expert content analyst. Assess the relevance of the following web page content to the **main topic**: "{topicName}" (Description: "{topicDescription}").
 
 Web Page Content (first 2000 characters):
 ---
 {page_content_snippet}
 ---
 
-Is this page content highly relevant to the topic?
-Provide a relevance score between 0.0 and 1.0.
+**Critically evaluate:** Is this page's **primary focus** highly relevant to "{topicName}"?
+- **Accept:** Pages dedicated to the topic, comprehensive comparisons, core tutorials, official documentation, key project pages.
+- **Reject:** Pages where the topic is only mentioned briefly, listicles covering many unrelated topics, pages focused *only* on a very specific niche *unless* that niche is the explicit topic "{topicName}" (e.g., reject a page *only* about a Ruby vector library if the topic is general vector databases), forum threads with low signal-to-noise, or purely marketing pages.
+
+Provide a relevance score between 0.0 (not relevant) and 1.0 (highly relevant). Only assign a high score if the primary focus aligns strongly with "{topicName}".
 `,
         );
         const outputParser = new JsonOutputFunctionsParser();
@@ -690,21 +694,22 @@ Provide a relevance score between 0.0 and 1.0.
 
       this.logger.log(`[${slug}] Extracting items from: ${page.source_url}`);
       try {
+        // Stricter prompt for item extraction
         const prompt = PromptTemplate.fromTemplate(
           `You are an expert data extractor and technical writer for "Awesome List" directories.
-The main topic of the Awesome List is: "{topicName}" (Description: "{topicDescription}").
-From the following web page content, identify and extract information for one or more distinct items (tools, resources, libraries, articles, etc.) that are highly relevant to this topic.
+The **main topic** of the Awesome List is: "{topicName}" (Description: "{topicDescription}").
+From the following web page content, identify and extract information for one or more distinct items (tools, resources, libraries, articles, etc.) that are **directly and highly relevant to this main topic**. Do NOT extract items that are only tangentially related or represent a different category unless it's explicitly part of "{topicName}".
 
 Web Page Content (first 5000 characters):
 ---
 {page_content_snippet}
 ---
 
-For each identified item:
+For each identified item **that directly relates to "{topicName}"**:
 1.  Provide its canonical **name**.
-2.  Write a concise **description** highlighting its relevance to "{topicName}".
-3.  Determine its most direct and canonical **source_url** (homepage, docs, repo). Omit the item if a high-quality URL cannot be found.
-4.  List relevant high-level **categories** (e.g., "Monitoring", "Security").
+2.  Write a concise **description** highlighting its specific relevance to "{topicName}".
+3.  Determine its most direct and canonical **source_url** (homepage, docs, repo). **Crucially, omit the item entirely if a high-quality, canonical URL for the item itself cannot be found.** Do not use URLs for blog posts merely mentioning the item unless the post *is* the primary resource. The URL must be valid and specific to the item.
+4.  List relevant high-level **categories** (e.g., "Monitoring", "Security") that fit within the context of "{topicName}".
 5.  List specific **tags** (keywords, technologies, e.g., "open-source", "real-time").
 6.  Determine if it should be **featured** based on prominence/recommendations.
 7.  Generate **markdown_content**: Extract the *most relevant* information from the page content and format it as clean Markdown. Follow these rules strictly:
@@ -715,7 +720,8 @@ For each identified item:
     *   **Structure:** Use appropriate Markdown headings (e.g., \`### Features\`, \`### Pricing\`), bullet points, and code formatting where applicable. Keep it concise and informative.
     *   **Length:** Aim for a useful summary (typically 100-500 words), not the entire page content.
 
-Only call the extraction function if you find at least one item meeting the criteria, especially the requirement for a valid source_url.
+**Critical Filter:** Only extract items that are *directly* relevant to the main topic "{topicName}". For example, if the topic is "Vector Databases", do not extract a general-purpose database or a library for a specific programming language (like Ruby) unless it's explicitly a vector database client/tool directly supporting the core topic. Ensure the \`source_url\` is for the item itself, not an article *about* the item.
+Only call the extraction function if you find at least one item meeting these strict criteria.
 `,
         );
 
@@ -1002,7 +1008,7 @@ The description should explain what kind of items or resources typically fall un
     // Update item categories to use normalized names or IDs
     // This part is tricky as items might have multiple categories, and we need to map them.
     // For simplicity, we'll assume items will store the normalized category NAME for now.
-    // A more robust system might store category IDs in items.
+    //TODO A more robust system might store category IDs in items.
     extractedItems.forEach((item) => {
       if (item.category) {
         if (Array.isArray(item.category)) {
