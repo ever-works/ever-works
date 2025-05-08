@@ -13,7 +13,7 @@ export class AppController {
     private readonly markdownGenerator: MarkdownGeneratorService,
     private readonly websiteGenerator: WebsiteGeneratorService,
     private readonly githubService: GithubService,
-  ) { }
+  ) {}
 
   @Post('directories')
   async createDirectory(
@@ -39,7 +39,7 @@ export class AppController {
     return dir;
   }
 
-  @Post('generate')
+  @Post('generate-old-version')
   async generateData(
     @Body('slug') slug: string,
     @Body('prompt') prompt: string,
@@ -59,11 +59,32 @@ export class AppController {
     return directory;
   }
 
+  // @Post('generate')
+  // @HttpCode(HttpStatus.ACCEPTED) // Suggesting ACCEPTED as this might be a long-running task
+  // async generateItemsGenerator(
+  //   @Body(
+  //     new ValidationPipe({
+  //       transform: true,
+  //       whitelist: true,
+  //       forbidNonWhitelisted: true,
+  //     }),
+  //   )
+  //   createItemsGeneratorDto: CreateItemsGeneratorDto,
+  // ): Promise<ItemsGeneratorResponseDto> {
+  //   // Intentionally not awaiting this to allow for an immediate response
+  //   // The actual processing will happen in the background.
+  //   // A more robust solution might involve job queues, webhooks, or websockets for status updates.
+  //   this.ItemsGeneratorService.generateItemsGenerator(createItemsGeneratorDto);
+
+  //   return {
+  //     status: 'pending',
+  //     slug: createItemsGeneratorDto.slug,
+  //     message: `Processing request for '${createItemsGeneratorDto.name}'. Check logs or data directory for updates.`,
+  //   };
+  // }
+
   @Post('sync')
-  async updateData(
-    @Body('slug') slug: string,
-    @Body('prompt') prompt: string,
-  ) {
+  async updateData(@Body('slug') slug: string, @Body('prompt') prompt: string) {
     const user = await User.sessionMock();
     const directory = await Directory.findMock(slug);
     if (!directory) {
