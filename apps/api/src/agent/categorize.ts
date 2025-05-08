@@ -40,7 +40,7 @@ export const categorizeOutputSchema = z.object({
 export async function categorize(task: string, items: object[]): Promise<ItemData[]> {
     Logger.log(`Categorizing items with length: ${items.length}`, 'Agent');
     const llm = new ChatOpenAI({
-        model: 'gpt-4o',
+        model: process.env.OPENAI_MODEL || 'gpt-4.1-mini',
         temperature: 0.3,
     });
 

@@ -1,14 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { CreateItemsGeneratorDto, ConfigDto } from './dto/create-awesome-list.dto';
+import {
+  CreateItemsGeneratorDto,
+  ConfigDto,
+} from './dto/create-awesome-list.dto';
 import { ItemData } from './dto/item-data.dto';
 import { Category } from './dto/category.dto';
 import { Tag } from './dto/tag.dto';
-import {
-  ItemsGeneratorMetrics,
-  ItemsGeneratorDataPaths,
-} from './dto/items-generator-response.dto';
-import * as fs from 'fs-extra';
-import * as path from 'path';
+import { ItemsGeneratorMetrics } from './dto/items-generator-response.dto';
 import { ChatOpenAI } from '@langchain/openai';
 import { PromptTemplate } from '@langchain/core/prompts';
 import { StringOutputParser } from '@langchain/core/output_parsers';
@@ -119,12 +117,10 @@ const DEFAULT_CONFIG: Required<ConfigDto> = {
 @Injectable()
 export class ItemsGeneratorService {
   private readonly logger = new Logger(ItemsGeneratorService.name);
-  private readonly dataDir = path.resolve(process.cwd(), 'data');
   private llm: ChatOpenAI;
   private tavilyRetriever: TavilySearchAPIRetriever | undefined;
 
   constructor() {
-    fs.ensureDirSync(this.dataDir);
     if (!process.env.OPENAI_API_KEY) {
       this.logger.warn(
         'OPENAI_API_KEY not found in .env file. AI features will be limited.',
@@ -132,7 +128,7 @@ export class ItemsGeneratorService {
     }
     this.llm = new ChatOpenAI({
       apiKey: process.env.OPENAI_API_KEY,
-      modelName: 'gpt-4.1-mini', // Or your preferred model
+      modelName: process.env.OPENAI_MODEL || 'gpt-4.1-mini',
       temperature: 0.7,
     });
 
@@ -150,42 +146,39 @@ export class ItemsGeneratorService {
 
   async generateItemsGenerator(
     createItemsGeneratorDto: CreateItemsGeneratorDto,
-  ): Promise<void> {
-    const { slug, name, description, target_keywords } = createItemsGeneratorDto;
+    existing: {
+      existingItems?: ItemData[];
+      existingCategories?: Category[];
+      existingTags?: Tag[];
+    } = {},
+  ) {
+    const { slug, name, description, target_keywords } =
+      createItemsGeneratorDto;
     const config = { ...DEFAULT_CONFIG, ...createItemsGeneratorDto.config };
-    const listDataPath = path.join(this.dataDir, slug);
-    const itemsPath = path.join(listDataPath, 'items.json');
-    const categoriesPath = path.join(listDataPath, 'categories.json');
-    const tagsPath = path.join(listDataPath, 'tags.json');
 
     this.logger.log(`Starting generation for slug: ${slug}, name: ${name}`);
 
     try {
-      await fs.ensureDir(listDataPath);
+      const {
+        existingItems = [],
+        existingCategories = [],
+        existingTags = [],
+      } = existing;
 
-      let existingItems: ItemData[] = [];
-      let existingCategories: Category[] = [];
-      let existingTags: Tag[] = [];
       const processedSourceUrls = new Set<string>();
 
-      if (await fs.pathExists(itemsPath)) {
-        existingItems = (await fs.readJson(itemsPath, { throws: false })) || [];
-        existingItems.forEach((item) =>
-          processedSourceUrls.add(item.source_url),
-        );
+      if (existingItems.length) {
         this.logger.log(
           `Loaded ${existingItems.length} existing items for slug: ${slug}`,
         );
       }
-      if (await fs.pathExists(categoriesPath)) {
-        existingCategories =
-          (await fs.readJson(categoriesPath, { throws: false })) || [];
+
+      if (existingCategories.length) {
         this.logger.log(
           `Loaded ${existingCategories.length} existing categories for slug: ${slug}`,
         );
       }
-      if (await fs.pathExists(tagsPath)) {
-        existingTags = (await fs.readJson(tagsPath, { throws: false })) || [];
+      if (existingTags.length) {
         this.logger.log(
           `Loaded ${existingTags.length} existing tags for slug: ${slug}`,
         );
@@ -274,48 +267,22 @@ export class ItemsGeneratorService {
           webPages.length, // urls_scanned (total unique URLs from search results)
           relevantPages.length, // pages_processed (pages that passed content filtering)
         );
+
       this.logger.log(
         `[${slug}] Aggregated data: ${finalItems.length} items, ${finalCategories.length} categories, ${finalTags.length} tags.`,
       );
-      this.logger.log(`[${slug}] Metrics: ${JSON.stringify(metrics)}`);
-
-      // 8. Data Persistence
-      this.logger.log(`[${slug}] 8. Data Persistence - Starting`);
-      const dataPaths: ItemsGeneratorDataPaths = {
-        items: itemsPath,
-        categories: categoriesPath,
-        tags: tagsPath,
-      };
-      await this.persistData(
-        listDataPath,
-        finalItems,
-        finalCategories,
-        finalTags,
-        dataPaths,
-      );
-      this.logger.log(`[${slug}] Data persisted successfully.`);
-
       this.logger.log(
         `[${slug}] Awesome list generation complete. Final metrics: ${JSON.stringify(metrics)}`,
       );
-      this.logger.log(`[${slug}] Data saved to: ${listDataPath}`);
-      // This is where a more robust notification (webhook, websocket, email) would be triggered,
-      // potentially including the 'metrics' and 'dataPaths'.
-      // For example, update a status file or emit an event:
-      // await fs.writeJson(path.join(listDataPath, '_status.json'), {
-      //   status: 'success',
-      //   slug,
-      //   message: 'Directory data generated/updated successfully.',
-      //   metrics,
-      //   data_paths: dataPaths,
-      //   completed_at: new Date().toISOString(),
-      // }, { spaces: 2 });
 
-      this.logger.log(
-        `Successfully processed and saved data for slug: ${slug}`,
-      );
-      // This is where a more robust notification (webhook, websocket, email) would be triggered.
-      // For now, the client gets an initial "pending" and has to check logs/data.
+      // This is where a more robust notification (webhook, websocket, email) would be triggered,
+      // potentially including the 'metrics'
+
+      return {
+        categories: finalCategories,
+        items: finalItems,
+        tags: finalTags,
+      };
     } catch (error) {
       this.logger.error(
         `Error generating awesome list for slug ${slug}: ${error.message}`,
@@ -323,6 +290,8 @@ export class ItemsGeneratorService {
       );
       // Update a status file or send a notification about the error
     }
+
+    return null;
   }
 
   private async generateSearchQueries(
@@ -1136,33 +1105,5 @@ The description should explain what kind of items or resources typically fall un
     };
 
     return { finalItems, finalCategories, finalTags, metrics };
-  }
-  private async persistData(
-    listDataPath: string,
-    items: ItemData[],
-    categories: Category[],
-    tags: Tag[],
-    dataPaths: ItemsGeneratorDataPaths,
-  ): Promise<void> {
-    this.logger.log(`Persisting data to ${listDataPath}`);
-    try {
-      // Ensure the directory exists (though it should from the start)
-      await fs.ensureDir(listDataPath);
-
-      await fs.writeJson(dataPaths.items, items, { spaces: 2 });
-      this.logger.log(`Items saved to ${dataPaths.items}`);
-
-      await fs.writeJson(dataPaths.categories, categories, { spaces: 2 });
-      this.logger.log(`Categories saved to ${dataPaths.categories}`);
-
-      await fs.writeJson(dataPaths.tags, tags, { spaces: 2 });
-      this.logger.log(`Tags saved to ${dataPaths.tags}`);
-    } catch (error) {
-      this.logger.error(
-        `Error persisting data to ${listDataPath}: ${error.message}`,
-        error.stack,
-      );
-      throw error; // Re-throw to be caught by the main try-catch block
-    }
   }
 }

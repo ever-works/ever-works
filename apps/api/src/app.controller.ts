@@ -1,10 +1,20 @@
-import { Body, Controller, NotFoundException, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  HttpCode,
+  HttpStatus,
+  NotFoundException,
+  Post,
+  ValidationPipe,
+} from '@nestjs/common';
 import { DataGeneratorService } from './data-generator/data-generator.service';
 import { MarkdownGeneratorService } from './markdown-generator/markdown-generator.service';
 import { WebsiteGeneratorService } from './website-generator/website-generator.service';
 import { Directory } from './entities/directory.entity';
 import { User } from './entities/user.entity';
 import { GithubService } from './git/github.service';
+import { CreateItemsGeneratorDto } from './items-generator/dto/create-awesome-list.dto';
+import { ItemsGeneratorResponseDto } from './items-generator/dto/items-generator-response.dto';
 
 @Controller()
 export class AppController {
@@ -39,7 +49,7 @@ export class AppController {
     return dir;
   }
 
-  @Post('generate-old-version')
+  @Post('generate')
   async generateData(
     @Body('slug') slug: string,
     @Body('prompt') prompt: string,
@@ -59,29 +69,45 @@ export class AppController {
     return directory;
   }
 
-  // @Post('generate')
-  // @HttpCode(HttpStatus.ACCEPTED) // Suggesting ACCEPTED as this might be a long-running task
-  // async generateItemsGenerator(
-  //   @Body(
-  //     new ValidationPipe({
-  //       transform: true,
-  //       whitelist: true,
-  //       forbidNonWhitelisted: true,
-  //     }),
-  //   )
-  //   createItemsGeneratorDto: CreateItemsGeneratorDto,
-  // ): Promise<ItemsGeneratorResponseDto> {
-  //   // Intentionally not awaiting this to allow for an immediate response
-  //   // The actual processing will happen in the background.
-  //   // A more robust solution might involve job queues, webhooks, or websockets for status updates.
-  //   this.ItemsGeneratorService.generateItemsGenerator(createItemsGeneratorDto);
+  @Post('generate-new')
+  @HttpCode(HttpStatus.ACCEPTED) // Suggesting ACCEPTED as this might be a long-running task
+  async generateItemsGenerator(
+    @Body(
+      new ValidationPipe({
+        transform: true,
+        whitelist: true,
+        forbidNonWhitelisted: true,
+      }),
+    )
+    createItemsGeneratorDto: CreateItemsGeneratorDto,
+  ): Promise<ItemsGeneratorResponseDto> {
+    const user = await User.sessionMock();
+    const directory = await Directory.findMock(createItemsGeneratorDto.slug);
+    if (!directory) {
+      throw new NotFoundException('Directory not found');
+    }
 
-  //   return {
-  //     status: 'pending',
-  //     slug: createItemsGeneratorDto.slug,
-  //     message: `Processing request for '${createItemsGeneratorDto.name}'. Check logs or data directory for updates.`,
-  //   };
-  // }
+    // Intentionally not awaiting this to allow for an immediate response
+    // The actual processing will happen in the background.
+    // A more robust solution might involve job queues, webhooks, or websockets for status updates.
+    (async () => {
+      await this.dataGenerator.initializeV2(
+        directory,
+        user,
+        createItemsGeneratorDto,
+      );
+      await Promise.all([
+        this.markdownGenerator.initialize(directory, user),
+        this.websiteGenerator.initialize(directory, user),
+      ]);
+    })();
+
+    return {
+      status: 'pending',
+      slug: createItemsGeneratorDto.slug,
+      message: `Processing request for '${createItemsGeneratorDto.name}'. Check logs or data directory for updates.`,
+    };
+  }
 
   @Post('sync')
   async updateData(@Body('slug') slug: string, @Body('prompt') prompt: string) {

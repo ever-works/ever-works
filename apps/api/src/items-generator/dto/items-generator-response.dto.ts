@@ -8,17 +8,10 @@ export interface ItemsGeneratorMetrics {
   total_tags_in_store: number;
 }
 
-export interface ItemsGeneratorDataPaths {
-  items: string;
-  categories: string;
-  tags: string;
-}
-
 export interface ItemsGeneratorResponseDto {
   status: 'success' | 'error' | 'pending';
   slug: string;
   message: string;
   metrics?: ItemsGeneratorMetrics;
-  data_paths?: ItemsGeneratorDataPaths;
   error_details?: string; // For use when status is 'error'
 }

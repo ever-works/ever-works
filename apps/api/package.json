@@ -41,7 +41,6 @@
     "class-validator": "^0.14.2",
     "date-fns": "^4.1.0",
     "dotenv": "^16.5.0",
-    "fs-extra": "^11.3.0",
     "isomorphic-git": "^1.29.0",
     "langchain": "^0.3.24",
     "libsodium-wrappers": "^0.7.15",
