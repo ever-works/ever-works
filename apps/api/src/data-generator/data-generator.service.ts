@@ -13,6 +13,7 @@ import { Agent } from 'src/agent/agent';
 import { markdown } from 'src/agent/markdown';
 import { CreateItemsGeneratorDto } from 'src/items-generator/dto/create-awesome-list.dto';
 import { ItemsGeneratorService } from '../items-generator/items-generator.service';
+import { ItemData as NItemData } from '../items-generator/dto/item-data.dto';
 
 @Injectable()
 export class DataGeneratorService {
@@ -130,8 +131,12 @@ export class DataGeneratorService {
       );
 
       for (const item of items) {
-        item.slug = slugify(item.name, { lower: true, trim: true });
-        await this.processItem(data, item, user);
+        item.slug = slugify(item.slug || item.name, {
+          lower: true,
+          trim: true,
+        });
+
+        await this.processItemV2(data, item, user);
       }
 
       await this.githubService.push(dest, token);
@@ -183,9 +188,34 @@ export class DataGeneratorService {
     }
   }
 
+  private async processItemV2(
+    data: DataRepository,
+    item: NItemData,
+    user: User,
+  ) {
+    await data.createItemDir(item);
+    const promises = [data.writeItem(item)];
+
+    // Fetch the item data
+    const md = await markdown(item);
+    if (md) {
+      promises.push(data.writeItemMarkdown(item, md));
+    }
+
+    await Promise.all(promises);
+    await this.githubService.add(data.dir, '.');
+    await this.githubService.commit(
+      data.dir,
+      `add ${item.name}`,
+      user.asCommitter(),
+    );
+  }
+
   private async processItem(data: DataRepository, item: ItemData, user: User) {
     await data.createItemDir(item);
     const promises = [data.writeItem(item)];
+
+    // Fetch the item data
     const md = await markdown(item);
     if (md) {
       promises.push(data.writeItemMarkdown(item, md));
