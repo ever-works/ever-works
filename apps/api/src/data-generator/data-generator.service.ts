@@ -32,6 +32,8 @@ export class DataGeneratorService {
       const dest = await this.githubService.clone(directory.owner, repo, token);
       const data = await DataRepository.create(dest);
 
+      this.logger.log(`Data repository initialized at ${dest}`);
+
       try {
          await data.ensureDirectoriesExist();
          await Promise.all([
