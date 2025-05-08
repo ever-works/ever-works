@@ -769,12 +769,12 @@ Determine if an item should be 'featured' based on its prominence or explicit re
   private slugify(text: string): string {
     return text
       .toString()
-      .normalize('NFKD') // Normalize accented characters
+      .normalize('NFKD')
       .toLowerCase()
       .trim()
-      .replace(/\s+/g, '-') // Replace spaces with -
-      .replace(/[^\w-]+/g, '') // Remove all non-word chars
-      .replace(/--+/g, '-'); // Replace multiple - with single -
+      .replace(/\s+/g, '-')
+      .replace(/[^\w-]+/g, '')
+      .replace(/--+/g, '-');
   }
 
   private async normalizeTerms(
