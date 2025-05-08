@@ -60,6 +60,12 @@ const itemDataSchema = z.object({
     .describe(
       'URL-friendly slug, auto-generated from item.name if not provided.',
     ),
+  markdown_content: z
+    .string()
+    .optional()
+    .describe(
+      'Relevant content extracted from the source URL, formatted as Markdown. Focus on features, technical details, and pricing (if applicable), excluding marketing language, testimonials, and generic support info.',
+    ),
 });
 
 // Type for the extracted item, can be an array if multiple items are found on a page
@@ -465,7 +471,7 @@ Generated Queries:
 
             const response = await axios.get(source_url, {
               headers: {
-                'User-Agent': `ItemsGeneratorBuilder/${slug} (Node.js/Axios; +https://github.com/your-repo)`, // Replace with actual repo if public
+                'User-Agent': `ItemsGeneratorBuilder/${slug} (Node.js/Axios; +https://github.com/ever-works)`, // Replace with actual repo if public
               },
               timeout: 15000, // 15-second timeout
               validateStatus: (status) => status >= 200 && status < 400, // Only consider 2xx and 3xx as success
@@ -523,7 +529,7 @@ Generated Queries:
       return text;
     } catch (error) {
       this.logger.error(`Error extracting text with Cheerio: ${error.message}`);
-      return ''; // Return empty string on error
+      return '';
     }
   }
 
@@ -663,11 +669,12 @@ Provide a relevance score between 0.0 and 1.0.
       return [];
     }
 
+    // Ensure the Zod schema used here includes markdown_content
     const itemExtractionFunction = {
       name: 'extract_awesome_list_items',
       description:
-        'Extracts one or more distinct items (tools, resources, libraries, articles, etc.) from the provided web page content that are relevant to the awesome list topic.',
-      parameters: zodToJsonSchema(extractedItemsSchema),
+        'Extracts one or more distinct items (tools, resources, libraries, articles, etc.) from the provided web page content that are relevant to the awesome list topic, including generating relevant Markdown content.',
+      parameters: zodToJsonSchema(extractedItemsSchema), // This schema MUST include markdown_content
     };
 
     for (const page of relevantPages) {
@@ -684,21 +691,31 @@ Provide a relevance score between 0.0 and 1.0.
       this.logger.log(`[${slug}] Extracting items from: ${page.source_url}`);
       try {
         const prompt = PromptTemplate.fromTemplate(
-          `You are an expert data extractor for "Awesome List" directories.
+          `You are an expert data extractor and technical writer for "Awesome List" directories.
 The main topic of the Awesome List is: "{topicName}" (Description: "{topicDescription}").
 From the following web page content, identify and extract information for one or more distinct items (tools, resources, libraries, articles, etc.) that are highly relevant to this topic.
 
-Web Page Content (first 4000 characters):
+Web Page Content (first 5000 characters):
 ---
 {page_content_snippet}
 ---
 
-For each item, provide its name, a concise description, its most direct and canonical source_url, relevant categories, and specific tags.
-Only extract an item if you can confidently determine a high-quality, direct 'source_url' for it. If not, omit that item.
-A 'source_url' should lead directly to the item's homepage, official documentation, or primary repository, not a blog post merely mentioning it unless the blog post *is* the primary resource.
-Ensure the description is informative and highlights relevance to "{topicName}".
-Categories should be high-level (e.g., "Monitoring", "Security"). Tags should be specific keywords (e.g., "open-source", "real-time").
-Determine if an item should be 'featured' based on its prominence or explicit recommendations on the page.
+For each identified item:
+1.  Provide its canonical **name**.
+2.  Write a concise **description** highlighting its relevance to "{topicName}".
+3.  Determine its most direct and canonical **source_url** (homepage, docs, repo). Omit the item if a high-quality URL cannot be found.
+4.  List relevant high-level **categories** (e.g., "Monitoring", "Security").
+5.  List specific **tags** (keywords, technologies, e.g., "open-source", "real-time").
+6.  Determine if it should be **featured** based on prominence/recommendations.
+7.  Generate **markdown_content**: Extract the *most relevant* information from the page content and format it as clean Markdown. Follow these rules strictly:
+    *   **Focus:** Prioritize factual information, technical details, features, capabilities, and pricing/plans (if applicable and clearly stated).
+    *   **Exclude:** All marketing/sales language (e.g., "revolutionary", "best-in-class", "why choose us"), testimonials, customer logos, generic "About Us" sections unrelated to the item's function, generic support/contact information, and calls to action (e.g., "Sign up now", "Request a demo").
+    *   **Features:** List *all* relevant features mentioned, not just key features. Use bullet points under a "### Features" heading if appropriate.
+    *   **Pricing:** If pricing information (plans, tiers, costs) is present and clear, include it under a "### Pricing" heading. Summarize clearly.
+    *   **Structure:** Use appropriate Markdown headings (e.g., \`### Features\`, \`### Pricing\`), bullet points, and code formatting where applicable. Keep it concise and informative.
+    *   **Length:** Aim for a useful summary (typically 100-500 words), not the entire page content.
+
+Only call the extraction function if you find at least one item meeting the criteria, especially the requirement for a valid source_url.
 `,
         );
 
@@ -715,7 +732,7 @@ Determine if an item should be 'featured' based on its prominence or explicit re
         const extractionResult = (await extractionChain.invoke({
           topicName,
           topicDescription,
-          page_content_snippet: page.text_content.slice(0, 4000), // Use a larger snippet for extraction
+          page_content_snippet: page.text_content.slice(0, 5000), // Use a larger snippet for extraction + markdown
         })) as { items?: Partial<ItemData>[] }; // Type assertion for the expected output structure
 
         if (
@@ -731,6 +748,7 @@ Determine if an item should be 'featured' based on its prominence or explicit re
                 featured: false, // Default featured if not provided by LLM
                 ...extractedItem,
               };
+              // The itemDataSchema now includes markdown_content, so it will be validated
               const validatedItem = itemDataSchema.parse(
                 itemToValidate,
               ) as ItemData; // Cast to ItemData after successful parsing
@@ -743,7 +761,7 @@ Determine if an item should be 'featured' based on its prominence or explicit re
 
               allExtractedItems.push(validatedItem);
               this.logger.log(
-                `[${slug}] Extracted item: "${validatedItem.name}" (Slug: ${validatedItem.slug}) from ${page.source_url}`,
+                `[${slug}] Extracted item: "${validatedItem.name}" (Slug: ${validatedItem.slug}) with markdown_content from ${page.source_url}`,
               );
             } catch (validationError) {
               this.logger.warn(

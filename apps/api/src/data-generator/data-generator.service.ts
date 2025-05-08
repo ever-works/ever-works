@@ -190,16 +190,21 @@ export class DataGeneratorService {
 
   private async processItemV2(
     data: DataRepository,
-    item: NItemData,
+    fullItem: NItemData,
     user: User,
   ) {
+    let { markdown_content, ...item } = fullItem;
+
     await data.createItemDir(item);
     const promises = [data.writeItem(item)];
 
     // Fetch the item data
-    const md = await markdown(item);
-    if (md) {
-      promises.push(data.writeItemMarkdown(item, md));
+    if (!markdown_content) {
+      markdown_content = await markdown(item);
+    }
+
+    if (markdown_content) {
+      promises.push(data.writeItemMarkdown(item, markdown_content));
     }
 
     await Promise.all(promises);
