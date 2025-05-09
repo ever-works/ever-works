@@ -426,7 +426,7 @@ Generated Queries:
 
             const response = await axios.get(source_url, {
               headers: {
-                'User-Agent': `ItemsGeneratorBuilder/${slug} (Node.js/Axios; +https://github.com/your-repo)`,
+                'User-Agent': `ItemsGeneratorBuilder/${slug} (Node.js/Axios; +https://github.com/ever-works)`,
               },
               timeout: 15000, // 15-second timeout
               validateStatus: (status) => status >= 200 && status < 400, // Only consider 2xx and 3xx as success
