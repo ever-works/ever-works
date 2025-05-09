@@ -1,9 +1,10 @@
 import {
   Body,
   Controller,
+  HttpCode,
+  HttpStatus,
   NotFoundException,
   Post,
-  UsePipes,
   ValidationPipe,
 } from '@nestjs/common';
 import { DataGeneratorService } from './data-generator/data-generator.service';
@@ -12,8 +13,8 @@ import { WebsiteGeneratorService } from './website-generator/website-generator.s
 import { Directory } from './entities/directory.entity';
 import { User } from './entities/user.entity';
 import { GithubService } from './git/github.service';
-import { GenerateDataDto } from './validators/generate-data.dto';
-import { CreateDirectoryDto } from './validators/create-directory.dto';
+import { CreateItemsGeneratorDto } from './items-generator/dto/create-awesome-list.dto';
+import { ItemsGeneratorResponseDto } from './items-generator/dto/items-generator-response.dto';
 
 @Controller()
 export class AppController {
@@ -25,9 +26,12 @@ export class AppController {
   ) {}
 
   @Post('directories')
-  @UsePipes(new ValidationPipe({ transform: true }))
-  async createDirectory(@Body() createDirectoryDto: CreateDirectoryDto) {
-    const { slug, name, description, owner } = createDirectoryDto;
+  async createDirectory(
+    @Body('slug') slug: string,
+    @Body('name') name: string,
+    @Body('description') description: string,
+    @Body('owner') owner?: string,
+  ) {
     const user = await User.sessionMock();
     const dir = new Directory();
     dir.slug = slug;
@@ -35,8 +39,8 @@ export class AppController {
     if (owner) {
       dir.owner = owner;
     } else {
-      const githubUser = await this.githubService.getUser(user.getGitToken()); // Renamed owner to githubUser to avoid conflict
-      dir.owner = githubUser.login;
+      const owner = await this.githubService.getUser(user.getGitToken());
+      dir.owner = owner.login;
     }
     dir.name = name;
     dir.description = description;
@@ -46,9 +50,10 @@ export class AppController {
   }
 
   @Post('generate')
-  @UsePipes(new ValidationPipe({ transform: true }))
-  async generateData(@Body() generateDataDto: GenerateDataDto) {
-    const { slug, prompt } = generateDataDto;
+  async generateData(
+    @Body('slug') slug: string,
+    @Body('prompt') prompt: string,
+  ) {
     const user = await User.sessionMock();
     const directory = await Directory.findMock(slug);
     if (!directory) {
@@ -64,11 +69,48 @@ export class AppController {
     return directory;
   }
 
-  @Post('sync')
-  @UsePipes(new ValidationPipe({ transform: true }))
-  async updateData(@Body() updateDataDto: GenerateDataDto) {
-    const { slug, prompt } = updateDataDto;
+  @Post('generate-v2')
+  @HttpCode(HttpStatus.ACCEPTED) // Suggesting ACCEPTED as this might be a long-running task
+  async generateItemsGenerator(
+    @Body(
+      new ValidationPipe({
+        transform: true,
+        whitelist: true,
+        forbidNonWhitelisted: true,
+      }),
+    )
+    createItemsGeneratorDto: CreateItemsGeneratorDto,
+  ): Promise<ItemsGeneratorResponseDto> {
+    const user = await User.sessionMock();
+    const directory = await Directory.findMock(createItemsGeneratorDto.slug);
+    if (!directory) {
+      throw new NotFoundException('Directory not found');
+    }
 
+    // Intentionally not awaiting this to allow for an immediate response
+    // The actual processing will happen in the background.
+    // A more robust solution might involve job queues, webhooks, or websockets for status updates.
+    (async () => {
+      await this.dataGenerator.initializeV2(
+        directory,
+        user,
+        createItemsGeneratorDto,
+      );
+      await Promise.all([
+        this.markdownGenerator.initialize(directory, user),
+        this.websiteGenerator.initialize(directory, user),
+      ]);
+    })();
+
+    return {
+      status: 'pending',
+      slug: createItemsGeneratorDto.slug,
+      message: `Processing request for '${createItemsGeneratorDto.name}'. Check logs or data directory for updates.`,
+    };
+  }
+
+  @Post('sync')
+  async updateData(@Body('slug') slug: string, @Body('prompt') prompt: string) {
     const user = await User.sessionMock();
     const directory = await Directory.findMock(slug);
     if (!directory) {

@@ -12,7 +12,7 @@ import { DeployModule } from './deploy/deploy.module';
     GitModule,
     MarkdownGeneratorModule,
     WebsiteGeneratorModule,
-    DeployModule
+    DeployModule,
   ],
   controllers: [AppController],
 })

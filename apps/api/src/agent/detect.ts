@@ -53,7 +53,7 @@ const routerOutputSchema = z.object({
 export async function detectType(task: string) {
     Logger.log(`Routing items`, 'Agent');
     const llm = new ChatOpenAI({
-        model: process.env.OPENAI_MODEL || 'gpt-4.1',
+        model: process.env.OPENAI_MODEL || 'gpt-4.1-mini',
         temperature: 0.0,
     });
 
