@@ -17,8 +17,9 @@ export const itemDataSchema = z.object({
   source_url: z
     .string()
     .url()
+    .optional()
     .describe(
-      'The most direct, stable, and canonical URL for the item itself (e.g., project homepage, official documentation, GitHub repository). Must be a valid and highly relevant URL. If a high-quality URL cannot be confidently determined, this item should be omitted by not calling the function.',
+      'The most direct, stable, and canonical URL for the item itself (e.g., project homepage, official documentation, GitHub repository etc.). Must be a valid and highly relevant URL. If a high-quality URL cannot be confidently determined.',
     ),
   category: z
     .union([z.string(), z.array(z.string())])

@@ -10,7 +10,6 @@ import { ItemsGeneratorMetrics } from './dto/items-generator-response.dto';
 import { ChatOpenAI } from '@langchain/openai';
 import { PromptTemplate } from '@langchain/core/prompts';
 import { StringOutputParser } from '@langchain/core/output_parsers';
-import { TavilySearchAPIRetriever } from '@langchain/community/retrievers/tavily_search_api';
 import axios from 'axios';
 import { JsonOutputFunctionsParser } from 'langchain/output_parsers';
 import { zodToJsonSchema } from 'zod-to-json-schema';
@@ -28,6 +27,7 @@ import {
   RelevanceAssessment,
 } from './interfaces/items-generator.interfaces';
 import { extractTextFromHtml, slugify } from './utils/text.utils';
+import { tavily, TavilyClient } from '@tavily/core';
 
 // Default number of items to ask the AI to generate in the initial phase
 const DEFAULT_AI_ITEMS_TO_GENERATE = 20;
@@ -44,7 +44,7 @@ const DEFAULT_CONFIG: Required<ConfigDto> = {
 export class ItemsGeneratorService {
   private readonly logger = new Logger(ItemsGeneratorService.name);
   private llm: ChatOpenAI;
-  private tavilyRetriever: TavilySearchAPIRetriever | undefined;
+  private tavilyClient: TavilyClient | undefined;
 
   constructor() {
     if (!process.env.OPENAI_API_KEY) {
@@ -63,9 +63,8 @@ export class ItemsGeneratorService {
         'TAVILY_API_KEY not found in .env file. Web search capabilities will be disabled.',
       );
     } else {
-      this.tavilyRetriever = new TavilySearchAPIRetriever({
+      this.tavilyClient = tavily({
         apiKey: process.env.TAVILY_API_KEY,
-        k: DEFAULT_CONFIG.max_results_per_query,
       });
     }
   }
@@ -373,7 +372,7 @@ Generated Queries:
     processedSourceUrls: Set<string>, // URLs from existing items.json
     config: Required<ConfigDto>,
   ): Promise<WebPageData[]> {
-    if (!this.tavilyRetriever) {
+    if (!this.tavilyClient) {
       this.logger.warn(
         `[${slug}] Tavily API key not configured. Skipping web search.`,
       );
@@ -394,9 +393,7 @@ Generated Queries:
 
       this.logger.log(`[${slug}] Executing search query: "${query}"`);
       try {
-        // Update k value for retriever if needed, though it's set in constructor
-        // this.tavilyRetriever.k = config.max_results_per_query;
-        const documents = await this.tavilyRetriever.invoke(query);
+        const documents = await this.webSearch(query, config);
         this.logger.log(
           `[${slug}] Found ${documents.length} results for query: "${query}"`,
         );
@@ -404,10 +401,10 @@ Generated Queries:
         for (const doc of documents.slice(0, config.max_results_per_query)) {
           if (pagesFetchedThisRun >= config.max_pages_to_process) break;
 
-          const source_url = doc.metadata.source || doc.metadata.url; // Tavily might use 'url'
+          const source_url = doc.url;
           if (!source_url || typeof source_url !== 'string') {
             this.logger.warn(
-              `[${slug}] Skipping document with missing or invalid source URL for query "${query}". Metadata: ${JSON.stringify(doc.metadata)}`,
+              `[${slug}] Skipping document with missing or invalid source URL for query "${query}". Metadata: ${JSON.stringify(doc)}`,
             );
             continue;
           }
@@ -648,7 +645,7 @@ Web Page Content (first 5000 characters):
 For each identified item **that directly relates to "{topicName}"**:
 1.  Provide its canonical **name**.
 2.  Write a concise **description** highlighting its specific relevance to "{topicName}".
-3.  Determine its most direct and canonical **source_url** (homepage, docs, repo). **Crucially, omit the item entirely if a high-quality, canonical URL for the item itself cannot be found.** Do not use URLs for blog posts merely mentioning the item unless the post *is* the primary resource. The URL must be valid and specific to the item.
+3.  Determine its most direct and canonical **source_url** (homepage, docs, repo etc.). Do not use URLs for blog posts merely mentioning the item unless the post *is* the primary resource. The URL must be valid and specific to the item.
 4.  List relevant high-level **categories** (e.g., "Monitoring", "Security") that fit within the context of "{topicName}".
 5.  List specific **tags** (keywords, technologies, e.g., "open-source", "real-time").
 6.  Determine if it should be **featured** based on prominence/recommendations.
@@ -727,6 +724,7 @@ Only call the extraction function if you find at least one item meeting these st
         );
       }
     }
+
     return allExtractedItems;
   }
 
@@ -739,24 +737,8 @@ Only call the extraction function if you find at least one item meeting these st
     );
     const validItems: ItemData[] = [];
 
-    let defaultK: number | undefined;
-    if (this.tavilyRetriever) {
-      defaultK = this.tavilyRetriever.k;
-      this.tavilyRetriever.k = 3; // Per user example
-      this.logger.log(
-        `[${slug}] Temporarily set TavilyRetriever.k from ${defaultK} to ${this.tavilyRetriever.k} for item source validation phase.`,
-      );
-    }
-
     try {
       for (const currentItem of items) {
-        if (!currentItem.source_url) {
-          this.logger.warn(
-            `[${slug}] Item "${currentItem.name}" (ID: ${currentItem.slug || 'N/A'}) has no source_url, skipping validation.`,
-          );
-          continue;
-        }
-
         const validatedSourceUrl = await this.validateAndFetchSourceUrl(
           slug,
           currentItem,
@@ -770,10 +752,11 @@ Only call the extraction function if you find at least one item meeting these st
           validItems.push(updatedItem);
         }
       }
-    } finally {
-      if (this.tavilyRetriever && defaultK !== undefined) {
-        this.tavilyRetriever.k = defaultK;
-      }
+    } catch (error) {
+      this.logger.error(
+        `[${slug}] Error during source URL validation: ${error.message}`,
+        error.stack,
+      );
     }
 
     this.logger.log(
@@ -980,6 +963,7 @@ Generate the list of items according to the specified schema.
             const validatedItem = itemDataSchema.parse(
               itemToValidate,
             ) as ItemData;
+
             validatedItem.slug = slugify(validatedItem.name);
 
             if (!validatedItem.source_url) {
@@ -1205,7 +1189,7 @@ The description should explain what kind of items or resources typically fall un
       return validatedInitialUrl;
     }
 
-    if (!this.tavilyRetriever) {
+    if (!this.tavilyClient) {
       this.logger.warn(
         `[${slug}] Tavily retriever not available. Cannot search for URL for "${itemName}".`,
       );
@@ -1233,19 +1217,20 @@ The description should explain what kind of items or resources typically fall un
       this.logger.log(
         `[${slug}] Searching Tavily for "${itemName}" with query: "${searchQuery}"`,
       );
-      // Request a few results to increase chances of finding a valid one
-      // 'k' is set at instantiation of tavilyRetriever, not in invoke's config object
-      const documents = await this.tavilyRetriever.invoke(searchQuery);
+
+      const documents = await this.webSearch(searchQuery, {
+        max_results_per_query: 3,
+      });
 
       if (documents && documents.length > 0) {
         for (const doc of documents) {
-          const tavilyUrl = doc.metadata.source || doc.metadata.url;
-          if (tavilyUrl && typeof tavilyUrl === 'string') {
-            const validatedTavilyUrl = await validateUrl(tavilyUrl);
+          if (doc.url) {
+            const validatedTavilyUrl = await validateUrl(doc.url);
             if (validatedTavilyUrl) {
               this.logger.log(
                 `[${slug}] Found and validated Tavily URL for "${itemName}": ${validatedTavilyUrl}`,
               );
+
               return validatedTavilyUrl;
             }
           }
@@ -1269,6 +1254,15 @@ The description should explain what kind of items or resources typically fall un
       `[${slug}] Could not find or validate a source URL for "${itemName}" after AI and Tavily attempts.`,
     );
     return undefined; // No valid URL found
+  }
+
+  private async webSearch(query: string, config?: ConfigDto) {
+    const searches = await this.tavilyClient.search(query, {
+      maxResults:
+        config.max_results_per_query || DEFAULT_CONFIG.max_results_per_query,
+    });
+
+    return searches.results.sort((a, b) => b.score - a.score);
   }
 
   private async processCategoriesAndTags(
