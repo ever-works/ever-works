@@ -210,7 +210,8 @@ export class ItemsGeneratorService {
         `[${slug}] 7. Category and Tag Generation, Normalization & Consolidation - Starting`,
       );
       const { currentCategories, currentTags } =
-        await this.processCategoriesAndTags(slug, validatedItems, name); // Use validatedItems
+        await this.processCategoriesAndTags(slug, validatedItems, name);
+
       this.logger.log(
         `[${slug}] Processed ${currentCategories.length} categories and ${currentTags.length} tags based on validated items.`,
       );
@@ -225,7 +226,7 @@ export class ItemsGeneratorService {
           existingItems,
           existingCategories,
           existingTags,
-          validatedItems, // Use validatedItems
+          validatedItems,
           currentCategories,
           currentTags,
           webPages.length,
@@ -1169,14 +1170,15 @@ The description should explain what kind of items or resources typically fall un
     ): Promise<string | undefined> => {
       if (!urlToValidate || typeof urlToValidate !== 'string') {
         this.logger.warn(
-          `[${slug}] Invalid URL structure provided for ${origin} URL for "${itemName}": ${urlToValidate}`,
+          `[${slug}] Invalid URL structure provided for URL for "${itemName}": ${urlToValidate}`,
         );
         return undefined;
       }
+
       try {
         new URL(urlToValidate); // Basic syntax check
         this.logger.log(
-          `[${slug}] Validating ${origin}-provided URL for "${itemName}": ${urlToValidate}`,
+          `[${slug}] Validating provided URL for "${itemName}": ${urlToValidate}`,
         );
         await axios.head(urlToValidate, {
           timeout: 10000, // 10-second timeout
@@ -1187,12 +1189,12 @@ The description should explain what kind of items or resources typically fall un
         });
 
         this.logger.log(
-          `[${slug}] ${origin} URL validation successful for "${itemName}": ${urlToValidate}`,
+          `[${slug}] URL validation successful for "${itemName}": ${urlToValidate}`,
         );
         return urlToValidate;
       } catch (error) {
         this.logger.warn(
-          `[${slug}] ${origin}-provided URL for "${itemName}" ("${urlToValidate}") failed validation: ${error.message}.`,
+          `[${slug}] provided URL for "${itemName}" ("${urlToValidate}") failed validation: ${error.message}.`,
         );
         return undefined;
       }
