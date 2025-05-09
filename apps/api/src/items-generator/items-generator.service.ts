@@ -65,11 +65,18 @@ export class ItemsGeneratorService {
     } else {
       this.tavilyRetriever = new TavilySearchAPIRetriever({
         apiKey: process.env.TAVILY_API_KEY,
-        k: DEFAULT_CONFIG.max_results_per_query, // Initialize with default, can be overridden
+        k: DEFAULT_CONFIG.max_results_per_query,
       });
     }
   }
 
+  /**
+   * Entry point for generating items.
+   *
+   * @param createItemsGeneratorDto
+   * @param existing
+   * @returns
+   */
   async generateItemsGenerator(
     createItemsGeneratorDto: CreateItemsGeneratorDto,
     existing: {
@@ -183,22 +190,34 @@ export class ItemsGeneratorService {
       // Combine AI-generated items and web-extracted items
       const allDiscoveredItems = [...initialAiItems, ...extractedWebItems];
       this.logger.log(
-        `[${slug}] Total discovered items (AI + Web before final deduplication): ${allDiscoveredItems.length}.`,
+        `[${slug}] Total discovered items (AI + Web before source validation): ${allDiscoveredItems.length}.`,
       );
 
-      // 6. Category and Tag Generation, Normalization & Consolidation
+      // 6. Filter and Validate Source URLs for all discovered items
       this.logger.log(
-        `[${slug}] 6. Category and Tag Generation, Normalization & Consolidation - Starting`,
+        `[${slug}] 6. Filter and Validate Source URLs - Starting`,
+      );
+      const validatedItems = await this.filterAndValidateSourceItems(
+        allDiscoveredItems,
+        slug,
+      );
+      this.logger.log(
+        `[${slug}] After source validation, ${validatedItems.length} items remain.`,
+      );
+
+      // 7. Category and Tag Generation, Normalization & Consolidation
+      this.logger.log(
+        `[${slug}] 7. Category and Tag Generation, Normalization & Consolidation - Starting`,
       );
       const { currentCategories, currentTags } =
-        await this.processCategoriesAndTags(slug, allDiscoveredItems, name);
+        await this.processCategoriesAndTags(slug, validatedItems, name); // Use validatedItems
       this.logger.log(
-        `[${slug}] Processed ${currentCategories.length} categories and ${currentTags.length} tags based on combined items.`,
+        `[${slug}] Processed ${currentCategories.length} categories and ${currentTags.length} tags based on validated items.`,
       );
 
-      // 7. Deduplication and Data Aggregation
+      // 8. Deduplication and Data Aggregation
       this.logger.log(
-        `[${slug}] 7. Deduplication and Data Aggregation - Starting`,
+        `[${slug}] 8. Deduplication and Data Aggregation - Starting`,
       );
       const { finalItems, finalCategories, finalTags, metrics } =
         this.aggregateAndDeduplicateData(
@@ -206,7 +225,7 @@ export class ItemsGeneratorService {
           existingItems,
           existingCategories,
           existingTags,
-          allDiscoveredItems, // Use combined list
+          validatedItems, // Use validatedItems
           currentCategories,
           currentTags,
           webPages.length,
@@ -710,7 +729,59 @@ Only call the extraction function if you find at least one item meeting these st
     return allExtractedItems;
   }
 
-  // New method for AI-first item generation
+  private async filterAndValidateSourceItems(
+    items: ItemData[],
+    slug: string,
+  ): Promise<ItemData[]> {
+    this.logger.log(
+      `[${slug}] Starting source URL validation and filtering for ${items.length} items.`,
+    );
+    const validItems: ItemData[] = [];
+
+    let defaultK: number | undefined;
+    if (this.tavilyRetriever) {
+      defaultK = this.tavilyRetriever.k;
+      this.tavilyRetriever.k = 3; // Per user example
+      this.logger.log(
+        `[${slug}] Temporarily set TavilyRetriever.k from ${defaultK} to ${this.tavilyRetriever.k} for item source validation phase.`,
+      );
+    }
+
+    try {
+      for (const currentItem of items) {
+        if (!currentItem.source_url) {
+          this.logger.warn(
+            `[${slug}] Item "${currentItem.name}" (ID: ${currentItem.slug || 'N/A'}) has no source_url, skipping validation.`,
+          );
+          continue;
+        }
+
+        const validatedSourceUrl = await this.validateAndFetchSourceUrl(
+          slug,
+          currentItem,
+        );
+
+        if (validatedSourceUrl) {
+          const updatedItem: ItemData = {
+            ...currentItem,
+            source_url: validatedSourceUrl,
+          };
+          validItems.push(updatedItem);
+        }
+      }
+    } finally {
+      if (this.tavilyRetriever && defaultK !== undefined) {
+        this.tavilyRetriever.k = defaultK;
+      }
+    }
+
+    this.logger.log(
+      `[${slug}] Finished source URL validation. ${validItems.length} of ${items.length} items passed.`,
+    );
+
+    return validItems;
+  }
+
   private async generateInitialItemsWithAI(
     slug: string,
     topicName: string,
@@ -852,6 +923,10 @@ Generate the list of items according to the specified schema.
       )
       .pipe(new JsonOutputFunctionsParser());
 
+    // reset temperature
+    const defaultTemperature = this.llm.temperature;
+    this.llm.temperature = 0.2;
+
     try {
       const numItemsToGenerate =
         config.max_results_per_query * 1 || DEFAULT_AI_ITEMS_TO_GENERATE;
@@ -929,6 +1004,9 @@ Generate the list of items according to the specified schema.
         error.stack,
       );
     }
+
+    this.llm.temperature = defaultTemperature;
+
     this.logger.log(
       `[${slug}] AI-First Item Generation - Complete. Validated ${allGeneratedItems.length} items.`,
     );
@@ -1079,11 +1157,13 @@ The description should explain what kind of items or resources typically fall un
   }
 
   private async validateAndFetchSourceUrl(
-    initialUrl: string,
-    itemName: string,
-    itemDescription: string,
     slug: string,
+    currentItem: ItemData,
   ): Promise<string | undefined> {
+    const sourceUrl = currentItem.source_url;
+    const itemName = currentItem.name;
+    const itemDescription = currentItem.description;
+
     const validateUrl = async (
       urlToValidate: string,
     ): Promise<string | undefined> => {
@@ -1105,6 +1185,7 @@ The description should explain what kind of items or resources typically fall un
             'User-Agent': `ItemsGeneratorBuilder-URL-Validation/${slug}`,
           },
         });
+
         this.logger.log(
           `[${slug}] ${origin} URL validation successful for "${itemName}": ${urlToValidate}`,
         );
@@ -1117,7 +1198,7 @@ The description should explain what kind of items or resources typically fall un
       }
     };
 
-    const validatedInitialUrl = await validateUrl(initialUrl);
+    const validatedInitialUrl = await validateUrl(sourceUrl);
     if (validatedInitialUrl) {
       return validatedInitialUrl;
     }
