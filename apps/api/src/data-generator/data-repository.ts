@@ -14,7 +14,7 @@ export interface IDataConfig {
 
 export const DEFAULT_DATA_CONFIG: IDataConfig = {
     company_name: 'Acme',
-    content_table: false,
+    content_table: true, // Previous value was false
     item_name: 'Item',
     items_name: 'Items',
 };

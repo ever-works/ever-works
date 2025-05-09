@@ -1401,10 +1401,11 @@ The description should explain what kind of items or resources typically fall un
           const url = new URL(item.source_url);
           return (url.origin + url.pathname).replace(/\/$/, ''); // Normalize: remove trailing slash
         } catch (e) {
-          return item.source_url; // If not a valid URL, use as is
+          return item.source_url;
         }
       }
-      return `ai-gen:${slugify(item.name)}`; // Fallback key for items without a source_url
+
+      return `https://www.google.com/search?q=${item.name}`;
     };
 
     existingItems.forEach((item) => {
@@ -1441,6 +1442,7 @@ The description should explain what kind of items or resources typically fall un
         }
       }
     });
+
     const finalItems = Array.from(finalItemsMap.values());
 
     // Deduplicate Categories
