@@ -12,15 +12,13 @@ import { PromptTemplate } from '@langchain/core/prompts';
 import { StringOutputParser } from '@langchain/core/output_parsers';
 import { TavilySearchAPIRetriever } from '@langchain/community/retrievers/tavily_search_api';
 import axios from 'axios';
-// cheerio is now used in text.utils.ts
 import { JsonOutputFunctionsParser } from 'langchain/output_parsers';
-import { zodToJsonSchema } from 'zod-to-json-schema'; // z is imported in schema files
+import { zodToJsonSchema } from 'zod-to-json-schema';
 import {
   itemDataSchema,
   extractedItemsSchema,
 } from './schemas/item-extraction.schemas';
 import {
-  normalizedNameSchema,
   normalizedNamesListSchema,
   categoryDescriptionSchema,
 } from './schemas/normalization.schemas';
