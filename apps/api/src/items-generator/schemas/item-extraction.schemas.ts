@@ -59,3 +59,24 @@ export const extractedItemsSchema = z.object({
       "An array of items extracted from the page. Only include items for which a valid 'source_url' can be determined.",
     ),
 });
+
+// Zod schema for AI's assessment of prompt understanding
+export const promptUnderstandingAssessmentSchema = z.object({
+  can_proceed: z
+    .boolean()
+    .describe(
+      'True if the AI has sufficient context and clarity from the prompt to generate a meaningful list of items. False otherwise.',
+    ),
+  reason_if_cannot_proceed: z
+    .string()
+    .nullable()
+    .describe(
+      'If can_proceed is false, a brief explanation of why the prompt is too vague or lacks clarity for item generation. Null if can_proceed is true.',
+    ),
+  suggested_clarifications: z
+    .array(z.string())
+    .optional()
+    .describe(
+      'Optional: If can_proceed is false, specific questions or suggestions for the user to clarify the prompt.',
+    ),
+});
