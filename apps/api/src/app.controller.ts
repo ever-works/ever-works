@@ -13,7 +13,7 @@ import { WebsiteGeneratorService } from './website-generator/website-generator.s
 import { Directory } from './entities/directory.entity';
 import { User } from './entities/user.entity';
 import { GithubService } from './git/github.service';
-import { CreateItemsGeneratorDto } from './items-generator/dto/create-awesome-list.dto';
+import { CreateItemsGeneratorDto } from './items-generator/dto/create-items-generator.dto';
 import { ItemsGeneratorResponseDto } from './items-generator/dto/items-generator-response.dto';
 
 @Controller()

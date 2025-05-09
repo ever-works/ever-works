@@ -2,11 +2,13 @@ import { Injectable, Logger } from '@nestjs/common';
 import {
   CreateItemsGeneratorDto,
   ConfigDto,
-} from './dto/create-awesome-list.dto';
+} from './dto/create-items-generator.dto';
 import { ItemData } from './dto/item-data.dto';
 import { Category } from './dto/category.dto';
 import { Tag } from './dto/tag.dto';
 import { ItemsGeneratorMetrics } from './dto/items-generator-response.dto';
+import * as fs from 'fs-extra';
+import * as path from 'path';
 import { ChatOpenAI } from '@langchain/openai';
 import { PromptTemplate } from '@langchain/core/prompts';
 import { StringOutputParser } from '@langchain/core/output_parsers';
@@ -19,24 +21,34 @@ import { zodToJsonSchema } from 'zod-to-json-schema';
 
 // Zod schema for ItemData extraction
 const itemDataSchema = z.object({
-  name: z.string().min(3).describe(
-    'The primary, canonical name of the item (tool, resource, library, article, paper, talk).', // Updated description
-  ),
+  name: z
+    .string()
+    .min(3)
+    .describe(
+      'The primary, canonical name of the item (tool, resource, library, article).',
+    ),
   description: z
     .string()
     .min(20)
     .describe(
       "A concise, informative summary of the item and its relevance to the main topic. If a good summary isn't directly available, generate one from the page content.",
     ),
-  source_url: z.string().url().describe(
-    'The most direct, stable, and canonical URL for the item itself (e.g., project homepage, official documentation, GitHub repository, article URL, PDF link). Must be a valid and highly relevant URL. If a high-quality URL cannot be confidently determined, this item should be omitted by not calling the function.', // Updated description
-  ),
-  category: z.union([z.string(), z.array(z.string())]).describe(
-    "One or more relevant high-level category names (e.g., 'Monitoring', 'CI/CD', 'Data Visualization', 'Articles & Talks', 'Research Papers').", // Updated examples
-  ),
-  tags: z.array(z.string()).describe(
-    "Specific keywords, technologies, or features associated with the item (e.g., 'real-time', 'open-source', 'golang', 'tutorial', 'deep-dive', 'survey-paper').", // Updated examples
-  ),
+  source_url: z
+    .string()
+    .url()
+    .describe(
+      'The most direct, stable, and canonical URL for the item itself (e.g., project homepage, official documentation, GitHub repository). Must be a valid and highly relevant URL. If a high-quality URL cannot be confidently determined, this item should be omitted by not calling the function.',
+    ),
+  category: z
+    .union([z.string(), z.array(z.string())])
+    .describe(
+      "One or more relevant high-level category names (e.g., 'Monitoring', 'CI/CD', 'Data Visualization').",
+    ),
+  tags: z
+    .array(z.string())
+    .describe(
+      "Specific keywords, technologies, or features associated with the item (e.g., 'real-time', 'open-source', 'golang').",
+    ),
   featured: z
     .boolean()
     .optional()
@@ -50,9 +62,12 @@ const itemDataSchema = z.object({
     .describe(
       'URL-friendly slug, auto-generated from item.name if not provided.',
     ),
-  markdown_content: z.string().optional().describe(
-    'Relevant content extracted from the source URL (if HTML), formatted as Markdown. Focus on features, technical details, and pricing (if applicable), excluding marketing language, testimonials, and generic support info. Omit for PDFs.', // Updated description
-  ),
+  markdown_content: z
+    .string()
+    .optional()
+    .describe(
+      'Relevant content extracted from the source URL, formatted as Markdown. Focus on features, technical details, and pricing (if applicable), excluding marketing language, testimonials, and generic support info.',
+    ),
 });
 
 // Type for the extracted item, can be an array if multiple items are found on a page
@@ -88,10 +103,9 @@ const categoryDescriptionSchema = z.object({
 
 interface WebPageData {
   source_url: string;
-  html_content: string; // Could be HTML or potentially raw data for PDF if downloaded (though parsing is disabled)
+  html_content: string;
   retrieved_at: string; // ISO date string
-  text_content?: string; // Extracted plain text (from HTML or PDF metadata/link context)
-  content_type?: string; // Store the content type
+  text_content?: string; // Extracted plain text
 }
 
 interface RelevanceAssessment {
@@ -105,7 +119,7 @@ const DEFAULT_CONFIG: Required<ConfigDto> = {
   max_results_per_query: 20,
   max_pages_to_process: 100,
   relevance_threshold_content: 0.75,
-  min_content_length_for_extraction: 500, // Note: This might filter out short abstracts linking to PDFs
+  min_content_length_for_extraction: 500,
 };
 
 @Injectable()
@@ -177,12 +191,13 @@ export class ItemsGeneratorService {
           `Loaded ${existingTags.length} existing tags for slug: ${slug}`,
         );
       }
-
       // Placeholder for the core processing pipeline
       this.logger.log(`[${slug}] 1. Initialization & Slug Handling - Complete`);
 
       // 2. AI-Powered Search Query Generation
-      this.logger.log(`[${slug}] 2. AI-Powered Search Query Generation - TODO`);
+      this.logger.log(
+        `[${slug}] 2. AI-Powered Search Query Generation - Starting`,
+      ); // Corrected Log
       const searchQueries = await this.generateSearchQueries(
         name,
         description,
@@ -255,16 +270,17 @@ export class ItemsGeneratorService {
           existingItems,
           existingCategories,
           existingTags,
-          extractedItemsData, // items extracted in current run
-          currentCategories, // categories processed in current run
-          currentTags, // tags processed in current run
-          webPages.length, // urls_scanned (total unique URLs from search results)
-          relevantPages.length, // pages_processed (pages that passed content filtering)
+          extractedItemsData,
+          currentCategories,
+          currentTags,
+          webPages.length,
+          relevantPages.length,
         );
 
       this.logger.log(
         `[${slug}] Aggregated data: ${finalItems.length} items, ${finalCategories.length} categories, ${finalTags.length} tags.`,
       );
+
       this.logger.log(
         `[${slug}] Awesome list generation complete. Final metrics: ${JSON.stringify(metrics)}`,
       );
@@ -287,7 +303,6 @@ export class ItemsGeneratorService {
 
     return null;
   }
-
   private async generateSearchQueries(
     name: string,
     description: string,
@@ -305,9 +320,6 @@ export class ItemsGeneratorService {
         `${name} resources`,
         `${name} libraries`,
         `${name} tutorials`,
-        `${name} articles`, // Added
-        `${name} talks`, // Added
-        `${name} research papers`, // Added
         `official documentation ${name}`,
         `community ${name}`,
       ];
@@ -322,7 +334,6 @@ export class ItemsGeneratorService {
       return [...new Set(fallbackQueries)].slice(0, config.max_search_queries);
     }
 
-    // Updated prompt to include articles, talks, papers
     const promptTemplate = PromptTemplate.fromTemplate(
       `You are an expert at generating highly relevant and diverse search engine queries to build an "Awesome List" about a specific topic.
 The topic is: "{name}"
@@ -333,14 +344,13 @@ Generate {num_queries} distinct search queries. Each query should be on a new li
 The queries should aim to discover:
 - Key tools and software
 - Essential libraries and frameworks
-- Seminal articles, blog posts, and tutorials (including conference talks if relevant)
-- Important research papers or technical reports (consider using filetype:pdf)
+- Seminal articles and blog posts
 - Official documentation and guides
 - Important community resources, forums, or discussions
 - Common use cases and best practices
 - Comparisons and alternatives
 
-Consider variations, long-tail keywords, and queries targeting different facets and resource types (tools, articles, papers, talks).
+Consider variations, long-tail keywords, and queries targeting different facets of the topic.
 Avoid overly broad or generic queries. Be specific.
 
 Generated Queries:
@@ -385,9 +395,6 @@ Generated Queries:
         `${name} resources`,
         `${name} libraries`,
         `${name} tutorials`,
-        `${name} articles`, // Added
-        `${name} talks`, // Added
-        `${name} research papers`, // Added
         `official documentation ${name}`,
         `community ${name}`,
       ];
@@ -402,6 +409,8 @@ Generated Queries:
       return [...new Set(fallbackQueries)].slice(0, config.max_search_queries);
     }
   }
+
+  // Placeholder for other private methods to be implemented:
 
   private async retrieveWebPages(
     slug: string,
@@ -430,6 +439,8 @@ Generated Queries:
 
       this.logger.log(`[${slug}] Executing search query: "${query}"`);
       try {
+        // Update k value for retriever if needed, though it's set in constructor
+        // this.tavilyRetriever.k = config.max_results_per_query;
         const documents = await this.tavilyRetriever.invoke(query);
         this.logger.log(
           `[${slug}] Found ${documents.length} results for query: "${query}"`,
@@ -463,51 +474,34 @@ Generated Queries:
 
             const response = await axios.get(source_url, {
               headers: {
-                'User-Agent': `ItemGeneratorBuilder/${slug} (Node.js/Axios; +https://github.com/ever-works)`,
-                Accept:
-                  'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,application/pdf,*/*;q=0.8',
+                'User-Agent': `ItemsGeneratorBuilder/${slug} (Node.js/Axios; +https://github.com/your-repo)`, // Replace with actual repo if public
               },
               timeout: 15000, // 15-second timeout
               validateStatus: (status) => status >= 200 && status < 400, // Only consider 2xx and 3xx as success
-              responseType: 'arraybuffer', // Fetch as buffer to handle PDF/HTML
             });
 
-            const contentType = response.headers['content-type'] || '';
-            let html_content = ''; // Default to empty string
-
-            if (contentType.includes('application/pdf')) {
-              this.logger.log(
-                `[${slug}] Detected PDF content at ${source_url}. Cannot parse content directly.`,
-              );
-              // Since pdf-parse is denied, we cannot extract text.
-              // We will rely on the LLM in the next step to infer details from the URL/context if possible.
-              // We store an empty string for html_content but keep the content_type.
-              html_content = ''; // No HTML content for PDF
-            } else if (
-              contentType.includes('text/html') ||
-              contentType.includes('text/plain') ||
-              contentType.includes('application/xml')
+            if (
+              response.headers['content-type'] &&
+              !response.headers['content-type'].includes('text/html') &&
+              !response.headers['content-type'].includes('text/plain')
             ) {
-              // Decode buffer for text-based content
-              html_content = Buffer.from(response.data).toString('utf-8');
-            } else {
               this.logger.warn(
-                `[${slug}] Skipping unsupported content type at ${source_url} (Content-Type: ${contentType})`,
+                `[${slug}] Skipping non-HTML/text content at ${source_url} (Content-Type: ${response.headers['content-type']})`,
               );
               currentRunProcessedUrls.add(source_url); // Mark as processed to avoid re-fetching
               continue;
             }
 
+            const html_content = response.data;
             allFetchedPages.push({
               source_url,
-              html_content, // This will be empty for PDFs now
+              html_content,
               retrieved_at: new Date().toISOString(),
-              content_type: contentType, // Store content type
             });
             currentRunProcessedUrls.add(source_url);
             pagesFetchedThisRun++;
             this.logger.log(
-              `[${slug}] Successfully processed URL: ${source_url}. Total pages processed this run: ${pagesFetchedThisRun}`,
+              `[${slug}] Successfully fetched content from: ${source_url}. Total pages fetched this run: ${pagesFetchedThisRun}`,
             );
           } catch (fetchError) {
             this.logger.error(
@@ -526,7 +520,6 @@ Generated Queries:
   }
 
   private extractTextFromHtml(htmlContent: string): string {
-    if (!htmlContent) return ''; // Handle empty content (e.g., for PDFs)
     try {
       const $ = cheerio.load(htmlContent);
       // Remove script and style elements
@@ -555,79 +548,23 @@ Generated Queries:
       this.logger.warn(
         `[${slug}] OpenAI API Key not configured. Skipping LLM-based relevance assessment. Applying basic content length filter only.`,
       );
-
-      // If no LLM, apply basic filtering and return
-      return webPages.filter((page) => {
-        if (page.content_type?.includes('application/pdf')) {
-          this.logger.log(
-            `[${slug}] Keeping potential PDF page (LLM disabled): ${page.source_url}`,
-          );
-          return true; // Keep PDFs if LLM is off
-        }
-
-        page.text_content = this.extractTextFromHtml(page.html_content);
-        const passesLengthCheck =
-          page.text_content.length >= config.min_content_length_for_extraction;
-
-        if (!passesLengthCheck) {
-          this.logger.log(
-            `[${slug}] Discarding page (too short, LLM disabled): ${page.source_url}`,
-          );
-        } else {
-          this.logger.log(
-            `[${slug}] Keeping page (LLM disabled, length check passed): ${page.source_url}`,
-          );
-        }
-        return passesLengthCheck;
-      });
     }
 
     for (const page of webPages) {
-      // Extract text only if it's HTML/Text content
-      if (
-        page.html_content &&
-        page.content_type &&
-        !page.content_type.includes('application/pdf')
-      ) {
-        page.text_content = this.extractTextFromHtml(page.html_content);
-      } else {
-        // For PDFs or pages where text extraction failed, use a placeholder or skip length check
-        page.text_content = page.content_type?.includes('application/pdf')
-          ? '[PDF Content - Not Parsed]'
-          : '';
-      }
+      const textContent = this.extractTextFromHtml(page.html_content);
+      page.text_content = textContent; // Store extracted text for later use
 
-      // Apply length check only if text content could be extracted
-      if (
-        page.text_content &&
-        page.text_content !== '[PDF Content - Not Parsed]' &&
-        page.text_content.length < config.min_content_length_for_extraction
-      ) {
+      if (textContent.length < config.min_content_length_for_extraction) {
         this.logger.log(
-          `[${slug}] Discarding page (too short: ${page.text_content.length} chars): ${page.source_url}`,
+          `[${slug}] Discarding page (too short: ${textContent.length} chars): ${page.source_url}`,
         );
         continue;
       }
 
-      // If it's a PDF and we couldn't parse it, we might keep it based on URL/context for later LLM item extraction attempt
-      // Or apply stricter filtering here if desired (e.g., only keep PDFs from known academic domains)
-      if (page.content_type?.includes('application/pdf')) {
+      if (!this.llm.apiKey) {
         this.logger.log(
-          `[${slug}] Keeping potential PDF page for item extraction attempt: ${page.source_url}`,
+          `[${slug}] Keeping page (OpenAI API Key not configured, basic length check passed): ${page.source_url}`,
         );
-        relevantPages.push(page);
-        continue; // Skip LLM relevance check for PDF content itself
-      }
-
-      // Perform LLM relevance check only on pages with extracted text content
-      if (
-        !page.text_content ||
-        page.text_content === '[PDF Content - Not Parsed]'
-      ) {
-        this.logger.log(
-          `[${slug}] Skipping LLM relevance check for page with no text content: ${page.source_url}`,
-        );
-        // Decide whether to keep these pages - keeping for now
         relevantPages.push(page);
         continue;
       }
@@ -636,6 +573,7 @@ Generated Queries:
         this.logger.log(
           `[${slug}] Assessing relevance for: ${page.source_url}`,
         );
+        // Using function calling for structured output
         const relevanceFunction = {
           name: 'assess_content_relevance',
           description:
@@ -673,7 +611,7 @@ Web Page Content (first 2000 characters):
 ---
 
 **Critically evaluate:** Is this page's **primary focus** highly relevant to "{topicName}"?
-- **Accept:** Pages dedicated to the topic, comprehensive comparisons, core tutorials, official documentation, key project pages, relevant research paper abstracts/landing pages.
+- **Accept:** Pages dedicated to the topic, comprehensive comparisons, core tutorials, official documentation, key project pages.
 - **Reject:** Pages where the topic is only mentioned briefly, listicles covering many unrelated topics, pages focused *only* on a very specific niche *unless* that niche is the explicit topic "{topicName}" (e.g., reject a page *only* about a Ruby vector library if the topic is general vector databases), forum threads with low signal-to-noise, or purely marketing pages.
 
 Provide a relevance score between 0.0 (not relevant) and 1.0 (highly relevant). Only assign a high score if the primary focus aligns strongly with "{topicName}".
@@ -692,7 +630,7 @@ Provide a relevance score between 0.0 (not relevant) and 1.0 (highly relevant). 
         const assessmentResult = (await relevanceChain.invoke({
           topicName,
           topicDescription,
-          page_content_snippet: page.text_content.slice(0, 2000), // Send a snippet to save tokens/time
+          page_content_snippet: textContent.slice(0, 2000), // Send a snippet to save tokens/time
         })) as RelevanceAssessment;
 
         if (
@@ -738,61 +676,54 @@ Provide a relevance score between 0.0 (not relevant) and 1.0 (highly relevant). 
       return [];
     }
 
+    // Ensure the Zod schema used here includes markdown_content
     const itemExtractionFunction = {
       name: 'extract_awesome_list_items',
       description:
-        'Extracts one or more distinct items (tools, resources, libraries, articles, papers, talks, etc.) from the provided web page content that are relevant to the awesome list topic, including generating relevant Markdown content.',
-      parameters: zodToJsonSchema(extractedItemsSchema),
+        'Extracts one or more distinct items (tools, resources, libraries, articles, etc.) from the provided web page content that are relevant to the awesome list topic, including generating relevant Markdown content.',
+      parameters: zodToJsonSchema(extractedItemsSchema), // This schema MUST include markdown_content
     };
 
     for (const page of relevantPages) {
-      // Use text_content if available (HTML), otherwise indicate it's a PDF or missing content
-      const contentSnippet =
-        page.text_content && page.text_content !== '[PDF Content - Not Parsed]'
-          ? page.text_content.slice(0, 5000)
-          : `[Content from URL: ${page.source_url} - Type: ${page.content_type || 'Unknown'}. Extract item details based on context and URL.]`;
-
-      // Skip extraction if content snippet is just the placeholder and not a PDF link we might infer from
       if (
-        contentSnippet.startsWith('[Content from URL:') &&
-        !page.content_type?.includes('application/pdf')
+        !page.text_content ||
+        page.text_content.length < config.min_content_length_for_extraction
       ) {
         this.logger.log(
-          `[${slug}] Skipping item extraction for page with no usable content: ${page.source_url}`,
+          `[${slug}] Skipping item extraction for page (insufficient content): ${page.source_url}`,
         );
         continue;
       }
 
       this.logger.log(`[${slug}] Extracting items from: ${page.source_url}`);
       try {
-        // Stricter prompt for item extraction including articles/papers/PDFs
+        // Stricter prompt for item extraction
         const prompt = PromptTemplate.fromTemplate(
           `You are an expert data extractor and technical writer for "Awesome List" directories.
 The **main topic** of the Awesome List is: "{topicName}" (Description: "{topicDescription}").
-From the following web page content or context, identify and extract information for one or more distinct items (tools, resources, libraries, articles, research papers, talks, etc.) that are **directly and highly relevant to this main topic**. Do NOT extract items that are only tangentially related or represent a different category unless it's explicitly part of "{topicName}".
+From the following web page content, identify and extract information for one or more distinct items (tools, resources, libraries, articles, etc.) that are **directly and highly relevant to this main topic**. Do NOT extract items that are only tangentially related or represent a different category unless it's explicitly part of "{topicName}".
 
-Web Page Content/Context (up to 5000 characters):
+Web Page Content (first 5000 characters):
 ---
 {page_content_snippet}
 ---
 
 For each identified item **that directly relates to "{topicName}"**:
-1.  Provide its canonical **name** (e.g., tool name, article title, paper title).
-2.  Write a concise **description** highlighting its specific relevance to "{topicName}". For papers/articles, summarize the key contribution or topic.
-3.  Determine its most direct and canonical **source_url** (homepage, docs, repo, PDF link, article URL). **Crucially, omit the item entirely if a high-quality, canonical URL for the item itself cannot be found.** The URL must be valid and specific to the item.
-4.  List relevant high-level **categories** (e.g., "Tools", "Libraries", "Articles & Talks", "Research Papers", "Datasets"). Assign "Research Papers" if it seems to be a paper (e.g., PDF link from academic site). Assign "Articles & Talks" for blog posts, tutorials, conference talks etc.
-5.  List specific **tags** (keywords, technologies, concepts e.g., "open-source", "real-time", "survey-paper", "tutorial").
+1.  Provide its canonical **name**.
+2.  Write a concise **description** highlighting its specific relevance to "{topicName}".
+3.  Determine its most direct and canonical **source_url** (homepage, docs, repo). **Crucially, omit the item entirely if a high-quality, canonical URL for the item itself cannot be found.** Do not use URLs for blog posts merely mentioning the item unless the post *is* the primary resource. The URL must be valid and specific to the item.
+4.  List relevant high-level **categories** (e.g., "Monitoring", "Security") that fit within the context of "{topicName}".
+5.  List specific **tags** (keywords, technologies, e.g., "open-source", "real-time").
 6.  Determine if it should be **featured** based on prominence/recommendations.
-7.  Generate **markdown_content** (ONLY if the source is likely HTML/text, NOT for PDFs): Extract the *most relevant* information from the page content and format it as clean Markdown. Follow these rules strictly:
+7.  Generate **markdown_content**: Extract the *most relevant* information from the page content and format it as clean Markdown. Follow these rules strictly:
     *   **Focus:** Prioritize factual information, technical details, features, capabilities, and pricing/plans (if applicable and clearly stated).
     *   **Exclude:** All marketing/sales language (e.g., "revolutionary", "best-in-class", "why choose us"), testimonials, customer logos, generic "About Us" sections unrelated to the item's function, generic support/contact information, and calls to action (e.g., "Sign up now", "Request a demo").
     *   **Features:** List *all* relevant features mentioned, not just key features. Use bullet points under a "### Features" heading if appropriate.
     *   **Pricing:** If pricing information (plans, tiers, costs) is present and clear, include it under a "### Pricing" heading. Summarize clearly.
     *   **Structure:** Use appropriate Markdown headings (e.g., \`### Features\`, \`### Pricing\`), bullet points, and code formatting where applicable. Keep it concise and informative.
-    *   **Length:** Aim for a useful summary (typically 300-1000 words), not the entire page content.
-    *   **If PDF:** Leave \`markdown_content\` empty or omit it.
+    *   **Length:** Aim for a useful summary (typically 100-500 words), not the entire page content.
 
-**Critical Filter:** Only extract items that are *directly* relevant to the main topic "{topicName}". For example, if the topic is "Vector Databases", do not extract a general-purpose database or a library for a specific programming language (like Ruby) unless it's explicitly a vector database client/tool directly supporting the core topic. Ensure the \`source_url\` is for the item itself, not an article *about* the item (unless the item *is* the article/paper).
+**Critical Filter:** Only extract items that are *directly* relevant to the main topic "{topicName}". For example, if the topic is "Vector Databases", do not extract a general-purpose database or a library for a specific programming language (like Ruby) unless it's explicitly a vector database client/tool directly supporting the core topic. Ensure the \`source_url\` is for the item itself, not an article *about* the item.
 Only call the extraction function if you find at least one item meeting these strict criteria.
 `,
         );
@@ -810,8 +741,8 @@ Only call the extraction function if you find at least one item meeting these st
         const extractionResult = (await extractionChain.invoke({
           topicName,
           topicDescription,
-          page_content_snippet: contentSnippet, // Use potentially modified snippet
-        })) as { items?: Partial<ItemData>[] }; // Type assertion
+          page_content_snippet: page.text_content.slice(0, 5000), // Use a larger snippet for extraction + markdown
+        })) as { items?: Partial<ItemData>[] }; // Type assertion for the expected output structure
 
         if (
           extractionResult &&
@@ -819,19 +750,19 @@ Only call the extraction function if you find at least one item meeting these st
           extractionResult.items.length > 0
         ) {
           for (const extractedItem of extractionResult.items) {
+            // Validate with Zod before pushing
             try {
+              // Ensure all required fields are present before parsing, especially if LLM omits optionals
               const itemToValidate: Partial<ItemData> = {
-                featured: false,
+                featured: false, // Default featured if not provided by LLM
                 ...extractedItem,
-                // Ensure markdown_content is null/undefined if the source is likely a PDF
-                markdown_content: page.content_type?.includes('application/pdf')
-                  ? undefined
-                  : extractedItem.markdown_content,
               };
+              // The itemDataSchema now includes markdown_content, so it will be validated
               const validatedItem = itemDataSchema.parse(
                 itemToValidate,
-              ) as ItemData;
+              ) as ItemData; // Cast to ItemData after successful parsing
 
+              // Auto-generate slug if not provided or to ensure consistency
               validatedItem.slug = (validatedItem.slug || validatedItem.name)
                 .toLowerCase()
                 .replace(/\s+/g, '-')
@@ -839,7 +770,7 @@ Only call the extraction function if you find at least one item meeting these st
 
               allExtractedItems.push(validatedItem);
               this.logger.log(
-                `[${slug}] Extracted item: "${validatedItem.name}" (Category: ${Array.isArray(validatedItem.category) ? validatedItem.category.join(', ') : validatedItem.category}) from ${page.source_url}`, // Log category
+                `[${slug}] Extracted item: "${validatedItem.name}" (Slug: ${validatedItem.slug}) with markdown_content from ${page.source_url}`,
               );
             } catch (validationError) {
               this.logger.warn(
@@ -865,12 +796,12 @@ Only call the extraction function if you find at least one item meeting these st
   private slugify(text: string): string {
     return text
       .toString()
-      .normalize('NFKD')
+      .normalize('NFKD') // Normalize accented characters
       .toLowerCase()
       .trim()
-      .replace(/\s+/g, '-')
-      .replace(/[^\w-]+/g, '')
-      .replace(/--+/g, '-');
+      .replace(/\s+/g, '-') // Replace spaces with -
+      .replace(/[^\w-]+/g, '') // Remove all non-word chars
+      .replace(/--+/g, '-'); // Replace multiple - with single -
   }
 
   private async normalizeTerms(
@@ -890,7 +821,7 @@ Only call the extraction function if you find at least one item meeting these st
 
     const normalizationFunction = {
       name: `normalize_${termType}_names`,
-      description: `Normalizes a list of ${termType} names to their canonical forms, considering the context of an Awesome List about "${topicName}". For example, "ML", "Machine Learning", and "machine-learning" should all normalize to "Machine Learning". Also handle terms like "Articles", "Papers", "Talks".`, // Added context
+      description: `Normalizes a list of ${termType} names to their canonical forms, considering the context of an Awesome List about "${topicName}". For example, "ML", "Machine Learning", and "machine-learning" should all normalize to "Machine Learning".`,
       parameters: zodToJsonSchema(normalizedNamesListSchema),
     };
 
@@ -898,7 +829,7 @@ Only call the extraction function if you find at least one item meeting these st
       `You are an expert in data normalization for software and technology topics.
 The Awesome List topic is: "{topicName}".
 Given the following list of raw {termType} names, please normalize them to their most common, canonical forms.
-Consider synonyms, abbreviations, and different capitalizations. Ensure consistency for common types like 'Articles & Talks', 'Research Papers', 'Tutorials & Guides'.
+Consider synonyms, abbreviations, and different capitalizations.
 Ensure the normalized names are suitable for display in a curated list.
 
 Raw {termType} names (one per line):
@@ -919,6 +850,7 @@ Return the list of original names paired with their normalized versions.
       .pipe(outputParser);
 
     const normalizedMap = new Map<string, string>();
+    // Process in chunks if the list is very long to avoid overly large prompts
     const chunkSize = 50;
     for (let i = 0; i < terms.length; i += chunkSize) {
       const chunk = terms.slice(i, i + chunkSize);
@@ -939,15 +871,7 @@ Return the list of original names paired with their normalized versions.
 
         if (result && result.normalized_names) {
           result.normalized_names.forEach((pair) => {
-            // Basic post-processing for consistency
-            let normName = pair.normalized_name.trim();
-            if (/article|blog|post|talk|video|presentation/i.test(normName))
-              normName = 'Articles & Talks';
-            if (/paper|research|study|preprint|arxiv/i.test(normName))
-              normName = 'Research Papers';
-            if (/tutorial|guide|how-to/i.test(normName))
-              normName = 'Tutorials & Guides';
-            normalizedMap.set(pair.original_name, normName);
+            normalizedMap.set(pair.original_name, pair.normalized_name);
           });
         } else {
           this.logger.warn(
@@ -971,15 +895,6 @@ Return the list of original names paired with their normalized versions.
     categoryName: string,
     topicName: string,
   ): Promise<string | undefined> {
-    // Skip description generation for generic categories like Articles/Papers
-    if (
-      ['Articles & Talks', 'Research Papers', 'Tutorials & Guides'].includes(
-        categoryName,
-      )
-    ) {
-      return undefined;
-    }
-
     if (!this.llm.apiKey) {
       this.logger.warn(
         `[${slug}] OpenAI API Key not configured. Skipping category description generation for "${categoryName}".`,
@@ -1043,20 +958,12 @@ The description should explain what kind of items or resources typically fall un
     extractedItems.forEach((item) => {
       if (item.category) {
         if (Array.isArray(item.category)) {
-          item.category.forEach(
-            (c) => typeof c === 'string' && rawCategories.add(c.trim()),
-          ); // Type check
-        } else if (typeof item.category === 'string') {
+          item.category.forEach((c) => rawCategories.add(c.trim()));
+        } else {
           rawCategories.add(item.category.trim());
         }
       }
-
-      if (Array.isArray(item.tags)) {
-        // Ensure tags is an array
-        item.tags.forEach(
-          (t) => typeof t === 'string' && rawTags.add(t.trim()),
-        ); // Type check
-      }
+      item.tags.forEach((t) => rawTags.add(t.trim()));
     });
 
     const uniqueRawCategories = Array.from(rawCategories).filter((c) => c);
@@ -1089,12 +996,11 @@ The description should explain what kind of items or resources typically fall un
           normalizedName,
           topicName,
         );
-
         finalCategoriesMap.set(id, {
           id,
           name: normalizedName,
+          description: description || undefined, // Ensure it's explicitly undefined if not generated
           // icon_url: undefined, // Placeholder for future icon logic
-          description: description || undefined,
         });
         this.logger.log(
           `[${slug}] Created category: ID=${id}, Name=${normalizedName}`,
@@ -1102,14 +1008,17 @@ The description should explain what kind of items or resources typically fall un
       }
     }
 
-    // Update item categories to use normalized names
+    // Update item categories to use normalized names or IDs
+    // This part is tricky as items might have multiple categories, and we need to map them.
+    // For simplicity, we'll assume items will store the normalized category NAME for now.
+    // A more robust system might store category IDs in items.
     extractedItems.forEach((item) => {
       if (item.category) {
         if (Array.isArray(item.category)) {
-          item.category = item.category
-            .map((catName) => normalizedCategoryMap.get(catName) || catName)
-            .filter((c) => typeof c === 'string'); // Ensure result is string[]
-        } else if (typeof item.category === 'string') {
+          item.category = item.category.map(
+            (catName) => normalizedCategoryMap.get(catName) || catName,
+          );
+        } else {
           item.category =
             normalizedCategoryMap.get(item.category) || item.category;
         }
@@ -1130,13 +1039,9 @@ The description should explain what kind of items or resources typically fall un
 
     // Update item tags to use normalized names
     extractedItems.forEach((item) => {
-      if (Array.isArray(item.tags)) {
-        item.tags = item.tags
-          .map((tagName) => normalizedTagMap.get(tagName) || tagName)
-          .filter((t) => typeof t === 'string'); // Ensure result is string[]
-      } else {
-        item.tags = []; // Default to empty array if not array initially
-      }
+      item.tags = item.tags.map(
+        (tagName) => normalizedTagMap.get(tagName) || tagName,
+      );
     });
 
     return {
@@ -1176,22 +1081,9 @@ The description should explain what kind of items or resources typically fall un
           `[${slug}] Adding new item: "${newItem.name}" (${newItem.source_url})`,
         );
       } else {
-        // Optional: Merge markdown_content if new one is better/present and old one is not?
-        const existingItem = finalItemsMap.get(newItem.source_url);
-        if (
-          existingItem &&
-          !existingItem.markdown_content &&
-          newItem.markdown_content
-        ) {
-          existingItem.markdown_content = newItem.markdown_content;
-          this.logger.log(
-            `[${slug}] Updated markdown_content for existing item: "${newItem.name}"`,
-          );
-        } else {
-          this.logger.log(
-            `[${slug}] Item already exists (skipped update): "${newItem.name}" (${newItem.source_url})`,
-          );
-        }
+        this.logger.log(
+          `[${slug}] Item already exists (skipped): "${newItem.name}" (${newItem.source_url})`,
+        );
       }
     });
     const finalItems = Array.from(finalItemsMap.values());
