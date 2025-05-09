@@ -11,7 +11,7 @@ import {
 } from './data-repository';
 import { Agent } from 'src/agent/agent';
 import { markdown } from 'src/agent/markdown';
-import { CreateItemsGeneratorDto } from 'src/items-generator/dto/create-items-generator.dto';
+import { CreateItemsGeneratorDto } from '../items-generator/dto/create-items-generator.dto';
 import { ItemsGeneratorService } from '../items-generator/items-generator.service';
 import { ItemData as NItemData } from '../items-generator/dto/item-data.dto';
 

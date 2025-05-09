@@ -1,7 +1,7 @@
 import * as cheerio from 'cheerio';
 import { Logger } from '@nestjs/common';
 
-const logger = new Logger('TextUtils'); // Optional: if you want logging within these utils
+const logger = new Logger('TextUtils');
 
 export function extractTextFromHtml(htmlContent: string): string {
   try {
