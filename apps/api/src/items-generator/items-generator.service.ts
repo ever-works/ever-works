@@ -12,105 +12,23 @@ import { PromptTemplate } from '@langchain/core/prompts';
 import { StringOutputParser } from '@langchain/core/output_parsers';
 import { TavilySearchAPIRetriever } from '@langchain/community/retrievers/tavily_search_api';
 import axios from 'axios';
-import * as cheerio from 'cheerio';
+// cheerio is now used in text.utils.ts
 import { JsonOutputFunctionsParser } from 'langchain/output_parsers';
-import { z } from 'zod';
-import { zodToJsonSchema } from 'zod-to-json-schema';
-
-// Zod schema for ItemData extraction
-const itemDataSchema = z.object({
-  name: z
-    .string()
-    .min(3)
-    .describe(
-      'The primary, canonical name of the item (tool, resource, library, article).',
-    ),
-  description: z
-    .string()
-    .min(20)
-    .describe(
-      "A concise, informative summary of the item and its relevance to the main topic. If a good summary isn't directly available, generate one from the page content.",
-    ),
-  source_url: z
-    .string()
-    .url()
-    .describe(
-      'The most direct, stable, and canonical URL for the item itself (e.g., project homepage, official documentation, GitHub repository). Must be a valid and highly relevant URL. If a high-quality URL cannot be confidently determined, this item should be omitted by not calling the function.',
-    ),
-  category: z
-    .union([z.string(), z.array(z.string())])
-    .describe(
-      "One or more relevant high-level category names (e.g., 'Monitoring', 'CI/CD', 'Data Visualization').",
-    ),
-  tags: z
-    .array(z.string())
-    .describe(
-      "Specific keywords, technologies, or features associated with the item (e.g., 'real-time', 'open-source', 'golang').",
-    ),
-  featured: z
-    .boolean()
-    .optional()
-    .default(false)
-    .describe(
-      "Determine if the item warrants a 'featured' status based on prominence, recommendations, or significance. Default to false.",
-    ),
-  slug: z
-    .string()
-    .optional()
-    .describe(
-      'URL-friendly slug, auto-generated from item.name if not provided.',
-    ),
-  markdown_content: z
-    .string()
-    .optional()
-    .describe(
-      'Relevant content extracted from the source URL, formatted as Markdown. Focus on features, technical details, and pricing (if applicable), excluding marketing language, testimonials, and generic support info.',
-    ),
-});
-
-// Type for the extracted item, can be an array if multiple items are found on a page
-const extractedItemsSchema = z.object({
-  items: z
-    .array(itemDataSchema)
-    .describe(
-      "An array of items extracted from the page. Only include items for which a valid 'source_url' can be determined.",
-    ),
-});
-
-const normalizedNameSchema = z.object({
-  original_name: z.string(),
-  normalized_name: z
-    .string()
-    .describe('The canonical, standardized form of the original name.'),
-});
-
-const normalizedNamesListSchema = z.object({
-  normalized_names: z
-    .array(normalizedNameSchema)
-    .describe('A list of original names and their normalized counterparts.'),
-});
-
-const categoryDescriptionSchema = z.object({
-  category_name: z.string(),
-  description: z
-    .string()
-    .describe(
-      'A brief, informative description of the category, suitable for an Awesome List.',
-    ),
-});
-
-interface WebPageData {
-  source_url: string;
-  html_content: string;
-  retrieved_at: string; // ISO date string
-  text_content?: string; // Extracted plain text
-}
-
-interface RelevanceAssessment {
-  relevant: boolean;
-  relevance_score: number; // 0.0 to 1.0
-  reason: string;
-}
+import { zodToJsonSchema } from 'zod-to-json-schema'; // z is imported in schema files
+import {
+  itemDataSchema,
+  extractedItemsSchema,
+} from './schemas/item-extraction.schemas';
+import {
+  normalizedNameSchema,
+  normalizedNamesListSchema,
+  categoryDescriptionSchema,
+} from './schemas/normalization.schemas';
+import {
+  WebPageData,
+  RelevanceAssessment,
+} from './interfaces/items-generator.interfaces';
+import { extractTextFromHtml, slugify } from './utils/text.utils';
 
 const DEFAULT_CONFIG: Required<ConfigDto> = {
   max_search_queries: 10,
@@ -517,22 +435,7 @@ Generated Queries:
     return allFetchedPages;
   }
 
-  private extractTextFromHtml(htmlContent: string): string {
-    try {
-      const $ = cheerio.load(htmlContent);
-      // Remove script and style elements
-      $(
-        'script, style, noscript, iframe, header, footer, nav, aside, form, [aria-hidden="true"], .noprint',
-      ).remove();
-      // Get text from the body, attempt to normalize whitespace
-      let text = $('body').text() || '';
-      text = text.replace(/\s\s+/g, ' ').trim(); // Replace multiple spaces/newlines with a single space
-      return text;
-    } catch (error) {
-      this.logger.error(`Error extracting text with Cheerio: ${error.message}`);
-      return ''; // Return empty string on error
-    }
-  }
+  // Removed extractTextFromHtml, now imported from ./utils/text.utils
 
   private async filterAndAssessPages(
     slug: string,
@@ -549,7 +452,7 @@ Generated Queries:
     }
 
     for (const page of webPages) {
-      const textContent = this.extractTextFromHtml(page.html_content);
+      const textContent = extractTextFromHtml(page.html_content);
       page.text_content = textContent; // Store extracted text for later use
 
       if (textContent.length < config.min_content_length_for_extraction) {
@@ -791,16 +694,7 @@ Only call the extraction function if you find at least one item meeting these st
     return allExtractedItems;
   }
 
-  private slugify(text: string): string {
-    return text
-      .toString()
-      .normalize('NFKD') // Normalize accented characters
-      .toLowerCase()
-      .trim()
-      .replace(/\s+/g, '-') // Replace spaces with -
-      .replace(/[^\w-]+/g, '') // Remove all non-word chars
-      .replace(/--+/g, '-'); // Replace multiple - with single -
-  }
+  // Removed slugify, now imported from ./utils/text.utils
 
   private async normalizeTerms(
     slug: string,
@@ -987,7 +881,7 @@ The description should explain what kind of items or resources typically fall un
     const finalCategoriesMap = new Map<string, Category>();
     for (const rawCat of uniqueRawCategories) {
       const normalizedName = normalizedCategoryMap.get(rawCat) || rawCat;
-      const id = this.slugify(normalizedName);
+      const id = slugify(normalizedName);
       if (!finalCategoriesMap.has(id)) {
         const description = await this.generateCategoryDescription(
           slug,
@@ -1026,7 +920,7 @@ The description should explain what kind of items or resources typically fall un
     const finalTagsMap = new Map<string, Tag>();
     uniqueRawTags.forEach((rawTag) => {
       const normalizedName = normalizedTagMap.get(rawTag) || rawTag;
-      const id = this.slugify(normalizedName);
+      const id = slugify(normalizedName);
       if (!finalTagsMap.has(id)) {
         finalTagsMap.set(id, { id, name: normalizedName });
         this.logger.log(

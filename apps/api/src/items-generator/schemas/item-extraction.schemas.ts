@@ -1,0 +1,61 @@
+import { z } from 'zod';
+
+// Zod schema for ItemData extraction
+export const itemDataSchema = z.object({
+  name: z
+    .string()
+    .min(3)
+    .describe(
+      'The primary, canonical name of the item (tool, resource, library, article).',
+    ),
+  description: z
+    .string()
+    .min(20)
+    .describe(
+      "A concise, informative summary of the item and its relevance to the main topic. If a good summary isn't directly available, generate one from the page content.",
+    ),
+  source_url: z
+    .string()
+    .url()
+    .describe(
+      'The most direct, stable, and canonical URL for the item itself (e.g., project homepage, official documentation, GitHub repository). Must be a valid and highly relevant URL. If a high-quality URL cannot be confidently determined, this item should be omitted by not calling the function.',
+    ),
+  category: z
+    .union([z.string(), z.array(z.string())])
+    .describe(
+      "One or more relevant high-level category names (e.g., 'Monitoring', 'CI/CD', 'Data Visualization').",
+    ),
+  tags: z
+    .array(z.string())
+    .describe(
+      "Specific keywords, technologies, or features associated with the item (e.g., 'real-time', 'open-source', 'golang').",
+    ),
+  featured: z
+    .boolean()
+    .optional()
+    .default(false)
+    .describe(
+      "Determine if the item warrants a 'featured' status based on prominence, recommendations, or significance. Default to false.",
+    ),
+  slug: z
+    .string()
+    .optional()
+    .describe(
+      'URL-friendly slug, auto-generated from item.name if not provided.',
+    ),
+  markdown_content: z
+    .string()
+    .optional()
+    .describe(
+      'Relevant content extracted from the source URL, formatted as Markdown. Focus on features, technical details, and pricing (if applicable), excluding marketing language, testimonials, and generic support info.',
+    ),
+});
+
+// Type for the extracted item, can be an array if multiple items are found on a page
+export const extractedItemsSchema = z.object({
+  items: z
+    .array(itemDataSchema)
+    .describe(
+      "An array of items extracted from the page. Only include items for which a valid 'source_url' can be determined.",
+    ),
+});
