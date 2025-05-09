@@ -7,8 +7,6 @@ import { ItemData } from './dto/item-data.dto';
 import { Category } from './dto/category.dto';
 import { Tag } from './dto/tag.dto';
 import { ItemsGeneratorMetrics } from './dto/items-generator-response.dto';
-import * as fs from 'fs-extra';
-import * as path from 'path';
 import { ChatOpenAI } from '@langchain/openai';
 import { PromptTemplate } from '@langchain/core/prompts';
 import { StringOutputParser } from '@langchain/core/output_parsers';
