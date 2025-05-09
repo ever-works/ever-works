@@ -81,18 +81,16 @@ export class DataGeneratorService {
         `init repository`,
         user.asCommitter(),
       );
-      this.logger.debug('Initial files written and committed.');
 
       this.logger.log(`Processing ${items.length} items...`);
       for (const item of items) {
         item.slug = slugify(item.name, { lower: true, trim: true });
-        this.logger.debug(`Processing item: ${item.name} (slug: ${item.slug})`);
         await this.processItem(data, item, user);
       }
-      this.logger.log('All items processed.');
 
       this.logger.log(`Pushing changes to ${directory.owner}/${repo}`);
       await this.githubService.push(dest, token);
+
       this.logger.log('Successfully initialized and pushed data repository.');
     } catch (err) {
       this.logger.error('Failed to initialize data repository', err);
@@ -164,6 +162,7 @@ export class DataGeneratorService {
         data.writeTags(tags),
         data.writeMarkdownTemplate(this.getHeader(directory), this.getFooter()),
       ]);
+
       await this.githubService.add(data.dir, '.');
       await this.githubService.commit(
         data.dir,
@@ -178,12 +177,8 @@ export class DataGeneratorService {
           lower: true,
           trim: true,
         });
-        this.logger.debug(
-          `Processing item (V2): ${item.name} (slug: ${item.slug})`,
-        );
         await this.processItemV2(data, item, user);
       }
-      this.logger.log('All items processed (V2).');
 
       this.logger.log(`Pushing changes to ${directory.owner}/${repo}`);
       await this.githubService.push(dest, token);
@@ -284,42 +279,21 @@ export class DataGeneratorService {
 
     // Fetch the item data
     if (!markdown_content) {
-      this.logger.debug(
-        `processItemV2: Markdown content not provided, fetching for ${item.slug}`,
-      );
-      markdown_content = await markdown(item);
-      if (markdown_content) {
-        this.logger.debug(
-          `processItemV2: Fetched markdown content for ${item.slug}`,
-        );
-      } else {
-        this.logger.debug(
-          `processItemV2: No markdown content fetched for ${item.slug}`,
-        );
-      }
-    } else {
-      this.logger.debug(
-        `processItemV2: Markdown content provided for ${item.slug}`,
-      );
+      markdown_content = `## References\n\n- [${item.source_url}](${item.source_url})\n\n`;
     }
 
     if (markdown_content) {
       promises.push(data.writeItemMarkdown(item, markdown_content));
-      this.logger.debug(
-        `processItemV2: Queued writing item markdown for ${item.slug}`,
-      );
     }
 
     await Promise.all(promises);
-    this.logger.debug(
-      `processItemV2: Item data and markdown (if any) written for ${item.slug}`,
-    );
     await this.githubService.add(data.dir, '.');
     await this.githubService.commit(
       data.dir,
       `add ${item.name}`,
       user.asCommitter(),
     );
+
     this.logger.log(
       `processItemV2: Committed item ${item.name} (slug: ${item.slug})`,
     );
@@ -329,20 +303,15 @@ export class DataGeneratorService {
     this.logger.debug(
       `processItem: Starting for item ${item.name} (slug: ${item.slug})`,
     );
+
     await data.createItemDir(item);
-    this.logger.debug(`processItem: Created item directory for ${item.slug}`);
     const promises = [data.writeItem(item)];
-    this.logger.debug(`processItem: Queued writing item data for ${item.slug}`);
 
     // Fetch the item data
     this.logger.debug(`processItem: Fetching markdown for ${item.slug}`);
     const md = await markdown(item);
     if (md) {
-      this.logger.debug(`processItem: Fetched markdown for ${item.slug}`);
       promises.push(data.writeItemMarkdown(item, md));
-      this.logger.debug(
-        `processItem: Queued writing item markdown for ${item.slug}`,
-      );
     } else {
       this.logger.debug(`processItem: No markdown fetched for ${item.slug}`);
     }
@@ -357,6 +326,7 @@ export class DataGeneratorService {
       `add ${item.name}`,
       user.asCommitter(),
     );
+
     this.logger.log(
       `processItem: Committed item ${item.name} (slug: ${item.slug})`,
     );
