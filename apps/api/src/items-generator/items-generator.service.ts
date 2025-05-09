@@ -1205,7 +1205,11 @@ The description should explain what kind of items or resources typically fall un
           ? itemDescription.substring(0, 100)
           : '';
 
-      const searchQuery = `${safeItemName} ${safeItemDescription}`.trim();
+      const searchQuery = (
+        safeItemName +
+        `${safeItemName && safeItemDescription ? ' - ' : ''}` +
+        safeItemDescription
+      ).trim();
 
       if (!searchQuery) {
         this.logger.warn(
