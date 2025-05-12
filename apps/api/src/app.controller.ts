@@ -17,6 +17,7 @@ import { GithubService } from './git/github.service';
 import { CreateItemsGeneratorDto } from './items-generator/dto/create-items-generator.dto';
 import { ItemsGeneratorResponseDto } from './items-generator/dto/items-generator-response.dto';
 import { CreateDirectoryDto } from './dto/create-directory.dto';
+import { GenerateDataDto } from './dto/generate-data.dto';
 
 @Controller()
 export class AppController {
@@ -49,10 +50,10 @@ export class AppController {
   }
 
   @Post('generate')
-  async generateData(
-    @Body('slug') slug: string,
-    @Body('prompt') prompt: string,
-  ) {
+  @UsePipes(new ValidationPipe({ transform: true }))
+  async generateData(@Body() generateDataDto: GenerateDataDto) {
+    const { slug, prompt } = generateDataDto;
+
     const user = await User.sessionMock();
     const directory = await Directory.findMock(slug);
     if (!directory) {
