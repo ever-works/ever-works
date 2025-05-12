@@ -19,7 +19,7 @@ import {
   WebPageData,
   RelevanceAssessment,
 } from './interfaces/items-generator.interfaces';
-import { extractTextFromHtml, slugifyText } from './utils/text.utils';
+import { slugifyText } from './utils/text.utils';
 import { tavily, TavilyClient } from '@tavily/core';
 import { deduplicateByField } from 'src/agent/utils';
 import { deduplicate, extractNewItems } from 'src/agent/deduplicator';
@@ -463,7 +463,7 @@ The **main topic** of the Directory Builder is: "{topicName}"
 Description: "{topicDescription}"
 Optional initial keywords: {target_keywords_string}
 
-Based on this topic, please generate a comprehensive list of approximately {num_items_to_generate} distinct items (e.g., tools, software, libraries, frameworks, seminal articles, official documentation, key community resources, important projects).
+Based on this topic, please generate a comprehensive list of distinct items (e.g., tools, software, libraries, frameworks, official documentation, key community resources, important projects).
 
 For each item, provide the following details:
 1.  **name**: The canonical name of the item.
@@ -494,8 +494,8 @@ Generate the list of items according to the specified schema.
     this.llm.temperature = 0.2;
 
     try {
-      const numItemsToGenerate =
-        config.max_results_per_query * 1 || DEFAULT_AI_ITEMS_TO_GENERATE;
+      // const numItemsToGenerate =
+      //   config.max_results_per_query * 1 || DEFAULT_AI_ITEMS_TO_GENERATE;
 
       const result = (await generationChain.invoke({
         topicName,
@@ -503,7 +503,6 @@ Generate the list of items according to the specified schema.
         target_keywords_string: targetKeywords
           ? targetKeywords.join(', ')
           : 'N/A',
-        num_items_to_generate: numItemsToGenerate,
       })) as { items?: Partial<ItemData>[] };
 
       if (result && result.items && result.items.length > 0) {
@@ -1068,18 +1067,21 @@ Only call the extraction function if you find at least one item meeting these st
     const categorized = await categorize(
       description,
       extractedItems.map((i) => ({
+        slug: i.slug,
         name: i.name,
         description: i.description,
         url: i.source_url,
       })),
     );
 
+    this.logger.log(`Categorized items: ${categorized.length}`);
     const categories = this.mapUnique(
       categorized.map((item) => item.category as string),
     );
     const tags = this.mapUnique(
       categorized.flatMap((item) => item.tags as string[]),
     );
+
     return {
       finalItems: categorized.map(this.toItemData),
       categories,
@@ -1102,7 +1104,7 @@ Only call the extraction function if you find at least one item meeting these st
       source_url: item.source_url,
       category: slugifyText(item.category as string),
       tags: item.tags.map((tag) => slugifyText(tag)),
-      slug: slugifyText(item.name),
+      slug: item.slug || slugifyText(item.name),
     };
   }
 
@@ -1147,6 +1149,7 @@ Only call the extraction function if you find at least one item meeting these st
       'source_url',
     );
 
+    this.logger.log(`[${slug}] Deduplicating items with AI.`);
     deduplicated = await deduplicate(
       description,
       deduplicated.map((i) => ({
@@ -1158,6 +1161,7 @@ Only call the extraction function if you find at least one item meeting these st
 
     let aggregatedItems = deduplicated;
     if (existingItems.length > 0) {
+      this.logger.log(`[${slug}] Extracting new items.`);
       aggregatedItems = await extractNewItems(existingItems, deduplicated);
     }
 

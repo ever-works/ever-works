@@ -16,7 +16,7 @@ import { ItemsGeneratorService } from '../items-generator/items-generator.servic
 
 @Injectable()
 export class DataGeneratorService {
-  private readonly logger = new Logger('DataGeneratorService');
+  private readonly logger = new Logger(DataGeneratorService.name);
 
   constructor(
     private readonly githubService: GithubService,
@@ -118,8 +118,9 @@ export class DataGeneratorService {
 
     if (!generatedItems) {
       this.logger.error('Failed to generate items from ItemsGeneratorService.');
-      throw new Error('Failed to generate items');
+      return;
     }
+
     this.logger.debug(
       `Generated ${generatedItems.categories.length} categories, ${generatedItems.items.length} items, ${generatedItems.tags.length} tags.`,
     );
@@ -192,6 +193,8 @@ export class DataGeneratorService {
     } finally {
       await data.cleanup();
     }
+
+    return items;
   }
 
   async update(directory: Directory, user: User, prompt: string) {

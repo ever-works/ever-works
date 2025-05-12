@@ -4,20 +4,17 @@ import { z } from 'zod';
 export const itemDataSchema = z.object({
   name: z
     .string()
-    .min(3)
     .describe(
-      'The primary, canonical name of the item (tool, resource, library, article).',
+      'The primary, canonical name of the item (tool, resource, library etc.)',
     ),
   description: z
     .string()
-    .min(20)
     .describe(
       "A concise, informative summary of the item and its relevance to the main topic. If a good summary isn't directly available, generate one from the page content.",
     ),
   source_url: z
     .string()
-    .url()
-    .optional()
+    .nullable()
     .describe(
       'The most direct, stable, and canonical URL for the item itself (e.g., project homepage, official documentation, GitHub repository etc.). Must be a valid and highly relevant URL.',
     ),
@@ -30,7 +27,7 @@ export const itemDataWithCategoriesAndTagsSchema = itemDataSchema.extend({
       'URL-friendly slug, auto-generated from item.name if not provided.',
     ),
   category: z
-    .union([z.string(), z.array(z.string())])
+    .string()
     .describe(
       "One or more relevant high-level category names (e.g., 'Monitoring', 'CI/CD', 'Data Visualization').",
     ),
@@ -45,9 +42,7 @@ export const itemDataWithCategoriesAndTagsSchema = itemDataSchema.extend({
 export const extractedItemsSchema = z.object({
   items: z
     .array(itemDataSchema)
-    .describe(
-      "An array of items extracted from the page. Only include items for which a valid 'source_url' can be determined.",
-    ),
+    .describe('An array of items extracted from the page.'),
 });
 
 // Zod schema for AI's assessment of prompt understanding
@@ -65,7 +60,7 @@ export const promptUnderstandingAssessmentSchema = z.object({
     ),
   suggested_clarifications: z
     .array(z.string())
-    .optional()
+    .nullable()
     .describe(
       'Optional: If can_proceed is false, specific questions or suggestions for the user to clarify the prompt.',
     ),
