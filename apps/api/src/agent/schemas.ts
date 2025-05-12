@@ -19,7 +19,15 @@ export const itemDataSchema = z.object({
     .url()
     .optional()
     .describe(
-      'The most direct, stable, and canonical URL for the item itself (e.g., project homepage, official documentation, GitHub repository etc.). Must be a valid and highly relevant URL. If a high-quality URL cannot be confidently determined.',
+      'The most direct, stable, and canonical URL for the item itself (e.g., project homepage, official documentation, GitHub repository etc.). Must be a valid and highly relevant URL.',
+    ),
+});
+
+export const itemDataWithCategoriesAndTagsSchema = itemDataSchema.extend({
+  slug: z
+    .string()
+    .describe(
+      'URL-friendly slug, auto-generated from item.name if not provided.',
     ),
   category: z
     .union([z.string(), z.array(z.string())])
@@ -30,19 +38,6 @@ export const itemDataSchema = z.object({
     .array(z.string())
     .describe(
       "Specific keywords, technologies, or features associated with the item (e.g., 'real-time', 'open-source', 'golang').",
-    ),
-  featured: z
-    .boolean()
-    .optional()
-    .default(false)
-    .describe(
-      "Determine if the item warrants a 'featured' status based on prominence, recommendations, or significance. Default to false.",
-    ),
-  slug: z
-    .string()
-    .optional()
-    .describe(
-      'URL-friendly slug, auto-generated from item.name if not provided.',
     ),
 });
 

@@ -3,6 +3,7 @@ import { ChatOpenAI } from "@langchain/openai";
 import { Logger } from "@nestjs/common";
 import { ItemData } from "./types";
 import { z } from "zod";
+import { itemDataWithCategoriesAndTagsSchema } from "./schemas";
 
 const CATEGORIZE_PROMPT = `
 You are directory website builder and your task is to categorize items based on their features and descriptions.
@@ -18,16 +19,7 @@ Here is the list of items to categorize:
 `.trim();
 
 export const categorizeOutputSchema = z.object({
-    items: z.array(
-        z.object({
-            slug: z.string(),
-            name: z.string(),
-            description: z.string(),
-            source_url: z.string().optional().describe('The URL of item`s official website/repository'),
-            category: z.string().optional().describe('The category of the item make it start with uppercase letter'),
-            tags: z.array(z.string()).optional().describe('The tags of the item make them start with uppercase letter'),
-        })
-    ),
+    items: z.array(itemDataWithCategoriesAndTagsSchema),
 });
 
 /**

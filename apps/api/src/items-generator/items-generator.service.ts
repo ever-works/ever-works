@@ -3,9 +3,6 @@ import {
   CreateItemsGeneratorDto,
   ConfigDto,
 } from './dto/create-items-generator.dto';
-import { ItemData } from './dto/item-data.dto';
-import { Category } from './dto/category.dto';
-import { Tag } from './dto/tag.dto';
 import { ItemsGeneratorMetrics } from './dto/items-generator-response.dto';
 import { ChatOpenAI } from '@langchain/openai';
 import { PromptTemplate } from '@langchain/core/prompts';
@@ -17,17 +14,17 @@ import {
   itemDataSchema,
   extractedItemsSchema,
   promptUnderstandingAssessmentSchema,
-} from './schemas/item-extraction.schemas';
-import {
-  normalizedNamesListSchema,
-  categoryDescriptionSchema,
-} from './schemas/normalization.schemas';
+} from '../agent/schemas';
 import {
   WebPageData,
   RelevanceAssessment,
 } from './interfaces/items-generator.interfaces';
-import { extractTextFromHtml, slugify } from './utils/text.utils';
+import { extractTextFromHtml, slugifyText } from './utils/text.utils';
 import { tavily, TavilyClient } from '@tavily/core';
+import { deduplicateByField } from 'src/agent/utils';
+import { deduplicate, extractNewItems } from 'src/agent/deduplicator';
+import { Category, ItemData, Tag } from 'src/agent/types';
+import { categorize } from 'src/agent/categorize';
 
 // Default number of items to ask the AI to generate in the initial phase
 const DEFAULT_AI_ITEMS_TO_GENERATE = 20;
@@ -204,36 +201,29 @@ export class ItemsGeneratorService {
         `[${slug}] After source validation, ${validatedItems.length} items remain.`,
       );
 
-      // 7. Category and Tag Generation, Normalization & Consolidation
+      // 7. Deduplication and Data Aggregation
       this.logger.log(
-        `[${slug}] 7. Category and Tag Generation, Normalization & Consolidation - Starting`,
+        `[${slug}] 7. Deduplication and Data Aggregation - Starting`,
       );
-      const { currentCategories, currentTags } =
-        await this.processCategoriesAndTags(slug, validatedItems, name);
-
-      this.logger.log(
-        `[${slug}] Processed ${currentCategories.length} categories and ${currentTags.length} tags based on validated items.`,
-      );
-
-      // 8. Deduplication and Data Aggregation
-      this.logger.log(
-        `[${slug}] 8. Deduplication and Data Aggregation - Starting`,
-      );
-      const { finalItems, finalCategories, finalTags, metrics } =
-        this.aggregateAndDeduplicateData(
-          slug,
+      const { aggregatedItems, metrics } =
+        await this.aggregateAndDeduplicateData(
+          createItemsGeneratorDto,
           existingItems,
-          existingCategories,
-          existingTags,
           validatedItems,
-          currentCategories,
-          currentTags,
           webPages.length,
           relevantPages.length,
         );
 
+      // 8. Category and Tag Generation
+      this.logger.log(`[${slug}] 7. Category and Tag Generation - Starting`);
+      const { categories, tags, finalItems } =
+        await this.processCategoriesAndTags(
+          createItemsGeneratorDto,
+          aggregatedItems,
+        );
+
       this.logger.log(
-        `[${slug}] Aggregated data: ${finalItems.length} items, ${finalCategories.length} categories, ${finalTags.length} tags.`,
+        `[${slug}] Processed ${categories.length} categories and ${tags.length} tags based on validated items.`,
       );
 
       this.logger.log(
@@ -244,9 +234,9 @@ export class ItemsGeneratorService {
       // potentially including the 'metrics'
 
       return {
-        categories: finalCategories,
         items: finalItems,
-        tags: finalTags,
+        categories: categories,
+        tags: tags,
       };
     } catch (error) {
       this.logger.error(
@@ -366,10 +356,212 @@ Generated Queries:
     }
   }
 
+  private async generateInitialItemsWithAI(
+    slug: string,
+    topicName: string,
+    topicDescription: string,
+    targetKeywords: string[] | undefined,
+    config: Required<ConfigDto>,
+  ): Promise<ItemData[]> {
+    this.logger.log(
+      `[${slug}] AI-First Item Generation - Starting for topic: ${topicName}`,
+    );
+    const allGeneratedItems: ItemData[] = [];
+
+    if (!this.llm.apiKey) {
+      this.logger.warn(
+        `[${slug}] OpenAI API Key not configured. Skipping AI-first item generation.`,
+      );
+      return [];
+    }
+
+    // 1. Assess Prompt Understanding
+    const understandingAssessmentFunction = {
+      name: 'assess_prompt_understanding_for_item_generation',
+      description:
+        'Assesses if the provided topic, description, and keywords are clear and specific enough to generate a meaningful list of items for an Directory Builder.',
+      parameters: zodToJsonSchema(promptUnderstandingAssessmentSchema),
+    };
+
+    const understandingPrompt = PromptTemplate.fromTemplate(
+      `You are an AI assistant helping to curate an "Directory Builder".
+Topic: "{topicName}"
+Description: "{topicDescription}"
+Keywords: "{target_keywords_string}"
+
+Before attempting to generate items, please assess if the provided information is clear, specific, and sufficient for you to generate a high-quality, relevant list of items (tools, resources, libraries, etc.).
+
+- If the information is clear and sufficient, respond with 'can_proceed: true'.
+- If the information is too vague, ambiguous, or lacks necessary detail, respond with 'can_proceed: false' and provide a brief 'reason_if_cannot_proceed'.
+- Optionally, if 'can_proceed: false', you can provide 'suggested_clarifications' as an array of questions or points the user could address to improve the prompt.
+
+Consider:
+- Is the topic well-defined?
+- Is the scope clear (not too broad, not too narrow without context)?
+- Are there any ambiguities that would make item generation difficult or likely to produce irrelevant results?
+`,
+    );
+
+    const understandingChain = understandingPrompt
+      .pipe(
+        this.llm.bind({
+          functions: [understandingAssessmentFunction],
+          function_call: {
+            name: 'assess_prompt_understanding_for_item_generation',
+          },
+        }),
+      )
+      .pipe(new JsonOutputFunctionsParser());
+
+    try {
+      const assessment = (await understandingChain.invoke({
+        topicName,
+        topicDescription,
+        target_keywords_string: targetKeywords
+          ? targetKeywords.join(', ')
+          : 'N/A',
+      })) as {
+        can_proceed: boolean;
+        reason_if_cannot_proceed: string | null;
+        suggested_clarifications?: string[];
+      };
+
+      if (!assessment.can_proceed) {
+        this.logger.warn(
+          `[${slug}] AI cannot confidently proceed with item generation for topic "${topicName}" due to prompt clarity. Reason: ${assessment.reason_if_cannot_proceed || 'No specific reason provided.'}`,
+        );
+        if (
+          assessment.suggested_clarifications &&
+          assessment.suggested_clarifications.length > 0
+        ) {
+          this.logger.warn(
+            `[${slug}] AI suggested clarifications: ${assessment.suggested_clarifications.join('; ')}`,
+          );
+        }
+        return []; // Do not proceed with item generation
+      }
+
+      this.logger.log(
+        `[${slug}] AI assessment: Prompt for topic "${topicName}" is clear. Proceeding with item generation.`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `[${slug}] Error during AI prompt understanding assessment for topic "${topicName}": ${error.message}. Proceeding with caution (will attempt item generation).`,
+        error.stack,
+      );
+      // If the understanding check itself fails, we log the error but still attempt item generation.
+      // This is a fallback in case the assessment mechanism has an issue.
+    }
+
+    // 2. Proceed with Item Generation if understanding is sufficient (or assessment failed)
+    const itemGenerationFunction = {
+      name: 'generate_awesome_list_items_directly',
+      description:
+        'Generates a list of distinct items (tools, resources, libraries, articles, etc.) that are highly relevant to the directory builder topic, including their details.',
+      parameters: zodToJsonSchema(extractedItemsSchema),
+    };
+
+    const generationPrompt = PromptTemplate.fromTemplate(
+      `You are an expert curator and technical writer tasked with generating an initial list of items for an "Directory Builder" about a specific topic.
+The **main topic** of the Directory Builder is: "{topicName}"
+Description: "{topicDescription}"
+Optional initial keywords: {target_keywords_string}
+
+Based on this topic, please generate a comprehensive list of approximately {num_items_to_generate} distinct items (e.g., tools, software, libraries, frameworks, seminal articles, official documentation, key community resources, important projects).
+
+For each item, provide the following details:
+1.  **name**: The canonical name of the item.
+2.  **description**: A concise description (1-3 sentences) highlighting its specific relevance to "{topicName}".
+3.  **source_url**: The most direct and canonical URL (e.g., homepage, official documentation, repository). If a high-quality, canonical URL cannot be confidently determined, you may omit it but it's highly encouraged.
+
+**Critical Instructions:**
+-   Focus on **relevance** to "{topicName}".
+-   Aim for **diversity** in the types of items if appropriate for the topic.
+-   Provide **accurate and canonical** information, especially for names and URLs.
+-   If the topic is broad, try to cover its main sub-areas. If it's niche, focus on key resources for that niche.
+
+Generate the list of items according to the specified schema.
+`,
+    );
+
+    const generationChain = generationPrompt
+      .pipe(
+        this.llm.bind({
+          functions: [itemGenerationFunction],
+          function_call: { name: 'generate_awesome_list_items_directly' },
+        }),
+      )
+      .pipe(new JsonOutputFunctionsParser());
+
+    // reset temperature
+    const defaultTemperature = this.llm.temperature;
+    this.llm.temperature = 0.2;
+
+    try {
+      const numItemsToGenerate =
+        config.max_results_per_query * 1 || DEFAULT_AI_ITEMS_TO_GENERATE;
+
+      const result = (await generationChain.invoke({
+        topicName,
+        topicDescription,
+        target_keywords_string: targetKeywords
+          ? targetKeywords.join(', ')
+          : 'N/A',
+        num_items_to_generate: numItemsToGenerate,
+      })) as { items?: Partial<ItemData>[] };
+
+      if (result && result.items && result.items.length > 0) {
+        this.logger.log(
+          `[${slug}] AI initially generated ${result.items.length} items.`,
+        );
+        for (const generatedItem of result.items) {
+          try {
+            const itemToValidate: Partial<ItemData> = {
+              ...generatedItem,
+            };
+
+            const validatedItem = itemDataSchema.parse(
+              itemToValidate,
+            ) as ItemData;
+
+            validatedItem.slug = slugifyText(validatedItem.name);
+
+            if (!validatedItem.source_url) {
+              this.logger.warn(
+                `[${slug}] AI generated item "${validatedItem.name}" without a source_url. Deduplication might be affected.`,
+              );
+            }
+            allGeneratedItems.push(validatedItem);
+          } catch (validationError) {
+            this.logger.warn(
+              `[${slug}] Discarding AI-generated item due to validation error: ${validationError.errors.map((e) => e.message).join(', ')}. Item: ${JSON.stringify(generatedItem)}`,
+            );
+          }
+        }
+      } else {
+        this.logger.log(
+          `[${slug}] No initial items generated by AI for topic: ${topicName}.`,
+        );
+      }
+    } catch (error) {
+      this.logger.error(
+        `[${slug}] Error generating initial items with AI for topic ${topicName}: ${error.message}`,
+        error.stack,
+      );
+    }
+
+    this.llm.temperature = defaultTemperature;
+
+    this.logger.log(
+      `[${slug}] AI-First Item Generation - Complete. Validated ${allGeneratedItems.length} items.`,
+    );
+    return allGeneratedItems;
+  }
+
   private async retrieveWebPages(
     slug: string,
     searchQueries: string[],
-    processedSourceUrls: Set<string>, // URLs from existing items.json
+    processedSourceUrls: Set<string>,
     config: Required<ConfigDto>,
   ): Promise<WebPageData[]> {
     if (!this.tavilyClient) {
@@ -637,7 +829,7 @@ Provide a relevance score between 0.0 (not relevant) and 1.0 (highly relevant). 
 The **main topic** of the Directory Builder is: "{topicName}" (Description: "{topicDescription}").
 From the following web page content, identify and extract information for one or more distinct items (tools, resources, libraries, articles, etc.) that are **directly and highly relevant to this main topic**. Do NOT extract items that are only tangentially related or represent a different category unless it's explicitly part of "{topicName}".
 
-Web Page Content (first 5000 characters):
+Web Page Content:
 ---
 {page_content_snippet}
 ---
@@ -646,9 +838,6 @@ For each identified item **that directly relates to "{topicName}"**:
 1.  Provide its canonical **name**.
 2.  Write a concise **description** highlighting its specific relevance to "{topicName}".
 3.  Determine its most direct and canonical **source_url** (homepage, docs, repo etc.). Do not use URLs for blog posts merely mentioning the item unless the post *is* the primary resource. The URL must be valid and specific to the item.
-4.  List relevant high-level **categories** (e.g., "Monitoring", "Security") that fit within the context of "{topicName}".
-5.  List specific **tags** (keywords, technologies, e.g., "open-source", "real-time").
-6.  Determine if it should be **featured** based on prominence/recommendations.
 
 **Critical Filter:** Only extract items that are *directly* relevant to the main topic "{topicName}". For example, if the topic is "Vector Databases", do not extract a general-purpose database or a library for a specific programming language (like Ruby) unless it's explicitly a vector database client/tool directly supporting the core topic. Ensure the \`source_url\` is for the item itself, not an article *about* the item.
 Only call the extraction function if you find at least one item meeting these strict criteria.
@@ -668,8 +857,8 @@ Only call the extraction function if you find at least one item meeting these st
         const extractionResult = (await extractionChain.invoke({
           topicName,
           topicDescription,
-          page_content_snippet: page.text_content.slice(0, 5000), // Use a larger snippet for extraction + markdown
-        })) as { items?: Partial<ItemData>[] }; // Type assertion for the expected output structure
+          page_content_snippet: page.text_content,
+        })) as { items?: Partial<ItemData>[] };
 
         if (
           extractionResult &&
@@ -681,19 +870,15 @@ Only call the extraction function if you find at least one item meeting these st
             try {
               // Ensure all required fields are present before parsing, especially if LLM omits optionals
               const itemToValidate: Partial<ItemData> = {
-                featured: false, // Default featured if not provided by LLM
                 ...extractedItem,
               };
 
               const validatedItem = itemDataSchema.parse(
                 itemToValidate,
-              ) as ItemData; // Cast to ItemData after successful parsing
+              ) as ItemData;
 
               // Auto-generate slug if not provided or to ensure consistency
-              validatedItem.slug = (validatedItem.slug || validatedItem.name)
-                .toLowerCase()
-                .replace(/\s+/g, '-')
-                .replace(/[^a-z0-9-]/g, '');
+              validatedItem.slug = slugifyText(validatedItem.name);
 
               allExtractedItems.push(validatedItem);
               this.logger.log(
@@ -757,379 +942,6 @@ Only call the extraction function if you find at least one item meeting these st
     );
 
     return validItems;
-  }
-
-  private async generateInitialItemsWithAI(
-    slug: string,
-    topicName: string,
-    topicDescription: string,
-    targetKeywords: string[] | undefined,
-    config: Required<ConfigDto>,
-  ): Promise<ItemData[]> {
-    this.logger.log(
-      `[${slug}] AI-First Item Generation - Starting for topic: ${topicName}`,
-    );
-    const allGeneratedItems: ItemData[] = [];
-
-    if (!this.llm.apiKey) {
-      this.logger.warn(
-        `[${slug}] OpenAI API Key not configured. Skipping AI-first item generation.`,
-      );
-      return [];
-    }
-
-    // 1. Assess Prompt Understanding
-    const understandingAssessmentFunction = {
-      name: 'assess_prompt_understanding_for_item_generation',
-      description:
-        'Assesses if the provided topic, description, and keywords are clear and specific enough to generate a meaningful list of items for an Directory Builder.',
-      parameters: zodToJsonSchema(promptUnderstandingAssessmentSchema),
-    };
-
-    const understandingPrompt = PromptTemplate.fromTemplate(
-      `You are an AI assistant helping to curate an "Directory Builder".
-Topic: "{topicName}"
-Description: "{topicDescription}"
-Keywords: "{target_keywords_string}"
-
-Before attempting to generate items, please assess if the provided information is clear, specific, and sufficient for you to generate a high-quality, relevant list of items (tools, resources, libraries, etc.).
-
-- If the information is clear and sufficient, respond with 'can_proceed: true'.
-- If the information is too vague, ambiguous, or lacks necessary detail, respond with 'can_proceed: false' and provide a brief 'reason_if_cannot_proceed'.
-- Optionally, if 'can_proceed: false', you can provide 'suggested_clarifications' as an array of questions or points the user could address to improve the prompt.
-
-Consider:
-- Is the topic well-defined?
-- Is the scope clear (not too broad, not too narrow without context)?
-- Are there any ambiguities that would make item generation difficult or likely to produce irrelevant results?
-`,
-    );
-
-    const understandingChain = understandingPrompt
-      .pipe(
-        this.llm.bind({
-          functions: [understandingAssessmentFunction],
-          function_call: {
-            name: 'assess_prompt_understanding_for_item_generation',
-          },
-        }),
-      )
-      .pipe(new JsonOutputFunctionsParser());
-
-    try {
-      const assessment = (await understandingChain.invoke({
-        topicName,
-        topicDescription,
-        target_keywords_string: targetKeywords
-          ? targetKeywords.join(', ')
-          : 'N/A',
-      })) as {
-        can_proceed: boolean;
-        reason_if_cannot_proceed: string | null;
-        suggested_clarifications?: string[];
-      };
-
-      if (!assessment.can_proceed) {
-        this.logger.warn(
-          `[${slug}] AI cannot confidently proceed with item generation for topic "${topicName}" due to prompt clarity. Reason: ${assessment.reason_if_cannot_proceed || 'No specific reason provided.'}`,
-        );
-        if (
-          assessment.suggested_clarifications &&
-          assessment.suggested_clarifications.length > 0
-        ) {
-          this.logger.warn(
-            `[${slug}] AI suggested clarifications: ${assessment.suggested_clarifications.join('; ')}`,
-          );
-        }
-        return []; // Do not proceed with item generation
-      }
-
-      this.logger.log(
-        `[${slug}] AI assessment: Prompt for topic "${topicName}" is clear. Proceeding with item generation.`,
-      );
-    } catch (error) {
-      this.logger.error(
-        `[${slug}] Error during AI prompt understanding assessment for topic "${topicName}": ${error.message}. Proceeding with caution (will attempt item generation).`,
-        error.stack,
-      );
-      // If the understanding check itself fails, we log the error but still attempt item generation.
-      // This is a fallback in case the assessment mechanism has an issue.
-    }
-
-    // 2. Proceed with Item Generation if understanding is sufficient (or assessment failed)
-    const itemGenerationFunction = {
-      name: 'generate_awesome_list_items_directly',
-      description:
-        'Generates a list of distinct items (tools, resources, libraries, articles, etc.) that are highly relevant to the directory builder topic, including their details.',
-      parameters: zodToJsonSchema(extractedItemsSchema),
-    };
-
-    const generationPrompt = PromptTemplate.fromTemplate(
-      `You are an expert curator and technical writer tasked with generating an initial list of items for an "Directory Builder" about a specific topic.
-The **main topic** of the Directory Builder is: "{topicName}"
-Description: "{topicDescription}"
-Optional initial keywords: {target_keywords_string}
-
-Based on this topic, please generate a comprehensive list of approximately {num_items_to_generate} distinct items (e.g., tools, software, libraries, frameworks, seminal articles, official documentation, key community resources, important projects).
-
-For each item, provide the following details:
-1.  **name**: The canonical name of the item.
-2.  **description**: A concise description (1-3 sentences) highlighting its specific relevance to "{topicName}".
-3.  **source_url**: The most direct and canonical URL (e.g., homepage, official documentation, repository). If a high-quality, canonical URL cannot be confidently determined, you may omit it but it's highly encouraged.
-4.  **category**: Suggest one or two high-level categories this item belongs to within the context of "{topicName}" (e.g., "Data Visualization", "State Management", "Security Tooling"). This is a preliminary suggestion.
-5.  **tags**: List 3-5 specific keywords or tags (e.g., "open-source", "javascript", "real-time", "cli").
-6.  **featured**: A boolean indicating if this item is highly prominent or recommended (true/false). Default to false if unsure.
-
-**Critical Instructions:**
--   Focus on **relevance** to "{topicName}".
--   Aim for **diversity** in the types of items if appropriate for the topic.
--   Provide **accurate and canonical** information, especially for names and URLs.
--   If the topic is broad, try to cover its main sub-areas. If it's niche, focus on key resources for that niche.
-
-Generate the list of items according to the specified schema.
-`,
-    );
-
-    const generationChain = generationPrompt
-      .pipe(
-        this.llm.bind({
-          functions: [itemGenerationFunction],
-          function_call: { name: 'generate_awesome_list_items_directly' },
-        }),
-      )
-      .pipe(new JsonOutputFunctionsParser());
-
-    // reset temperature
-    const defaultTemperature = this.llm.temperature;
-    this.llm.temperature = 0.2;
-
-    try {
-      const numItemsToGenerate =
-        config.max_results_per_query * 1 || DEFAULT_AI_ITEMS_TO_GENERATE;
-
-      const result = (await generationChain.invoke({
-        topicName,
-        topicDescription,
-        target_keywords_string: targetKeywords
-          ? targetKeywords.join(', ')
-          : 'N/A',
-        num_items_to_generate: numItemsToGenerate,
-      })) as { items?: Partial<ItemData>[] };
-
-      if (result && result.items && result.items.length > 0) {
-        this.logger.log(
-          `[${slug}] AI initially generated ${result.items.length} items.`,
-        );
-        for (const generatedItem of result.items) {
-          try {
-            const itemToValidate: Partial<ItemData> = {
-              featured: false,
-              tags: generatedItem.tags || [],
-              category: [],
-              ...generatedItem,
-            };
-
-            if (generatedItem.category) {
-              if (typeof generatedItem.category === 'string') {
-                itemToValidate.category = [
-                  generatedItem.category.trim(),
-                ].filter((c) => c);
-              } else if (Array.isArray(generatedItem.category)) {
-                itemToValidate.category = generatedItem.category
-                  .map((c) => c.trim())
-                  .filter((c) => c);
-              }
-            } else {
-              itemToValidate.category = [];
-            }
-
-            if (generatedItem.tags && Array.isArray(generatedItem.tags)) {
-              itemToValidate.tags = generatedItem.tags
-                .map((t) => t.trim())
-                .filter((t) => t);
-            } else {
-              itemToValidate.tags = [];
-            }
-
-            const validatedItem = itemDataSchema.parse(
-              itemToValidate,
-            ) as ItemData;
-
-            validatedItem.slug = slugify(validatedItem.name);
-
-            if (!validatedItem.source_url) {
-              this.logger.warn(
-                `[${slug}] AI generated item "${validatedItem.name}" without a source_url. Deduplication might be affected.`,
-              );
-            }
-            allGeneratedItems.push(validatedItem);
-          } catch (validationError) {
-            this.logger.warn(
-              `[${slug}] Discarding AI-generated item due to validation error: ${validationError.errors.map((e) => e.message).join(', ')}. Item: ${JSON.stringify(generatedItem)}`,
-            );
-          }
-        }
-      } else {
-        this.logger.log(
-          `[${slug}] No initial items generated by AI for topic: ${topicName}.`,
-        );
-      }
-    } catch (error) {
-      this.logger.error(
-        `[${slug}] Error generating initial items with AI for topic ${topicName}: ${error.message}`,
-        error.stack,
-      );
-    }
-
-    this.llm.temperature = defaultTemperature;
-
-    this.logger.log(
-      `[${slug}] AI-First Item Generation - Complete. Validated ${allGeneratedItems.length} items.`,
-    );
-    return allGeneratedItems;
-  }
-
-  private async normalizeTerms(
-    slug: string,
-    terms: string[],
-    termType: 'category' | 'tag',
-    topicName: string,
-  ): Promise<Map<string, string>> {
-    if (!this.llm.apiKey || terms.length === 0) {
-      this.logger.warn(
-        `[${slug}] OpenAI API Key not configured or no ${termType} terms to normalize. Using original terms.`,
-      );
-      const map = new Map<string, string>();
-      terms.forEach((term) => map.set(term, term)); // Simple 1:1 mapping
-      return map;
-    }
-
-    const normalizationFunction = {
-      name: `normalize_${termType}_names`,
-      description: `Normalizes a list of ${termType} names to their canonical forms, considering the context of an Directory Builder about "${topicName}". For example, "ML", "Machine Learning", and "machine-learning" should all normalize to "Machine Learning".`,
-      parameters: zodToJsonSchema(normalizedNamesListSchema),
-    };
-
-    const prompt = PromptTemplate.fromTemplate(
-      `You are an expert in data normalization for software and technology topics.
-The Directory Builder topic is: "{topicName}".
-Given the following list of raw {termType} names, please normalize them to their most common, canonical forms.
-Consider synonyms, abbreviations, and different capitalizations.
-Ensure the normalized names are suitable for display in a curated list.
-
-Raw {termType} names (one per line):
-{term_list_string}
-
-Return the list of original names paired with their normalized versions.
-`,
-    );
-
-    const outputParser = new JsonOutputFunctionsParser();
-    const normalizationChain = prompt
-      .pipe(
-        this.llm.bind({
-          functions: [normalizationFunction],
-          function_call: { name: normalizationFunction.name },
-        }),
-      )
-      .pipe(outputParser);
-
-    const normalizedMap = new Map<string, string>();
-    // Process in chunks if the list is very long to avoid overly large prompts
-    const chunkSize = 50;
-    for (let i = 0; i < terms.length; i += chunkSize) {
-      const chunk = terms.slice(i, i + chunkSize);
-      try {
-        this.logger.log(
-          `[${slug}] Normalizing ${termType} chunk: ${chunk.join(', ')}`,
-        );
-        const result = (await normalizationChain.invoke({
-          topicName,
-          termType,
-          term_list_string: chunk.join('\n'),
-        })) as {
-          normalized_names?: {
-            original_name: string;
-            normalized_name: string;
-          }[];
-        };
-
-        if (result && result.normalized_names) {
-          result.normalized_names.forEach((pair) => {
-            normalizedMap.set(pair.original_name, pair.normalized_name);
-          });
-        } else {
-          this.logger.warn(
-            `[${slug}] LLM did not return expected structure for ${termType} normalization chunk. Using original terms for this chunk.`,
-          );
-          chunk.forEach((term) => normalizedMap.set(term, term));
-        }
-      } catch (error) {
-        this.logger.error(
-          `[${slug}] Error normalizing ${termType} chunk with LLM: ${error.message}. Using original terms for this chunk.`,
-          error.stack,
-        );
-        chunk.forEach((term) => normalizedMap.set(term, term));
-      }
-    }
-    return normalizedMap;
-  }
-
-  private async generateCategoryDescription(
-    slug: string,
-    categoryName: string,
-    topicName: string,
-  ): Promise<string | undefined> {
-    if (!this.llm.apiKey) {
-      this.logger.warn(
-        `[${slug}] OpenAI API Key not configured. Skipping category description generation for "${categoryName}".`,
-      );
-      return undefined;
-    }
-
-    const descriptionFunction = {
-      name: 'generate_category_description',
-      description: `Generates a brief, informative description for the category "${categoryName}" within the context of an Directory Builder about "${topicName}".`,
-      parameters: zodToJsonSchema(categoryDescriptionSchema),
-    };
-
-    const prompt = PromptTemplate.fromTemplate(
-      `You are an expert technical writer creating content for an "Directory Builder".
-The Directory Builder topic is: "{topicName}".
-The category is: "{categoryName}".
-
-Please generate a concise (1-2 sentences) and informative description for this category.
-The description should explain what kind of items or resources typically fall under this category in the context of "{topicName}".
-`,
-    );
-
-    const outputParser = new JsonOutputFunctionsParser();
-    const descriptionChain = prompt
-      .pipe(
-        this.llm.bind({
-          functions: [descriptionFunction],
-          function_call: { name: descriptionFunction.name },
-        }),
-      )
-      .pipe(outputParser);
-
-    try {
-      this.logger.log(
-        `[${slug}] Generating description for category: "${categoryName}"`,
-      );
-      const result = (await descriptionChain.invoke({
-        topicName,
-        categoryName,
-      })) as { category_name: string; description: string };
-
-      return result.description;
-    } catch (error) {
-      this.logger.error(
-        `[${slug}] Error generating description for category "${categoryName}" with LLM: ${error.message}`,
-        error.stack,
-      );
-      return undefined;
-    }
   }
 
   private async validateAndFetchSourceUrl(
@@ -1261,204 +1073,115 @@ The description should explain what kind of items or resources typically fall un
   }
 
   private async processCategoriesAndTags(
-    slug: string,
-    extractedItems: ItemData[],
-    topicName: string,
-  ): Promise<{ currentCategories: Category[]; currentTags: Tag[] }> {
-    const rawCategories = new Set<string>();
-    const rawTags = new Set<string>();
+    createItemsGeneratorDto: CreateItemsGeneratorDto,
+    extractedItems: Partial<ItemData>[],
+  ) {
+    const { description } = createItemsGeneratorDto;
 
-    extractedItems.forEach((item) => {
-      if (item.category) {
-        if (Array.isArray(item.category)) {
-          item.category.forEach((c) => rawCategories.add(c.trim()));
-        } else {
-          rawCategories.add(item.category.trim());
-        }
-      }
-      item.tags.forEach((t) => rawTags.add(t.trim()));
-    });
-
-    const uniqueRawCategories = Array.from(rawCategories).filter((c) => c);
-    const uniqueRawTags = Array.from(rawTags).filter((t) => t);
-
-    this.logger.log(
-      `[${slug}] Found ${uniqueRawCategories.length} unique raw categories and ${uniqueRawTags.length} unique raw tags.`,
+    const categorized = await categorize(
+      description,
+      extractedItems.map((i) => ({
+        name: i.name,
+        description: i.description,
+        url: i.source_url,
+      })),
     );
 
-    const normalizedCategoryMap = await this.normalizeTerms(
-      slug,
-      uniqueRawCategories,
-      'category',
-      topicName,
+    const categories = this.mapUnique(
+      categorized.map((item) => item.category as string),
     );
-    const normalizedTagMap = await this.normalizeTerms(
-      slug,
-      uniqueRawTags,
-      'tag',
-      topicName,
+    const tags = this.mapUnique(
+      categorized.flatMap((item) => item.tags as string[]),
     );
-
-    const finalCategoriesMap = new Map<string, Category>();
-    for (const rawCat of uniqueRawCategories) {
-      const normalizedName = normalizedCategoryMap.get(rawCat) || rawCat;
-      const id = slugify(normalizedName);
-      if (!finalCategoriesMap.has(id)) {
-        const description = await this.generateCategoryDescription(
-          slug,
-          normalizedName,
-          topicName,
-        );
-        finalCategoriesMap.set(id, {
-          id,
-          name: normalizedName,
-          description: description || undefined, // Ensure it's explicitly undefined if not generated
-          // icon_url: undefined, // Placeholder for future icon logic
-        });
-        this.logger.log(
-          `[${slug}] Created category: ID=${id}, Name=${normalizedName}`,
-        );
-      }
-    }
-
-    // Update item categories to use normalized names or IDs
-    // This part is tricky as items might have multiple categories, and we need to map them.
-    // For simplicity, we'll assume items will store the normalized category NAME for now.
-    // A more robust system might store category IDs in items.
-    extractedItems.forEach((item) => {
-      if (item.category) {
-        if (Array.isArray(item.category)) {
-          item.category = item.category.map(
-            (catName) => normalizedCategoryMap.get(catName) || catName,
-          );
-        } else {
-          item.category =
-            normalizedCategoryMap.get(item.category) || item.category;
-        }
-      }
-    });
-
-    const finalTagsMap = new Map<string, Tag>();
-    uniqueRawTags.forEach((rawTag) => {
-      const normalizedName = normalizedTagMap.get(rawTag) || rawTag;
-      const id = slugify(normalizedName);
-      if (!finalTagsMap.has(id)) {
-        finalTagsMap.set(id, { id, name: normalizedName });
-        this.logger.log(
-          `[${slug}] Created tag: ID=${id}, Name=${normalizedName}`,
-        );
-      }
-    });
-
-    // Update item tags to use normalized names
-    extractedItems.forEach((item) => {
-      item.tags = item.tags.map(
-        (tagName) => normalizedTagMap.get(tagName) || tagName,
-      );
-    });
-
     return {
-      currentCategories: Array.from(finalCategoriesMap.values()),
-      currentTags: Array.from(finalTagsMap.values()),
+      finalItems: categorized.map(this.toItemData),
+      categories,
+      tags,
     };
   }
 
-  private aggregateAndDeduplicateData(
-    slug: string,
+  private mapUnique(names: string[]) {
+    const unique = new Set(names);
+    return Array.from(unique).map((name) => ({
+      id: slugifyText(name),
+      name,
+    }));
+  }
+
+  private toItemData(item: Partial<ItemData>): ItemData {
+    return {
+      name: item.name,
+      description: item.description,
+      source_url: item.source_url,
+      category: slugifyText(item.category as string),
+      tags: item.tags.map((tag) => slugifyText(tag)),
+      slug: slugifyText(item.name),
+    };
+  }
+
+  private async aggregateAndDeduplicateData(
+    createItemsGeneratorDto: CreateItemsGeneratorDto,
     existingItems: ItemData[],
-    existingCategories: Category[],
-    existingTags: Tag[],
     newlyExtractedItemsThisRun: ItemData[],
-    processedCategoriesThisRun: Category[],
-    processedTagsThisRun: Tag[],
     urlsScannedThisRun: number,
     pagesProcessedThisRun: number,
-  ): {
-    finalItems: ItemData[];
-    finalCategories: Category[];
-    finalTags: Tag[];
-    metrics: ItemsGeneratorMetrics;
-  } {
+  ) {
+    const { slug, description } = createItemsGeneratorDto;
+
     this.logger.log(`[${slug}] Starting data aggregation and deduplication.`);
     let newItemsAddedToStoreCount = 0;
 
     // Deduplicate Items
     this.logger.log(`[${slug}] Deduplicating items.`);
-    const finalItemsMap = new Map<string, ItemData>();
 
-    const getItemKey = (item: ItemData): string => {
-      if (item.source_url) {
-        // Normalize URL slightly to catch common variations if needed, e.g. remove trailing slash
-        try {
-          const url = new URL(item.source_url);
-          return (url.origin + url.pathname).replace(/\/$/, ''); // Normalize: remove trailing slash
-        } catch (e) {
-          return item.source_url;
-        }
-      }
+    // const finalItemsMap = new Map<string, ItemData>();
+    // const getItemKey = (item: Partial<ItemData>): string => {
+    //   if (item.source_url) {
+    //     // Normalize URL slightly to catch common variations if needed, e.g. remove trailing slash
+    //     try {
+    //       const url = new URL(item.source_url);
+    //       return (url.origin + url.pathname).replace(/\/$/, ''); // Normalize: remove trailing slash
+    //     } catch (e) {
+    //       return item.source_url;
+    //     }
+    //   }
 
-      return `https://www.google.com/search?q=${item.name}`;
-    };
+    //   return `gen:${item.name}`;
+    // };
 
-    existingItems.forEach((item) => {
-      const key = getItemKey(item);
-      finalItemsMap.set(key, item);
-    });
+    // existingItems.forEach((item) => {
+    //   const key = getItemKey(item);
+    //   finalItemsMap.set(key, item);
+    // });
 
-    newlyExtractedItemsThisRun.forEach((newItem) => {
-      // newlyExtractedItemsThisRun is allDiscoveredItems
-      const key = getItemKey(newItem);
-      const alreadyExisted = finalItemsMap.has(key);
+    // deduplicate newly extracted items (with AI)
+    let deduplicated = deduplicateByField(
+      deduplicateByField(newlyExtractedItemsThisRun, 'slug'),
+      'source_url',
+    );
 
-      // Overwrite with newItem to ensure latest data (e.g. AI might have better initial description)
-      // Logic for merging can be more sophisticated here if needed.
-      // const oldItem = finalItemsMap.get(key);
-      finalItemsMap.set(key, newItem);
+    deduplicated = await deduplicate(
+      description,
+      deduplicated.map((i) => ({
+        name: i.name,
+        description: i.description,
+        url: i.source_url,
+      })),
+    );
 
-      if (!alreadyExisted) {
-        newItemsAddedToStoreCount++;
-      }
-    });
-
-    const finalItems = Array.from(finalItemsMap.values());
-
-    // Deduplicate Categories
-    this.logger.log(`[${slug}] Deduplicating categories.`);
-    const finalCategoriesMap = new Map<string, Category>();
-    existingCategories.forEach((cat) => finalCategoriesMap.set(cat.id, cat));
-    processedCategoriesThisRun.forEach((newCat) => {
-      const existingCat = finalCategoriesMap.get(newCat.id);
-      if (!existingCat) {
-        finalCategoriesMap.set(newCat.id, newCat);
-      } else {
-        if (newCat.description && !existingCat.description) {
-          existingCat.description = newCat.description;
-        }
-      }
-    });
-    const finalCategories = Array.from(finalCategoriesMap.values());
-
-    // Deduplicate Tags
-    this.logger.log(`[${slug}] Deduplicating tags.`);
-    const finalTagsMap = new Map<string, Tag>();
-    existingTags.forEach((tag) => finalTagsMap.set(tag.id, tag));
-    processedTagsThisRun.forEach((newTag) => {
-      if (!finalTagsMap.has(newTag.id)) {
-        finalTagsMap.set(newTag.id, newTag);
-      }
-    });
-    const finalTags = Array.from(finalTagsMap.values());
+    let aggregatedItems = deduplicated;
+    if (existingItems.length > 0) {
+      aggregatedItems = await extractNewItems(existingItems, deduplicated);
+    }
 
     const metrics: ItemsGeneratorMetrics = {
       urls_scanned: urlsScannedThisRun,
       pages_processed: pagesProcessedThisRun,
       items_extracted_current_run: newlyExtractedItemsThisRun.length,
       new_items_added_to_store: newItemsAddedToStoreCount,
-      total_items_in_store: finalItems.length,
-      total_categories_in_store: finalCategories.length,
-      total_tags_in_store: finalTags.length,
+      total_items_in_store: aggregatedItems.length,
     };
 
-    return { finalItems, finalCategories, finalTags, metrics };
+    return { aggregatedItems, metrics };
   }
 }

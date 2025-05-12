@@ -1,5 +1,6 @@
 import * as cheerio from 'cheerio';
 import { Logger } from '@nestjs/common';
+import slugify from 'slugify';
 
 const logger = new Logger('TextUtils');
 
@@ -12,7 +13,7 @@ export function extractTextFromHtml(htmlContent: string): string {
     ).remove();
     // Get text from the body, attempt to normalize whitespace
     let text = $('body').text() || '';
-    text = text.replace(/\s\s+/g, ' ').trim(); // Replace multiple spaces/newlines with a single space
+    text = text.replace(/\s\s+/g, ' ').trim();
     return text;
   } catch (error) {
     logger.error(`Error extracting text with Cheerio: ${error.message}`);
@@ -20,13 +21,6 @@ export function extractTextFromHtml(htmlContent: string): string {
   }
 }
 
-export function slugify(text: string): string {
-  return text
-    .toString()
-    .normalize('NFKD') // Normalize accented characters
-    .toLowerCase()
-    .trim()
-    .replace(/\s+/g, '-') // Replace spaces with -
-    .replace(/[^\w-]+/g, '') // Remove all non-word chars
-    .replace(/--+/g, '-'); // Replace multiple - with single -
+export function slugifyText(text: string): string {
+  return slugify(text, { lower: true, trim: true });
 }

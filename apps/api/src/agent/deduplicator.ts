@@ -5,6 +5,7 @@ import slugify from "slugify";
 import { z } from "zod";
 import { ItemData } from "./types";
 import { categorizeOutputSchema } from "./categorize";
+import { itemDataSchema } from "./schemas";
 
 const DEDUPLICATOR_PROMPT = `
 You are directory website builder and your task is to deduplicate items.
@@ -62,13 +63,7 @@ Here is the list of new items:
 `.trim();
 
 const outputSchema = z.object({
-    items: z.array(
-        z.object({
-            name: z.string(),
-            description: z.string(),
-            source_url: z.string().optional().describe('The URL of item`s official website/repository'),
-        })
-    ),
+    items: z.array(itemDataSchema),
 });
 
 export async function deduplicate(task: string, items: object[]) {
