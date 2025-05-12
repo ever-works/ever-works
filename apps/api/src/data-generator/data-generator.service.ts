@@ -179,6 +179,7 @@ export class DataGeneratorService {
           lower: true,
           trim: true,
         });
+
         await this.processItem(data, item, user);
       }
 
@@ -272,12 +273,18 @@ export class DataGeneratorService {
 
     // Fetch the item data
     this.logger.debug(`processItem: Fetching markdown for ${item.slug}`);
-    const md = await markdown(item);
-    if (md) {
-      promises.push(data.writeItemMarkdown(item, md));
-    } else {
-      this.logger.debug(`processItem: No markdown fetched for ${item.slug}`);
+    let md = `#${item.name}\n\n${item.description}\n\n[${item.source_url}](${item.source_url})`;
+
+    try {
+      md = await markdown(item);
+    } catch (err) {
+      this.logger.error(
+        `processItem: Failed to generate markdown for ${item.slug}`,
+        err.stack,
+      );
     }
+
+    promises.push(data.writeItemMarkdown(item, md));
 
     await Promise.all(promises);
     this.logger.debug(
