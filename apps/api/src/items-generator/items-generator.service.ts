@@ -1120,9 +1120,6 @@ Only call the extraction function if you find at least one item meeting these st
     this.logger.log(`[${slug}] Starting data aggregation and deduplication.`);
     let newItemsAddedToStoreCount = 0;
 
-    // Deduplicate Items
-    this.logger.log(`[${slug}] Deduplicating items.`);
-
     // const finalItemsMap = new Map<string, ItemData>();
     // const getItemKey = (item: Partial<ItemData>): string => {
     //   if (item.source_url) {
@@ -1143,12 +1140,14 @@ Only call the extraction function if you find at least one item meeting these st
     //   finalItemsMap.set(key, item);
     // });
 
-    // deduplicate newly extracted items (with AI)
+    // deduplicate newly extracted items (by fields)
+    this.logger.log(`[${slug}] Deduplicating items by fields`);
     let deduplicated = deduplicateByField(
       deduplicateByField(newlyExtractedItemsThisRun, 'slug'),
       'source_url',
     );
 
+    // deduplicate newly extracted items (with AI)
     this.logger.log(`[${slug}] Deduplicating items with AI.`);
     deduplicated = await deduplicate(
       description,

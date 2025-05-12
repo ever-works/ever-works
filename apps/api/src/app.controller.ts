@@ -90,6 +90,9 @@ export class AppController {
     // The actual processing will happen in the background.
     // A more robust solution might involve job queues, webhooks, or websockets for status updates.
     (async () => {
+      const startTime = new Date();
+      console.log(`Generation started at: ${startTime.toISOString()}`);
+
       const generated = await this.dataGenerator.initializeV2(
         directory,
         user,
@@ -102,6 +105,11 @@ export class AppController {
           this.websiteGenerator.initialize(directory, user),
         ]);
       }
+
+      const endTime = new Date();
+      console.log(`Generation finished at: ${endTime.toISOString()}`);
+      const duration = (endTime.getTime() - startTime.getTime()) / 1000;
+      console.log(`Total time taken: ${duration} seconds`);
     })();
 
     return {
