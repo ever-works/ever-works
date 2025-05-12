@@ -44,12 +44,6 @@ export const itemDataSchema = z.object({
     .describe(
       'URL-friendly slug, auto-generated from item.name if not provided.',
     ),
-  markdown_content: z
-    .string()
-    .optional()
-    .describe(
-      'Relevant content extracted from the source URL, formatted as Markdown. Focus on features, technical details, and pricing (if applicable), excluding marketing language, testimonials, and generic support info.',
-    ),
 });
 
 // Type for the extracted item, can be an array if multiple items are found on a page

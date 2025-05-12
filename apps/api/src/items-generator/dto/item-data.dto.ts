@@ -6,5 +6,4 @@ export interface ItemData {
   slug?: string; // Auto-generated from item.name
   category: string | string[]; // Names of categories, referencing Category.name or Category.id
   tags: string[]; // Names of tags, referencing Tag.name or Tag.id
-  markdown_content?: string; // Relevant content from source_url, formatted as Markdown
 }

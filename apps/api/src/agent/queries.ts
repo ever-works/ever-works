@@ -29,7 +29,7 @@ export async function generateQueries(task: string, max = 5): Promise<string[]> 
     Logger.log('Generating queries', 'Agent');
 
     const llm = new ChatOpenAI({
-        model: process.env.OPENAI_MODEL || 'gpt-4.1-mini',
+        model: process.env.OPENAI_MODEL || 'gpt-4.1',
         temperature: 0.6,
     });
 

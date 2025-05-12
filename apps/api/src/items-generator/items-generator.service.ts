@@ -54,7 +54,7 @@ export class ItemsGeneratorService {
     }
     this.llm = new ChatOpenAI({
       apiKey: process.env.OPENAI_API_KEY,
-      modelName: process.env.OPENAI_MODEL || 'gpt-4.1-mini',
+      modelName: process.env.OPENAI_MODEL || 'gpt-4.1',
       temperature: 0.7,
     });
 
@@ -237,7 +237,7 @@ export class ItemsGeneratorService {
       );
 
       this.logger.log(
-        `[${slug}] Awesome list generation complete. Final metrics: ${JSON.stringify(metrics)}`,
+        `[${slug}] Directory Builder generation complete. Final metrics: ${JSON.stringify(metrics)}`,
       );
 
       // This is where a more robust notification (webhook, websocket, email) would be triggered,
@@ -250,7 +250,7 @@ export class ItemsGeneratorService {
       };
     } catch (error) {
       this.logger.error(
-        `Error generating awesome list for slug ${slug}: ${error.message}`,
+        `Error generating directory builder for slug ${slug}: ${error.message}`,
         error.stack,
       );
       // Update a status file or send a notification about the error
@@ -291,7 +291,7 @@ export class ItemsGeneratorService {
     }
 
     const promptTemplate = PromptTemplate.fromTemplate(
-      `You are an expert at generating highly relevant and diverse search engine queries to build an "Awesome List" about a specific topic.
+      `You are an expert at generating highly relevant and diverse search engine queries to build an "Directory Builder" about a specific topic.
 The topic is: "{name}"
 Description: "{description}"
 Optional initial keywords: {target_keywords_string}
@@ -614,7 +614,7 @@ Provide a relevance score between 0.0 (not relevant) and 1.0 (highly relevant). 
     const itemExtractionFunction = {
       name: 'extract_awesome_list_items',
       description:
-        'Extracts one or more distinct items (tools, resources, libraries, articles, etc.) from the provided web page content that are relevant to the awesome list topic, including generating relevant Markdown content.',
+        'Extracts one or more distinct items (tools, resources, libraries, articles, etc.) from the provided web page content that are relevant to the directory builder topic, including generating relevant Markdown content.',
       parameters: zodToJsonSchema(extractedItemsSchema),
     };
 
@@ -633,8 +633,8 @@ Provide a relevance score between 0.0 (not relevant) and 1.0 (highly relevant). 
       try {
         // Stricter prompt for item extraction
         const prompt = PromptTemplate.fromTemplate(
-          `You are an expert data extractor and technical writer for "Awesome List" directories.
-The **main topic** of the Awesome List is: "{topicName}" (Description: "{topicDescription}").
+          `You are an expert data extractor and technical writer for "Directory Builder" directories.
+The **main topic** of the Directory Builder is: "{topicName}" (Description: "{topicDescription}").
 From the following web page content, identify and extract information for one or more distinct items (tools, resources, libraries, articles, etc.) that are **directly and highly relevant to this main topic**. Do NOT extract items that are only tangentially related or represent a different category unless it's explicitly part of "{topicName}".
 
 Web Page Content (first 5000 characters):
@@ -649,13 +649,6 @@ For each identified item **that directly relates to "{topicName}"**:
 4.  List relevant high-level **categories** (e.g., "Monitoring", "Security") that fit within the context of "{topicName}".
 5.  List specific **tags** (keywords, technologies, e.g., "open-source", "real-time").
 6.  Determine if it should be **featured** based on prominence/recommendations.
-7.  Generate **markdown_content**: Extract the *most relevant* information from the page content and format it as clean Markdown. Follow these rules strictly:
-    *   **Focus:** Prioritize factual information, technical details, features, capabilities, and pricing/plans (if applicable and clearly stated).
-    *   **Exclude:** All marketing/sales language (e.g., "revolutionary", "best-in-class", "why choose us"), testimonials, customer logos, generic "About Us" sections unrelated to the item's function, generic support/contact information, and calls to action (e.g., "Sign up now", "Request a demo").
-    *   **Features:** List *all* relevant features mentioned, not just key features. Use bullet points under a "### Features" heading if appropriate.
-    *   **Pricing:** If pricing information (plans, tiers, costs) is present and clear, include it under a "### Pricing" heading. Summarize clearly.
-    *   **Structure:** Use appropriate Markdown headings (e.g., \`### Features\`, \`### Pricing\`), bullet points, and code formatting where applicable. Keep it concise and informative.
-    *   **Length:** Aim for a useful summary (typically 100-500 words), not the entire page content.
 
 **Critical Filter:** Only extract items that are *directly* relevant to the main topic "{topicName}". For example, if the topic is "Vector Databases", do not extract a general-purpose database or a library for a specific programming language (like Ruby) unless it's explicitly a vector database client/tool directly supporting the core topic. Ensure the \`source_url\` is for the item itself, not an article *about* the item.
 Only call the extraction function if you find at least one item meeting these strict criteria.
@@ -691,7 +684,7 @@ Only call the extraction function if you find at least one item meeting these st
                 featured: false, // Default featured if not provided by LLM
                 ...extractedItem,
               };
-              // The itemDataSchema now includes markdown_content, so it will be validated
+
               const validatedItem = itemDataSchema.parse(
                 itemToValidate,
               ) as ItemData; // Cast to ItemData after successful parsing
@@ -704,7 +697,7 @@ Only call the extraction function if you find at least one item meeting these st
 
               allExtractedItems.push(validatedItem);
               this.logger.log(
-                `[${slug}] Extracted item: "${validatedItem.name}" (Slug: ${validatedItem.slug}) with markdown_content from ${page.source_url}`,
+                `[${slug}] Extracted item: "${validatedItem.name}" (Slug: ${validatedItem.slug})`,
               );
             } catch (validationError) {
               this.logger.warn(
@@ -789,12 +782,12 @@ Only call the extraction function if you find at least one item meeting these st
     const understandingAssessmentFunction = {
       name: 'assess_prompt_understanding_for_item_generation',
       description:
-        'Assesses if the provided topic, description, and keywords are clear and specific enough to generate a meaningful list of items for an Awesome List.',
+        'Assesses if the provided topic, description, and keywords are clear and specific enough to generate a meaningful list of items for an Directory Builder.',
       parameters: zodToJsonSchema(promptUnderstandingAssessmentSchema),
     };
 
     const understandingPrompt = PromptTemplate.fromTemplate(
-      `You are an AI assistant helping to curate an "Awesome List".
+      `You are an AI assistant helping to curate an "Directory Builder".
 Topic: "{topicName}"
 Description: "{topicDescription}"
 Keywords: "{target_keywords_string}"
@@ -867,13 +860,13 @@ Consider:
     const itemGenerationFunction = {
       name: 'generate_awesome_list_items_directly',
       description:
-        'Generates a list of distinct items (tools, resources, libraries, articles, etc.) that are highly relevant to the awesome list topic, including their details.',
+        'Generates a list of distinct items (tools, resources, libraries, articles, etc.) that are highly relevant to the directory builder topic, including their details.',
       parameters: zodToJsonSchema(extractedItemsSchema),
     };
 
     const generationPrompt = PromptTemplate.fromTemplate(
-      `You are an expert curator and technical writer tasked with generating an initial list of items for an "Awesome List" about a specific topic.
-The **main topic** of the Awesome List is: "{topicName}"
+      `You are an expert curator and technical writer tasked with generating an initial list of items for an "Directory Builder" about a specific topic.
+The **main topic** of the Directory Builder is: "{topicName}"
 Description: "{topicDescription}"
 Optional initial keywords: {target_keywords_string}
 
@@ -886,7 +879,6 @@ For each item, provide the following details:
 4.  **category**: Suggest one or two high-level categories this item belongs to within the context of "{topicName}" (e.g., "Data Visualization", "State Management", "Security Tooling"). This is a preliminary suggestion.
 5.  **tags**: List 3-5 specific keywords or tags (e.g., "open-source", "javascript", "real-time", "cli").
 6.  **featured**: A boolean indicating if this item is highly prominent or recommended (true/false). Default to false if unsure.
-7.  **markdown_content**: (Optional for initial generation, can be brief) A very short summary or key features in Markdown format (50-150 words) of its core purpose and relevance.
 
 **Critical Instructions:**
 -   Focus on **relevance** to "{topicName}".
@@ -932,7 +924,6 @@ Generate the list of items according to the specified schema.
           try {
             const itemToValidate: Partial<ItemData> = {
               featured: false,
-              markdown_content: generatedItem.markdown_content || '',
               tags: generatedItem.tags || [],
               category: [],
               ...generatedItem,
@@ -1015,13 +1006,13 @@ Generate the list of items according to the specified schema.
 
     const normalizationFunction = {
       name: `normalize_${termType}_names`,
-      description: `Normalizes a list of ${termType} names to their canonical forms, considering the context of an Awesome List about "${topicName}". For example, "ML", "Machine Learning", and "machine-learning" should all normalize to "Machine Learning".`,
+      description: `Normalizes a list of ${termType} names to their canonical forms, considering the context of an Directory Builder about "${topicName}". For example, "ML", "Machine Learning", and "machine-learning" should all normalize to "Machine Learning".`,
       parameters: zodToJsonSchema(normalizedNamesListSchema),
     };
 
     const prompt = PromptTemplate.fromTemplate(
       `You are an expert in data normalization for software and technology topics.
-The Awesome List topic is: "{topicName}".
+The Directory Builder topic is: "{topicName}".
 Given the following list of raw {termType} names, please normalize them to their most common, canonical forms.
 Consider synonyms, abbreviations, and different capitalizations.
 Ensure the normalized names are suitable for display in a curated list.
@@ -1098,13 +1089,13 @@ Return the list of original names paired with their normalized versions.
 
     const descriptionFunction = {
       name: 'generate_category_description',
-      description: `Generates a brief, informative description for the category "${categoryName}" within the context of an Awesome List about "${topicName}".`,
+      description: `Generates a brief, informative description for the category "${categoryName}" within the context of an Directory Builder about "${topicName}".`,
       parameters: zodToJsonSchema(categoryDescriptionSchema),
     };
 
     const prompt = PromptTemplate.fromTemplate(
-      `You are an expert technical writer creating content for an "Awesome List".
-The Awesome List topic is: "{topicName}".
+      `You are an expert technical writer creating content for an "Directory Builder".
+The Directory Builder topic is: "{topicName}".
 The category is: "{categoryName}".
 
 Please generate a concise (1-2 sentences) and informative description for this category.
@@ -1392,6 +1383,7 @@ The description should explain what kind of items or resources typically fall un
     let newItemsAddedToStoreCount = 0;
 
     // Deduplicate Items
+    this.logger.log(`[${slug}] Deduplicating items.`);
     const finalItemsMap = new Map<string, ItemData>();
 
     const getItemKey = (item: ItemData): string => {
@@ -1419,62 +1411,40 @@ The description should explain what kind of items or resources typically fall un
       const alreadyExisted = finalItemsMap.has(key);
 
       // Overwrite with newItem to ensure latest data (e.g. AI might have better initial description)
-      // or if web extraction provides more markdown_content for an AI-stubbed item.
       // Logic for merging can be more sophisticated here if needed.
-      const oldItem = finalItemsMap.get(key);
+      // const oldItem = finalItemsMap.get(key);
       finalItemsMap.set(key, newItem);
 
       if (!alreadyExisted) {
         newItemsAddedToStoreCount++;
-        this.logger.log(
-          `[${slug}] Adding new item: "${newItem.name}" (Key: ${key})`,
-        );
-      } else {
-        // If item existed, check if we should log an update or merge
-        if (oldItem && newItem.markdown_content && !oldItem.markdown_content) {
-          this.logger.log(
-            `[${slug}] Updating item "${newItem.name}" (Key: ${key}) with new markdown content.`,
-          );
-        } else {
-          this.logger.log(
-            `[${slug}] Item "${newItem.name}" (Key: ${key}) already exists or was updated.`,
-          );
-        }
       }
     });
 
     const finalItems = Array.from(finalItemsMap.values());
 
     // Deduplicate Categories
+    this.logger.log(`[${slug}] Deduplicating categories.`);
     const finalCategoriesMap = new Map<string, Category>();
     existingCategories.forEach((cat) => finalCategoriesMap.set(cat.id, cat));
     processedCategoriesThisRun.forEach((newCat) => {
       const existingCat = finalCategoriesMap.get(newCat.id);
       if (!existingCat) {
         finalCategoriesMap.set(newCat.id, newCat);
-        this.logger.log(
-          `[${slug}] Adding new category: "${newCat.name}" (ID: ${newCat.id})`,
-        );
       } else {
         if (newCat.description && !existingCat.description) {
           existingCat.description = newCat.description;
-          this.logger.log(
-            `[${slug}] Updated description for existing category: "${newCat.name}"`,
-          );
         }
       }
     });
     const finalCategories = Array.from(finalCategoriesMap.values());
 
     // Deduplicate Tags
+    this.logger.log(`[${slug}] Deduplicating tags.`);
     const finalTagsMap = new Map<string, Tag>();
     existingTags.forEach((tag) => finalTagsMap.set(tag.id, tag));
     processedTagsThisRun.forEach((newTag) => {
       if (!finalTagsMap.has(newTag.id)) {
         finalTagsMap.set(newTag.id, newTag);
-        this.logger.log(
-          `[${slug}] Adding new tag: "${newTag.name}" (ID: ${newTag.id})`,
-        );
       }
     });
     const finalTags = Array.from(finalTagsMap.values());

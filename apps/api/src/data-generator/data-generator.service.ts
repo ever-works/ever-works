@@ -110,6 +110,8 @@ export class DataGeneratorService {
     );
     this.logger.debug(`Using DTO: ${JSON.stringify(createItemsGeneratorDto)}`);
 
+    // TODO: The generateItemsGenerator function expects a parameter for existing data.
+    // If available, consider cloning the current project to fulfill this requirement.
     const generatedItems =
       await this.itemsGeneratorService.generateItemsGenerator(
         createItemsGeneratorDto,
@@ -177,7 +179,7 @@ export class DataGeneratorService {
           lower: true,
           trim: true,
         });
-        await this.processItemV2(data, item, user);
+        await this.processItem(data, item, user);
       }
 
       this.logger.log(`Pushing changes to ${directory.owner}/${repo}`);
@@ -256,47 +258,6 @@ export class DataGeneratorService {
     } finally {
       await data.cleanup();
     }
-  }
-
-  private async processItemV2(
-    data: DataRepository,
-    fullItem: NItemData,
-    user: User,
-  ) {
-    this.logger.debug(
-      `processItemV2: Starting for item slug ${fullItem.slug || fullItem.name}`,
-    );
-    let { markdown_content, ...item } = fullItem;
-
-    this.logger.debug(
-      `processItemV2: Creating item directory for ${item.slug}`,
-    );
-    await data.createItemDir(item);
-    const promises = [data.writeItem(item)];
-    this.logger.debug(
-      `processItemV2: Queued writing item data for ${item.slug}`,
-    );
-
-    // Fetch the item data
-    if (!markdown_content) {
-      markdown_content = `## References\n\n- [${item.source_url}](${item.source_url})\n\n`;
-    }
-
-    if (markdown_content) {
-      promises.push(data.writeItemMarkdown(item, markdown_content));
-    }
-
-    await Promise.all(promises);
-    await this.githubService.add(data.dir, '.');
-    await this.githubService.commit(
-      data.dir,
-      `add ${item.name}`,
-      user.asCommitter(),
-    );
-
-    this.logger.log(
-      `processItemV2: Committed item ${item.name} (slug: ${item.slug})`,
-    );
   }
 
   private async processItem(data: DataRepository, item: ItemData, user: User) {
