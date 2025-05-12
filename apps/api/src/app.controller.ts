@@ -5,6 +5,7 @@ import {
   HttpStatus,
   NotFoundException,
   Post,
+  UsePipes,
   ValidationPipe,
 } from '@nestjs/common';
 import { DataGeneratorService } from './data-generator/data-generator.service';
@@ -15,6 +16,7 @@ import { User } from './entities/user.entity';
 import { GithubService } from './git/github.service';
 import { CreateItemsGeneratorDto } from './items-generator/dto/create-items-generator.dto';
 import { ItemsGeneratorResponseDto } from './items-generator/dto/items-generator-response.dto';
+import { CreateDirectoryDto } from './dto/create-directory.dto';
 
 @Controller()
 export class AppController {
@@ -26,12 +28,9 @@ export class AppController {
   ) {}
 
   @Post('directories')
-  async createDirectory(
-    @Body('slug') slug: string,
-    @Body('name') name: string,
-    @Body('description') description: string,
-    @Body('owner') owner?: string,
-  ) {
+  @UsePipes(new ValidationPipe({ transform: true }))
+  async createDirectory(@Body() createDirectoryDto: CreateDirectoryDto) {
+    const { slug, name, description, owner } = createDirectoryDto;
     const user = await User.sessionMock();
     const dir = new Directory();
     dir.slug = slug;
