@@ -28,7 +28,7 @@ export class ConfigDto {
   @IsOptional()
   @IsInt()
   @Min(0)
-  min_content_length_for_extraction?: number = 500;
+  min_content_length_for_extraction?: number = 300;
 }
 
 export class CreateItemsGeneratorDto {

@@ -223,10 +223,6 @@ export class ItemsGeneratorService {
         );
 
       this.logger.log(
-        `[${slug}] Processed ${categories.length} categories and ${tags.length} tags based on validated items.`,
-      );
-
-      this.logger.log(
         `[${slug}] Directory Builder generation complete. Final metrics: ${JSON.stringify(metrics)}`,
       );
 
@@ -616,30 +612,22 @@ Generate the list of items according to the specified schema.
             // Polite crawling: wait a bit
             await new Promise((resolve) => setTimeout(resolve, 1000)); // 1-second delay
 
-            const response = await axios.get(source_url, {
-              headers: {
-                'User-Agent': `ItemsGeneratorBuilder/${slug} (Node.js/Axios; +https://github.com/ever-works)`,
-              },
-              timeout: 15000, // 15-second timeout
-              validateStatus: (status) => status >= 200 && status < 400, // Only consider 2xx and 3xx as success
+            const response = await this.tavilyClient.extract([source_url], {
+              maxResults: 1,
             });
 
-            if (
-              response.headers['content-type'] &&
-              !response.headers['content-type'].includes('text/html') &&
-              !response.headers['content-type'].includes('text/plain')
-            ) {
+            if (!response.results[0]) {
               this.logger.warn(
-                `[${slug}] Skipping non-HTML/text content at ${source_url} (Content-Type: ${response.headers['content-type']})`,
+                `[${slug}] Skipping document with missing or invalid source URL for query "${query}". Metadata: ${JSON.stringify(doc)}`,
               );
-              currentRunProcessedUrls.add(source_url); // Mark as processed to avoid re-fetching
               continue;
             }
 
-            const html_content = response.data;
+            const extractedResult = response.results[0];
+
             allFetchedPages.push({
               source_url,
-              html_content,
+              raw_content: extractedResult.rawContent,
               retrieved_at: new Date().toISOString(),
             });
             currentRunProcessedUrls.add(source_url);
@@ -678,8 +666,7 @@ Generate the list of items according to the specified schema.
     }
 
     for (const page of webPages) {
-      const textContent = extractTextFromHtml(page.html_content);
-      page.text_content = textContent; // Store extracted text for later use
+      const textContent = page.raw_content;
 
       if (textContent.length < config.min_content_length_for_extraction) {
         this.logger.log(
@@ -781,7 +768,7 @@ Provide a relevance score between 0.0 (not relevant) and 1.0 (highly relevant). 
         this.logger.warn(
           `[${slug}] Keeping page due to relevance assessment error (will rely on later extraction quality): ${page.source_url}`,
         );
-        relevantPages.push(page); // Keep page if assessment fails, to not lose potentially good data
+        relevantPages.push(page);
       }
     }
     return relevantPages;
@@ -812,8 +799,8 @@ Provide a relevance score between 0.0 (not relevant) and 1.0 (highly relevant). 
 
     for (const page of relevantPages) {
       if (
-        !page.text_content ||
-        page.text_content.length < config.min_content_length_for_extraction
+        !page.raw_content ||
+        page.raw_content.length < config.min_content_length_for_extraction
       ) {
         this.logger.log(
           `[${slug}] Skipping item extraction for page (insufficient content): ${page.source_url}`,
@@ -857,7 +844,7 @@ Only call the extraction function if you find at least one item meeting these st
         const extractionResult = (await extractionChain.invoke({
           topicName,
           topicDescription,
-          page_content_snippet: page.text_content,
+          page_content_snippet: page.raw_content,
         })) as { items?: Partial<ItemData>[] };
 
         if (
