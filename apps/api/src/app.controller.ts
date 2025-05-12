@@ -90,15 +90,18 @@ export class AppController {
     // The actual processing will happen in the background.
     // A more robust solution might involve job queues, webhooks, or websockets for status updates.
     (async () => {
-      await this.dataGenerator.initializeV2(
+      const generated = await this.dataGenerator.initializeV2(
         directory,
         user,
         createItemsGeneratorDto,
       );
-      await Promise.all([
-        this.markdownGenerator.initialize(directory, user),
-        this.websiteGenerator.initialize(directory, user),
-      ]);
+
+      if (generated) {
+        await Promise.all([
+          this.markdownGenerator.initialize(directory, user),
+          this.websiteGenerator.initialize(directory, user),
+        ]);
+      }
     })();
 
     return {

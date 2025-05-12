@@ -194,7 +194,7 @@ export class DataGeneratorService {
       await data.cleanup();
     }
 
-    return items;
+    return true;
   }
 
   async update(directory: Directory, user: User, prompt: string) {
