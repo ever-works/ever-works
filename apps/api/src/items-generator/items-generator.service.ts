@@ -189,32 +189,20 @@ export class ItemsGeneratorService {
         `[${slug}] Total discovered items (AI + Web before source validation): ${allDiscoveredItems.length}.`,
       );
 
-      // 6. Filter and Validate Source URLs for all discovered items
+      // 6. Deduplication and Data Aggregation
       this.logger.log(
-        `[${slug}] 6. Filter and Validate Source URLs - Starting`,
-      );
-      const validatedItems = await this.filterAndValidateSourceItems(
-        allDiscoveredItems,
-        slug,
-      );
-      this.logger.log(
-        `[${slug}] After source validation, ${validatedItems.length} items remain.`,
-      );
-
-      // 7. Deduplication and Data Aggregation
-      this.logger.log(
-        `[${slug}] 7. Deduplication and Data Aggregation - Starting`,
+        `[${slug}] 6. Deduplication and Data Aggregation - Starting`,
       );
       const { aggregatedItems, metrics } =
         await this.aggregateAndDeduplicateData(
           createItemsGeneratorDto,
           existingItems,
-          validatedItems,
+          allDiscoveredItems,
           webPages.length,
           relevantPages.length,
         );
 
-      // 8. Category and Tag Generation
+      // 7. Category and Tag Generation
       this.logger.log(`[${slug}] 7. Category and Tag Generation - Starting`);
       const { categories, tags, finalItems } =
         await this.processCategoriesAndTags(
@@ -226,11 +214,20 @@ export class ItemsGeneratorService {
         `[${slug}] Directory Builder generation complete. Final metrics: ${JSON.stringify(metrics)}`,
       );
 
+      // 8. Filter and Validate Source URLs for all discovered items
+      this.logger.log(
+        `[${slug}] 8. Filter and Validate Source URLs - Starting`,
+      );
+      const validatedItems = await this.filterAndValidateSourceItems(
+        finalItems,
+        slug,
+      );
+
       // This is where a more robust notification (webhook, websocket, email) would be triggered,
       // potentially including the 'metrics'
 
       return {
-        items: finalItems,
+        items: validatedItems,
         categories: categories,
         tags: tags,
       };

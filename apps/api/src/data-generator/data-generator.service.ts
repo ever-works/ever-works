@@ -284,7 +284,7 @@ export class DataGeneratorService {
       );
     }
 
-    promises.push(data.writeItemMarkdown(item, md));
+    promises.push(data.writeItemMarkdown(item, `${md}`));
 
     await Promise.all(promises);
     this.logger.debug(

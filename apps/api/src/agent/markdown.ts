@@ -56,5 +56,5 @@ export async function markdown(item: Partial<ItemData>): Promise<string> {
             content: content.rawContent,
         });
     
-    return result.markdown;
+    return result.markdown || '';
 }
