@@ -9,4 +9,5 @@ export interface ItemData {
   category: string | string[] | Category | Category[];
   slug?: string;
   tags: string[] | Tag[];
+  markdown?: string;
 }

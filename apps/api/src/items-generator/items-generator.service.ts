@@ -3,7 +3,6 @@ import {
   CreateItemsGeneratorDto,
   ConfigDto,
 } from './dto/create-items-generator.dto';
-import { ItemData, Category, Tag } from '../agent/types';
 import { AiItemGenerationService } from './steps/ai-item-generation.service';
 import { SearchQueryGenerationService } from './steps/search-query-generation.service';
 import { WebPageRetrievalService } from './steps/web-page-retrieval.service';
@@ -12,6 +11,8 @@ import { ItemExtractionService } from './steps/item-extraction.service';
 import { SourceValidationService } from './steps/source-validation.service';
 import { DataAggregationService } from './steps/data-aggregation.service';
 import { CategoryProcessingService } from './steps/category-processing.service';
+import { MarkdownGenerationService } from './steps/markdown-generation.service';
+import { Category, ItemData, Tag } from './dto';
 
 // Default configuration values
 const DEFAULT_CONFIG: Required<ConfigDto> = {
@@ -35,6 +36,7 @@ export class ItemsGeneratorService {
     private readonly sourceValidationService: SourceValidationService,
     private readonly dataAggregationService: DataAggregationService,
     private readonly categoryProcessingService: CategoryProcessingService,
+    private readonly markdownGenerationService: MarkdownGenerationService,
   ) {}
 
   /**
@@ -215,5 +217,64 @@ export class ItemsGeneratorService {
     }
 
     return null;
+  }
+
+  /**
+   * Generate markdown for a single item
+   * @param item The item to generate markdown for
+   * @returns The item with markdown content
+   */
+  async generateMarkdownForItem(item: ItemData): Promise<ItemData> {
+    this.logger.log(`Generating markdown for item: ${item.name}`);
+
+    try {
+      const markdown =
+        await this.markdownGenerationService.generateMarkdown(item);
+
+      return {
+        ...item,
+        markdown,
+      };
+    } catch (error) {
+      this.logger.error(
+        `Error generating markdown for item ${item.name}: ${error.message}`,
+        error.stack,
+      );
+
+      return {
+        ...item,
+        markdown: '',
+      };
+    }
+  }
+
+  /**
+   * Generate markdown for multiple items
+   * @param items The items to generate markdown for
+   * @returns The items with markdown content
+   */
+  async generateMarkdownForItems(items: ItemData[]): Promise<ItemData[]> {
+    if (!items || items.length === 0) {
+      return [];
+    }
+
+    this.logger.log(`Generating markdown for ${items.length} items`);
+
+    try {
+      return await this.markdownGenerationService.generateMarkdownForItems(
+        items,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Error generating markdown for items: ${error.message}`,
+        error.stack,
+      );
+
+      // Return the original items without markdown
+      return items.map((item) => ({
+        ...item,
+        markdown: '',
+      }));
+    }
   }
 }

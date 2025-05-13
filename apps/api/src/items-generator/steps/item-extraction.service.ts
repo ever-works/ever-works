@@ -6,9 +6,9 @@ import { zodToJsonSchema } from 'zod-to-json-schema';
 import { extractedItemsSchema, itemDataSchema } from '../../agent/schemas';
 import { ConfigDto } from '../dto/create-items-generator.dto';
 import { WebPageData } from '../interfaces/items-generator.interfaces';
-import { ItemData } from '../../agent/types';
 import { slugifyText } from '../utils/text.utils';
 import { AiService } from '../shared';
+import { ItemData } from '../dto';
 
 @Injectable()
 export class ItemExtractionService {

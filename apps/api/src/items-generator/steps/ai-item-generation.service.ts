@@ -3,14 +3,14 @@ import { ChatOpenAI } from '@langchain/openai';
 import { PromptTemplate } from '@langchain/core/prompts';
 import { JsonOutputFunctionsParser } from 'langchain/output_parsers';
 import { zodToJsonSchema } from 'zod-to-json-schema';
-import {
-  itemDataSchema,
-  extractedItemsSchema,
-  promptUnderstandingAssessmentSchema,
-} from '../../agent/schemas';
-import { ItemData } from '../../agent/types';
 import { slugifyText } from '../utils/text.utils';
 import { AiService } from '../shared';
+import { ItemData } from '../dto';
+import {
+  extractedItemsSchema,
+  itemDataSchema,
+  promptUnderstandingAssessmentSchema,
+} from '../schemas/item-extraction.schemas';
 
 @Injectable()
 export class AiItemGenerationService {

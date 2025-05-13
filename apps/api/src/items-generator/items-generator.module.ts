@@ -8,6 +8,7 @@ import { ItemExtractionService } from './steps/item-extraction.service';
 import { SourceValidationService } from './steps/source-validation.service';
 import { DataAggregationService } from './steps/data-aggregation.service';
 import { CategoryProcessingService } from './steps/category-processing.service';
+import { MarkdownGenerationService } from './steps/markdown-generation.service';
 import { AiService, SearchService } from './shared';
 
 @Module({
@@ -28,6 +29,7 @@ import { AiService, SearchService } from './shared';
     SourceValidationService,
     DataAggregationService,
     CategoryProcessingService,
+    MarkdownGenerationService,
   ],
   exports: [ItemsGeneratorService],
 })
