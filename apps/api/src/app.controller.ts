@@ -17,7 +17,6 @@ import { GithubService } from './git/github.service';
 import { CreateItemsGeneratorDto } from './items-generator/dto/create-items-generator.dto';
 import { ItemsGeneratorResponseDto } from './items-generator/dto/items-generator-response.dto';
 import { CreateDirectoryDto } from './dto/create-directory.dto';
-import { GenerateDataDto } from './dto/generate-data.dto';
 
 @Controller()
 export class AppController {
@@ -50,27 +49,7 @@ export class AppController {
   }
 
   @Post('generate')
-  @UsePipes(new ValidationPipe({ transform: true }))
-  async generateData(@Body() generateDataDto: GenerateDataDto) {
-    const { slug, prompt } = generateDataDto;
-
-    const user = await User.sessionMock();
-    const directory = await Directory.findMock(slug);
-    if (!directory) {
-      throw new NotFoundException('Directory not found');
-    }
-
-    await this.dataGenerator.initialize(directory, user, prompt);
-    await Promise.all([
-      this.markdownGenerator.initialize(directory, user),
-      this.websiteGenerator.initialize(directory, user),
-    ]);
-
-    return directory;
-  }
-
-  @Post('generate-v2')
-  @HttpCode(HttpStatus.ACCEPTED) // Suggesting ACCEPTED as this might be a long-running task
+  @HttpCode(HttpStatus.ACCEPTED)
   async generateItemsGenerator(
     @Body(
       new ValidationPipe({
@@ -94,7 +73,7 @@ export class AppController {
       const startTime = new Date();
       console.log(`Generation started at: ${startTime.toISOString()}`);
 
-      const generated = await this.dataGenerator.initializeV2(
+      const generated = await this.dataGenerator.initialize(
         directory,
         user,
         createItemsGeneratorDto,

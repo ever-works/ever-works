@@ -119,7 +119,7 @@ export class MarkdownGenerationService {
       processedItems.push(...batchResults);
 
       if (i + BATCH_SIZE < items.length) {
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+        await new Promise((resolve) => setTimeout(resolve, 500));
       }
     }
 

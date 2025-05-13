@@ -1,6 +1,11 @@
 import { Category } from './category.dto';
 import { Tag } from './tag.dto';
 
+export interface Identifiable {
+  id: string;
+  name: string;
+}
+
 export interface ItemData {
   name: string;
   description: string;
