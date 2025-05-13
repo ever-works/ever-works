@@ -43,7 +43,7 @@ export class CategoryProcessingService {
   private llm: ChatOpenAI;
 
   constructor(private readonly aiService: AiService) {
-    this.llm = this.aiService.createLlmWithTemperature(0.3); // Use temperature 0.3 for some creativity in categorization
+    this.llm = this.aiService.createLlmWithTemperature(0.3);
   }
 
   /**
@@ -184,21 +184,83 @@ export class CategoryProcessingService {
     const BATCH_SIZE = 30;
     const allCategorizedItems: ItemData[] = [];
 
+    // Track categories and tags across batches for consistency
+    const existingCategories: Set<string> = new Set();
+    const existingTags: Set<string> = new Set();
+
+    // Enhanced prompt with existing categories and tags
+    const enhancedPromptTemplate = `
+${CATEGORIZE_PROMPT}
+
+<existing_categories>
+{existing_categories}
+</existing_categories>
+
+<existing_tags>
+{existing_tags}
+</existing_tags>
+
+<additional_instructions>
+- For consistency, consider using the existing categories and tags listed above when appropriate.
+- You can create new categories or tags if the existing ones don't fit well.
+- Prioritize consistency across items that serve similar purposes.
+</additional_instructions>
+`.trim();
+
     // Process items in batches
     for (let i = 0; i < items.length; i += BATCH_SIZE) {
       const batch = items.slice(i, i + BATCH_SIZE);
+      const batchNumber = Math.floor(i / BATCH_SIZE) + 1;
+      const totalBatches = Math.ceil(items.length / BATCH_SIZE);
+
+      this.logger.log(
+        `Processing batch ${batchNumber} of ${totalBatches} (${batch.length} items)`,
+      );
 
       try {
-        const prompt =
-          HumanMessagePromptTemplate.fromTemplate(CATEGORIZE_PROMPT);
+        // Format existing categories and tags for the prompt
+        const categoriesText = Array.from(existingCategories).join(', ');
+        const tagsText = Array.from(existingTags).join(', ');
+
+        // Use the enhanced prompt if we have existing categories/tags, otherwise use the basic prompt
+        const promptTemplate =
+          existingCategories.size > 0 || existingTags.size > 0
+            ? enhancedPromptTemplate
+            : CATEGORIZE_PROMPT;
+
+        const prompt = HumanMessagePromptTemplate.fromTemplate(promptTemplate);
         const result = await prompt
           .pipe(this.llm.withStructuredOutput(categorizeOutputSchema))
           .invoke({
             task: description,
             items: JSON.stringify(batch),
+            existing_categories: categoriesText,
+            existing_tags: tagsText,
           });
 
-        allCategorizedItems.push(...(result.items as ItemData[]));
+        const batchResults = result.items as ItemData[];
+
+        // Extract and store categories and tags from this batch for future batches
+        batchResults.forEach((item) => {
+          if (item.category && typeof item.category === 'string') {
+            existingCategories.add(item.category);
+          }
+
+          if (Array.isArray(item.tags)) {
+            item.tags.forEach((tag: any) => {
+              if (typeof tag === 'string') {
+                existingTags.add(tag);
+              }
+            });
+          }
+        });
+
+        this.logger.log(
+          `Batch ${batchNumber} complete. Found ${batchResults.length} categorized items. ` +
+            `Running totals: ${existingCategories.size} categories, ${existingTags.size} tags.`,
+        );
+
+        allCategorizedItems.push(...batchResults);
 
         // Add a small delay between batches to avoid rate limiting
         if (i + BATCH_SIZE < items.length) {
@@ -210,10 +272,15 @@ export class CategoryProcessingService {
           error.stack,
         );
 
-        // Fallback for this batch
+        // Fallback for this batch - use existing categories if available
+        const fallbackCategory =
+          existingCategories.size > 0
+            ? Array.from(existingCategories)[0]
+            : 'others';
+
         const fallbackItems = batch.map((item) => ({
           ...item,
-          category: 'others',
+          category: fallbackCategory,
           tags: [],
           slug: item.slug || slugifyText(item.name),
         })) as ItemData[];
@@ -222,7 +289,72 @@ export class CategoryProcessingService {
       }
     }
 
-    return allCategorizedItems;
+    // Final consistency pass to normalize categories and tags
+    return this.normalizeCategorizationResults(allCategorizedItems);
+  }
+
+  /**
+   * Normalize categorization results for consistency
+   * @param items Categorized items
+   * @returns Normalized items
+   */
+  private normalizeCategorizationResults(items: ItemData[]): ItemData[] {
+    // Count category and tag frequencies
+    const categoryFrequency: Map<string, number> = new Map();
+    const tagFrequency: Map<string, number> = new Map();
+
+    // Build frequency maps
+    items.forEach((item) => {
+      // Count categories
+      const category = typeof item.category === 'string' ? item.category : '';
+      if (category) {
+        categoryFrequency.set(
+          category,
+          (categoryFrequency.get(category) || 0) + 1,
+        );
+      }
+
+      // Count tags
+      if (Array.isArray(item.tags)) {
+        item.tags.forEach((tag: any) => {
+          const tagName = typeof tag === 'string' ? tag : '';
+          if (tagName) {
+            tagFrequency.set(tagName, (tagFrequency.get(tagName) || 0) + 1);
+          }
+        });
+      }
+    });
+
+    // Filter out rare categories (likely errors or inconsistencies)
+    const validCategories = new Set(
+      Array.from(categoryFrequency.entries())
+        .filter(([_, count]) => count >= 2) // Keep categories with at least 2 occurrences
+        .map(([category, _]) => category),
+    );
+
+    // If we filtered out all categories, keep at least one
+    if (validCategories.size === 0 && categoryFrequency.size > 0) {
+      // Find the most frequent category
+      const mostFrequentCategory = Array.from(categoryFrequency.entries()).sort(
+        (a, b) => b[1] - a[1],
+      )[0][0];
+      validCategories.add(mostFrequentCategory);
+    }
+
+    // Default category if needed
+    const defaultCategory =
+      validCategories.size > 0 ? Array.from(validCategories)[0] : 'others';
+
+    // Normalize items
+    return items.map((item) => {
+      const category = typeof item.category === 'string' ? item.category : '';
+
+      return {
+        ...item,
+        // Use the category if it's valid, otherwise use the default
+        category: validCategories.has(category) ? category : defaultCategory,
+      };
+    });
   }
 
   /**
