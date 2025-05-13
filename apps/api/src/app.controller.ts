@@ -100,14 +100,23 @@ export class AppController {
   }
 
   @Post('sync')
-  async updateData(@Body('slug') slug: string, @Body('prompt') prompt: string) {
+  async updateData(
+    @Body(
+      new ValidationPipe({
+        transform: true,
+        whitelist: true,
+        forbidNonWhitelisted: true,
+      }),
+    )
+    createItemsGeneratorDto: CreateItemsGeneratorDto,
+  ) {
     const user = await User.sessionMock();
-    const directory = await Directory.findMock(slug);
+    const directory = await Directory.findMock(createItemsGeneratorDto.slug);
     if (!directory) {
       throw new NotFoundException('Directory not found');
     }
 
-    await this.dataGenerator.update(directory, user, prompt);
+    await this.dataGenerator.update(directory, user, createItemsGeneratorDto);
     await this.markdownGenerator.update(directory, user);
 
     return directory;
