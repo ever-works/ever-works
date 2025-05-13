@@ -112,7 +112,9 @@ export class DataGeneratorService {
 
       this.logger.log(`Pushing changes to ${directory.owner}/${repo}`);
       await this.githubService.push(dest, token);
-      this.logger.log('Successfully initialized and pushed data repository.');
+      this.logger.log(
+        `Successfully initialized and pushed data repository - initialized with ${items.length} items.`,
+      );
     } catch (err) {
       this.logger.error('Failed to initialize data repository', err);
       throw err;
