@@ -221,18 +221,11 @@ export class SourceValidationService {
         );
 
         if (firstValidUrl) {
-          this.logger.log(
-            `[${slug}] Found and validated Tavily URL for "${itemName}": ${firstValidUrl}`,
-          );
           return firstValidUrl;
         }
 
         this.logger.warn(
           `[${slug}] Tavily found ${urlsToValidate.length} URLs for "${itemName}", but none passed validation.`,
-        );
-      } else {
-        this.logger.warn(
-          `[${slug}] Tavily search found no results for "${itemName}" with query "${searchQuery}".`,
         );
       }
     } catch (tavilyError) {
@@ -246,7 +239,7 @@ export class SourceValidationService {
       `[${slug}] Could not find or validate a source URL for "${itemName}" after all attempts.`,
     );
 
-    return undefined; // No valid URL found
+    return undefined;
   }
 
   private async webSearch(query: string, config?: Partial<ConfigDto>) {
