@@ -103,14 +103,14 @@ export class ItemExtractionService {
         const itemExtractionFunction = {
           name: 'extract_awesome_list_items',
           description:
-            'Extracts one or more distinct items (tools, resources, libraries, articles, etc.) from the provided web page content that are relevant to the directory builder topic, including generating relevant Markdown content.',
+            'Extracts one or more distinct items (tools, resources, libraries, articles, etc.) from the provided web page content that are relevant to the directory website topic, including generating relevant Markdown content.',
           parameters: zodToJsonSchema(extractedItemsSchema),
         };
 
         // Stricter prompt for item extraction
         const prompt = PromptTemplate.fromTemplate(
-          `You are an expert data extractor and technical writer for "Directory Builder" directories.
-The **main topic** of the Directory Builder is: "{topicName}" (Description: "{topicDescription}").
+          `You are an expert data extractor and technical writer for "Directory website" directories.
+The **main topic** of the Directory website is: "{topicName}" (Description: "{topicDescription}").
 From the following web page content, identify and extract information for one or more distinct items (tools, resources, libraries, articles, etc.) that are **directly and highly relevant to this main topic**. Do NOT extract items that are only tangentially related or represent a different category unless it's explicitly part of "{topicName}".
 
 Web Page Content:

@@ -43,12 +43,12 @@ export class AiItemGenerationService {
     const understandingAssessmentFunction = {
       name: 'assess_prompt_understanding_for_item_generation',
       description:
-        'Assesses if the provided topic, description, and keywords are clear and specific enough to generate a meaningful list of items for an Directory Builder.',
+        'Assesses if the provided topic, description, and keywords are clear and specific enough to generate a meaningful list of items for a Directory website.',
       parameters: zodToJsonSchema(promptUnderstandingAssessmentSchema),
     };
 
     const understandingPrompt = PromptTemplate.fromTemplate(
-      `You are an AI assistant helping to curate an "Directory Builder".
+      `You are an AI assistant helping to curate a "Directory website".
 Topic: "{topicName}"
 Description: "{topicDescription}"
 Keywords: "{target_keywords_string}"
@@ -121,13 +121,13 @@ Consider:
     const itemGenerationFunction = {
       name: 'generate_awesome_list_items_directly',
       description:
-        'Generates a list of distinct items (tools, resources, libraries, articles, etc.) that are highly relevant to the directory builder topic, including their details.',
+        'Generates a list of distinct items (tools, resources, libraries, articles, etc.) that are highly relevant to the directory website topic, including their details.',
       parameters: zodToJsonSchema(extractedItemsSchema),
     };
 
     const generationPrompt = PromptTemplate.fromTemplate(
-      `You are an expert curator and technical writer tasked with generating an initial list of items for an "Directory Builder" about a specific topic.
-The **main topic** of the Directory Builder is: "{topicName}"
+      `You are an expert curator and technical writer tasked with generating an initial list of items for a "Directory website" about a specific topic.
+The **main topic** of the Directory website is: "{topicName}"
 Description: "{topicDescription}"
 Optional initial keywords: {target_keywords_string}
 

@@ -242,7 +242,7 @@ export class ItemsGeneratorService {
         );
 
       this.logger.log(
-        `[${slug}] Directory Builder generation complete. Final metrics: ${JSON.stringify(metrics)}`,
+        `[${slug}] Directory data generation complete. Final metrics: ${JSON.stringify(metrics)}`,
       );
 
       // 8. Filter and Validate Source URLs for all discovered items
@@ -265,7 +265,7 @@ export class ItemsGeneratorService {
       };
     } catch (error: any) {
       this.logger.error(
-        `Error generating directory builder for slug ${slug}: ${error.message}`,
+        `Error generating directory data for slug ${slug}: ${error.message}`,
         error.stack,
       );
       // Update a status file or send a notification about the error

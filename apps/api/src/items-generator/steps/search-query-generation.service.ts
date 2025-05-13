@@ -46,7 +46,7 @@ export class SearchQueryGenerationService {
     }
 
     const promptTemplate = PromptTemplate.fromTemplate(
-      `You are an expert at generating highly relevant and diverse search engine queries to build an "Directory Builder" about a specific topic.
+      `You are an expert at generating highly relevant and diverse search engine queries to build a "Directory website" about a specific topic.
 The topic is: "{name}"
 Description: "{description}"
 Optional initial keywords: {target_keywords_string}
