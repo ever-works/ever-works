@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ChatOpenAI } from '@langchain/openai';
 import { PromptTemplate } from '@langchain/core/prompts';
 import { StringOutputParser } from '@langchain/core/output_parsers';
+import { formatDate } from 'date-fns';
 import { ConfigDto } from '../dto/create-items-generator.dto';
 import { AiService } from '../shared';
 
@@ -50,6 +51,7 @@ export class SearchQueryGenerationService {
 The topic is: "{name}"
 Description: "{description}"
 Optional initial keywords: {target_keywords_string}
+Today is {day} the {datetime}
 
 Generate {num_queries} distinct search queries. Each query should be on a new line.
 The queries should aim to discover:
@@ -67,6 +69,7 @@ Generated Queries:
 `,
     );
 
+    const now = new Date();
     const queryGenerationChain = promptTemplate
       .pipe(this.llm)
       .pipe(new StringOutputParser());
@@ -78,7 +81,9 @@ Generated Queries:
         target_keywords_string: targetKeywords
           ? targetKeywords.join(', ')
           : 'N/A',
-        num_queries: config.max_search_queries * 2, // Generate more to allow for filtering
+        num_queries: config.max_search_queries * 2,
+        day: formatDate(now, 'cccc'),
+        datetime: formatDate(now, 'yyyy-MM-dd HH:mm'),
       });
 
       const queries = result
