@@ -1,4 +1,4 @@
-import slugify from "slugify";
+import { slugifyText } from "src/items-generator/utils/text.utils";
 import { ItemData } from "../agent/types";
 
 export class ReadmeBuilder {
@@ -43,7 +43,7 @@ export class ReadmeBuilder {
         if (this.isTocEnabled) {
             toc += '## Table of Contents\n\n';
             this.toc.forEach((header) => {
-                const slug = slugify(header, { lower: true, trim: true });
+                const slug = slugifyText(header);
                 toc += `- [${header}](#${slug})\n`;
             });
             toc += '\n';

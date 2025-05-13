@@ -1,11 +1,11 @@
 import { HumanMessagePromptTemplate } from "@langchain/core/prompts";
 import { ChatOpenAI } from "@langchain/openai";
 import { Logger } from "@nestjs/common";
-import slugify from "slugify";
 import { z } from "zod";
 import { ItemData } from "./types";
 import { categorizeOutputSchema } from "./categorize";
 import { itemDataSchema } from "./schemas";
+import { slugifyText } from "src/items-generator/utils/text.utils";
 
 const DEDUPLICATOR_PROMPT = `
 You are directory website builder and your task is to deduplicate items.
@@ -82,7 +82,7 @@ export async function deduplicate(task: string, items: object[]) {
         });
     
     Logger.log(`Got ${result.items.length} after deduplication with LLM`, 'Agent');
-    return result.items.map(item => ({ slug: slugify(item.name, { lower: true, trim: true }), ...item }));
+    return result.items.map(item => ({ slug: slugifyText(item.name,), ...item }));
 }
 
 export async function extractNewItems(existingItems: Partial<ItemData>[], newItems: Partial<ItemData>[]) {
@@ -101,5 +101,5 @@ export async function extractNewItems(existingItems: Partial<ItemData>[], newIte
         });
 
     Logger.log(`Got ${result.items.length} after extracting new items with LLM`, 'Agent');
-    return result.items.map(item => ({ slug: slugify(item.name, { lower: true, trim: true }), ...item }));
+    return result.items.map(item => ({ slug: slugifyText(item.name,), ...item }));
 }

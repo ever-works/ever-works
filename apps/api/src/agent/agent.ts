@@ -7,8 +7,8 @@ import { generateItemsSubarray } from "./generator";
 import { arrayDiff, deduplicateByField } from "./utils";
 import { deduplicate, extractNewItems } from "./deduplicator";
 import { categorize } from "./categorize";
-import slugify from "slugify";
 import { detectType } from "./detect";
+import { slugifyText } from "src/items-generator/utils/text.utils";
 
 export interface GenerateOptions {
     maxQueries?: number;
@@ -73,7 +73,7 @@ export class Agent {
 
     private mapUnique(names: string[]): Array<Identifiable> {
         const unique = new Set(names);
-        return Array.from(unique).map(name => ({ id: slugify(name, { lower: true, trim: true }), name }));
+        return Array.from(unique).map(name => ({ id: slugifyText(name), name }));
     }
 
     private toItemData(item: Partial<ItemData>): ItemData {
@@ -81,9 +81,9 @@ export class Agent {
             name: item.name,
             description: item.description,
             source_url: item.source_url,
-            category: slugify(item.category as string, { lower: true, trim: true }),
-            tags: item.tags.map(tag => slugify(tag, { lower: true, trim: true })),
-            slug: slugify(item.name, { lower: true, trim: true }),
+            category: slugifyText(item.category as string),
+            tags: item.tags.map(tag => slugifyText(tag)),
+            slug: slugifyText(item.name),
         };
     }
 

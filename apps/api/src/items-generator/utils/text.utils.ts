@@ -1,6 +1,6 @@
 import * as cheerio from 'cheerio';
 import { Logger } from '@nestjs/common';
-import slugify from 'slugify';
+// import slugify from 'slugify';
 import axios from 'axios';
 
 const logger = new Logger('TextUtils');
@@ -48,5 +48,14 @@ export function extractTextFromHtml(htmlContent: string): string {
 }
 
 export function slugifyText(text: string): string {
-  return slugify(text, { lower: true, trim: true });
+  // return slugify(text, { lower: true, trim: true });
+
+  return text
+    .toString()
+    .normalize('NFKD') // Normalize accented characters
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/[^\w-]+/g, '')
+    .replace(/--+/g, '-');
 }
