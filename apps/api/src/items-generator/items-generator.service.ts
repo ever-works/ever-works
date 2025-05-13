@@ -3,32 +3,17 @@ import {
   CreateItemsGeneratorDto,
   ConfigDto,
 } from './dto/create-items-generator.dto';
-import { ItemsGeneratorMetrics } from './dto/items-generator-response.dto';
-import { ChatOpenAI } from '@langchain/openai';
-import { PromptTemplate } from '@langchain/core/prompts';
-import { StringOutputParser } from '@langchain/core/output_parsers';
-import axios from 'axios';
-import { JsonOutputFunctionsParser } from 'langchain/output_parsers';
-import { zodToJsonSchema } from 'zod-to-json-schema';
-import {
-  itemDataSchema,
-  extractedItemsSchema,
-  promptUnderstandingAssessmentSchema,
-} from '../agent/schemas';
-import {
-  WebPageData,
-  RelevanceAssessment,
-} from './interfaces/items-generator.interfaces';
-import { slugifyText } from './utils/text.utils';
-import { tavily, TavilyClient } from '@tavily/core';
-import { deduplicateByField } from 'src/agent/utils';
-import { deduplicate, extractNewItems } from 'src/agent/deduplicator';
-import { Category, ItemData, Tag } from 'src/agent/types';
-import { categorize } from 'src/agent/categorize';
+import { ItemData, Category, Tag } from '../agent/types';
+import { AiItemGenerationService } from './steps/ai-item-generation.service';
+import { SearchQueryGenerationService } from './steps/search-query-generation.service';
+import { WebPageRetrievalService } from './steps/web-page-retrieval.service';
+import { ContentFilteringService } from './steps/content-filtering.service';
+import { ItemExtractionService } from './steps/item-extraction.service';
+import { SourceValidationService } from './steps/source-validation.service';
+import { DataAggregationService } from './steps/data-aggregation.service';
+import { CategoryProcessingService } from './steps/category-processing.service';
 
-// Default number of items to ask the AI to generate in the initial phase
-const DEFAULT_AI_ITEMS_TO_GENERATE = 20;
-
+// Default configuration values
 const DEFAULT_CONFIG: Required<ConfigDto> = {
   max_search_queries: 10,
   max_results_per_query: 20,
@@ -40,31 +25,17 @@ const DEFAULT_CONFIG: Required<ConfigDto> = {
 @Injectable()
 export class ItemsGeneratorService {
   private readonly logger = new Logger(ItemsGeneratorService.name);
-  private llm: ChatOpenAI;
-  private tavilyClient: TavilyClient | undefined;
 
-  constructor() {
-    if (!process.env.OPENAI_API_KEY) {
-      this.logger.warn(
-        'OPENAI_API_KEY not found in .env file. AI features will be limited.',
-      );
-    }
-    this.llm = new ChatOpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-      modelName: process.env.OPENAI_MODEL || 'gpt-4.1',
-      temperature: 0.7,
-    });
-
-    if (!process.env.TAVILY_API_KEY) {
-      this.logger.warn(
-        'TAVILY_API_KEY not found in .env file. Web search capabilities will be disabled.',
-      );
-    } else {
-      this.tavilyClient = tavily({
-        apiKey: process.env.TAVILY_API_KEY,
-      });
-    }
-  }
+  constructor(
+    private readonly aiItemGenerationService: AiItemGenerationService,
+    private readonly searchQueryGenerationService: SearchQueryGenerationService,
+    private readonly webPageRetrievalService: WebPageRetrievalService,
+    private readonly contentFilteringService: ContentFilteringService,
+    private readonly itemExtractionService: ItemExtractionService,
+    private readonly sourceValidationService: SourceValidationService,
+    private readonly dataAggregationService: DataAggregationService,
+    private readonly categoryProcessingService: CategoryProcessingService,
+  ) {}
 
   /**
    * Entry point for generating items.
@@ -116,13 +87,13 @@ export class ItemsGeneratorService {
 
       // 1.5. AI-First Item Generation
       this.logger.log(`[${slug}] 1.5. AI-First Item Generation - Invoking`);
-      const initialAiItems: ItemData[] = await this.generateInitialItemsWithAI(
-        slug,
-        name,
-        description,
-        target_keywords,
-        config,
-      );
+      const initialAiItems: ItemData[] =
+        await this.aiItemGenerationService.generateInitialItemsWithAI(
+          slug,
+          name,
+          description,
+          target_keywords,
+        );
       this.logger.log(
         `[${slug}] AI generated ${initialAiItems.length} initial items.`,
       );
@@ -131,22 +102,23 @@ export class ItemsGeneratorService {
       this.logger.log(
         `[${slug}] 2. AI-Powered Search Query Generation - Starting`,
       );
-      const searchQueries = await this.generateSearchQueries(
-        name,
-        description,
-        target_keywords,
-        config,
-      );
+      const searchQueries =
+        await this.searchQueryGenerationService.generateSearchQueries(
+          name,
+          description,
+          target_keywords,
+          config,
+        );
       this.logger.log(
         `[${slug}] Generated ${searchQueries.length} search queries.`,
       );
 
       // 3. Web Search & Content Retrieval
       this.logger.log(`[${slug}] 3. Web Search & Content Retrieval - Starting`);
-      const webPages = await this.retrieveWebPages(
+      const webPages = await this.webPageRetrievalService.retrieveWebPages(
         slug,
         searchQueries,
-        processedSourceUrls, // TODO: Consider if AI-generated URLs should be added here
+        processedSourceUrls,
         config,
       );
       this.logger.log(
@@ -157,13 +129,14 @@ export class ItemsGeneratorService {
       this.logger.log(
         `[${slug}] 4. Content Pre-filtering & Relevance Assessment - Starting`,
       );
-      const relevantPages = await this.filterAndAssessPages(
-        slug,
-        webPages,
-        name,
-        description,
-        config,
-      );
+      const relevantPages =
+        await this.contentFilteringService.filterAndAssessPages(
+          slug,
+          webPages,
+          name,
+          description,
+          config,
+        );
       this.logger.log(
         `[${slug}] Filtered down to ${relevantPages.length} relevant pages.`,
       );
@@ -172,13 +145,14 @@ export class ItemsGeneratorService {
       this.logger.log(
         `[${slug}] 5. AI-Driven Structured Data Extraction for Items from Web - Starting`,
       );
-      const extractedWebItems: ItemData[] = await this.extractItemsFromPages(
-        slug,
-        relevantPages,
-        name,
-        description,
-        config,
-      );
+      const extractedWebItems: ItemData[] =
+        await this.itemExtractionService.extractItemsFromPages(
+          slug,
+          relevantPages,
+          name,
+          description,
+          config,
+        );
       this.logger.log(
         `[${slug}] Extracted ${extractedWebItems.length} potential items from web pages.`,
       );
@@ -194,7 +168,7 @@ export class ItemsGeneratorService {
         `[${slug}] 6. Deduplication and Data Aggregation - Starting`,
       );
       const { aggregatedItems, metrics } =
-        await this.aggregateAndDeduplicateData(
+        await this.dataAggregationService.aggregateAndDeduplicateData(
           createItemsGeneratorDto,
           existingItems,
           allDiscoveredItems,
@@ -205,7 +179,7 @@ export class ItemsGeneratorService {
       // 7. Category and Tag Generation
       this.logger.log(`[${slug}] 7. Category and Tag Generation - Starting`);
       const { categories, tags, finalItems } =
-        await this.processCategoriesAndTags(
+        await this.categoryProcessingService.processCategoriesAndTags(
           createItemsGeneratorDto,
           aggregatedItems,
         );
@@ -218,10 +192,11 @@ export class ItemsGeneratorService {
       this.logger.log(
         `[${slug}] 8. Filter and Validate Source URLs - Starting`,
       );
-      const validatedItems = await this.filterAndValidateSourceItems(
-        finalItems,
-        slug,
-      );
+      const validatedItems =
+        await this.sourceValidationService.filterAndValidateSourceItems(
+          finalItems,
+          slug,
+        );
 
       // This is where a more robust notification (webhook, websocket, email) would be triggered,
       // potentially including the 'metrics'
@@ -231,7 +206,7 @@ export class ItemsGeneratorService {
         categories: categories,
         tags: tags,
       };
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(
         `Error generating directory builder for slug ${slug}: ${error.message}`,
         error.stack,
@@ -240,935 +215,5 @@ export class ItemsGeneratorService {
     }
 
     return null;
-  }
-
-  private async generateSearchQueries(
-    name: string,
-    description: string,
-    targetKeywords: string[] | undefined,
-    config: Required<ConfigDto>,
-  ): Promise<string[]> {
-    this.logger.log(`[${name}] Generating search queries using LLM...`);
-
-    if (!this.llm.apiKey) {
-      this.logger.warn(
-        `[${name}] OpenAI API Key not configured. Falling back to basic query generation.`,
-      );
-      const fallbackQueries = [
-        `best tools for ${name}`,
-        `${name} resources`,
-        `${name} libraries`,
-        `${name} tutorials`,
-        `official documentation ${name}`,
-        `community ${name}`,
-      ];
-      if (targetKeywords && targetKeywords.length > 0) {
-        return [
-          ...new Set([
-            ...targetKeywords.map((kw) => `${kw} ${name}`),
-            ...fallbackQueries,
-          ]),
-        ].slice(0, config.max_search_queries);
-      }
-      return [...new Set(fallbackQueries)].slice(0, config.max_search_queries);
-    }
-
-    const promptTemplate = PromptTemplate.fromTemplate(
-      `You are an expert at generating highly relevant and diverse search engine queries to build an "Directory Builder" about a specific topic.
-The topic is: "{name}"
-Description: "{description}"
-Optional initial keywords: {target_keywords_string}
-
-Generate {num_queries} distinct search queries. Each query should be on a new line.
-The queries should aim to discover:
-- Key tools and software
-- Essential libraries and frameworks
-- Seminal articles and blog posts
-- Official documentation and guides
-- Important community resources, forums, or discussions
-- Common use cases and best practices
-- Comparisons and alternatives
-
-Consider variations, long-tail keywords, and queries targeting different facets of the topic.
-Avoid overly broad or generic queries. Be specific.
-
-Generated Queries:
-`,
-    );
-
-    const queryGenerationChain = promptTemplate
-      .pipe(this.llm)
-      .pipe(new StringOutputParser());
-
-    try {
-      const result = await queryGenerationChain.invoke({
-        name,
-        description,
-        target_keywords_string: targetKeywords
-          ? targetKeywords.join(', ')
-          : 'N/A',
-        num_queries: config.max_search_queries * 2, // Generate more to allow for filtering
-      });
-
-      const queries = result
-        .split('\n')
-        .map((q) => q.trim().replace(/^- /, ''))
-        .filter((q) => q.length > 3) // Filter out very short or empty lines
-        .filter((q, index, self) => self.indexOf(q) === index); // Ensure uniqueness
-
-      this.logger.log(
-        `[${name}] LLM generated ${queries.length} unique queries.`,
-      );
-      return queries.slice(0, config.max_search_queries);
-    } catch (error) {
-      this.logger.error(
-        `[${name}] Error generating search queries with LLM: ${error.message}`,
-        error.stack,
-      );
-      this.logger.warn(
-        `[${name}] Falling back to basic query generation due to LLM error.`,
-      );
-      // Fallback to simpler generation if LLM fails
-      const fallbackQueries = [
-        `best tools for ${name}`,
-        `${name} resources`,
-        `${name} libraries`,
-        `${name} tutorials`,
-        `official documentation ${name}`,
-        `community ${name}`,
-      ];
-      if (targetKeywords && targetKeywords.length > 0) {
-        return [
-          ...new Set([
-            ...targetKeywords.map((kw) => `${kw} ${name}`),
-            ...fallbackQueries,
-          ]),
-        ].slice(0, config.max_search_queries);
-      }
-      return [...new Set(fallbackQueries)].slice(0, config.max_search_queries);
-    }
-  }
-
-  private async generateInitialItemsWithAI(
-    slug: string,
-    topicName: string,
-    topicDescription: string,
-    targetKeywords: string[] | undefined,
-    config: Required<ConfigDto>,
-  ): Promise<ItemData[]> {
-    this.logger.log(
-      `[${slug}] AI-First Item Generation - Starting for topic: ${topicName}`,
-    );
-    const allGeneratedItems: ItemData[] = [];
-
-    if (!this.llm.apiKey) {
-      this.logger.warn(
-        `[${slug}] OpenAI API Key not configured. Skipping AI-first item generation.`,
-      );
-      return [];
-    }
-
-    // 1. Assess Prompt Understanding
-    const understandingAssessmentFunction = {
-      name: 'assess_prompt_understanding_for_item_generation',
-      description:
-        'Assesses if the provided topic, description, and keywords are clear and specific enough to generate a meaningful list of items for an Directory Builder.',
-      parameters: zodToJsonSchema(promptUnderstandingAssessmentSchema),
-    };
-
-    const understandingPrompt = PromptTemplate.fromTemplate(
-      `You are an AI assistant helping to curate an "Directory Builder".
-Topic: "{topicName}"
-Description: "{topicDescription}"
-Keywords: "{target_keywords_string}"
-
-Before attempting to generate items, please assess if the provided information is clear, specific, and sufficient for you to generate a high-quality, relevant list of items (tools, resources, libraries, etc.).
-
-- If the information is clear and sufficient, respond with 'can_proceed: true'.
-- If the information is too vague, ambiguous, or lacks necessary detail, respond with 'can_proceed: false' and provide a brief 'reason_if_cannot_proceed'.
-- Optionally, if 'can_proceed: false', you can provide 'suggested_clarifications' as an array of questions or points the user could address to improve the prompt.
-
-Consider:
-- Is the topic well-defined?
-- Is the scope clear (not too broad, not too narrow without context)?
-- Are there any ambiguities that would make item generation difficult or likely to produce irrelevant results?
-`,
-    );
-
-    const understandingChain = understandingPrompt
-      .pipe(
-        this.llm.bind({
-          functions: [understandingAssessmentFunction],
-          function_call: {
-            name: 'assess_prompt_understanding_for_item_generation',
-          },
-        }),
-      )
-      .pipe(new JsonOutputFunctionsParser());
-
-    try {
-      const assessment = (await understandingChain.invoke({
-        topicName,
-        topicDescription,
-        target_keywords_string: targetKeywords
-          ? targetKeywords.join(', ')
-          : 'N/A',
-      })) as {
-        can_proceed: boolean;
-        reason_if_cannot_proceed: string | null;
-        suggested_clarifications?: string[];
-      };
-
-      if (!assessment.can_proceed) {
-        this.logger.warn(
-          `[${slug}] AI cannot confidently proceed with item generation for topic "${topicName}" due to prompt clarity. Reason: ${assessment.reason_if_cannot_proceed || 'No specific reason provided.'}`,
-        );
-        if (
-          assessment.suggested_clarifications &&
-          assessment.suggested_clarifications.length > 0
-        ) {
-          this.logger.warn(
-            `[${slug}] AI suggested clarifications: ${assessment.suggested_clarifications.join('; ')}`,
-          );
-        }
-        return []; // Do not proceed with item generation
-      }
-
-      this.logger.log(
-        `[${slug}] AI assessment: Prompt for topic "${topicName}" is clear. Proceeding with item generation.`,
-      );
-    } catch (error) {
-      this.logger.error(
-        `[${slug}] Error during AI prompt understanding assessment for topic "${topicName}": ${error.message}. Proceeding with caution (will attempt item generation).`,
-        error.stack,
-      );
-      // If the understanding check itself fails, we log the error but still attempt item generation.
-      // This is a fallback in case the assessment mechanism has an issue.
-    }
-
-    // 2. Proceed with Item Generation if understanding is sufficient (or assessment failed)
-    const itemGenerationFunction = {
-      name: 'generate_awesome_list_items_directly',
-      description:
-        'Generates a list of distinct items (tools, resources, libraries, articles, etc.) that are highly relevant to the directory builder topic, including their details.',
-      parameters: zodToJsonSchema(extractedItemsSchema),
-    };
-
-    const generationPrompt = PromptTemplate.fromTemplate(
-      `You are an expert curator and technical writer tasked with generating an initial list of items for an "Directory Builder" about a specific topic.
-The **main topic** of the Directory Builder is: "{topicName}"
-Description: "{topicDescription}"
-Optional initial keywords: {target_keywords_string}
-
-Based on this topic, please generate a comprehensive list of distinct items (e.g., tools, software, libraries, frameworks, official documentation, key community resources, important projects).
-
-For each item, provide the following details:
-1.  **name**: The canonical name of the item.
-2.  **description**: A concise description (1-3 sentences) highlighting its specific relevance to "{topicName}".
-3.  **source_url**: The most direct and canonical URL (e.g., homepage, official documentation, repository). If a high-quality, canonical URL cannot be confidently determined, you may omit it but it's highly encouraged.
-
-**Critical Instructions:**
--   Focus on **relevance** to "{topicName}".
--   Aim for **diversity** in the types of items if appropriate for the topic.
--   Provide **accurate and canonical** information, especially for names and URLs.
--   If the topic is broad, try to cover its main sub-areas. If it's niche, focus on key resources for that niche.
-
-Generate the list of items according to the specified schema.
-`,
-    );
-
-    const generationChain = generationPrompt
-      .pipe(
-        this.llm.bind({
-          functions: [itemGenerationFunction],
-          function_call: { name: 'generate_awesome_list_items_directly' },
-        }),
-      )
-      .pipe(new JsonOutputFunctionsParser());
-
-    // reset temperature
-    const defaultTemperature = this.llm.temperature;
-    this.llm.temperature = 0.2;
-
-    try {
-      // const numItemsToGenerate =
-      //   config.max_results_per_query * 1 || DEFAULT_AI_ITEMS_TO_GENERATE;
-
-      const result = (await generationChain.invoke({
-        topicName,
-        topicDescription,
-        target_keywords_string: targetKeywords
-          ? targetKeywords.join(', ')
-          : 'N/A',
-      })) as { items?: Partial<ItemData>[] };
-
-      if (result && result.items && result.items.length > 0) {
-        this.logger.log(
-          `[${slug}] AI initially generated ${result.items.length} items.`,
-        );
-        for (const generatedItem of result.items) {
-          try {
-            const itemToValidate: Partial<ItemData> = {
-              ...generatedItem,
-            };
-
-            const validatedItem = itemDataSchema.parse(
-              itemToValidate,
-            ) as ItemData;
-
-            validatedItem.slug = slugifyText(validatedItem.name);
-
-            if (!validatedItem.source_url) {
-              this.logger.warn(
-                `[${slug}] AI generated item "${validatedItem.name}" without a source_url. Deduplication might be affected.`,
-              );
-            }
-            allGeneratedItems.push(validatedItem);
-          } catch (validationError) {
-            this.logger.warn(
-              `[${slug}] Discarding AI-generated item due to validation error: ${validationError.errors.map((e) => e.message).join(', ')}. Item: ${JSON.stringify(generatedItem)}`,
-            );
-          }
-        }
-      } else {
-        this.logger.log(
-          `[${slug}] No initial items generated by AI for topic: ${topicName}.`,
-        );
-      }
-    } catch (error) {
-      this.logger.error(
-        `[${slug}] Error generating initial items with AI for topic ${topicName}: ${error.message}`,
-        error.stack,
-      );
-    }
-
-    this.llm.temperature = defaultTemperature;
-
-    this.logger.log(
-      `[${slug}] AI-First Item Generation - Complete. Validated ${allGeneratedItems.length} items.`,
-    );
-    return allGeneratedItems;
-  }
-
-  private async retrieveWebPages(
-    slug: string,
-    searchQueries: string[],
-    processedSourceUrls: Set<string>,
-    config: Required<ConfigDto>,
-  ): Promise<WebPageData[]> {
-    if (!this.tavilyClient) {
-      this.logger.warn(
-        `[${slug}] Tavily API key not configured. Skipping web search.`,
-      );
-      return [];
-    }
-
-    const allFetchedPages: WebPageData[] = [];
-    const currentRunProcessedUrls = new Set<string>();
-    let pagesFetchedThisRun = 0;
-
-    for (const query of searchQueries) {
-      if (pagesFetchedThisRun >= config.max_pages_to_process) {
-        this.logger.log(
-          `[${slug}] Reached max_pages_to_process limit (${config.max_pages_to_process}). Stopping further web retrieval.`,
-        );
-        break;
-      }
-
-      this.logger.log(`[${slug}] Executing search query: "${query}"`);
-      try {
-        const documents = await this.webSearch(query, config);
-        this.logger.log(
-          `[${slug}] Found ${documents.length} results for query: "${query}"`,
-        );
-
-        for (const doc of documents.slice(0, config.max_results_per_query)) {
-          if (pagesFetchedThisRun >= config.max_pages_to_process) break;
-
-          const source_url = doc.url;
-          if (!source_url || typeof source_url !== 'string') {
-            this.logger.warn(
-              `[${slug}] Skipping document with missing or invalid source URL for query "${query}". Metadata: ${JSON.stringify(doc)}`,
-            );
-            continue;
-          }
-
-          if (
-            processedSourceUrls.has(source_url) ||
-            currentRunProcessedUrls.has(source_url)
-          ) {
-            this.logger.log(
-              `[${slug}] Skipping already processed URL: ${source_url}`,
-            );
-            continue;
-          }
-
-          this.logger.log(`[${slug}] Fetching content from: ${source_url}`);
-          try {
-            // Polite crawling: wait a bit
-            await new Promise((resolve) => setTimeout(resolve, 1000)); // 1-second delay
-
-            const response = await this.tavilyClient.extract([source_url], {
-              maxResults: 1,
-            });
-
-            if (!response.results[0]) {
-              this.logger.warn(
-                `[${slug}] Skipping document with missing or invalid source URL for query "${query}". Metadata: ${JSON.stringify(doc)}`,
-              );
-              continue;
-            }
-
-            const extractedResult = response.results[0];
-
-            allFetchedPages.push({
-              source_url,
-              raw_content: extractedResult.rawContent,
-              retrieved_at: new Date().toISOString(),
-            });
-            currentRunProcessedUrls.add(source_url);
-            pagesFetchedThisRun++;
-            this.logger.log(
-              `[${slug}] Successfully fetched content from: ${source_url}. Total pages fetched this run: ${pagesFetchedThisRun}`,
-            );
-          } catch (fetchError) {
-            this.logger.error(
-              `[${slug}] Error fetching content from ${source_url}: ${fetchError.message}`,
-            );
-            currentRunProcessedUrls.add(source_url); // Add to processed to avoid retrying failed URLs in this run
-          }
-        }
-      } catch (searchError) {
-        this.logger.error(
-          `[${slug}] Error executing search query "${query}" with Tavily: ${searchError.message}`,
-        );
-      }
-    }
-    return allFetchedPages;
-  }
-
-  private async filterAndAssessPages(
-    slug: string,
-    webPages: WebPageData[],
-    topicName: string,
-    topicDescription: string,
-    config: Required<ConfigDto>,
-  ): Promise<WebPageData[]> {
-    const relevantPages: WebPageData[] = [];
-    if (!this.llm.apiKey) {
-      this.logger.warn(
-        `[${slug}] OpenAI API Key not configured. Skipping LLM-based relevance assessment. Applying basic content length filter only.`,
-      );
-    }
-
-    for (const page of webPages) {
-      const textContent = page.raw_content;
-
-      if (textContent.length < config.min_content_length_for_extraction) {
-        this.logger.log(
-          `[${slug}] Discarding page (too short: ${textContent.length} chars): ${page.source_url}`,
-        );
-        continue;
-      }
-
-      if (!this.llm.apiKey) {
-        this.logger.log(
-          `[${slug}] Keeping page (OpenAI API Key not configured, basic length check passed): ${page.source_url}`,
-        );
-        relevantPages.push(page);
-        continue;
-      }
-
-      try {
-        this.logger.log(
-          `[${slug}] Assessing relevance for: ${page.source_url}`,
-        );
-        // Using function calling for structured output
-        const relevanceFunction = {
-          name: 'assess_content_relevance',
-          description:
-            'Assess if the provided web page content is highly relevant to the given topic.',
-          parameters: {
-            type: 'object',
-            properties: {
-              relevant: {
-                type: 'boolean',
-                description:
-                  'True if the content is highly relevant, false otherwise.',
-              },
-              relevance_score: {
-                type: 'number',
-                description:
-                  'A score between 0.0 (not relevant) and 1.0 (highly relevant).',
-              },
-              reason: {
-                type: 'string',
-                description:
-                  'A brief explanation for the relevance assessment.',
-              },
-            },
-            required: ['relevant', 'relevance_score', 'reason'],
-          },
-        };
-
-        // Stricter prompt for page relevance
-        const prompt = PromptTemplate.fromTemplate(
-          `You are an expert content analyst. Assess the relevance of the following web page content to the **main topic**: "{topicName}" (Description: "{topicDescription}").
-
-Web Page Content (first 2000 characters):
----
-{page_content_snippet}
----
-
-**Critically evaluate:** Is this page's **primary focus** highly relevant to "{topicName}"?
-- **Accept:** Pages dedicated to the topic, comprehensive comparisons, core tutorials, official documentation, key project pages.
-- **Reject:** Pages where the topic is only mentioned briefly, listicles covering many unrelated topics, pages focused *only* on a very specific niche *unless* that niche is the explicit topic "{topicName}" (e.g., reject a page *only* about a Ruby vector library if the topic is general vector databases), forum threads with low signal-to-noise, or purely marketing pages.
-
-Provide a relevance score between 0.0 (not relevant) and 1.0 (highly relevant). Only assign a high score if the primary focus aligns strongly with "{topicName}".
-`,
-        );
-        const outputParser = new JsonOutputFunctionsParser();
-        const relevanceChain = prompt
-          .pipe(
-            this.llm.bind({
-              functions: [relevanceFunction],
-              function_call: { name: 'assess_content_relevance' },
-            }),
-          )
-          .pipe(outputParser);
-
-        const assessmentResult = (await relevanceChain.invoke({
-          topicName,
-          topicDescription,
-          page_content_snippet: textContent.slice(0, 2000), // Send a snippet to save tokens/time
-        })) as RelevanceAssessment;
-
-        if (
-          assessmentResult.relevant &&
-          assessmentResult.relevance_score >= config.relevance_threshold_content
-        ) {
-          this.logger.log(
-            `[${slug}] Relevant page (Score: ${assessmentResult.relevance_score}): ${page.source_url} - Reason: ${assessmentResult.reason}`,
-          );
-          relevantPages.push(page);
-        } else {
-          this.logger.log(
-            `[${slug}] Discarding page (Not relevant/Score too low: ${assessmentResult.relevance_score}): ${page.source_url} - Reason: ${assessmentResult.reason}`,
-          );
-        }
-      } catch (error) {
-        this.logger.error(
-          `[${slug}] Error assessing relevance for ${page.source_url}: ${error.message}`,
-          error.stack,
-        );
-        this.logger.warn(
-          `[${slug}] Keeping page due to relevance assessment error (will rely on later extraction quality): ${page.source_url}`,
-        );
-        relevantPages.push(page);
-      }
-    }
-    return relevantPages;
-  }
-
-  private async extractItemsFromPages(
-    slug: string,
-    relevantPages: WebPageData[],
-    topicName: string,
-    topicDescription: string,
-    config: Required<ConfigDto>,
-  ): Promise<ItemData[]> {
-    const allExtractedItems: ItemData[] = [];
-
-    if (!this.llm.apiKey) {
-      this.logger.warn(
-        `[${slug}] OpenAI API Key not configured. Skipping AI-driven item extraction.`,
-      );
-      return [];
-    }
-
-    const itemExtractionFunction = {
-      name: 'extract_awesome_list_items',
-      description:
-        'Extracts one or more distinct items (tools, resources, libraries, articles, etc.) from the provided web page content that are relevant to the directory builder topic, including generating relevant Markdown content.',
-      parameters: zodToJsonSchema(extractedItemsSchema),
-    };
-
-    for (const page of relevantPages) {
-      if (
-        !page.raw_content ||
-        page.raw_content.length < config.min_content_length_for_extraction
-      ) {
-        this.logger.log(
-          `[${slug}] Skipping item extraction for page (insufficient content): ${page.source_url}`,
-        );
-        continue;
-      }
-
-      this.logger.log(`[${slug}] Extracting items from: ${page.source_url}`);
-      try {
-        // Stricter prompt for item extraction
-        const prompt = PromptTemplate.fromTemplate(
-          `You are an expert data extractor and technical writer for "Directory Builder" directories.
-The **main topic** of the Directory Builder is: "{topicName}" (Description: "{topicDescription}").
-From the following web page content, identify and extract information for one or more distinct items (tools, resources, libraries, articles, etc.) that are **directly and highly relevant to this main topic**. Do NOT extract items that are only tangentially related or represent a different category unless it's explicitly part of "{topicName}".
-
-Web Page Content:
----
-{page_content_snippet}
----
-
-For each identified item **that directly relates to "{topicName}"**:
-1.  Provide its canonical **name**.
-2.  Write a concise **description** highlighting its specific relevance to "{topicName}".
-3.  Determine its most direct and canonical **source_url** (homepage, docs, repo etc.). Do not use URLs for blog posts merely mentioning the item unless the post *is* the primary resource. The URL must be valid and specific to the item.
-
-**Critical Filter:** Only extract items that are *directly* relevant to the main topic "{topicName}". For example, if the topic is "Vector Databases", do not extract a general-purpose database or a library for a specific programming language (like Ruby) unless it's explicitly a vector database client/tool directly supporting the core topic. Ensure the \`source_url\` is for the item itself, not an article *about* the item.
-Only call the extraction function if you find at least one item meeting these strict criteria.
-`,
-        );
-
-        const outputParser = new JsonOutputFunctionsParser();
-        const extractionChain = prompt
-          .pipe(
-            this.llm.bind({
-              functions: [itemExtractionFunction],
-              function_call: { name: 'extract_awesome_list_items' },
-            }),
-          )
-          .pipe(outputParser);
-
-        const extractionResult = (await extractionChain.invoke({
-          topicName,
-          topicDescription,
-          page_content_snippet: page.raw_content,
-        })) as { items?: Partial<ItemData>[] };
-
-        if (
-          extractionResult &&
-          extractionResult.items &&
-          extractionResult.items.length > 0
-        ) {
-          for (const extractedItem of extractionResult.items) {
-            // Validate with Zod before pushing
-            try {
-              // Ensure all required fields are present before parsing, especially if LLM omits optionals
-              const itemToValidate: Partial<ItemData> = {
-                ...extractedItem,
-              };
-
-              const validatedItem = itemDataSchema.parse(
-                itemToValidate,
-              ) as ItemData;
-
-              // Auto-generate slug if not provided or to ensure consistency
-              validatedItem.slug = slugifyText(validatedItem.name);
-
-              allExtractedItems.push(validatedItem);
-              this.logger.log(
-                `[${slug}] Extracted item: "${validatedItem.name}" (Slug: ${validatedItem.slug})`,
-              );
-            } catch (validationError) {
-              this.logger.warn(
-                `[${slug}] Discarding item due to validation error: ${validationError.errors.map((e) => e.message).join(', ')}. Item: ${JSON.stringify(extractedItem)} from ${page.source_url}`,
-              );
-            }
-          }
-        } else {
-          this.logger.log(
-            `[${slug}] No items extracted by LLM from ${page.source_url}`,
-          );
-        }
-      } catch (error) {
-        this.logger.error(
-          `[${slug}] Error extracting items from ${page.source_url}: ${error.message}`,
-          error.stack,
-        );
-      }
-    }
-
-    return allExtractedItems;
-  }
-
-  private async filterAndValidateSourceItems(
-    items: ItemData[],
-    slug: string,
-  ): Promise<ItemData[]> {
-    this.logger.log(
-      `[${slug}] Starting source URL validation and filtering for ${items.length} items.`,
-    );
-    const validItems: ItemData[] = [];
-
-    try {
-      for (const currentItem of items) {
-        const validatedSourceUrl = await this.validateAndFetchSourceUrl(
-          slug,
-          currentItem,
-        );
-
-        if (validatedSourceUrl) {
-          const updatedItem: ItemData = {
-            ...currentItem,
-            source_url: validatedSourceUrl,
-          };
-          validItems.push(updatedItem);
-        }
-      }
-    } catch (error) {
-      this.logger.error(
-        `[${slug}] Error during source URL validation: ${error.message}`,
-        error.stack,
-      );
-    }
-
-    this.logger.log(
-      `[${slug}] Finished source URL validation. ${validItems.length} of ${items.length} items passed.`,
-    );
-
-    return validItems;
-  }
-
-  private async validateAndFetchSourceUrl(
-    slug: string,
-    currentItem: ItemData,
-  ): Promise<string | undefined> {
-    const sourceUrl = currentItem.source_url;
-    const itemName = currentItem.name;
-    const itemDescription = currentItem.description;
-
-    const validateUrl = async (
-      urlToValidate: string,
-    ): Promise<string | undefined> => {
-      if (!urlToValidate || typeof urlToValidate !== 'string') {
-        this.logger.warn(
-          `[${slug}] Invalid URL structure provided for URL for "${itemName}": ${urlToValidate}`,
-        );
-        return undefined;
-      }
-
-      try {
-        new URL(urlToValidate); // Basic syntax check
-        this.logger.log(
-          `[${slug}] Validating provided URL for "${itemName}": ${urlToValidate}`,
-        );
-        await axios.head(urlToValidate, {
-          timeout: 10000, // 10-second timeout
-          validateStatus: (status) => status >= 200 && status < 400, // Allow 2xx and 3xx (redirects)
-          headers: {
-            'User-Agent': `ItemsGeneratorBuilder-URL-Validation/${slug}`,
-          },
-        });
-
-        this.logger.log(
-          `[${slug}] URL validation successful for "${itemName}": ${urlToValidate}`,
-        );
-        return urlToValidate;
-      } catch (error) {
-        this.logger.warn(
-          `[${slug}] provided URL for "${itemName}" ("${urlToValidate}") failed validation: ${error.message}.`,
-        );
-        return undefined;
-      }
-    };
-
-    const validatedInitialUrl = await validateUrl(sourceUrl);
-    if (validatedInitialUrl) {
-      return validatedInitialUrl;
-    }
-
-    if (!this.tavilyClient) {
-      this.logger.warn(
-        `[${slug}] Tavily retriever not available. Cannot search for URL for "${itemName}".`,
-      );
-      return undefined;
-    }
-
-    try {
-      // Ensure itemName and itemDescription are strings before using them in search query
-      const safeItemName = typeof itemName === 'string' ? itemName : 'item';
-
-      const safeItemDescription =
-        typeof itemDescription === 'string'
-          ? itemDescription.substring(0, 100)
-          : '';
-
-      const searchQuery = (
-        safeItemName +
-        `${safeItemName && safeItemDescription ? ' - ' : ''}` +
-        safeItemDescription
-      ).trim();
-
-      if (!searchQuery) {
-        this.logger.warn(
-          `[${slug}] Cannot perform Tavily search for "${itemName}" due to empty search query.`,
-        );
-        return undefined;
-      }
-
-      this.logger.log(
-        `[${slug}] Searching Tavily for "${itemName}" with query: "${searchQuery}"`,
-      );
-
-      const documents = await this.webSearch(searchQuery, {
-        max_results_per_query: 3,
-      });
-
-      if (documents && documents.length > 0) {
-        for (const doc of documents) {
-          if (doc.url) {
-            const validatedTavilyUrl = await validateUrl(doc.url);
-            if (validatedTavilyUrl) {
-              this.logger.log(
-                `[${slug}] Found and validated Tavily URL for "${itemName}": ${validatedTavilyUrl}`,
-              );
-
-              return validatedTavilyUrl;
-            }
-          }
-        }
-        this.logger.warn(
-          `[${slug}] Tavily found URLs for "${itemName}", but none passed validation.`,
-        );
-      } else {
-        this.logger.warn(
-          `[${slug}] Tavily search found no results for "${itemName}" with query "${searchQuery}".`,
-        );
-      }
-    } catch (tavilyError) {
-      this.logger.error(
-        `[${slug}] Error during Tavily search for "${itemName}": ${tavilyError.message}`,
-        tavilyError.stack,
-      );
-    }
-
-    this.logger.warn(
-      `[${slug}] Could not find or validate a source URL for "${itemName}" after AI and Tavily attempts.`,
-    );
-    return undefined; // No valid URL found
-  }
-
-  private async webSearch(query: string, config?: ConfigDto) {
-    const searches = await this.tavilyClient.search(query, {
-      maxResults:
-        config.max_results_per_query || DEFAULT_CONFIG.max_results_per_query,
-    });
-
-    return searches.results.sort((a, b) => b.score - a.score);
-  }
-
-  private async processCategoriesAndTags(
-    createItemsGeneratorDto: CreateItemsGeneratorDto,
-    extractedItems: Partial<ItemData>[],
-  ) {
-    const { description } = createItemsGeneratorDto;
-
-    const categorized = await categorize(
-      description,
-      extractedItems.map((i) => ({
-        slug: i.slug,
-        name: i.name,
-        description: i.description,
-        url: i.source_url,
-      })),
-    );
-
-    this.logger.log(`Categorized items: ${categorized.length}`);
-    const categories = this.mapUnique(
-      categorized.map((item) => item.category as string),
-    );
-    const tags = this.mapUnique(
-      categorized.flatMap((item) => item.tags as string[]),
-    );
-
-    return {
-      finalItems: categorized.map(this.toItemData),
-      categories,
-      tags,
-    };
-  }
-
-  private mapUnique(names: string[]) {
-    const unique = new Set(names);
-    return Array.from(unique).map((name) => ({
-      id: slugifyText(name),
-      name,
-    }));
-  }
-
-  private toItemData(item: Partial<ItemData>): ItemData {
-    return {
-      name: item.name,
-      description: item.description,
-      source_url: item.source_url,
-      category: slugifyText(item.category as string),
-      tags: item.tags.map((tag) => slugifyText(tag)),
-      slug: item.slug || slugifyText(item.name),
-    };
-  }
-
-  private async aggregateAndDeduplicateData(
-    createItemsGeneratorDto: CreateItemsGeneratorDto,
-    existingItems: ItemData[],
-    newlyExtractedItemsThisRun: ItemData[],
-    urlsScannedThisRun: number,
-    pagesProcessedThisRun: number,
-  ) {
-    const { slug, description } = createItemsGeneratorDto;
-
-    this.logger.log(`[${slug}] Starting data aggregation and deduplication.`);
-    let newItemsAddedToStoreCount = 0;
-
-    // const finalItemsMap = new Map<string, ItemData>();
-    // const getItemKey = (item: Partial<ItemData>): string => {
-    //   if (item.source_url) {
-    //     // Normalize URL slightly to catch common variations if needed, e.g. remove trailing slash
-    //     try {
-    //       const url = new URL(item.source_url);
-    //       return (url.origin + url.pathname).replace(/\/$/, ''); // Normalize: remove trailing slash
-    //     } catch (e) {
-    //       return item.source_url;
-    //     }
-    //   }
-
-    //   return `gen:${item.name}`;
-    // };
-
-    // existingItems.forEach((item) => {
-    //   const key = getItemKey(item);
-    //   finalItemsMap.set(key, item);
-    // });
-
-    // deduplicate newly extracted items (by fields)
-    this.logger.log(`[${slug}] Deduplicating items by fields`);
-    let deduplicated = deduplicateByField(
-      deduplicateByField(newlyExtractedItemsThisRun, 'slug'),
-      'source_url',
-    );
-
-    // deduplicate newly extracted items (with AI)
-    this.logger.log(`[${slug}] Deduplicating items with AI.`);
-    deduplicated = await deduplicate(
-      description,
-      deduplicated.map((i) => ({
-        name: i.name,
-        description: i.description,
-        url: i.source_url,
-      })),
-    );
-
-    let aggregatedItems = deduplicated;
-    if (existingItems.length > 0) {
-      this.logger.log(`[${slug}] Extracting new items.`);
-      aggregatedItems = await extractNewItems(existingItems, deduplicated);
-    }
-
-    const metrics: ItemsGeneratorMetrics = {
-      urls_scanned: urlsScannedThisRun,
-      pages_processed: pagesProcessedThisRun,
-      items_extracted_current_run: newlyExtractedItemsThisRun.length,
-      new_items_added_to_store: newItemsAddedToStoreCount,
-      total_items_in_store: aggregatedItems.length,
-    };
-
-    return { aggregatedItems, metrics };
   }
 }
