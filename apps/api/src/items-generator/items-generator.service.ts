@@ -22,6 +22,7 @@ const DEFAULT_CONFIG: Required<ConfigDto> = {
   max_pages_to_process: 100,
   relevance_threshold_content: 0.75,
   min_content_length_for_extraction: 500,
+  ai_first_generation_enabled: true,
 };
 
 @Injectable()
@@ -90,9 +91,7 @@ export class ItemsGeneratorService {
       this.logger.log(`[${slug}] 1. Initialization & Slug Handling - Complete`);
 
       // 1.1. Extract URLs from Prompt
-      this.logger.log(
-        `[${slug}] 1.1. URL Extraction from Prompt - Starting`,
-      );
+      this.logger.log(`[${slug}] 1.1. URL Extraction from Prompt - Starting`);
       const { extractedUrls, rewrittenPrompt: prompt } =
         await this.urlExtractionService.extractUrlsFromPrompt(
           slug,
@@ -117,17 +116,21 @@ export class ItemsGeneratorService {
       }
 
       // 1.5. AI-First Item Generation
-      this.logger.log(`[${slug}] 1.5. AI-First Item Generation - Invoking`);
-      const initialAiItems: ItemData[] =
-        await this.aiItemGenerationService.generateInitialItemsWithAI(
-          slug,
-          name,
-          prompt,
-          target_keywords,
+      let initialAiItems: ItemData[] = [];
+
+      if (config.ai_first_generation_enabled) {
+        this.logger.log(`[${slug}] 1.5. AI-First Item Generation - Invoking`);
+        initialAiItems =
+          await this.aiItemGenerationService.generateInitialItemsWithAI(
+            slug,
+            name,
+            prompt,
+            target_keywords,
+          );
+        this.logger.log(
+          `[${slug}] AI generated ${initialAiItems.length} initial items.`,
         );
-      this.logger.log(
-        `[${slug}] AI generated ${initialAiItems.length} initial items.`,
-      );
+      }
 
       // 2. AI-Powered Search Query Generation
       this.logger.log(

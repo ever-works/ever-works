@@ -6,6 +6,7 @@ import {
   IsInt,
   Min,
   Max,
+  IsBoolean,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -37,6 +38,10 @@ export class ConfigDto {
   @IsInt()
   @Min(0)
   min_content_length_for_extraction?: number = 300;
+
+  @IsOptional()
+  @IsBoolean()
+  ai_first_generation_enabled?: boolean = true;
 }
 
 export class CreateItemsGeneratorDto {
