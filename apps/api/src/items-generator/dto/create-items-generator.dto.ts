@@ -7,6 +7,7 @@ import {
   Min,
   Max,
   IsBoolean,
+  IsUrl,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -61,7 +62,7 @@ export class CreateItemsGeneratorDto {
 
   @IsOptional()
   @IsArray()
-  @IsString({ each: true })
+  @IsUrl({ protocols: ['http', 'https'], require_tld: true }, { each: true })
   source_urls?: string[] = [];
 
   @IsOptional()
