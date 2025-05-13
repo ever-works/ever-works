@@ -10,6 +10,7 @@ import {
 } from '../../agent/schemas';
 import { ItemData } from '../../agent/types';
 import { slugifyText } from '../utils/text.utils';
+import { AiService } from '../shared';
 
 // Default number of items to ask the AI to generate in the initial phase
 
@@ -18,17 +19,8 @@ export class AiItemGenerationService {
   private readonly logger = new Logger(AiItemGenerationService.name);
   private llm: ChatOpenAI;
 
-  constructor() {
-    if (!process.env.OPENAI_API_KEY) {
-      this.logger.warn(
-        'OPENAI_API_KEY not found in .env file. AI features will be limited.',
-      );
-    }
-    this.llm = new ChatOpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-      modelName: process.env.OPENAI_MODEL || 'gpt-4.1',
-      temperature: 0.7,
-    });
+  constructor(private readonly aiService: AiService) {
+    this.llm = this.aiService.getLlm();
   }
 
   async generateInitialItemsWithAI(
@@ -158,18 +150,17 @@ Generate the list of items according to the specified schema.
 `,
     );
 
+    // Use a lower temperature for item generation
+    const lowTempLlm = this.aiService.createLlmWithTemperature(0.2);
+
     const generationChain = generationPrompt
       .pipe(
-        this.llm.bind({
+        lowTempLlm.bind({
           functions: [itemGenerationFunction],
           function_call: { name: 'generate_awesome_list_items_directly' },
         }),
       )
       .pipe(new JsonOutputFunctionsParser());
-
-    // reset temperature
-    const defaultTemperature = this.llm.temperature;
-    this.llm.temperature = 0.2;
 
     try {
       const result = (await generationChain.invoke({
@@ -219,8 +210,6 @@ Generate the list of items according to the specified schema.
         error.stack,
       );
     }
-
-    this.llm.temperature = defaultTemperature;
 
     this.logger.log(
       `[${slug}] AI-First Item Generation - Complete. Validated ${allGeneratedItems.length} items.`,

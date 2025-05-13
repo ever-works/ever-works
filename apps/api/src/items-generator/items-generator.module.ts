@@ -8,10 +8,18 @@ import { ItemExtractionService } from './steps/item-extraction.service';
 import { SourceValidationService } from './steps/source-validation.service';
 import { DataAggregationService } from './steps/data-aggregation.service';
 import { CategoryProcessingService } from './steps/category-processing.service';
+import { AiService, SearchService } from './shared';
 
 @Module({
   providers: [
+    // Shared services
+    AiService,
+    SearchService,
+
+    // Main service
     ItemsGeneratorService,
+
+    // Step services
     AiItemGenerationService,
     SearchQueryGenerationService,
     WebPageRetrievalService,

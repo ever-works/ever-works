@@ -3,23 +3,15 @@ import { ChatOpenAI } from '@langchain/openai';
 import { PromptTemplate } from '@langchain/core/prompts';
 import { StringOutputParser } from '@langchain/core/output_parsers';
 import { ConfigDto } from '../dto/create-items-generator.dto';
+import { AiService } from '../shared';
 
 @Injectable()
 export class SearchQueryGenerationService {
   private readonly logger = new Logger(SearchQueryGenerationService.name);
   private llm: ChatOpenAI;
 
-  constructor() {
-    if (!process.env.OPENAI_API_KEY) {
-      this.logger.warn(
-        'OPENAI_API_KEY not found in .env file. AI features will be limited.',
-      );
-    }
-    this.llm = new ChatOpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-      modelName: process.env.OPENAI_MODEL || 'gpt-4.1',
-      temperature: 0.7,
-    });
+  constructor(private readonly aiService: AiService) {
+    this.llm = this.aiService.getLlm();
   }
 
   async generateSearchQueries(

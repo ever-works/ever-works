@@ -7,24 +7,15 @@ import {
   WebPageData,
   RelevanceAssessment,
 } from '../interfaces/items-generator.interfaces';
+import { AiService } from '../shared';
 
 @Injectable()
 export class ContentFilteringService {
   private readonly logger = new Logger(ContentFilteringService.name);
   private llm: ChatOpenAI;
 
-  constructor() {
-    if (!process.env.OPENAI_API_KEY) {
-      this.logger.warn(
-        'OPENAI_API_KEY not found in .env file. AI features will be limited.',
-      );
-    }
-
-    this.llm = new ChatOpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-      modelName: process.env.OPENAI_MODEL || 'gpt-4.1',
-      temperature: 0.7,
-    });
+  constructor(private readonly aiService: AiService) {
+    this.llm = this.aiService.getLlm();
   }
 
   async filterAndAssessPages(

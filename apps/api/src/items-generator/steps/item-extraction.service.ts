@@ -8,23 +8,15 @@ import { ConfigDto } from '../dto/create-items-generator.dto';
 import { WebPageData } from '../interfaces/items-generator.interfaces';
 import { ItemData } from '../../agent/types';
 import { slugifyText } from '../utils/text.utils';
+import { AiService } from '../shared';
 
 @Injectable()
 export class ItemExtractionService {
   private readonly logger = new Logger(ItemExtractionService.name);
   private llm: ChatOpenAI;
 
-  constructor() {
-    if (!process.env.OPENAI_API_KEY) {
-      this.logger.warn(
-        'OPENAI_API_KEY not found in .env file. AI features will be limited.',
-      );
-    }
-    this.llm = new ChatOpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-      modelName: process.env.OPENAI_MODEL || 'gpt-4.1',
-      temperature: 0.7,
-    });
+  constructor(private readonly aiService: AiService) {
+    this.llm = this.aiService.getLlm();
   }
 
   async extractItemsFromPages(
@@ -126,7 +118,7 @@ Only call the extraction function if you find at least one item meeting these st
               );
             } catch (validationError) {
               this.logger.warn(
-                `[${slug}] Discarding item due to validation error: ${validationError.errors.map((e) => e.message).join(', ')}. Item: ${JSON.stringify(extractedItem)} from ${page.source_url}`,
+                `[${slug}] Discarding item due to validation error: ${validationError.errors.map((e: any) => e.message).join(', ')}. Item: ${JSON.stringify(extractedItem)} from ${page.source_url}`,
               );
             }
           }

@@ -1,23 +1,16 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { tavily, TavilyClient } from '@tavily/core';
+import { TavilyClient } from '@tavily/core';
 import { ConfigDto } from '../dto/create-items-generator.dto';
 import { WebPageData } from '../interfaces/items-generator.interfaces';
+import { SearchService } from '../shared';
 
 @Injectable()
 export class WebPageRetrievalService {
   private readonly logger = new Logger(WebPageRetrievalService.name);
   private tavilyClient: TavilyClient | undefined;
 
-  constructor() {
-    if (!process.env.TAVILY_API_KEY) {
-      this.logger.warn(
-        'TAVILY_API_KEY not found in .env file. Web search capabilities will be disabled.',
-      );
-    } else {
-      this.tavilyClient = tavily({
-        apiKey: process.env.TAVILY_API_KEY,
-      });
-    }
+  constructor(private readonly searchService: SearchService) {
+    this.tavilyClient = this.searchService.getTavilyClient();
   }
 
   async retrieveWebPages(
@@ -118,16 +111,6 @@ export class WebPageRetrievalService {
   }
 
   async webSearch(query: string, config?: ConfigDto) {
-    if (!this.tavilyClient) {
-      return [];
-    }
-    
-    const DEFAULT_MAX_RESULTS = 20;
-    
-    const searches = await this.tavilyClient.search(query, {
-      maxResults: config?.max_results_per_query || DEFAULT_MAX_RESULTS,
-    });
-
-    return searches.results.sort((a, b) => b.score - a.score);
+    return this.searchService.webSearch(query, config);
   }
 }
