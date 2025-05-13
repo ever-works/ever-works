@@ -386,6 +386,16 @@ export class DataAggregationService {
       `Grouping ${items.length} items using string similarity clustering`,
     );
 
+    // Replace any special characters with spaces
+    function tr(text: string): string {
+      return (text || '')
+        .toLowerCase()
+        .replace(/\s+v?(\d+\.)*\d+(\s+|$)/g, ' ')
+        .replace(/[^\w\s]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+
     // Extract normalized names for similarity comparison
     const normalizedItems = items
       .map((item) => {
@@ -435,12 +445,12 @@ export class DataAggregationService {
         );
 
         // Check if the candidate name appears before the current name
-        const currentNameFirstOccurrence = currentName.split(' ')[0];
-        const candidateNameFirstOccurrence = candidateName.split(' ')[0];
+        const splittedCurrentItemName = tr(currentItem.name).split(' ');
+        const splittedCandidateName = tr(candidateItem.name).split(' ');
 
         const isSimilarByOccurrence =
-          candidateName.split(' ').includes(currentNameFirstOccurrence) ||
-          currentName.split(' ').includes(candidateNameFirstOccurrence);
+          splittedCandidateName.includes(splittedCurrentItemName[0]?.trim()) ||
+          splittedCurrentItemName.includes(splittedCandidateName[0]?.trim());
 
         // If similar enough, add to cluster
         if (similarity >= this.SIMILARITY_THRESHOLD || isSimilarByOccurrence) {
