@@ -258,8 +258,6 @@ export class ItemsGeneratorService {
       return [];
     }
 
-    this.logger.log(`Generating markdown for ${items.length} items`);
-
     try {
       return await this.markdownGenerationService.generateMarkdownForItems(
         items,

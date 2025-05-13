@@ -77,7 +77,6 @@ export class MarkdownGenerationService {
           content: content.rawContent,
         });
 
-      this.logger.log(`Successfully generated markdown for: ${item.name}`);
       return result.markdown || '';
     } catch (error) {
       this.logger.error(
@@ -101,17 +100,13 @@ export class MarkdownGenerationService {
     this.logger.log(`Generating markdown for ${items.length} items`);
 
     // Process items in batches to avoid overwhelming the API
-    const BATCH_SIZE = 5;
+    const BATCH_SIZE = 10;
     const processedItems: ItemData[] = [];
 
     // Process each batch
     for (let i = 0; i < items.length; i += BATCH_SIZE) {
       const batch = items.slice(i, i + BATCH_SIZE);
-      this.logger.log(
-        `Processing batch ${Math.floor(i / BATCH_SIZE) + 1} of ${Math.ceil(items.length / BATCH_SIZE)} (${batch.length} items)`,
-      );
 
-      // Process each item in the batch in parallel
       const markdownPromises = batch.map(async (item) => {
         const markdown = await this.generateMarkdown(item);
         return {
@@ -120,17 +115,14 @@ export class MarkdownGenerationService {
         };
       });
 
-      // Wait for all items in this batch to complete
       const batchResults = await Promise.all(markdownPromises);
       processedItems.push(...batchResults);
 
-      // Add a small delay between batches to avoid rate limiting
       if (i + BATCH_SIZE < items.length) {
         await new Promise((resolve) => setTimeout(resolve, 1000));
       }
     }
 
-    this.logger.log(`Completed markdown generation for ${items.length} items`);
     return processedItems;
   }
 
