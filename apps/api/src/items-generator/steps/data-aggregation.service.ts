@@ -404,7 +404,7 @@ export class DataAggregationService {
       .filter(({ normalizedName }) => normalizedName.length > 0);
 
     // Create initial clusters using hierarchical clustering
-    const SIMILARITY_THRESHOLD = 0.7;
+    const SIMILARITY_THRESHOLD = 0.5;
     const clusters: ItemData[][] = [];
     const processed = new Set<number>();
 
