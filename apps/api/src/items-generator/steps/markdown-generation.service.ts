@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { AiService } from '../shared';
 import { SearchService } from '../shared';
 import { ItemData } from '../dto';
+import { extractTextFromSourceURL } from '../utils/text.utils';
 
 // Markdown generation prompt
 export const MARKDOWN_PROMPT = `
@@ -144,6 +145,15 @@ export class MarkdownGenerationService {
     try {
       return await this.searchService.extractContent(url);
     } catch (error) {
+      // try again with extractTextFromSourceURL
+      const text = await extractTextFromSourceURL(url).catch(() => null);
+
+      if (text) {
+        return {
+          rawContent: text,
+        };
+      }
+
       this.logger.error(
         `Error extracting content from ${url}: ${error.message}`,
         error.stack,
