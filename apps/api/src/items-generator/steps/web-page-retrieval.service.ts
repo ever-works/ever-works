@@ -68,9 +68,6 @@ export class WebPageRetrievalService {
 
           this.logger.log(`[${slug}] Fetching content from: ${source_url}`);
           try {
-            // Polite crawling: wait a bit
-            await new Promise((resolve) => setTimeout(resolve, 1000)); // 1-second delay
-
             const response = await this.tavilyClient.extract([source_url], {
               maxResults: 1,
             });
