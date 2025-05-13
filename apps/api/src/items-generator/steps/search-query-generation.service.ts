@@ -57,9 +57,8 @@ The queries should aim to discover:
 - Essential libraries and frameworks
 - Seminal articles and blog posts
 - Official documentation and guides
-- Important community resources, forums, or discussions
-- Common use cases and best practices
 - Comparisons and alternatives
+- Awesome lists and directories
 
 Consider variations, long-tail keywords, and queries targeting different facets of the topic.
 Avoid overly broad or generic queries. Be specific.
