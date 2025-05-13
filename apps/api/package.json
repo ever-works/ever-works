@@ -24,6 +24,7 @@
     "@langchain/deepseek": "^0.0.1",
     "@langchain/langgraph": "^0.2.54",
     "@langchain/openai": "^0.5.10",
+    "@langchain/textsplitters": "^0.1.0",
     "@nestjs/bullmq": "^10.2.3",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.2",
