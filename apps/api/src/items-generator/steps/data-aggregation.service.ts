@@ -70,6 +70,7 @@ export class DataAggregationService {
   private readonly logger = new Logger(DataAggregationService.name);
   private llm: ChatOpenAI;
   private MAX_CLUSTER_SIZE = 50;
+  private SIMILARITY_THRESHOLD = 0.5;
 
   constructor(private readonly aiService: AiService) {
     this.llm = this.aiService.createLlmWithTemperature(0.0); // Use temperature 0 for deterministic results
@@ -404,7 +405,6 @@ export class DataAggregationService {
       .filter(({ normalizedName }) => normalizedName.length > 0);
 
     // Create initial clusters using hierarchical clustering
-    const SIMILARITY_THRESHOLD = 0.5;
     const clusters: ItemData[][] = [];
     const processed = new Set<number>();
 
@@ -435,7 +435,7 @@ export class DataAggregationService {
         );
 
         // If similar enough, add to cluster
-        if (similarity >= SIMILARITY_THRESHOLD) {
+        if (similarity >= this.SIMILARITY_THRESHOLD) {
           cluster.push(candidateItem);
           processed.add(j);
         }
