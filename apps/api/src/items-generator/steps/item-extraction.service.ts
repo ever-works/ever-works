@@ -3,12 +3,15 @@ import { ChatOpenAI } from '@langchain/openai';
 import { PromptTemplate } from '@langchain/core/prompts';
 import { JsonOutputFunctionsParser } from 'langchain/output_parsers';
 import { zodToJsonSchema } from 'zod-to-json-schema';
-import { extractedItemsSchema, itemDataSchema } from '../../agent/schemas';
 import { ConfigDto } from '../dto/create-items-generator.dto';
 import { WebPageData } from '../interfaces/items-generator.interfaces';
 import { slugifyText } from '../utils/text.utils';
 import { AiService } from '../shared';
 import { ItemData } from '../dto';
+import {
+  extractedItemsSchema,
+  itemDataSchema,
+} from '../schemas/item-extraction.schemas';
 
 @Injectable()
 export class ItemExtractionService {

@@ -1,4 +1,12 @@
-import { IsString, IsArray, IsOptional, ValidateNested, IsInt, Min, Max } from 'class-validator';
+import {
+  IsString,
+  IsArray,
+  IsOptional,
+  ValidateNested,
+  IsInt,
+  Min,
+  Max,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class ConfigDto {
@@ -45,6 +53,11 @@ export class CreateItemsGeneratorDto {
   @IsArray()
   @IsString({ each: true })
   target_keywords?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  source_urls?: string[];
 
   @IsOptional()
   @ValidateNested()
