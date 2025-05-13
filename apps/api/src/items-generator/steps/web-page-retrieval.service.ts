@@ -141,9 +141,9 @@ export class WebPageRetrievalService {
       allFetchedPages.push(...validResults);
 
       // Add a small delay between batches to be polite to the API
-      if (i + BATCH_SIZE < urlsToProcess.length) {
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-      }
+      // if (i + BATCH_SIZE < urlsToProcess.length) {
+      //   await new Promise((resolve) => setTimeout(resolve, 1000));
+      // }
     }
 
     this.logger.log(
