@@ -139,6 +139,7 @@ For each item, provide the following details:
 3.  **source_url**: The most direct and canonical URL (e.g., homepage, official documentation, repository). If a high-quality, canonical URL cannot be confidently determined, you may omit it but it's highly encouraged.
 
 **Critical Instructions:**
+-   *Only generate items if you are completely certain of their relevance to the topic.*
 -   Focus on **relevance** to "{topicName}".
 -   Aim for **diversity** in the types of items if appropriate for the topic.
 -   Provide **accurate and canonical** information, especially for names and URLs.
@@ -149,7 +150,7 @@ Generate the list of items according to the specified schema.
     );
 
     // Use a lower temperature for item generation
-    const lowTempLlm = this.aiService.createLlmWithTemperature(0.2);
+    const lowTempLlm = this.aiService.createLlmWithTemperature(0.0);
 
     const generationChain = generationPrompt
       .pipe(
