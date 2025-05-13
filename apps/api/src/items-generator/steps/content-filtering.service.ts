@@ -176,9 +176,9 @@ Provide a relevance score between 0.0 (not relevant) and 1.0 (highly relevant). 
       relevantPages.push(...relevantPagesFromBatch);
 
       // Add a small delay between batches to avoid rate limiting
-      // if (i + BATCH_SIZE < filteredPages.length) {
-      //   await new Promise((resolve) => setTimeout(resolve, 500));
-      // }
+      if (i + BATCH_SIZE < filteredPages.length) {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      }
     }
 
     this.logger.log(
