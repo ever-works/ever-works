@@ -7,16 +7,13 @@ import {
   DEFAULT_DATA_CONFIG,
   IDataConfig,
 } from './data-repository';
+import { slugifyText } from '../items-generator/utils/text.utils';
 import { ItemsGeneratorService } from '../items-generator/items-generator.service';
 import {
   CreateItemsGeneratorDto,
   Identifiable,
   ItemData,
 } from '../items-generator/dto';
-
-// refactor later
-import { Agent } from '../agent/agent';
-import { slugifyText } from '../items-generator/utils/text.utils';
 
 @Injectable()
 export class DataGeneratorService {
