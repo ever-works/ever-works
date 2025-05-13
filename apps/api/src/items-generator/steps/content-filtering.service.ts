@@ -25,35 +25,44 @@ export class ContentFilteringService {
     topicDescription: string,
     config: Required<ConfigDto>,
   ): Promise<WebPageData[]> {
-    const relevantPages: WebPageData[] = [];
+    this.logger.log(
+      `[${slug}] Starting content filtering for ${webPages.length} pages`,
+    );
+
+    const filteredPages = webPages.filter((page) => {
+      const isLongEnough =
+        page.raw_content.length >= config.min_content_length_for_extraction;
+
+      return isLongEnough;
+    });
+
+    // Check if OpenAI API is configured
     if (!this.llm.apiKey) {
-      this.logger.warn(
-        `[${slug}] OpenAI API Key not configured. Skipping LLM-based relevance assessment. Applying basic content length filter only.`,
-      );
+      return filteredPages;
     }
 
-    for (const page of webPages) {
-      const textContent = page.raw_content;
+    this.logger.log(
+      `[${slug}] ${filteredPages.length} pages passed initial length filter`,
+    );
 
-      if (textContent.length < config.min_content_length_for_extraction) {
-        this.logger.log(
-          `[${slug}] Discarding page (too short: ${textContent.length} chars): ${page.source_url}`,
-        );
-        continue;
-      }
+    if (filteredPages.length === 0) {
+      return [];
+    }
 
-      if (!this.llm.apiKey) {
-        this.logger.log(
-          `[${slug}] Keeping page (OpenAI API Key not configured, basic length check passed): ${page.source_url}`,
-        );
-        relevantPages.push(page);
-        continue;
-      }
-
+    // Step 2: Define the relevance assessment function
+    const assessPageRelevance = async (
+      page: WebPageData,
+    ): Promise<{
+      page: WebPageData;
+      isRelevant: boolean;
+      assessment?: RelevanceAssessment;
+      error?: any;
+    }> => {
       try {
         this.logger.log(
           `[${slug}] Assessing relevance for: ${page.source_url}`,
         );
+
         // Using function calling for structured output
         const relevanceFunction = {
           name: 'assess_content_relevance',
@@ -112,22 +121,25 @@ Provide a relevance score between 0.0 (not relevant) and 1.0 (highly relevant). 
         const assessmentResult = (await relevanceChain.invoke({
           topicName,
           topicDescription,
-          page_content_snippet: textContent.slice(0, 2000), // Send a snippet to save tokens/time
+          page_content_snippet: page.raw_content.slice(0, 2000),
         })) as RelevanceAssessment;
 
-        if (
+        const isRelevant =
           assessmentResult.relevant &&
-          assessmentResult.relevance_score >= config.relevance_threshold_content
-        ) {
+          assessmentResult.relevance_score >=
+            config.relevance_threshold_content;
+
+        if (isRelevant) {
           this.logger.log(
             `[${slug}] Relevant page (Score: ${assessmentResult.relevance_score}): ${page.source_url} - Reason: ${assessmentResult.reason}`,
           );
-          relevantPages.push(page);
         } else {
           this.logger.log(
             `[${slug}] Discarding page (Not relevant/Score too low: ${assessmentResult.relevance_score}): ${page.source_url} - Reason: ${assessmentResult.reason}`,
           );
         }
+
+        return { page, isRelevant, assessment: assessmentResult };
       } catch (error) {
         this.logger.error(
           `[${slug}] Error assessing relevance for ${page.source_url}: ${error.message}`,
@@ -136,9 +148,42 @@ Provide a relevance score between 0.0 (not relevant) and 1.0 (highly relevant). 
         this.logger.warn(
           `[${slug}] Keeping page due to relevance assessment error (will rely on later extraction quality): ${page.source_url}`,
         );
-        relevantPages.push(page);
+        return { page, isRelevant: true, error };
       }
+    };
+
+    // Step 3: Process pages in batches to avoid rate limits
+    const BATCH_SIZE = 15;
+    const relevantPages: WebPageData[] = [];
+
+    this.logger.log(
+      `[${slug}] Processing relevance assessment in batches of ${BATCH_SIZE}`,
+    );
+
+    // Process pages in batches
+    for (let i = 0; i < filteredPages.length; i += BATCH_SIZE) {
+      const batch = filteredPages.slice(i, i + BATCH_SIZE);
+
+      // Process the batch in parallel
+      const assessmentPromises = batch.map((page) => assessPageRelevance(page));
+      const assessmentResults = await Promise.all(assessmentPromises);
+
+      // Filter relevant pages from this batch
+      const relevantPagesFromBatch = assessmentResults
+        .filter((result) => result.isRelevant)
+        .map((result) => result.page);
+
+      relevantPages.push(...relevantPagesFromBatch);
+
+      // Add a small delay between batches to avoid rate limiting
+      // if (i + BATCH_SIZE < filteredPages.length) {
+      //   await new Promise((resolve) => setTimeout(resolve, 500));
+      // }
     }
+
+    this.logger.log(
+      `[${slug}] Content filtering complete. ${relevantPages.length} relevant pages found out of ${webPages.length} total pages.`,
+    );
     return relevantPages;
   }
 }
