@@ -49,7 +49,7 @@ export class ContentFilteringService {
       return [];
     }
 
-    // Step 2: Define the relevance assessment function
+    // Define the relevance assessment function
     const assessPageRelevance = async (
       page: WebPageData,
     ): Promise<{
@@ -153,7 +153,7 @@ Provide a relevance score between 0.0 (not relevant) and 1.0 (highly relevant). 
     };
 
     // Step 3: Process pages in batches to avoid rate limits
-    const BATCH_SIZE = 15;
+    const BATCH_SIZE = 10;
     const relevantPages: WebPageData[] = [];
 
     this.logger.log(

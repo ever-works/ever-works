@@ -57,7 +57,7 @@ export class CreateItemsGeneratorDto {
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
-  source_urls?: string[];
+  source_urls?: string[] = [];
 
   @IsOptional()
   @ValidateNested()

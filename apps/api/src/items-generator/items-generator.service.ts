@@ -12,6 +12,7 @@ import { SourceValidationService } from './steps/source-validation.service';
 import { DataAggregationService } from './steps/data-aggregation.service';
 import { CategoryProcessingService } from './steps/category-processing.service';
 import { MarkdownGenerationService } from './steps/markdown-generation.service';
+import { UrlExtractionService } from './steps/url-extraction.service';
 import { Category, ItemData, Tag } from './dto';
 
 // Default configuration values
@@ -28,6 +29,7 @@ export class ItemsGeneratorService {
   private readonly logger = new Logger(ItemsGeneratorService.name);
 
   constructor(
+    private readonly urlExtractionService: UrlExtractionService,
     private readonly aiItemGenerationService: AiItemGenerationService,
     private readonly searchQueryGenerationService: SearchQueryGenerationService,
     private readonly webPageRetrievalService: WebPageRetrievalService,
@@ -54,7 +56,7 @@ export class ItemsGeneratorService {
       existingTags?: Tag[];
     } = {},
   ) {
-    const { slug, name, description, target_keywords } =
+    const { slug, name, target_keywords, source_urls } =
       createItemsGeneratorDto;
     const config = { ...DEFAULT_CONFIG, ...createItemsGeneratorDto.config };
 
@@ -87,6 +89,33 @@ export class ItemsGeneratorService {
       }
       this.logger.log(`[${slug}] 1. Initialization & Slug Handling - Complete`);
 
+      // 1.1. Extract URLs from Description
+      this.logger.log(
+        `[${slug}] 1.1. URL Extraction from Description - Starting`,
+      );
+      const { extractedUrls, rewrittenDescription: description } =
+        await this.urlExtractionService.extractUrlsFromDescription(
+          slug,
+          createItemsGeneratorDto.description,
+        );
+
+      // Update the description in the DTO
+      createItemsGeneratorDto.description = description;
+
+      // Add source_urls to the extractedUrls
+      extractedUrls.push(...source_urls);
+
+      if (extractedUrls.length > 0) {
+        this.logger.log(
+          `[${slug}] Extracted (or source urls) ${extractedUrls.length} URLs from description: ${extractedUrls.join(', ')}`,
+        );
+        this.logger.log(`[${slug}] Updated description: "${description}"`);
+      } else {
+        this.logger.log(
+          `[${slug}] No URLs found in description. Using original description.`,
+        );
+      }
+
       // 1.5. AI-First Item Generation
       this.logger.log(`[${slug}] 1.5. AI-First Item Generation - Invoking`);
       const initialAiItems: ItemData[] =
@@ -117,12 +146,35 @@ export class ItemsGeneratorService {
 
       // 3. Web Search & Content Retrieval
       this.logger.log(`[${slug}] 3. Web Search & Content Retrieval - Starting`);
-      const webPages = await this.webPageRetrievalService.retrieveWebPages(
-        slug,
-        searchQueries,
-        processedSourceUrls,
-        config,
-      );
+
+      // Process extracted URLs first if any were found
+      let initialWebPages = [];
+      if (extractedUrls.length > 0) {
+        this.logger.log(
+          `[${slug}] Processing ${extractedUrls.length} URLs extracted from description`,
+        );
+        initialWebPages =
+          await this.webPageRetrievalService.retrieveSpecificUrls(
+            slug,
+            extractedUrls,
+            processedSourceUrls,
+          );
+        this.logger.log(
+          `[${slug}] Retrieved ${initialWebPages.length} web pages from extracted URLs`,
+        );
+      }
+
+      // Then proceed with normal web search
+      const searchWebPages =
+        await this.webPageRetrievalService.retrieveWebPages(
+          slug,
+          searchQueries,
+          processedSourceUrls,
+          config,
+        );
+
+      // Combine web pages from both sources
+      const webPages = [...initialWebPages, ...searchWebPages];
       this.logger.log(
         `[${slug}] Retrieved ${webPages.length} web pages for processing.`,
       );
