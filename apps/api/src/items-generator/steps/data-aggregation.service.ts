@@ -86,7 +86,7 @@ export class DataAggregationService {
     urlsScannedThisRun: number,
     pagesProcessedThisRun: number,
   ) {
-    const { slug, description } = createItemsGeneratorDto;
+    const { slug, prompt } = createItemsGeneratorDto;
     this.logger.log(`[${slug}] Starting data aggregation and deduplication.`);
 
     // Track metrics
@@ -106,7 +106,7 @@ export class DataAggregationService {
     // Deduplicate with AI (more sophisticated)
     if (deduplicated.length > 0) {
       this.logger.log(`[${slug}] Deduplicating items with AI.`);
-      deduplicated = await this.deduplicateWithAI(description, deduplicated);
+      deduplicated = await this.deduplicateWithAI(prompt, deduplicated);
       this.logger.log(
         `[${slug}] AI-based deduplication: ${deduplicated.length} items remaining`,
       );

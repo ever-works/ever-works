@@ -48,7 +48,7 @@ export class CategoryProcessingService {
 
   /**
    * Process items to generate categories and tags
-   * @param createItemsGeneratorDto The DTO containing the description
+   * @param createItemsGeneratorDto The DTO containing the prompt
    * @param extractedItems The items to categorize
    * @returns Object containing categorized items, categories, and tags
    */
@@ -56,7 +56,7 @@ export class CategoryProcessingService {
     createItemsGeneratorDto: CreateItemsGeneratorDto,
     extractedItems: Partial<ItemData>[],
   ) {
-    const { slug, description } = createItemsGeneratorDto;
+    const { slug, prompt } = createItemsGeneratorDto;
     this.logger.log(
       `[${slug}] Starting category and tag processing for ${extractedItems.length} items`,
     );
@@ -71,10 +71,7 @@ export class CategoryProcessingService {
 
     try {
       // Categorize items using AI
-      const categorized = await this.categorizeItems(
-        description,
-        extractedItems,
-      );
+      const categorized = await this.categorizeItems(prompt, extractedItems);
       this.logger.log(
         `[${slug}] Successfully categorized ${categorized.length} items`,
       );

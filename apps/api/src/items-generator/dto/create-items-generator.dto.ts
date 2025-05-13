@@ -47,7 +47,7 @@ export class CreateItemsGeneratorDto {
   name: string;
 
   @IsString()
-  description: string;
+  prompt: string;
 
   @IsOptional()
   @IsArray()

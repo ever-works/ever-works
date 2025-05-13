@@ -89,30 +89,30 @@ export class ItemsGeneratorService {
       }
       this.logger.log(`[${slug}] 1. Initialization & Slug Handling - Complete`);
 
-      // 1.1. Extract URLs from Description
+      // 1.1. Extract URLs from Prompt
       this.logger.log(
-        `[${slug}] 1.1. URL Extraction from Description - Starting`,
+        `[${slug}] 1.1. URL Extraction from Prompt - Starting`,
       );
-      const { extractedUrls, rewrittenDescription: description } =
-        await this.urlExtractionService.extractUrlsFromDescription(
+      const { extractedUrls, rewrittenPrompt: prompt } =
+        await this.urlExtractionService.extractUrlsFromPrompt(
           slug,
-          createItemsGeneratorDto.description,
+          createItemsGeneratorDto.prompt,
         );
 
-      // Update the description in the DTO
-      createItemsGeneratorDto.description = description;
+      // Update the prompt in the DTO
+      createItemsGeneratorDto.prompt = prompt;
 
       // Add source_urls to the extractedUrls
       extractedUrls.push(...source_urls);
 
       if (extractedUrls.length > 0) {
         this.logger.log(
-          `[${slug}] Extracted (or source urls) ${extractedUrls.length} URLs from description: ${extractedUrls.join(', ')}`,
+          `[${slug}] Extracted (or source urls) ${extractedUrls.length} URLs from prompt: ${extractedUrls.join(', ')}`,
         );
-        this.logger.log(`[${slug}] Updated description: "${description}"`);
+        this.logger.log(`[${slug}] Updated prompt: "${prompt}"`);
       } else {
         this.logger.log(
-          `[${slug}] No URLs found in description. Using original description.`,
+          `[${slug}] No URLs found in prompt. Using original prompt.`,
         );
       }
 
@@ -122,7 +122,7 @@ export class ItemsGeneratorService {
         await this.aiItemGenerationService.generateInitialItemsWithAI(
           slug,
           name,
-          description,
+          prompt,
           target_keywords,
         );
       this.logger.log(
@@ -136,7 +136,7 @@ export class ItemsGeneratorService {
       const searchQueries =
         await this.searchQueryGenerationService.generateSearchQueries(
           name,
-          description,
+          prompt,
           target_keywords,
           config,
         );
@@ -151,7 +151,7 @@ export class ItemsGeneratorService {
       let initialWebPages = [];
       if (extractedUrls.length > 0) {
         this.logger.log(
-          `[${slug}] Processing ${extractedUrls.length} URLs extracted from description`,
+          `[${slug}] Processing ${extractedUrls.length} URLs extracted from prompt`,
         );
         initialWebPages =
           await this.webPageRetrievalService.retrieveSpecificUrls(
@@ -188,7 +188,7 @@ export class ItemsGeneratorService {
           slug,
           webPages,
           name,
-          description,
+          prompt,
           config,
         );
       this.logger.log(
@@ -204,7 +204,7 @@ export class ItemsGeneratorService {
           slug,
           relevantPages,
           name,
-          description,
+          prompt,
           config,
         );
       this.logger.log(
