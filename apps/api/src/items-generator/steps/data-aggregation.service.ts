@@ -332,38 +332,38 @@ export class DataAggregationService {
       }
     }
 
-    // Final deduplication pass if needed
-    if (processedItems.length > CHUNK_SIZE) {
-      // Use field-based deduplication first to reduce size
-      processedItems = this.deduplicateByField(
-        this.deduplicateByField(processedItems, 'slug'),
-        'source_url',
-      );
+    // Final deduplication pass if needed (increased chunk size)
+    // if (processedItems.length > CHUNK_SIZE) {
+    //   // Use field-based deduplication first to reduce size
+    //   processedItems = this.deduplicateByField(
+    //     this.deduplicateByField(processedItems, 'slug'),
+    //     'source_url',
+    //   );
 
-      // If still large, use a final AI pass with increased chunk size
-      if (processedItems.length > CHUNK_SIZE * 2) {
-        const finalChunks = this.chunkArray(processedItems, CHUNK_SIZE * 2);
-        let finalProcessedItems: ItemData[] = [];
+    //   // If still large, use a final AI pass with increased chunk size
+    //   if (processedItems.length > CHUNK_SIZE * 2) {
+    //     const finalChunks = this.chunkArray(processedItems, CHUNK_SIZE * 2);
+    //     let finalProcessedItems: ItemData[] = [];
 
-        for (let i = 0; i < finalChunks.length; i++) {
-          this.logger.log(
-            `Final deduplication pass: chunk ${i + 1}/${finalChunks.length} (${finalChunks[i].length} items)`,
-          );
-          const deduplicatedChunk = await this.processSingleDeduplicationBatch(
-            description,
-            finalChunks[i],
-          );
-          finalProcessedItems = finalProcessedItems.concat(deduplicatedChunk);
+    //     for (let i = 0; i < finalChunks.length; i++) {
+    //       this.logger.log(
+    //         `Final deduplication pass: chunk ${i + 1}/${finalChunks.length} (${finalChunks[i].length} items)`,
+    //       );
+    //       const deduplicatedChunk = await this.processSingleDeduplicationBatch(
+    //         description,
+    //         finalChunks[i],
+    //       );
+    //       finalProcessedItems = finalProcessedItems.concat(deduplicatedChunk);
 
-          // Add a small delay between chunks
-          if (i < finalChunks.length - 1) {
-            await new Promise((resolve) => setTimeout(resolve, 500));
-          }
-        }
+    //       // Add a small delay between chunks
+    //       if (i < finalChunks.length - 1) {
+    //         await new Promise((resolve) => setTimeout(resolve, 500));
+    //       }
+    //     }
 
-        processedItems = finalProcessedItems;
-      }
-    }
+    //     processedItems = finalProcessedItems;
+    //   }
+    // }
 
     const totalTime = (Date.now() - startTime) / 1000;
     this.logger.log(
