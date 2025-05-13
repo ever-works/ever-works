@@ -434,8 +434,16 @@ export class DataAggregationService {
           candidateName,
         );
 
+        // Check if the candidate name appears before the current name
+        const currentNameFirstOccurrence = currentName.split(' ')[0];
+        const candidateNameFirstOccurrence = candidateName.split(' ')[0];
+
+        const isSimilarByOccurrence =
+          candidateName.split(' ').includes(currentNameFirstOccurrence) ||
+          currentName.split(' ').includes(candidateNameFirstOccurrence);
+
         // If similar enough, add to cluster
-        if (similarity >= this.SIMILARITY_THRESHOLD) {
+        if (similarity >= this.SIMILARITY_THRESHOLD || isSimilarByOccurrence) {
           cluster.push(candidateItem);
           processed.add(j);
         }
