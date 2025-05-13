@@ -35,7 +35,9 @@ export class DataGeneratorService {
     this.logger.log(
       `Initializing data repository for directory: ${directory.slug}`,
     );
-    this.logger.debug(`Using DTO: ${JSON.stringify(createItemsGeneratorDto)}`);
+    this.logger.debug(
+      `Using createItemsGeneratorDto: ${JSON.stringify(createItemsGeneratorDto)}`,
+    );
 
     // TODO: The generateItemsGenerator function expects a parameter for existing data.
     // If available, consider cloning the current project to fulfill this requirement.
