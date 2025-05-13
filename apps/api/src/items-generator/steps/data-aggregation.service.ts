@@ -190,13 +190,7 @@ export class DataAggregationService {
         .pipe(this.llm.withStructuredOutput(extractedItemsSchema))
         .invoke({
           task: description,
-          items: JSON.stringify(
-            items.map((i) => ({
-              name: i.name,
-              description: i.description,
-              url: i.source_url,
-            })),
-          ),
+          items: JSON.stringify(items.map(this.itemMap)),
         });
 
       return result.items.map((item) => {
@@ -235,19 +229,11 @@ export class DataAggregationService {
         EXTRACT_NEW_ITEMS_PROMPT,
       );
 
-      function itemMap(item: ItemData) {
-        return {
-          name: item.name,
-          description: item.description,
-          url: item.source_url,
-        };
-      }
-
       const result = await prompt
         .pipe(this.llm.withStructuredOutput(extractedItemsSchema))
         .invoke({
-          existing: JSON.stringify(existingItems.map(itemMap)),
-          new: JSON.stringify(newItems.map(itemMap)),
+          existing: JSON.stringify(existingItems.map(this.itemMap)),
+          new: JSON.stringify(newItems.map(this.itemMap)),
         });
 
       return result.items.map((item) => {
@@ -266,5 +252,13 @@ export class DataAggregationService {
       // Fallback to the new items if AI extraction fails
       return newItems;
     }
+  }
+
+  private itemMap(item: ItemData) {
+    return {
+      name: item.name,
+      description: item.description,
+      url: item.source_url,
+    };
   }
 }
