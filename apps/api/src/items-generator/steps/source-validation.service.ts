@@ -26,7 +26,7 @@ export class SourceValidationService {
       return [];
     }
 
-    // Process items in batches to avoid overwhelming the network
+    // Process items in batches
     const BATCH_SIZE = 15;
     const validItems: ItemData[] = [];
     const startTime = Date.now();

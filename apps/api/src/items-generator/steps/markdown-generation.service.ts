@@ -99,7 +99,7 @@ export class MarkdownGenerationService {
 
     this.logger.log(`Generating markdown for ${items.length} items`);
 
-    // Process items in batches to avoid overwhelming the API
+    // Process items in batches
     const BATCH_SIZE = 10;
     const processedItems: ItemData[] = [];
 
