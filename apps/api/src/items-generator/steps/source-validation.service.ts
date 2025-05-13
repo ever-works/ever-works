@@ -1,8 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import axios from 'axios';
 import { TavilyClient } from '@tavily/core';
-import { ItemData } from '../../agent/types';
-import { ConfigDto } from '../dto/create-items-generator.dto';
+import { ItemData, ConfigDto } from '../dto';
 import { SearchService } from '../shared';
 
 @Injectable()
