@@ -126,13 +126,16 @@ export class DataGeneratorService {
     return true;
   }
 
-  async update(directory: Directory, user: User, prompt: string) {
+  async update(
+    directory: Directory,
+    user: User,
+    createItemsGeneratorDto: CreateItemsGeneratorDto,
+  ) {
     this.logger.log(
       `Updating data repository for directory: ${directory.slug} with prompt: "${prompt}"`,
     );
     const token = user.getGitToken();
     const repo = directory.getDataRepo();
-    const agent = new Agent();
 
     this.logger.log(`Cloning repository ${directory.owner}/${repo}`);
     const dest = await this.githubService.clone(directory.owner, repo, token);
@@ -149,15 +152,28 @@ export class DataGeneratorService {
       );
 
       this.logger.debug('Generating new items based on prompt...');
-      const generated = await agent.generateNewItems(prompt, existingItems);
+
+      const generatedItems =
+        await this.itemsGeneratorService.generateItemsGenerator(
+          createItemsGeneratorDto,
+          { existingItems, existingCategories: categories, existingTags: tags },
+        );
+
+      if (!generatedItems) {
+        this.logger.error(
+          'Failed to generate items from ItemsGeneratorService.',
+        );
+        return;
+      }
+
       this.logger.debug(
-        `Generated ${generated.categories.length} new categories, ${generated.items.length} new items, ${generated.tags.length} new tags.`,
+        `Generated ${generatedItems.categories.length} categories, ${generatedItems.items.length} items, ${generatedItems.tags.length} tags.`,
       );
 
       this.logger.debug('Merging and writing categories and tags...');
       await Promise.all([
-        data.writeCategories(this.merge(categories, generated.categories)),
-        data.writeTags(this.merge(tags, generated.tags)),
+        data.writeCategories(this.merge(categories, generatedItems.categories)),
+        data.writeTags(this.merge(tags, generatedItems.tags)),
       ]);
       await this.githubService.add(data.dir, '.');
       await this.githubService.commit(
@@ -169,8 +185,13 @@ export class DataGeneratorService {
 
       await data.ensureDirectoriesExist();
 
-      this.logger.log(`Processing ${generated.items.length} new items...`);
-      for (const item of generated.items) {
+      this.logger.log(`Processing ${generatedItems.items.length} new items...`);
+      const itemsWithMarkdown =
+        await this.itemsGeneratorService.generateMarkdownForItems(
+          generatedItems.items,
+        );
+
+      for (const item of itemsWithMarkdown) {
         item.slug = slugifyText(item.slug || item.name);
         this.logger.debug(
           `Processing new item: ${item.name} (slug: ${item.slug})`,
@@ -180,6 +201,7 @@ export class DataGeneratorService {
       this.logger.log('All new items processed.');
 
       this.logger.log(`Pushing changes to ${directory.owner}/${repo}`);
+
       // TODO: it should create PR (or multiple PRs) instead of pushing directly
       await this.githubService.push(dest, token);
       this.logger.log('Successfully updated and pushed data repository.');
