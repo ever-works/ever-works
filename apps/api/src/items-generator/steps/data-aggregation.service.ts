@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ChatOpenAI } from '@langchain/openai';
 import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
+import * as stringSimilarity from 'string-similarity';
 import { CreateItemsGeneratorDto } from '../dto/create-items-generator.dto';
 import { ItemsGeneratorMetrics } from '../dto/items-generator-response.dto';
 import { AiService } from '../shared';
@@ -68,6 +69,7 @@ Here is the list of new items:
 export class DataAggregationService {
   private readonly logger = new Logger(DataAggregationService.name);
   private llm: ChatOpenAI;
+  private MAX_CLUSTER_SIZE = 50;
 
   constructor(private readonly aiService: AiService) {
     this.llm = this.aiService.createLlmWithTemperature(0.0); // Use temperature 0 for deterministic results
@@ -187,7 +189,7 @@ export class DataAggregationService {
     this.logger.log(`Starting AI deduplication for ${items.length} items`);
 
     // For small arrays, process directly
-    if (items.length <= 50) {
+    if (items.length <= this.MAX_CLUSTER_SIZE) {
       return this.processSingleDeduplicationBatch(description, items);
     }
 
@@ -253,7 +255,7 @@ export class DataAggregationService {
     );
 
     // Process each group in manageable chunks
-    const CHUNK_SIZE = 50; // Optimal size for LLM processing
+    const CHUNK_SIZE = this.MAX_CLUSTER_SIZE;
     let processedItems: ItemData[] = [];
     let totalProcessed = 0;
 
@@ -328,7 +330,7 @@ export class DataAggregationService {
       }
     }
 
-    // Step 3: Final deduplication pass if needed
+    // Final deduplication pass if needed
     if (processedItems.length > CHUNK_SIZE) {
       // Use field-based deduplication first to reduce size
       processedItems = this.deduplicateByField(
@@ -370,30 +372,144 @@ export class DataAggregationService {
   }
 
   /**
-   * Group similar items together to improve deduplication efficiency
+   * Group similar items together to improve deduplication efficiency using string similarity
    * @param items Items to group
    * @returns Array of item groups
    */
   private groupSimilarItems(items: ItemData[]): ItemData[][] {
-    // Create a simple grouping based on the first letter of the name
-    // This is a basic approach that can be enhanced with more sophisticated clustering
-    const groups: Map<string, ItemData[]> = new Map();
+    if (!items || items.length === 0) return [];
+    if (items.length <= this.MAX_CLUSTER_SIZE) return [items];
 
-    for (const item of items) {
-      if (!item.name) continue;
+    this.logger.log(
+      `Grouping ${items.length} items using string similarity clustering`,
+    );
 
-      // Get the first letter or character
-      const firstChar = item.name.charAt(0).toLowerCase();
+    // Extract normalized names for similarity comparison
+    const normalizedItems = items
+      .map((item) => {
+        // Skip items without names
+        if (!item.name) return { item, normalizedName: '' };
 
-      // Group by first letter
-      if (!groups.has(firstChar)) {
-        groups.set(firstChar, []);
+        // Normalize the name: lowercase, remove version numbers, trim
+        let normalizedName = item.name
+          .toLowerCase()
+          .replace(/\s+v?(\d+\.)*\d+(\s+|$)/g, ' ')
+          .replace(/\s+/g, ' ')
+          .replace(/[^\w\s]/g, '')
+          .trim();
+
+        return { item, normalizedName };
+      })
+      .filter(({ normalizedName }) => normalizedName.length > 0);
+
+    // Create initial clusters using hierarchical clustering
+    const SIMILARITY_THRESHOLD = 0.7;
+    const clusters: ItemData[][] = [];
+    const processed = new Set<number>();
+
+    // For each unprocessed item
+    for (let i = 0; i < normalizedItems.length; i++) {
+      if (processed.has(i)) continue;
+
+      const { item: currentItem, normalizedName: currentName } =
+        normalizedItems[i];
+
+      const cluster: ItemData[] = [currentItem];
+      processed.add(i);
+
+      // Find similar items
+      for (let j = 0; j < normalizedItems.length; j++) {
+        if (i === j || processed.has(j)) continue;
+
+        const { item: candidateItem, normalizedName: candidateName } =
+          normalizedItems[j];
+
+        // Skip empty names
+        if (!currentName || !candidateName) continue;
+
+        // Calculate similarity
+        const similarity = stringSimilarity.compareTwoStrings(
+          currentName,
+          candidateName,
+        );
+
+        // If similar enough, add to cluster
+        if (similarity >= SIMILARITY_THRESHOLD) {
+          cluster.push(candidateItem);
+          processed.add(j);
+        }
       }
-      groups.get(firstChar)!.push(item);
+
+      clusters.push(cluster);
     }
 
-    // Convert map to array of groups
-    return Array.from(groups.values());
+    // Merge small clusters if needed
+    const MIN_CLUSTER_SIZE = 5;
+    const MAX_CLUSTER_SIZE = this.MAX_CLUSTER_SIZE;
+    const finalClusters: ItemData[][] = [];
+    let currentCluster: ItemData[] = [];
+
+    // Sort clusters by size (largest first) for better distribution
+    const sortedClusters = clusters.sort((a, b) => b.length - a.length);
+
+    // Process large clusters first
+    for (const cluster of sortedClusters) {
+      if (cluster.length >= MIN_CLUSTER_SIZE) {
+        // If cluster is too large, split it
+        if (cluster.length > MAX_CLUSTER_SIZE) {
+          const numSubClusters = Math.ceil(cluster.length / MAX_CLUSTER_SIZE);
+          const subClusterSize = Math.ceil(cluster.length / numSubClusters);
+
+          for (let i = 0; i < cluster.length; i += subClusterSize) {
+            const subCluster = cluster.slice(i, i + subClusterSize);
+            finalClusters.push(subCluster);
+          }
+        } else {
+          finalClusters.push(cluster);
+        }
+      } else {
+        // Small clusters get merged until they reach optimal size
+        if (currentCluster.length + cluster.length <= MAX_CLUSTER_SIZE) {
+          currentCluster = currentCluster.concat(cluster);
+        } else {
+          if (currentCluster.length > 0) {
+            finalClusters.push(currentCluster);
+          }
+          currentCluster = cluster;
+        }
+      }
+    }
+
+    // Add the last merged cluster if not empty
+    if (currentCluster.length > 0) {
+      finalClusters.push(currentCluster);
+    }
+
+    // Handle any remaining items that weren't processed
+    const processedItems = new Set(finalClusters.flatMap((cluster) => cluster));
+    const remainingItems = items.filter((item) => !processedItems.has(item));
+
+    if (remainingItems.length > 0) {
+      // Split remaining items into reasonably sized clusters
+      for (let i = 0; i < remainingItems.length; i += MAX_CLUSTER_SIZE) {
+        finalClusters.push(remainingItems.slice(i, i + MAX_CLUSTER_SIZE));
+      }
+    }
+
+    this.logger.log(
+      `Created ${finalClusters.length} clusters with average size of ${Math.round(items.length / finalClusters.length)} items`,
+    );
+
+    // Log cluster sizes for debugging
+    const clusterSizes = finalClusters
+      .map((c) => c.length)
+      .sort((a, b) => b - a);
+
+    this.logger.log(
+      `Cluster sizes: ${clusterSizes.slice(0, 10).join(', ')}${clusterSizes.length > 10 ? '...' : ''}`,
+    );
+
+    return finalClusters;
   }
 
   /**
@@ -429,7 +545,7 @@ export class DataAggregationService {
     );
 
     // For small arrays, process directly
-    if (newItems.length <= 50) {
+    if (newItems.length <= this.MAX_CLUSTER_SIZE) {
       return this.processSingleExtractionBatch(existingItems, newItems);
     }
 
@@ -489,14 +605,14 @@ export class DataAggregationService {
     newItems: ItemData[],
     startTime: number,
   ): Promise<ItemData[]> {
-    // Step 1: Group similar items by name similarity to create more efficient chunks
+    // Group similar items by name similarity to create more efficient chunks
     const groupedItems = this.groupSimilarItems(newItems);
     this.logger.log(
       `Grouped ${newItems.length} new items into ${groupedItems.length} clusters for efficient processing`,
     );
 
-    // Step 2: Process each group in manageable chunks
-    const CHUNK_SIZE = 50; // Optimal size for LLM processing
+    // Process each group in manageable chunks
+    const CHUNK_SIZE = this.MAX_CLUSTER_SIZE;
     let extractedItems: ItemData[] = [];
     let totalProcessed = 0;
 
@@ -563,7 +679,7 @@ export class DataAggregationService {
       }
     }
 
-    // Step 3: Final deduplication pass to ensure no duplicates in the result
+    // Final deduplication pass to ensure no duplicates in the result
     extractedItems = this.deduplicateByField(
       this.deduplicateByField(extractedItems, 'slug'),
       'source_url',
