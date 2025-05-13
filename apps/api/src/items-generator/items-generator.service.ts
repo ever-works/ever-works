@@ -313,7 +313,7 @@ Generated Queries:
       const queries = result
         .split('\n')
         .map((q) => q.trim().replace(/^- /, ''))
-        .filter((q) => q.length > 5) // Filter out very short or empty lines
+        .filter((q) => q.length > 3) // Filter out very short or empty lines
         .filter((q, index, self) => self.indexOf(q) === index); // Ensure uniqueness
 
       this.logger.log(
