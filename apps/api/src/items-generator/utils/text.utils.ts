@@ -1,8 +1,34 @@
 import * as cheerio from 'cheerio';
 import { Logger } from '@nestjs/common';
 import slugify from 'slugify';
+import axios from 'axios';
 
 const logger = new Logger('TextUtils');
+
+export async function extractTextFromSourceURL(
+  source_url: string,
+): Promise<string> {
+  const response = await axios.get(source_url, {
+    headers: {
+      'User-Agent': `ItemsGeneratorBuilder/ever-works (Node.js/Axios; +https://github.com/ever-works)`,
+    },
+    timeout: 15000, // 15-second timeout
+    validateStatus: (status) => status >= 200 && status < 400, // Only consider 2xx and 3xx as success
+  });
+
+  if (
+    response.headers['content-type'] &&
+    !response.headers['content-type'].includes('text/html') &&
+    !response.headers['content-type'].includes('text/plain')
+  ) {
+    this.logger.warn(
+      `[extractTextFromSourceURL] Skipping non-HTML/text content at ${source_url} (Content-Type: ${response.headers['content-type']})`,
+    );
+    return '';
+  }
+
+  return extractTextFromHtml(response.data);
+}
 
 export function extractTextFromHtml(htmlContent: string): string {
   try {
