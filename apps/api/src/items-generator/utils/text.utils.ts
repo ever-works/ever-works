@@ -21,7 +21,7 @@ export async function extractTextFromSourceURL(
     !response.headers['content-type'].includes('text/html') &&
     !response.headers['content-type'].includes('text/plain')
   ) {
-    this.logger.warn(
+    logger.warn(
       `[extractTextFromSourceURL] Skipping non-HTML/text content at ${source_url} (Content-Type: ${response.headers['content-type']})`,
     );
     return '';
