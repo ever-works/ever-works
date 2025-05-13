@@ -20,21 +20,65 @@ export class SourceValidationService {
     this.logger.log(
       `[${slug}] Starting source URL validation and filtering for ${items.length} items.`,
     );
+
+    if (!items || items.length === 0) {
+      this.logger.log(`[${slug}] No items to validate.`);
+      return [];
+    }
+
+    // Process items in batches to avoid overwhelming the network
+    const BATCH_SIZE = 15;
     const validItems: ItemData[] = [];
+    const startTime = Date.now();
 
     try {
-      for (const currentItem of items) {
-        const validatedSourceUrl = await this.validateAndFetchSourceUrl(
-          slug,
-          currentItem,
+      // Process items in batches
+      for (let i = 0; i < items.length; i += BATCH_SIZE) {
+        const batch = items.slice(i, i + BATCH_SIZE);
+        const batchNumber = Math.floor(i / BATCH_SIZE) + 1;
+        const totalBatches = Math.ceil(items.length / BATCH_SIZE);
+
+        this.logger.log(
+          `[${slug}] Processing batch ${batchNumber} of ${totalBatches} (${batch.length} items)`,
         );
 
-        if (validatedSourceUrl) {
-          const updatedItem: ItemData = {
-            ...currentItem,
-            source_url: validatedSourceUrl,
-          };
-          validItems.push(updatedItem);
+        // Process all items in the batch in parallel
+        const validationPromises = batch.map((item) => {
+          return this.validateAndFetchSourceUrl(slug, item)
+            .then((validatedSourceUrl) => {
+              if (validatedSourceUrl) {
+                return {
+                  ...item,
+                  source_url: validatedSourceUrl,
+                  valid: true,
+                };
+              }
+              return { ...item, valid: false };
+            })
+            .catch((error) => {
+              this.logger.error(
+                `[${slug}] Error validating URL for "${item.name}": ${error.message}`,
+                error.stack,
+              );
+              return { ...item, valid: false };
+            });
+        });
+
+        const batchResults = await Promise.all(validationPromises);
+
+        // Filter valid items and add them to the result
+        const validBatchItems = batchResults
+          .filter((item) => item.valid)
+          .map(({ valid, ...item }) => item);
+        validItems.push(...validBatchItems);
+
+        this.logger.log(
+          `[${slug}] Batch ${batchNumber} complete. ${validBatchItems.length} of ${batch.length} items passed validation.`,
+        );
+
+        // Add a small delay between batches to be polite to external servers
+        if (i + BATCH_SIZE < items.length) {
+          await new Promise((resolve) => setTimeout(resolve, 500));
         }
       }
     } catch (error) {
@@ -44,8 +88,9 @@ export class SourceValidationService {
       );
     }
 
+    const processingTime = (Date.now() - startTime) / 1000;
     this.logger.log(
-      `[${slug}] Finished source URL validation. ${validItems.length} of ${items.length} items passed.`,
+      `[${slug}] Finished source URL validation in ${processingTime.toFixed(2)}s. ${validItems.length} of ${items.length} items passed.`,
     );
 
     return validItems;
@@ -70,7 +115,15 @@ export class SourceValidationService {
       }
 
       try {
-        new URL(urlToValidate); // Basic syntax check
+        // Basic syntax check
+        try {
+          new URL(urlToValidate);
+        } catch (urlError) {
+          this.logger.warn(
+            `[${slug}] Invalid URL format for "${itemName}": ${urlToValidate}`,
+          );
+          return undefined;
+        }
 
         this.logger.log(
           `[${slug}] Validating provided URL for "${itemName}": ${urlToValidate}`,
@@ -96,11 +149,13 @@ export class SourceValidationService {
       }
     };
 
+    // Try to validate the original source URL first
     const validatedInitialUrl = await validateUrl(sourceUrl);
     if (validatedInitialUrl) {
       return validatedInitialUrl;
     }
 
+    // If original URL is invalid, try to find a new one using Tavily
     if (!this.tavilyClient) {
       this.logger.warn(
         `[${slug}] Tavily retriever not available. Cannot search for URL for "${itemName}".`,
@@ -111,7 +166,6 @@ export class SourceValidationService {
     try {
       // Ensure itemName and itemDescription are strings before using them in search query
       const safeItemName = typeof itemName === 'string' ? itemName : 'item';
-
       const safeItemDescription =
         typeof itemDescription === 'string'
           ? itemDescription.substring(0, 100)
@@ -135,24 +189,46 @@ export class SourceValidationService {
       );
 
       const documents = await this.webSearch(searchQuery, {
-        max_results_per_query: 3,
+        max_results_per_query: 5,
       });
 
       if (documents && documents.length > 0) {
-        for (const doc of documents) {
-          if (doc.url) {
-            const validatedTavilyUrl = await validateUrl(doc.url);
-            if (validatedTavilyUrl) {
-              this.logger.log(
-                `[${slug}] Found and validated Tavily URL for "${itemName}": ${validatedTavilyUrl}`,
-              );
+        // Filter out undefined URLs and prepare for validation
+        const urlsToValidate = documents
+          .filter((doc) => doc.url && typeof doc.url === 'string')
+          .map((doc) => doc.url);
 
-              return validatedTavilyUrl;
-            }
-          }
+        if (urlsToValidate.length === 0) {
+          this.logger.warn(
+            `[${slug}] Tavily search found no valid URLs for "${itemName}".`,
+          );
+          return undefined;
         }
+
+        this.logger.log(
+          `[${slug}] Validating ${urlsToValidate.length} URLs from Tavily search for "${itemName}".`,
+        );
+
+        // Validate all URLs in parallel
+        const validationPromises = urlsToValidate.map((url) =>
+          validateUrl(url),
+        );
+        const validationResults = await Promise.all(validationPromises);
+
+        // Find the first valid URL
+        const firstValidUrl = validationResults.find(
+          (url) => url !== undefined,
+        );
+
+        if (firstValidUrl) {
+          this.logger.log(
+            `[${slug}] Found and validated Tavily URL for "${itemName}": ${firstValidUrl}`,
+          );
+          return firstValidUrl;
+        }
+
         this.logger.warn(
-          `[${slug}] Tavily found URLs for "${itemName}", but none passed validation.`,
+          `[${slug}] Tavily found ${urlsToValidate.length} URLs for "${itemName}", but none passed validation.`,
         );
       } else {
         this.logger.warn(
@@ -167,8 +243,9 @@ export class SourceValidationService {
     }
 
     this.logger.warn(
-      `[${slug}] Could not find or validate a source URL for "${itemName}" after AI and Tavily attempts.`,
+      `[${slug}] Could not find or validate a source URL for "${itemName}" after all attempts.`,
     );
+
     return undefined; // No valid URL found
   }
 
