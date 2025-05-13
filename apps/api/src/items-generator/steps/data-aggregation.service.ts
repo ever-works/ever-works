@@ -186,6 +186,7 @@ export class DataAggregationService {
     try {
       const prompt =
         HumanMessagePromptTemplate.fromTemplate(DEDUPLICATOR_PROMPT);
+
       const result = await prompt
         .pipe(this.llm.withStructuredOutput(extractedItemsSchema))
         .invoke({
