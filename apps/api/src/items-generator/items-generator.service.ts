@@ -21,7 +21,7 @@ const DEFAULT_CONFIG: Required<ConfigDto> = {
   max_results_per_query: 20,
   max_pages_to_process: 100,
   relevance_threshold_content: 0.75,
-  min_content_length_for_extraction: 500,
+  min_content_length_for_extraction: 300,
   ai_first_generation_enabled: true,
 };
 
