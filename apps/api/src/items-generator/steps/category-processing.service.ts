@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { CreateItemsGeneratorDto } from '../dto/create-items-generator.dto';
-import { ItemData } from '../../agent/types';
 import { categorize } from '../../agent/categorize';
 import { slugifyText } from '../utils/text.utils';
+import { ItemData } from '../dto';
 
 @Injectable()
 export class CategoryProcessingService {

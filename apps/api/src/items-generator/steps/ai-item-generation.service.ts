@@ -12,8 +12,6 @@ import { ItemData } from '../../agent/types';
 import { slugifyText } from '../utils/text.utils';
 import { AiService } from '../shared';
 
-// Default number of items to ask the AI to generate in the initial phase
-
 @Injectable()
 export class AiItemGenerationService {
   private readonly logger = new Logger(AiItemGenerationService.name);

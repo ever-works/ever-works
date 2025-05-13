@@ -1,13 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ChatOpenAI } from '@langchain/openai';
 import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
-import { z } from 'zod';
 import { CreateItemsGeneratorDto } from '../dto/create-items-generator.dto';
 import { ItemsGeneratorMetrics } from '../dto/items-generator-response.dto';
-import { ItemData } from '../../agent/types';
-import { itemDataSchema } from '../../agent/schemas';
 import { AiService } from '../shared';
 import { slugifyText } from '../utils/text.utils';
+import { extractedItemsSchema } from '../schemas/item-extraction.schemas';
+import { ItemData } from '../dto';
 
 // Prompts for deduplication and extraction
 const DEDUPLICATOR_PROMPT = `
@@ -64,11 +63,6 @@ Here is the list of new items:
 {new}
 </new>
 `.trim();
-
-// Output schemas for validation
-const outputSchema = z.object({
-  items: z.array(itemDataSchema),
-});
 
 @Injectable()
 export class DataAggregationService {
@@ -193,7 +187,7 @@ export class DataAggregationService {
       const prompt =
         HumanMessagePromptTemplate.fromTemplate(DEDUPLICATOR_PROMPT);
       const result = await prompt
-        .pipe(this.llm.withStructuredOutput(outputSchema))
+        .pipe(this.llm.withStructuredOutput(extractedItemsSchema))
         .invoke({
           task: description,
           items: JSON.stringify(
@@ -250,7 +244,7 @@ export class DataAggregationService {
       }
 
       const result = await prompt
-        .pipe(this.llm.withStructuredOutput(outputSchema))
+        .pipe(this.llm.withStructuredOutput(extractedItemsSchema))
         .invoke({
           existing: JSON.stringify(existingItems.map(itemMap)),
           new: JSON.stringify(newItems.map(itemMap)),
