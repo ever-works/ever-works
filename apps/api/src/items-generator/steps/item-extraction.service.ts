@@ -33,7 +33,7 @@ export class ItemExtractionService {
       return [];
     }
 
-    // Step 1: Filter pages with sufficient content
+    // Filter pages with sufficient content
     const pagesWithSufficientContent = relevantPages.filter((page) => {
       const hasSufficientContent =
         page.raw_content &&
@@ -52,7 +52,7 @@ export class ItemExtractionService {
       return [];
     }
 
-    // Step 2: Define the item extraction function
+    // Define the item extraction function
     const extractItemsFromPage = async (
       page: WebPageData,
     ): Promise<ItemData[]> => {
@@ -147,8 +147,8 @@ Only call the extraction function if you find at least one item meeting these st
       return extractedItems;
     };
 
-    // Step 3: Process pages in batches to avoid rate limits
-    const BATCH_SIZE = 10; // Smaller batch size for extraction as it's more intensive
+    // Process pages in batches to avoid rate limits
+    const BATCH_SIZE = 10;
     const allExtractedItems: ItemData[] = [];
 
     this.logger.log(
