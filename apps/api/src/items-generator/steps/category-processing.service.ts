@@ -187,9 +187,6 @@ export class CategoryProcessingService {
     // Process items in batches
     for (let i = 0; i < items.length; i += BATCH_SIZE) {
       const batch = items.slice(i, i + BATCH_SIZE);
-      this.logger.log(
-        `Processing batch ${Math.floor(i / BATCH_SIZE) + 1} of ${Math.ceil(items.length / BATCH_SIZE)} (${batch.length} items)`,
-      );
 
       try {
         const prompt =
