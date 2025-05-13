@@ -231,6 +231,7 @@ export class DataAggregationService {
         `Error during AI deduplication batch: ${error.message}`,
         error.stack,
       );
+
       // Fallback to the original items if AI deduplication fails
       return items;
     }
