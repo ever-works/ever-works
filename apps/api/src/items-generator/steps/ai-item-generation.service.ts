@@ -18,7 +18,7 @@ export class AiItemGenerationService {
   private llm: ChatOpenAI;
 
   constructor(private readonly aiService: AiService) {
-    this.llm = this.aiService.getLlm();
+    this.llm = this.aiService.createLlmWithTemperature(0.3);
   }
 
   async generateInitialItemsWithAI(
