@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { ItemData, Category, Tag, CreateItemsGeneratorDto } from '../dto';
 import { slugifyText } from '../utils/text.utils';
 import { AiService } from '../shared';
-import { itemDataWithCategoriesAndTagsSchema } from '../../agent/schemas';
+import { itemDataWithCategoriesAndTagsSchema } from '../schemas/item-extraction.schemas';
 
 // Prompt for categorization
 const CATEGORIZE_PROMPT = `
