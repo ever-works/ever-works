@@ -75,7 +75,7 @@ export class MarkdownGenerationService {
         .pipe(this.llm.withStructuredOutput(markdownOutputSchema))
         .invoke({
           item: JSON.stringify(item),
-          content: content.rawContent,
+          content: content.rawContent.slice(0, 8000),
         });
 
       return result.markdown || '';
