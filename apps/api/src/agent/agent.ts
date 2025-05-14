@@ -2,13 +2,13 @@ import { Logger } from "@nestjs/common";
 import { Identifiable, ItemData } from "./types";
 import { markdown } from "./markdown";
 import { generateQueries } from "./queries";
-import { aggregateSearchResults, extractContent, filterUrls, searchWeb } from "./tavily";
+import { aggregateSearchResults, extractContent, searchWeb } from "./tavily";
 import { generateItemsSubarray } from "./generator";
 import { arrayDiff, deduplicateByField } from "./utils";
-import { deduplicateItems, filterNewItems } from "./deduplicator";
-import { categorizeItems } from "./categorize";
-import slugify from "slugify";
+import { deduplicate, extractNewItems } from "./deduplicator";
+import { categorize } from "./categorize";
 import { detectType } from "./detect";
+import { slugifyText } from "src/items-generator/utils/text.utils";
 
 export interface GenerateOptions {
     maxQueries?: number;
@@ -48,9 +48,7 @@ export class Agent {
 
         const queries = await generateQueries(task, options.maxQueries);
         const searches = await Promise.all(queries.map(q => searchWeb(q)));
-        let urls = aggregateSearchResults(searches.flat(), options.maxUrls);
-        urls = await filterUrls(urls);
-
+        const urls = aggregateSearchResults(searches.flat(), options.maxUrls);
         const context = await extractContent(urls);
 
         // For each website we extract content from, we generate subarrays of items -> then we merge subarrays into one array (and later we need to deduplicate items)
@@ -58,28 +56,16 @@ export class Agent {
         const generated = subarrays.flat();
         const aggregated = deduplicateByField(deduplicateByField(generated, 'slug'), 'source_url');
         Logger.log(`Generated and aggregated ${aggregated.length} items`, 'Agent');
-
-        // Remove duplicates using LLM
-        // const deduplicated = await deduplicateItems(task, aggregated.map(i => ({ name: i.name, description: i.description, url: i.source_url })));
-        // console.log(arrayDiff(aggregated, deduplicated, 'slug'));
+        const deduplicated = await deduplicate(task, aggregated.map(i => ({ name: i.name, description: i.description, url: i.source_url })));
+        console.log(arrayDiff(aggregated, deduplicated, 'slug'));
         
         // Only filter for new items if we have existing items (initially we pass empty array)
-        let itemsToProcess = aggregated;
+        let itemsToProcess = deduplicated;
         if (existingItems.length > 0) {
-            itemsToProcess = await filterNewItems(existingItems, aggregated);
+            itemsToProcess = await extractNewItems(existingItems, deduplicated);
         }
 
-        const categorized = await categorizeItems(
-            task,
-            itemsToProcess.map((i) => ({
-              name: i.name,
-              slug: i.slug,
-              description: i.description,
-              url: i.source_url,
-              category: i.category,
-              tags: i.tags,
-            })),
-        );
+        const categorized = await categorize(task, itemsToProcess.map(i => ({ name: i.name, description: i.description, url: i.source_url })));
         const categories = this.mapUnique(categorized.map(item => item.category as string));
         const tags = this.mapUnique(categorized.flatMap(item => item.tags as string[]));
         return { queries, urls, items: categorized.map(this.toItemData), categories, tags };
@@ -87,7 +73,7 @@ export class Agent {
 
     private mapUnique(names: string[]): Array<Identifiable> {
         const unique = new Set(names);
-        return Array.from(unique).map(name => ({ id: slugify(name, { lower: true, trim: true }), name }));
+        return Array.from(unique).map(name => ({ id: slugifyText(name), name }));
     }
 
     private toItemData(item: Partial<ItemData>): ItemData {
@@ -95,9 +81,9 @@ export class Agent {
             name: item.name,
             description: item.description,
             source_url: item.source_url,
-            category: slugify(item.category as string, { lower: true, trim: true }),
-            tags: item.tags.map(tag => slugify(tag, { lower: true, trim: true })),
-            slug: slugify(item.name, { lower: true, trim: true }),
+            category: slugifyText(item.category as string),
+            tags: item.tags.map(tag => slugifyText(tag)),
+            slug: slugifyText(item.name),
         };
     }
 

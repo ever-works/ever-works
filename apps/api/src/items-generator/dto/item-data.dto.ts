@@ -1,14 +1,10 @@
+import { Category } from './category.dto';
+import { Tag } from './tag.dto';
+
 export interface Identifiable {
   id: string;
   name: string;
 }
-
-export interface Category extends Identifiable {
-  description?: string;
-  icon_url?: string;
-}
-
-export interface Tag extends Identifiable {}
 
 export interface ItemData {
   name: string;
@@ -18,4 +14,5 @@ export interface ItemData {
   category: string | string[] | Category | Category[];
   slug?: string;
   tags: string[] | Tag[];
+  markdown?: string;
 }

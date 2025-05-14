@@ -1,6 +1,8 @@
 import {
   Body,
   Controller,
+  HttpCode,
+  HttpStatus,
   NotFoundException,
   Post,
   UsePipes,
@@ -12,8 +14,9 @@ import { WebsiteGeneratorService } from './website-generator/website-generator.s
 import { Directory } from './entities/directory.entity';
 import { User } from './entities/user.entity';
 import { GithubService } from './git/github.service';
-import { GenerateDataDto } from './validators/generate-data.dto';
-import { CreateDirectoryDto } from './validators/create-directory.dto';
+import { CreateItemsGeneratorDto } from './items-generator/dto/create-items-generator.dto';
+import { ItemsGeneratorResponseDto } from './items-generator/dto/items-generator-response.dto';
+import { CreateDirectoryDto } from './dto/create-directory.dto';
 
 @Controller()
 export class AppController {
@@ -35,8 +38,8 @@ export class AppController {
     if (owner) {
       dir.owner = owner;
     } else {
-      const githubUser = await this.githubService.getUser(user.getGitToken()); // Renamed owner to githubUser to avoid conflict
-      dir.owner = githubUser.login;
+      const owner = await this.githubService.getUser(user.getGitToken());
+      dir.owner = owner.login;
     }
     dir.name = name;
     dir.description = description;
@@ -46,36 +49,74 @@ export class AppController {
   }
 
   @Post('generate')
-  @UsePipes(new ValidationPipe({ transform: true }))
-  async generateData(@Body() generateDataDto: GenerateDataDto) {
-    const { slug, prompt } = generateDataDto;
+  @HttpCode(HttpStatus.ACCEPTED)
+  async generateItemsGenerator(
+    @Body(
+      new ValidationPipe({
+        transform: true,
+        whitelist: true,
+        forbidNonWhitelisted: true,
+      }),
+    )
+    createItemsGeneratorDto: CreateItemsGeneratorDto,
+  ): Promise<ItemsGeneratorResponseDto> {
     const user = await User.sessionMock();
-    const directory = await Directory.findMock(slug);
+    const directory = await Directory.findMock(createItemsGeneratorDto.slug);
     if (!directory) {
       throw new NotFoundException('Directory not found');
     }
 
-    await this.dataGenerator.initialize(directory, user, prompt);
-    await Promise.all([
-      this.markdownGenerator.initialize(directory, user),
-      this.websiteGenerator.initialize(directory, user),
-    ]);
+    // Intentionally not awaiting this to allow for an immediate response
+    // The actual processing will happen in the background.
+    // A more robust solution might involve job queues, webhooks, or websockets for status updates.
+    (async () => {
+      const startTime = new Date();
+      console.log(`Generation started at: ${startTime.toISOString()}`);
 
-    return directory;
+      const generated = await this.dataGenerator.initialize(
+        directory,
+        user,
+        createItemsGeneratorDto,
+      );
+
+      if (generated) {
+        await Promise.all([
+          this.markdownGenerator.initialize(directory, user),
+          this.websiteGenerator.initialize(directory, user),
+        ]);
+      }
+
+      const endTime = new Date();
+      console.log(`Generation finished at: ${endTime.toISOString()}`);
+      const duration = (endTime.getTime() - startTime.getTime()) / 1000;
+      console.log(`Total time taken: ${duration} seconds`);
+    })();
+
+    return {
+      status: 'pending',
+      slug: createItemsGeneratorDto.slug,
+      message: `Processing request for '${createItemsGeneratorDto.name}'. Check logs or data directory for updates.`,
+    };
   }
 
   @Post('sync')
-  @UsePipes(new ValidationPipe({ transform: true }))
-  async updateData(@Body() updateDataDto: GenerateDataDto) {
-    const { slug, prompt } = updateDataDto;
-
+  async updateData(
+    @Body(
+      new ValidationPipe({
+        transform: true,
+        whitelist: true,
+        forbidNonWhitelisted: true,
+      }),
+    )
+    createItemsGeneratorDto: CreateItemsGeneratorDto,
+  ) {
     const user = await User.sessionMock();
-    const directory = await Directory.findMock(slug);
+    const directory = await Directory.findMock(createItemsGeneratorDto.slug);
     if (!directory) {
       throw new NotFoundException('Directory not found');
     }
 
-    await this.dataGenerator.update(directory, user, prompt);
+    await this.dataGenerator.update(directory, user, createItemsGeneratorDto);
     await this.markdownGenerator.update(directory, user);
 
     return directory;
