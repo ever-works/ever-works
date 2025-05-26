@@ -10,6 +10,7 @@ import { DataAggregationService } from './steps/data-aggregation.service';
 import { CategoryProcessingService } from './steps/category-processing.service';
 import { MarkdownGenerationService } from './steps/markdown-generation.service';
 import { UrlExtractionService } from './steps/url-extraction.service';
+import { PromptComparisonService } from './steps/prompt-comparison.service';
 import { AiService, SearchService } from './shared';
 
 @Module({
@@ -22,6 +23,7 @@ import { AiService, SearchService } from './shared';
     ItemsGeneratorService,
 
     // Step services
+    PromptComparisonService,
     UrlExtractionService,
     AiItemGenerationService,
     SearchQueryGenerationService,

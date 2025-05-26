@@ -1,15 +1,22 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { CreateItemsGeneratorDto, ConfigDto } from './dto/create-items-generator.dto';
-import { AiItemGenerationService } from './steps/ai-item-generation.service';
-import { SearchQueryGenerationService } from './steps/search-query-generation.service';
-import { WebPageRetrievalService } from './steps/web-page-retrieval.service';
-import { ContentFilteringService } from './steps/content-filtering.service';
-import { ItemExtractionService } from './steps/item-extraction.service';
-import { SourceValidationService } from './steps/source-validation.service';
-import { DataAggregationService } from './steps/data-aggregation.service';
-import { CategoryProcessingService } from './steps/category-processing.service';
-import { MarkdownGenerationService } from './steps/markdown-generation.service';
-import { UrlExtractionService } from './steps/url-extraction.service';
+import {
+    CreateItemsGeneratorDto,
+    ConfigDto,
+    OperationType,
+} from './dto/create-items-generator.dto';
+import {
+    AiItemGenerationService,
+    SearchQueryGenerationService,
+    WebPageRetrievalService,
+    ContentFilteringService,
+    ItemExtractionService,
+    SourceValidationService,
+    DataAggregationService,
+    CategoryProcessingService,
+    MarkdownGenerationService,
+    UrlExtractionService,
+    PromptComparisonService,
+} from './steps';
 import { Category, ItemData, Tag } from './dto';
 import { IDataConfig } from '../data-generator/data-repository';
 
@@ -28,6 +35,7 @@ export class ItemsGeneratorService {
     private readonly logger = new Logger(ItemsGeneratorService.name);
 
     constructor(
+        private readonly promptComparisonService: PromptComparisonService,
         private readonly urlExtractionService: UrlExtractionService,
         private readonly aiItemGenerationService: AiItemGenerationService,
         private readonly searchQueryGenerationService: SearchQueryGenerationService,
@@ -53,7 +61,7 @@ export class ItemsGeneratorService {
             existingItems?: ItemData[];
             existingCategories?: Category[];
             existingTags?: Tag[];
-            existingConfig?: IDataConfig | {};
+            existingConfig?: IDataConfig;
         } = {},
     ) {
         const { slug, name, target_keywords, source_urls } = createItemsGeneratorDto;
@@ -62,9 +70,19 @@ export class ItemsGeneratorService {
         this.logger.log(`Starting generation for slug: ${slug}, name: ${name}`);
 
         try {
-            const { existingItems = [], existingCategories = [], existingTags = [] } = existing;
+            let {
+                existingItems = [],
+                existingCategories = [],
+                existingTags = [],
+                existingConfig,
+            } = existing;
 
-            const processedSourceUrls = new Set<string>();
+            // reset existing if we are in recreate mode
+            if (createItemsGeneratorDto.operation === OperationType.RECREATE) {
+                existingItems = [];
+                existingCategories = [];
+                existingTags = [];
+            }
 
             // Log the number of existing items, categories, and tags (if any)
             if (existingItems.length || existingCategories.length || existingTags.length) {
@@ -74,6 +92,44 @@ export class ItemsGeneratorService {
                 );
                 this.logger.log(`Loaded ${existingTags.length} existing tags for slug: ${slug}`);
             }
+
+            // 1.0. Prompt Comparison
+            if (
+                existingConfig?.initial_prompt &&
+                createItemsGeneratorDto.operation === OperationType.CREATE_UPDATE &&
+                existingItems.length > 0
+            ) {
+                this.logger.log(`[${slug}] 1.0. Prompt Comparison - Starting`);
+                const comparisonResult = await this.promptComparisonService.comparePrompts(
+                    slug,
+                    existingConfig.initial_prompt,
+                    createItemsGeneratorDto.prompt,
+                );
+
+                const confidence = comparisonResult.confidence;
+                const confidenceThreshold = 0.5;
+
+                const areRelated =
+                    comparisonResult.areRelated &&
+                    comparisonResult.confidence > confidenceThreshold;
+
+                this.logger.log(
+                    `[${slug}] Prompt comparison: ${comparisonResult.areRelated ? 'RELATED' : 'UNRELATED'} ` +
+                        `(confidence: ${confidence.toFixed(2)})`,
+                );
+
+                // If prompts are not related, throw an error
+                // Preventing data inconsistency
+                if (!areRelated) {
+                    throw new Error(
+                        `Prompt comparison failed. Prompts are not related. Confidence: ${confidence.toFixed(
+                            2,
+                        )}`,
+                    );
+                }
+            }
+
+            const processedSourceUrls = new Set<string>();
 
             // 1.1. Extract URLs from Prompt
             this.logger.log(`[${slug}] 1.1. URL Extraction from Prompt - Starting`);

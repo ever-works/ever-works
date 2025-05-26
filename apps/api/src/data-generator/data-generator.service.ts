@@ -35,7 +35,7 @@ export class DataGeneratorService {
             existingItems: [],
             existingCategories: [],
             existingTags: [],
-            existingConfig: {},
+            existingConfig: null,
         };
 
         // Get existing data if available
@@ -221,7 +221,7 @@ export class DataGeneratorService {
                     data.getCategories().catch(() => []),
                     data.getTags().catch(() => []),
                     data.getItems().catch(() => []),
-                    data.getConfig().catch(() => ({})),
+                    data.getConfig().catch(() => null),
                 ]);
 
                 this.logger.debug(
@@ -240,7 +240,7 @@ export class DataGeneratorService {
                     existingItems: [],
                     existingCategories: [],
                     existingTags: [],
-                    existingConfig: {},
+                    existingConfig: null,
                 };
             }
         } catch (error) {
@@ -252,7 +252,7 @@ export class DataGeneratorService {
                 existingItems: [],
                 existingCategories: [],
                 existingTags: [],
-                existingConfig: {},
+                existingConfig: null,
             };
         }
     }
