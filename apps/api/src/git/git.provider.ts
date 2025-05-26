@@ -29,16 +29,22 @@ export abstract class GitProvider {
     /**
      *  Clones or pulls repository to/from a persistent location using slugified name
      */
-    async cloneOrPull(owner: string, repo: string, token: string): Promise<string> {
+    async cloneOrPull(
+        owner: string,
+        repo: string,
+        token: string,
+        committer: ICommitter = {},
+    ): Promise<string> {
         const dir = this.getDir(owner, repo);
         const url = this.getURL(owner, repo);
         const auth = this.getAuth(token);
 
         if (await this.directoryExists(dir)) {
             try {
-                await this.pull(dir, token);
+                await this.pull(dir, token, committer);
                 return dir;
             } catch (error) {
+                console.log(`Failed to pull ${dir}, removing directory and cloning again`, error);
                 await fs.promises.rm(dir, { recursive: true, force: true });
             }
         }
@@ -68,13 +74,17 @@ export abstract class GitProvider {
     }
 
     /* Pulls latest changes from remote repository */
-    async pull(dir: string, token: string): Promise<void> {
+    async pull(dir: string, token: string, committer: ICommitter = {}): Promise<void> {
         const auth = this.getAuth(token);
+        committer.email = committer.email || process.env.GIT_EMAIL;
+        committer.name = committer.name || process.env.GIT_NAME;
+
         await git.pull({
             onAuth: () => auth,
             fs,
             http,
             dir,
+            author: committer,
             singleBranch: true,
         });
     }
@@ -136,6 +146,15 @@ export abstract class GitProvider {
             return null;
         } catch (error) {
             throw new Error(`Failed to get main branch: ${error.message}`);
+        }
+    }
+
+    // get active branch
+    async getActiveBranch(dir: string): Promise<string | void> {
+        try {
+            return await git.currentBranch({ fs, dir });
+        } catch (error) {
+            throw new Error(`Failed to get active branch: ${error.message}`);
         }
     }
 
