@@ -8,8 +8,14 @@ import {
   Max,
   IsBoolean,
   IsUrl,
+  IsEnum,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+
+export enum OperationType {
+  CREATE_UPDATE = 'create-update',
+  RECREATE = 'recreate',
+}
 
 export class ConfigDto {
   @IsOptional()
@@ -69,4 +75,8 @@ export class CreateItemsGeneratorDto {
   @ValidateNested()
   @Type(() => ConfigDto)
   config?: ConfigDto;
+
+  @IsOptional()
+  @IsEnum(OperationType)
+  operation?: OperationType = OperationType.CREATE_UPDATE;
 }
