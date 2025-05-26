@@ -53,6 +53,7 @@ export class DataGeneratorService {
 
     const token = user.getGitToken();
     const repo = directory.getDataRepo();
+
     const description = `machine-readable data for ${directory.slug}`;
 
     this.logger.log(`Creating GitHub repository: ${directory.owner}/${repo}`);
