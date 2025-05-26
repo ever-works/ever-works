@@ -69,7 +69,7 @@ export class AppController {
       throw new NotFoundException('Directory not found');
     }
 
-    // Intentionally not awaiting this to allow for an immediate response
+    // TODO: Intentionally not awaiting this to allow for an immediate response
     // The actual processing will happen in the background.
     // A more robust solution might involve job queues, webhooks, or websockets for status updates.
     (async () => {
@@ -100,28 +100,5 @@ export class AppController {
       slug: createItemsGeneratorDto.slug,
       message: `Processing request for '${createItemsGeneratorDto.name}'. Check logs or data directory for updates.`,
     };
-  }
-
-  @Post('sync')
-  async updateData(
-    @Body(
-      new ValidationPipe({
-        transform: true,
-        whitelist: true,
-        forbidNonWhitelisted: true,
-      }),
-    )
-    createItemsGeneratorDto: CreateItemsGeneratorDto,
-  ) {
-    const user = await User.sessionMock();
-    const directory = await Directory.findMock(createItemsGeneratorDto.slug);
-    if (!directory) {
-      throw new NotFoundException('Directory not found');
-    }
-
-    await this.dataGenerator.update(directory, user, createItemsGeneratorDto);
-    await this.markdownGenerator.update(directory, user);
-
-    return directory;
   }
 }
