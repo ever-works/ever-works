@@ -34,22 +34,17 @@ export abstract class GitProvider {
         const url = this.getURL(owner, repo);
         const auth = this.getAuth(token);
 
-        // Check if directory already exists
         if (await this.directoryExists(dir)) {
             try {
-                // Try to pull latest changes
                 await this.pull(dir, token);
                 return dir;
             } catch (error) {
-                // If pull fails, remove directory and clone fresh
                 await fs.promises.rm(dir, { recursive: true, force: true });
             }
         }
 
-        // Ensure parent directory exists
         await fs.promises.mkdir(path.dirname(dir), { recursive: true });
 
-        // Clone repository
         await git.clone({
             onAuth: () => auth,
             fs,
@@ -178,7 +173,6 @@ export abstract class GitProvider {
      */
     async createAndSwitchToRandomBranch(dir: string, prefix: string = 'feature'): Promise<string> {
         try {
-            // Get all existing branches to ensure uniqueness
             const existingBranches = await git.listBranches({ fs, dir });
 
             let branchName: string;
