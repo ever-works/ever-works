@@ -101,6 +101,7 @@ export class AppController {
         return {
             status: 'pending',
             slug: createItemsGeneratorDto.slug,
+            parameters: createItemsGeneratorDto,
             message: `Processing request for '${createItemsGeneratorDto.name}'. Check logs or data directory for updates.`,
         };
     }

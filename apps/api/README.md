@@ -18,9 +18,9 @@ pnpm dev
 
 ```json
 {
-  "slug": "awesome-time-tracking",
-  "name": "Awesome Time Tracking",
-  "description": "Time Tracking - Software, Methodologies and Practices."
+    "slug": "awesome-time-tracking",
+    "name": "Awesome Time Tracking",
+    "description": "Time Tracking - Software, Methodologies and Practices."
 }
 ```
 
@@ -29,10 +29,10 @@ If you want to init directory for organization, pass optional `owner` field:
 
 ```json
 {
-  "slug": "awesome-time-tracking",
-  "owner": "ever-works",
-  "name": "Awesome Time Tracking",
-  "description": "Time Tracking - Software, Methodologies and Practices."
+    "slug": "awesome-time-tracking",
+    "owner": "ever-works",
+    "name": "Awesome Time Tracking",
+    "description": "Time Tracking - Software, Methodologies and Practices."
 }
 ```
 
@@ -42,9 +42,9 @@ If you want to init directory for organization, pass optional `owner` field:
 
 ```json
 {
-  "slug": "awesome-time-tracking",
-  "name": "Awesome Time Tracking",
-  "prompt": "Generate list of best time tracking software"
+    "slug": "awesome-time-tracking",
+    "name": "Awesome Time Tracking",
+    "prompt": "Generate list of best time tracking software"
 }
 ```
 
@@ -52,43 +52,45 @@ If you want to init directory for organization, pass optional `owner` field:
 
 ```json
 {
-  "slug": "awesome-time-tracking",
-  "name": "Awesome Time Tracking",
-  "prompt": "Generate list of best time tracking software for business. Include both open-source and commercial solutions. You can check these URLs for reference: https://github.com/awesome-lists/awesome-time-tracking https://alternativeto.net/category/productivity/time-tracking/",
-  "target_keywords": [
-    "time tracking",
-    "productivity",
-    "project management",
-    "timesheet",
-    "work hours"
-  ],
-  "source_urls": [
-    "https://github.com/awesome-lists/awesome-time-tracking",
-    "https://alternativeto.net/category/productivity/time-tracking/"
-  ],
-  "operation": "create-update",
-  "config": {
-    "max_search_queries": 15,
-    "max_results_per_query": 25,
-    "max_pages_to_process": 150,
-    "relevance_threshold_content": 0.8,
-    "min_content_length_for_extraction": 500,
-    "ai_first_generation_enabled": true
-  }
+    "slug": "awesome-time-tracking",
+    "name": "Awesome Time Tracking",
+    "prompt": "Generate list of best time tracking software for business. Include both open-source and commercial solutions. You can check these URLs for reference: https://github.com/awesome-lists/awesome-time-tracking https://alternativeto.net/category/productivity/time-tracking/",
+    "target_keywords": [
+        "time tracking",
+        "productivity",
+        "project management",
+        "timesheet",
+        "work hours"
+    ],
+    "source_urls": [
+        "https://github.com/awesome-lists/awesome-time-tracking",
+        "https://alternativeto.net/category/productivity/time-tracking/"
+    ],
+    "operation": "create-update",
+    "update_with_pull_request": true,
+    "config": {
+        "max_search_queries": 15,
+        "max_results_per_query": 25,
+        "max_pages_to_process": 150,
+        "relevance_threshold_content": 0.8,
+        "min_content_length_for_extraction": 500,
+        "ai_first_generation_enabled": true
+    }
 }
 ```
 
 **Request Parameters:**
 
-| Field             | Type     | Required   | Default         | Description                                                                                               |
-| ----------------- | -------- | ---------- | --------------- | --------------------------------------------------------------------------------------------------------- |
-| `slug`            | string   | `required` | -               | Unique identifier for the directory                                                                       |
-| `name`            | string   | `required` | -               | Display name for the directory                                                                            |
-| `prompt`          | string   | `required` | -               | Description/prompt for item generation. URLs mentioned here will be automatically extracted and processed |
-| `target_keywords` | string[] | `optional` | `[]`            | Keywords to focus the search and generation                                                               |
-| `source_urls`     | string[] | `optional` | `[]`            | Additional URLs to process for content extraction                                                         |
-| `operation`       | enum     | `optional` | `create-update` | Operation type: `create-update` or `recreate` (see Operation Types below)                                 |
-| `config`          | object   | `optional` | -               | Advanced configuration options                                                                            |
+| Field                      | Type     | Required   | Default         | Description                                                                                               |
+| -------------------------- | -------- | ---------- | --------------- | --------------------------------------------------------------------------------------------------------- |
+| `slug`                     | string   | `required` | -               | Unique identifier for the directory                                                                       |
+| `name`                     | string   | `required` | -               | Display name for the directory                                                                            |
+| `prompt`                   | string   | `required` | -               | Description/prompt for item generation. URLs mentioned here will be automatically extracted and processed |
+| `target_keywords`          | string[] | `optional` | `[]`            | Keywords to focus the search and generation                                                               |
+| `source_urls`              | string[] | `optional` | `[]`            | Additional URLs to process for content extraction                                                         |
+| `operation`                | enum     | `optional` | `create-update` | Operation type: `create-update` or `recreate` (see Operation Types below)                                 |
+| `update_with_pull_request` | boolean  | `optional` | `true`          | Whether to update the repository with a pull request or directly commit the changes to main branch.       |
+| `config`                   | object   | `optional` | -               | Advanced configuration options                                                                            |
 
 **Configuration Options:**
 
@@ -127,8 +129,8 @@ If you want to init directory for organization, pass optional `owner` field:
 ```json
 // Optional:
 {
-  "GITHUB_TOKEN": "gh_sqjhqwghsydghsydfgsdyfgdsyf",
-  "VERCEL_TOKEN": "e21qwyu2ewgfcuydesgf7udsdsfds"
+    "GITHUB_TOKEN": "gh_sqjhqwghsydghsydfgsdyfgdsyf",
+    "VERCEL_TOKEN": "e21qwyu2ewgfcuydesgf7udsdsfds"
 }
 ```
 

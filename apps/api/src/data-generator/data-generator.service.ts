@@ -99,6 +99,7 @@ export class DataGeneratorService {
 
             const createOrUpdate =
                 createItemsGeneratorDto.operation === OperationType.CREATE_UPDATE;
+            const update_with_pull_request = createItemsGeneratorDto.update_with_pull_request;
 
             const defaultBranch = await this.githubService.getMainBranch(dest).catch((err) => {
                 this.logger.error('Failed to get main branch', err);
@@ -113,7 +114,7 @@ export class DataGeneratorService {
                 });
 
                 await data.clearFiles();
-            } else if (existed && createOrUpdate) {
+            } else if (existed && createOrUpdate && update_with_pull_request) {
                 // In case of update, we want to create a new branch and switch to it
                 newBranchName = await this.githubService.createAndSwitchToRandomBranch(dest);
                 this.logger.log(`Created and switched to new branch: ${newBranchName}`);
