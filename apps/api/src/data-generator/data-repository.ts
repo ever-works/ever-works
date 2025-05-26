@@ -4,6 +4,10 @@ import * as yaml from 'yaml';
 import { format } from 'date-fns';
 import { Category, ItemData, Tag } from '../agent/types';
 
+type PRUpdate = {
+    branch: string;
+    title: string;
+};
 export interface IDataConfig {
     company_name?: string;
     content_table?: boolean;
@@ -11,6 +15,7 @@ export interface IDataConfig {
     items_name?: string;
     copyright_year?: number;
     initial_prompt?: string;
+    pr_update?: PRUpdate | null;
 }
 
 export const DEFAULT_DATA_CONFIG: IDataConfig = {
