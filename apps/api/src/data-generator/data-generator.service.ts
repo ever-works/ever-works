@@ -5,7 +5,12 @@ import { User } from '../entities/user.entity';
 import { DataRepository, DEFAULT_DATA_CONFIG, IDataConfig } from './data-repository';
 import { slugifyText } from '../items-generator/utils/text.utils';
 import { ItemsGeneratorService } from '../items-generator/items-generator.service';
-import { CreateItemsGeneratorDto, Identifiable, ItemData } from '../items-generator/dto';
+import {
+    CreateItemsGeneratorDto,
+    Identifiable,
+    ItemData,
+    OperationType,
+} from '../items-generator/dto';
 
 @Injectable()
 export class DataGeneratorService {
@@ -27,6 +32,7 @@ export class DataGeneratorService {
 
         // Get existing data if available
         const existingData = await this.getExistingData(directory, user);
+        const existed = existingData.existingItems.length > 0;
 
         const generatedItems = await this.itemsGeneratorService.generateItemsGenerator(
             createItemsGeneratorDto,
@@ -38,17 +44,18 @@ export class DataGeneratorService {
             return;
         }
 
-        this.logger.debug(
-            `Generated ${generatedItems.categories.length} categories, ${generatedItems.items.length} items, ${generatedItems.tags.length} tags.`,
-        );
-
         const { categories, items, tags } = generatedItems;
+
+        this.logger.debug(
+            `Generated ${categories.length} categories, ${items.length} items, ${tags.length} tags.`,
+        );
 
         const token = user.getGitToken();
         const repo = directory.getDataRepo();
 
         const description = `machine-readable data for ${directory.slug}`;
 
+        // Creating GitHub repository
         this.logger.log(`Creating GitHub repository: ${directory.owner}/${repo}`);
         if (directory.organization) {
             await this.githubService.createEmptyRepoAsOrg(
@@ -62,6 +69,7 @@ export class DataGeneratorService {
         }
         this.logger.log(`Successfully created GitHub repository: ${directory.owner}/${repo}`);
 
+        // Cloning repository
         this.logger.log(`Cloning repository ${directory.owner}/${repo}`);
         const dest = await this.githubService.cloneOrPull(directory.owner, repo, token);
         const data = await DataRepository.create(dest);
@@ -70,15 +78,22 @@ export class DataGeneratorService {
         try {
             this.logger.debug('Ensuring directories exist and writing initial files...');
             await data.ensureDirectoriesExist();
-            await Promise.all([
-                data.writeReadme(this.getDefaultReadme(directory)),
-                data.writeLicense(this.getLicense()),
-                data.writeConfig(this.getDefaultConfig()),
-                data.writeCategories(categories),
-                data.writeTags(tags),
-                data.writeMarkdownTemplate(this.getHeader(directory), this.getFooter()),
-            ]);
 
+            const promises = [data.writeCategories(categories), data.writeTags(tags)];
+
+            /**
+             * rewrite meta files only if we are creating new repository or we are recreating it
+             */
+            if (!existed || createItemsGeneratorDto.operation === OperationType.RECREATE) {
+                promises.push(
+                    data.writeReadme(this.getDefaultReadme(directory)),
+                    data.writeLicense(this.getLicense()),
+                    data.writeConfig(this.getDefaultConfig()),
+                    data.writeMarkdownTemplate(this.getHeader(directory), this.getFooter()),
+                );
+            }
+
+            await Promise.all(promises);
             await this.githubService.add(data.dir, '.');
             await this.githubService.commit(data.dir, `init repository`, user.asCommitter());
             this.logger.debug('Initial files written and committed.');
@@ -106,79 +121,6 @@ export class DataGeneratorService {
         }
 
         return true;
-    }
-
-    async update(
-        directory: Directory,
-        user: User,
-        createItemsGeneratorDto: CreateItemsGeneratorDto,
-    ) {
-        this.logger.log(`Updating data repository for directory: ${directory.slug}`);
-        const token = user.getGitToken();
-        const repo = directory.getDataRepo();
-
-        const dest = await this.githubService.cloneOrPull(directory.owner, repo, token);
-        const data = await DataRepository.create(dest);
-        this.logger.log(`Repository ready at ${dest}`);
-
-        try {
-            const categories = await data.getCategories();
-            const tags = await data.getTags();
-            const existingItems = await data.getItems();
-            this.logger.debug(
-                `Fetched ${categories.length} categories, ${tags.length} tags, ${existingItems.length} existing items.`,
-            );
-
-            this.logger.debug('Generating new items based on prompt...');
-
-            const generatedItems = await this.itemsGeneratorService.generateItemsGenerator(
-                createItemsGeneratorDto,
-                { existingItems, existingCategories: categories, existingTags: tags },
-            );
-
-            if (!generatedItems) {
-                this.logger.error('Failed to generate items from ItemsGeneratorService.');
-                return;
-            }
-
-            this.logger.debug(
-                `Generated ${generatedItems.categories.length} categories, ${generatedItems.items.length} items, ${generatedItems.tags.length} tags.`,
-            );
-
-            this.logger.debug('Merging and writing categories and tags...');
-            await Promise.all([
-                data.writeCategories(this.merge(categories, generatedItems.categories)),
-                data.writeTags(this.merge(tags, generatedItems.tags)),
-            ]);
-            await this.githubService.add(data.dir, '.');
-            await this.githubService.commit(data.dir, `update repository`, user.asCommitter());
-            this.logger.debug('Categories and tags updated and committed.');
-
-            await data.ensureDirectoriesExist();
-
-            this.logger.log(`Processing ${generatedItems.items.length} new items...`);
-            const itemsWithMarkdown = await this.itemsGeneratorService.generateMarkdownForItems(
-                generatedItems.items,
-            );
-
-            for (const item of itemsWithMarkdown) {
-                item.slug = slugifyText(item.slug || item.name);
-                this.logger.debug(`Processing new item: ${item.name} (slug: ${item.slug})`);
-                await this.processItem(data, item, user);
-            }
-            this.logger.log('All new items processed.');
-
-            this.logger.log(`Pushing changes to ${directory.owner}/${repo}`);
-
-            // TODO: it should create PR (or multiple PRs) instead of pushing directly
-            await this.githubService.push(dest, token);
-            this.logger.log('Successfully updated and pushed data repository.');
-        } catch (err) {
-            this.logger.error('Failed to update data repository', err);
-            throw err;
-        } finally {
-            await data.cleanup();
-        }
     }
 
     /**
@@ -302,6 +244,7 @@ export class DataGeneratorService {
 
     private getFooter() {
         return (
+            this.getLegalNotice() +
             '## License\n\n' +
             'Shield: [![CC BY-SA 4.0][cc-by-sa-shield]][cc-by-sa]\n\n' +
             'This work is licensed under a\n\n' +
@@ -314,13 +257,14 @@ export class DataGeneratorService {
     }
 
     private getLegalNotice() {
-        return `All product names, logos, and brands are the property of their respective owners. All company, product, and service names used in this repository, related repositories, and associated websites are for identification purposes only. The use of these names, logos, and brands does not imply endorsement, affiliation, or sponsorship.
+        return `## Legal Notice\n
+All product names, logos, and brands are the property of their respective owners. All company, product, and service names used in this repository, related repositories, and associated websites are for identification purposes only. The use of these names, logos, and brands does not imply endorsement, affiliation, or sponsorship.
 
 This directory may include content generated by artificial intelligence (AI). While efforts have been made to ensure the accuracy and reliability of the information, we make no representations or warranties of any kind, express or implied, about the completeness, accuracy, reliability, suitability, or availability of the information contained herein. Users are advised to independently verify the information before making decisions based on it.
 
 We disclaim any responsibility for errors, omissions, or inaccuracies in the content, whether generated by humans, AI, or any other means. By using this directory, you agree to use it at your own risk and acknowledge that the information provided may not always be current or accurate.
 
-If you believe that your intellectual property rights or other legal rights have been infringed, please contact us immediately at legal@ever.co and we will take appropriate action.`;
+If you believe that your intellectual property rights or other legal rights have been infringed, please contact us immediately at legal@ever.co and we will take appropriate action.\n\n`;
     }
 
     private getLicense() {
