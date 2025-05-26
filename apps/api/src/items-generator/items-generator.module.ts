@@ -12,12 +12,22 @@ import { MarkdownGenerationService } from './steps/markdown-generation.service';
 import { UrlExtractionService } from './steps/url-extraction.service';
 import { PromptComparisonService } from './steps/prompt-comparison.service';
 import { AiService, SearchService } from './shared';
+import {
+  SharedUtilsService,
+  NewItemsExtractorService,
+  AiDeduplicatorService
+} from './steps/data-aggregation';
 
 @Module({
   providers: [
     // Shared services
     AiService,
     SearchService,
+
+    // Data aggregation shared services
+    SharedUtilsService,
+    NewItemsExtractorService,
+    AiDeduplicatorService,
 
     // Main service
     ItemsGeneratorService,
