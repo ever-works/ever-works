@@ -58,11 +58,11 @@ export class DataGeneratorService {
             return;
         }
 
-        const { categories, items, tags } = generatedItems;
+        const { categories: newCategories, items: newItems, tags: newTags } = generatedItems;
         const { existingCategories, existingTags } = existingData;
 
         this.logger.debug(
-            `Generated ${categories.length} categories, ${items.length} items, ${tags.length} tags.`,
+            `Generated ${newCategories.length} categories, ${newItems.length} items, ${newTags.length} tags.`,
         );
 
         const token = user.getGitToken();
@@ -119,8 +119,8 @@ export class DataGeneratorService {
             }
 
             const promises = [
-                data.writeCategories(this.merge(existingCategories, categories)),
-                data.writeTags(this.merge(existingTags, tags)),
+                data.writeCategories(this.merge(existingCategories, newCategories)),
+                data.writeTags(this.merge(existingTags, newTags)),
             ];
 
             /**
@@ -146,9 +146,9 @@ export class DataGeneratorService {
             this.logger.debug('files written and committed.');
 
             // Process items (with markdown generation, writing to disk and committing)
-            this.logger.log(`Processing ${items.length} items...`);
+            this.logger.log(`Processing ${newItems.length} items...`);
             const itemsWithMarkdown =
-                await this.itemsGeneratorService.generateMarkdownForItems(items);
+                await this.itemsGeneratorService.generateMarkdownForItems(newItems);
 
             for (const item of itemsWithMarkdown) {
                 item.slug = slugifyText(item.slug || item.name);
@@ -185,7 +185,7 @@ export class DataGeneratorService {
                 );
             } else {
                 this.logger.log(
-                    `Successfully created and pushed data repository - initialized with ${items.length} items.`,
+                    `Successfully created and pushed data repository - initialized with ${newItems.length} items.`,
                 );
             }
         } catch (err) {
