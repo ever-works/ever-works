@@ -12,7 +12,7 @@ import { MarkdownRepository } from './markdown-repository';
 export class MarkdownGeneratorService {
     constructor(private readonly githubService: GithubService) {}
 
-    async initialize(directory: Directory, user: User) {
+    async initialize(directory: Directory, user: User, shouldCreatePR: boolean = false) {
         const token = user.getGitToken();
 
         if (directory.organization) {
@@ -25,11 +25,6 @@ export class MarkdownGeneratorService {
         } else {
             await this.githubService.createEmptyRepo(directory.slug, directory.description, token);
         }
-        await this.update(directory, user);
-    }
-
-    async update(directory: Directory, user: User) {
-        const token = user.getGitToken();
 
         const markdownPath = await this.githubService.cloneOrPull(
             directory.owner,

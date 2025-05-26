@@ -193,8 +193,6 @@ export class DataGeneratorService {
         } catch (err) {
             this.logger.error('Failed to initialize data repository', err);
             throw err;
-        } finally {
-            await data.cleanup();
         }
 
         return true;
