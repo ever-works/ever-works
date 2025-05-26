@@ -5,7 +5,7 @@ import * as sodium from 'libsodium-wrappers';
 
 @Injectable()
 export class GithubService extends GitProvider {
-    private readonly logger = new Logger('GithubService');
+    private readonly logger = new Logger(GithubService.name);
 
     getAuth(token: string): IGitAuth {
         return { username: 'x-access-token', password: token };
