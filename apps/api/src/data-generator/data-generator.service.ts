@@ -5,7 +5,12 @@ import { User } from '../entities/user.entity';
 import { DataRepository, DEFAULT_DATA_CONFIG, IDataConfig } from './data-repository';
 import { slugifyText } from '../items-generator/utils/text.utils';
 import { ItemsGeneratorService } from '../items-generator/items-generator.service';
-import { CreateItemsGeneratorDto, ItemData, OperationType } from '../items-generator/dto';
+import {
+    CreateItemsGeneratorDto,
+    Identifiable,
+    ItemData,
+    OperationType,
+} from '../items-generator/dto';
 import { format } from 'date-fns';
 
 @Injectable()
@@ -26,11 +31,23 @@ export class DataGeneratorService {
             `Initializing data repository for directory: ${JSON.stringify(createItemsGeneratorDto)}`,
         );
 
+        let existingData = {
+            existingItems: [],
+            existingCategories: [],
+            existingTags: [],
+            existingConfig: {},
+        };
+
         // Get existing data if available
-        const existingData = await this.getExistingData(directory, user);
+        // get existing data only if we are in update mode
+        if (createItemsGeneratorDto.operation === OperationType.CREATE_UPDATE) {
+            existingData = await this.getExistingData(directory, user);
+        }
+
         const existed = existingData.existingItems.length > 0;
 
         // Generate items
+        // The generated items will be new
         const generatedItems = await this.itemsGeneratorService.generateItemsGenerator(
             createItemsGeneratorDto,
             existingData,
@@ -42,6 +59,7 @@ export class DataGeneratorService {
         }
 
         const { categories, items, tags } = generatedItems;
+        const { existingCategories, existingTags } = existingData;
 
         this.logger.debug(
             `Generated ${categories.length} categories, ${items.length} items, ${tags.length} tags.`,
@@ -75,6 +93,7 @@ export class DataGeneratorService {
             // Ensure directories exist
             await data.ensureDirectoriesExist();
 
+            // Name of the new branch if we are in update mode
             let newBranchName: string | null = null;
 
             const createOrUpdate =
@@ -86,7 +105,7 @@ export class DataGeneratorService {
             });
 
             // In case of re-creation:
-            // Switch to the main branch and remove existing items.
+            // Switch to the main branch and remove existing items files.
             if (createItemsGeneratorDto.operation === OperationType.RECREATE) {
                 await this.githubService.switchToMainBranch(dest).catch((err) => {
                     this.logger.error('Failed to switch to main branch', err);
@@ -99,7 +118,10 @@ export class DataGeneratorService {
                 this.logger.log(`Created and switched to new branch: ${newBranchName}`);
             }
 
-            const promises = [data.writeCategories(categories), data.writeTags(tags)];
+            const promises = [
+                data.writeCategories(this.merge(existingCategories, categories)),
+                data.writeTags(this.merge(existingTags, tags)),
+            ];
 
             /**
              * rewrite meta files only if we are creating new repository or we are recreating it
@@ -265,6 +287,17 @@ export class DataGeneratorService {
         await this.githubService.commit(data.dir, `add ${item.name}`, user.asCommitter());
 
         this.logger.log(`processItem: Committed item ${item.name} (slug: ${item.slug})`);
+    }
+
+    private merge(a: Identifiable[], b: Identifiable[]) {
+        const map = new Map<string, Identifiable>();
+        for (const item of a) {
+            map.set(item.id, item);
+        }
+        for (const item of b) {
+            map.set(item.id, item);
+        }
+        return Array.from(map.values());
     }
 
     private getDefaultConfig(additionalConfig?: Partial<IDataConfig>): IDataConfig {
