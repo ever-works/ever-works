@@ -96,6 +96,17 @@ export class DataRepository {
         await fs.rm(this.dir, { recursive: true, force: true });
     }
 
+    async clearFiles() {
+        const files = await fs.readdir(this.dir);
+        for (const file of files) {
+            if (file.includes('.git')) {
+                continue;
+            }
+
+            await fs.rm(path.join(this.dir, file), { recursive: true, force: true });
+        }
+    }
+
     async ensureDirectoriesExist() {
         await Promise.all([
             fs.mkdir(this.markdownTemplatePath, { recursive: true }),

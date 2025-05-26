@@ -34,6 +34,7 @@ export class DataGeneratorService {
         const existingData = await this.getExistingData(directory, user);
         const existed = existingData.existingItems.length > 0;
 
+        // Generate items
         const generatedItems = await this.itemsGeneratorService.generateItemsGenerator(
             createItemsGeneratorDto,
             existingData,
@@ -76,8 +77,13 @@ export class DataGeneratorService {
         this.logger.log(`Cloned repository to ${dest}`);
 
         try {
-            this.logger.debug('Ensuring directories exist and writing initial files...');
+            // Ensure directories exist
             await data.ensureDirectoriesExist();
+
+            // In case of recreation, remove existing items
+            if (createItemsGeneratorDto.operation === OperationType.RECREATE) {
+                await data.clearFiles();
+            }
 
             const promises = [data.writeCategories(categories), data.writeTags(tags)];
 
@@ -88,7 +94,9 @@ export class DataGeneratorService {
                 promises.push(
                     data.writeReadme(this.getDefaultReadme(directory)),
                     data.writeLicense(this.getLicense()),
-                    data.writeConfig(this.getDefaultConfig()),
+                    data.writeConfig(
+                        this.getDefaultConfig({ initial_prompt: createItemsGeneratorDto.prompt }),
+                    ),
                     data.writeMarkdownTemplate(this.getHeader(directory), this.getFooter()),
                 );
             }
@@ -96,10 +104,10 @@ export class DataGeneratorService {
             await Promise.all(promises);
             await this.githubService.add(data.dir, '.');
             await this.githubService.commit(data.dir, `init repository`, user.asCommitter());
-            this.logger.debug('Initial files written and committed.');
+            this.logger.debug('files written and committed.');
 
+            // Process items
             this.logger.log(`Processing ${items.length} items...`);
-
             const itemsWithMarkdown =
                 await this.itemsGeneratorService.generateMarkdownForItems(items);
 
@@ -108,6 +116,8 @@ export class DataGeneratorService {
                 await this.processItem(data, item, user);
             }
 
+            // Push changes
+            // TODO we should create a PR with new changes in case of repo update
             this.logger.log(`Pushing changes to ${directory.owner}/${repo}`);
             await this.githubService.push(dest, token);
             this.logger.log(
@@ -214,20 +224,13 @@ export class DataGeneratorService {
         this.logger.log(`processItem: Committed item ${item.name} (slug: ${item.slug})`);
     }
 
-    private merge(a: Identifiable[], b: Identifiable[]) {
-        const map = new Map<string, Identifiable>();
-        for (const item of a) {
-            map.set(item.id, item);
-        }
-        for (const item of b) {
-            map.set(item.id, item);
-        }
-        return Array.from(map.values());
-    }
-
-    private getDefaultConfig(): IDataConfig {
+    private getDefaultConfig(additionalConfig?: Partial<IDataConfig>): IDataConfig {
         const now = new Date();
-        return { ...DEFAULT_DATA_CONFIG, copyright_year: now.getFullYear() };
+        return {
+            ...DEFAULT_DATA_CONFIG,
+            copyright_year: now.getFullYear(),
+            ...additionalConfig,
+        };
     }
 
     private getDefaultReadme(directory: Directory) {

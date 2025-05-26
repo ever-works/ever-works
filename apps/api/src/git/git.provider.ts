@@ -28,8 +28,7 @@ export abstract class GitProvider {
      *  Clones or pulls repository to/from a persistent location using slugified name
      */
     async cloneOrPull(owner: string, repo: string, token: string): Promise<string> {
-        const slugifiedName = slugifyText(`${owner}-${repo}`);
-        const dir = path.join(os.tmpdir(), 'ever-works-repos', slugifiedName);
+        const dir = this.getDir(owner, repo);
         const url = this.getURL(owner, repo);
         const auth = this.getAuth(token);
 
@@ -121,5 +120,9 @@ export abstract class GitProvider {
             http,
             dir,
         });
+    }
+
+    private getDir(owner: string, repo: string) {
+        return path.join(os.tmpdir(), 'ever-works-repos', slugifyText(`${owner}-${repo}`));
     }
 }
