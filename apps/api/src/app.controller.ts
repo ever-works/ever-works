@@ -87,6 +87,7 @@ export class AppController {
 
             if (generated) {
                 await Promise.all([
+                    // we cleanup all repositories here (markdown and data)
                     this.markdownGenerator.initialize(directory, user),
                     this.websiteGenerator.initialize(directory, user),
                 ]);
