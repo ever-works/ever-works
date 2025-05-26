@@ -229,10 +229,9 @@ export class ItemsGeneratorService {
                 `Error generating directory data for slug ${slug}: ${error.message}`,
                 error.stack,
             );
-            // Update a status file or send a notification about the error
-        }
 
-        return null;
+            throw error;
+        }
     }
 
     /**

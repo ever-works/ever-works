@@ -48,13 +48,14 @@ export class DataGeneratorService {
 
         // Generate items
         // The generated items will be new
-        const generatedItems = await this.itemsGeneratorService.generateItemsGenerator(
-            createItemsGeneratorDto,
-            existingData,
-        );
+        const generatedItems = await this.itemsGeneratorService
+            .generateItemsGenerator(createItemsGeneratorDto, existingData)
+            .catch((err) => {
+                this.logger.error('Failed to generate items from ItemsGeneratorService.', err);
+                return null;
+            });
 
         if (!generatedItems) {
-            this.logger.error('Failed to generate items from ItemsGeneratorService.');
             return;
         }
 
