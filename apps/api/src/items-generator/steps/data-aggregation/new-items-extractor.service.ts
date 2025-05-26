@@ -130,7 +130,6 @@ export class NewItemsExtractorService {
             `Grouped ${newItems.length} new items into ${groupedItems.length} clusters for efficient processing`,
         );
 
-        // Pre-compute relevant existing items for the entire batch to avoid redundant computation
         const relevantExistingItems = this.sharedUtils.findRelevantExistingItems(
             newItems,
             existingItems,
