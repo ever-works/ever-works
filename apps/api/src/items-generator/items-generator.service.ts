@@ -11,6 +11,7 @@ import { CategoryProcessingService } from './steps/category-processing.service';
 import { MarkdownGenerationService } from './steps/markdown-generation.service';
 import { UrlExtractionService } from './steps/url-extraction.service';
 import { Category, ItemData, Tag } from './dto';
+import { IDataConfig } from '../data-generator/data-repository';
 
 // Default configuration values
 const DEFAULT_CONFIG: Required<ConfigDto> = {
@@ -52,6 +53,7 @@ export class ItemsGeneratorService {
             existingItems?: ItemData[];
             existingCategories?: Category[];
             existingTags?: Tag[];
+            existingConfig?: IDataConfig | {};
         } = {},
     ) {
         const { slug, name, target_keywords, source_urls } = createItemsGeneratorDto;
