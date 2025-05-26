@@ -17,6 +17,8 @@ Example of same items but with different names - they should be considered as du
 "express" and "Express"
 "Docker" and "Docker Desktop"
 "X by Y" and "X" (btw we prefer shorter names)
+"github.com/user/repo" and "github.com/user/repo/tree/main"
+"example.com" and "www.example.com"
 </examples>
 
 Here is the list of items to deduplicate:

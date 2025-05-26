@@ -204,12 +204,6 @@ export class NewItemsExtractorService {
             }
         }
 
-        // Final deduplication pass to ensure no duplicates in the result
-        extractedItems = this.sharedUtils.deduplicateByField(
-            this.sharedUtils.deduplicateByField(extractedItems, 'slug'),
-            'source_url',
-        );
-
         this.logger.log(
             `Completed new items extraction: ${newItems.length} items → ${extractedItems.length} new items`,
         );
