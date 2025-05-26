@@ -137,6 +137,7 @@ export class DataGeneratorService {
                 const pr_update = {
                     branch: newBranchName,
                     title: prTitle,
+                    body: prBody,
                 };
 
                 promises.push(
@@ -144,6 +145,7 @@ export class DataGeneratorService {
                     data.writeLicense(this.getLicense()),
                     data.writeConfig(
                         this.getDefaultConfig({
+                            operation: createItemsGeneratorDto.operation,
                             initial_prompt: createItemsGeneratorDto.prompt,
                             pr_update: newBranchName ? pr_update : null,
                         }),

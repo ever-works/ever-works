@@ -3,10 +3,12 @@ import * as fs from 'fs/promises';
 import * as yaml from 'yaml';
 import { format } from 'date-fns';
 import { Category, ItemData, Tag } from '../agent/types';
+import { OperationType } from '../items-generator/dto';
 
 type PRUpdate = {
     branch: string;
     title: string;
+    body: string;
 };
 export interface IDataConfig {
     company_name?: string;
@@ -15,6 +17,7 @@ export interface IDataConfig {
     items_name?: string;
     copyright_year?: number;
     initial_prompt?: string;
+    operation?: OperationType;
     pr_update?: PRUpdate | null;
 }
 

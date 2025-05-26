@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import * as fs from 'fs/promises';
 import { GithubService } from '../git/github.service';
 import type { Category, Identifiable, ItemData, Tag } from '../agent/types';
@@ -7,12 +7,15 @@ import { User } from '../entities/user.entity';
 import { DataRepository } from '../data-generator/data-repository';
 import { ReadmeBuilder } from './readme-builder';
 import { MarkdownRepository } from './markdown-repository';
+import { OperationType } from 'src/items-generator/dto';
 
 @Injectable()
 export class MarkdownGeneratorService {
+    private readonly logger = new Logger(MarkdownGeneratorService.name);
+
     constructor(private readonly githubService: GithubService) {}
 
-    async initialize(directory: Directory, user: User, shouldCreatePR: boolean = false) {
+    async initialize(directory: Directory, user: User) {
         const token = user.getGitToken();
 
         if (directory.organization) {
@@ -40,13 +43,43 @@ export class MarkdownGeneratorService {
 
         const markdownRepo = new MarkdownRepository(markdownPath);
         const dataRepo = await DataRepository.create(dataPath);
+
         const markdowns = new Set<string>(); // will be needed to check if markdown exists before referencing them in README
         const categories = await this.loadCategories(dataRepo);
         const tags = await this.loadTags(dataRepo);
+        const config = await dataRepo.getConfig();
 
         try {
             const slugs = await fs.readdir(dataRepo.dataDir);
             await markdownRepo.ensureDirectoriesExist();
+
+            const defaultBranch = await this.githubService
+                .getMainBranch(markdownRepo.dir)
+                .catch((err) => {
+                    this.logger.error('Failed to get main branch', err);
+                    return null;
+                });
+
+            let canCreatePR =
+                config.operation !== OperationType.RECREATE && !!config.pr_update?.branch;
+
+            // In case of re-creation:
+            // Switch to the main branch and remove existing items files.
+            if (config?.operation === OperationType.RECREATE) {
+                await this.githubService.switchToMainBranch(markdownRepo.dir).catch((err) => {
+                    this.logger.error('Failed to switch to main branch', err);
+                });
+
+                await markdownRepo.clearFiles();
+            } else if (config.pr_update?.branch) {
+                // Switch to PR branch
+                await this.githubService
+                    .switchToBranch(markdownRepo.dir, config.pr_update.branch, true)
+                    .catch((err) => {
+                        canCreatePR = false;
+                        this.logger.error('Failed to switch to PR branch', err);
+                    });
+            }
 
             const groups = {}; // we want to group items by category, like: { 'open-source': [items], 'commercial': [items] }
             for (const slug of slugs) {
@@ -94,6 +127,30 @@ export class MarkdownGeneratorService {
             await this.githubService.add(markdownPath, '.');
             await this.githubService.commit(markdownPath, 'sync README.md', user.asCommitter());
             await this.githubService.push(markdownPath, token);
+
+            if (canCreatePR && defaultBranch) {
+                this.logger.log(
+                    `Creating PR from ${config.pr_update.branch} to ${defaultBranch} for ${directory.slug}`,
+                );
+
+                await this.githubService
+                    .createPR(
+                        {
+                            owner: directory.owner,
+                            repo: directory.slug,
+                            base: defaultBranch,
+                            head: config.pr_update.branch,
+                            title: config.pr_update.title,
+                            body: config.pr_update.body,
+                        },
+                        token,
+                    )
+                    .catch((err) => {
+                        this.logger.error('Failed to create PR', err);
+                    });
+            } else {
+                this.logger.log(`Pushed changes to main branch for ${directory.slug}`);
+            }
         } catch (err) {
             throw err;
         } finally {

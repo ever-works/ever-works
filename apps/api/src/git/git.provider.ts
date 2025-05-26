@@ -168,6 +168,30 @@ export abstract class GitProvider {
     }
 
     /**
+     * Switch to a branch or create it if it doesn't exist (if create is true)
+     */
+    async switchToBranch(dir: string, branch: string, create: boolean = false) {
+        try {
+            const branches = await git.listBranches({ fs, dir });
+
+            if (branches.includes(branch)) {
+                await git.checkout({ fs, dir, ref: branch });
+                return branch;
+            }
+
+            if (create) {
+                await git.branch({ fs, dir, ref: branch });
+                await git.checkout({ fs, dir, ref: branch });
+                return branch;
+            }
+
+            throw new Error(`Branch ${branch} doesn't exist`);
+        } catch (error) {
+            throw new Error(`Failed to switch to branch: ${error.message}`);
+        }
+    }
+
+    /**
      * Generates a random unique branch name and switches to it
      * Ensures the branch name doesn't conflict with existing branches
      */
