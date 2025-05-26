@@ -216,4 +216,228 @@ export class SharedUtilsService {
     async addProcessingDelay(milliseconds: number): Promise<void> {
         await new Promise((resolve) => setTimeout(resolve, milliseconds));
     }
+
+    /**
+     * Creates a fast lookup index for existing items using multiple keys
+     * @param items Items to index
+     */
+    createItemLookupIndex(items: ItemData[]): Map<string, ItemData> {
+        const index = new Map<string, ItemData>();
+
+        for (const item of items) {
+            // Index by slug
+            if (item.slug) {
+                index.set(`slug:${item.slug.toLowerCase()}`, item);
+            }
+
+            // Index by source URL
+            if (item.source_url) {
+                index.set(`url:${item.source_url.toLowerCase()}`, item);
+            }
+
+            // Index by normalized name
+            const normalizedName = this.normalizeItemName(item.name);
+            if (normalizedName) {
+                index.set(`name:${normalizedName}`, item);
+            }
+        }
+
+        return index;
+    }
+
+    /**
+     * Normalizes item name for comparison
+     * @param name Item name to normalize
+     */
+    normalizeItemName(name: string): string {
+        if (!name) return '';
+
+        return name
+            .toLowerCase()
+            .replace(/\s+v?(\d+\.)*\d+(\s+|$)/g, ' ')
+            .replace(/[^\w\s]/g, ' ')
+            .replace(/\s+/g, ' ')
+            .replace(/\b(js|javascript|library|framework|tool|app|application)\b/g, '')
+            .trim();
+    }
+
+    /**
+     * Checks if a new item already exists in the lookup index using multiple strategies
+     * @param newItem New item to check
+     * @param lookupIndex Lookup index of existing items
+     */
+    isItemDuplicate(newItem: ItemData, lookupIndex: Map<string, ItemData>): boolean {
+        // Check by slug
+        if (newItem.slug && lookupIndex.has(`slug:${newItem.slug.toLowerCase()}`)) {
+            return true;
+        }
+
+        // Check by exact source URL
+        if (newItem.source_url && lookupIndex.has(`url:${newItem.source_url.toLowerCase()}`)) {
+            return true;
+        }
+
+        // Check by normalized name
+        const normalizedName = this.normalizeItemName(newItem.name);
+        if (normalizedName && lookupIndex.has(`name:${normalizedName}`)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Filters new items using manual deduplication strategies
+     * @param existingItems Existing items
+     * @param newItems New items to filter
+     */
+    filterNewItemsManually(existingItems: ItemData[], newItems: ItemData[]): ItemData[] {
+        if (!newItems || newItems.length === 0) return [];
+        if (!existingItems || existingItems.length === 0) return newItems;
+
+        // Create lookup index for fast comparison
+        const lookupIndex = this.createItemLookupIndex(existingItems);
+
+        // Filter out duplicates
+        return newItems.filter((newItem) => !this.isItemDuplicate(newItem, lookupIndex));
+    }
+
+    /**
+     * Finds relevant existing items for AI comparison using similarity
+     * @param newItems New items to compare
+     * @param existingItems All existing items
+     * @param maxRelevantItems Maximum number of relevant items to return
+     */
+    findRelevantExistingItems(
+        newItems: ItemData[],
+        existingItems: ItemData[],
+        maxRelevantItems: number = 100,
+    ): ItemData[] {
+        if (!existingItems || existingItems.length === 0) return [];
+        if (!newItems || newItems.length === 0) return [];
+
+        // If existing items is small, return all
+        if (existingItems.length <= maxRelevantItems) {
+            return existingItems;
+        }
+
+        // Extract keywords from new items
+        const newItemKeywords = new Set<string>();
+        for (const item of newItems) {
+            const keywords = this.extractKeywords(item.name + ' ' + item.description);
+            keywords.forEach((keyword) => newItemKeywords.add(keyword));
+        }
+
+        // Score existing items by relevance
+        const scoredItems = existingItems.map((existingItem) => {
+            const existingKeywords = this.extractKeywords(
+                existingItem.name + ' ' + existingItem.description,
+            );
+            const commonKeywords = existingKeywords.filter((keyword) =>
+                newItemKeywords.has(keyword),
+            );
+            const score = commonKeywords.length / Math.max(existingKeywords.length, 1);
+
+            return { item: existingItem, score };
+        });
+
+        // Sort by score and return top items
+        return scoredItems
+            .sort((a, b) => b.score - a.score)
+            .slice(0, maxRelevantItems)
+            .map((scored) => scored.item);
+    }
+
+    /**
+     * Extracts keywords from text for similarity comparison
+     * @param text Text to extract keywords from
+     */
+    private extractKeywords(text: string): string[] {
+        if (!text) return [];
+
+        return text
+            .toLowerCase()
+            .replace(/[^\w\s]/g, ' ')
+            .split(/\s+/)
+            .filter((word) => word.length > 2) // Filter out short words
+            .filter((word) => !this.isStopWord(word)) // Filter out stop words
+            .slice(0, 20); // Limit to first 20 keywords
+    }
+
+    /**
+     * Checks if a word is a stop word
+     * @param word Word to check
+     */
+    private isStopWord(word: string): boolean {
+        const stopWords = new Set([
+            'the',
+            'and',
+            'for',
+            'are',
+            'but',
+            'not',
+            'you',
+            'all',
+            'can',
+            'had',
+            'her',
+            'was',
+            'one',
+            'our',
+            'out',
+            'day',
+            'get',
+            'has',
+            'him',
+            'his',
+            'how',
+            'its',
+            'may',
+            'new',
+            'now',
+            'old',
+            'see',
+            'two',
+            'who',
+            'boy',
+            'did',
+            'man',
+            'way',
+            'she',
+            'use',
+            'your',
+            'said',
+            'each',
+            'make',
+            'most',
+            'over',
+            'such',
+            'very',
+            'what',
+            'with',
+            'have',
+            'from',
+            'they',
+            'know',
+            'want',
+            'been',
+            'good',
+            'much',
+            'some',
+            'time',
+            'will',
+            'when',
+            'come',
+            'here',
+            'just',
+            'like',
+            'long',
+            'many',
+            'than',
+            'them',
+            'well',
+            'were',
+        ]);
+        return stopWords.has(word);
+    }
 }
