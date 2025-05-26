@@ -104,16 +104,15 @@ export class DataAggregationService {
         );
 
         // Extract new items (if we have existing items)
-        let aggregatedItems = deduplicated;
         if (existingItems.length > 0 && deduplicated.length > 0) {
             this.logger.log(`[${slug}] Extracting new items.`);
+            const previousCount = deduplicated.length;
 
-            const previousCount = aggregatedItems.length;
-            aggregatedItems = await this.extractNewItems(existingItems, deduplicated);
-            newItemsAddedToStoreCount = aggregatedItems.length;
+            deduplicated = await this.extractNewItems(existingItems, deduplicated);
+            newItemsAddedToStoreCount = deduplicated.length;
 
             this.logger.log(
-                `[${slug}] New items extraction: ${previousCount} → ${aggregatedItems.length} items`,
+                `[${slug}] New items extraction: ${previousCount} → ${newItemsAddedToStoreCount} items`,
             );
         }
 
@@ -132,14 +131,14 @@ export class DataAggregationService {
             pages_processed: pagesProcessedThisRun,
             items_extracted_current_run: newlyExtractedItemsThisRun.length,
             new_items_added_to_store: newItemsAddedToStoreCount,
-            total_items_in_store: aggregatedItems.length,
+            total_items_in_store: deduplicated.length,
         };
 
         this.logger.log(
-            `[${slug}] Data aggregation and deduplication complete. Final item count: ${aggregatedItems.length}`,
+            `[${slug}] Data aggregation and deduplication complete. Final item count: ${deduplicated.length}`,
         );
 
-        return { aggregatedItems, metrics };
+        return { aggregatedItems: deduplicated, metrics };
     }
 
     /**
