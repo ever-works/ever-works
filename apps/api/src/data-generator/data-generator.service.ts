@@ -55,7 +55,7 @@ export class DataGeneratorService {
                 return null;
             });
 
-        if (!generatedItems) {
+        if (!generatedItems || generatedItems.items.length === 0) {
             return;
         }
 
@@ -102,8 +102,6 @@ export class DataGeneratorService {
 
             const update_with_pull_request = createItemsGeneratorDto.update_with_pull_request;
 
-            const { title: prTitle, body: prBody } = this.getPRDetails(directory);
-
             const defaultBranch = await this.githubService.getMainBranch(dest).catch((err) => {
                 this.logger.error('Failed to get main branch', err);
                 return null;
@@ -132,14 +130,6 @@ export class DataGeneratorService {
              * rewrite meta files only if we are creating new repository or we are recreating it
              */
             if (!existed || createItemsGeneratorDto.operation === OperationType.RECREATE) {
-                // this attribute is used by other services to determine if PR was created for update
-                // and what is the name of the branch and title of the PR
-                const pr_update = {
-                    branch: newBranchName,
-                    title: prTitle,
-                    body: prBody,
-                };
-
                 promises.push(
                     data.writeReadme(this.getDefaultReadme(directory)),
                     data.writeLicense(this.getLicense()),
@@ -147,10 +137,29 @@ export class DataGeneratorService {
                         this.getDefaultConfig({
                             operation: createItemsGeneratorDto.operation,
                             initial_prompt: createItemsGeneratorDto.prompt,
-                            pr_update: newBranchName ? pr_update : null,
                         }),
                     ),
                     data.writeMarkdownTemplate(this.getHeader(directory), this.getFooter()),
+                );
+            }
+
+            const { title: prTitle, body: prBody } = this.getPRDetails(directory);
+            const preloadedConfig = await data.getConfig().catch(() => null);
+
+            // Write PR details in config so that other repository may use it
+            if (newBranchName) {
+                promises.push(
+                    data.writeConfig(
+                        this.getDefaultConfig({
+                            ...preloadedConfig,
+                            operation: createItemsGeneratorDto.operation,
+                            pr_update: {
+                                branch: newBranchName,
+                                title: prTitle,
+                                body: prBody,
+                            },
+                        }),
+                    ),
                 );
             }
 
