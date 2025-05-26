@@ -259,6 +259,8 @@ export class ItemsGeneratorService {
                 await this.categoryProcessingService.processCategoriesAndTags(
                     createItemsGeneratorDto,
                     aggregatedItems,
+                    existingCategories || [],
+                    existingTags || [],
                 );
 
             this.logger.log(

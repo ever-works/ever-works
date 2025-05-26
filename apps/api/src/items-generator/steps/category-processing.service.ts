@@ -50,11 +50,12 @@ export class CategoryProcessingService {
      * Process items to generate categories and tags
      * @param createItemsGeneratorDto The DTO containing the prompt
      * @param extractedItems The items to categorize
-     * @returns Object containing categorized items, categories, and tags
      */
     async processCategoriesAndTags(
         createItemsGeneratorDto: CreateItemsGeneratorDto,
         extractedItems: Partial<ItemData>[],
+        existingCategories: Category[],
+        existingTags: Tag[],
     ) {
         const { slug, prompt } = createItemsGeneratorDto;
         this.logger.log(
@@ -69,9 +70,22 @@ export class CategoryProcessingService {
             return { finalItems: [], categories: [], tags: [] };
         }
 
+        // Convert existing categories and tags to sets for easy lookup
+        const existingCategoriesSet: Set<string> = new Set();
+        const existingTagsSet: Set<string> = new Set();
+
+        existingCategories.forEach((category) => existingCategoriesSet.add(category.name));
+        existingTags.forEach((tag) => existingTagsSet.add(tag.name));
+
         try {
             // Categorize items using AI
-            const categorized = await this.categorizeItems(prompt, extractedItems);
+            const categorized = await this.categorizeItems(
+                prompt,
+                extractedItems,
+                existingCategoriesSet,
+                existingTagsSet,
+            );
+
             this.logger.log(`[${slug}] Successfully categorized ${categorized.length} items`);
 
             // Extract unique categories and tags
@@ -115,11 +129,12 @@ export class CategoryProcessingService {
      * Categorize items using AI
      * @param description Description of the directory
      * @param items Items to categorize
-     * @returns Categorized items
      */
     private async categorizeItems(
         description: string,
         items: Partial<ItemData>[],
+        existingCategories: Set<string>,
+        existingTags: Set<string>,
     ): Promise<ItemData[]> {
         if (!items || items.length === 0) return [];
 
@@ -134,16 +149,30 @@ export class CategoryProcessingService {
 
             // Process in batches if there are many items
             if (items.length > 50) {
-                return this.processBatchCategorization(description, itemsForCategorization);
+                return this.processBatchCategorization(
+                    description,
+                    itemsForCategorization,
+                    existingCategories,
+                    existingTags,
+                );
             }
 
+            // Format existing categories and tags for the prompt
+            const categoriesText = Array.from(existingCategories).join(', ');
+            const tagsText = Array.from(existingTags).join(', ');
+
+            // Use the enhanced prompt if we have existing categories/tags, otherwise use the basic prompt
+            const promptTemplate = this.enhancedPrompt(existingCategories, existingTags);
+
             // Process all items at once if the count is reasonable
-            const prompt = HumanMessagePromptTemplate.fromTemplate(CATEGORIZE_PROMPT);
+            const prompt = HumanMessagePromptTemplate.fromTemplate(promptTemplate);
             const result = await prompt
                 .pipe(this.llm.withStructuredOutput(categorizeOutputSchema))
                 .invoke({
                     task: description,
                     items: JSON.stringify(itemsForCategorization),
+                    existing_categories: categoriesText,
+                    existing_tags: tagsText,
                 });
 
             return result.items as ItemData[];
@@ -161,23 +190,13 @@ export class CategoryProcessingService {
     }
 
     /**
-     * Process items in batches for categorization
-     * @param description Description of the directory
-     * @param items Items to categorize
-     * @returns Categorized items
+     * Generate an enhanced prompt that includes existing categories and tags
      */
-    private async processBatchCategorization(
-        description: string,
-        items: any[],
-    ): Promise<ItemData[]> {
-        const BATCH_SIZE = 30;
-        const allCategorizedItems: ItemData[] = [];
+    private enhancedPrompt(existingCategories: Set<string>, existingTags: Set<string>) {
+        if (!existingCategories.size && !existingTags.size) {
+            return CATEGORIZE_PROMPT;
+        }
 
-        // Track categories and tags across batches for consistency
-        const existingCategories: Set<string> = new Set();
-        const existingTags: Set<string> = new Set();
-
-        // Enhanced prompt with existing categories and tags
         const enhancedPromptTemplate = `
 ${CATEGORIZE_PROMPT}
 
@@ -196,6 +215,23 @@ ${CATEGORIZE_PROMPT}
 </additional_instructions>
 `.trim();
 
+        return enhancedPromptTemplate;
+    }
+
+    /**
+     * Process items in batches for categorization
+     * @param description Description of the directory
+     * @param items Items to categorize
+     */
+    private async processBatchCategorization(
+        description: string,
+        items: any[],
+        existingCategories: Set<string>,
+        existingTags: Set<string>,
+    ): Promise<ItemData[]> {
+        const BATCH_SIZE = 30;
+        const allCategorizedItems: ItemData[] = [];
+
         // Process items in batches
         for (let i = 0; i < items.length; i += BATCH_SIZE) {
             const batch = items.slice(i, i + BATCH_SIZE);
@@ -212,10 +248,7 @@ ${CATEGORIZE_PROMPT}
                 const tagsText = Array.from(existingTags).join(', ');
 
                 // Use the enhanced prompt if we have existing categories/tags, otherwise use the basic prompt
-                const promptTemplate =
-                    existingCategories.size > 0 || existingTags.size > 0
-                        ? enhancedPromptTemplate
-                        : CATEGORIZE_PROMPT;
+                const promptTemplate = this.enhancedPrompt(existingCategories, existingTags);
 
                 const prompt = HumanMessagePromptTemplate.fromTemplate(promptTemplate);
                 const result = await prompt
@@ -283,7 +316,6 @@ ${CATEGORIZE_PROMPT}
     /**
      * Normalize categorization results for consistency
      * @param items Categorized items
-     * @returns Normalized items
      */
     private normalizeCategorizationResults(items: ItemData[]): ItemData[] {
         // Count category and tag frequencies
@@ -344,7 +376,6 @@ ${CATEGORIZE_PROMPT}
     /**
      * Extract unique categories from categorized items
      * @param items Categorized items
-     * @returns Array of unique categories
      */
     private extractUniqueCategories(items: ItemData[]): Category[] {
         const categoryNames = items.map((item) => item.category as string);
@@ -354,7 +385,6 @@ ${CATEGORIZE_PROMPT}
     /**
      * Extract unique tags from categorized items
      * @param items Categorized items
-     * @returns Array of unique tags
      */
     private extractUniqueTags(items: ItemData[]): Tag[] {
         const tagNames = items.flatMap((item) => item.tags as string[]);
@@ -364,7 +394,6 @@ ${CATEGORIZE_PROMPT}
     /**
      * Map an array of names to unique identifiable objects
      * @param names Array of names
-     * @returns Array of unique identifiable objects
      */
     private mapUnique(names: string[]): Array<{ id: string; name: string }> {
         const unique = new Set(names.filter(Boolean));
@@ -377,7 +406,6 @@ ${CATEGORIZE_PROMPT}
     /**
      * Convert a partial item to a full ItemData object
      * @param item Partial item data
-     * @returns Complete ItemData object
      */
     private toItemData(item: Partial<ItemData>): ItemData {
         return {
