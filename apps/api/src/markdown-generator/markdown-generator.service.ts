@@ -10,7 +10,7 @@ import { MarkdownRepository } from './markdown-repository';
 
 @Injectable()
 export class MarkdownGeneratorService {
-    constructor(private readonly githubService: GithubService) { }
+    constructor(private readonly githubService: GithubService) {}
 
     async initialize(directory: Directory, user: User) {
         const token = user.getGitToken();
@@ -31,8 +31,13 @@ export class MarkdownGeneratorService {
     async update(directory: Directory, user: User) {
         const token = user.getGitToken();
 
-        const markdownPath = await this.githubService.clone(directory.owner, directory.slug, token);
-        const dataPath = await this.githubService.clone(
+        const markdownPath = await this.githubService.cloneOrPull(
+            directory.owner,
+            directory.slug,
+            token,
+        );
+
+        const dataPath = await this.githubService.cloneOrPull(
             directory.owner,
             directory.getDataRepo(),
             token,
@@ -48,7 +53,7 @@ export class MarkdownGeneratorService {
             const slugs = await fs.readdir(dataRepo.dataDir);
             await markdownRepo.ensureDirectoriesExist();
 
-            const groups = {};  // we want to group items by category, like: { 'open-source': [items], 'commercial': [items] }
+            const groups = {}; // we want to group items by category, like: { 'open-source': [items], 'commercial': [items] }
             for (const slug of slugs) {
                 const markdown = await dataRepo.getMarkdown(slug);
                 if (markdown) {
@@ -58,11 +63,13 @@ export class MarkdownGeneratorService {
 
                 const item = await dataRepo.getItem(slug);
                 if (Array.isArray(item.tags)) {
-                    item.tags = item.tags.map(tag => this.populate<Tag>(tag, tags));
+                    item.tags = item.tags.map((tag) => this.populate<Tag>(tag, tags));
                 }
 
                 if (Array.isArray(item.category)) {
-                    item.category = item.category.map(category => this.populate<Category>(category, categories));
+                    item.category = item.category.map((category) =>
+                        this.populate<Category>(category, categories),
+                    );
                 } else {
                     item.category = [this.populate(item.category, categories)];
                 }
@@ -81,19 +88,21 @@ export class MarkdownGeneratorService {
             if (license) {
                 await markdownRepo.writeLicense(license);
             }
-            
-            const readme: string = await this.generateReadme(dataRepo, markdowns, groups, categories);
+
+            const readme: string = await this.generateReadme(
+                dataRepo,
+                markdowns,
+                groups,
+                categories,
+            );
             await markdownRepo.writeReadme(readme);
             await this.githubService.add(markdownPath, '.');
-            await this.githubService.commit(markdownPath, 'sync README.md',  user.asCommitter());
+            await this.githubService.commit(markdownPath, 'sync README.md', user.asCommitter());
             await this.githubService.push(markdownPath, token);
         } catch (err) {
             throw err;
         } finally {
-            await Promise.all([
-                dataRepo.cleanup(),
-                markdownRepo.cleanup(),
-            ]);
+            await Promise.all([dataRepo.cleanup(), markdownRepo.cleanup()]);
         }
     }
 
@@ -101,7 +110,7 @@ export class MarkdownGeneratorService {
         data: DataRepository,
         markdowns: Set<string>,
         groups: Record<string, Array<ItemData>>,
-        categories: Map<string, Category>
+        categories: Map<string, Category>,
     ) {
         const config = await data.getConfig();
         const { header, footer } = await data.readMarkdownTemplate();

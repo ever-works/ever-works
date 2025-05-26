@@ -21,7 +21,7 @@ export class GithubService extends GitProvider {
             org,
             name: repo,
             description,
-            private: true,  // for now
+            private: true, // for now
         });
 
         return res.data;
@@ -32,7 +32,7 @@ export class GithubService extends GitProvider {
         const res = await octokit.rest.repos.createForAuthenticatedUser({
             name: repo,
             description,
-            private: true,  // for now
+            private: true, // for now
         });
 
         return res.data;
@@ -69,19 +69,19 @@ export class GithubService extends GitProvider {
         const duplicated = await this.createEmptyRepo(name, '', token);
         const origin = duplicated.clone_url;
 
-        const originalDir = await this.clone(owner, repo, token);
+        const originalDir = await this.cloneOrPull(owner, repo, token);
         await this.remoteRemove(originalDir, 'origin');
         await this.remoteAdd(originalDir, 'origin', origin);
         await this.push(originalDir, token);
 
         return originalDir;
     }
-    
+
     async duplicateAsOrg(owner: string, repo: string, org: string, name: string, token: string) {
         const duplicated = await this.createEmptyRepoAsOrg(org, name, '', token);
         const origin = duplicated.clone_url;
 
-        const originalDir = await this.clone(owner, repo, token);
+        const originalDir = await this.cloneOrPull(owner, repo, token);
         await this.remoteRemove(originalDir, 'origin');
         await this.remoteAdd(originalDir, 'origin', origin);
         await this.push(originalDir, token);
@@ -96,28 +96,25 @@ export class GithubService extends GitProvider {
 
         const result = await octokit.rest.actions.getRepoPublicKey({
             owner,
-            repo
+            repo,
         });
 
         return result.data;
     }
 
     async setActionSecret(
-        data: { key: string, value: string, repo: string, owner: string },
-        publicKey: { key_id: string, key: string },
-        token: string
+        data: { key: string; value: string; repo: string; owner: string },
+        publicKey: { key_id: string; key: string },
+        token: string,
     ) {
         const octokit = new Octokit({
             auth: token,
         });
 
         await sodium.ready;
-        const binkey = sodium.from_base64(publicKey.key, sodium.base64_variants.ORIGINAL)
+        const binkey = sodium.from_base64(publicKey.key, sodium.base64_variants.ORIGINAL);
         const binsec = sodium.from_string(data.value);
-        const encryptedBytes = sodium.crypto_box_seal(
-            binsec,
-            binkey,
-        );
+        const encryptedBytes = sodium.crypto_box_seal(binsec, binkey);
 
         await octokit.rest.actions.createOrUpdateRepoSecret({
             owner: data.owner,
@@ -129,8 +126,8 @@ export class GithubService extends GitProvider {
     }
 
     async setActionVariable(
-        data: { key: string, value: string, repo: string, owner: string },
-        token: string
+        data: { key: string; value: string; repo: string; owner: string },
+        token: string,
     ) {
         const octokit = new Octokit({
             auth: token,
@@ -169,8 +166,14 @@ export class GithubService extends GitProvider {
     }
 
     async dispatchAction(
-        data: { workflow: string, inputs?: { [x: string]: unknown }, branch: string, owner: string, repo: string, },
-        token: string
+        data: {
+            workflow: string;
+            inputs?: { [x: string]: unknown };
+            branch: string;
+            owner: string;
+            repo: string;
+        },
+        token: string,
     ) {
         const octokit = new Octokit({
             auth: token,
