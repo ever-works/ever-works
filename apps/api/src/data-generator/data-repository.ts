@@ -10,6 +10,7 @@ export interface IDataConfig {
     item_name?: string;
     items_name?: string;
     copyright_year?: number;
+    prompt?: string;
 }
 
 export const DEFAULT_DATA_CONFIG: IDataConfig = {

@@ -1,3 +1,6 @@
+import { randomUUID } from 'node:crypto';
+import { slugifyText } from '../items-generator/utils/text.utils';
+
 export class User {
     id: string;
     username: string;
@@ -5,13 +8,14 @@ export class User {
 
     static async sessionMock() {
         const user = new User();
+
+        user.id = slugifyText(process.env.GIT_NAME || randomUUID());
         user.username = process.env.GIT_NAME;
-        user.id = '11111111-1111-1111-1111-111111111111';
         user.email = process.env.GIT_EMAIL;
-        
+
         return user;
     }
-    
+
     getGitToken() {
         return process.env.GITHUB_APIKEY;
     }

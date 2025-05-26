@@ -117,13 +117,11 @@ export class DataGeneratorService {
         const token = user.getGitToken();
         const repo = directory.getDataRepo();
 
-        this.logger.log(`Cloning/pulling repository ${directory.owner}/${repo}`);
         const dest = await this.githubService.cloneOrPull(directory.owner, repo, token);
         const data = await DataRepository.create(dest);
         this.logger.log(`Repository ready at ${dest}`);
 
         try {
-            this.logger.debug('Fetching existing categories, tags, and items...');
             const categories = await data.getCategories();
             const tags = await data.getTags();
             const existingItems = await data.getItems();
