@@ -15,8 +15,31 @@ export class GithubService extends GitProvider {
         return `https://github.com/${owner}/${repo}`;
     }
 
+    private async getRepository(owner: string, repo: string, token: string) {
+        const octokit = new Octokit({ auth: token });
+        try {
+            const data = await octokit.rest.repos.get({
+                owner,
+                repo,
+            });
+            return data;
+        } catch (err) {
+            if (err instanceof RequestError && err.status === 404) {
+                return undefined;
+            }
+            throw err;
+        }
+    }
+
     async createEmptyRepoAsOrg(org: string, repo: string, description: string, token: string) {
         const octokit = new Octokit({ auth: token });
+
+        // Check if repository already exists
+        const existingRepository = await this.getRepository(org, repo, token);
+        if (existingRepository) {
+            return existingRepository.data;
+        }
+
         const res = await octokit.rest.repos.createInOrg({
             org,
             name: repo,
@@ -29,6 +52,16 @@ export class GithubService extends GitProvider {
 
     async createEmptyRepo(repo: string, description: string, token: string) {
         const octokit = new Octokit({ auth: token });
+
+        // Get authenticated user to check repository existence
+        const { data: user } = await octokit.rest.users.getAuthenticated();
+
+        // Check if repository already exists
+        const existingRepository = await this.getRepository(user.login, repo, token);
+        if (existingRepository) {
+            return existingRepository.data;
+        }
+
         const res = await octokit.rest.repos.createForAuthenticatedUser({
             name: repo,
             description,

@@ -17,6 +17,10 @@ export class Directory {
     }
 
     static async createMock(directory: Directory) {
+        if (!directory.owner) {
+            throw new Error('Owner is required');
+        }
+
         directories.set(directory.slug, directory);
     }
 
