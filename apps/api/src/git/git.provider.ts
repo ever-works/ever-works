@@ -19,6 +19,8 @@ interface ICommitter {
     email?: string;
 }
 
+const DEFAULT_BRANCHES = ['main', 'master'] as const;
+
 export abstract class GitProvider {
     abstract getAuth(token: string): IGitAuth;
 
@@ -120,6 +122,91 @@ export abstract class GitProvider {
             http,
             dir,
         });
+    }
+
+    /**
+     * Returns the name of the main branch if it exists, otherwise returns null
+     * Checks for default branches in the order defined in DEFAULT_BRANCHES
+     */
+    async getMainBranch(dir: string): Promise<string | null> {
+        try {
+            const branches = await git.listBranches({ fs, dir });
+
+            for (const defaultBranch of DEFAULT_BRANCHES) {
+                if (branches.includes(defaultBranch)) {
+                    return defaultBranch;
+                }
+            }
+
+            return null;
+        } catch (error) {
+            throw new Error(`Failed to get main branch: ${error.message}`);
+        }
+    }
+
+    /**
+     * Switches to main branch if current branch is not one of the default branches
+     * Checks local branches and switches to the first available default branch found
+     */
+    async switchToMainBranch(dir: string): Promise<string | null> {
+        try {
+            const currentBranch = await git.currentBranch({ fs, dir });
+
+            if (currentBranch && DEFAULT_BRANCHES.includes(currentBranch as any)) {
+                return currentBranch;
+            }
+
+            const branches = await git.listBranches({ fs, dir });
+
+            for (const defaultBranch of DEFAULT_BRANCHES) {
+                if (branches.includes(defaultBranch)) {
+                    // Switch to the default branch
+                    await git.checkout({ fs, dir, ref: defaultBranch });
+                    return defaultBranch;
+                }
+            }
+
+            return null;
+        } catch (error) {
+            throw new Error(`Failed to switch to main branch: ${error.message}`);
+        }
+    }
+
+    /**
+     * Generates a random unique branch name and switches to it
+     * Ensures the branch name doesn't conflict with existing branches
+     */
+    async createAndSwitchToRandomBranch(dir: string, prefix: string = 'feature'): Promise<string> {
+        try {
+            // Get all existing branches to ensure uniqueness
+            const existingBranches = await git.listBranches({ fs, dir });
+
+            let branchName: string;
+            let attempts = 0;
+            const maxAttempts = 10;
+
+            // Generate unique branch name
+            do {
+                const timestamp = Date.now();
+                const randomSuffix = Math.random().toString(36).substring(2, 8);
+                branchName = `${prefix}-${timestamp}-${randomSuffix}`;
+                attempts++;
+
+                if (attempts >= maxAttempts) {
+                    throw new Error(
+                        `Failed to generate unique branch name after ${maxAttempts} attempts`,
+                    );
+                }
+            } while (existingBranches.includes(branchName));
+
+            // Create and switch to the new branch
+            await git.branch({ fs, dir, ref: branchName });
+            await git.checkout({ fs, dir, ref: branchName });
+
+            return branchName;
+        } catch (error) {
+            throw new Error(`Failed to create and switch to random branch: ${error.message}`);
+        }
     }
 
     private getDir(owner: string, repo: string) {

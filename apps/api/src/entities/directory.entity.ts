@@ -1,5 +1,4 @@
 import { randomUUID } from 'crypto';
-import { slugifyText } from 'src/items-generator/utils/text.utils';
 
 const directories = new Map<string, Directory>();
 
@@ -26,14 +25,6 @@ export class Directory {
 
     static async findMock(slug: string) {
         return directories.get(slug);
-    }
-
-    getRepoFullName() {
-        if (!this.owner || !this.slug) {
-            throw new Error('Owner and slug are required');
-        }
-
-        return slugifyText(`${this.owner}/${this.slug}`);
     }
 
     getDataRepo() {

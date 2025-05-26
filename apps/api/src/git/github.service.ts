@@ -220,4 +220,42 @@ export class GithubService extends GitProvider {
             repo: data.repo,
         });
     }
+
+    /**
+     * Creates a pull request from source branch to target branch
+     */
+    async createPR(
+        params: {
+            owner: string;
+            repo: string;
+            head: string;
+            base: string;
+            title: string;
+            body?: string;
+            draft?: boolean;
+        },
+        token: string,
+    ) {
+        const octokit = new Octokit({ auth: token });
+
+        try {
+            const { data } = await octokit.rest.pulls.create({
+                owner: params.owner,
+                repo: params.repo,
+                title: params.title,
+                head: params.head,
+                base: params.base,
+                body: params.body || `Automated pull request from ${params.head} to ${params.base}`,
+                draft: params.draft || false,
+            });
+
+            return data;
+        } catch (err) {
+            this.logger.error(
+                `Failed to create PR from ${params.head} to ${params.base}`,
+                err.message,
+            );
+            throw err;
+        }
+    }
 }
