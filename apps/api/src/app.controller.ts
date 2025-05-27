@@ -34,21 +34,17 @@ export class AppController {
         const user = await User.sessionMock();
 
         const dir = new Directory();
+
         dir.slug = slug;
-
-        const ghOwner = await this.githubService.getUser(user.getGitToken());
-        dir.owner = ghOwner.login;
-        dir.organization = typeof owner !== 'undefined' && owner !== ghOwner.login;
-
-        // override owner if provided
-        if (owner) {
-            dir.owner = owner;
-        }
-
         dir.name = name;
         dir.description = description;
 
+        const ghOwner = await this.githubService.getUser(user.getGitToken());
+        dir.owner = owner || ghOwner.login;
+        dir.organization = !!owner && owner !== ghOwner.login;
+
         Directory.createMock(dir);
+
         return dir;
     }
 

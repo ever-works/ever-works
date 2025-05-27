@@ -199,7 +199,10 @@ export class DataGeneratorService {
                         token,
                     )
                     .catch((err) => {
-                        this.logger.error('Failed to create PR', err);
+                        this.logger.warn(
+                            `Unable to create pull request ${directory.owner}/${repo}`,
+                            err.message,
+                        );
                     });
 
                 this.logger.log(

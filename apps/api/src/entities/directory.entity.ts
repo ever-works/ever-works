@@ -15,7 +15,7 @@ export class Directory {
         this.id = randomUUID();
     }
 
-    static async createMock(directory: Directory) {
+    static createMock(directory: Directory) {
         if (!directory.owner) {
             throw new Error('Owner is required');
         }

@@ -8,6 +8,7 @@ import { SearchService } from '../shared';
 export class WebPageRetrievalService {
     private readonly logger = new Logger(WebPageRetrievalService.name);
     private tavilyClient: TavilyClient | undefined;
+    private BATCH_SIZE = 10;
 
     constructor(private readonly searchService: SearchService) {
         this.tavilyClient = this.searchService.getTavilyClient();
@@ -89,11 +90,8 @@ export class WebPageRetrievalService {
         // Limit the number of URLs to process based on config
         const urlsToProcess = urlsToFetch.slice(0, config.max_pages_to_process);
 
-        // Process URLs in batches to avoid overwhelming the API
-        const BATCH_SIZE = 15;
-
-        for (let i = 0; i < urlsToProcess.length; i += BATCH_SIZE) {
-            const batch = urlsToProcess.slice(i, i + BATCH_SIZE);
+        for (let i = 0; i < urlsToProcess.length; i += this.BATCH_SIZE) {
+            const batch = urlsToProcess.slice(i, i + this.BATCH_SIZE);
 
             const extractionPromises = batch.map(async ({ url, query }) => {
                 try {
@@ -130,7 +128,7 @@ export class WebPageRetrievalService {
             allFetchedPages.push(...validResults);
 
             // Add a small delay between batches to be polite to the API
-            if (i + BATCH_SIZE < urlsToProcess.length) {
+            if (i + this.BATCH_SIZE < urlsToProcess.length) {
                 await new Promise((resolve) => setTimeout(resolve, 1000));
             }
         }
@@ -161,28 +159,23 @@ export class WebPageRetrievalService {
             return [];
         }
 
-        if (!urls || urls.length === 0) {
+        const dedupedUrls = [...new Set(urls)];
+
+        if (!dedupedUrls || dedupedUrls.length === 0) {
             return [];
         }
 
-        urls = [...new Set(urls)];
-
-        this.logger.log(`[${slug}] Retrieving content from ${urls.length} specific URLs`);
-
         const allFetchedPages: WebPageData[] = [];
 
-        if (urls.length === 0) {
+        if (dedupedUrls.length === 0) {
             this.logger.log(`[${slug}] All URLs have already been processed. Skipping.`);
             return [];
         }
 
-        this.logger.log(`[${slug}] Processing ${urls.length} unique URLs`);
+        this.logger.log(`[${slug}] Processing ${dedupedUrls.length} unique URLs`);
 
-        // Process URLs in batches to avoid overwhelming the API
-        const BATCH_SIZE = 10;
-
-        for (let i = 0; i < urls.length; i += BATCH_SIZE) {
-            const batch = urls.slice(i, i + BATCH_SIZE);
+        for (let i = 0; i < dedupedUrls.length; i += this.BATCH_SIZE) {
+            const batch = dedupedUrls.slice(i, i + this.BATCH_SIZE);
 
             const extractionPromises = batch.map(async (url) => {
                 try {
@@ -221,7 +214,7 @@ export class WebPageRetrievalService {
             allFetchedPages.push(...validResults);
 
             // Add a small delay between batches to be polite to the API
-            if (i + BATCH_SIZE < urls.length) {
+            if (i + this.BATCH_SIZE < dedupedUrls.length) {
                 await new Promise((resolve) => setTimeout(resolve, 500));
             }
         }

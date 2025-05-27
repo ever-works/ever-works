@@ -14,7 +14,7 @@ Built with NestJS.
 pnpm dev
 ```
 
-4. Create directory object (in memory for now) using a request to `http://localhost:3001/directories`
+4. Create a directory object (in memory for now) using a request to `http://localhost:3001/directories`
 
 ```json
 {

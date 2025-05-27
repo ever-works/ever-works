@@ -4,6 +4,7 @@ import * as fs from 'node:fs';
 import * as http from 'isomorphic-git/http/node';
 import git from 'isomorphic-git';
 import { slugifyText } from '../items-generator/utils/text.utils';
+import { Logger } from '@nestjs/common';
 
 /*
     'oauth2'         - GitLab
@@ -22,6 +23,8 @@ interface ICommitter {
 const DEFAULT_BRANCHES = ['main', 'master'] as const;
 
 export abstract class GitProvider {
+    protected abstract readonly logger: Logger;
+
     abstract getAuth(token: string): IGitAuth;
 
     abstract getURL(owner: string, repo: string): string;
@@ -44,7 +47,9 @@ export abstract class GitProvider {
                 await this.pull(dir, token, committer);
                 return dir;
             } catch (error) {
-                console.log(`Failed to pull ${dir}, removing directory and cloning again`, error);
+                this.logger?.warn(
+                    `Failed to pull ${dir}, removing directory and cloning again – ${error.message}`,
+                );
                 await fs.promises.rm(dir, { recursive: true, force: true });
             }
         }

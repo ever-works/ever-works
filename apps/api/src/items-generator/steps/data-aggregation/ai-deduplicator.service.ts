@@ -71,9 +71,8 @@ export class AiDeduplicatorService {
                 };
             });
         } catch (error) {
-            this.logger.error(`Error during AI deduplication batch: ${error.message}`, error.stack);
-
             // Fallback to the original items if AI deduplication fails
+            this.logger.warn(`Error during AI deduplication batch: ${error.message}`, error.stack);
             return items;
         }
     }
