@@ -56,7 +56,7 @@ export class AiDeduplicatorService {
                 .pipe(this.llm.withStructuredOutput(extractedItemsSchema))
                 .invoke({
                     task: description,
-                    items: JSON.stringify(items.map(this.sharedUtils.itemMap)),
+                    items: JSON.stringify(items.map((item) => this.sharedUtils.itemMap(item))),
                 });
 
             return result.items.map((item) => {
@@ -133,14 +133,6 @@ export class AiDeduplicatorService {
                     if (i < chunks.length - 1) {
                         await this.sharedUtils.addProcessingDelay(500);
                     }
-                }
-
-                // Deduplicate the chunks again if needed
-                if (deduplicatedChunks.length > CHUNK_SIZE) {
-                    deduplicatedChunks = await this.processSingleDeduplicationBatch(
-                        description,
-                        deduplicatedChunks,
-                    );
                 }
 
                 processedItems = processedItems.concat(deduplicatedChunks);
