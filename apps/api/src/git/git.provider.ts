@@ -1,6 +1,6 @@
-import * as os from 'os';
+import * as os from 'node:os';
 import * as path from 'node:path';
-import * as fs from 'fs';
+import * as fs from 'node:fs';
 import * as http from 'isomorphic-git/http/node';
 import git from 'isomorphic-git';
 import { slugifyText } from '../items-generator/utils/text.utils';
