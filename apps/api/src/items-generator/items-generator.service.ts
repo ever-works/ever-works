@@ -19,6 +19,7 @@ import {
 } from './steps';
 import { Category, ItemData, Tag } from './dto';
 import { IDataConfig } from '../data-generator/data-repository';
+import { WebPageData } from './interfaces/items-generator.interfaces';
 
 // Default configuration values
 const DEFAULT_CONFIG: Required<ConfigDto> = {
@@ -146,15 +147,13 @@ export class ItemsGeneratorService {
             createItemsGeneratorDto.prompt = prompt;
 
             // Add source_urls to the extractedUrls
-            extractedUrls.push(...source_urls);
+            extractedUrls.push(...(source_urls || []));
 
             if (extractedUrls.length > 0) {
                 this.logger.log(
                     `[${slug}] Extracted (or source urls) ${extractedUrls.length} URLs from prompt: ${extractedUrls.join(', ')}`,
                 );
                 this.logger.log(`[${slug}] Updated prompt: "${prompt}"`);
-            } else {
-                this.logger.log(`[${slug}] No URLs found in prompt. Using original prompt.`);
             }
 
             // 1.5. AI-First Item Generation
@@ -185,11 +184,8 @@ export class ItemsGeneratorService {
             this.logger.log(`[${slug}] 3. Web Search & Content Retrieval - Starting`);
 
             // Process extracted URLs first if any were found
-            let initialWebPages = [];
+            let initialWebPages: WebPageData[] = [];
             if (extractedUrls.length > 0) {
-                this.logger.log(
-                    `[${slug}] Processing ${extractedUrls.length} URLs extracted from prompt`,
-                );
                 initialWebPages = await this.webPageRetrievalService.retrieveSpecificUrls(
                     slug,
                     extractedUrls,
