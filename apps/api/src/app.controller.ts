@@ -35,10 +35,8 @@ export class AppController {
 
         const dir = new Directory();
         dir.slug = slug;
-        dir.organization = typeof owner !== 'undefined';
 
         const ghOwner = await this.githubService.getUser(user.getGitToken());
-
         dir.owner = ghOwner.login;
         dir.organization = typeof owner !== 'undefined' && owner !== ghOwner.login;
 
