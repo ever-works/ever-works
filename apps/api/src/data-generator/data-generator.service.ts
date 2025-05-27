@@ -292,7 +292,7 @@ export class DataGeneratorService {
         const promises = [data.writeItem(item)];
 
         // Write item markdown to disk
-        let md =
+        const md =
             item.markdown ||
             `#${item.name}\n\n${item.description}\n\n[${item.source_url}](${item.source_url})`;
 
