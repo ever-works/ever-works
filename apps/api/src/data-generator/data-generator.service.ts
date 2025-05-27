@@ -296,19 +296,6 @@ export class DataGeneratorService {
             item.markdown ||
             `#${item.name}\n\n${item.description}\n\n[${item.source_url}](${item.source_url})`;
 
-        if (!item.markdown) {
-            try {
-                const { markdown } = await this.itemsGeneratorService.generateMarkdownForItem(item);
-
-                md = markdown;
-            } catch (err) {
-                this.logger.error(
-                    `processItem: Failed to generate markdown for ${item.slug}`,
-                    err.stack,
-                );
-            }
-        }
-
         promises.push(data.writeItemMarkdown(item, `${md}`));
 
         await Promise.all(promises);
