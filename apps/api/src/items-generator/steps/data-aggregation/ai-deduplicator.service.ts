@@ -101,7 +101,6 @@ export class AiDeduplicatorService {
         for (let groupIndex = 0; groupIndex < groupedItems.length; groupIndex++) {
             const group = groupedItems[groupIndex];
 
-            // Skip empty groups
             if (!group || group.length === 0) continue;
 
             // Process large groups in chunks
