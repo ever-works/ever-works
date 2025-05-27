@@ -73,7 +73,7 @@ If you want to init directory for organization, pass optional `owner` field:
         "max_results_per_query": 25,
         "max_pages_to_process": 150,
         "relevance_threshold_content": 0.8,
-        "min_content_length_for_extraction": 500,
+        "min_content_length_for_extraction": 300,
         "ai_first_generation_enabled": true
     }
 }
