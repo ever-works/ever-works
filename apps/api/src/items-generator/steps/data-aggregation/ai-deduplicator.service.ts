@@ -10,6 +10,9 @@ import { DEDUPLICATOR_PROMPT } from './prompts.constants';
 
 @Injectable()
 export class AiDeduplicatorService {
+    private readonly CHUNK_DELAY_MS = 500;
+    private readonly GROUP_DELAY_MS = 1000;
+
     private readonly logger = new Logger(AiDeduplicatorService.name);
     private llm: ChatOpenAI;
 
@@ -105,7 +108,7 @@ export class AiDeduplicatorService {
 
             // Process large groups in chunks
             if (group.length > CHUNK_SIZE) {
-                // Process the group in chunks
+                // Process the group in chunks (for large group)
                 const chunks = this.sharedUtils.chunkArray(group, CHUNK_SIZE);
                 let deduplicatedChunks: ItemData[] = [];
 
@@ -130,7 +133,7 @@ export class AiDeduplicatorService {
 
                     // Add a small delay between chunks to avoid rate limiting
                     if (i < chunks.length - 1) {
-                        await this.sharedUtils.addProcessingDelay(500);
+                        await this.sharedUtils.addProcessingDelay(this.CHUNK_DELAY_MS);
                     }
                 }
 
@@ -155,7 +158,7 @@ export class AiDeduplicatorService {
 
             // Add a small delay between groups to avoid rate limiting
             if (groupIndex < groupedItems.length - 1) {
-                await this.sharedUtils.addProcessingDelay(1000);
+                await this.sharedUtils.addProcessingDelay(this.GROUP_DELAY_MS);
             }
         }
 
