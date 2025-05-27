@@ -107,7 +107,7 @@ export class DataRepository {
     async clearFiles() {
         const files = await fs.readdir(this.dir);
         for (const file of files) {
-            if (file.includes('.git')) {
+            if (file === '.git' || file.startsWith('.git')) {
                 continue;
             }
 
