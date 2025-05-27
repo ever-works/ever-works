@@ -67,6 +67,9 @@ export class ItemsGeneratorService {
         const { slug, name, target_keywords, source_urls } = createItemsGeneratorDto;
         const config = { ...DEFAULT_CONFIG, ...createItemsGeneratorDto.config };
 
+        // Update the DTO with the final config
+        createItemsGeneratorDto.config = config;
+
         this.logger.log(`Starting generation for slug: ${slug}, name: ${name}`);
 
         try {

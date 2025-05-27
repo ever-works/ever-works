@@ -73,33 +73,7 @@ export class AppController {
         // TODO: Intentionally not awaiting this to allow for an immediate response
         // The actual processing will happen in the background.
         // A more robust solution might involve job queues, webhooks, or websockets for status updates.
-        (async () => {
-            const startTime = new Date();
-            console.log(`Generation started at: ${startTime.toISOString()}`);
-
-            try {
-                const generated = await this.dataGenerator.initialize(
-                    directory,
-                    user,
-                    createItemsGeneratorDto,
-                );
-
-                if (generated) {
-                    await Promise.all([
-                        // we cleanup all repositories here (markdown and data)
-                        this.markdownGenerator.initialize(directory, user),
-                        this.websiteGenerator.initialize(directory, user),
-                    ]);
-                }
-            } catch (error) {
-                console.error('Error during generation:', error);
-            }
-
-            const endTime = new Date();
-            console.log(`Generation finished at: ${endTime.toISOString()}`);
-            const duration = (endTime.getTime() - startTime.getTime()) / 1000;
-            console.log(`Total time taken: ${duration} seconds`);
-        })();
+        this.processGeneration(directory, user, createItemsGeneratorDto);
 
         return {
             status: 'pending',
@@ -107,5 +81,32 @@ export class AppController {
             parameters: createItemsGeneratorDto,
             message: `Processing request for '${createItemsGeneratorDto.name}'. Check logs or data directory for updates.`,
         };
+    }
+
+    private async processGeneration(
+        directory: Directory,
+        user: User,
+        dto: CreateItemsGeneratorDto,
+    ) {
+        const startTime = new Date();
+        console.log(`Generation started at: ${startTime.toISOString()}`);
+
+        try {
+            const generated = await this.dataGenerator.initialize(directory, user, dto);
+
+            if (generated) {
+                await Promise.all([
+                    this.markdownGenerator.initialize(directory, user),
+                    this.websiteGenerator.initialize(directory, user),
+                ]);
+            }
+        } catch (error) {
+            console.error('Error during generation:', error);
+        }
+
+        const endTime = new Date();
+        console.log(`Generation finished at: ${endTime.toISOString()}`);
+        const duration = (endTime.getTime() - startTime.getTime()) / 1000;
+        console.log(`Total time taken: ${duration} seconds`);
     }
 }

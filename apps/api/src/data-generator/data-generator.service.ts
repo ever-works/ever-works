@@ -46,8 +46,7 @@ export class DataGeneratorService {
 
         const existed = existingData.existingItems.length > 0;
 
-        // Generate items
-        // The generated items will be new
+        // Generate items, the items generator will always to generate new items
         const generatedItems = await this.itemsGeneratorService
             .generateItemsGenerator(createItemsGeneratorDto, existingData)
             .catch((err) => {
