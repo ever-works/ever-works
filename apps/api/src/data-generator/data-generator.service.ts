@@ -57,7 +57,7 @@ export class DataGeneratorService {
         // If no items were generated, we don't need to do anything else
         if (!generatedItems || generatedItems.items.length === 0) {
             const dataDir = this.githubService.getDir(directory.owner, directory.getDataRepo());
-            await DataRepository.create(dataDir).then((data) => data.cleanupCustomDir(dataDir));
+            await DataRepository.create(dataDir).then((data) => data.cleanup());
             return;
         }
 
