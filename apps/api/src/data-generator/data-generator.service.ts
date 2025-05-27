@@ -54,9 +54,8 @@ export class DataGeneratorService {
                 return null;
             });
 
-        if (!generatedItems || generatedItems.items.length === 0) {
-            return;
-        }
+        const token = user.getGitToken();
+        const repo = directory.getDataRepo();
 
         const { categories: newCategories, items: newItems, tags: newTags } = generatedItems;
         const { existingCategories, existingTags } = existingData;
@@ -64,9 +63,6 @@ export class DataGeneratorService {
         this.logger.debug(
             `Generated ${newCategories.length} categories, ${newItems.length} items, ${newTags.length} tags.`,
         );
-
-        const token = user.getGitToken();
-        const repo = directory.getDataRepo();
 
         const description = `machine-readable data for ${directory.slug}`;
 
@@ -88,6 +84,12 @@ export class DataGeneratorService {
         const dest = await this.githubService.cloneOrPull(directory.owner, repo, token);
         const data = await DataRepository.create(dest);
         this.logger.log(`Cloned repository to ${dest}`);
+
+        // If no items were generated, we don't need to do anything else
+        if (!generatedItems || generatedItems.items.length === 0) {
+            await data.cleanup();
+            return;
+        }
 
         try {
             // Ensure directories exist
@@ -215,6 +217,7 @@ export class DataGeneratorService {
             }
         } catch (err) {
             this.logger.error('Failed to initialize data repository', err);
+            await data.cleanup();
             throw err;
         } finally {
             // never cleanup data with (data.cleanup()),
