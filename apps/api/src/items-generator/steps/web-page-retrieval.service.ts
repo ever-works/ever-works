@@ -161,10 +161,6 @@ export class WebPageRetrievalService {
 
         const dedupedUrls = [...new Set(urls)];
 
-        if (!dedupedUrls || dedupedUrls.length === 0) {
-            return [];
-        }
-
         const allFetchedPages: WebPageData[] = [];
 
         if (dedupedUrls.length === 0) {
