@@ -8,7 +8,7 @@ import { SearchService } from '../shared';
 export class WebPageRetrievalService {
     private readonly logger = new Logger(WebPageRetrievalService.name);
     private tavilyClient: TavilyClient | undefined;
-    private BATCH_SIZE = 10;
+    private readonly BATCH_SIZE = 10;
 
     constructor(private readonly searchService: SearchService) {
         this.tavilyClient = this.searchService.getTavilyClient();
