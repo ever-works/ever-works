@@ -73,7 +73,7 @@ export class AppController {
         // TODO: Intentionally not awaiting this to allow for an immediate response
         // The actual processing will happen in the background.
         // A more robust solution might involve job queues, webhooks, or websockets for status updates.
-        this.processGeneration(directory, user, createItemsGeneratorDto);
+        void this.processGeneration(directory, user, createItemsGeneratorDto);
 
         return {
             status: 'pending',
