@@ -251,7 +251,7 @@ export abstract class GitProvider {
         }
     }
 
-    private getDir(owner: string, repo: string) {
+    getDir(owner: string, repo: string) {
         return path.join(os.tmpdir(), 'ever-works-repos', slugifyText(`${owner}-${repo}`));
     }
 }

@@ -104,6 +104,10 @@ export class DataRepository {
         await fs.rm(this.dir, { recursive: true, force: true });
     }
 
+    async cleanupCustomDir(dir: string) {
+        await fs.rm(dir, { recursive: true, force: true });
+    }
+
     async clearFiles() {
         const files = await fs.readdir(this.dir);
         for (const file of files) {

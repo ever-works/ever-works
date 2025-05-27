@@ -54,8 +54,12 @@ export class DataGeneratorService {
                 return null;
             });
 
-        const token = user.getGitToken();
-        const repo = directory.getDataRepo();
+        // If no items were generated, we don't need to do anything else
+        if (!generatedItems || generatedItems.items.length === 0) {
+            const dataDir = this.githubService.getDir(directory.owner, directory.getDataRepo());
+            await DataRepository.create(dataDir).then((data) => data.cleanupCustomDir(dataDir));
+            return;
+        }
 
         const { categories: newCategories, items: newItems, tags: newTags } = generatedItems;
         const { existingCategories, existingTags } = existingData;
@@ -66,8 +70,10 @@ export class DataGeneratorService {
 
         const description = `machine-readable data for ${directory.slug}`;
 
+        const token = user.getGitToken();
+        const repo = directory.getDataRepo();
+
         // Creating GitHub repository
-        this.logger.log(`Creating GitHub repository: ${directory.owner}/${repo}`);
         if (directory.organization) {
             await this.githubService.createEmptyRepoAsOrg(
                 directory.owner,
@@ -78,18 +84,13 @@ export class DataGeneratorService {
         } else {
             await this.githubService.createEmptyRepo(repo, description, token);
         }
+
         this.logger.log(`Successfully created GitHub repository: ${directory.owner}/${repo}`);
 
         // Cloning repository
         const dest = await this.githubService.cloneOrPull(directory.owner, repo, token);
         const data = await DataRepository.create(dest);
         this.logger.log(`Cloned repository to ${dest}`);
-
-        // If no items were generated, we don't need to do anything else
-        if (!generatedItems || generatedItems.items.length === 0) {
-            await data.cleanup();
-            return;
-        }
 
         try {
             // Ensure directories exist
