@@ -79,18 +79,22 @@ export class AppController {
             const startTime = new Date();
             console.log(`Generation started at: ${startTime.toISOString()}`);
 
-            const generated = await this.dataGenerator.initialize(
-                directory,
-                user,
-                createItemsGeneratorDto,
-            );
+            try {
+                const generated = await this.dataGenerator.initialize(
+                    directory,
+                    user,
+                    createItemsGeneratorDto,
+                );
 
-            if (generated) {
-                await Promise.all([
-                    // we cleanup all repositories here (markdown and data)
-                    this.markdownGenerator.initialize(directory, user),
-                    this.websiteGenerator.initialize(directory, user),
-                ]);
+                if (generated) {
+                    await Promise.all([
+                        // we cleanup all repositories here (markdown and data)
+                        this.markdownGenerator.initialize(directory, user),
+                        this.websiteGenerator.initialize(directory, user),
+                    ]);
+                }
+            } catch (error) {
+                console.error('Error during generation:', error);
             }
 
             const endTime = new Date();
