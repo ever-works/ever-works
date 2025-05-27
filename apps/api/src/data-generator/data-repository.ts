@@ -1,4 +1,4 @@
-import * as path from 'path';
+import * as path from 'node:path';
 import * as fs from 'fs/promises';
 import * as yaml from 'yaml';
 import { format } from 'date-fns';
