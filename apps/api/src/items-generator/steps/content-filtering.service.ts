@@ -24,12 +24,16 @@ export class ContentFilteringService {
     ): Promise<WebPageData[]> {
         this.logger.log(`[${slug}] Starting content filtering for ${webPages.length} pages`);
 
-        const filteredPages = webPages.filter((page) => {
-            const isLongEnough =
-                page.raw_content.length >= config.min_content_length_for_extraction;
+        const filteredPages = webPages
+            .filter((page, index, self) => {
+                return index === self.findIndex((t) => t.source_url === page.source_url);
+            })
+            .filter((page) => {
+                const isLongEnough =
+                    page.raw_content.length >= config.min_content_length_for_extraction;
 
-            return isLongEnough;
-        });
+                return isLongEnough;
+            });
 
         // Check if OpenAI API is configured
         if (!this.llm.apiKey) {
