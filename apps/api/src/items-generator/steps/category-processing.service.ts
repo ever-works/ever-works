@@ -144,7 +144,7 @@ export class CategoryProcessingService {
                 slug: i.slug,
                 name: i.name,
                 description: i.description,
-                url: i.source_url,
+                source_url: i.source_url,
             }));
 
             // Process in batches if there are many items
@@ -367,7 +367,9 @@ ${CATEGORIZE_PROMPT}
      * @param items Categorized items
      */
     private extractUniqueCategories(items: ItemData[]): Category[] {
-        const categoryNames = items.map((item) => item.category as string);
+        const categoryNames = items.map((item) =>
+            typeof item.category === 'string' ? item.category : item.category?.name,
+        );
         return this.mapUnique(categoryNames);
     }
 
