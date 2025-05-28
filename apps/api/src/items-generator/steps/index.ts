@@ -1,3 +1,4 @@
+export * from './prompt-comparison.service';
 export * from './ai-item-generation.service';
 export * from './search-query-generation.service';
 export * from './web-page-retrieval.service';
@@ -6,3 +7,5 @@ export * from './item-extraction.service';
 export * from './source-validation.service';
 export * from './data-aggregation.service';
 export * from './category-processing.service';
+export * from './markdown-generation.service';
+export * from './url-extraction.service';

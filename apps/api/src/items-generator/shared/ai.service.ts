@@ -23,6 +23,10 @@ export class AiService {
     });
   }
 
+  isApiKeyConfigured(): boolean {
+    return this.isConfigured;
+  }
+
   /**
    * Get the LLM instance
    */

@@ -1,333 +1,342 @@
 import { Injectable, Logger } from '@nestjs/common';
 import {
-  CreateItemsGeneratorDto,
-  ConfigDto,
+    CreateItemsGeneratorDto,
+    ConfigDto,
+    OperationType,
 } from './dto/create-items-generator.dto';
-import { AiItemGenerationService } from './steps/ai-item-generation.service';
-import { SearchQueryGenerationService } from './steps/search-query-generation.service';
-import { WebPageRetrievalService } from './steps/web-page-retrieval.service';
-import { ContentFilteringService } from './steps/content-filtering.service';
-import { ItemExtractionService } from './steps/item-extraction.service';
-import { SourceValidationService } from './steps/source-validation.service';
-import { DataAggregationService } from './steps/data-aggregation.service';
-import { CategoryProcessingService } from './steps/category-processing.service';
-import { MarkdownGenerationService } from './steps/markdown-generation.service';
-import { UrlExtractionService } from './steps/url-extraction.service';
+import {
+    AiItemGenerationService,
+    SearchQueryGenerationService,
+    WebPageRetrievalService,
+    ContentFilteringService,
+    ItemExtractionService,
+    SourceValidationService,
+    DataAggregationService,
+    CategoryProcessingService,
+    MarkdownGenerationService,
+    UrlExtractionService,
+    PromptComparisonService,
+} from './steps';
 import { Category, ItemData, Tag } from './dto';
+import { IDataConfig } from '../data-generator/data-repository';
+import { WebPageData } from './interfaces/items-generator.interfaces';
 
 // Default configuration values
 const DEFAULT_CONFIG: Required<ConfigDto> = {
-  max_search_queries: 10,
-  max_results_per_query: 20,
-  max_pages_to_process: 100,
-  relevance_threshold_content: 0.75,
-  min_content_length_for_extraction: 300,
-  ai_first_generation_enabled: true,
+    max_search_queries: 10,
+    max_results_per_query: 20,
+    max_pages_to_process: 100,
+    relevance_threshold_content: 0.75,
+    min_content_length_for_extraction: 300,
+    ai_first_generation_enabled: true,
+    prompt_comparison_confidence_threshold: 0.5,
 };
 
 @Injectable()
 export class ItemsGeneratorService {
-  private readonly logger = new Logger(ItemsGeneratorService.name);
+    private readonly logger = new Logger(ItemsGeneratorService.name);
 
-  constructor(
-    private readonly urlExtractionService: UrlExtractionService,
-    private readonly aiItemGenerationService: AiItemGenerationService,
-    private readonly searchQueryGenerationService: SearchQueryGenerationService,
-    private readonly webPageRetrievalService: WebPageRetrievalService,
-    private readonly contentFilteringService: ContentFilteringService,
-    private readonly itemExtractionService: ItemExtractionService,
-    private readonly sourceValidationService: SourceValidationService,
-    private readonly dataAggregationService: DataAggregationService,
-    private readonly categoryProcessingService: CategoryProcessingService,
-    private readonly markdownGenerationService: MarkdownGenerationService,
-  ) {}
+    constructor(
+        private readonly promptComparisonService: PromptComparisonService,
+        private readonly urlExtractionService: UrlExtractionService,
+        private readonly aiItemGenerationService: AiItemGenerationService,
+        private readonly searchQueryGenerationService: SearchQueryGenerationService,
+        private readonly webPageRetrievalService: WebPageRetrievalService,
+        private readonly contentFilteringService: ContentFilteringService,
+        private readonly itemExtractionService: ItemExtractionService,
+        private readonly sourceValidationService: SourceValidationService,
+        private readonly dataAggregationService: DataAggregationService,
+        private readonly categoryProcessingService: CategoryProcessingService,
+        private readonly markdownGenerationService: MarkdownGenerationService,
+    ) {}
 
-  /**
-   * Entry point for generating items.
-   *
-   * @param createItemsGeneratorDto
-   * @param existing
-   * @returns
-   */
-  async generateItemsGenerator(
-    createItemsGeneratorDto: CreateItemsGeneratorDto,
-    existing: {
-      existingItems?: ItemData[];
-      existingCategories?: Category[];
-      existingTags?: Tag[];
-    } = {},
-  ) {
-    const { slug, name, target_keywords, source_urls } =
-      createItemsGeneratorDto;
-    const config = { ...DEFAULT_CONFIG, ...createItemsGeneratorDto.config };
+    /**
+     * Entry point for generating items.
+     *
+     * @param createItemsGeneratorDto
+     * @param existing
+     * @returns
+     */
+    async generateItemsGenerator(
+        createItemsGeneratorDto: CreateItemsGeneratorDto,
+        existing: {
+            existingItems?: ItemData[];
+            existingCategories?: Category[];
+            existingTags?: Tag[];
+            existingConfig?: IDataConfig;
+        } = {},
+    ) {
+        const { slug, name, target_keywords, source_urls } = createItemsGeneratorDto;
+        const config = { ...DEFAULT_CONFIG, ...createItemsGeneratorDto.config };
 
-    this.logger.log(`Starting generation for slug: ${slug}, name: ${name}`);
+        this.logger.log(`Starting generation for slug: ${slug}, name: ${name}`);
 
-    try {
-      const {
-        existingItems = [],
-        existingCategories = [],
-        existingTags = [],
-      } = existing;
+        try {
+            let {
+                existingItems = [],
+                existingCategories = [],
+                existingTags = [],
+                existingConfig,
+            } = existing;
 
-      const processedSourceUrls = new Set<string>();
+            // reset existing if we are in recreate mode
+            if (createItemsGeneratorDto.operation === OperationType.RECREATE) {
+                existingItems = [];
+                existingCategories = [];
+                existingTags = [];
+            }
 
-      if (existingItems.length) {
-        this.logger.log(
-          `Loaded ${existingItems.length} existing items for slug: ${slug}`,
-        );
-      }
+            // Log the number of existing items, categories, and tags (if any)
+            if (existingItems.length || existingCategories.length || existingTags.length) {
+                this.logger.log(`Loaded ${existingItems.length} existing items for slug: ${slug}`);
+                this.logger.log(
+                    `Loaded ${existingCategories.length} existing categories for slug: ${slug}`,
+                );
+                this.logger.log(`Loaded ${existingTags.length} existing tags for slug: ${slug}`);
+            }
 
-      if (existingCategories.length) {
-        this.logger.log(
-          `Loaded ${existingCategories.length} existing categories for slug: ${slug}`,
-        );
-      }
-      if (existingTags.length) {
-        this.logger.log(
-          `Loaded ${existingTags.length} existing tags for slug: ${slug}`,
-        );
-      }
-      this.logger.log(`[${slug}] 1. Initialization & Slug Handling - Complete`);
+            // 1.0. Prompt Comparison
+            if (
+                existingConfig?.initial_prompt &&
+                createItemsGeneratorDto.operation === OperationType.CREATE_UPDATE &&
+                existingItems.length > 0
+            ) {
+                this.logger.log(`[${slug}] 1.0. Prompt Comparison - Starting`);
+                const comparisonResult = await this.promptComparisonService.comparePrompts(
+                    slug,
+                    existingConfig.initial_prompt,
+                    createItemsGeneratorDto.prompt,
+                );
 
-      // 1.1. Extract URLs from Prompt
-      this.logger.log(`[${slug}] 1.1. URL Extraction from Prompt - Starting`);
-      const { extractedUrls, rewrittenPrompt: prompt } =
-        await this.urlExtractionService.extractUrlsFromPrompt(
-          slug,
-          createItemsGeneratorDto.prompt,
-        );
+                const confidence = comparisonResult.confidence;
+                const confidenceThreshold = config.prompt_comparison_confidence_threshold || 0.5;
 
-      // Update the prompt in the DTO
-      createItemsGeneratorDto.prompt = prompt;
+                const areRelated =
+                    comparisonResult.areRelated &&
+                    comparisonResult.confidence > confidenceThreshold;
 
-      // Add source_urls to the extractedUrls
-      extractedUrls.push(...source_urls);
+                this.logger.log(
+                    `[${slug}] Prompt comparison: ${comparisonResult.areRelated ? 'RELATED' : 'UNRELATED'} ` +
+                        `(confidence: ${confidence.toFixed(2)})`,
+                );
 
-      if (extractedUrls.length > 0) {
-        this.logger.log(
-          `[${slug}] Extracted (or source urls) ${extractedUrls.length} URLs from prompt: ${extractedUrls.join(', ')}`,
-        );
-        this.logger.log(`[${slug}] Updated prompt: "${prompt}"`);
-      } else {
-        this.logger.log(
-          `[${slug}] No URLs found in prompt. Using original prompt.`,
-        );
-      }
+                // If prompts are not related, throw an error
+                // Preventing data inconsistency
+                if (!areRelated) {
+                    throw new Error(
+                        `Prompt comparison failed. Prompts are not related. Confidence: ${confidence.toFixed(
+                            2,
+                        )}`,
+                    );
+                }
+            }
 
-      // 1.5. AI-First Item Generation
-      let initialAiItems: ItemData[] = [];
+            const processedSourceUrls = new Set<string>();
 
-      if (config.ai_first_generation_enabled) {
-        this.logger.log(`[${slug}] 1.5. AI-First Item Generation - Invoking`);
-        initialAiItems =
-          await this.aiItemGenerationService.generateInitialItemsWithAI(
-            slug,
-            name,
-            prompt,
-            target_keywords,
-          );
-        this.logger.log(
-          `[${slug}] AI generated ${initialAiItems.length} initial items.`,
-        );
-      }
+            // 1.1. Extract URLs from Prompt
+            this.logger.log(`[${slug}] 1.1. URL Extraction from Prompt - Starting`);
+            const { extractedUrls, rewrittenPrompt: prompt } =
+                await this.urlExtractionService.extractUrlsFromPrompt(
+                    slug,
+                    createItemsGeneratorDto.prompt,
+                );
 
-      // 2. AI-Powered Search Query Generation
-      this.logger.log(
-        `[${slug}] 2. AI-Powered Search Query Generation - Starting`,
-      );
-      const searchQueries =
-        await this.searchQueryGenerationService.generateSearchQueries(
-          name,
-          prompt,
-          target_keywords,
-          config,
-        );
-      this.logger.log(
-        `[${slug}] Generated ${searchQueries.length} search queries.`,
-      );
+            // Update the prompt in the DTO
+            createItemsGeneratorDto.prompt = prompt;
 
-      // 3. Web Search & Content Retrieval
-      this.logger.log(`[${slug}] 3. Web Search & Content Retrieval - Starting`);
+            // Add source_urls to the extractedUrls
+            extractedUrls.push(...(source_urls || []));
 
-      // Process extracted URLs first if any were found
-      let initialWebPages = [];
-      if (extractedUrls.length > 0) {
-        this.logger.log(
-          `[${slug}] Processing ${extractedUrls.length} URLs extracted from prompt`,
-        );
-        initialWebPages =
-          await this.webPageRetrievalService.retrieveSpecificUrls(
-            slug,
-            extractedUrls,
-            processedSourceUrls,
-          );
-        this.logger.log(
-          `[${slug}] Retrieved ${initialWebPages.length} web pages from extracted URLs`,
-        );
-      }
+            if (extractedUrls.length > 0) {
+                this.logger.log(
+                    `[${slug}] Extracted (or source urls) ${extractedUrls.length} URLs from prompt: ${extractedUrls.join(', ')}`,
+                );
+                this.logger.log(`[${slug}] Updated prompt: "${prompt}"`);
+            }
 
-      // Then proceed with normal web search
-      const searchWebPages =
-        await this.webPageRetrievalService.retrieveWebPages(
-          slug,
-          searchQueries,
-          processedSourceUrls,
-          config,
-        );
+            // 1.5. AI-First Item Generation
+            let initialAiItems: ItemData[] = [];
 
-      // Combine web pages from both sources
-      const webPages = [...initialWebPages, ...searchWebPages];
-      this.logger.log(
-        `[${slug}] Retrieved ${webPages.length} web pages for processing.`,
-      );
+            if (config.ai_first_generation_enabled) {
+                this.logger.log(`[${slug}] 1.5. AI-First Item Generation - Invoking`);
+                initialAiItems = await this.aiItemGenerationService.generateInitialItemsWithAI(
+                    slug,
+                    name,
+                    prompt,
+                    target_keywords,
+                );
+                this.logger.log(`[${slug}] AI generated ${initialAiItems.length} initial items.`);
+            }
 
-      // 4. Content Pre-filtering & Relevance Assessment
-      this.logger.log(
-        `[${slug}] 4. Content Pre-filtering & Relevance Assessment - Starting`,
-      );
-      const relevantPages =
-        await this.contentFilteringService.filterAndAssessPages(
-          slug,
-          webPages,
-          name,
-          prompt,
-          config,
-        );
-      this.logger.log(
-        `[${slug}] Filtered down to ${relevantPages.length} relevant pages.`,
-      );
+            // 2. AI-Powered Search Query Generation
+            this.logger.log(`[${slug}] 2. AI-Powered Search Query Generation - Starting`);
+            const searchQueries = await this.searchQueryGenerationService.generateSearchQueries(
+                name,
+                prompt,
+                target_keywords,
+                config,
+            );
+            this.logger.log(`[${slug}] Generated ${searchQueries.length} search queries.`);
 
-      // 5. AI-Driven Structured Data Extraction for Items (from Web)
-      this.logger.log(
-        `[${slug}] 5. AI-Driven Structured Data Extraction for Items from Web - Starting`,
-      );
-      const extractedWebItems: ItemData[] =
-        await this.itemExtractionService.extractItemsFromPages(
-          slug,
-          relevantPages,
-          name,
-          prompt,
-          config,
-        );
-      this.logger.log(
-        `[${slug}] Extracted ${extractedWebItems.length} potential items from web pages.`,
-      );
+            // 3. Web Search & Content Retrieval
+            this.logger.log(`[${slug}] 3. Web Search & Content Retrieval - Starting`);
 
-      // Combine AI-generated items and web-extracted items
-      const allDiscoveredItems = [...initialAiItems, ...extractedWebItems];
-      this.logger.log(
-        `[${slug}] Total discovered items (AI + Web before source validation): ${allDiscoveredItems.length}.`,
-      );
+            // Process extracted URLs first if any were found
+            let initialWebPages: WebPageData[] = [];
+            if (extractedUrls.length > 0) {
+                initialWebPages = await this.webPageRetrievalService.retrieveSpecificUrls(
+                    slug,
+                    extractedUrls,
+                    processedSourceUrls,
+                );
+                this.logger.log(
+                    `[${slug}] Retrieved ${initialWebPages.length} web pages from extracted URLs`,
+                );
+            }
 
-      // 6. Deduplication and Data Aggregation
-      this.logger.log(
-        `[${slug}] 6. Deduplication and Data Aggregation - Starting`,
-      );
-      const { aggregatedItems, metrics } =
-        await this.dataAggregationService.aggregateAndDeduplicateData(
-          createItemsGeneratorDto,
-          existingItems,
-          allDiscoveredItems,
-          webPages.length,
-          relevantPages.length,
-        );
+            // Then proceed with normal web search
+            const searchWebPages = await this.webPageRetrievalService.retrieveWebPages(
+                slug,
+                searchQueries,
+                processedSourceUrls,
+                config,
+            );
 
-      // 7. Category and Tag Generation
-      this.logger.log(`[${slug}] 7. Category and Tag Generation - Starting`);
-      const { categories, tags, finalItems } =
-        await this.categoryProcessingService.processCategoriesAndTags(
-          createItemsGeneratorDto,
-          aggregatedItems,
-        );
+            // Combine web pages from both sources
+            const webPages = [...initialWebPages, ...searchWebPages];
+            this.logger.log(`[${slug}] Retrieved ${webPages.length} web pages for processing.`);
 
-      this.logger.log(
-        `[${slug}] Directory data generation complete. Final metrics: ${JSON.stringify(metrics)}`,
-      );
+            // 4. Content Pre-filtering & Relevance Assessment
+            this.logger.log(`[${slug}] 4. Content Pre-filtering & Relevance Assessment - Starting`);
+            const relevantPages = await this.contentFilteringService.filterAndAssessPages(
+                slug,
+                webPages,
+                name,
+                prompt,
+                config,
+            );
+            this.logger.log(`[${slug}] Filtered down to ${relevantPages.length} relevant pages.`);
 
-      // 8. Filter and Validate Source URLs for all discovered items
-      this.logger.log(
-        `[${slug}] 8. Filter and Validate Source URLs - Starting`,
-      );
-      const validatedItems =
-        await this.sourceValidationService.filterAndValidateSourceItems(
-          finalItems,
-          slug,
-        );
+            // 5. AI-Driven Structured Data Extraction for Items (from Web)
+            this.logger.log(
+                `[${slug}] 5. AI-Driven Structured Data Extraction for Items from Web - Starting`,
+            );
+            const extractedWebItems: ItemData[] =
+                await this.itemExtractionService.extractItemsFromPages(
+                    slug,
+                    relevantPages,
+                    name,
+                    prompt,
+                    config,
+                );
+            this.logger.log(
+                `[${slug}] Extracted ${extractedWebItems.length} potential items from web pages.`,
+            );
 
-      // This is where a more robust notification (webhook, websocket, email) would be triggered,
-      // potentially including the 'metrics'
+            // Combine AI-generated items and web-extracted items
+            const allDiscoveredItems = [...initialAiItems, ...extractedWebItems];
+            this.logger.log(
+                `[${slug}] Total discovered items (AI + Web before source validation): ${allDiscoveredItems.length}.`,
+            );
 
-      return {
-        items: validatedItems,
-        categories: categories,
-        tags: tags,
-      };
-    } catch (error: any) {
-      this.logger.error(
-        `Error generating directory data for slug ${slug}: ${error.message}`,
-        error.stack,
-      );
-      // Update a status file or send a notification about the error
+            // 6. Deduplication and Data Aggregation
+            this.logger.log(`[${slug}] 6. Deduplication and Data Aggregation - Starting`);
+            const { aggregatedItems, metrics } =
+                await this.dataAggregationService.aggregateAndDeduplicateData(
+                    createItemsGeneratorDto,
+                    existingItems,
+                    allDiscoveredItems,
+                    webPages.length,
+                    relevantPages.length,
+                );
+
+            // 7. Category and Tag Generation
+            this.logger.log(`[${slug}] 7. Category and Tag Generation - Starting`);
+            const { categories, tags, finalItems } =
+                await this.categoryProcessingService.processCategoriesAndTags(
+                    createItemsGeneratorDto,
+                    aggregatedItems,
+                    existingCategories || [],
+                    existingTags || [],
+                );
+
+            this.logger.log(
+                `[${slug}] Directory data generation complete. Final metrics: ${JSON.stringify(metrics)}`,
+            );
+
+            // 8. Filter and Validate Source URLs for all discovered items
+            this.logger.log(`[${slug}] 8. Filter and Validate Source URLs - Starting`);
+            const validatedItems = await this.sourceValidationService.filterAndValidateSourceItems(
+                finalItems,
+                slug,
+            );
+
+            // This is where a more robust notification (webhook, websocket, email) would be triggered,
+            // potentially including the 'metrics'
+
+            return {
+                items: validatedItems,
+                categories: categories,
+                tags: tags,
+            };
+        } catch (error: any) {
+            this.logger.error(
+                `Error generating directory data for slug ${slug}: ${error.message}`,
+                error.stack,
+            );
+
+            throw error;
+        }
     }
 
-    return null;
-  }
+    /**
+     * Generate markdown for a single item
+     * @param item The item to generate markdown for
+     * @returns The item with markdown content
+     */
+    async generateMarkdownForItem(item: ItemData): Promise<ItemData> {
+        this.logger.log(`Generating markdown for item: ${item.name}`);
 
-  /**
-   * Generate markdown for a single item
-   * @param item The item to generate markdown for
-   * @returns The item with markdown content
-   */
-  async generateMarkdownForItem(item: ItemData): Promise<ItemData> {
-    this.logger.log(`Generating markdown for item: ${item.name}`);
+        try {
+            const markdown = await this.markdownGenerationService.generateMarkdown(item);
 
-    try {
-      const markdown =
-        await this.markdownGenerationService.generateMarkdown(item);
+            return {
+                ...item,
+                markdown,
+            };
+        } catch (error) {
+            this.logger.error(
+                `Error generating markdown for item ${item.name}: ${error.message}`,
+                error.stack,
+            );
 
-      return {
-        ...item,
-        markdown,
-      };
-    } catch (error) {
-      this.logger.error(
-        `Error generating markdown for item ${item.name}: ${error.message}`,
-        error.stack,
-      );
-
-      return {
-        ...item,
-        markdown: '',
-      };
-    }
-  }
-
-  /**
-   * Generate markdown for multiple items
-   * @param items The items to generate markdown for
-   * @returns The items with markdown content
-   */
-  async generateMarkdownForItems(items: ItemData[]): Promise<ItemData[]> {
-    if (!items || items.length === 0) {
-      return [];
+            return {
+                ...item,
+                markdown: '',
+            };
+        }
     }
 
-    try {
-      return await this.markdownGenerationService.generateMarkdownForItems(
-        items,
-      );
-    } catch (error) {
-      this.logger.error(
-        `Error generating markdown for items: ${error.message}`,
-        error.stack,
-      );
+    /**
+     * Generate markdown for multiple items
+     * @param items The items to generate markdown for
+     * @returns The items with markdown content
+     */
+    async generateMarkdownForItems(items: ItemData[]): Promise<ItemData[]> {
+        if (!items || items.length === 0) {
+            return [];
+        }
 
-      // Return the original items without markdown
-      return items.map((item) => ({
-        ...item,
-        markdown: '',
-      }));
+        try {
+            return await this.markdownGenerationService.generateMarkdownForItems(items);
+        } catch (error) {
+            this.logger.error(`Error generating markdown for items: ${error.message}`, error.stack);
+
+            // Return the original items without markdown
+            return items.map((item) => ({
+                ...item,
+                markdown: '',
+            }));
+        }
     }
-  }
 }

@@ -1,4 +1,4 @@
-import { randomUUID } from "crypto";
+import { randomUUID } from 'node:crypto';
 
 const directories = new Map<string, Directory>();
 
@@ -10,12 +10,16 @@ export class Directory {
     companyName: string;
     organization: boolean;
     description: string;
-    
+
     constructor() {
         this.id = randomUUID();
     }
 
-    static async createMock(directory: Directory) {
+    static createMock(directory: Directory) {
+        if (!directory.owner) {
+            throw new Error('Owner is required');
+        }
+
         directories.set(directory.slug, directory);
     }
 

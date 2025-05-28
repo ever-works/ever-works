@@ -1,15 +1,24 @@
-import * as path from "path";
-import * as fs from 'fs/promises';
+import * as path from 'node:path';
+import * as fs from 'node:fs/promises';
 import * as yaml from 'yaml';
-import { format } from "date-fns";
-import { Category, ItemData, Tag } from "../agent/types";
+import { format } from 'date-fns';
+import { Category, ItemData, Tag } from '../agent/types';
+import { OperationType } from '../items-generator/dto';
 
+type PRUpdate = {
+    branch: string;
+    title: string;
+    body: string;
+};
 export interface IDataConfig {
     company_name?: string;
     content_table?: boolean;
     item_name?: string;
     items_name?: string;
     copyright_year?: number;
+    initial_prompt?: string;
+    operation?: OperationType;
+    pr_update?: PRUpdate | null;
 }
 
 export const DEFAULT_DATA_CONFIG: IDataConfig = {
@@ -30,7 +39,7 @@ export class DataRepository {
         private readonly tagsPath: string,
         private readonly markdownTemplatePath: string,
         public readonly dataDir: string,
-    ) { }
+    ) {}
 
     static async create(dir: string): Promise<DataRepository> {
         /*
@@ -95,10 +104,21 @@ export class DataRepository {
         await fs.rm(this.dir, { recursive: true, force: true });
     }
 
+    async clearFiles() {
+        const files = await fs.readdir(this.dir);
+        for (const file of files) {
+            if (file === '.git' || file.startsWith('.git')) {
+                continue;
+            }
+
+            await fs.rm(path.join(this.dir, file), { recursive: true, force: true });
+        }
+    }
+
     async ensureDirectoriesExist() {
         await Promise.all([
             fs.mkdir(this.markdownTemplatePath, { recursive: true }),
-            fs.mkdir(this.dataDir, { recursive: true })
+            fs.mkdir(this.dataDir, { recursive: true }),
         ]);
     }
 
@@ -110,10 +130,10 @@ export class DataRepository {
             const config = await fs.readFile(this.configPath, 'utf-8');
             this.config = yaml.parse(config);
 
-            return this.config
+            return this.config;
         } catch (err) {
-            if (err && err.code && err.code === 'ENOENT') {
-                this.config = {};   // set some defaults if needed
+            if (err?.code === 'ENOENT') {
+                this.config = {}; // set some defaults if needed
                 return this.config;
             }
             throw err;
@@ -150,7 +170,7 @@ export class DataRepository {
                 const slug = item.name;
                 return this.getItem(slug);
             });
-        
+
         return Promise.all(promises);
     }
 
@@ -239,7 +259,7 @@ export class DataRepository {
 
     async writeItem(item: ItemData) {
         const { slug, ...rest } = item; // we don't want to write slug to the file
-        const updated_at = format(new Date(), "yyyy-MM-dd HH:mm");
+        const updated_at = format(new Date(), 'yyyy-MM-dd HH:mm');
         const str = yaml.stringify({ ...rest, updated_at });
         const filepath = path.join(this.getItemPath(item.slug), `${item.slug}.yml`);
         await fs.writeFile(filepath, str, 'utf-8');

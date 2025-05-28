@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { GithubService } from '../git/github.service';
 import { Directory } from '../entities/directory.entity';
 import { User } from '../entities/user.entity';
-import * as fs from 'fs/promises';
+import * as fs from 'node:fs/promises';
 
 @Injectable()
 export class WebsiteGeneratorService {

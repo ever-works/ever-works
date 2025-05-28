@@ -1,12 +1,12 @@
 import {
-  Body,
-  Controller,
-  HttpCode,
-  HttpStatus,
-  NotFoundException,
-  Post,
-  UsePipes,
-  ValidationPipe,
+    Body,
+    Controller,
+    HttpCode,
+    HttpStatus,
+    NotFoundException,
+    Post,
+    UsePipes,
+    ValidationPipe,
 } from '@nestjs/common';
 import { DataGeneratorService } from './data-generator/data-generator.service';
 import { MarkdownGeneratorService } from './markdown-generator/markdown-generator.service';
@@ -20,105 +20,89 @@ import { CreateDirectoryDto } from './dto/create-directory.dto';
 
 @Controller()
 export class AppController {
-  constructor(
-    private readonly dataGenerator: DataGeneratorService,
-    private readonly markdownGenerator: MarkdownGeneratorService,
-    private readonly websiteGenerator: WebsiteGeneratorService,
-    private readonly githubService: GithubService,
-  ) {}
+    constructor(
+        private readonly dataGenerator: DataGeneratorService,
+        private readonly markdownGenerator: MarkdownGeneratorService,
+        private readonly websiteGenerator: WebsiteGeneratorService,
+        private readonly githubService: GithubService,
+    ) {}
 
-  @Post('directories')
-  @UsePipes(new ValidationPipe({ transform: true }))
-  async createDirectory(@Body() createDirectoryDto: CreateDirectoryDto) {
-    const { slug, name, description, owner } = createDirectoryDto;
-    const user = await User.sessionMock();
-    const dir = new Directory();
-    dir.slug = slug;
-    dir.organization = typeof owner !== 'undefined';
-    if (owner) {
-      dir.owner = owner;
-    } else {
-      const owner = await this.githubService.getUser(user.getGitToken());
-      dir.owner = owner.login;
-    }
-    dir.name = name;
-    dir.description = description;
+    @Post('directories')
+    @UsePipes(new ValidationPipe({ transform: true }))
+    async createDirectory(@Body() createDirectoryDto: CreateDirectoryDto) {
+        const { slug, name, description, owner } = createDirectoryDto;
+        const user = await User.sessionMock();
 
-    Directory.createMock(dir);
-    return dir;
-  }
+        const dir = new Directory();
 
-  @Post('generate')
-  @HttpCode(HttpStatus.ACCEPTED)
-  async generateItemsGenerator(
-    @Body(
-      new ValidationPipe({
-        transform: true,
-        whitelist: true,
-        forbidNonWhitelisted: true,
-      }),
-    )
-    createItemsGeneratorDto: CreateItemsGeneratorDto,
-  ): Promise<ItemsGeneratorResponseDto> {
-    const user = await User.sessionMock();
-    const directory = await Directory.findMock(createItemsGeneratorDto.slug);
-    if (!directory) {
-      throw new NotFoundException('Directory not found');
+        dir.slug = slug;
+        dir.name = name;
+        dir.description = description;
+
+        const ghOwner = await this.githubService.getUser(user.getGitToken());
+        dir.owner = owner || ghOwner.login;
+        dir.organization = !!owner && owner !== ghOwner.login;
+
+        Directory.createMock(dir);
+
+        return dir;
     }
 
-    // Intentionally not awaiting this to allow for an immediate response
-    // The actual processing will happen in the background.
-    // A more robust solution might involve job queues, webhooks, or websockets for status updates.
-    (async () => {
-      const startTime = new Date();
-      console.log(`Generation started at: ${startTime.toISOString()}`);
+    @Post('generate')
+    @HttpCode(HttpStatus.ACCEPTED)
+    async generateItemsGenerator(
+        @Body(
+            new ValidationPipe({
+                transform: true,
+                whitelist: true,
+                forbidNonWhitelisted: true,
+            }),
+        )
+        createItemsGeneratorDto: CreateItemsGeneratorDto,
+    ): Promise<ItemsGeneratorResponseDto> {
+        const user = await User.sessionMock();
+        const directory = await Directory.findMock(createItemsGeneratorDto.slug);
+        if (!directory) {
+            throw new NotFoundException('Directory not found');
+        }
 
-      const generated = await this.dataGenerator.initialize(
-        directory,
-        user,
-        createItemsGeneratorDto,
-      );
+        // TODO: Intentionally not awaiting this to allow for an immediate response
+        // The actual processing will happen in the background.
+        // A more robust solution might involve job queues, webhooks, or websockets for status updates.
+        void this.processGeneration(directory, user, createItemsGeneratorDto);
 
-      if (generated) {
-        await Promise.all([
-          this.markdownGenerator.initialize(directory, user),
-          this.websiteGenerator.initialize(directory, user),
-        ]);
-      }
-
-      const endTime = new Date();
-      console.log(`Generation finished at: ${endTime.toISOString()}`);
-      const duration = (endTime.getTime() - startTime.getTime()) / 1000;
-      console.log(`Total time taken: ${duration} seconds`);
-    })();
-
-    return {
-      status: 'pending',
-      slug: createItemsGeneratorDto.slug,
-      message: `Processing request for '${createItemsGeneratorDto.name}'. Check logs or data directory for updates.`,
-    };
-  }
-
-  @Post('sync')
-  async updateData(
-    @Body(
-      new ValidationPipe({
-        transform: true,
-        whitelist: true,
-        forbidNonWhitelisted: true,
-      }),
-    )
-    createItemsGeneratorDto: CreateItemsGeneratorDto,
-  ) {
-    const user = await User.sessionMock();
-    const directory = await Directory.findMock(createItemsGeneratorDto.slug);
-    if (!directory) {
-      throw new NotFoundException('Directory not found');
+        return {
+            status: 'pending',
+            slug: createItemsGeneratorDto.slug,
+            parameters: createItemsGeneratorDto,
+            message: `Processing request for '${createItemsGeneratorDto.name}'. Check logs or data directory for updates.`,
+        };
     }
 
-    await this.dataGenerator.update(directory, user, createItemsGeneratorDto);
-    await this.markdownGenerator.update(directory, user);
+    private async processGeneration(
+        directory: Directory,
+        user: User,
+        dto: CreateItemsGeneratorDto,
+    ) {
+        const startTime = new Date();
+        console.log(`Generation started at: ${startTime.toISOString()}`);
 
-    return directory;
-  }
+        try {
+            const generated = await this.dataGenerator.initialize(directory, user, dto);
+
+            if (generated) {
+                await Promise.all([
+                    this.markdownGenerator.initialize(directory, user),
+                    this.websiteGenerator.initialize(directory, user),
+                ]);
+            }
+        } catch (error) {
+            console.error('Error during generation:', error);
+        }
+
+        const endTime = new Date();
+        console.log(`Generation finished at: ${endTime.toISOString()}`);
+        const duration = (endTime.getTime() - startTime.getTime()) / 1000;
+        console.log(`Total time taken: ${duration} seconds`);
+    }
 }

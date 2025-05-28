@@ -2,304 +2,384 @@ import { Injectable, Logger } from '@nestjs/common';
 import { GithubService } from '../git/github.service';
 import { Directory } from '../entities/directory.entity';
 import { User } from '../entities/user.entity';
-import {
-  DataRepository,
-  DEFAULT_DATA_CONFIG,
-  IDataConfig,
-} from './data-repository';
+import { DataRepository, DEFAULT_DATA_CONFIG, IDataConfig } from './data-repository';
 import { slugifyText } from '../items-generator/utils/text.utils';
 import { ItemsGeneratorService } from '../items-generator/items-generator.service';
 import {
-  CreateItemsGeneratorDto,
-  Identifiable,
-  ItemData,
+    CreateItemsGeneratorDto,
+    Identifiable,
+    ItemData,
+    OperationType,
 } from '../items-generator/dto';
+import { format } from 'date-fns';
 
 @Injectable()
 export class DataGeneratorService {
-  private readonly logger = new Logger(DataGeneratorService.name);
+    private readonly logger = new Logger(DataGeneratorService.name);
 
-  constructor(
-    private readonly githubService: GithubService,
-    private readonly itemsGeneratorService: ItemsGeneratorService,
-  ) {}
+    constructor(
+        private readonly githubService: GithubService,
+        private readonly itemsGeneratorService: ItemsGeneratorService,
+    ) {}
 
-  async initialize(
-    directory: Directory,
-    user: User,
-    createItemsGeneratorDto: CreateItemsGeneratorDto,
-  ) {
-    this.logger.log(
-      `Initializing data repository for directory: ${directory.slug}`,
-    );
-    this.logger.debug(
-      `Using createItemsGeneratorDto: ${JSON.stringify(createItemsGeneratorDto)}`,
-    );
-
-    // TODO: The generateItemsGenerator function expects a parameter for existing data.
-    // If available, consider cloning the current project to fulfill this requirement.
-    const generatedItems =
-      await this.itemsGeneratorService.generateItemsGenerator(
-        createItemsGeneratorDto,
-      );
-
-    if (!generatedItems) {
-      this.logger.error('Failed to generate items from ItemsGeneratorService.');
-      return;
-    }
-
-    this.logger.debug(
-      `Generated ${generatedItems.categories.length} categories, ${generatedItems.items.length} items, ${generatedItems.tags.length} tags.`,
-    );
-
-    const { categories, items, tags } = generatedItems;
-
-    const token = user.getGitToken();
-    const repo = directory.getDataRepo();
-    const description = `machine-readable data for ${directory.slug}`;
-
-    this.logger.log(`Creating GitHub repository: ${directory.owner}/${repo}`);
-    if (directory.organization) {
-      await this.githubService.createEmptyRepoAsOrg(
-        directory.owner,
-        repo,
-        description,
-        token,
-      );
-    } else {
-      await this.githubService.createEmptyRepo(repo, description, token);
-    }
-    this.logger.log(
-      `Successfully created GitHub repository: ${directory.owner}/${repo}`,
-    );
-
-    this.logger.log(`Cloning repository ${directory.owner}/${repo}`);
-    const dest = await this.githubService.clone(directory.owner, repo, token);
-    const data = await DataRepository.create(dest);
-    this.logger.log(`Cloned repository to ${dest}`);
-
-    try {
-      this.logger.debug(
-        'Ensuring directories exist and writing initial files...',
-      );
-      await data.ensureDirectoriesExist();
-      await Promise.all([
-        data.writeReadme(this.getDefaultReadme(directory)),
-        data.writeLicense(this.getLicense()),
-        data.writeConfig(this.getDefaultConfig()),
-        data.writeCategories(categories),
-        data.writeTags(tags),
-        data.writeMarkdownTemplate(this.getHeader(directory), this.getFooter()),
-      ]);
-
-      await this.githubService.add(data.dir, '.');
-      await this.githubService.commit(
-        data.dir,
-        `init repository`,
-        user.asCommitter(),
-      );
-      this.logger.debug('Initial files written and committed.');
-
-      this.logger.log(`Processing ${items.length} items...`);
-
-      const itemsWithMarkdown =
-        await this.itemsGeneratorService.generateMarkdownForItems(items);
-
-      for (const item of itemsWithMarkdown) {
-        item.slug = slugifyText(item.slug || item.name);
-        await this.processItem(data, item, user);
-      }
-
-      this.logger.log(`Pushing changes to ${directory.owner}/${repo}`);
-      await this.githubService.push(dest, token);
-      this.logger.log(
-        `Successfully initialized and pushed data repository - initialized with ${items.length} items.`,
-      );
-    } catch (err) {
-      this.logger.error('Failed to initialize data repository', err);
-      throw err;
-    } finally {
-      await data.cleanup();
-    }
-
-    return true;
-  }
-
-  async update(
-    directory: Directory,
-    user: User,
-    createItemsGeneratorDto: CreateItemsGeneratorDto,
-  ) {
-    this.logger.log(
-      `Updating data repository for directory: ${directory.slug} with prompt: "${prompt}"`,
-    );
-    const token = user.getGitToken();
-    const repo = directory.getDataRepo();
-
-    this.logger.log(`Cloning repository ${directory.owner}/${repo}`);
-    const dest = await this.githubService.clone(directory.owner, repo, token);
-    const data = await DataRepository.create(dest);
-    this.logger.log(`Cloned repository to ${dest}`);
-
-    try {
-      this.logger.debug('Fetching existing categories, tags, and items...');
-      const categories = await data.getCategories();
-      const tags = await data.getTags();
-      const existingItems = await data.getItems();
-      this.logger.debug(
-        `Fetched ${categories.length} categories, ${tags.length} tags, ${existingItems.length} existing items.`,
-      );
-
-      this.logger.debug('Generating new items based on prompt...');
-
-      const generatedItems =
-        await this.itemsGeneratorService.generateItemsGenerator(
-          createItemsGeneratorDto,
-          { existingItems, existingCategories: categories, existingTags: tags },
-        );
-
-      if (!generatedItems) {
-        this.logger.error(
-          'Failed to generate items from ItemsGeneratorService.',
-        );
-        return;
-      }
-
-      this.logger.debug(
-        `Generated ${generatedItems.categories.length} categories, ${generatedItems.items.length} items, ${generatedItems.tags.length} tags.`,
-      );
-
-      this.logger.debug('Merging and writing categories and tags...');
-      await Promise.all([
-        data.writeCategories(this.merge(categories, generatedItems.categories)),
-        data.writeTags(this.merge(tags, generatedItems.tags)),
-      ]);
-      await this.githubService.add(data.dir, '.');
-      await this.githubService.commit(
-        data.dir,
-        `update repository`,
-        user.asCommitter(),
-      );
-      this.logger.debug('Categories and tags updated and committed.');
-
-      await data.ensureDirectoriesExist();
-
-      this.logger.log(`Processing ${generatedItems.items.length} new items...`);
-      const itemsWithMarkdown =
-        await this.itemsGeneratorService.generateMarkdownForItems(
-          generatedItems.items,
-        );
-
-      for (const item of itemsWithMarkdown) {
-        item.slug = slugifyText(item.slug || item.name);
+    async initialize(
+        directory: Directory,
+        user: User,
+        createItemsGeneratorDto: CreateItemsGeneratorDto,
+    ) {
         this.logger.debug(
-          `Processing new item: ${item.name} (slug: ${item.slug})`,
+            `Initializing data repository for directory: ${JSON.stringify(createItemsGeneratorDto)}`,
         );
-        await this.processItem(data, item, user);
-      }
-      this.logger.log('All new items processed.');
 
-      this.logger.log(`Pushing changes to ${directory.owner}/${repo}`);
+        let existingData = {
+            existingItems: [],
+            existingCategories: [],
+            existingTags: [],
+            existingConfig: null,
+        };
 
-      // TODO: it should create PR (or multiple PRs) instead of pushing directly
-      await this.githubService.push(dest, token);
-      this.logger.log('Successfully updated and pushed data repository.');
-    } catch (err) {
-      this.logger.error('Failed to update data repository', err);
-      throw err;
-    } finally {
-      await data.cleanup();
-    }
-  }
+        // Get existing data if available
+        // get existing data only if we are in update mode
+        if (createItemsGeneratorDto.operation === OperationType.CREATE_UPDATE) {
+            existingData = await this.getExistingData(directory, user);
+        }
 
-  private async processItem(data: DataRepository, item: ItemData, user: User) {
-    this.logger.debug(
-      `processItem: Starting for item ${item.name} (slug: ${item.slug})`,
-    );
+        const existed = existingData.existingItems.length > 0;
 
-    await data.createItemDir(item);
-    const promises = [data.writeItem(item)];
+        // Generate items, the items generator will always to generate new items
+        const generatedItems = await this.itemsGeneratorService
+            .generateItemsGenerator(createItemsGeneratorDto, existingData)
+            .catch((err) => {
+                this.logger.error('Failed to generate items from ItemsGeneratorService.', err);
+                return null;
+            });
 
-    // Write item markdown to disk
-    let md =
-      item.markdown ||
-      `#${item.name}\n\n${item.description}\n\n[${item.source_url}](${item.source_url})`;
+        // If no items were generated, we don't need to do anything else
+        if (!generatedItems || generatedItems.items.length === 0) {
+            const dataDir = this.githubService.getDir(directory.owner, directory.getDataRepo());
+            await DataRepository.create(dataDir).then((data) => data.cleanup());
+            return;
+        }
 
-    if (!item.markdown) {
-      try {
-        const { markdown } =
-          await this.itemsGeneratorService.generateMarkdownForItem(item);
+        const { categories: newCategories, items: newItems, tags: newTags } = generatedItems;
+        const { existingCategories, existingTags } = existingData;
 
-        md = markdown;
-      } catch (err) {
-        this.logger.error(
-          `processItem: Failed to generate markdown for ${item.slug}`,
-          err.stack,
+        this.logger.debug(
+            `Generated ${newCategories.length} categories, ${newItems.length} items, ${newTags.length} tags.`,
         );
-      }
+
+        const description = `machine-readable data for ${directory.slug}`;
+
+        const token = user.getGitToken();
+        const repo = directory.getDataRepo();
+
+        // Creating GitHub repository
+        if (directory.organization) {
+            await this.githubService.createEmptyRepoAsOrg(
+                directory.owner,
+                repo,
+                description,
+                token,
+            );
+        } else {
+            await this.githubService.createEmptyRepo(repo, description, token);
+        }
+
+        this.logger.log(`Successfully created GitHub repository: ${directory.owner}/${repo}`);
+
+        // Cloning repository
+        const dest = await this.githubService
+            .cloneOrPull(directory.owner, repo, token)
+            .catch((err) => {
+                this.logger.error('Failed to clone repository', err);
+                return null;
+            });
+
+        const data = await DataRepository.create(dest).catch((err) => {
+            this.logger.error('Failed to create data repository', err);
+            return null;
+        });
+
+        if (!data || !dest) {
+            this.logger.error('Failed to create data repository');
+            return false;
+        }
+
+        this.logger.log(`Cloned repository to ${dest}`);
+
+        try {
+            // Ensure directories exist
+            await data.ensureDirectoriesExist();
+
+            // Name of the new branch if we are in update mode
+            let newBranchName: string | null = null;
+
+            const createOrUpdate =
+                createItemsGeneratorDto.operation === OperationType.CREATE_UPDATE;
+
+            const update_with_pull_request = createItemsGeneratorDto.update_with_pull_request;
+
+            const defaultBranch = await this.githubService.getMainBranch(dest).catch((err) => {
+                this.logger.error('Failed to get main branch', err);
+                return null;
+            });
+
+            // In case of re-creation:
+            // Switch to the main branch and remove existing items files.
+            if (createItemsGeneratorDto.operation === OperationType.RECREATE) {
+                await this.githubService.switchToMainBranch(dest).catch((err) => {
+                    this.logger.error('Failed to switch to main branch', err);
+                    return null;
+                });
+
+                await data.clearFiles();
+            } else if (existed && createOrUpdate && update_with_pull_request) {
+                // In case of update, we want to create a new branch and switch to it
+                newBranchName = await this.githubService.createAndSwitchToRandomBranch(dest);
+                this.logger.log(`Created and switched to new branch: ${newBranchName}`);
+            }
+
+            const promises = [
+                data.writeCategories(this.merge(existingCategories, newCategories)),
+                data.writeTags(this.merge(existingTags, newTags)),
+            ];
+
+            /**
+             * rewrite meta files only if we are creating new repository or we are recreating it
+             */
+            if (!existed || createItemsGeneratorDto.operation === OperationType.RECREATE) {
+                promises.push(
+                    data.writeReadme(this.getDefaultReadme(directory)),
+                    data.writeLicense(this.getLicense()),
+                    data.writeConfig(
+                        this.getDefaultConfig({
+                            operation: createItemsGeneratorDto.operation,
+                            initial_prompt: createItemsGeneratorDto.prompt,
+                        }),
+                    ),
+                    data.writeMarkdownTemplate(this.getHeader(directory), this.getFooter()),
+                );
+            }
+
+            const { title: prTitle, body: prBody } = this.getPRDetails(directory);
+            const preloadedConfig = await data.getConfig().catch(() => null);
+
+            // Write PR details in config so that other repository may use it
+            if (newBranchName) {
+                promises.push(
+                    data.writeConfig(
+                        this.getDefaultConfig({
+                            ...preloadedConfig,
+                            operation: createItemsGeneratorDto.operation,
+                            pr_update: {
+                                branch: newBranchName,
+                                title: prTitle,
+                                body: prBody,
+                            },
+                        }),
+                    ),
+                );
+            }
+
+            // write categories, tags, readme, license, config, markdown template
+            await Promise.all(promises);
+
+            // Commit changes
+            await this.githubService.add(data.dir, '.');
+            await this.githubService.commit(data.dir, `init repository`, user.asCommitter());
+            this.logger.debug('files written and committed.');
+
+            // Process items (with markdown generation, writing to disk and committing)
+            this.logger.log(`Processing ${newItems.length} items...`);
+            const itemsWithMarkdown =
+                await this.itemsGeneratorService.generateMarkdownForItems(newItems);
+
+            for (const item of itemsWithMarkdown) {
+                item.slug = slugifyText(item.slug || item.name);
+                await this.processItem(data, item, user);
+            }
+
+            // Push changes
+            await this.githubService.push(dest, token);
+            this.logger.log(`All processed and pushed to ${directory.owner}/${repo}`);
+
+            // create PR if we are in update mode and branch was created
+            if (newBranchName && defaultBranch && createOrUpdate) {
+                await this.githubService.createPR(
+                    {
+                        owner: directory.owner,
+                        repo: repo,
+                        head: newBranchName,
+                        base: defaultBranch,
+                        title: prTitle,
+                        body: prBody,
+                    },
+                    token,
+                );
+
+                this.logger.log(
+                    `Successfully created and pushed data repository - created PR ${newBranchName} to ${defaultBranch}`,
+                );
+            } else {
+                this.logger.log(
+                    `Successfully created and pushed data repository - initialized with ${newItems.length} items.`,
+                );
+            }
+        } catch (err) {
+            this.logger.error('Failed to initialize data repository', err);
+            await data.cleanup();
+            throw err;
+        } finally {
+            // never cleanup data with (data.cleanup()),
+            // we need this repo for future updates
+        }
+
+        return true;
     }
 
-    promises.push(data.writeItemMarkdown(item, `${md}`));
-
-    await Promise.all(promises);
-    await this.githubService.add(data.dir, '.');
-    await this.githubService.commit(
-      data.dir,
-      `add ${item.name}`,
-      user.asCommitter(),
-    );
-
-    this.logger.log(
-      `processItem: Committed item ${item.name} (slug: ${item.slug})`,
-    );
-  }
-
-  private merge(a: Identifiable[], b: Identifiable[]) {
-    const map = new Map<string, Identifiable>();
-    for (const item of a) {
-      map.set(item.id, item);
+    private getPRDetails(directory: Directory) {
+        const title = `Update data - ${format(new Date(), 'MM/dd/yyyy HH:mm')}`;
+        const body = `Update data for ${directory.slug}\n\nGenerated by [Ever Works](https://ever.works)`;
+        return { title, body };
     }
-    for (const item of b) {
-      map.set(item.id, item);
+
+    /**
+     * Gets existing data from the repository if it exists, otherwise returns empty data
+     */
+    private async getExistingData(directory: Directory, user: User) {
+        this.logger.debug(`Getting existing data for directory: ${directory.slug}`);
+
+        const token = user.getGitToken();
+        const repo = directory.getDataRepo();
+
+        try {
+            // Try to clone or pull the repository using persistent directory
+            this.logger.log(`Checking for existing repository ${directory.owner}/${repo}`);
+            const dest = await this.githubService.cloneOrPull(directory.owner, repo, token);
+            const data = await DataRepository.create(dest);
+            this.logger.log(`Found existing repository at ${dest}`);
+
+            try {
+                // Try to get existing data
+                const [categories, tags, existingItems, config] = await Promise.all([
+                    data.getCategories().catch(() => []),
+                    data.getTags().catch(() => []),
+                    data.getItems().catch(() => []),
+                    data.getConfig().catch(() => null),
+                ]);
+
+                this.logger.debug(
+                    `Found existing data: ${categories.length} categories, ${tags.length} tags, ${existingItems.length} items`,
+                );
+
+                return {
+                    existingItems,
+                    existingCategories: categories,
+                    existingTags: tags,
+                    existingConfig: config,
+                };
+            } catch (error) {
+                this.logger.debug(`No existing data found in repository: ${error.message}`);
+                return {
+                    existingItems: [],
+                    existingCategories: [],
+                    existingTags: [],
+                    existingConfig: null,
+                };
+            }
+        } catch (error) {
+            // Repository doesn't exist or can't be accessed
+            this.logger.debug(
+                `Repository ${directory.owner}/${repo} doesn't exist or can't be accessed: ${error.message}`,
+            );
+            return {
+                existingItems: [],
+                existingCategories: [],
+                existingTags: [],
+                existingConfig: null,
+            };
+        }
     }
-    return Array.from(map.values());
-  }
 
-  private getDefaultConfig(): IDataConfig {
-    const now = new Date();
-    return { ...DEFAULT_DATA_CONFIG, copyright_year: now.getFullYear() };
-  }
+    private async processItem(data: DataRepository, item: ItemData, user: User) {
+        this.logger.debug(`processItem: Starting for item ${item.name} (slug: ${item.slug})`);
 
-  private getDefaultReadme(directory: Directory) {
-    const markdownURL = this.githubService.getURL(
-      directory.owner,
-      directory.slug,
-    );
-    return (
-      `# ${directory.getDataRepo()}\n\n` +
-      `This repository holds data used to generate [${directory.slug}](${markdownURL})\n\n`
-    );
-  }
+        await data.createItemDir(item);
+        const promises = [data.writeItem(item)];
 
-  private getHeader(directory: Directory) {
-    return `# ${directory.name}\n\n` + `${directory.description}\n\n`;
-  }
+        // Write item markdown to disk
+        const md =
+            item.markdown ||
+            `#${item.name}\n\n${item.description}\n\n[${item.source_url}](${item.source_url})`;
 
-  private getFooter() {
-    return (
-      '## License\n\n' +
-      'Shield: [![CC BY-SA 4.0][cc-by-sa-shield]][cc-by-sa]\n\n' +
-      'This work is licensed under a\n\n' +
-      '[Creative Commons Attribution-ShareAlike 4.0 International License][cc-by-sa].\n\n' +
-      '[![CC BY-SA 4.0][cc-by-sa-image]][cc-by-sa]\n\n' +
-      '[cc-by-sa]: http://creativecommons.org/licenses/by-sa/4.0/\n\n' +
-      '[cc-by-sa-image]: https://licensebuttons.net/l/by-sa/4.0/88x31.png\n\n' +
-      '[cc-by-sa-shield]: https://img.shields.io/badge/License-CC%20BY--SA%204.0-lightgrey.svg\n\n'
-    );
-  }
+        promises.push(data.writeItemMarkdown(item, `${md}`));
 
-  private getLicense() {
-    return `Attribution-ShareAlike 4.0 International
+        await Promise.all(promises);
+        await this.githubService.add(data.dir, '.');
+        await this.githubService.commit(data.dir, `add ${item.name}`, user.asCommitter());
+
+        this.logger.log(`processItem: Committed item ${item.name} (slug: ${item.slug})`);
+    }
+
+    private merge(a: Identifiable[], b: Identifiable[]) {
+        const map = new Map<string, Identifiable>();
+        for (const item of a) {
+            map.set(item.id, item);
+        }
+        for (const item of b) {
+            map.set(item.id, item);
+        }
+        return Array.from(map.values());
+    }
+
+    private getDefaultConfig(additionalConfig?: Partial<IDataConfig>): IDataConfig {
+        const now = new Date();
+        return {
+            ...DEFAULT_DATA_CONFIG,
+            copyright_year: now.getFullYear(),
+            ...additionalConfig,
+        };
+    }
+
+    private getDefaultReadme(directory: Directory) {
+        const markdownURL = this.githubService.getURL(directory.owner, directory.slug);
+        return (
+            `# ${directory.getDataRepo()}\n\n` +
+            `This repository holds data used to generate [${directory.slug}](${markdownURL})\n\n`
+        );
+    }
+
+    private getHeader(directory: Directory) {
+        return `# ${directory.name}\n\n` + `${directory.description}\n\n`;
+    }
+
+    private getFooter() {
+        return (
+            this.getLegalNotice() +
+            '## License\n\n' +
+            'Shield: [![CC BY-SA 4.0][cc-by-sa-shield]][cc-by-sa]\n\n' +
+            'This work is licensed under a\n\n' +
+            '[Creative Commons Attribution-ShareAlike 4.0 International License][cc-by-sa].\n\n' +
+            '[![CC BY-SA 4.0][cc-by-sa-image]][cc-by-sa]\n\n' +
+            '[cc-by-sa]: http://creativecommons.org/licenses/by-sa/4.0/\n\n' +
+            '[cc-by-sa-image]: https://licensebuttons.net/l/by-sa/4.0/88x31.png\n\n' +
+            '[cc-by-sa-shield]: https://img.shields.io/badge/License-CC%20BY--SA%204.0-lightgrey.svg\n\n'
+        );
+    }
+
+    private getLegalNotice() {
+        return `## Legal\n
+All product names, logos, and brands are the property of their respective owners. All company, product, and service names used in this repository, related repositories, and associated websites are for identification purposes only. The use of these names, logos, and brands does not imply endorsement, affiliation, or sponsorship.
+
+This directory may include content generated by artificial intelligence (AI). While efforts have been made to ensure the accuracy and reliability of the information, we make no representations or warranties of any kind, express or implied, about the completeness, accuracy, reliability, suitability, or availability of the information contained herein. Users are advised to independently verify the information before making decisions based on it.
+
+We disclaim any responsibility for errors, omissions, or inaccuracies in the content, whether generated by humans, AI, or any other means. By using this directory, you agree to use it at your own risk and acknowledge that the information provided may not always be current or accurate.
+
+If you believe that your intellectual property rights or other legal rights have been infringed, please contact us immediately at legal@ever.co and we will take appropriate action.\n\n`;
+    }
+
+    private getLicense() {
+        return `Attribution-ShareAlike 4.0 International
 
 =======================================================================
 
@@ -726,5 +806,5 @@ the avoidance of doubt, this paragraph does not form part of the
 public licenses.
 
 Creative Commons may be contacted at creativecommons.org.`;
-  }
+    }
 }
