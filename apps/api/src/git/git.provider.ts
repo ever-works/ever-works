@@ -155,7 +155,7 @@ export abstract class GitProvider {
     }
 
     // get active branch
-    async getActiveBranch(dir: string): Promise<string | void> {
+    async getActiveBranch(dir: string) {
         try {
             return await git.currentBranch({ fs, dir });
         } catch (error) {

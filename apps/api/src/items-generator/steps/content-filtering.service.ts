@@ -10,6 +10,7 @@ import { AiService } from '../shared';
 export class ContentFilteringService {
     private readonly logger = new Logger(ContentFilteringService.name);
     private llm: ChatOpenAI;
+    private BATCH_SIZE = 10;
 
     constructor(private readonly aiService: AiService) {
         this.llm = this.aiService.getLlm();
@@ -30,13 +31,13 @@ export class ContentFilteringService {
             })
             .filter((page) => {
                 const isLongEnough =
-                    page.raw_content.length >= config.min_content_length_for_extraction;
+                    (page.raw_content?.length ?? 0) >= config.min_content_length_for_extraction;
 
                 return isLongEnough;
             });
 
         // Check if OpenAI API is configured
-        if (!this.llm.apiKey) {
+        if (!this.aiService.isAiConfigured()) {
             return filteredPages;
         }
 
@@ -146,14 +147,15 @@ Provide a relevance score between 0.0 (not relevant) and 1.0 (highly relevant). 
         };
 
         // Step 3: Process pages in batches to avoid rate limits
-        const BATCH_SIZE = 10;
         const relevantPages: WebPageData[] = [];
 
-        this.logger.log(`[${slug}] Processing relevance assessment in batches of ${BATCH_SIZE}`);
+        this.logger.log(
+            `[${slug}] Processing relevance assessment in batches of ${this.BATCH_SIZE}`,
+        );
 
         // Process pages in batches
-        for (let i = 0; i < filteredPages.length; i += BATCH_SIZE) {
-            const batch = filteredPages.slice(i, i + BATCH_SIZE);
+        for (let i = 0; i < filteredPages.length; i += this.BATCH_SIZE) {
+            const batch = filteredPages.slice(i, i + this.BATCH_SIZE);
 
             // Process the batch in parallel
             const assessmentPromises = batch.map((page) => assessPageRelevance(page));
@@ -167,7 +169,7 @@ Provide a relevance score between 0.0 (not relevant) and 1.0 (highly relevant). 
             relevantPages.push(...relevantPagesFromBatch);
 
             // Add a small delay between batches to avoid rate limiting
-            if (i + BATCH_SIZE < filteredPages.length) {
+            if (i + this.BATCH_SIZE < filteredPages.length) {
                 await new Promise((resolve) => setTimeout(resolve, 500));
             }
         }

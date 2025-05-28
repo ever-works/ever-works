@@ -9,6 +9,7 @@ import {
     IsBoolean,
     IsUrl,
     IsEnum,
+    IsNotEmpty,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -58,12 +59,15 @@ export class ConfigDto {
 
 export class CreateItemsGeneratorDto {
     @IsString()
+    @IsNotEmpty()
     slug: string;
 
     @IsString()
+    @IsNotEmpty()
     name: string;
 
     @IsString()
+    @IsNotEmpty()
     prompt: string;
 
     @IsOptional()
@@ -73,6 +77,7 @@ export class CreateItemsGeneratorDto {
 
     @IsOptional()
     @IsArray()
+    @IsString({ each: true })
     @IsUrl({ protocols: ['http', 'https'], require_tld: true }, { each: true })
     source_urls?: string[] = [];
 

@@ -118,7 +118,6 @@ export class NewItemsExtractorService {
      * Process a large array of items for extraction using a chunking strategy
      * @param existingItems Existing items
      * @param newItems New items to filter
-     * @param startTime Start time for logging
      */
     private async processLargeExtractionArray(
         existingItems: ItemData[],

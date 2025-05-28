@@ -88,8 +88,23 @@ export class DataGeneratorService {
         this.logger.log(`Successfully created GitHub repository: ${directory.owner}/${repo}`);
 
         // Cloning repository
-        const dest = await this.githubService.cloneOrPull(directory.owner, repo, token);
-        const data = await DataRepository.create(dest);
+        const dest = await this.githubService
+            .cloneOrPull(directory.owner, repo, token)
+            .catch((err) => {
+                this.logger.error('Failed to clone repository', err);
+                return null;
+            });
+
+        const data = await DataRepository.create(dest).catch((err) => {
+            this.logger.error('Failed to create data repository', err);
+            return null;
+        });
+
+        if (!data || !dest) {
+            this.logger.error('Failed to create data repository');
+            return false;
+        }
+
         this.logger.log(`Cloned repository to ${dest}`);
 
         try {
@@ -190,24 +205,17 @@ export class DataGeneratorService {
 
             // create PR if we are in update mode and branch was created
             if (newBranchName && defaultBranch && createOrUpdate) {
-                await this.githubService
-                    .createPR(
-                        {
-                            owner: directory.owner,
-                            repo: repo,
-                            head: newBranchName,
-                            base: defaultBranch,
-                            title: prTitle,
-                            body: prBody,
-                        },
-                        token,
-                    )
-                    .catch((err) => {
-                        this.logger.warn(
-                            `Unable to create pull request ${directory.owner}/${repo}`,
-                            err.message,
-                        );
-                    });
+                await this.githubService.createPR(
+                    {
+                        owner: directory.owner,
+                        repo: repo,
+                        head: newBranchName,
+                        base: defaultBranch,
+                        title: prTitle,
+                        body: prBody,
+                    },
+                    token,
+                );
 
                 this.logger.log(
                     `Successfully created and pushed data repository - created PR ${newBranchName} to ${defaultBranch}`,

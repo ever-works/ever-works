@@ -7,7 +7,7 @@ import { User } from '../entities/user.entity';
 import { DataRepository } from '../data-generator/data-repository';
 import { ReadmeBuilder } from './readme-builder';
 import { MarkdownRepository } from './markdown-repository';
-import { OperationType } from 'src/items-generator/dto';
+import { OperationType } from '../items-generator/dto';
 
 @Injectable()
 export class MarkdownGeneratorService {
