@@ -320,7 +320,6 @@ ${CATEGORIZE_PROMPT}
     private normalizeCategorizationResults(items: ItemData[]): ItemData[] {
         // Count category and tag frequencies
         const categoryFrequency: Map<string, number> = new Map();
-        // const tagFrequency: Map<string, number> = new Map();
 
         // Build frequency maps
         items.forEach((item) => {
@@ -329,16 +328,6 @@ ${CATEGORIZE_PROMPT}
             if (category) {
                 categoryFrequency.set(category, (categoryFrequency.get(category) || 0) + 1);
             }
-
-            // Count tags
-            // if (Array.isArray(item.tags)) {
-            //     item.tags.forEach((tag: any) => {
-            //         const tagName = typeof tag === 'string' ? tag : '';
-            //         if (tagName) {
-            //             tagFrequency.set(tagName, (tagFrequency.get(tagName) || 0) + 1);
-            //         }
-            //     });
-            // }
         });
 
         // Filter out rare categories (likely errors or inconsistencies)
