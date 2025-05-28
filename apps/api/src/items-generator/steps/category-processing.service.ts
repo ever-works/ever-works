@@ -175,7 +175,7 @@ export class CategoryProcessingService {
                     existing_tags: tagsText,
                 });
 
-            return this.normalizeCategorizationResults(result.items as ItemData[]);
+            return result.items as ItemData[];
         } catch (error) {
             this.logger.error(`Error during AI categorization: ${error.message}`, error.stack);
 
