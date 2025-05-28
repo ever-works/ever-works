@@ -49,6 +49,11 @@ export class ConfigDto {
     @IsOptional()
     @IsBoolean()
     ai_first_generation_enabled?: boolean = true;
+
+    @IsOptional()
+    @Min(0.01)
+    @Max(1.0)
+    prompt_comparison_confidence_threshold?: number = 0.5;
 }
 
 export class CreateItemsGeneratorDto {

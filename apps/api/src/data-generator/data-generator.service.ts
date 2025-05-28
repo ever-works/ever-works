@@ -114,6 +114,7 @@ export class DataGeneratorService {
             if (createItemsGeneratorDto.operation === OperationType.RECREATE) {
                 await this.githubService.switchToMainBranch(dest).catch((err) => {
                     this.logger.error('Failed to switch to main branch', err);
+                    return null;
                 });
 
                 await data.clearFiles();

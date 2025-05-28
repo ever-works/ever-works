@@ -1,5 +1,5 @@
 import * as path from 'node:path';
-import * as fs from 'fs/promises';
+import * as fs from 'node:fs/promises';
 import * as yaml from 'yaml';
 import { format } from 'date-fns';
 import { Category, ItemData, Tag } from '../agent/types';
@@ -132,7 +132,7 @@ export class DataRepository {
 
             return this.config;
         } catch (err) {
-            if (err && err.code && err.code === 'ENOENT') {
+            if (err?.code === 'ENOENT') {
                 this.config = {}; // set some defaults if needed
                 return this.config;
             }

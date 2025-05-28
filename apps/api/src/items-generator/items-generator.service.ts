@@ -29,6 +29,7 @@ const DEFAULT_CONFIG: Required<ConfigDto> = {
     relevance_threshold_content: 0.75,
     min_content_length_for_extraction: 300,
     ai_first_generation_enabled: true,
+    prompt_comparison_confidence_threshold: 0.5,
 };
 
 @Injectable()
@@ -108,7 +109,7 @@ export class ItemsGeneratorService {
                 );
 
                 const confidence = comparisonResult.confidence;
-                const confidenceThreshold = 0.5;
+                const confidenceThreshold = config.prompt_comparison_confidence_threshold || 0.5;
 
                 const areRelated =
                     comparisonResult.areRelated &&

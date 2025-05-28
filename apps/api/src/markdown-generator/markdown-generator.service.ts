@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import * as fs from 'fs/promises';
+import * as fs from 'node:fs/promises';
 import { GithubService } from '../git/github.service';
 import type { Category, Identifiable, ItemData, Tag } from '../agent/types';
 import { Directory } from '../entities/directory.entity';
@@ -68,6 +68,7 @@ export class MarkdownGeneratorService {
             if (config?.operation === OperationType.RECREATE) {
                 await this.githubService.switchToMainBranch(markdownRepo.dir).catch((err) => {
                     this.logger.error('Failed to switch to main branch', err);
+                    return null;
                 });
 
                 await markdownRepo.clearFiles();
@@ -152,6 +153,7 @@ export class MarkdownGeneratorService {
                 this.logger.log(`Pushed changes to main branch for ${directory.slug}`);
             }
         } catch (err) {
+            this.logger.error('Error during markdown generation', err);
             throw err;
         } finally {
             await Promise.all([dataRepo.cleanup(), markdownRepo.cleanup()]);

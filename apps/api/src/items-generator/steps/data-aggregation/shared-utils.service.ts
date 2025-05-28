@@ -76,7 +76,7 @@ export class SharedUtilsService {
                 if (!item.name) return { item, normalizedName: '' };
 
                 // Normalize the name: lowercase, remove version numbers, trim
-                let normalizedName = item.name
+                const normalizedName = item.name
                     .toLowerCase()
                     .replace(/\s+v?(\d+\.)*\d+(\s+|$)/g, ' ')
                     .replace(/\s+/g, ' ')
@@ -173,7 +173,7 @@ export class SharedUtilsService {
         }
 
         // Handle any remaining items that weren't processed
-        const processedItems = new Set(finalClusters.flatMap((cluster) => cluster));
+        const processedItems = new Set(finalClusters.flat());
         const remainingItems = items.filter((item) => !processedItems.has(item));
 
         if (remainingItems.length > 0) {

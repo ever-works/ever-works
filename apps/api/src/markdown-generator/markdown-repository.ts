@@ -1,5 +1,5 @@
 import * as path from 'node:path';
-import * as fs from 'fs/promises';
+import * as fs from 'node:fs/promises';
 
 export class MarkdownRepository {
     private readonly detailsPath: string;
