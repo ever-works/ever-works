@@ -95,7 +95,7 @@ export class DataGeneratorService {
                 return null;
             });
 
-        const data = await DataRepository.create(dest).catch((err) => {
+        const data: DataRepository = await DataRepository.create(dest).catch((err) => {
             this.logger.error('Failed to create data repository', err);
             return null;
         });
@@ -127,12 +127,15 @@ export class DataGeneratorService {
             // In case of re-creation:
             // Switch to the main branch and remove existing items files.
             if (createItemsGeneratorDto.operation === OperationType.RECREATE) {
+                this.logger.log('Recreating repository, clearing existing files');
+
+                // just to make sure we're recreating from main
                 await this.githubService.switchToMainBranch(dest).catch((err) => {
                     this.logger.error('Failed to switch to main branch', err);
                     return null;
                 });
 
-                await data.clearFiles();
+                await data.resetFiles();
             } else if (existed && createOrUpdate && update_with_pull_request) {
                 // In case of update, we want to create a new branch and switch to it
                 newBranchName = await this.githubService.createAndSwitchToRandomBranch(dest);
@@ -164,7 +167,7 @@ export class DataGeneratorService {
             const { title: prTitle, body: prBody } = this.getPRDetails(directory);
             const preloadedConfig = await data.getConfig().catch(() => null);
 
-            // Write PR details in config so that other repository may use it
+            // Write PR details in config so that others repositories may use it
             if (newBranchName) {
                 promises.push(
                     data.writeConfig(

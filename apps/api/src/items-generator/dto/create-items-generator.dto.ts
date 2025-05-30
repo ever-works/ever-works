@@ -23,38 +23,38 @@ export class ConfigDto {
     @IsInt()
     @Min(1)
     @Max(100) // Sensible upper limit
-    max_search_queries?: number = 10;
+    max_search_queries: number = 10;
 
     @IsOptional()
     @IsInt()
     @Min(1)
     @Max(100) // Sensible upper limit
-    max_results_per_query?: number = 20;
+    max_results_per_query: number = 20;
 
     @IsOptional()
     @IsInt()
     @Min(1)
     @Max(1000) // Sensible upper limit
-    max_pages_to_process?: number = 100;
+    max_pages_to_process: number = 100;
 
     @IsOptional()
     @Min(0.01)
     @Max(1.0)
-    relevance_threshold_content?: number = 0.75;
+    relevance_threshold_content: number = 0.75;
 
     @IsOptional()
     @IsInt()
     @Min(0)
-    min_content_length_for_extraction?: number = 300;
+    min_content_length_for_extraction: number = 300;
 
     @IsOptional()
     @IsBoolean()
-    ai_first_generation_enabled?: boolean = true;
+    ai_first_generation_enabled: boolean = true;
 
     @IsOptional()
     @Min(0.01)
     @Max(1.0)
-    prompt_comparison_confidence_threshold?: number = 0.5;
+    prompt_comparison_confidence_threshold: number = 0.5;
 }
 
 export class CreateItemsGeneratorDto {
@@ -84,7 +84,7 @@ export class CreateItemsGeneratorDto {
     @IsOptional()
     @ValidateNested()
     @Type(() => ConfigDto)
-    config?: ConfigDto;
+    config: ConfigDto = new ConfigDto();
 
     @IsOptional()
     @IsEnum(OperationType)

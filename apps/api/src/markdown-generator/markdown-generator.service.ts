@@ -71,7 +71,7 @@ export class MarkdownGeneratorService {
                     return null;
                 });
 
-                await markdownRepo.clearFiles();
+                await markdownRepo.resetFiles();
             } else if (config.pr_update?.branch) {
                 // Switch to PR branch
                 await this.githubService

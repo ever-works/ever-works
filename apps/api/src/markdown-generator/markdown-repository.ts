@@ -21,7 +21,11 @@ export class MarkdownRepository {
         await fs.rm(this.dir, { recursive: true, force: true });
     }
 
-    async clearFiles() {
+    /**
+     * Remove all files except .git
+     * and ensure all needed directories exist
+     */
+    async resetFiles() {
         const files = await fs.readdir(this.dir);
         for (const file of files) {
             if (file === '.git' || file.startsWith('.git')) {
@@ -30,6 +34,8 @@ export class MarkdownRepository {
 
             await fs.rm(path.join(this.dir, file), { recursive: true, force: true });
         }
+
+        await this.ensureDirectoriesExist();
     }
 
     async ensureDirectoriesExist() {

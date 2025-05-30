@@ -21,17 +21,6 @@ import { Category, ItemData, Tag } from './dto';
 import { IDataConfig } from '../data-generator/data-repository';
 import { WebPageData } from './interfaces/items-generator.interfaces';
 
-// Default configuration values
-const DEFAULT_CONFIG: Required<ConfigDto> = {
-    max_search_queries: 10,
-    max_results_per_query: 20,
-    max_pages_to_process: 100,
-    relevance_threshold_content: 0.75,
-    min_content_length_for_extraction: 300,
-    ai_first_generation_enabled: true,
-    prompt_comparison_confidence_threshold: 0.5,
-};
-
 @Injectable()
 export class ItemsGeneratorService {
     private readonly logger = new Logger(ItemsGeneratorService.name);
@@ -66,8 +55,7 @@ export class ItemsGeneratorService {
             existingConfig?: IDataConfig;
         } = {},
     ) {
-        const { slug, name, target_keywords, source_urls } = createItemsGeneratorDto;
-        const config = { ...DEFAULT_CONFIG, ...createItemsGeneratorDto.config };
+        const { slug, name, target_keywords, source_urls, config } = createItemsGeneratorDto;
 
         this.logger.log(`Starting generation for slug: ${slug}, name: ${name}`);
 
