@@ -4,47 +4,39 @@ import { Directory } from '../entities/directory.entity';
 import { User } from '../entities/user.entity';
 import * as fs from 'node:fs/promises';
 
+const template = {
+    owner: 'ever-co',
+    repo: 'ever-works-website-template',
+} as const;
+
 @Injectable()
 export class WebsiteGeneratorService {
     constructor(private readonly githubService: GithubService) {}
 
-    async duplicate(directory: Directory, user: User) {
-        const template = {
-            owner: 'ever-co',
-            repo: 'ever-works-website-template',
-        } as const;
-
+    private async duplicate(directory: Directory, user: User) {
         const token = user.getGitToken();
 
-        /*  We duplicate because fork is async as GitHub API docs states:
-         *  https://docs.github.com/en/rest/repos/forks?apiVersion=2022-11-28#create-a-fork
-         *  But you can try to fork it if you want and check if it's really an issue for us.
-         *  I think having workflows inside repo available from the beginning is main reason why I decided to duplicate repo.
-         */
-        if (directory.organization) {
-            return this.githubService.duplicateAsOrg(
-                template.owner,
-                template.repo,
-                directory.owner,
-                directory.getWebsiteRepo(),
-                token,
-            );
-        }
-
-        return this.githubService.duplicate(
-            template.owner,
-            template.repo,
-            directory.getWebsiteRepo(),
+        return this.githubService.fork(
+            {
+                owner: template.owner,
+                repo: template.repo,
+                name: directory.getWebsiteRepo(),
+                isOrganization: directory.organization,
+            },
             token,
         );
     }
 
-    async initialize(directory: Directory, user: User) {
-        let path: string;
+    async initialize(
+        directory: Directory,
+        user: User,
+        operation: 'fork' | 'clone' | 'create-using-template' = 'fork',
+    ) {
+        let path: any;
         try {
             path = await this.duplicate(directory, user);
         } finally {
-            if (path) {
+            if (path && typeof path === 'string') {
                 // cleanup
                 await fs.rm(path, { recursive: true, force: true });
             }

@@ -83,24 +83,106 @@ export class GithubService extends GitProvider {
         }
     }
 
-    async fork(owner: string, repo: string, name: string, token: string) {
+    async fork(
+        {
+            owner,
+            repo,
+            name,
+            isOrganization,
+        }: {
+            owner: string;
+            repo: string;
+            name: string;
+            isOrganization?: boolean;
+        },
+        token: string,
+    ) {
         const octokit = new Octokit({ auth: token });
+        let forkDetails;
+
+        // Check if repository with the target name already exists for the target owner
+        const existingRepository = await this.getRepository(owner, name, token);
+        if (existingRepository) {
+            return existingRepository.data;
+        }
+
         try {
-            const { data } = await octokit.rest.repos.createFork({
+            const response = await octokit.rest.repos.createFork({
                 owner,
                 repo,
                 name,
+                organization: isOrganization ? name : undefined,
             });
-            return data;
+
+            forkDetails = response.data;
+
+            this.logger.log(
+                `Fork initiated for ${owner}/${repo} as ${forkDetails.owner.login}/${forkDetails.name}. URL: ${forkDetails.html_url}. Waiting for availability.`,
+            );
         } catch (err) {
-            this.logger.error('Failed to fork GitHub repository', err.message);
+            if (err instanceof RequestError) {
+                this.logger.error(
+                    `Failed to initiate fork of ${owner}/${repo} to ${name}. Status: ${err.status}`,
+                    err.message,
+                );
+            } else {
+                this.logger.error(
+                    `Failed to initiate fork of ${owner}/${repo} to ${name}.`,
+                    err.message,
+                );
+            }
             throw err;
         }
+
+        const newRepoOwner = forkDetails.owner.login;
+        const newRepoName = forkDetails.name;
+
+        const REPO_CHECK_INTERVAL_MS = 5000;
+        const MAX_REPO_CHECK_ATTEMPTS = 24;
+
+        for (let attempt = 1; attempt <= MAX_REPO_CHECK_ATTEMPTS; attempt++) {
+            this.logger.log(
+                `Checking fork status for ${newRepoOwner}/${newRepoName}, attempt ${attempt}/${MAX_REPO_CHECK_ATTEMPTS}`,
+            );
+            try {
+                // Attempt to get the repository details
+                // A successful call means the repository is now available
+                await octokit.rest.repos.get({
+                    owner: newRepoOwner,
+                    repo: newRepoName,
+                });
+
+                this.logger.log(`Fork ${newRepoOwner}/${newRepoName} is available.`);
+
+                return null;
+            } catch (err) {
+                if (err instanceof RequestError && err.status === 404) {
+                    if (attempt < MAX_REPO_CHECK_ATTEMPTS) {
+                        await new Promise((resolve) => setTimeout(resolve, REPO_CHECK_INTERVAL_MS));
+                    } else {
+                        throw new Error(
+                            `Fork ${newRepoOwner}/${newRepoName} did not become available after ${MAX_REPO_CHECK_ATTEMPTS} attempts (${(MAX_REPO_CHECK_ATTEMPTS * REPO_CHECK_INTERVAL_MS) / 1000}s).`,
+                        );
+                    }
+                } else {
+                    this.logger.error(
+                        `Error checking fork status for ${newRepoOwner}/${newRepoName}: ${err.message}`,
+                        err.stack,
+                    );
+
+                    throw err;
+                }
+            }
+        }
+
+        throw new Error(`Fork ${newRepoOwner}/${newRepoName} timed out after maximum attempts.`);
     }
 
     async duplicate(owner: string, repo: string, name: string, token: string) {
         const duplicated = await this.createEmptyRepo(name, '', token);
         const origin = duplicated.clone_url;
+
+        this.logger.log(`Duplicated ${owner}/${repo} to ${duplicated.owner.login}/${name}`);
 
         const originalDir = await this.cloneOrPull(owner, repo, token);
         await this.remoteRemove(originalDir, 'origin');
@@ -114,12 +196,56 @@ export class GithubService extends GitProvider {
         const duplicated = await this.createEmptyRepoAsOrg(org, name, '', token);
         const origin = duplicated.clone_url;
 
+        this.logger.log(`Duplicated ${owner}/${repo} to ${duplicated.owner.login}/${name}`);
+
         const originalDir = await this.cloneOrPull(owner, repo, token);
         await this.remoteRemove(originalDir, 'origin');
         await this.remoteAdd(originalDir, 'origin', origin);
         await this.push(originalDir, token);
 
         return originalDir;
+    }
+
+    async createRepoFromTemplate(
+        templateOwner: string,
+        templateRepo: string,
+        targetOwner: string,
+        newName: string,
+        token: string,
+        description?: string,
+        isPrivate: boolean = true,
+    ) {
+        const octokit = new Octokit({ auth: token });
+        try {
+            // Check if the target repository already exists
+            const existingRepository = await this.getRepository(targetOwner, newName, token);
+            if (existingRepository) {
+                return existingRepository.data;
+            }
+
+            this.logger.log(
+                `Creating repository ${targetOwner}/${newName} from template ${templateOwner}/${templateRepo}...`,
+            );
+
+            await octokit.rest.repos.createUsingTemplate({
+                template_owner: templateOwner,
+                template_repo: templateRepo,
+                owner: targetOwner,
+                name: newName,
+                description:
+                    description ||
+                    `Repository created from template ${templateOwner}/${templateRepo}`,
+                private: isPrivate,
+            });
+        } catch (err) {
+            this.logger.error(
+                `Failed to create repository ${targetOwner}/${newName} from template ${templateOwner}/${templateRepo}.`,
+                err.message,
+            );
+            throw err;
+        }
+
+        return null;
     }
 
     async repositoryPublickey(owner: string, repo: string, token: string) {
