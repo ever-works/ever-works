@@ -16,32 +16,21 @@ export class WebsiteUpdateService {
      * Updates an existing website repository based on the original creation method
      */
     async updateRepository(
-        slug: string,
-        owner: string,
-        isOrganization: boolean,
+        directory: Directory,
         user: User,
     ): Promise<{ method: string; message: string }> {
-        const directory = await Directory.findMock(slug);
-        if (!directory) {
-            throw new NotFoundException(`Directory with slug '${slug}' not found`);
-        }
-
-        // Update directory properties if they differ
-        directory.owner = owner;
-        directory.organization = isOrganization;
-
         const token = user.getGitToken();
         const websiteRepo = directory.getWebsiteRepo();
 
         // Check if the target repository exists
         const repositoryExists = await this.githubService.repositoryExists(
-            owner,
+            directory.owner,
             websiteRepo,
             token,
         );
         if (!repositoryExists) {
             throw new NotFoundException(
-                `Website repository '${owner}/${websiteRepo}' does not exist`,
+                `Website repository '${directory.owner}/${websiteRepo}' does not exist`,
             );
         }
 

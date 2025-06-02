@@ -4,6 +4,7 @@ import {
     HttpCode,
     HttpStatus,
     NotFoundException,
+    Param,
     Post,
     UsePipes,
     ValidationPipe,
@@ -18,10 +19,7 @@ import { GithubService } from './git/github.service';
 import { CreateItemsGeneratorDto } from './items-generator/dto/create-items-generator.dto';
 import { ItemsGeneratorResponseDto } from './items-generator/dto/items-generator-response.dto';
 import { CreateDirectoryDto } from './dto/create-directory.dto';
-import {
-    UpdateWebsiteRepositoryDto,
-    UpdateWebsiteRepositoryResponseDto,
-} from './website-generator/dto/update-website-repository.dto';
+import { UpdateWebsiteRepositoryResponseDto } from './website-generator/dto/update-website-repository.dto';
 
 @Controller()
 export class AppController {
@@ -116,28 +114,31 @@ export class AppController {
         console.log(`Total time taken: ${duration} seconds`);
     }
 
-    @Post('update-website')
+    @Post('update-website/:slug')
     @HttpCode(HttpStatus.OK)
     @UsePipes(new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }))
     async updateWebsiteRepository(
-        @Body() updateDto: UpdateWebsiteRepositoryDto,
+        @Param('slug') slug: string,
     ): Promise<UpdateWebsiteRepositoryResponseDto> {
         try {
             const user = await User.sessionMock();
-            const { slug, owner, isOrganization } = updateDto;
+
+            // Check if directory exists for the given slug
+            const directory = await Directory.findMock(slug);
+            if (!directory) {
+                throw new NotFoundException(`Directory with slug '${slug}' not found`);
+            }
 
             const result = await this.websiteUpdateService.updateRepository(
-                slug,
-                owner,
-                isOrganization,
+                directory,
                 user,
             );
 
             return {
                 status: 'success',
-                slug,
-                owner,
-                repository: `${owner}/${slug}-website`,
+                slug: directory.slug,
+                owner: directory.owner,
+                repository: `${directory.owner}/${directory.slug}-website`,
                 message: result.message,
                 method_used: result.method,
             };
@@ -146,9 +147,9 @@ export class AppController {
 
             return {
                 status: 'error',
-                slug: updateDto.slug,
-                owner: updateDto.owner,
-                repository: `${updateDto.owner}/${updateDto.slug}-website`,
+                slug,
+                owner: '',
+                repository: `/${slug}-website`,
                 message: 'Failed to update website repository',
                 error_details: error.message,
             };
