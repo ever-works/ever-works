@@ -3,7 +3,7 @@ import * as fs from 'node:fs/promises';
 import * as yaml from 'yaml';
 import { format } from 'date-fns';
 import { Category, ItemData, Tag } from '../agent/types';
-import { OperationType } from '../items-generator/dto';
+import { GenerationMethod } from '../items-generator/dto';
 
 type PRUpdate = {
     branch: string;
@@ -17,7 +17,7 @@ export interface IDataConfig {
     items_name?: string;
     copyright_year?: number;
     initial_prompt?: string;
-    operation?: OperationType;
+    generation_method?: GenerationMethod;
     pr_update?: PRUpdate | null;
 }
 
@@ -104,7 +104,11 @@ export class DataRepository {
         await fs.rm(this.dir, { recursive: true, force: true });
     }
 
-    async clearFiles() {
+    /**
+     * Remove all files except .git
+     * and ensure all needed directories exist
+     */
+    async resetFiles() {
         const files = await fs.readdir(this.dir);
         for (const file of files) {
             if (file === '.git' || file.startsWith('.git')) {
@@ -113,6 +117,8 @@ export class DataRepository {
 
             await fs.rm(path.join(this.dir, file), { recursive: true, force: true });
         }
+
+        await this.ensureDirectoriesExist();
     }
 
     async ensureDirectoriesExist() {

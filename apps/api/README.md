@@ -66,8 +66,9 @@ If you want to init directory for organization, pass optional `owner` field:
         "https://github.com/awesome-lists/awesome-time-tracking",
         "https://alternativeto.net/category/productivity/time-tracking/"
     ],
-    "operation": "create-update",
+    "generation_method": "create-update",
     "update_with_pull_request": true,
+    "website_repository_creation_method": "duplicate",
     "config": {
         "max_search_queries": 15,
         "max_results_per_query": 25,
@@ -81,16 +82,17 @@ If you want to init directory for organization, pass optional `owner` field:
 
 **Request Parameters:**
 
-| Field                      | Type     | Required   | Default         | Description                                                                                               |
-| -------------------------- | -------- | ---------- | --------------- | --------------------------------------------------------------------------------------------------------- |
-| `slug`                     | string   | `required` | -               | Unique identifier for the directory                                                                       |
-| `name`                     | string   | `required` | -               | Display name for the directory                                                                            |
-| `prompt`                   | string   | `required` | -               | Description/prompt for item generation. URLs mentioned here will be automatically extracted and processed |
-| `target_keywords`          | string[] | `optional` | `[]`            | Keywords to focus the search and generation                                                               |
-| `source_urls`              | string[] | `optional` | `[]`            | Additional URLs to process for content extraction                                                         |
-| `operation`                | enum     | `optional` | `create-update` | Operation type: `create-update` or `recreate` (see Operation Types below)                                 |
-| `update_with_pull_request` | boolean  | `optional` | `true`          | Whether to update the repository with a pull request or directly commit the changes to main branch.       |
-| `config`                   | object   | `optional` | -               | Advanced configuration options                                                                            |
+| Field                                | Type     | Required   | Default         | Description                                                                                               |
+| ------------------------------------ | -------- | ---------- | --------------- | --------------------------------------------------------------------------------------------------------- |
+| `slug`                               | string   | `required` | -               | Unique identifier for the directory                                                                       |
+| `name`                               | string   | `required` | -               | Display name for the directory                                                                            |
+| `prompt`                             | string   | `required` | -               | Description/prompt for item generation. URLs mentioned here will be automatically extracted and processed |
+| `target_keywords`                    | string[] | `optional` | `[]`            | Keywords to focus the search and generation                                                               |
+| `source_urls`                        | string[] | `optional` | `[]`            | Additional URLs to process for content extraction                                                         |
+| `generation_method`                  | enum     | `optional` | `create-update` | Generation method: `create-update` or `recreate` (see Generation Methods below)                           |
+| `update_with_pull_request`           | boolean  | `optional` | `true`          | Whether to update the repository with a pull request or directly commit the changes to main branch.       |
+| `website_repository_creation_method` | enum     | `optional` | `duplicate`     | Method for creating the website repository: `duplicate`, `fork`, or `create-using-template` (see below)   |
+| `config`                             | object   | `optional` | -               | Advanced configuration options                                                                            |
 
 **Configuration Options:**
 
@@ -103,12 +105,20 @@ If you want to init directory for organization, pass optional `owner` field:
 | `min_content_length_for_extraction` | number  | 300     | 0+       | Minimum content length required for item extraction |
 | `ai_first_generation_enabled`       | boolean | true    | -        | Enable AI-first item generation before web search   |
 
-**Operation Types:**
+**Generation Methods:**
 
-| Operation       | Description                                                                                                                                                                                          |
-| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `create-update` | **Default behavior.** Creates a new repository if it doesn't exist, or updates an existing repository by adding new items. Existing items are preserved and new items are deduplicated against them. |
-| `recreate`      | **Complete rebuild.** Entirely recreates the repository with fresh data, removing all existing content and replacing it with newly generated items.                                                  |
+| Generation Method | Description                                                                                                                                                                                          |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `create-update`   | **Default behavior.** Creates a new repository if it doesn't exist, or updates an existing repository by adding new items. Existing items are preserved and new items are deduplicated against them. |
+| `recreate`        | **Complete rebuild.** Entirely recreates the repository with fresh data, removing all existing content and replacing it with newly generated items.                                                  |
+
+**Website Repository Creation Methods:**
+
+| Method                  | Description                                                                                                                                 |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `duplicate`             | **Default behavior.** Creates an independent copy (duplicate) of the template repository. This is a full clone.                             |
+| `fork`                  | Creates a fork of the template repository under the specified user or organization. This maintains a link to the original template.         |
+| `create-using-template` | Creates a new repository using the template repository as a GitHub template. This initializes the new repository with the template's files. |
 
 **Features:**
 
@@ -137,6 +147,76 @@ If you want to init directory for organization, pass optional `owner` field:
 > Request body is optional for now, by default it will take values from `.env` during development. Don't forget to change it before going to production, because it will save these tokens inside user's gh actions secrets...
 
 > This endpoint will trigger GitHub Actions Workflow inside website repository. Important thing to note is that we cannot reuse `GITHUB_TOKEN` from github actions workflow because it has short lifetime while our website needs long living github token to make periodically clones, pulls etc.
+
+7. Update website repository (optional) using a request to `http://localhost:3001/update-website/{slug}`
+
+This endpoint updates an existing website repository by pulling the latest changes from the template repository. It automatically detects the original creation method and applies the appropriate update strategy.
+
+**Request:**
+
+```
+POST /update-website/awesome-time-tracking
+```
+
+**URL Parameters:**
+
+| Parameter | Type   | Required   | Description                                    |
+| --------- | ------ | ---------- | ---------------------------------------------- |
+| `slug`    | string | `required` | The slug of the directory/repository to update |
+
+**Response:**
+
+```json
+{
+    "status": "success",
+    "slug": "awesome-time-tracking",
+    "owner": "ever-works",
+    "repository": "ever-works/awesome-time-tracking-website",
+    "message": "Successfully updated using duplicate method",
+    "method_used": "duplicate"
+}
+```
+
+**Response Fields:**
+
+| Field           | Type   | Description                                                               |
+| --------------- | ------ | ------------------------------------------------------------------------- |
+| `status`        | string | Status of the operation: `success` or `error`                             |
+| `slug`          | string | The directory slug that was updated                                       |
+| `owner`         | string | The GitHub owner (user or organization) of the repository                 |
+| `repository`    | string | Full repository name in `owner/repo-name` format                          |
+| `message`       | string | Descriptive message about the update operation                            |
+| `method_used`   | string | The update method that was successfully used (see Update Methods below)   |
+| `error_details` | string | _(Error responses only)_ Additional details about the error that occurred |
+
+**Update Methods:**
+
+The service automatically tries different update strategies in order of preference:
+
+| Method                  | Description                                                                                                                        |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `fork`                  | **Preferred method.** Pulls latest changes from the upstream template repository. Only works if the repository is actually a fork. |
+| `duplicate`             | **Fallback method.** Clones the original template, replaces the remote origin, and pushes to the target repository.                |
+| `create-using-template` | **Last resort.** Clones both repositories, copies files from template to target (excluding .git), commits and pushes the changes.  |
+
+**Error Responses:**
+
+```json
+{
+    "status": "error",
+    "slug": "awesome-time-tracking",
+    "owner": "",
+    "repository": "/awesome-time-tracking-website",
+    "message": "Failed to update website repository",
+    "error_details": "Directory with slug 'awesome-time-tracking' not found"
+}
+```
+
+**Prerequisites:**
+
+- The directory must exist (created via `/directories` endpoint)
+- The website repository must exist (created via `/generate` endpoint)
+- Valid GitHub authentication token in environment
 
 ## Prompt used to generate awesome time tracking in ever works org
 
