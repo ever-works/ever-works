@@ -111,7 +111,7 @@ export class GithubService extends GitProvider {
                 owner,
                 repo,
                 name,
-                organization: isOrganization ? name : undefined,
+                organization: isOrganization ? owner : undefined,
             });
 
             forkDetails = response.data;
@@ -120,17 +120,11 @@ export class GithubService extends GitProvider {
                 `Fork initiated for ${owner}/${repo} as ${forkDetails.owner.login}/${forkDetails.name}. URL: ${forkDetails.html_url}. Waiting for availability.`,
             );
         } catch (err) {
-            if (err instanceof RequestError) {
-                this.logger.error(
-                    `Failed to initiate fork of ${owner}/${repo} to ${name}. Status: ${err.status}`,
-                    err.message,
-                );
-            } else {
-                this.logger.error(
-                    `Failed to initiate fork of ${owner}/${repo} to ${name}.`,
-                    err.message,
-                );
-            }
+            this.logger.error(
+                `Failed to initiate fork of ${owner}/${repo} to ${name}.`,
+                err.message,
+            );
+
             throw err;
         }
 
@@ -236,6 +230,7 @@ export class GithubService extends GitProvider {
                     description ||
                     `Repository created from template ${templateOwner}/${templateRepo}`,
                 private: isPrivate,
+                include_all_branches: false,
             });
         } catch (err) {
             this.logger.error(
