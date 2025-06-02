@@ -68,6 +68,7 @@ If you want to init directory for organization, pass optional `owner` field:
     ],
     "operation": "create-update",
     "update_with_pull_request": true,
+    "website_repository_creation_method": "duplicate",
     "config": {
         "max_search_queries": 15,
         "max_results_per_query": 25,
@@ -81,16 +82,17 @@ If you want to init directory for organization, pass optional `owner` field:
 
 **Request Parameters:**
 
-| Field                      | Type     | Required   | Default         | Description                                                                                               |
-| -------------------------- | -------- | ---------- | --------------- | --------------------------------------------------------------------------------------------------------- |
-| `slug`                     | string   | `required` | -               | Unique identifier for the directory                                                                       |
-| `name`                     | string   | `required` | -               | Display name for the directory                                                                            |
-| `prompt`                   | string   | `required` | -               | Description/prompt for item generation. URLs mentioned here will be automatically extracted and processed |
-| `target_keywords`          | string[] | `optional` | `[]`            | Keywords to focus the search and generation                                                               |
-| `source_urls`              | string[] | `optional` | `[]`            | Additional URLs to process for content extraction                                                         |
-| `operation`                | enum     | `optional` | `create-update` | Operation type: `create-update` or `recreate` (see Operation Types below)                                 |
-| `update_with_pull_request` | boolean  | `optional` | `true`          | Whether to update the repository with a pull request or directly commit the changes to main branch.       |
-| `config`                   | object   | `optional` | -               | Advanced configuration options                                                                            |
+| Field                                | Type     | Required   | Default         | Description                                                                                               |
+| ------------------------------------ | -------- | ---------- | --------------- | --------------------------------------------------------------------------------------------------------- |
+| `slug`                               | string   | `required` | -               | Unique identifier for the directory                                                                       |
+| `name`                               | string   | `required` | -               | Display name for the directory                                                                            |
+| `prompt`                             | string   | `required` | -               | Description/prompt for item generation. URLs mentioned here will be automatically extracted and processed |
+| `target_keywords`                    | string[] | `optional` | `[]`            | Keywords to focus the search and generation                                                               |
+| `source_urls`                        | string[] | `optional` | `[]`            | Additional URLs to process for content extraction                                                         |
+| `operation`                          | enum     | `optional` | `create-update` | Operation type: `create-update` or `recreate` (see Operation Types below)                                 |
+| `update_with_pull_request`           | boolean  | `optional` | `true`          | Whether to update the repository with a pull request or directly commit the changes to main branch.       |
+| `website_repository_creation_method` | enum     | `optional` | `duplicate`     | Method for creating the website repository: `duplicate`, `fork`, or `create-using-template` (see below)   |
+| `config`                             | object   | `optional` | -               | Advanced configuration options                                                                            |
 
 **Configuration Options:**
 
@@ -109,6 +111,14 @@ If you want to init directory for organization, pass optional `owner` field:
 | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `create-update` | **Default behavior.** Creates a new repository if it doesn't exist, or updates an existing repository by adding new items. Existing items are preserved and new items are deduplicated against them. |
 | `recreate`      | **Complete rebuild.** Entirely recreates the repository with fresh data, removing all existing content and replacing it with newly generated items.                                                  |
+
+**Website Repository Creation Methods:**
+
+| Method                  | Description                                                                                                                                 |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `duplicate`             | **Default behavior.** Creates an independent copy (duplicate) of the template repository. This is a full clone.                             |
+| `fork`                  | Creates a fork of the template repository under the specified user or organization. This maintains a link to the original template.         |
+| `create-using-template` | Creates a new repository using the template repository as a GitHub template. This initializes the new repository with the template's files. |
 
 **Features:**
 

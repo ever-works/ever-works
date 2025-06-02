@@ -93,7 +93,11 @@ export class AppController {
             if (generated) {
                 await Promise.all([
                     this.markdownGenerator.initialize(directory, user),
-                    this.websiteGenerator.initialize(directory, user),
+                    this.websiteGenerator.initialize(
+                        directory,
+                        user,
+                        dto.website_repository_creation_method,
+                    ),
                 ]);
             }
         } catch (error) {

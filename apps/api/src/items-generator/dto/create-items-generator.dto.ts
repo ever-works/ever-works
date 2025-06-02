@@ -18,6 +18,12 @@ export enum OperationType {
     RECREATE = 'recreate',
 }
 
+export enum WebsiteRepositoryCreationMethod {
+    DUPLICATE = 'duplicate',
+    FORK = 'fork',
+    CREATE_USING_TEMPLATE = 'create-using-template',
+}
+
 export class ConfigDto {
     @IsOptional()
     @IsInt()
@@ -93,4 +99,9 @@ export class CreateItemsGeneratorDto {
     @IsOptional()
     @IsBoolean()
     update_with_pull_request?: boolean = true;
+
+    @IsOptional()
+    @IsEnum(WebsiteRepositoryCreationMethod)
+    website_repository_creation_method?: WebsiteRepositoryCreationMethod =
+        WebsiteRepositoryCreationMethod.DUPLICATE;
 }
