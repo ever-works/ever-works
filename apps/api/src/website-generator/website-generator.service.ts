@@ -3,12 +3,8 @@ import { GithubService } from '../git/github.service';
 import { WebsiteRepositoryCreationMethod } from '../items-generator/dto/create-items-generator.dto';
 import { Directory } from '../entities/directory.entity';
 import { User } from '../entities/user.entity';
+import { WEBSITE_TEMPLATE_CONFIG } from './config/website-template.config';
 import * as fs from 'node:fs/promises';
-
-const template = {
-    owner: 'ever-co',
-    repo: 'ever-works-website-template',
-} as const;
 
 @Injectable()
 export class WebsiteGeneratorService {
@@ -19,8 +15,8 @@ export class WebsiteGeneratorService {
 
         if (directory.organization) {
             return this.githubService.duplicateAsOrg(
-                template.owner,
-                template.repo,
+                WEBSITE_TEMPLATE_CONFIG.owner,
+                WEBSITE_TEMPLATE_CONFIG.repo,
                 directory.owner,
                 directory.getWebsiteRepo(),
                 token,
@@ -28,8 +24,8 @@ export class WebsiteGeneratorService {
         }
 
         return this.githubService.duplicate(
-            template.owner,
-            template.repo,
+            WEBSITE_TEMPLATE_CONFIG.owner,
+            WEBSITE_TEMPLATE_CONFIG.repo,
             directory.getWebsiteRepo(),
             token,
         );
@@ -40,8 +36,8 @@ export class WebsiteGeneratorService {
 
         return this.githubService.fork(
             {
-                owner: template.owner,
-                repo: template.repo,
+                owner: WEBSITE_TEMPLATE_CONFIG.owner,
+                repo: WEBSITE_TEMPLATE_CONFIG.repo,
                 name: directory.getWebsiteRepo(),
                 isOrganization: directory.organization,
             },
@@ -53,8 +49,8 @@ export class WebsiteGeneratorService {
         const token = user.getGitToken();
 
         return this.githubService.createRepoFromTemplate(
-            template.owner,
-            template.repo,
+            WEBSITE_TEMPLATE_CONFIG.owner,
+            WEBSITE_TEMPLATE_CONFIG.repo,
             directory.owner,
             directory.getWebsiteRepo(),
             token,

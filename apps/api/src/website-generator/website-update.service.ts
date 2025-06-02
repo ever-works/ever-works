@@ -1,15 +1,10 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { GithubService } from '../git/github.service';
-import { WebsiteRepositoryCreationMethod } from '../items-generator/dto/create-items-generator.dto';
 import { Directory } from '../entities/directory.entity';
 import { User } from '../entities/user.entity';
+import { WEBSITE_TEMPLATE_CONFIG } from './config/website-template.config';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-
-const template = {
-    owner: 'ever-co',
-    repo: 'ever-works-website-template',
-} as const;
 
 @Injectable()
 export class WebsiteUpdateService {
@@ -39,7 +34,11 @@ export class WebsiteUpdateService {
         const websiteRepo = directory.getWebsiteRepo();
 
         // Check if the target repository exists
-        const repositoryExists = await this.githubService.repositoryExists(owner, websiteRepo, token);
+        const repositoryExists = await this.githubService.repositoryExists(
+            owner,
+            websiteRepo,
+            token,
+        );
         if (!repositoryExists) {
             throw new NotFoundException(
                 `Website repository '${owner}/${websiteRepo}' does not exist`,
@@ -49,7 +48,7 @@ export class WebsiteUpdateService {
         // Try to determine the creation method and update accordingly
         // Since we can't reliably determine the original creation method from GitHub API,
         // we'll try different update strategies in order of preference
-        
+
         try {
             // First, try the fork method (pull from upstream)
             const forkResult = await this.updateFork(directory, user);
@@ -71,7 +70,10 @@ export class WebsiteUpdateService {
         try {
             // If duplicate fails, try template method (clone both, replace files)
             await this.updateTemplate(directory, user);
-            return { method: 'create-using-template', message: 'Successfully updated using template method' };
+            return {
+                method: 'create-using-template',
+                message: 'Successfully updated using template method',
+            };
         } catch (error) {
             this.logger.error(`Template update failed: ${error.message}`);
             throw new Error(`All update methods failed. Last error: ${error.message}`);
@@ -97,8 +99,8 @@ export class WebsiteUpdateService {
             const isActualFork = await this.githubService.hasForkRelationship(
                 directory.owner,
                 websiteRepo,
-                template.owner,
-                template.repo,
+                WEBSITE_TEMPLATE_CONFIG.owner,
+                WEBSITE_TEMPLATE_CONFIG.repo,
                 token,
             );
 
@@ -107,7 +109,7 @@ export class WebsiteUpdateService {
             }
 
             // Add upstream remote if it doesn't exist
-            await this.githubService.addUpstreamRemote(targetDir, template.owner, template.repo);
+            await this.githubService.addUpstreamRemote(targetDir, WEBSITE_TEMPLATE_CONFIG.owner, WEBSITE_TEMPLATE_CONFIG.repo);
 
             // Pull from upstream
             await this.githubService.pullFromUpstream(targetDir, token);
@@ -131,8 +133,8 @@ export class WebsiteUpdateService {
 
         // Clone the original template repository
         const originalDir = await this.githubService.cloneOrPull(
-            template.owner,
-            template.repo,
+            WEBSITE_TEMPLATE_CONFIG.owner,
+            WEBSITE_TEMPLATE_CONFIG.repo,
             token,
         );
 
@@ -146,7 +148,9 @@ export class WebsiteUpdateService {
         // Push to the target repository
         await this.githubService.push(originalDir, token);
 
-        this.logger.log(`Successfully updated ${directory.owner}/${websiteRepo} using duplicate method`);
+        this.logger.log(
+            `Successfully updated ${directory.owner}/${websiteRepo} using duplicate method`,
+        );
     }
 
     /**
@@ -158,7 +162,7 @@ export class WebsiteUpdateService {
 
         // Clone both repositories
         const [originalDir, targetDir] = await Promise.all([
-            this.githubService.cloneOrPull(template.owner, template.repo, token),
+            this.githubService.cloneOrPull(WEBSITE_TEMPLATE_CONFIG.owner, WEBSITE_TEMPLATE_CONFIG.repo, token),
             this.githubService.cloneOrPull(directory.owner, websiteRepo, token),
         ]);
 
@@ -167,17 +171,15 @@ export class WebsiteUpdateService {
 
         // Add, commit, and push changes
         await this.githubService.add(targetDir, '.');
-        
+
         const committer = user.asCommitter();
-        await this.githubService.commit(
-            targetDir,
-            'Update website from template',
-            committer,
-        );
-        
+        await this.githubService.commit(targetDir, 'Update website from template', committer);
+
         await this.githubService.push(targetDir, token);
 
-        this.logger.log(`Successfully updated ${directory.owner}/${websiteRepo} using template method`);
+        this.logger.log(
+            `Successfully updated ${directory.owner}/${websiteRepo} using template method`,
+        );
     }
 
     /**
