@@ -426,7 +426,11 @@ export class GithubService extends GitProvider {
     /**
      * Adds upstream remote to a repository
      */
-    async addUpstreamRemote(dir: string, upstreamOwner: string, upstreamRepo: string): Promise<void> {
+    async addUpstreamRemote(
+        dir: string,
+        upstreamOwner: string,
+        upstreamRepo: string,
+    ): Promise<void> {
         try {
             // Remove upstream remote if it exists
             try {
@@ -449,6 +453,9 @@ export class GithubService extends GitProvider {
     async pullFromUpstream(dir: string, token: string): Promise<void> {
         const auth = this.getAuth(token);
 
+        // Set up committer info
+        const committer = this.getCommitter();
+
         try {
             await git.fetch({
                 onAuth: () => auth,
@@ -464,12 +471,14 @@ export class GithubService extends GitProvider {
                 throw new Error('No current branch found');
             }
 
-            // Merge upstream changes
+            // Merge upstream changes with author info
             await git.merge({
                 fs,
                 dir,
                 ours: currentBranch,
                 theirs: `upstream/${currentBranch}`,
+                author: committer,
+                committer: committer,
             });
         } catch (error) {
             throw new Error(`Failed to pull from upstream: ${error.message}`);

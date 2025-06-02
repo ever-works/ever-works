@@ -81,8 +81,7 @@ export abstract class GitProvider {
     /* Pulls latest changes from remote repository */
     async pull(dir: string, token: string, committer: ICommitter = {}): Promise<void> {
         const auth = this.getAuth(token);
-        committer.email = committer.email || process.env.GIT_EMAIL;
-        committer.name = committer.name || process.env.GIT_NAME;
+        committer = this.getCommitter(committer);
 
         await git.pull({
             onAuth: () => auth,
@@ -94,6 +93,13 @@ export abstract class GitProvider {
         });
     }
 
+    getCommitter(committer: ICommitter = {}): ICommitter {
+        committer.email = committer.email || process.env.GIT_EMAIL;
+        committer.name = committer.name || process.env.GIT_NAME;
+
+        return committer;
+    }
+
     add(dir: string, paths: string | string[]) {
         return git.add({
             fs,
@@ -103,8 +109,7 @@ export abstract class GitProvider {
     }
 
     commit(dir: string, message: string, committer: ICommitter = {}) {
-        committer.email = committer.email || process.env.GIT_EMAIL;
-        committer.name = committer.name || process.env.GIT_NAME;
+        committer = this.getCommitter(committer);
 
         return git.commit({
             fs,
