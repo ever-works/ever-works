@@ -109,7 +109,11 @@ export class WebsiteUpdateService {
             }
 
             // Add upstream remote if it doesn't exist
-            await this.githubService.addUpstreamRemote(targetDir, WEBSITE_TEMPLATE_CONFIG.owner, WEBSITE_TEMPLATE_CONFIG.repo);
+            await this.githubService.addUpstreamRemote(
+                targetDir,
+                WEBSITE_TEMPLATE_CONFIG.owner,
+                WEBSITE_TEMPLATE_CONFIG.repo,
+            );
 
             // Pull from upstream
             await this.githubService.pullFromUpstream(targetDir, token);
@@ -162,7 +166,11 @@ export class WebsiteUpdateService {
 
         // Clone both repositories
         const [originalDir, targetDir] = await Promise.all([
-            this.githubService.cloneOrPull(WEBSITE_TEMPLATE_CONFIG.owner, WEBSITE_TEMPLATE_CONFIG.repo, token),
+            this.githubService.cloneOrPull(
+                WEBSITE_TEMPLATE_CONFIG.owner,
+                WEBSITE_TEMPLATE_CONFIG.repo,
+                token,
+            ),
             this.githubService.cloneOrPull(directory.owner, websiteRepo, token),
         ]);
 
