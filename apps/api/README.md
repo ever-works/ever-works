@@ -148,6 +148,76 @@ If you want to init directory for organization, pass optional `owner` field:
 
 > This endpoint will trigger GitHub Actions Workflow inside website repository. Important thing to note is that we cannot reuse `GITHUB_TOKEN` from github actions workflow because it has short lifetime while our website needs long living github token to make periodically clones, pulls etc.
 
+7. Update website repository (optional) using a request to `http://localhost:3001/update-website/{slug}`
+
+This endpoint updates an existing website repository by pulling the latest changes from the template repository. It automatically detects the original creation method and applies the appropriate update strategy.
+
+**Request:**
+
+```
+POST /update-website/awesome-time-tracking
+```
+
+**URL Parameters:**
+
+| Parameter | Type   | Required   | Description                                    |
+| --------- | ------ | ---------- | ---------------------------------------------- |
+| `slug`    | string | `required` | The slug of the directory/repository to update |
+
+**Response:**
+
+```json
+{
+    "status": "success",
+    "slug": "awesome-time-tracking",
+    "owner": "ever-works",
+    "repository": "ever-works/awesome-time-tracking-website",
+    "message": "Successfully updated using duplicate method",
+    "method_used": "duplicate"
+}
+```
+
+**Response Fields:**
+
+| Field           | Type   | Description                                                               |
+| --------------- | ------ | ------------------------------------------------------------------------- |
+| `status`        | string | Status of the operation: `success` or `error`                             |
+| `slug`          | string | The directory slug that was updated                                       |
+| `owner`         | string | The GitHub owner (user or organization) of the repository                 |
+| `repository`    | string | Full repository name in `owner/repo-name` format                          |
+| `message`       | string | Descriptive message about the update operation                            |
+| `method_used`   | string | The update method that was successfully used (see Update Methods below)   |
+| `error_details` | string | _(Error responses only)_ Additional details about the error that occurred |
+
+**Update Methods:**
+
+The service automatically tries different update strategies in order of preference:
+
+| Method                  | Description                                                                                                                        |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `fork`                  | **Preferred method.** Pulls latest changes from the upstream template repository. Only works if the repository is actually a fork. |
+| `duplicate`             | **Fallback method.** Clones the original template, replaces the remote origin, and pushes to the target repository.                |
+| `create-using-template` | **Last resort.** Clones both repositories, copies files from template to target (excluding .git), commits and pushes the changes.  |
+
+**Error Responses:**
+
+```json
+{
+    "status": "error",
+    "slug": "awesome-time-tracking",
+    "owner": "",
+    "repository": "/awesome-time-tracking-website",
+    "message": "Failed to update website repository",
+    "error_details": "Directory with slug 'awesome-time-tracking' not found"
+}
+```
+
+**Prerequisites:**
+
+- The directory must exist (created via `/directories` endpoint)
+- The website repository must exist (created via `/generate` endpoint)
+- Valid GitHub authentication token in environment
+
 ## Prompt used to generate awesome time tracking in ever works org
 
 ```
