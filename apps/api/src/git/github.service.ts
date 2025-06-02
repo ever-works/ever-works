@@ -2,6 +2,9 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Octokit, RequestError } from 'octokit';
 import { GitProvider, IGitAuth } from './git.provider';
 import * as sodium from 'libsodium-wrappers';
+import * as fs from 'node:fs';
+import * as http from 'isomorphic-git/http/node';
+import git from 'isomorphic-git';
 
 @Injectable()
 export class GithubService extends GitProvider {
@@ -98,7 +101,7 @@ export class GithubService extends GitProvider {
         token: string,
     ) {
         const octokit = new Octokit({ auth: token });
-        let forkDetails;
+        let forkDetails: any;
 
         // Check if repository with the target name already exists for the target owner
         const existingRepository = await this.getRepository(owner, name, token);
@@ -377,6 +380,99 @@ export class GithubService extends GitProvider {
                 err.message,
             );
             throw err;
+        }
+    }
+
+    /**
+     * Checks if a repository exists
+     */
+    async repositoryExists(owner: string, repo: string, token: string): Promise<boolean> {
+        const repository = await this.getRepository(owner, repo, token);
+        return !!repository;
+    }
+
+    /**
+     * Checks if a repository has a fork relationship with another repository
+     */
+    async hasForkRelationship(
+        forkOwner: string,
+        forkRepo: string,
+        parentOwner: string,
+        parentRepo: string,
+        token: string,
+    ): Promise<boolean> {
+        try {
+            const repository = await this.getRepository(forkOwner, forkRepo, token);
+            if (!repository) {
+                return false;
+            }
+
+            const repoData = repository.data;
+            return (
+                repoData.fork &&
+                repoData.parent &&
+                repoData.parent.owner.login === parentOwner &&
+                repoData.parent.name === parentRepo
+            );
+        } catch (error) {
+            this.logger.error(
+                `Failed to check fork relationship for ${forkOwner}/${forkRepo}`,
+                error.message,
+            );
+            return false;
+        }
+    }
+
+    /**
+     * Adds upstream remote to a repository
+     */
+    async addUpstreamRemote(dir: string, upstreamOwner: string, upstreamRepo: string): Promise<void> {
+        try {
+            // Remove upstream remote if it exists
+            try {
+                await this.remoteRemove(dir, 'upstream');
+            } catch (error) {
+                // Remote might not exist, which is fine
+            }
+
+            // Add upstream remote
+            const upstreamUrl = this.getURL(upstreamOwner, upstreamRepo);
+            await this.remoteAdd(dir, 'upstream', upstreamUrl);
+        } catch (error) {
+            throw new Error(`Failed to add upstream remote: ${error.message}`);
+        }
+    }
+
+    /**
+     * Pulls changes from upstream remote
+     */
+    async pullFromUpstream(dir: string, token: string): Promise<void> {
+        const auth = this.getAuth(token);
+
+        try {
+            await git.fetch({
+                onAuth: () => auth,
+                fs,
+                http,
+                dir,
+                remote: 'upstream',
+            });
+
+            // Get current branch
+            const currentBranch = await git.currentBranch({ fs, dir });
+            if (!currentBranch) {
+                throw new Error('No current branch found');
+            }
+
+            // Merge upstream changes
+            await git.merge({
+                fs,
+                dir,
+                ours: currentBranch,
+                theirs: `upstream/${currentBranch}`,
+            });
+        } catch (error) {
+            throw new Error(`Failed to pull from upstream: ${error.message}`);
         }
     }
 }

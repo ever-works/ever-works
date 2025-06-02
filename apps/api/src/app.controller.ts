@@ -11,12 +11,17 @@ import {
 import { DataGeneratorService } from './data-generator/data-generator.service';
 import { MarkdownGeneratorService } from './markdown-generator/markdown-generator.service';
 import { WebsiteGeneratorService } from './website-generator/website-generator.service';
+import { WebsiteUpdateService } from './website-generator/website-update.service';
 import { Directory } from './entities/directory.entity';
 import { User } from './entities/user.entity';
 import { GithubService } from './git/github.service';
 import { CreateItemsGeneratorDto } from './items-generator/dto/create-items-generator.dto';
 import { ItemsGeneratorResponseDto } from './items-generator/dto/items-generator-response.dto';
 import { CreateDirectoryDto } from './dto/create-directory.dto';
+import {
+    UpdateWebsiteRepositoryDto,
+    UpdateWebsiteRepositoryResponseDto,
+} from './website-generator/dto/update-website-repository.dto';
 
 @Controller()
 export class AppController {
@@ -24,6 +29,7 @@ export class AppController {
         private readonly dataGenerator: DataGeneratorService,
         private readonly markdownGenerator: MarkdownGeneratorService,
         private readonly websiteGenerator: WebsiteGeneratorService,
+        private readonly websiteUpdateService: WebsiteUpdateService,
         private readonly githubService: GithubService,
     ) {}
 
@@ -108,5 +114,44 @@ export class AppController {
         console.log(`Generation finished at: ${endTime.toISOString()}`);
         const duration = (endTime.getTime() - startTime.getTime()) / 1000;
         console.log(`Total time taken: ${duration} seconds`);
+    }
+
+    @Post('update-website')
+    @HttpCode(HttpStatus.OK)
+    @UsePipes(new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }))
+    async updateWebsiteRepository(
+        @Body() updateDto: UpdateWebsiteRepositoryDto,
+    ): Promise<UpdateWebsiteRepositoryResponseDto> {
+        try {
+            const user = await User.sessionMock();
+            const { slug, owner, isOrganization } = updateDto;
+
+            const result = await this.websiteUpdateService.updateRepository(
+                slug,
+                owner,
+                isOrganization,
+                user,
+            );
+
+            return {
+                status: 'success',
+                slug,
+                owner,
+                repository: `${owner}/${slug}-website`,
+                message: result.message,
+                method_used: result.method,
+            };
+        } catch (error) {
+            console.error('Error updating website repository:', error);
+
+            return {
+                status: 'error',
+                slug: updateDto.slug,
+                owner: updateDto.owner,
+                repository: `${updateDto.owner}/${updateDto.slug}-website`,
+                message: 'Failed to update website repository',
+                error_details: error.message,
+            };
+        }
     }
 }
