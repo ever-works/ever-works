@@ -7,7 +7,7 @@ import { User } from '../entities/user.entity';
 import { DataRepository } from '../data-generator/data-repository';
 import { ReadmeBuilder } from './readme-builder';
 import { MarkdownRepository } from './markdown-repository';
-import { OperationType } from '../items-generator/dto';
+import { GenerationMethod } from '../items-generator/dto';
 
 @Injectable()
 export class MarkdownGeneratorService {
@@ -61,11 +61,11 @@ export class MarkdownGeneratorService {
                 });
 
             let canCreatePR =
-                config.operation !== OperationType.RECREATE && !!config.pr_update?.branch;
+                config.generation_method !== GenerationMethod.RECREATE && !!config.pr_update?.branch;
 
             // In case of re-creation:
             // Switch to the main branch and remove existing items files.
-            if (config?.operation === OperationType.RECREATE) {
+            if (config?.generation_method === GenerationMethod.RECREATE) {
                 await this.githubService.switchToMainBranch(markdownRepo.dir).catch((err) => {
                     this.logger.error('Failed to switch to main branch', err);
                     return null;

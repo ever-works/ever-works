@@ -3,7 +3,7 @@ import * as fs from 'node:fs/promises';
 import * as yaml from 'yaml';
 import { format } from 'date-fns';
 import { Category, ItemData, Tag } from '../agent/types';
-import { OperationType } from '../items-generator/dto';
+import { GenerationMethod } from '../items-generator/dto';
 
 type PRUpdate = {
     branch: string;
@@ -17,7 +17,7 @@ export interface IDataConfig {
     items_name?: string;
     copyright_year?: number;
     initial_prompt?: string;
-    operation?: OperationType;
+    generation_method?: GenerationMethod;
     pr_update?: PRUpdate | null;
 }
 

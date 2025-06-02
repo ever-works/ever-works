@@ -13,7 +13,7 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
-export enum OperationType {
+export enum GenerationMethod {
     CREATE_UPDATE = 'create-update',
     RECREATE = 'recreate',
 }
@@ -93,8 +93,8 @@ export class CreateItemsGeneratorDto {
     config: ConfigDto = new ConfigDto();
 
     @IsOptional()
-    @IsEnum(OperationType)
-    operation?: OperationType = OperationType.CREATE_UPDATE;
+    @IsEnum(GenerationMethod)
+    generation_method?: GenerationMethod = GenerationMethod.CREATE_UPDATE;
 
     @IsOptional()
     @IsBoolean()

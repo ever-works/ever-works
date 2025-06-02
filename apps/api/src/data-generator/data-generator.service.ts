@@ -9,7 +9,7 @@ import {
     CreateItemsGeneratorDto,
     Identifiable,
     ItemData,
-    OperationType,
+    GenerationMethod,
 } from '../items-generator/dto';
 import { format } from 'date-fns';
 
@@ -40,7 +40,7 @@ export class DataGeneratorService {
 
         // Get existing data if available
         // get existing data only if we are in update mode
-        if (createItemsGeneratorDto.operation === OperationType.CREATE_UPDATE) {
+        if (createItemsGeneratorDto.generation_method === GenerationMethod.CREATE_UPDATE) {
             existingData = await this.getExistingData(directory, user);
         }
 
@@ -115,7 +115,7 @@ export class DataGeneratorService {
             let newBranchName: string | null = null;
 
             const createOrUpdate =
-                createItemsGeneratorDto.operation === OperationType.CREATE_UPDATE;
+                createItemsGeneratorDto.generation_method === GenerationMethod.CREATE_UPDATE;
 
             const update_with_pull_request = createItemsGeneratorDto.update_with_pull_request;
 
@@ -126,7 +126,7 @@ export class DataGeneratorService {
 
             // In case of re-creation:
             // Switch to the main branch and remove existing items files.
-            if (createItemsGeneratorDto.operation === OperationType.RECREATE) {
+            if (createItemsGeneratorDto.generation_method === GenerationMethod.RECREATE) {
                 this.logger.log('Recreating repository, clearing existing files');
 
                 // just to make sure we're recreating from main
@@ -150,13 +150,13 @@ export class DataGeneratorService {
             /**
              * rewrite meta files only if we are creating new repository or we are recreating it
              */
-            if (!existed || createItemsGeneratorDto.operation === OperationType.RECREATE) {
+            if (!existed || createItemsGeneratorDto.generation_method === GenerationMethod.RECREATE) {
                 promises.push(
                     data.writeReadme(this.getDefaultReadme(directory)),
                     data.writeLicense(this.getLicense()),
                     data.writeConfig(
                         this.getDefaultConfig({
-                            operation: createItemsGeneratorDto.operation,
+                            generation_method: createItemsGeneratorDto.generation_method,
                             initial_prompt: createItemsGeneratorDto.prompt,
                         }),
                     ),
@@ -173,7 +173,7 @@ export class DataGeneratorService {
                     data.writeConfig(
                         this.getDefaultConfig({
                             ...preloadedConfig,
-                            operation: createItemsGeneratorDto.operation,
+                            generation_method: createItemsGeneratorDto.generation_method,
                             pr_update: {
                                 branch: newBranchName,
                                 title: prTitle,

@@ -66,7 +66,7 @@ If you want to init directory for organization, pass optional `owner` field:
         "https://github.com/awesome-lists/awesome-time-tracking",
         "https://alternativeto.net/category/productivity/time-tracking/"
     ],
-    "operation": "create-update",
+    "generation_method": "create-update",
     "update_with_pull_request": true,
     "website_repository_creation_method": "duplicate",
     "config": {
@@ -89,7 +89,7 @@ If you want to init directory for organization, pass optional `owner` field:
 | `prompt`                             | string   | `required` | -               | Description/prompt for item generation. URLs mentioned here will be automatically extracted and processed |
 | `target_keywords`                    | string[] | `optional` | `[]`            | Keywords to focus the search and generation                                                               |
 | `source_urls`                        | string[] | `optional` | `[]`            | Additional URLs to process for content extraction                                                         |
-| `operation`                          | enum     | `optional` | `create-update` | Operation type: `create-update` or `recreate` (see Operation Types below)                                 |
+| `generation_method`                  | enum     | `optional` | `create-update` | Generation method: `create-update` or `recreate` (see Generation Methods below)                           |
 | `update_with_pull_request`           | boolean  | `optional` | `true`          | Whether to update the repository with a pull request or directly commit the changes to main branch.       |
 | `website_repository_creation_method` | enum     | `optional` | `duplicate`     | Method for creating the website repository: `duplicate`, `fork`, or `create-using-template` (see below)   |
 | `config`                             | object   | `optional` | -               | Advanced configuration options                                                                            |
@@ -105,12 +105,12 @@ If you want to init directory for organization, pass optional `owner` field:
 | `min_content_length_for_extraction` | number  | 300     | 0+       | Minimum content length required for item extraction |
 | `ai_first_generation_enabled`       | boolean | true    | -        | Enable AI-first item generation before web search   |
 
-**Operation Types:**
+**Generation Methods:**
 
-| Operation       | Description                                                                                                                                                                                          |
-| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `create-update` | **Default behavior.** Creates a new repository if it doesn't exist, or updates an existing repository by adding new items. Existing items are preserved and new items are deduplicated against them. |
-| `recreate`      | **Complete rebuild.** Entirely recreates the repository with fresh data, removing all existing content and replacing it with newly generated items.                                                  |
+| Generation Method | Description                                                                                                                                                                                          |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `create-update`   | **Default behavior.** Creates a new repository if it doesn't exist, or updates an existing repository by adding new items. Existing items are preserved and new items are deduplicated against them. |
+| `recreate`        | **Complete rebuild.** Entirely recreates the repository with fresh data, removing all existing content and replacing it with newly generated items.                                                  |
 
 **Website Repository Creation Methods:**
 

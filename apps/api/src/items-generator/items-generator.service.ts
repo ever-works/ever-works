@@ -1,9 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import {
-    CreateItemsGeneratorDto,
-    ConfigDto,
-    OperationType,
-} from './dto/create-items-generator.dto';
+import { CreateItemsGeneratorDto, GenerationMethod } from './dto/create-items-generator.dto';
 import {
     AiItemGenerationService,
     SearchQueryGenerationService,
@@ -68,7 +64,7 @@ export class ItemsGeneratorService {
             } = existing;
 
             // reset existing if we are in recreate mode
-            if (createItemsGeneratorDto.operation === OperationType.RECREATE) {
+            if (createItemsGeneratorDto.generation_method === GenerationMethod.RECREATE) {
                 existingItems = [];
                 existingCategories = [];
                 existingTags = [];
@@ -86,7 +82,7 @@ export class ItemsGeneratorService {
             // 1.0. Prompt Comparison
             if (
                 existingConfig?.initial_prompt &&
-                createItemsGeneratorDto.operation === OperationType.CREATE_UPDATE &&
+                createItemsGeneratorDto.generation_method === GenerationMethod.CREATE_UPDATE &&
                 existingItems.length > 0
             ) {
                 this.logger.log(`[${slug}] 1.0. Prompt Comparison - Starting`);
