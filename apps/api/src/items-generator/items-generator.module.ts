@@ -9,7 +9,7 @@ import { SourceValidationService } from './steps/source-validation.service';
 import { DataAggregationService } from './steps/data-aggregation.service';
 import { CategoryProcessingService } from './steps/category-processing.service';
 import { MarkdownGenerationService } from './steps/markdown-generation.service';
-import { UrlExtractionService } from './steps/url-extraction.service';
+import { PromptProcessingService } from './steps/prompt-processing.service';
 import { PromptComparisonService } from './steps/prompt-comparison.service';
 import { AiService, SearchService } from './shared';
 import {
@@ -34,7 +34,7 @@ import {
 
     // Step services
     PromptComparisonService,
-    UrlExtractionService,
+    PromptProcessingService,
     AiItemGenerationService,
     SearchQueryGenerationService,
     WebPageRetrievalService,

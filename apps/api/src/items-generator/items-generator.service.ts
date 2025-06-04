@@ -10,7 +10,7 @@ import {
     DataAggregationService,
     CategoryProcessingService,
     MarkdownGenerationService,
-    UrlExtractionService,
+    PromptProcessingService,
     PromptComparisonService,
 } from './steps';
 import { Category, ItemData, Tag } from './dto';
@@ -23,7 +23,7 @@ export class ItemsGeneratorService {
 
     constructor(
         private readonly promptComparisonService: PromptComparisonService,
-        private readonly urlExtractionService: UrlExtractionService,
+        private readonly promptProcessingService: PromptProcessingService,
         private readonly aiItemGenerationService: AiItemGenerationService,
         private readonly searchQueryGenerationService: SearchQueryGenerationService,
         private readonly webPageRetrievalService: WebPageRetrievalService,
@@ -117,13 +117,28 @@ export class ItemsGeneratorService {
 
             const processedSourceUrls = new Set<string>();
 
-            // 1.1. Extract URLs from Prompt
-            this.logger.log(`[${slug}] 1.1. URL Extraction from Prompt - Starting`);
-            const { extractedUrls, rewrittenPrompt: prompt } =
-                await this.urlExtractionService.extractUrlsFromPrompt(
-                    slug,
-                    createItemsGeneratorDto.prompt,
+            // 1.1. Process Prompt (Extract URLs and Category Hints)
+            this.logger.log(`[${slug}] 1.1. Prompt Processing (URLs and Categories) - Starting`);
+            const {
+                extractedUrls,
+                suggestedCategories,
+                rewrittenPrompt: prompt,
+            } = await this.promptProcessingService.processPrompt(
+                slug,
+                createItemsGeneratorDto.prompt,
+            );
+
+            // Merge initial categories from DTO with categories extracted from prompt
+            const allInitialCategories = [
+                ...(createItemsGeneratorDto.initial_categories || []),
+                ...suggestedCategories,
+            ].filter((category, index, arr) => arr.indexOf(category) === index); // Remove duplicates
+
+            if (allInitialCategories.length > 0) {
+                this.logger.log(
+                    `[${slug}] Found ${allInitialCategories.length} initial categories: ${allInitialCategories.join(', ')}`,
                 );
+            }
 
             // Update the prompt in the DTO
             createItemsGeneratorDto.prompt = prompt;
@@ -242,6 +257,7 @@ export class ItemsGeneratorService {
                     aggregatedItems,
                     existingCategories || [],
                     existingTags || [],
+                    allInitialCategories,
                 );
 
             this.logger.log(

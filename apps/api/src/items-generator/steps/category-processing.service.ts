@@ -50,12 +50,16 @@ export class CategoryProcessingService {
      * Process items to generate categories and tags
      * @param createItemsGeneratorDto The DTO containing the prompt
      * @param extractedItems The items to categorize
+     * @param existingCategories Existing categories to maintain consistency
+     * @param existingTags Existing tags to maintain consistency
+     * @param initialCategories Categories provided initially (from DTO or prompt)
      */
     async processCategoriesAndTags(
         createItemsGeneratorDto: CreateItemsGeneratorDto,
         extractedItems: Partial<ItemData>[],
         existingCategories: Category[],
         existingTags: Tag[],
+        initialCategories: string[] = [],
     ) {
         const { slug, prompt } = createItemsGeneratorDto;
         this.logger.log(
@@ -76,6 +80,9 @@ export class CategoryProcessingService {
 
         existingCategories.forEach((category) => existingCategoriesSet.add(category.name));
         existingTags.forEach((tag) => existingTagsSet.add(tag.name));
+
+        // Add initial categories to existing categories for prioritization
+        initialCategories.forEach((category) => existingCategoriesSet.add(category));
 
         try {
             // Categorize items using AI
@@ -210,8 +217,10 @@ ${CATEGORIZE_PROMPT}
 
 <additional_instructions>
 - For consistency, consider using the existing categories and tags listed above when appropriate.
+- PRIORITIZE using existing categories that match the items' purposes.
 - You can create new categories or tags if the existing ones don't fit well.
 - Prioritize consistency across items that serve similar purposes.
+- If an item clearly fits into one of the existing categories, use that category rather than creating a new one.
 </additional_instructions>
 `.trim();
 

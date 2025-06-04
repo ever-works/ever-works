@@ -79,6 +79,11 @@ export class CreateItemsGeneratorDto {
     @IsOptional()
     @IsArray()
     @IsString({ each: true })
+    initial_categories?: string[];
+
+    @IsOptional()
+    @IsArray()
+    @IsString({ each: true })
     target_keywords?: string[];
 
     @IsOptional()
