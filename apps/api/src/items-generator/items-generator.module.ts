@@ -11,7 +11,7 @@ import { CategoryProcessingService } from './steps/category-processing.service';
 import { MarkdownGenerationService } from './steps/markdown-generation.service';
 import { PromptProcessingService } from './steps/prompt-processing.service';
 import { PromptComparisonService } from './steps/prompt-comparison.service';
-import { AiService, SearchService } from './shared';
+import { AiService, SearchService, NotionService } from './shared';
 import {
   SharedUtilsService,
   NewItemsExtractorService,
@@ -23,6 +23,7 @@ import {
     // Shared services
     AiService,
     SearchService,
+    NotionService,
 
     // Data aggregation shared services
     SharedUtilsService,
