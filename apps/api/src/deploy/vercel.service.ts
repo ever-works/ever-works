@@ -87,6 +87,8 @@ export class VercelService implements IDeployService {
             async () => {
                 console.log('Trying to update repository instead');
                 await this.websiteUpdateService.updateRepository(directory, user);
+                // add delay to make sure the update is done
+                await new Promise((resolve) => setTimeout(resolve, 5000));
                 await dispatchDeployAction();
             },
         ];
