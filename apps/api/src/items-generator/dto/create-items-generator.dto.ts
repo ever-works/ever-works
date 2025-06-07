@@ -113,6 +113,10 @@ export class CreateItemsGeneratorDto {
     config: ConfigDto = new ConfigDto();
 
     @IsOptional()
+    @IsString()
+    repository_description?: string;
+
+    @IsOptional()
     @IsEnum(GenerationMethod)
     generation_method?: GenerationMethod = GenerationMethod.CREATE_UPDATE;
 

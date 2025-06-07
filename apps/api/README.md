@@ -111,6 +111,7 @@ To generate data and create a GitHub repository for the directory, send a POST r
 | `name`                               | string   | `required` | -               | Display name for the directory                                                                            |
 | `prompt`                             | string   | `required` | -               | Description/prompt for item generation. URLs mentioned here will be automatically extracted and processed |
 | `company`                            | object   | `optional` | -               | Company information (see Company Object below)                                                            |
+| `repository_description`             | string   | `optional` | -               | Description for the generated github repository                                                                  |
 | `target_keywords`                    | string[] | `optional` | `[]`            | Keywords to focus the search and generation                                                               |
 | `initial_categories`                 | string[] | `optional` | `[]`            | Initial categories to assign to generated items                                                           |
 | `source_urls`                        | string[] | `optional` | `[]`            | Additional URLs to process for content extraction                                                         |

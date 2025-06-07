@@ -15,18 +15,20 @@ export class MarkdownGeneratorService {
 
     constructor(private readonly githubService: GithubService) {}
 
-    async initialize(directory: Directory, user: User) {
+    async initialize(directory: Directory, user: User, repository_description?: string) {
         const token = user.getGitToken();
+
+        const description = repository_description || directory.description;
 
         if (directory.organization) {
             await this.githubService.createEmptyRepoAsOrg(
                 directory.owner,
                 directory.slug,
-                directory.description,
+                description,
                 token,
             );
         } else {
-            await this.githubService.createEmptyRepo(directory.slug, directory.description, token);
+            await this.githubService.createEmptyRepo(directory.slug, description, token);
         }
 
         const markdownPath = await this.githubService.cloneOrPull(
@@ -61,7 +63,8 @@ export class MarkdownGeneratorService {
                 });
 
             let canCreatePR =
-                config.generation_method !== GenerationMethod.RECREATE && !!config.pr_update?.branch;
+                config.generation_method !== GenerationMethod.RECREATE &&
+                !!config.pr_update?.branch;
 
             // In case of re-creation:
             // Switch to the main branch and remove existing items files.
