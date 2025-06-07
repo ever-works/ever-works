@@ -9,8 +9,8 @@ import { itemDataWithCategoriesAndTagsSchema } from '../schemas/item-extraction.
 
 // Prompt for categorization
 const CATEGORIZE_PROMPT = `
-You are directory website builder and your task is to categorize items based on their features and descriptions.
-Take a look at task given by user as it may contain some hints about categories:
+You are a directory website builder and your task is to categorize items based on their features and descriptions.
+
 <task>
 {task}
 </task>
@@ -21,14 +21,33 @@ Here is the list of items to categorize:
 </items>
 
 <instructions>
-1. Assign each item to ONE appropriate category based on its primary function or purpose.
-2. Choose concise, descriptive category names that clearly represent groups of similar items.
-3. Assign 2-5 relevant tags to each item that highlight key features, technologies, or use cases.
-4. Ensure categories are consistent and at a similar level of abstraction.
-5. For software/tools, good category examples include: "Monitoring", "CI/CD", "Data Visualization", "Testing", etc.
-6. For tags, good examples include: "open-source", "real-time", "cloud-native", "enterprise", etc.
-7. Avoid overly broad categories like "Tools" or "Software" - be more specific.
-8. Avoid overly specific categories that would only contain 1-2 items.
+1. **Task Analysis**: First, analyze the task description above to determine your categorization approach:
+   - If the task contains specific categorization instructions, category preferences, or tag requirements, follow those guidelines
+   - If the task doesn't specify categorization details, analyze the items themselves to determine appropriate categories based on their types, functions, and purposes
+   - Look for any domain context, target audience, or industry focus mentioned in the task
+
+2. **Category Assignment**: Assign each item to ONE appropriate category based on:
+   - Any specific categories mentioned or implied in the task description
+   - If no specific categories are mentioned, group items by their primary function or purpose
+   - Ensure categories are consistent and at a similar level of abstraction
+   - For software/tools, good category examples include: "Monitoring", "CI/CD", "Data Visualization", "Testing", etc.
+
+3. **Tag Assignment**: Assign 2-5 relevant tags to each item that:
+   - Include any specific tags or keywords mentioned in the task description
+   - If no specific tags are mentioned, highlight key features, technologies, or use cases
+   - Align with the domain context provided in the task (if any)
+   - For tags, good examples include: "open-source", "real-time", "cloud-native", "enterprise", etc.
+
+4. **Fallback Categorization** (when task has no specific categorization guidance):
+   - Analyze the items to identify common patterns and group similar items together
+   - Create categories based on the primary function, technology type, or use case of the items
+   - Ensure categories are meaningful and help users find related items easily
+
+5. **General Guidelines**:
+   - Avoid overly broad categories like "Tools" or "Software" - be more specific
+   - Avoid overly specific categories that would only contain 1-2 items
+   - Maintain consistency across similar items
+   - If the task emphasizes certain aspects (e.g., "open-source", "enterprise"), reflect this in your categorization
 </instructions>
 `.trim();
 
