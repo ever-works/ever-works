@@ -10,6 +10,7 @@ import {
     Identifiable,
     ItemData,
     GenerationMethod,
+    CompanyDto,
 } from '../items-generator/dto';
 import { format } from 'date-fns';
 
@@ -161,8 +162,7 @@ export class DataGeneratorService {
                         this.getDefaultConfig({
                             generation_method: createItemsGeneratorDto.generation_method,
                             initial_prompt: createItemsGeneratorDto.prompt,
-                            company_name: createItemsGeneratorDto.company?.name,
-                            company_website: createItemsGeneratorDto.company?.website,
+                            ...this.withCompanyConfig(createItemsGeneratorDto.company),
                             ...createItemsGeneratorDto.config,
                         }),
                     ),
@@ -180,8 +180,7 @@ export class DataGeneratorService {
                         this.getDefaultConfig({
                             ...preloadedConfig,
                             generation_method: createItemsGeneratorDto.generation_method,
-                            company_name: createItemsGeneratorDto.company?.name,
-                            company_website: createItemsGeneratorDto.company?.website,
+                            ...this.withCompanyConfig(createItemsGeneratorDto.company),
                             ...createItemsGeneratorDto.config,
                             pr_update: {
                                 branch: newBranchName,
@@ -342,6 +341,15 @@ export class DataGeneratorService {
             map.set(item.id, item);
         }
         return Array.from(map.values());
+    }
+
+    private withCompanyConfig(company?: CompanyDto) {
+        return company
+            ? {
+                  company_name: company.name,
+                  company_website: company.website,
+              }
+            : {};
     }
 
     private getDefaultConfig(additionalConfig?: Partial<IDataConfig>): IDataConfig {

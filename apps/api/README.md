@@ -55,6 +55,10 @@ If you want to init directory for organization, pass optional `owner` field:
     "slug": "awesome-time-tracking",
     "name": "Awesome Time Tracking",
     "prompt": "Generate list of best time tracking software for business. Include both open-source and commercial solutions. You can check these URLs for reference: https://github.com/awesome-lists/awesome-time-tracking https://alternativeto.net/category/productivity/time-tracking/",
+    "company": {
+        "name": "Acme Corporation",
+        "website": "https://acme.com"
+    },
     "target_keywords": [
         "time tracking",
         "productivity",
@@ -87,12 +91,20 @@ If you want to init directory for organization, pass optional `owner` field:
 | `slug`                               | string   | `required` | -               | Unique identifier for the directory                                                                       |
 | `name`                               | string   | `required` | -               | Display name for the directory                                                                            |
 | `prompt`                             | string   | `required` | -               | Description/prompt for item generation. URLs mentioned here will be automatically extracted and processed |
+| `company`                            | object   | `optional` | -               | Company information (see Company Object below)                                                           |
 | `target_keywords`                    | string[] | `optional` | `[]`            | Keywords to focus the search and generation                                                               |
 | `source_urls`                        | string[] | `optional` | `[]`            | Additional URLs to process for content extraction                                                         |
 | `generation_method`                  | enum     | `optional` | `create-update` | Generation method: `create-update` or `recreate` (see Generation Methods below)                           |
 | `update_with_pull_request`           | boolean  | `optional` | `true`          | Whether to update the repository with a pull request or directly commit the changes to main branch.       |
 | `website_repository_creation_method` | enum     | `optional` | `duplicate`     | Method for creating the website repository: `duplicate`, `fork`, or `create-using-template` (see below)   |
 | `config`                             | object   | `optional` | -               | Advanced configuration options                                                                            |
+
+**Company Object:**
+
+| Field     | Type   | Required                        | Description                                                                    |
+| --------- | ------ | ------------------------------- | ------------------------------------------------------------------------------ |
+| `name`    | string | `required` (when company provided) | Company name that will be written to config.yml                               |
+| `website` | string | `required` (when company provided) | Company website URL (must be valid HTTP/HTTPS URL) that will be written to config.yml |
 
 **Configuration Options:**
 
