@@ -236,7 +236,6 @@ ${CATEGORIZE_PROMPT}
 
 <additional_instructions>
 - For consistency, consider using the existing categories and tags listed above when appropriate.
-- PRIORITIZE using existing categories that match the items' purposes.
 - You can create new categories or tags if the existing ones don't fit well.
 - Prioritize consistency across items that serve similar purposes.
 - If an item clearly fits into one of the existing categories, use that category rather than creating a new one.
