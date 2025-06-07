@@ -4,17 +4,31 @@ Built with NestJS.
 
 ## How to run
 
-1. Clone https://github.com/ever-co/ever-works
+### 1. Clone the repository
 
-2. Create `.env` file (based on `.env.example`)
+Make sure you have [pnpm](https://pnpm.io/) installed, then clone the repository:
 
-3. Run application using (cd to root of the whole repo, not backend app):
+```sh
+git clone https://github.com/ever-co/ever-works.git
+```
+
+### 2. Create `.env` file
+
+Navigate to the `apps/api` directory and create a `.env` file. You can use the example file as a starting point:
+
+```shell
+cp .env.example .env
+```
+
+### 3. Run application using (cd to root of the whole repo, not backend app):
 
 ```sh
 pnpm dev
 ```
 
-4. Create a directory object (in memory for now) using a request to `http://localhost:3001/directories`
+### 4. Create a directory object
+
+To create a new directory object, send a POST request to `http://localhost:3001/directories` with the following JSON body:
 
 ```json
 {
@@ -24,8 +38,9 @@ pnpm dev
 }
 ```
 
-By default it will create directory with currently authenticated GitHub user as an owner.
-If you want to init directory for organization, pass optional `owner` field:
+By default, the directory will be created with the currently authenticated GitHub user as the owner.
+
+If you want to initialize the directory within an organization, provide the optional `owner` field:
 
 ```json
 {
@@ -36,7 +51,9 @@ If you want to init directory for organization, pass optional `owner` field:
 }
 ```
 
-5. Generate GitHub repositories using a request to `http://localhost:3001/generate`
+### 5. Generate data and GitHub repositories
+
+To generate data and create a GitHub repository for the directory, send a POST request to `http://localhost:3001/generate` with the following JSON body:
 
 **Basic Request:**
 
@@ -66,6 +83,7 @@ If you want to init directory for organization, pass optional `owner` field:
         "timesheet",
         "work hours"
     ],
+    "initial_categories": ["Open Source", "Commercial"],
     "source_urls": [
         "https://github.com/awesome-lists/awesome-time-tracking",
         "https://alternativeto.net/category/productivity/time-tracking/"
@@ -79,6 +97,7 @@ If you want to init directory for organization, pass optional `owner` field:
         "max_pages_to_process": 150,
         "relevance_threshold_content": 0.8,
         "min_content_length_for_extraction": 300,
+        "prompt_comparison_confidence_threshold": 0.6,
         "ai_first_generation_enabled": true
     }
 }
@@ -91,8 +110,9 @@ If you want to init directory for organization, pass optional `owner` field:
 | `slug`                               | string   | `required` | -               | Unique identifier for the directory                                                                       |
 | `name`                               | string   | `required` | -               | Display name for the directory                                                                            |
 | `prompt`                             | string   | `required` | -               | Description/prompt for item generation. URLs mentioned here will be automatically extracted and processed |
-| `company`                            | object   | `optional` | -               | Company information (see Company Object below)                                                           |
+| `company`                            | object   | `optional` | -               | Company information (see Company Object below)                                                            |
 | `target_keywords`                    | string[] | `optional` | `[]`            | Keywords to focus the search and generation                                                               |
+| `initial_categories`                 | string[] | `optional` | `[]`            | Initial categories to assign to generated items                                                           |
 | `source_urls`                        | string[] | `optional` | `[]`            | Additional URLs to process for content extraction                                                         |
 | `generation_method`                  | enum     | `optional` | `create-update` | Generation method: `create-update` or `recreate` (see Generation Methods below)                           |
 | `update_with_pull_request`           | boolean  | `optional` | `true`          | Whether to update the repository with a pull request or directly commit the changes to main branch.       |
@@ -101,21 +121,22 @@ If you want to init directory for organization, pass optional `owner` field:
 
 **Company Object:**
 
-| Field     | Type   | Required                        | Description                                                                    |
-| --------- | ------ | ------------------------------- | ------------------------------------------------------------------------------ |
-| `name`    | string | `required` (when company provided) | Company name that will be written to config.yml                               |
+| Field     | Type   | Required                           | Description                                                                           |
+| --------- | ------ | ---------------------------------- | ------------------------------------------------------------------------------------- |
+| `name`    | string | `required` (when company provided) | Company name that will be written to config.yml                                       |
 | `website` | string | `required` (when company provided) | Company website URL (must be valid HTTP/HTTPS URL) that will be written to config.yml |
 
 **Configuration Options:**
 
-| Field                               | Type    | Default | Range    | Description                                         |
-| ----------------------------------- | ------- | ------- | -------- | --------------------------------------------------- |
-| `max_search_queries`                | number  | 10      | 1-100    | Maximum number of search queries to execute         |
-| `max_results_per_query`             | number  | 20      | 1-100    | Maximum results to process per search query         |
-| `max_pages_to_process`              | number  | 100     | 1-1000   | Maximum web pages to process for content extraction |
-| `relevance_threshold_content`       | number  | 0.75    | 0.01-1.0 | Minimum relevance score for content filtering       |
-| `min_content_length_for_extraction` | number  | 300     | 0+       | Minimum content length required for item extraction |
-| `ai_first_generation_enabled`       | boolean | true    | -        | Enable AI-first item generation before web search   |
+| Field                                    | Type    | Default | Range    | Description                                                                                       |
+| ---------------------------------------- | ------- | ------- | -------- | ------------------------------------------------------------------------------------------------- |
+| `max_search_queries`                     | number  | 10      | 1-100    | Maximum number of search queries to execute                                                       |
+| `max_results_per_query`                  | number  | 20      | 1-100    | Maximum results to process per search query                                                       |
+| `max_pages_to_process`                   | number  | 100     | 1-1000   | Maximum web pages to process for content extraction                                               |
+| `relevance_threshold_content`            | number  | 0.75    | 0.01-1.0 | Minimum relevance score for content filtering                                                     |
+| `min_content_length_for_extraction`      | number  | 300     | 0+       | Minimum content length required for item extraction                                               |
+| `ai_first_generation_enabled`            | boolean | true    | -        | Enable AI-first item generation before web search                                                 |
+| `prompt_comparison_confidence_threshold` | number  | 0.5     | 0.01-1.0 | Minimum confidence score for prompt comparison (used when `generation_method` is `create-update`) |
 
 **Generation Methods:**
 
@@ -146,21 +167,10 @@ If you want to init directory for organization, pass optional `owner` field:
 
 > This is a long-running task that may take 5-15 minutes depending on the configuration and number of items processed. The system uses intelligent batching and rate limiting to ensure reliable processing.
 
-6. Deploy to Vercel (optional) using a request to `http://localhost:3001/deploy/awesome-time-tracking/vercel`
+### 6. Update website repository
 
-```json
-// Optional:
-{
-    "GITHUB_TOKEN": "gh_sqjhqwghsydghsydfgsdyfgdsyf",
-    "VERCEL_TOKEN": "e21qwyu2ewgfcuydesgf7udsdsfds"
-}
-```
-
-> Request body is optional for now, by default it will take values from `.env` during development. Don't forget to change it before going to production, because it will save these tokens inside user's gh actions secrets...
-
-> This endpoint will trigger GitHub Actions Workflow inside website repository. Important thing to note is that we cannot reuse `GITHUB_TOKEN` from github actions workflow because it has short lifetime while our website needs long living github token to make periodically clones, pulls etc.
-
-7. Update website repository (optional) using a request to `http://localhost:3001/update-website/{slug}`
+To update an existing website repository with the latest changes from the template repository, send a POST request to `http://localhost:3001/update-website/{slug}`.
+the `slug` parameter should match the directory slug used when creating the website repository.
 
 This endpoint updates an existing website repository by pulling the latest changes from the template repository. It automatically detects the original creation method and applies the appropriate update strategy.
 
@@ -230,8 +240,54 @@ The service automatically tries different update strategies in order of preferen
 - The website repository must exist (created via `/generate` endpoint)
 - Valid GitHub authentication token in environment
 
-## Prompt used to generate awesome time tracking in ever works org
+### 7. Deploy to Vercel
+
+To deploy the website repository to Vercel, send a POST request to `http://localhost:3001/deploy/{slug}/vercel`.
+the `slug` parameter should match the directory slug used when creating the website repository.
+**Request:**
 
 ```
-Please build a directory of time tracking software for business. Split it into 2 categories: open-source and commercial.
+POST /deploy/awesome-time-tracking/vercel
+```
+
+**URL Parameters:**
+
+| Parameter | Type   | Required   | Description                                    |
+| --------- | ------ | ---------- | ---------------------------------------------- |
+| `slug`    | string | `required` | The slug of the directory/repository to deploy |
+
+**Request Body:**
+
+```json
+// Optional:
+{
+    "GITHUB_TOKEN": "gh_sqjhqwghsydghsydfgsdyfgdsyf",
+    "VERCEL_TOKEN": "e21qwyu2ewgfcuydesgf7udsdsfds"
+}
+```
+
+> Request body is optional for now, by default it will take values from `.env` during development. Don't forget to change it before going to production, because it will save these tokens inside user's gh actions secrets...
+
+> This endpoint will trigger GitHub Actions Workflow inside website repository. Important thing to note is that we cannot reuse `GITHUB_TOKEN` from github actions workflow because it has short lifetime while our website needs long living github token to make periodically clones, pulls etc.
+
+### Example Prompt used to generate awesome time tracking in ever works org
+
+```json
+{
+    "slug": "awesome-time-tracking",
+    "name": "Awesome Time Tracking",
+    "prompt": "Generate list of best time tracking software for business. Include both open-source and commercial solutions. You can check these URLs for reference: https://github.com/awesome-lists/awesome-time-tracking https://alternativeto.net/category/productivity/time-tracking/",
+    "company": {
+        "name": "Ever Co.",
+        "website": "https://ever.co"
+    },
+    "target_keywords": [
+        "time tracking",
+        "productivity",
+        "project management",
+        "timesheet",
+        "work hours"
+    ],
+    "initial_categories": ["Open Source", "Commercial"]
+}
 ```
