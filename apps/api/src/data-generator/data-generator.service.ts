@@ -150,7 +150,10 @@ export class DataGeneratorService {
             /**
              * rewrite meta files only if we are creating new repository or we are recreating it
              */
-            if (!existed || createItemsGeneratorDto.generation_method === GenerationMethod.RECREATE) {
+            if (
+                !existed ||
+                createItemsGeneratorDto.generation_method === GenerationMethod.RECREATE
+            ) {
                 promises.push(
                     data.writeReadme(this.getDefaultReadme(directory)),
                     data.writeLicense(this.getLicense()),
@@ -158,6 +161,9 @@ export class DataGeneratorService {
                         this.getDefaultConfig({
                             generation_method: createItemsGeneratorDto.generation_method,
                             initial_prompt: createItemsGeneratorDto.prompt,
+                            company_name: createItemsGeneratorDto.company?.name,
+                            company_website: createItemsGeneratorDto.company?.website,
+                            ...createItemsGeneratorDto.config,
                         }),
                     ),
                     data.writeMarkdownTemplate(this.getHeader(directory), this.getFooter()),
@@ -174,6 +180,9 @@ export class DataGeneratorService {
                         this.getDefaultConfig({
                             ...preloadedConfig,
                             generation_method: createItemsGeneratorDto.generation_method,
+                            company_name: createItemsGeneratorDto.company?.name,
+                            company_website: createItemsGeneratorDto.company?.website,
+                            ...createItemsGeneratorDto.config,
                             pr_update: {
                                 branch: newBranchName,
                                 title: prTitle,

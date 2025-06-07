@@ -12,6 +12,7 @@ type PRUpdate = {
 };
 export interface IDataConfig {
     company_name?: string;
+    company_website?: string;
     content_table?: boolean;
     item_name?: string;
     items_name?: string;

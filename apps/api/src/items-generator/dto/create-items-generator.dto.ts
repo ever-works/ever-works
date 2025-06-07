@@ -24,6 +24,16 @@ export enum WebsiteRepositoryCreationMethod {
     CREATE_USING_TEMPLATE = 'create-using-template',
 }
 
+export class CompanyDto {
+    @IsString()
+    @IsNotEmpty()
+    name: string;
+
+    @IsString()
+    @IsUrl({ protocols: ['http', 'https'], require_tld: true })
+    website: string;
+}
+
 export class ConfigDto {
     @IsOptional()
     @IsInt()
@@ -75,6 +85,11 @@ export class CreateItemsGeneratorDto {
     @IsString()
     @IsNotEmpty()
     prompt: string;
+
+    @IsOptional()
+    @ValidateNested()
+    @Type(() => CompanyDto)
+    company?: CompanyDto;
 
     @IsOptional()
     @IsArray()
