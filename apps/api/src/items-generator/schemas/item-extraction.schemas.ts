@@ -21,7 +21,6 @@ export const itemDataSchema = baseSchema.extend({
         ),
     featured: z
         .boolean()
-        .optional()
         .default(false)
         .describe(
             "Determine if the item warrants a 'featured' status based on prominence, recommendations, or significance. Default to false.",
