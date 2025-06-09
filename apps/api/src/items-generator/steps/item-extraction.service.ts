@@ -19,6 +19,8 @@ The **topic** of this directory is:
 {topic}
 </topic>
 
+{featured_hints_section}
+
 From the following web page content, identify and extract information for one or more distinct items (tools, resources, libraries, articles, etc.) that are **directly and highly relevant to the specified topic**.
 
 Web Page Content:
@@ -30,7 +32,7 @@ For each identified item that directly relates to the topic:
 1. Provide its canonical **name**.
 2. Write a concise and short **description** highlighting its specific relevance to the topic.
 3. Determine its most direct and canonical **source_url** (homepage, documentation, repository, etc.). Do not use URLs for blog posts merely mentioning the item unless the post *is* the primary resource. The URL must be valid and specific to the item.
-4. **featured**: A boolean indicating if this item is highly prominent or recommended (true/false). Default to false if unsure.
+4. **featured**: A boolean indicating if this item should be highlighted or given special prominence (true/false). Consider the featured item guidelines above when making this determination. Default to false if unsure.
 
 **Critical Filter:** Only extract items that are *directly* relevant to the specified topic.
 For example, if the topic is "Vector Databases", do not extract a general-purpose database or a library for a specific programming language unless it's explicitly a vector database client/tool directly supporting the core topic.
@@ -89,6 +91,7 @@ export class ItemExtractionService {
         relevantPages: WebPageData[],
         topic: string,
         config: Required<ConfigDto>,
+        featuredItemHints: string[] = [],
     ): Promise<ItemData[]> {
         if (!this.llm.apiKey) {
             this.logger.warn(
@@ -115,6 +118,9 @@ export class ItemExtractionService {
         if (pagesWithSufficientContent.length === 0) {
             return [];
         }
+
+        // Generate featured hints section for the prompt
+        const featuredHintsSection = this.generateFeaturedHintsSection(featuredItemHints);
 
         // Define the item extraction function
         const extractItemsFromPage = async (page: WebPageData): Promise<ItemData[]> => {
@@ -164,6 +170,7 @@ export class ItemExtractionService {
                                 const chunkResult = (await extractionChain.invoke({
                                     topic: topic,
                                     page_content: chunk,
+                                    featured_hints_section: featuredHintsSection,
                                 })) as { items?: Partial<ItemData>[] };
 
                                 return chunkResult?.items || [];
@@ -226,6 +233,7 @@ export class ItemExtractionService {
                     const extractionResult = (await extractionChain.invoke({
                         topic: topic,
                         page_content: page.raw_content,
+                        featured_hints_section: featuredHintsSection,
                     })) as { items?: Partial<ItemData>[] };
 
                     if (
@@ -314,5 +322,24 @@ export class ItemExtractionService {
             `[${slug}] Item extraction complete. Extracted ${uniqueExtractedItems.length} unique items from ${pagesWithSufficientContent.length} pages.`,
         );
         return uniqueExtractedItems;
+    }
+
+    /**
+     * Generate the featured hints section for the prompt
+     * @param featuredItemHints Array of featured item hints
+     * @returns Formatted section for the prompt
+     */
+    private generateFeaturedHintsSection(featuredItemHints: string[]): string {
+        if (!featuredItemHints || featuredItemHints.length === 0) {
+            return '';
+        }
+
+        return `
+**Featured Item Guidelines:**
+The user has specified the following guidelines for which items should be marked as featured (highlighted):
+${featuredItemHints.map(hint => `- ${hint}`).join('\n')}
+
+When determining the 'featured' status for items, consider these guidelines carefully. Items that match these criteria should be marked as featured=true.
+`;
     }
 }

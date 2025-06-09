@@ -16,8 +16,9 @@ Your task:
 1. Extract all URLs mentioned in the prompt.
 2. Extract categories that are explicitly mentioned in the prompt that should be considered for categorization.
 3. Extract priority categories that should appear first in the final output based on priority indicators in the prompt.
-4. Rewrite the prompt without the URLs but preserve the context and meaning.
-5. Return the extracted URLs, explicitly mentioned categories, priority categories, and the rewritten prompt.
+4. Extract featured item specifications that indicate which types of items should be marked as featured/highlighted.
+5. Rewrite the prompt without the URLs but preserve the context and meaning.
+6. Return the extracted URLs, explicitly mentioned categories, priority categories, featured item hints, and the rewritten prompt.
 
 Guidelines for URL extraction:
 - Only extract URLs that are explicitly mentioned in the prompt
@@ -74,6 +75,38 @@ Examples of what NOT to extract as priority categories:
 - "I want categories like Monitoring, CI/CD, and Testing" (no priority indicators)
 - "organize these tools into categories" (no specific priority mentioned)
 - "categorize as open-source and commercial" (equal treatment, no priority)
+
+Guidelines for featured item extraction:
+- Look for specifications about which items should be highlighted, featured, or given special prominence
+- Extract featured item hints mentioned with phrases like:
+  * "highlight X items" or "feature X tools"
+  * "X should be featured" or "showcase X"
+  * "emphasize X solutions" or "spotlight X"
+  * "X are most important" or "key X items"
+  * "top X tools" or "best X solutions"
+  * "leading X platforms" or "premier X services"
+  * "enterprise X" or "commercial X" (when context suggests prominence)
+  * "popular X" or "widely used X"
+  * "recommended X" or "preferred X"
+- Extract company-specific items when mentioned (e.g., "include our company's tools", "feature our products")
+- Extract specific item names that should be featured (e.g., "make sure to highlight Docker and Kubernetes")
+- Extract item characteristics that indicate featuring (e.g., "feature open-source solutions", "highlight enterprise tools")
+- Do NOT extract general descriptive terms that don't indicate special prominence
+- Focus on specifications that clearly indicate certain items should stand out from others
+
+Examples of what TO extract as featured item hints:
+- "Feature the top open-source monitoring tools"
+- "Highlight enterprise solutions"
+- "Showcase Docker and Kubernetes prominently"
+- "Our company's products should be featured"
+- "Emphasize the most popular CI/CD tools"
+- "Spotlight leading cloud platforms"
+- "Make sure to highlight recommended solutions"
+
+Examples of what NOT to extract as featured item hints:
+- "I want monitoring tools" (no prominence indication)
+- "include various development tools" (no special highlighting)
+- "tools for testing and deployment" (descriptive, not prominence-focused)
 `.trim();
 
 // Output schema for validation
@@ -84,7 +117,14 @@ const promptProcessingOutputSchema = z.object({
         .describe('List of category hints extracted from the prompt'),
     priorityCategories: z
         .array(z.string())
-        .describe('List of categories that should appear first in the final output, extracted from priority indicators in the prompt'),
+        .describe(
+            'List of categories that should appear first in the final output, extracted from priority indicators in the prompt',
+        ),
+    featuredItemHints: z
+        .array(z.string())
+        .describe(
+            'List of specifications about which items should be featured/highlighted, extracted from prominence indicators in the prompt',
+        ),
     rewrittenPrompt: z
         .string()
         .describe('The prompt rewritten without URLs but preserving context'),
@@ -100,10 +140,10 @@ export class PromptProcessingService {
     }
 
     /**
-     * Extract URLs, category hints, and priority categories from a prompt and rewrite the prompt without URLs
+     * Extract URLs, category hints, priority categories, and featured item hints from a prompt and rewrite the prompt without URLs
      * @param slug The slug for logging purposes
      * @param prompt The prompt to extract URLs and categories from
-     * @returns Object containing extracted URLs, suggested categories, priority categories, and rewritten prompt
+     * @returns Object containing extracted URLs, suggested categories, priority categories, featured item hints, and rewritten prompt
      */
     async processPrompt(
         slug: string,
@@ -112,11 +152,18 @@ export class PromptProcessingService {
         extractedUrls: string[];
         suggestedCategories: string[];
         priorityCategories: string[];
+        featuredItemHints: string[];
         rewrittenPrompt: string;
     }> {
         if (!prompt) {
             this.logger.warn(`[${slug}] No prompt provided for processing`);
-            return { extractedUrls: [], suggestedCategories: [], priorityCategories: [], rewrittenPrompt: prompt || '' };
+            return {
+                extractedUrls: [],
+                suggestedCategories: [],
+                priorityCategories: [],
+                featuredItemHints: [],
+                rewrittenPrompt: prompt || '',
+            };
         }
 
         // Use AI for sophisticated extraction of URLs and categories
@@ -131,20 +178,28 @@ export class PromptProcessingService {
                     prompt,
                 });
 
-            const { extractedUrls, suggestedCategories, priorityCategories, rewrittenPrompt } = result;
+            const {
+                extractedUrls,
+                suggestedCategories,
+                priorityCategories,
+                featuredItemHints,
+                rewrittenPrompt,
+            } = result;
 
             this.logger.log(
-                `[${slug}] AI extracted ${extractedUrls.length} URLs, ${suggestedCategories.length} category hints, and ${priorityCategories.length} priority categories from prompt`,
+                `[${slug}] AI extracted ${extractedUrls.length} URLs, ${suggestedCategories.length} category hints, ${priorityCategories.length} priority categories, and ${featuredItemHints.length} featured item hints from prompt`,
             );
 
             const validatedUrls = this.validateUrls(extractedUrls);
             const cleanedCategories = this.cleanCategories(suggestedCategories);
             const cleanedPriorityCategories = this.cleanCategories(priorityCategories);
+            const cleanedFeaturedItemHints = this.cleanCategories(featuredItemHints);
 
             return {
                 extractedUrls: validatedUrls,
                 suggestedCategories: cleanedCategories,
                 priorityCategories: cleanedPriorityCategories,
+                featuredItemHints: cleanedFeaturedItemHints,
                 rewrittenPrompt: validatedUrls.length > 0 ? rewrittenPrompt || prompt : prompt,
             };
         } catch (error) {
@@ -161,6 +216,7 @@ export class PromptProcessingService {
                 extractedUrls: fallbackUrls,
                 suggestedCategories: [],
                 priorityCategories: [],
+                featuredItemHints: [],
                 rewrittenPrompt,
             };
         }

@@ -117,14 +117,15 @@ export class ItemsGeneratorService {
 
             const processedSourceUrls = new Set<string>();
 
-            // 1.1. Process Prompt (Extract URLs, Categories, and Priority Categories)
+            // 1.1. Process Prompt (Extract URLs, Categories, Priorities, and Featured Item Hints)
             this.logger.log(
-                `[${slug}] 1.1. Prompt Processing (URLs, Categories, and Priorities) - Starting`,
+                `[${slug}] 1.1. Prompt Processing (URLs, Categories, Priorities, and Featured Hints) - Starting`,
             );
             const {
                 extractedUrls,
                 suggestedCategories,
                 priorityCategories: promptPriorityCategories,
+                featuredItemHints,
                 rewrittenPrompt: prompt,
             } = await this.promptProcessingService.processPrompt(
                 slug,
@@ -157,6 +158,12 @@ export class ItemsGeneratorService {
                 );
             }
 
+            if (featuredItemHints.length > 0) {
+                this.logger.log(
+                    `[${slug}] Found ${featuredItemHints.length} featured item hints: ${featuredItemHints.join(', ')}`,
+                );
+            }
+
             // Update the prompt in the DTO
             createItemsGeneratorDto.prompt = prompt;
 
@@ -180,6 +187,7 @@ export class ItemsGeneratorService {
                     name,
                     prompt,
                     target_keywords,
+                    featuredItemHints,
                 );
                 this.logger.log(`[${slug}] AI generated ${initialAiItems.length} initial items.`);
             }
@@ -243,6 +251,7 @@ export class ItemsGeneratorService {
                     relevantPages,
                     prompt,
                     config,
+                    featuredItemHints,
                 );
             this.logger.log(
                 `[${slug}] Extracted ${extractedWebItems.length} potential items from web pages.`,

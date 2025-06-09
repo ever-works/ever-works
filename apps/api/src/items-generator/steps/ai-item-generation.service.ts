@@ -7,48 +7,47 @@ import { slugifyText } from '../utils/text.utils';
 import { AiService } from '../shared';
 import { ItemData } from '../dto';
 import {
-  extractedItemsSchema,
-  itemDataSchema,
-  promptUnderstandingAssessmentSchema,
+    extractedItemsSchema,
+    itemDataSchema,
+    promptUnderstandingAssessmentSchema,
 } from '../schemas/item-extraction.schemas';
 
 @Injectable()
 export class AiItemGenerationService {
-  private readonly logger = new Logger(AiItemGenerationService.name);
-  private llm: ChatOpenAI;
+    private readonly logger = new Logger(AiItemGenerationService.name);
+    private llm: ChatOpenAI;
 
-  constructor(private readonly aiService: AiService) {
-    this.llm = this.aiService.createLlmWithTemperature(0.3);
-  }
-
-  async generateInitialItemsWithAI(
-    slug: string,
-    topicName: string,
-    topicDescription: string,
-    targetKeywords: string[] | undefined,
-  ): Promise<ItemData[]> {
-    this.logger.log(
-      `[${slug}] AI-First Item Generation - Starting for topic: ${topicName}`,
-    );
-    const allGeneratedItems: ItemData[] = [];
-
-    if (!this.llm.apiKey) {
-      this.logger.warn(
-        `[${slug}] OpenAI API Key not configured. Skipping AI-first item generation.`,
-      );
-      return [];
+    constructor(private readonly aiService: AiService) {
+        this.llm = this.aiService.createLlmWithTemperature(0.3);
     }
 
-    // 1. Assess Prompt Understanding
-    const understandingAssessmentFunction = {
-      name: 'assess_prompt_understanding_for_item_generation',
-      description:
-        'Assesses if the provided topic, description, and keywords are clear and specific enough to generate a meaningful list of items for a Directory website.',
-      parameters: zodToJsonSchema(promptUnderstandingAssessmentSchema),
-    };
+    async generateInitialItemsWithAI(
+        slug: string,
+        topicName: string,
+        topicDescription: string,
+        targetKeywords: string[] | undefined,
+        featuredItemHints: string[] = [],
+    ): Promise<ItemData[]> {
+        this.logger.log(`[${slug}] AI-First Item Generation - Starting for topic: ${topicName}`);
+        const allGeneratedItems: ItemData[] = [];
 
-    const understandingPrompt = PromptTemplate.fromTemplate(
-      `You are an AI assistant helping to curate a "Directory website".
+        if (!this.llm.apiKey) {
+            this.logger.warn(
+                `[${slug}] OpenAI API Key not configured. Skipping AI-first item generation.`,
+            );
+            return [];
+        }
+
+        // 1. Assess Prompt Understanding
+        const understandingAssessmentFunction = {
+            name: 'assess_prompt_understanding_for_item_generation',
+            description:
+                'Assesses if the provided topic, description, and keywords are clear and specific enough to generate a meaningful list of items for a Directory website.',
+            parameters: zodToJsonSchema(promptUnderstandingAssessmentSchema),
+        };
+
+        const understandingPrompt = PromptTemplate.fromTemplate(
+            `You are an AI assistant helping to curate a "Directory website".
 Topic: "{topicName}"
 Description: "{topicDescription}"
 Keywords: "{target_keywords_string}"
@@ -64,72 +63,72 @@ Consider:
 - Is the scope clear (not too broad, not too narrow without context)?
 - Are there any ambiguities that would make item generation difficult or likely to produce irrelevant results?
 `,
-    );
-
-    const understandingChain = understandingPrompt
-      .pipe(
-        this.llm.bind({
-          functions: [understandingAssessmentFunction],
-          function_call: {
-            name: 'assess_prompt_understanding_for_item_generation',
-          },
-        }),
-      )
-      .pipe(new JsonOutputFunctionsParser());
-
-    try {
-      const assessment = (await understandingChain.invoke({
-        topicName,
-        topicDescription,
-        target_keywords_string: targetKeywords
-          ? targetKeywords.join(', ')
-          : 'N/A',
-      })) as {
-        can_proceed: boolean;
-        reason_if_cannot_proceed: string | null;
-        suggested_clarifications?: string[];
-      };
-
-      if (!assessment.can_proceed) {
-        this.logger.warn(
-          `[${slug}] AI cannot confidently proceed with item generation for topic "${topicName}" due to prompt clarity. Reason: ${assessment.reason_if_cannot_proceed || 'No specific reason provided.'}`,
         );
-        if (
-          assessment.suggested_clarifications &&
-          assessment.suggested_clarifications.length > 0
-        ) {
-          this.logger.warn(
-            `[${slug}] AI suggested clarifications: ${assessment.suggested_clarifications.join('; ')}`,
-          );
+
+        const understandingChain = understandingPrompt
+            .pipe(
+                this.llm.bind({
+                    functions: [understandingAssessmentFunction],
+                    function_call: {
+                        name: 'assess_prompt_understanding_for_item_generation',
+                    },
+                }),
+            )
+            .pipe(new JsonOutputFunctionsParser());
+
+        try {
+            const assessment = (await understandingChain.invoke({
+                topicName,
+                topicDescription,
+                target_keywords_string: targetKeywords ? targetKeywords.join(', ') : 'N/A',
+            })) as {
+                can_proceed: boolean;
+                reason_if_cannot_proceed: string | null;
+                suggested_clarifications?: string[];
+            };
+
+            if (!assessment.can_proceed) {
+                this.logger.warn(
+                    `[${slug}] AI cannot confidently proceed with item generation for topic "${topicName}" due to prompt clarity. Reason: ${assessment.reason_if_cannot_proceed || 'No specific reason provided.'}`,
+                );
+                if (
+                    assessment.suggested_clarifications &&
+                    assessment.suggested_clarifications.length > 0
+                ) {
+                    this.logger.warn(
+                        `[${slug}] AI suggested clarifications: ${assessment.suggested_clarifications.join('; ')}`,
+                    );
+                }
+                return []; // Do not proceed with item generation
+            }
+
+            this.logger.log(
+                `[${slug}] AI assessment: Prompt for topic "${topicName}" is clear. Proceeding with item generation.`,
+            );
+        } catch (error) {
+            this.logger.error(
+                `[${slug}] Error during AI prompt understanding assessment for topic "${topicName}": ${error.message}. Proceeding with caution (will attempt item generation).`,
+                error.stack,
+            );
+            // If the understanding check itself fails, we log the error but still attempt item generation.
+            // This is a fallback in case the assessment mechanism has an issue.
         }
-        return []; // Do not proceed with item generation
-      }
 
-      this.logger.log(
-        `[${slug}] AI assessment: Prompt for topic "${topicName}" is clear. Proceeding with item generation.`,
-      );
-    } catch (error) {
-      this.logger.error(
-        `[${slug}] Error during AI prompt understanding assessment for topic "${topicName}": ${error.message}. Proceeding with caution (will attempt item generation).`,
-        error.stack,
-      );
-      // If the understanding check itself fails, we log the error but still attempt item generation.
-      // This is a fallback in case the assessment mechanism has an issue.
-    }
+        // 2. Proceed with Item Generation if understanding is sufficient (or assessment failed)
+        const itemGenerationFunction = {
+            name: 'generate_awesome_list_items_directly',
+            description:
+                'Generates a list of distinct items (tools, resources, libraries, articles, etc.) that are highly relevant to the directory website topic, including their details.',
+            parameters: zodToJsonSchema(extractedItemsSchema),
+        };
 
-    // 2. Proceed with Item Generation if understanding is sufficient (or assessment failed)
-    const itemGenerationFunction = {
-      name: 'generate_awesome_list_items_directly',
-      description:
-        'Generates a list of distinct items (tools, resources, libraries, articles, etc.) that are highly relevant to the directory website topic, including their details.',
-      parameters: zodToJsonSchema(extractedItemsSchema),
-    };
-
-    const generationPrompt = PromptTemplate.fromTemplate(
-      `You are an expert curator and technical writer tasked with generating an initial list of items for a "Directory website" about a specific topic.
+        const generationPrompt = PromptTemplate.fromTemplate(
+            `You are an expert curator and technical writer tasked with generating an initial list of items for a "Directory website" about a specific topic.
 The **main topic** of the Directory website is: "{topicName}"
 Description: "{topicDescription}"
 Optional initial keywords: {target_keywords_string}
+
+{featured_hints_section}
 
 Based on this topic, please generate a comprehensive list of distinct items (e.g., tools, software, libraries, frameworks, official documentation, key community resources, important projects).
 
@@ -137,6 +136,7 @@ For each item, provide the following details:
 1.  **name**: The canonical name of the item.
 2.  **description**: A concise description (1-3 sentences) highlighting its specific relevance to "{topicName}".
 3.  **source_url**: The most direct and canonical URL (e.g., homepage, official documentation, repository). If a high-quality, canonical URL cannot be confidently determined, you may omit it but it's highly encouraged.
+4.  **featured**: A boolean indicating if this item should be highlighted or given special prominence (true/false). Consider the featured item guidelines above when making this determination. Default to false if unsure.
 
 **Critical Instructions:**
 -   *Only generate items if you are completely certain of their relevance to the topic.*
@@ -147,72 +147,89 @@ For each item, provide the following details:
 
 Generate the list of items according to the specified schema.
 `,
-    );
-
-    // Use a lower temperature for item generation
-    const lowTempLlm = this.aiService.createLlmWithTemperature(0.0);
-
-    const generationChain = generationPrompt
-      .pipe(
-        lowTempLlm.bind({
-          functions: [itemGenerationFunction],
-          function_call: { name: 'generate_awesome_list_items_directly' },
-        }),
-      )
-      .pipe(new JsonOutputFunctionsParser());
-
-    try {
-      const result = (await generationChain.invoke({
-        topicName,
-        topicDescription,
-        target_keywords_string: targetKeywords
-          ? targetKeywords.join(', ')
-          : 'N/A',
-      })) as { items?: Partial<ItemData>[] };
-
-      if (result && result.items && result.items.length > 0) {
-        this.logger.log(
-          `[${slug}] AI initially generated ${result.items.length} items.`,
         );
-        for (const generatedItem of result.items) {
-          try {
-            const itemToValidate: Partial<ItemData> = {
-              ...generatedItem,
-            };
 
-            const validatedItem = itemDataSchema.parse(
-              itemToValidate,
-            ) as ItemData;
+        // Use a lower temperature for item generation
+        const lowTempLlm = this.aiService.createLlmWithTemperature(0.0);
 
-            validatedItem.slug = slugifyText(validatedItem.name);
+        const generationChain = generationPrompt
+            .pipe(
+                lowTempLlm.bind({
+                    functions: [itemGenerationFunction],
+                    function_call: { name: 'generate_awesome_list_items_directly' },
+                }),
+            )
+            .pipe(new JsonOutputFunctionsParser());
 
-            if (!validatedItem.source_url) {
-              this.logger.warn(
-                `[${slug}] AI generated item "${validatedItem.name}" without a source_url. Deduplication might be affected.`,
-              );
+        // Generate featured hints section for the prompt
+        const featuredHintsSection = this.generateFeaturedHintsSection(featuredItemHints);
+
+        try {
+            const result = (await generationChain.invoke({
+                topicName,
+                topicDescription,
+                target_keywords_string: targetKeywords ? targetKeywords.join(', ') : 'N/A',
+                featured_hints_section: featuredHintsSection,
+            })) as { items?: Partial<ItemData>[] };
+
+            if (result && result.items && result.items.length > 0) {
+                this.logger.log(`[${slug}] AI initially generated ${result.items.length} items.`);
+                for (const generatedItem of result.items) {
+                    try {
+                        const itemToValidate: Partial<ItemData> = {
+                            ...generatedItem,
+                        };
+
+                        const validatedItem = itemDataSchema.parse(itemToValidate) as ItemData;
+
+                        validatedItem.slug = slugifyText(validatedItem.name);
+
+                        if (!validatedItem.source_url) {
+                            this.logger.warn(
+                                `[${slug}] AI generated item "${validatedItem.name}" without a source_url. Deduplication might be affected.`,
+                            );
+                        }
+                        allGeneratedItems.push(validatedItem);
+                    } catch (validationError) {
+                        this.logger.warn(
+                            `[${slug}] Discarding AI-generated item due to validation error: ${validationError.errors.map((e: any) => e.message).join(', ')}. Item: ${JSON.stringify(generatedItem)}`,
+                        );
+                    }
+                }
+            } else {
+                this.logger.log(
+                    `[${slug}] No initial items generated by AI for topic: ${topicName}.`,
+                );
             }
-            allGeneratedItems.push(validatedItem);
-          } catch (validationError) {
-            this.logger.warn(
-              `[${slug}] Discarding AI-generated item due to validation error: ${validationError.errors.map((e: any) => e.message).join(', ')}. Item: ${JSON.stringify(generatedItem)}`,
+        } catch (error) {
+            this.logger.error(
+                `[${slug}] Error generating initial items with AI for topic ${topicName}: ${error.message}`,
+                error.stack,
             );
-          }
         }
-      } else {
+
         this.logger.log(
-          `[${slug}] No initial items generated by AI for topic: ${topicName}.`,
+            `[${slug}] AI-First Item Generation - Complete. Validated ${allGeneratedItems.length} items.`,
         );
-      }
-    } catch (error) {
-      this.logger.error(
-        `[${slug}] Error generating initial items with AI for topic ${topicName}: ${error.message}`,
-        error.stack,
-      );
+        return allGeneratedItems;
     }
 
-    this.logger.log(
-      `[${slug}] AI-First Item Generation - Complete. Validated ${allGeneratedItems.length} items.`,
-    );
-    return allGeneratedItems;
-  }
+    /**
+     * Generate the featured hints section for the prompt
+     * @param featuredItemHints Array of featured item hints
+     * @returns Formatted section for the prompt
+     */
+    private generateFeaturedHintsSection(featuredItemHints: string[]): string {
+        if (!featuredItemHints || featuredItemHints.length === 0) {
+            return '';
+        }
+
+        return `
+**Featured Item Guidelines:**
+The user has specified the following guidelines for which items should be marked as featured (highlighted):
+${featuredItemHints.map((hint) => `- ${hint}`).join('\n')}
+
+When determining the 'featured' status for items, consider these guidelines carefully. Items that match these criteria should be marked as featured=true.
+`;
+    }
 }
