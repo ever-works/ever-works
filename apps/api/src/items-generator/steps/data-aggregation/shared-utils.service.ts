@@ -202,11 +202,7 @@ export class SharedUtilsService {
      * @param item ItemData to map
      */
     itemMap(item: ItemData) {
-        return {
-            name: item.name,
-            description: item.description,
-            url: item.source_url,
-        };
+        return { ...item };
     }
 
     /**

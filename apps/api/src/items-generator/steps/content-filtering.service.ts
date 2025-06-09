@@ -91,9 +91,9 @@ export class ContentFilteringService {
                     `You are an expert content analyst. Assess the relevance of the following web page content to the **main topic**: "{topicName}" (Description: "{topicDescription}").
 
 Web Page Content (first 2000 characters):
----
+<content>
 {page_content_snippet}
----
+</content>
 
 **Critically evaluate:** Is this page's **primary focus** highly relevant to "{topicName}" and "{topicDescription}"?
 - **Accept:** Pages dedicated to the topic, comprehensive comparisons, core tutorials, official documentation, key project pages.

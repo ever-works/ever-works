@@ -47,6 +47,7 @@ Here is the list of items to categorize:
    - Avoid overly broad categories like "Tools" or "Software" - be more specific
    - Avoid overly specific categories that would only contain 1-2 items
    - Maintain consistency across similar items
+   - The featured field should remain the same as in the original item
    - If the task emphasizes certain aspects (e.g., "open-source", "enterprise"), reflect this in your categorization
 </instructions>
 `.trim();
@@ -171,6 +172,7 @@ export class CategoryProcessingService {
                 name: i.name,
                 description: i.description,
                 source_url: i.source_url,
+                featured: i.featured,
             }));
 
             // Process in batches if there are many items
@@ -235,10 +237,28 @@ ${CATEGORIZE_PROMPT}
 </existing_tags>
 
 <additional_instructions>
-- For consistency, consider using the existing categories and tags listed above when appropriate.
-- You can create new categories or tags if the existing ones don't fit well.
-- Prioritize consistency across items that serve similar purposes.
-- If an item clearly fits into one of the existing categories, use that category rather than creating a new one.
+**Category Selection Guidelines:**
+
+1. **Check for strict category constraints in the task:**
+   - Look for phrases like "only use these categories", "must use specified categories", "restrict to", "limit to", or similar language in the task description
+   - If the task explicitly restricts categories to a specific list, you MUST only use those categories
+   - If strict constraints are specified, do NOT create new categories under any circumstances
+
+2. **When NO strict constraints are specified:**
+   - Use existing categories when items clearly fit
+   - Create new categories when necessary for items that don't fit well into existing categories
+   - Prioritize meaningful categorization over just reusing existing categories
+
+3. **For existing categories and tags:**
+   - Reuse existing categories when they accurately represent the item's primary function
+   - Reuse existing tags when they accurately describe item features
+   - Maintain consistency for similar items
+
+4. **When creating new categories (only if not restricted):**
+   - Create new categories if items represent distinctly different functions not covered by existing categories
+   - Ensure new categories are meaningful and help users find related items
+
+**Important:** Always check the task description first for any explicit category restrictions before deciding whether to create new categories.
 </additional_instructions>
 `.trim();
 
@@ -394,7 +414,10 @@ ${CATEGORIZE_PROMPT}
      * @param items Categorized items
      * @param priorityCategories Categories that should appear first in the final output
      */
-    private extractUniqueCategories(items: ItemData[], priorityCategories: string[] = []): Category[] {
+    private extractUniqueCategories(
+        items: ItemData[],
+        priorityCategories: string[] = [],
+    ): Category[] {
         const categoryNames = items.map((item) =>
             typeof item.category === 'string' ? item.category : item.category?.name,
         );
@@ -472,9 +495,7 @@ ${CATEGORIZE_PROMPT}
      */
     private toItemData(item: Partial<ItemData>): ItemData {
         return {
-            name: item.name,
-            description: item.description,
-            source_url: item.source_url,
+            ...(item as ItemData),
             category: slugifyText(item.category as string),
             tags: Array.isArray(item.tags)
                 ? item.tags.map((tag: any) => slugifyText(typeof tag === 'string' ? tag : tag.name))
