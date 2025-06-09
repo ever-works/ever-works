@@ -12,28 +12,29 @@ import { ItemData } from '../dto';
 import { extractedItemsSchema, itemDataSchema } from '../schemas/item-extraction.schemas';
 
 const ITEMS_EXTRACTION_PROMPT =
-    `You are an expert data extractor and technical writer for "Directory website" directories.
-The **main topic** of the Directory website is:
+    `You are an expert data extractor and technical writer for directory websites.
+
+The **topic** of this directory is:
 <topic>
 {topic}
 </topic>
 
-From the following web page content, identify and extract information for one or more distinct items (tools, resources, libraries, articles, etc.) that are **directly and highly relevant to this main topic**.
-Do NOT extract items that are only tangentially related or represent a different category unless it's explicitly part of "main topic".
+From the following web page content, identify and extract information for one or more distinct items (tools, resources, libraries, articles, etc.) that are **directly and highly relevant to the specified topic**.
 
 Web Page Content:
 <content>
 {page_content}
 </content>
 
-For each identified item **that directly relates to "main topic"**:
-1.  Provide its canonical **name**.
-2.  Write a concise and short **description** highlighting its specific relevance to "main topic".
-3.  Determine its most direct and canonical **source_url** (homepage, docs, repo etc.). Do not use URLs for blog posts merely mentioning the item unless the post *is* the primary resource. The URL must be valid and specific to the item.
-4.  **featured**: A boolean indicating if this item is highly prominent or recommended (true/false). Default to false if unsure.
+For each identified item that directly relates to the topic:
+1. Provide its canonical **name**.
+2. Write a concise and short **description** highlighting its specific relevance to the topic.
+3. Determine its most direct and canonical **source_url** (homepage, documentation, repository, etc.). Do not use URLs for blog posts merely mentioning the item unless the post *is* the primary resource. The URL must be valid and specific to the item.
+4. **featured**: A boolean indicating if this item is highly prominent or recommended (true/false). Default to false if unsure.
 
-**Critical Filter:** Only extract items that are *directly* relevant to the main topic "main topic". 
-For example, if the topic is "Vector Databases", do not extract a general-purpose database or a library for a specific programming language (like Ruby) unless it's explicitly a vector database client/tool directly supporting the core topic. 
+**Critical Filter:** Only extract items that are *directly* relevant to the specified topic.
+For example, if the topic is "Vector Databases", do not extract a general-purpose database or a library for a specific programming language unless it's explicitly a vector database client/tool directly supporting the core topic.
+
 Ensure the \`source_url\` is for the item itself, not an article *about* the item.
 Only call the extraction function if you find at least one item meeting these strict criteria.`.trim();
 
@@ -86,7 +87,7 @@ export class ItemExtractionService {
     async extractItemsFromPages(
         slug: string,
         relevantPages: WebPageData[],
-        prompt: string,
+        topic: string,
         config: Required<ConfigDto>,
     ): Promise<ItemData[]> {
         if (!this.llm.apiKey) {
@@ -128,10 +129,10 @@ export class ItemExtractionService {
                 };
 
                 // Stricter prompt for item extraction
-                const prompt = PromptTemplate.fromTemplate(ITEMS_EXTRACTION_PROMPT);
+                const promptTemplate = PromptTemplate.fromTemplate(ITEMS_EXTRACTION_PROMPT);
 
                 const outputParser = new JsonOutputFunctionsParser();
-                const extractionChain = prompt
+                const extractionChain = promptTemplate
                     .pipe(
                         this.llm.bind({
                             functions: [itemExtractionFunction],
@@ -161,7 +162,7 @@ export class ItemExtractionService {
                                 );
 
                                 const chunkResult = (await extractionChain.invoke({
-                                    topic: prompt,
+                                    topic: topic,
                                     page_content: chunk,
                                 })) as { items?: Partial<ItemData>[] };
 
@@ -223,7 +224,7 @@ export class ItemExtractionService {
                 } else {
                     // Process the entire content at once for smaller pages
                     const extractionResult = (await extractionChain.invoke({
-                        topic: prompt,
+                        topic: topic,
                         page_content: page.raw_content,
                     })) as { items?: Partial<ItemData>[] };
 
