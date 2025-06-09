@@ -99,6 +99,11 @@ export class CreateItemsGeneratorDto {
     @IsOptional()
     @IsArray()
     @IsString({ each: true })
+    priority_categories?: string[]; // Categories that should appear first in the final output
+
+    @IsOptional()
+    @IsArray()
+    @IsString({ each: true })
     target_keywords?: string[];
 
     @IsOptional()

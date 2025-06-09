@@ -80,7 +80,7 @@ export class CategoryProcessingService {
         existingTags: Tag[],
         initialCategories: string[] = [],
     ) {
-        const { slug, prompt } = createItemsGeneratorDto;
+        const { slug, prompt, priority_categories = [] } = createItemsGeneratorDto;
         this.logger.log(
             `[${slug}] Starting category and tag processing for ${extractedItems.length} items`,
         );
@@ -115,7 +115,7 @@ export class CategoryProcessingService {
             this.logger.log(`[${slug}] Successfully categorized ${categorized.length} items`);
 
             // Extract unique categories and tags
-            const categories = this.extractUniqueCategories(categorized);
+            const categories = this.extractUniqueCategories(categorized, priority_categories);
             const tags = this.extractUniqueTags(categorized);
 
             // Convert to final format
@@ -392,12 +392,13 @@ ${CATEGORIZE_PROMPT}
     /**
      * Extract unique categories from categorized items
      * @param items Categorized items
+     * @param priorityCategories Categories that should appear first in the final output
      */
-    private extractUniqueCategories(items: ItemData[]): Category[] {
+    private extractUniqueCategories(items: ItemData[], priorityCategories: string[] = []): Category[] {
         const categoryNames = items.map((item) =>
             typeof item.category === 'string' ? item.category : item.category?.name,
         );
-        return this.mapUnique(categoryNames);
+        return this.mapUniqueWithPriority(categoryNames, priorityCategories);
     }
 
     /**
@@ -419,6 +420,50 @@ ${CATEGORIZE_PROMPT}
             id: slugifyText(name),
             name,
         }));
+    }
+
+    /**
+     * Map an array of names to unique identifiable objects with priority support
+     * @param names Array of names
+     * @param priorityCategories Categories that should appear first (lower priority numbers)
+     */
+    private mapUniqueWithPriority(names: string[], priorityCategories: string[] = []): Category[] {
+        const unique = new Set(names.filter(Boolean));
+        const categories: Category[] = [];
+
+        // Create a map of priority category names to their priority order
+        const priorityMap = new Map<string, number>();
+        priorityCategories.forEach((categoryName, index) => {
+            priorityMap.set(categoryName.toLowerCase(), index + 1); // Priority 1, 2, 3, etc.
+        });
+
+        // Convert to Category objects with priority
+        Array.from(unique).forEach((name) => {
+            const priority = priorityMap.get(name.toLowerCase());
+            categories.push({
+                id: slugifyText(name),
+                name,
+                priority,
+            });
+        });
+
+        // Sort categories: priority categories first (by priority order), then alphabetically
+        return categories.sort((a, b) => {
+            // If both have priority, sort by priority number (lower = higher priority)
+            if (a.priority !== undefined && b.priority !== undefined) {
+                return a.priority - b.priority;
+            }
+            // If only a has priority, a comes first
+            if (a.priority !== undefined && b.priority === undefined) {
+                return -1;
+            }
+            // If only b has priority, b comes first
+            if (a.priority === undefined && b.priority !== undefined) {
+                return 1;
+            }
+            // If neither has priority, sort alphabetically
+            return a.name.localeCompare(b.name);
+        });
     }
 
     /**
