@@ -224,7 +224,6 @@ export class ItemsGeneratorService {
                 await this.itemExtractionService.extractItemsFromPages(
                     slug,
                     relevantPages,
-                    name,
                     prompt,
                     config,
                 );
