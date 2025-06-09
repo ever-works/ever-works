@@ -117,26 +117,43 @@ export class ItemsGeneratorService {
 
             const processedSourceUrls = new Set<string>();
 
-            // 1.1. Process Prompt (Extract URLs and Category Hints)
-            this.logger.log(`[${slug}] 1.1. Prompt Processing (URLs and Categories) - Starting`);
+            // 1.1. Process Prompt (Extract URLs, Categories, and Priority Categories)
+            this.logger.log(
+                `[${slug}] 1.1. Prompt Processing (URLs, Categories, and Priorities) - Starting`,
+            );
             const {
                 extractedUrls,
                 suggestedCategories,
+                priorityCategories: promptPriorityCategories,
                 rewrittenPrompt: prompt,
             } = await this.promptProcessingService.processPrompt(
                 slug,
                 createItemsGeneratorDto.prompt,
             );
 
+            // Merge priority categories from DTO with those extracted from prompt
+            const allPriorityCategories = [
+                ...(createItemsGeneratorDto.priority_categories || []),
+                ...promptPriorityCategories,
+            ].filter((category, index, arr) => arr.indexOf(category) === index); // Remove duplicates
+
             // Merge initial categories from DTO with categories extracted from prompt
+            // Priority categories must also be included in initial categories
             const allInitialCategories = [
                 ...(createItemsGeneratorDto.initial_categories || []),
                 ...suggestedCategories,
+                ...allPriorityCategories, // Ensure priority categories are included in initial categories
             ].filter((category, index, arr) => arr.indexOf(category) === index); // Remove duplicates
 
             if (allInitialCategories.length > 0) {
                 this.logger.log(
                     `[${slug}] Found ${allInitialCategories.length} initial categories: ${allInitialCategories.join(', ')}`,
+                );
+            }
+
+            if (allPriorityCategories.length > 0) {
+                this.logger.log(
+                    `[${slug}] Found ${allPriorityCategories.length} priority categories: ${allPriorityCategories.join(', ')}`,
                 );
             }
 
@@ -250,9 +267,16 @@ export class ItemsGeneratorService {
 
             // 7. Category and Tag Generation
             this.logger.log(`[${slug}] 7. Category and Tag Generation - Starting`);
+
+            // Create a modified DTO with merged priority categories
+            const dtoWithMergedPriorities = {
+                ...createItemsGeneratorDto,
+                priority_categories: allPriorityCategories,
+            };
+
             const { categories, tags, finalItems } =
                 await this.categoryProcessingService.processCategoriesAndTags(
-                    createItemsGeneratorDto,
+                    dtoWithMergedPriorities,
                     aggregatedItems,
                     existingCategories || [],
                     existingTags || [],

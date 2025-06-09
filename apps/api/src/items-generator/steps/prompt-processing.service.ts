@@ -15,8 +15,9 @@ You are a helpful assistant tasked with extracting URLs and explicitly mentioned
 Your task:
 1. Extract all URLs mentioned in the prompt.
 2. Extract categories that are explicitly mentioned in the prompt that should be considered for categorization.
-3. Rewrite the prompt without the URLs but preserve the context and meaning.
-4. Return the extracted URLs, explicitly mentioned categories, and the rewritten prompt.
+3. Extract priority categories that should appear first in the final output based on priority indicators in the prompt.
+4. Rewrite the prompt without the URLs but preserve the context and meaning.
+5. Return the extracted URLs, explicitly mentioned categories, priority categories, and the rewritten prompt.
 
 Guidelines for URL extraction:
 - Only extract URLs that are explicitly mentioned in the prompt
@@ -46,6 +47,33 @@ Examples of what NOT to extract as categories:
 - "I'm looking for various development tools" (too general, not explicit categories)
 - "tools for monitoring and testing" (descriptive, not explicit category instruction)
 - "similar to monitoring tools" (example/comparison, not explicit category)
+
+Guidelines for priority category extraction:
+- Look for categories that are explicitly mentioned with priority indicators
+- Extract categories mentioned with priority phrases like:
+  * "start with X category" or "begin with X"
+  * "X should be first" or "X first"
+  * "prioritize X" or "X is priority"
+  * "most important is X" or "X is most important"
+  * "focus on X first" or "X should come first"
+  * "lead with X" or "X at the top"
+  * "X should appear first" or "show X first"
+- Extract categories mentioned in ordered lists where position indicates priority (e.g., "1. Open Source, 2. CI/CD")
+- Extract categories that are emphasized as primary or main focus
+- Do NOT extract all categories as priority - only those with clear priority indicators
+- Priority categories should also be included in the regular suggestedCategories list
+
+Examples of what TO extract as priority categories:
+- "Start with Open Source tools, then other categories"
+- "Prioritize CI/CD solutions above all else"
+- "Most important category is Monitoring"
+- "1. Open Source, 2. Enterprise, 3. Others" (extract "Open Source" and "Enterprise" as priority)
+- "Focus on Open Source projects first"
+
+Examples of what NOT to extract as priority categories:
+- "I want categories like Monitoring, CI/CD, and Testing" (no priority indicators)
+- "organize these tools into categories" (no specific priority mentioned)
+- "categorize as open-source and commercial" (equal treatment, no priority)
 `.trim();
 
 // Output schema for validation
@@ -54,6 +82,9 @@ const promptProcessingOutputSchema = z.object({
     suggestedCategories: z
         .array(z.string())
         .describe('List of category hints extracted from the prompt'),
+    priorityCategories: z
+        .array(z.string())
+        .describe('List of categories that should appear first in the final output, extracted from priority indicators in the prompt'),
     rewrittenPrompt: z
         .string()
         .describe('The prompt rewritten without URLs but preserving context'),
@@ -69,10 +100,10 @@ export class PromptProcessingService {
     }
 
     /**
-     * Extract URLs and category hints from a prompt and rewrite the prompt without URLs
+     * Extract URLs, category hints, and priority categories from a prompt and rewrite the prompt without URLs
      * @param slug The slug for logging purposes
      * @param prompt The prompt to extract URLs and categories from
-     * @returns Object containing extracted URLs, suggested categories, and rewritten prompt
+     * @returns Object containing extracted URLs, suggested categories, priority categories, and rewritten prompt
      */
     async processPrompt(
         slug: string,
@@ -80,11 +111,12 @@ export class PromptProcessingService {
     ): Promise<{
         extractedUrls: string[];
         suggestedCategories: string[];
+        priorityCategories: string[];
         rewrittenPrompt: string;
     }> {
         if (!prompt) {
             this.logger.warn(`[${slug}] No prompt provided for processing`);
-            return { extractedUrls: [], suggestedCategories: [], rewrittenPrompt: prompt || '' };
+            return { extractedUrls: [], suggestedCategories: [], priorityCategories: [], rewrittenPrompt: prompt || '' };
         }
 
         // Use AI for sophisticated extraction of URLs and categories
@@ -99,18 +131,20 @@ export class PromptProcessingService {
                     prompt,
                 });
 
-            const { extractedUrls, suggestedCategories, rewrittenPrompt } = result;
+            const { extractedUrls, suggestedCategories, priorityCategories, rewrittenPrompt } = result;
 
             this.logger.log(
-                `[${slug}] AI extracted ${extractedUrls.length} URLs and ${suggestedCategories.length} category hints from prompt`,
+                `[${slug}] AI extracted ${extractedUrls.length} URLs, ${suggestedCategories.length} category hints, and ${priorityCategories.length} priority categories from prompt`,
             );
 
             const validatedUrls = this.validateUrls(extractedUrls);
             const cleanedCategories = this.cleanCategories(suggestedCategories);
+            const cleanedPriorityCategories = this.cleanCategories(priorityCategories);
 
             return {
                 extractedUrls: validatedUrls,
                 suggestedCategories: cleanedCategories,
+                priorityCategories: cleanedPriorityCategories,
                 rewrittenPrompt: validatedUrls.length > 0 ? rewrittenPrompt || prompt : prompt,
             };
         } catch (error) {
@@ -126,6 +160,7 @@ export class PromptProcessingService {
             return {
                 extractedUrls: fallbackUrls,
                 suggestedCategories: [],
+                priorityCategories: [],
                 rewrittenPrompt,
             };
         }
