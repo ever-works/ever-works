@@ -1,16 +1,84 @@
 import { Injectable, Logger } from '@nestjs/common';
 import axios from 'axios';
 import { TavilyClient } from '@tavily/core';
+import { ChatOpenAI } from '@langchain/openai';
+import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
+import { z } from 'zod';
 import { ItemData, ConfigDto } from '../dto';
-import { SearchService } from '../shared';
+import { SearchService, AiService } from '../shared';
+
+// Schema for AI URL validation response
+const urlValidationSchema = z.object({
+    is_official: z
+        .boolean()
+        .describe('Whether this URL appears to be the official/canonical source for the item'),
+    is_relevant: z
+        .boolean()
+        .describe(
+            'Whether this URL is relevant to the item (not a random blog post or unrelated content)',
+        ),
+    confidence_score: z
+        .number()
+        .min(0)
+        .max(1)
+        .describe('Confidence score from 0 to 1 for this assessment'),
+    url_type: z
+        .enum([
+            'official_website',
+            'github_repository',
+            'documentation',
+            'blog_post',
+            'news_article',
+            'marketplace',
+            'other',
+        ])
+        .describe('Type of URL/website'),
+    reasoning: z.string().describe('Brief explanation of why this URL was classified this way'),
+});
+
+// Prompt for AI URL validation
+const URL_VALIDATION_PROMPT = `
+You are an expert at identifying official and canonical URLs for software tools, libraries, frameworks, and other technical items.
+
+Given an item name, description, and a candidate URL with its content, determine if this URL is the official/canonical source for the item.
+
+Item Name: {itemName}
+Item Description: {itemDescription}
+Candidate URL: {candidateUrl}
+Page Content (first 2000 chars): {pageContent}
+
+Analyze the URL and content to determine:
+1. Is this the official website, GitHub repository, or primary documentation for the item?
+2. Is this just a blog post, news article, or secondary source talking about the item?
+3. How confident are you in this assessment?
+
+Consider these factors:
+- Domain authority (official domains like github.com, npmjs.com, official project domains)
+- Content type (project homepage, documentation, repository vs blog post, news article)
+- URL structure (official paths vs blog post paths)
+- Content relevance and authority
+- Whether the content is about the item or just mentions it
+
+Prefer official sources in this order:
+1. Official project website/homepage
+2. GitHub/GitLab repository
+3. Official documentation
+4. Package manager pages (npm, PyPI, etc.)
+5. Avoid: blog posts, news articles, tutorials, unless they are the only authoritative source
+`.trim();
 
 @Injectable()
 export class SourceValidationService {
     private readonly logger = new Logger(SourceValidationService.name);
     private tavilyClient: TavilyClient | undefined;
+    private llm: ChatOpenAI;
 
-    constructor(private readonly searchService: SearchService) {
+    constructor(
+        private readonly searchService: SearchService,
+        private readonly aiService: AiService,
+    ) {
         this.tavilyClient = this.searchService.getTavilyClient();
+        this.llm = this.aiService.createLlmWithTemperature(0.1); // Low temperature for consistent analysis
     }
 
     async filterAndValidateSourceItems(items: ItemData[], slug: string): Promise<ItemData[]> {
@@ -153,54 +221,123 @@ export class SourceValidationService {
             const safeItemDescription =
                 typeof itemDescription === 'string' ? itemDescription.substring(0, 100) : '';
 
-            const searchQuery = (
-                safeItemName +
-                `${safeItemName && safeItemDescription ? ' - ' : ''}` +
-                safeItemDescription
-            ).trim();
+            // Generate multiple targeted search queries for better results
+            const searchQueries = this.generateOfficialSourceQueries(
+                safeItemName,
+                safeItemDescription,
+            );
 
-            if (!searchQuery) {
-                this.logger.warn(
-                    `Cannot perform Tavily search for "${itemName}" due to empty search query.`,
-                );
+            this.logger.log(
+                `Searching for official source for "${itemName}" using ${searchQueries.length} targeted queries`,
+            );
+
+            // Search with multiple queries and collect all results
+            const allDocuments = [];
+            for (const query of searchQueries) {
+                try {
+                    const documents = await this.webSearch(query, {
+                        max_results_per_query: 3, // Fewer results per query since we have multiple queries
+                    });
+                    if (documents && documents.length > 0) {
+                        allDocuments.push(...documents);
+                    }
+                } catch (searchError) {
+                    this.logger.warn(`Search failed for query "${query}": ${searchError.message}`);
+                }
+            }
+
+            if (allDocuments.length === 0) {
+                this.logger.warn(`No search results found for "${itemName}" across all queries.`);
                 return undefined;
             }
 
-            this.logger.log(`Searching Tavily for "${itemName}" with query: "${searchQuery}"`);
+            // Remove duplicates and filter valid URLs
+            const uniqueUrls = Array.from(
+                new Set(
+                    allDocuments
+                        .filter((doc) => doc.url && typeof doc.url === 'string')
+                        .map((doc) => doc.url),
+                ),
+            );
 
-            const documents = await this.webSearch(searchQuery, {
-                max_results_per_query: 5,
+            if (uniqueUrls.length === 0) {
+                this.logger.warn(`No valid URLs found in search results for "${itemName}".`);
+                return undefined;
+            }
+
+            this.logger.log(
+                `Found ${uniqueUrls.length} unique URLs for "${itemName}". Analyzing with AI to find official source.`,
+            );
+
+            // Use AI to validate URLs and find the best official source
+            const urlAnalysisPromises = uniqueUrls.slice(0, 8).map(async (url) => {
+                // Limit to 8 URLs to avoid excessive API calls
+                const basicValidation = await validateUrl(url);
+                if (!basicValidation) {
+                    return null;
+                }
+
+                const aiValidation = await this.validateUrlWithAI(
+                    safeItemName,
+                    safeItemDescription,
+                    url,
+                );
+                return {
+                    url,
+                    aiValidation,
+                };
             });
 
-            if (documents && documents.length > 0) {
-                // Filter out undefined URLs and prepare for validation
-                const urlsToValidate = documents
-                    .filter((doc) => doc.url && typeof doc.url === 'string')
-                    .map((doc) => doc.url);
+            const urlAnalysisResults = await Promise.all(urlAnalysisPromises);
+            const validResults = urlAnalysisResults.filter((result) => result !== null);
 
-                if (urlsToValidate.length === 0) {
-                    this.logger.warn(`Tavily search found no valid URLs for "${itemName}".`);
-                    return undefined;
+            if (validResults.length === 0) {
+                this.logger.warn(`No URLs passed basic validation for "${itemName}".`);
+                return undefined;
+            }
+
+            // Find the best URL based on AI analysis
+            let bestUrl = null;
+            let bestScore = 0;
+
+            for (const result of validResults) {
+                if (result.aiValidation) {
+                    const { isOfficial, confidence } = result.aiValidation;
+                    const score = isOfficial ? confidence : confidence * 0.3; // Heavily penalize non-official sources
+
+                    this.logger.log(
+                        `URL analysis for "${itemName}" -> ${result.url}: official=${isOfficial}, confidence=${confidence}, score=${score}`,
+                    );
+
+                    if (score > bestScore) {
+                        bestScore = score;
+                        bestUrl = result.url;
+                    }
+                } else {
+                    // If AI validation failed, consider it as a fallback with low score
+                    if (bestScore === 0) {
+                        bestUrl = result.url;
+                        bestScore = 0.1;
+                    }
                 }
+            }
 
+            if (bestUrl && bestScore > 0.5) {
                 this.logger.log(
-                    `Validating ${urlsToValidate.length} URLs from Tavily search for "${itemName}".`,
+                    `Found high-confidence official URL for "${itemName}": ${bestUrl} (score: ${bestScore})`,
                 );
-
-                // Validate all URLs in parallel
-                const validationPromises = urlsToValidate.map((url) => validateUrl(url));
-                const validationResults = await Promise.all(validationPromises);
-
-                // Find the first valid URL
-                const firstValidUrl = validationResults.find((url) => url !== undefined);
-
-                if (firstValidUrl) {
-                    return firstValidUrl;
-                }
-
+                return bestUrl;
+            } else if (bestUrl && bestScore > 0.2) {
+                this.logger.log(
+                    `Found medium-confidence URL for "${itemName}": ${bestUrl} (score: ${bestScore})`,
+                );
+                return bestUrl;
+            } else {
                 this.logger.warn(
-                    `Tavily found ${urlsToValidate.length} URLs for "${itemName}", but none passed validation.`,
+                    `No high-confidence official URL found for "${itemName}". Best candidate: ${bestUrl} (score: ${bestScore})`,
                 );
+                // Return the best candidate even if confidence is low, but log it
+                return bestUrl;
             }
         } catch (tavilyError) {
             this.logger.error(
@@ -218,5 +355,89 @@ export class SourceValidationService {
 
     private async webSearch(query: string, config?: Partial<ConfigDto>) {
         return this.searchService.webSearch(query, config);
+    }
+
+    /**
+     * Use AI to validate if a URL is the official/canonical source for an item
+     */
+    private async validateUrlWithAI(
+        itemName: string,
+        itemDescription: string,
+        candidateUrl: string,
+    ): Promise<{ isOfficial: boolean; confidence: number; reasoning: string } | null> {
+        if (!this.aiService.isAiConfigured()) {
+            this.logger.warn('AI service not configured, skipping AI URL validation');
+            return null;
+        }
+
+        try {
+            // Extract content from the URL using Tavily
+            let pageContent = '';
+            try {
+                if (this.tavilyClient) {
+                    const extractedContent = await this.searchService.extractContent(candidateUrl);
+                    pageContent = extractedContent.rawContent || '';
+                }
+            } catch (contentError) {
+                this.logger.warn(
+                    `Could not extract content from ${candidateUrl}: ${contentError.message}`,
+                );
+                // Continue with empty content - AI can still analyze the URL structure
+            }
+
+            // Use AI to validate the URL
+            const promptTemplate = HumanMessagePromptTemplate.fromTemplate(URL_VALIDATION_PROMPT);
+            const result = await promptTemplate
+                .pipe(this.llm.withStructuredOutput(urlValidationSchema))
+                .invoke({
+                    itemName,
+                    itemDescription,
+                    candidateUrl,
+                    pageContent: pageContent.slice(0, 2000), // Limit content length
+                });
+
+            this.logger.log(
+                `AI URL validation for "${itemName}" -> ${candidateUrl}: official=${result.is_official}, confidence=${result.confidence_score}, type=${result.url_type}`,
+            );
+
+            return {
+                isOfficial: result.is_official && result.is_relevant,
+                confidence: result.confidence_score,
+                reasoning: result.reasoning,
+            };
+        } catch (error) {
+            this.logger.error(
+                `Error during AI URL validation for "${itemName}": ${error.message}`,
+                error.stack,
+            );
+            return null;
+        }
+    }
+
+    /**
+     * Generate better search queries for finding official sources
+     */
+    private generateOfficialSourceQueries(itemName: string, itemDescription: string): string[] {
+        const queries = [];
+
+        // Primary query - official site
+        queries.push(`"${itemName}" official website`);
+
+        // GitHub repository query
+        queries.push(`"${itemName}" github repository`);
+
+        // Documentation query
+        queries.push(`"${itemName}" documentation`);
+
+        // If description contains keywords, use them
+        const descriptionLower = itemDescription.toLowerCase();
+        if (descriptionLower.includes('library') || descriptionLower.includes('framework')) {
+            queries.push(`"${itemName}" library official`);
+        }
+        if (descriptionLower.includes('tool') || descriptionLower.includes('software')) {
+            queries.push(`"${itemName}" tool official site`);
+        }
+
+        return queries;
     }
 }
