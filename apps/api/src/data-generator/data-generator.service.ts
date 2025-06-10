@@ -207,7 +207,9 @@ export class DataGeneratorService {
 
             for (const item of itemsWithMarkdown) {
                 item.slug = slugifyText(item.slug || item.name);
-                await this.processItem(data, item, user);
+                await this.processItem(data, item, user).catch((err) => {
+                    this.logger.error('Failed to process item', err);
+                });
             }
 
             // Push changes
