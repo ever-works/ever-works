@@ -1,10 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ChatOpenAI } from '@langchain/openai';
 import { PromptTemplate } from '@langchain/core/prompts';
-import { JsonOutputFunctionsParser } from 'langchain/output_parsers';
-import { zodToJsonSchema } from 'zod-to-json-schema';
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
-import { ConfigDto } from '../dto/create-items-generator.dto';
+import { ConfigDto, CreateItemsGeneratorDto } from '../dto/create-items-generator.dto';
 import { WebPageData } from '../interfaces/items-generator.interfaces';
 import { slugifyText } from '../utils/text.utils';
 import { AiService } from '../shared';
@@ -14,31 +12,37 @@ import { extractedItemsSchema, itemDataSchema } from '../schemas/item-extraction
 const ITEMS_EXTRACTION_PROMPT =
     `You are an expert data extractor and technical writer for directory websites.
 
-The **topic** of this directory is:
-<topic>
-{topic}
-</topic>
+**TASK OVERVIEW:**
+The **main topic** of this directory is: 
+- topic name: "{topicName}" 
+- topic task: "{topicDescription}".
+
+Your task is to identify and extract information for one or more distinct items (tools, resources, libraries, articles, etc.) that are **directly and highly relevant to this main topic**.
 
 {featured_hints_section}
 
-From the following web page content, identify and extract information for one or more distinct items (tools, resources, libraries, articles, etc.) that are **directly and highly relevant to the specified topic**.
+**RESEARCH CONTEXT INSTRUCTIONS:**
+Here is the research context (web page content below), make sure you extract all relevant items and information from the research data.
+Some content might be invalid or irrelevant, make sure to exclude them and align with the task.
 
-Web Page Content:
-<content>
-{page_content}
-</content>
+**EXTRACTION CRITERIA:**
+- Only extract items that are *directly* relevant to the main topic "{topicName}"
+- Do NOT extract items that are only tangentially related or represent a different category unless it's explicitly part of "{topicName}"
+- For example, if the topic is "Vector Databases", do not extract a general-purpose database or a library for a specific programming language (like Ruby) unless it's explicitly a vector database client/tool directly supporting the core topic
+- Ensure the source_url is for the item itself, not an article *about* the item
+- Do not use URLs for blog posts merely mentioning the item unless the post *is* the primary resource
 
-For each identified item that directly relates to the topic:
-1. Provide its canonical **name**.
-2. Write a concise and short **description** highlighting its specific relevance to the topic.
-3. Determine its most direct and canonical **source_url** (homepage, documentation, repository, etc.). Do not use URLs for blog posts merely mentioning the item unless the post *is* the primary resource. The URL must be valid and specific to the item.
-4. **featured**: A boolean indicating if this item should be highlighted or given special prominence (true/false). Consider the featured item guidelines above when making this determination. Default to false if unsure.
+**EXTRACTION REQUIREMENTS:**
+For each identified item **that directly relates to "{topicName}"**:
+1. **name**: Provide its canonical name
+2. **description**: Write a concise and short description highlighting its specific relevance to "{topicName}"
+3. **source_url**: Determine its most direct and canonical URL (homepage, docs, repo etc.). The URL must be valid and specific to the item
+4. **featured**: A boolean indicating if this item should be highlighted or given special prominence (true/false). Consider the featured item specifications above when making this determination. Default to false if unsure
 
-**Critical Filter:** Only extract items that are *directly* relevant to the specified topic.
-For example, if the topic is "Vector Databases", do not extract a general-purpose database or a library for a specific programming language unless it's explicitly a vector database client/tool directly supporting the core topic.
-
-Ensure the \`source_url\` is for the item itself, not an article *about* the item.
-Only call the extraction function if you find at least one item meeting these strict criteria.`.trim();
+---
+**Web Page Content:**
+{page_content_snippet}
+---`.trim();
 
 @Injectable()
 export class ItemExtractionService {
@@ -87,12 +91,13 @@ export class ItemExtractionService {
     }
 
     async extractItemsFromPages(
-        slug: string,
+        createItemsGeneratorDto: CreateItemsGeneratorDto,
         relevantPages: WebPageData[],
-        topic: string,
         config: Required<ConfigDto>,
         featuredItemHints: string[] = [],
     ): Promise<ItemData[]> {
+        const { slug, name: topicName, prompt: topicDescription } = createItemsGeneratorDto;
+
         if (!this.llm.apiKey) {
             this.logger.warn(
                 `[${slug}] OpenAI API Key not configured. Skipping AI-driven item extraction.`,
@@ -127,26 +132,12 @@ export class ItemExtractionService {
             const extractedItems: ItemData[] = [];
 
             try {
-                const itemExtractionFunction = {
-                    name: 'extract_awesome_list_items',
-                    description:
-                        'Extracts one or more distinct items (tools, resources, libraries, articles, etc.) from the provided web page content that are relevant to the directory website topic, including generating relevant Markdown content.',
-                    parameters: zodToJsonSchema(extractedItemsSchema),
-                };
-
                 // Stricter prompt for item extraction
                 const promptTemplate = PromptTemplate.fromTemplate(ITEMS_EXTRACTION_PROMPT);
 
-                const outputParser = new JsonOutputFunctionsParser();
-                const extractionChain = promptTemplate
-                    .pipe(
-                        this.llm.bind({
-                            functions: [itemExtractionFunction],
-                            function_call: { name: 'extract_awesome_list_items' },
-                        }),
-                    )
-                    .pipe(outputParser);
-
+                const extractionChain = promptTemplate.pipe(
+                    this.llm.withStructuredOutput(extractedItemsSchema),
+                );
                 // Check if content is large enough to require chunking
                 if (page.raw_content && page.raw_content.length > this.MAX_CHUNK_SIZE) {
                     this.logger.log(
@@ -168,8 +159,9 @@ export class ItemExtractionService {
                                 );
 
                                 const chunkResult = (await extractionChain.invoke({
-                                    topic: topic,
-                                    page_content: chunk,
+                                    topicName: topicName,
+                                    topicDescription: topicDescription,
+                                    page_content_snippet: chunk,
                                     featured_hints_section: featuredHintsSection,
                                 })) as { items?: Partial<ItemData>[] };
 
@@ -231,8 +223,9 @@ export class ItemExtractionService {
                 } else {
                     // Process the entire content at once for smaller pages
                     const extractionResult = (await extractionChain.invoke({
-                        topic: topic,
-                        page_content: page.raw_content,
+                        topicName: topicName,
+                        topicDescription: topicDescription,
+                        page_content_snippet: page.raw_content,
                         featured_hints_section: featuredHintsSection,
                     })) as { items?: Partial<ItemData>[] };
 
@@ -326,7 +319,7 @@ export class ItemExtractionService {
 
     /**
      * Generate the featured hints section for the prompt
-     * @param featuredItemHints Array of featured item hints
+     * @param featuredItemHints Array of featured item specifications (guidelines, instructions, or criteria)
      * @returns Formatted section for the prompt
      */
     private generateFeaturedHintsSection(featuredItemHints: string[]): string {
@@ -335,11 +328,10 @@ export class ItemExtractionService {
         }
 
         return `
-**Featured Item Guidelines:**
-The user has specified the following guidelines for which items should be marked as featured (highlighted):
-${featuredItemHints.map(hint => `- ${hint}`).join('\n')}
+**Featured Item Specifications:**
+The user has provided the following specifications for which items should be marked as featured (highlighted):
+${featuredItemHints.map((hint) => `- ${hint}`).join('\n')}
 
-When determining the 'featured' status for items, consider these guidelines carefully. Items that match these criteria should be marked as featured=true.
-`;
+When determining the 'featured' status for items, carefully consider these specifications. Items that match these criteria, guidelines, or instructions should be marked as featured=true.`;
     }
 }

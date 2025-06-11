@@ -1,11 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ChatOpenAI } from '@langchain/openai';
 import { PromptTemplate } from '@langchain/core/prompts';
-import { JsonOutputFunctionsParser } from 'langchain/output_parsers';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import { slugifyText } from '../utils/text.utils';
 import { AiService } from '../shared';
-import { ItemData } from '../dto';
+import { CreateItemsGeneratorDto, ItemData } from '../dto';
 import {
     extractedItemsSchema,
     itemDataSchema,
@@ -22,12 +21,16 @@ export class AiItemGenerationService {
     }
 
     async generateInitialItemsWithAI(
-        slug: string,
-        topicName: string,
-        topicDescription: string,
-        targetKeywords: string[] | undefined,
+        createItemsGeneratorDto: CreateItemsGeneratorDto,
         featuredItemHints: string[] = [],
     ): Promise<ItemData[]> {
+        const {
+            slug,
+            name: topicName,
+            prompt: topicDescription,
+            target_keywords,
+        } = createItemsGeneratorDto;
+
         this.logger.log(`[${slug}] AI-First Item Generation - Starting for topic: ${topicName}`);
         const allGeneratedItems: ItemData[] = [];
 
@@ -37,14 +40,6 @@ export class AiItemGenerationService {
             );
             return [];
         }
-
-        // 1. Assess Prompt Understanding
-        const understandingAssessmentFunction = {
-            name: 'assess_prompt_understanding_for_item_generation',
-            description:
-                'Assesses if the provided topic, description, and keywords are clear and specific enough to generate a meaningful list of items for a Directory website.',
-            parameters: zodToJsonSchema(promptUnderstandingAssessmentSchema),
-        };
 
         const understandingPrompt = PromptTemplate.fromTemplate(
             `You are an AI assistant helping to curate a "Directory website".
@@ -65,22 +60,15 @@ Consider:
 `,
         );
 
-        const understandingChain = understandingPrompt
-            .pipe(
-                this.llm.bind({
-                    functions: [understandingAssessmentFunction],
-                    function_call: {
-                        name: 'assess_prompt_understanding_for_item_generation',
-                    },
-                }),
-            )
-            .pipe(new JsonOutputFunctionsParser());
+        const understandingChain = understandingPrompt.pipe(
+            this.llm.withStructuredOutput(promptUnderstandingAssessmentSchema),
+        );
 
         try {
             const assessment = (await understandingChain.invoke({
                 topicName,
                 topicDescription,
-                target_keywords_string: targetKeywords ? targetKeywords.join(', ') : 'N/A',
+                target_keywords_string: target_keywords ? target_keywords.join(', ') : 'N/A',
             })) as {
                 can_proceed: boolean;
                 reason_if_cannot_proceed: string | null;
@@ -152,14 +140,9 @@ Generate the list of items according to the specified schema.
         // Use a lower temperature for item generation
         const lowTempLlm = this.aiService.createLlmWithTemperature(0.0);
 
-        const generationChain = generationPrompt
-            .pipe(
-                lowTempLlm.bind({
-                    functions: [itemGenerationFunction],
-                    function_call: { name: 'generate_awesome_list_items_directly' },
-                }),
-            )
-            .pipe(new JsonOutputFunctionsParser());
+        const generationChain = generationPrompt.pipe(
+            lowTempLlm.withStructuredOutput(extractedItemsSchema),
+        );
 
         // Generate featured hints section for the prompt
         const featuredHintsSection = this.generateFeaturedHintsSection(featuredItemHints);
@@ -168,7 +151,7 @@ Generate the list of items according to the specified schema.
             const result = (await generationChain.invoke({
                 topicName,
                 topicDescription,
-                target_keywords_string: targetKeywords ? targetKeywords.join(', ') : 'N/A',
+                target_keywords_string: target_keywords ? target_keywords.join(', ') : 'N/A',
                 featured_hints_section: featuredHintsSection,
             })) as { items?: Partial<ItemData>[] };
 
@@ -216,7 +199,7 @@ Generate the list of items according to the specified schema.
 
     /**
      * Generate the featured hints section for the prompt
-     * @param featuredItemHints Array of featured item hints
+     * @param featuredItemHints Array of featured item specifications (guidelines, instructions, or criteria)
      * @returns Formatted section for the prompt
      */
     private generateFeaturedHintsSection(featuredItemHints: string[]): string {
@@ -225,11 +208,11 @@ Generate the list of items according to the specified schema.
         }
 
         return `
-**Featured Item Guidelines:**
-The user has specified the following guidelines for which items should be marked as featured (highlighted):
+**Featured Item Specifications:**
+The user has provided the following specifications for which items should be marked as featured (highlighted):
 ${featuredItemHints.map((hint) => `- ${hint}`).join('\n')}
 
-When determining the 'featured' status for items, consider these guidelines carefully. Items that match these criteria should be marked as featured=true.
+When determining the 'featured' status for items, carefully consider these specifications. Items that match these criteria, guidelines, or instructions should be marked as featured=true.
 `;
     }
 }

@@ -183,10 +183,7 @@ export class ItemsGeneratorService {
             if (config.ai_first_generation_enabled) {
                 this.logger.log(`[${slug}] 1.5. AI-First Item Generation - Invoking`);
                 initialAiItems = await this.aiItemGenerationService.generateInitialItemsWithAI(
-                    slug,
-                    name,
-                    prompt,
-                    target_keywords,
+                    createItemsGeneratorDto,
                     featuredItemHints,
                 );
                 this.logger.log(`[${slug}] AI generated ${initialAiItems.length} initial items.`);
@@ -195,9 +192,7 @@ export class ItemsGeneratorService {
             // 2. AI-Powered Search Query Generation
             this.logger.log(`[${slug}] 2. AI-Powered Search Query Generation - Starting`);
             const searchQueries = await this.searchQueryGenerationService.generateSearchQueries(
-                name,
-                prompt,
-                target_keywords,
+                createItemsGeneratorDto,
                 config,
             );
             this.logger.log(`[${slug}] Generated ${searchQueries.length} search queries.`);
@@ -247,9 +242,8 @@ export class ItemsGeneratorService {
             );
             const extractedWebItems: ItemData[] =
                 await this.itemExtractionService.extractItemsFromPages(
-                    slug,
+                    createItemsGeneratorDto,
                     relevantPages,
-                    prompt,
                     config,
                     featuredItemHints,
                 );
