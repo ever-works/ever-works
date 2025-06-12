@@ -47,7 +47,7 @@ export class ItemExtractionService {
     private textSplitter: RecursiveCharacterTextSplitter;
 
     // Constants for content chunking
-    private readonly MAX_CHUNK_SIZE = 8000; // Characters per chunk
+    private readonly MAX_CHUNK_SIZE = 4000; // Characters per chunk
     private readonly CHUNK_OVERLAP = 200; // Overlap between chunks
 
     constructor(private readonly aiService: AiService) {

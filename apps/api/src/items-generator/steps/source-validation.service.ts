@@ -164,11 +164,23 @@ export class SourceValidationService {
         const itemName = currentItem.name;
         const itemDescription = currentItem.description;
 
+        // Check if the source URL starts with Google search URL patterns
+        if (this.isGoogleSearchUrl(sourceUrl)) {
+            this.logger.log(`Ignoring item "${itemName}" with Google search URL: ${sourceUrl}`);
+            return undefined;
+        }
+
         const validateUrl = async (urlToValidate: string): Promise<string | undefined> => {
             if (!urlToValidate || typeof urlToValidate !== 'string') {
                 this.logger.warn(
                     `Invalid URL structure provided for URL for "${itemName}": ${urlToValidate}`,
                 );
+                return undefined;
+            }
+
+            // Check if this URL is a Google search URL
+            if (this.isGoogleSearchUrl(urlToValidate)) {
+                this.logger.warn(`Skipping Google search URL for "${itemName}": ${urlToValidate}`);
                 return undefined;
             }
 
@@ -439,5 +451,20 @@ export class SourceValidationService {
         }
 
         return queries;
+    }
+
+    /**
+     * Check if a URL is a Google search URL that should be ignored
+     */
+    private isGoogleSearchUrl(url: string): boolean {
+        if (!url || typeof url !== 'string') {
+            return false;
+        }
+
+        // Regex pattern to match Google search URLs across all domains
+        // Matches: google.{tld}/search or google.co.{tld}/search or google.com.{tld}/search
+        const googleSearchRegex = /google\.(?:com?\.)?[a-z]{2,3}\/search/i;
+
+        return googleSearchRegex.test(url);
     }
 }
