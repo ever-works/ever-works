@@ -30,135 +30,131 @@ Based on this website content:
 
 // Output schema for validation
 export const markdownOutputSchema = z.object({
-  markdown: z.string(),
+    markdown: z.string(),
 });
 
 @Injectable()
 export class MarkdownGenerationService {
-  private readonly logger = new Logger(MarkdownGenerationService.name);
-  private llm: ChatOpenAI;
+    private readonly logger = new Logger(MarkdownGenerationService.name);
+    private llm: ChatOpenAI;
 
-  constructor(
-    private readonly aiService: AiService,
-    private readonly searchService: SearchService,
-  ) {
-    this.llm = this.aiService.createLlmWithTemperature(0.6);
-  }
-
-  /**
-   * Generates markdown summary for a given item
-   * @param item The item to generate markdown for
-   * @returns A markdown string with the item's summary
-   */
-  async generateMarkdown(item: Partial<ItemData>): Promise<string> {
-    if (!item || !item.source_url) {
-      this.logger.warn(`Cannot generate markdown: Missing item or source URL`);
-      return '';
+    constructor(
+        private readonly aiService: AiService,
+        private readonly searchService: SearchService,
+    ) {
+        this.llm = this.aiService.createLlmWithTemperature(0.6);
     }
 
-    this.logger.log(`Generating markdown for: ${item.name} (${item.slug})`);
+    /**
+     * Generates markdown summary for a given item
+     * @param item The item to generate markdown for
+     * @returns A markdown string with the item's summary
+     */
+    async generateMarkdown(item: Partial<ItemData>): Promise<string> {
+        if (!item || !item.source_url) {
+            this.logger.warn(`Cannot generate markdown: Missing item or source URL`);
+            return '';
+        }
 
-    try {
-      // Extract content from the source URL
-      const content = await this.extractContentFrom(item.source_url);
+        this.logger.log(`Generating markdown for: ${item.name} (${item.slug})`);
 
-      if (!content || !content.rawContent) {
-        this.logger.warn(
-          `Failed to extract content from: "${item.source_url}"`,
-        );
-        return '';
-      }
+        try {
+            // Extract content from the source URL
+            const content = await this.extractContentFrom(item.source_url);
 
-      // Generate markdown using the extracted content
-      const prompt = HumanMessagePromptTemplate.fromTemplate(MARKDOWN_PROMPT);
-      const result = await prompt
-        .pipe(this.llm.withStructuredOutput(markdownOutputSchema))
-        .invoke({
-          item: JSON.stringify(item),
-          content: content.rawContent.slice(0, 8000),
-        });
+            if (!content || !content.rawContent) {
+                this.logger.warn(`Failed to extract content from: "${item.source_url}"`);
+                return '';
+            }
 
-      return result.markdown || '';
-    } catch (error) {
-      this.logger.error(
-        `Error generating markdown for ${item.name}: ${error.message}`,
-        error.stack,
-      );
-      return '';
-    }
-  }
+            // Generate markdown using the extracted content
+            const prompt = HumanMessagePromptTemplate.fromTemplate(MARKDOWN_PROMPT);
+            const result = await prompt
+                .pipe(this.llm.withStructuredOutput(markdownOutputSchema))
+                .invoke({
+                    item: JSON.stringify(item),
+                    content: content.rawContent.slice(0, 8000),
+                });
 
-  /**
-   * Generates markdown summaries for multiple items
-   * @param items The items to generate markdown for
-   * @returns An array of items with their markdown summaries
-   */
-  async generateMarkdownForItems(items: ItemData[]): Promise<ItemData[]> {
-    if (!items || items.length === 0) {
-      return [];
-    }
-
-    this.logger.log(`Generating markdown for ${items.length} items`);
-
-    // Process items in batches
-    const BATCH_SIZE = 10;
-    const processedItems: ItemData[] = [];
-
-    // Process each batch
-    for (let i = 0; i < items.length; i += BATCH_SIZE) {
-      const batch = items.slice(i, i + BATCH_SIZE);
-
-      const markdownPromises = batch.map(async (item) => {
-        const markdown = await this.generateMarkdown(item);
-        return {
-          ...item,
-          markdown,
-        };
-      });
-
-      const batchResults = await Promise.all(markdownPromises);
-      processedItems.push(...batchResults);
-
-      if (i + BATCH_SIZE < items.length) {
-        await new Promise((resolve) => setTimeout(resolve, 500));
-      }
+            return result.markdown || '';
+        } catch (error) {
+            this.logger.error(
+                `Error generating markdown for ${item.name}: ${error.message}`,
+                error.stack,
+            );
+            return '';
+        }
     }
 
-    return processedItems;
-  }
+    /**
+     * Generates markdown summaries for multiple items
+     * @param items The items to generate markdown for
+     * @returns An array of items with their markdown summaries
+     */
+    async generateMarkdownForItems(items: ItemData[]): Promise<ItemData[]> {
+        if (!items || items.length === 0) {
+            return [];
+        }
 
-  /**
-   * Extracts content from a URL using the search service
-   * @param url The URL to extract content from
-   * @returns The extracted content
-   */
-  private async extractContentFrom(url: string) {
-    this.logger.log(`Extracting content from ${url}`);
+        this.logger.log(`Generating markdown for ${items.length} items`);
 
-    if (!this.searchService.isSearchConfigured()) {
-      this.logger.warn(
-        'Search service not configured. Cannot extract content.',
-      );
-      return null;
+        // Process items in batches
+        const BATCH_SIZE = 10;
+        const processedItems: ItemData[] = [];
+
+        // Process each batch
+        for (let i = 0; i < items.length; i += BATCH_SIZE) {
+            const batch = items.slice(i, i + BATCH_SIZE);
+
+            const markdownPromises = batch.map(async (item) => {
+                const markdown = await this.generateMarkdown(item);
+                return {
+                    ...item,
+                    markdown,
+                };
+            });
+
+            const batchResults = await Promise.all(markdownPromises);
+            processedItems.push(...batchResults);
+
+            if (i + BATCH_SIZE < items.length) {
+                await new Promise((resolve) => setTimeout(resolve, 500));
+            }
+        }
+
+        return processedItems;
     }
 
-    try {
-      return await this.searchService.extractContent(url);
-    } catch (error) {
-      // try again with extractTextFromSourceURL
-      const text = await extractTextFromSourceURL(url).catch(() => null);
+    /**
+     * Extracts content from a URL using the search service
+     * @param url The URL to extract content from
+     * @returns The extracted content
+     */
+    private async extractContentFrom(url: string) {
+        this.logger.log(`Extracting content from ${url}`);
 
-      if (text) {
-        return {
-          rawContent: text,
-        };
-      }
+        if (!this.searchService.isSearchConfigured()) {
+            this.logger.warn('Search service not configured. Cannot extract content.');
+            return null;
+        }
 
-      this.logger.error(
-        `Error extracting content from ${url}: ${error.message}`,
-        error.stack,
-      );
-      return null;
+        try {
+            return await this.searchService.extractContent(url);
+        } catch (error) {
+            // try again with extractTextFromSourceURL
+            const text = await extractTextFromSourceURL(url).catch(() => null);
+
+            if (text) {
+                return {
+                    rawContent: text,
+                };
+            }
+
+            this.logger.error(
+                `Error extracting content from ${url}: ${error.message}`,
+                error.stack,
+            );
+            return null;
+        }
     }
-  }
 }

@@ -8,6 +8,7 @@ Every item has name, description, and optionally URL of item's official website/
 - Deduplicate the items based on names and URLs.
 - Some products have slightly different names but are the same - consider them as duplicates.
 - Transform any names that contains version numbers to the base name.
+- featured field should remain the same as in the original item
 </rules>
 
 Example of same items but with different names - they should be considered as duplicates:
@@ -35,10 +36,11 @@ We don't want to show duplicates to our users, so return only new items that don
 - Compare each new item with the list of existing items to identify duplicates
 - Items are considered duplicates if they have:
   * Same or very similar names (ignoring case, version numbers, common suffixes)
-  * Same or similar URLs (especially same domain/repository)
+  * Same or similar source URLs (especially same domain/repository)
   * Same underlying product/tool/library even with different naming
 - When in doubt, prefer to mark as duplicate rather than include a potential duplicate
 - Return only items that are genuinely new and not already represented in the existing list
+- featured field should remain the same as in the new item
 </rules>
 
 Example of same items but with different names - they should be considered as duplicates:

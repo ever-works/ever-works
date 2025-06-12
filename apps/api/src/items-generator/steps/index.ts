@@ -8,4 +8,4 @@ export * from './source-validation.service';
 export * from './data-aggregation.service';
 export * from './category-processing.service';
 export * from './markdown-generation.service';
-export * from './url-extraction.service';
+export * from './prompt-processing.service';

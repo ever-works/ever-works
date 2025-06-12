@@ -10,7 +10,7 @@ import {
     DataAggregationService,
     CategoryProcessingService,
     MarkdownGenerationService,
-    UrlExtractionService,
+    PromptProcessingService,
     PromptComparisonService,
 } from './steps';
 import { Category, ItemData, Tag } from './dto';
@@ -23,7 +23,7 @@ export class ItemsGeneratorService {
 
     constructor(
         private readonly promptComparisonService: PromptComparisonService,
-        private readonly urlExtractionService: UrlExtractionService,
+        private readonly promptProcessingService: PromptProcessingService,
         private readonly aiItemGenerationService: AiItemGenerationService,
         private readonly searchQueryGenerationService: SearchQueryGenerationService,
         private readonly webPageRetrievalService: WebPageRetrievalService,
@@ -117,13 +117,52 @@ export class ItemsGeneratorService {
 
             const processedSourceUrls = new Set<string>();
 
-            // 1.1. Extract URLs from Prompt
-            this.logger.log(`[${slug}] 1.1. URL Extraction from Prompt - Starting`);
-            const { extractedUrls, rewrittenPrompt: prompt } =
-                await this.urlExtractionService.extractUrlsFromPrompt(
-                    slug,
-                    createItemsGeneratorDto.prompt,
+            // 1.1. Process Prompt (Extract URLs, Categories, Priorities, and Featured Item Hints)
+            this.logger.log(
+                `[${slug}] 1.1. Prompt Processing (URLs, Categories, Priorities, and Featured Hints) - Starting`,
+            );
+            const {
+                extractedUrls,
+                suggestedCategories,
+                priorityCategories: promptPriorityCategories,
+                featuredItemHints,
+                rewrittenPrompt: prompt,
+            } = await this.promptProcessingService.processPrompt(
+                slug,
+                createItemsGeneratorDto.prompt,
+            );
+
+            // Merge priority categories from DTO with those extracted from prompt
+            const allPriorityCategories = [
+                ...(createItemsGeneratorDto.priority_categories || []),
+                ...promptPriorityCategories,
+            ].filter((category, index, arr) => arr.indexOf(category) === index); // Remove duplicates
+
+            // Merge initial categories from DTO with categories extracted from prompt
+            // Priority categories must also be included in initial categories
+            const allInitialCategories = [
+                ...(createItemsGeneratorDto.initial_categories || []),
+                ...suggestedCategories,
+                ...allPriorityCategories, // Ensure priority categories are included in initial categories
+            ].filter((category, index, arr) => arr.indexOf(category) === index); // Remove duplicates
+
+            if (allInitialCategories.length > 0) {
+                this.logger.log(
+                    `[${slug}] Found ${allInitialCategories.length} initial categories: ${allInitialCategories.join(', ')}`,
                 );
+            }
+
+            if (allPriorityCategories.length > 0) {
+                this.logger.log(
+                    `[${slug}] Found ${allPriorityCategories.length} priority categories: ${allPriorityCategories.join(', ')}`,
+                );
+            }
+
+            if (featuredItemHints.length > 0) {
+                this.logger.log(
+                    `[${slug}] Found ${featuredItemHints.length} featured item hints: ${featuredItemHints.join(', ')}`,
+                );
+            }
 
             // Update the prompt in the DTO
             createItemsGeneratorDto.prompt = prompt;
@@ -144,10 +183,8 @@ export class ItemsGeneratorService {
             if (config.ai_first_generation_enabled) {
                 this.logger.log(`[${slug}] 1.5. AI-First Item Generation - Invoking`);
                 initialAiItems = await this.aiItemGenerationService.generateInitialItemsWithAI(
-                    slug,
-                    name,
-                    prompt,
-                    target_keywords,
+                    createItemsGeneratorDto,
+                    featuredItemHints,
                 );
                 this.logger.log(`[${slug}] AI generated ${initialAiItems.length} initial items.`);
             }
@@ -155,9 +192,7 @@ export class ItemsGeneratorService {
             // 2. AI-Powered Search Query Generation
             this.logger.log(`[${slug}] 2. AI-Powered Search Query Generation - Starting`);
             const searchQueries = await this.searchQueryGenerationService.generateSearchQueries(
-                name,
-                prompt,
-                target_keywords,
+                createItemsGeneratorDto,
                 config,
             );
             this.logger.log(`[${slug}] Generated ${searchQueries.length} search queries.`);
@@ -207,11 +242,10 @@ export class ItemsGeneratorService {
             );
             const extractedWebItems: ItemData[] =
                 await this.itemExtractionService.extractItemsFromPages(
-                    slug,
+                    createItemsGeneratorDto,
                     relevantPages,
-                    name,
-                    prompt,
                     config,
+                    featuredItemHints,
                 );
             this.logger.log(
                 `[${slug}] Extracted ${extractedWebItems.length} potential items from web pages.`,
@@ -236,12 +270,20 @@ export class ItemsGeneratorService {
 
             // 7. Category and Tag Generation
             this.logger.log(`[${slug}] 7. Category and Tag Generation - Starting`);
+
+            // Create a modified DTO with merged priority categories
+            const dtoWithMergedPriorities = {
+                ...createItemsGeneratorDto,
+                priority_categories: allPriorityCategories,
+            };
+
             const { categories, tags, finalItems } =
                 await this.categoryProcessingService.processCategoriesAndTags(
-                    createItemsGeneratorDto,
+                    dtoWithMergedPriorities,
                     aggregatedItems,
                     existingCategories || [],
                     existingTags || [],
+                    allInitialCategories,
                 );
 
             this.logger.log(

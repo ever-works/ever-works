@@ -1,7 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as fs from 'node:fs/promises';
 import { GithubService } from '../git/github.service';
-import type { Category, Identifiable, ItemData, Tag } from '../agent/types';
+import type { Identifiable, ItemData, Tag } from '../agent/types';
+import { Category } from '../items-generator/dto/category.dto';
 import { Directory } from '../entities/directory.entity';
 import { User } from '../entities/user.entity';
 import { DataRepository } from '../data-generator/data-repository';
@@ -15,18 +16,20 @@ export class MarkdownGeneratorService {
 
     constructor(private readonly githubService: GithubService) {}
 
-    async initialize(directory: Directory, user: User) {
+    async initialize(directory: Directory, user: User, repository_description?: string) {
         const token = user.getGitToken();
+
+        const description = repository_description || directory.description;
 
         if (directory.organization) {
             await this.githubService.createEmptyRepoAsOrg(
                 directory.owner,
                 directory.slug,
-                directory.description,
+                description,
                 token,
             );
         } else {
-            await this.githubService.createEmptyRepo(directory.slug, directory.description, token);
+            await this.githubService.createEmptyRepo(directory.slug, description, token);
         }
 
         const markdownPath = await this.githubService.cloneOrPull(
@@ -61,7 +64,8 @@ export class MarkdownGeneratorService {
                 });
 
             let canCreatePR =
-                config.generation_method !== GenerationMethod.RECREATE && !!config.pr_update?.branch;
+                config.generation_method !== GenerationMethod.RECREATE &&
+                !!config.pr_update?.branch;
 
             // In case of re-creation:
             // Switch to the main branch and remove existing items files.
@@ -174,11 +178,14 @@ export class MarkdownGeneratorService {
             builder.enableToC();
         }
 
-        for (const category in groups) {
-            const categoryDetails = categories.get(category);
+        // Sort categories by priority, then alphabetically
+        const sortedCategoryIds = this.sortCategoriesByPriority(Object.keys(groups), categories);
+
+        for (const categoryId of sortedCategoryIds) {
+            const categoryDetails = categories.get(categoryId);
             builder.addSubHeader(categoryDetails.name);
 
-            const items = groups[category];
+            const items = groups[categoryId];
             items.sort((a, b) => {
                 if (a.featured && !b.featured) return -1;
                 if (!a.featured && b.featured) return 1;
@@ -194,6 +201,35 @@ export class MarkdownGeneratorService {
         }
 
         return builder.build();
+    }
+
+    /**
+     * Sort category IDs by priority, then alphabetically
+     * @param categoryIds Array of category IDs to sort
+     * @param categories Map of category details
+     */
+    private sortCategoriesByPriority(categoryIds: string[], categories: Map<string, Category>): string[] {
+        return categoryIds.sort((aId, bId) => {
+            const categoryA = categories.get(aId);
+            const categoryB = categories.get(bId);
+
+            // If both have priority, sort by priority number (lower = higher priority)
+            if (categoryA?.priority !== undefined && categoryB?.priority !== undefined) {
+                return categoryA.priority - categoryB.priority;
+            }
+            // If only A has priority, A comes first
+            if (categoryA?.priority !== undefined && categoryB?.priority === undefined) {
+                return -1;
+            }
+            // If only B has priority, B comes first
+            if (categoryA?.priority === undefined && categoryB?.priority !== undefined) {
+                return 1;
+            }
+            // If neither has priority, sort alphabetically by name
+            const nameA = categoryA?.name || aId;
+            const nameB = categoryB?.name || bId;
+            return nameA.localeCompare(nameB);
+        });
     }
 
     private async loadCategories(data: DataRepository): Promise<Map<string, Category>> {

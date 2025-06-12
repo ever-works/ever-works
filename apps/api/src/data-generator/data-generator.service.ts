@@ -10,6 +10,7 @@ import {
     Identifiable,
     ItemData,
     GenerationMethod,
+    CompanyDto,
 } from '../items-generator/dto';
 import { format } from 'date-fns';
 
@@ -150,7 +151,10 @@ export class DataGeneratorService {
             /**
              * rewrite meta files only if we are creating new repository or we are recreating it
              */
-            if (!existed || createItemsGeneratorDto.generation_method === GenerationMethod.RECREATE) {
+            if (
+                !existed ||
+                createItemsGeneratorDto.generation_method === GenerationMethod.RECREATE
+            ) {
                 promises.push(
                     data.writeReadme(this.getDefaultReadme(directory)),
                     data.writeLicense(this.getLicense()),
@@ -158,6 +162,8 @@ export class DataGeneratorService {
                         this.getDefaultConfig({
                             generation_method: createItemsGeneratorDto.generation_method,
                             initial_prompt: createItemsGeneratorDto.prompt,
+                            ...this.withCompanyConfig(createItemsGeneratorDto.company),
+                            ...createItemsGeneratorDto.config,
                         }),
                     ),
                     data.writeMarkdownTemplate(this.getHeader(directory), this.getFooter()),
@@ -174,6 +180,8 @@ export class DataGeneratorService {
                         this.getDefaultConfig({
                             ...preloadedConfig,
                             generation_method: createItemsGeneratorDto.generation_method,
+                            ...this.withCompanyConfig(createItemsGeneratorDto.company),
+                            ...createItemsGeneratorDto.config,
                             pr_update: {
                                 branch: newBranchName,
                                 title: prTitle,
@@ -199,7 +207,9 @@ export class DataGeneratorService {
 
             for (const item of itemsWithMarkdown) {
                 item.slug = slugifyText(item.slug || item.name);
-                await this.processItem(data, item, user);
+                await this.processItem(data, item, user).catch((err) => {
+                    this.logger.error('Failed to process item', err);
+                });
             }
 
             // Push changes
@@ -333,6 +343,15 @@ export class DataGeneratorService {
             map.set(item.id, item);
         }
         return Array.from(map.values());
+    }
+
+    private withCompanyConfig(company?: CompanyDto) {
+        return company
+            ? {
+                  company_name: company.name,
+                  company_website: company.website,
+              }
+            : {};
     }
 
     private getDefaultConfig(additionalConfig?: Partial<IDataConfig>): IDataConfig {

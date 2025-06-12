@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { TavilyClient } from '@tavily/core';
 import { ConfigDto } from '../dto/create-items-generator.dto';
 import { WebPageData } from '../interfaces/items-generator.interfaces';
-import { SearchService } from '../shared';
+import { SearchService, NotionService } from '../shared';
 
 @Injectable()
 export class WebPageRetrievalService {
@@ -10,7 +10,10 @@ export class WebPageRetrievalService {
     private tavilyClient: TavilyClient | undefined;
     private readonly BATCH_SIZE = 10;
 
-    constructor(private readonly searchService: SearchService) {
+    constructor(
+        private readonly searchService: SearchService,
+        private readonly notionService: NotionService,
+    ) {
         this.tavilyClient = this.searchService.getTavilyClient();
     }
 
@@ -152,15 +155,7 @@ export class WebPageRetrievalService {
         urls: string[],
         processedSourceUrls: Set<string>,
     ): Promise<WebPageData[]> {
-        if (!this.tavilyClient) {
-            this.logger.warn(
-                `[${slug}] Tavily API key not configured. Skipping specific URL retrieval.`,
-            );
-            return [];
-        }
-
         const dedupedUrls = [...new Set(urls)];
-
         const allFetchedPages: WebPageData[] = [];
 
         if (dedupedUrls.length === 0) {
@@ -168,14 +163,94 @@ export class WebPageRetrievalService {
             return [];
         }
 
-        this.logger.log(`[${slug}] Processing ${dedupedUrls.length} unique URLs`);
+        // Separate Notion URLs from regular URLs
+        const notionUrls: string[] = [];
+        const regularUrls: string[] = [];
 
-        for (let i = 0; i < dedupedUrls.length; i += this.BATCH_SIZE) {
-            const batch = dedupedUrls.slice(i, i + this.BATCH_SIZE);
+        for (const url of dedupedUrls) {
+            if (this.notionService.isNotionUrl(url)) {
+                notionUrls.push(url);
+            } else {
+                regularUrls.push(url);
+            }
+        }
 
-            const extractionPromises = batch.map(async (url) => {
+        this.logger.log(
+            `[${slug}] Processing ${dedupedUrls.length} URLs: ${notionUrls.length} Notion URLs, ${regularUrls.length} regular URLs`,
+        );
+
+        // Process Notion URLs
+        if (notionUrls.length > 0) {
+            this.logger.log(`[${slug}] Processing ${notionUrls.length} Notion URLs`);
+
+            for (const url of notionUrls) {
                 try {
-                    const response = await this.tavilyClient.extract([url], {
+                    const content = await this.notionService.extractNotionContent(url);
+
+                    // Add to processed URLs set
+                    processedSourceUrls.add(url);
+
+                    allFetchedPages.push({
+                        source_url: url,
+                        raw_content: content,
+                        retrieved_at: new Date().toISOString(),
+                    });
+
+                    this.logger.log(
+                        `[${slug}] Successfully extracted content from Notion URL: ${url}`,
+                    );
+                } catch (error) {
+                    this.logger.error(
+                        `[${slug}] Error extracting content from Notion URL ${url}: ${error.message}`,
+                    );
+                }
+            }
+        }
+
+        // Process regular URLs with Tavily
+        if (regularUrls.length > 0) {
+            if (!this.tavilyClient) {
+                this.logger.warn(
+                    `[${slug}] Tavily API key not configured. Skipping ${regularUrls.length} regular URLs.`,
+                );
+            } else {
+                this.logger.log(
+                    `[${slug}] Processing ${regularUrls.length} regular URLs with Tavily`,
+                );
+                const tavilyResults = await this.processUrlsWithTavily(
+                    slug,
+                    regularUrls,
+                    processedSourceUrls,
+                );
+                allFetchedPages.push(...tavilyResults);
+            }
+        }
+
+        this.logger.log(
+            `[${slug}] Specific URL retrieval complete. Retrieved ${allFetchedPages.length} pages.`,
+        );
+
+        return allFetchedPages;
+    }
+
+    /**
+     * Process URLs using Tavily (extracted from original retrieveSpecificUrls method)
+     */
+    private async processUrlsWithTavily(
+        slug: string,
+        urls: string[],
+        processedSourceUrls: Set<string>,
+    ): Promise<WebPageData[]> {
+        const allFetchedPages: WebPageData[] = [];
+
+        this.logger.log(`[${slug}] Processing ${urls.length} URLs with Tavily`);
+
+        for (let i = 0; i < urls.length; i += this.BATCH_SIZE) {
+            const batch = urls.slice(i, i + this.BATCH_SIZE);
+
+            const extractionPromises = batch.map(async (url: string) => {
+                try {
+                    const response = await this.tavilyClient!.extract([url], {
                         maxResults: 1,
                     });
 
@@ -196,7 +271,7 @@ export class WebPageRetrievalService {
                         raw_content: extractedResult.rawContent,
                         retrieved_at: new Date().toISOString(),
                     };
-                } catch (error) {
+                } catch (error: any) {
                     this.logger.error(
                         `[${slug}] Error fetching content from ${url}: ${error.message}`,
                     );
@@ -205,19 +280,17 @@ export class WebPageRetrievalService {
             });
 
             const batchResults = await Promise.all(extractionPromises);
-            const validResults: WebPageData[] = batchResults.filter((result) => result !== null);
+            const validResults: WebPageData[] = batchResults.filter(
+                (result: WebPageData | null) => result !== null,
+            ) as WebPageData[];
 
             allFetchedPages.push(...validResults);
 
             // Add a small delay between batches to be polite to the API
-            if (i + this.BATCH_SIZE < dedupedUrls.length) {
+            if (i + this.BATCH_SIZE < urls.length) {
                 await new Promise((resolve) => setTimeout(resolve, 500));
             }
         }
-
-        this.logger.log(
-            `[${slug}] Specific URL retrieval complete. Retrieved ${allFetchedPages.length} pages.`,
-        );
 
         return allFetchedPages;
     }

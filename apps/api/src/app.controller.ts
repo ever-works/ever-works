@@ -96,7 +96,7 @@ export class AppController {
 
             if (generated) {
                 await Promise.all([
-                    this.markdownGenerator.initialize(directory, user),
+                    this.markdownGenerator.initialize(directory, user, dto.repository_description),
                     this.websiteGenerator.initialize(
                         directory,
                         user,
@@ -129,10 +129,7 @@ export class AppController {
                 throw new NotFoundException(`Directory with slug '${slug}' not found`);
             }
 
-            const result = await this.websiteUpdateService.updateRepository(
-                directory,
-                user,
-            );
+            const result = await this.websiteUpdateService.updateRepository(directory, user);
 
             return {
                 status: 'success',

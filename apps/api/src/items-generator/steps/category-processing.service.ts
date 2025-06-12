@@ -29,6 +29,7 @@ Here is the list of items to categorize:
 6. For tags, good examples include: "open-source", "real-time", "cloud-native", "enterprise", etc.
 7. Avoid overly broad categories like "Tools" or "Software" - be more specific.
 8. Avoid overly specific categories that would only contain 1-2 items.
+9. Overwrite existing item category if it doesn't match the item's primary function or purpose.
 </instructions>
 `.trim();
 
@@ -41,6 +42,7 @@ const categorizeOutputSchema = z.object({
 export class CategoryProcessingService {
     private readonly logger = new Logger(CategoryProcessingService.name);
     private llm: ChatOpenAI;
+    private readonly BATCH_SIZE = 30;
 
     constructor(private readonly aiService: AiService) {
         this.llm = this.aiService.createLlmWithTemperature(0.3);
@@ -50,14 +52,18 @@ export class CategoryProcessingService {
      * Process items to generate categories and tags
      * @param createItemsGeneratorDto The DTO containing the prompt
      * @param extractedItems The items to categorize
+     * @param existingCategories Existing categories to maintain consistency
+     * @param existingTags Existing tags to maintain consistency
+     * @param initialCategories Categories provided initially (from DTO or prompt)
      */
     async processCategoriesAndTags(
         createItemsGeneratorDto: CreateItemsGeneratorDto,
         extractedItems: Partial<ItemData>[],
         existingCategories: Category[],
         existingTags: Tag[],
+        initialCategories: string[] = [],
     ) {
-        const { slug, prompt } = createItemsGeneratorDto;
+        const { slug, prompt, priority_categories = [] } = createItemsGeneratorDto;
         this.logger.log(
             `[${slug}] Starting category and tag processing for ${extractedItems.length} items`,
         );
@@ -77,6 +83,9 @@ export class CategoryProcessingService {
         existingCategories.forEach((category) => existingCategoriesSet.add(category.name));
         existingTags.forEach((tag) => existingTagsSet.add(tag.name));
 
+        // Add initial categories to existing categories for prioritization
+        initialCategories.forEach((category) => existingCategoriesSet.add(category));
+
         try {
             // Categorize items using AI
             const categorized = await this.categorizeItems(
@@ -89,7 +98,7 @@ export class CategoryProcessingService {
             this.logger.log(`[${slug}] Successfully categorized ${categorized.length} items`);
 
             // Extract unique categories and tags
-            const categories = this.extractUniqueCategories(categorized);
+            const categories = this.extractUniqueCategories(categorized, priority_categories);
             const tags = this.extractUniqueTags(categorized);
 
             // Convert to final format
@@ -145,10 +154,12 @@ export class CategoryProcessingService {
                 name: i.name,
                 description: i.description,
                 source_url: i.source_url,
+                featured: i.featured,
+                ...(i.category ? { category: i.category } : {}),
             }));
 
             // Process in batches if there are many items
-            if (items.length > 50) {
+            if (items.length > this.BATCH_SIZE) {
                 return this.processBatchCategorization(
                     description,
                     itemsForCategorization,
@@ -212,8 +223,7 @@ ${CATEGORIZE_PROMPT}
 - For consistency, consider using the existing categories and tags listed above when appropriate.
 - You can create new categories or tags if the existing ones don't fit well.
 - Prioritize consistency across items that serve similar purposes.
-</additional_instructions>
-`.trim();
+</additional_instructions>`.trim();
 
         return enhancedPromptTemplate;
     }
@@ -229,14 +239,13 @@ ${CATEGORIZE_PROMPT}
         existingCategories: Set<string>,
         existingTags: Set<string>,
     ): Promise<ItemData[]> {
-        const BATCH_SIZE = 30;
         const allCategorizedItems: ItemData[] = [];
 
         // Process items in batches
-        for (let i = 0; i < items.length; i += BATCH_SIZE) {
-            const batch = items.slice(i, i + BATCH_SIZE);
-            const batchNumber = Math.floor(i / BATCH_SIZE) + 1;
-            const totalBatches = Math.ceil(items.length / BATCH_SIZE);
+        for (let i = 0; i < items.length; i += this.BATCH_SIZE) {
+            const batch = items.slice(i, i + this.BATCH_SIZE);
+            const batchNumber = Math.floor(i / this.BATCH_SIZE) + 1;
+            const totalBatches = Math.ceil(items.length / this.BATCH_SIZE);
 
             this.logger.log(
                 `Processing batch ${batchNumber} of ${totalBatches} (${batch.length} items)`,
@@ -285,7 +294,7 @@ ${CATEGORIZE_PROMPT}
                 allCategorizedItems.push(...batchResults);
 
                 // Add a small delay between batches to avoid rate limiting
-                if (i + BATCH_SIZE < items.length) {
+                if (i + this.BATCH_SIZE < items.length) {
                     await new Promise((resolve) => setTimeout(resolve, 500));
                 }
             } catch (error) {
@@ -365,12 +374,16 @@ ${CATEGORIZE_PROMPT}
     /**
      * Extract unique categories from categorized items
      * @param items Categorized items
+     * @param priorityCategories Categories that should appear first in the final output
      */
-    private extractUniqueCategories(items: ItemData[]): Category[] {
+    private extractUniqueCategories(
+        items: ItemData[],
+        priorityCategories: string[] = [],
+    ): Category[] {
         const categoryNames = items.map((item) =>
             typeof item.category === 'string' ? item.category : item.category?.name,
         );
-        return this.mapUnique(categoryNames);
+        return this.mapUniqueWithPriority(categoryNames, priorityCategories);
     }
 
     /**
@@ -395,14 +408,56 @@ ${CATEGORIZE_PROMPT}
     }
 
     /**
+     * Map an array of names to unique identifiable objects with priority support
+     * @param names Array of names
+     * @param priorityCategories Categories that should appear first (lower priority numbers)
+     */
+    private mapUniqueWithPriority(names: string[], priorityCategories: string[] = []): Category[] {
+        const unique = new Set(names.filter(Boolean));
+        const categories: Category[] = [];
+
+        // Create a map of priority category names to their priority order
+        const priorityMap = new Map<string, number>();
+        priorityCategories.forEach((categoryName, index) => {
+            priorityMap.set(categoryName.toLowerCase(), index + 1); // Priority 1, 2, 3, etc.
+        });
+
+        // Convert to Category objects with priority
+        Array.from(unique).forEach((name) => {
+            const priority = priorityMap.get(name.toLowerCase());
+            categories.push({
+                id: slugifyText(name),
+                name,
+                priority,
+            });
+        });
+
+        // Sort categories: priority categories first (by priority order), then alphabetically
+        return categories.sort((a, b) => {
+            // If both have priority, sort by priority number (lower = higher priority)
+            if (a.priority !== undefined && b.priority !== undefined) {
+                return a.priority - b.priority;
+            }
+            // If only a has priority, a comes first
+            if (a.priority !== undefined && b.priority === undefined) {
+                return -1;
+            }
+            // If only b has priority, b comes first
+            if (a.priority === undefined && b.priority !== undefined) {
+                return 1;
+            }
+            // If neither has priority, sort alphabetically
+            return a.name.localeCompare(b.name);
+        });
+    }
+
+    /**
      * Convert a partial item to a full ItemData object
      * @param item Partial item data
      */
     private toItemData(item: Partial<ItemData>): ItemData {
         return {
-            name: item.name,
-            description: item.description,
-            source_url: item.source_url,
+            ...(item as ItemData),
             category: slugifyText(item.category as string),
             tags: Array.isArray(item.tags)
                 ? item.tags.map((tag: any) => slugifyText(typeof tag === 'string' ? tag : tag.name))

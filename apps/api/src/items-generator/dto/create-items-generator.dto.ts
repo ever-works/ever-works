@@ -24,6 +24,16 @@ export enum WebsiteRepositoryCreationMethod {
     CREATE_USING_TEMPLATE = 'create-using-template',
 }
 
+export class CompanyDto {
+    @IsString()
+    @IsNotEmpty()
+    name: string;
+
+    @IsString()
+    @IsUrl({ protocols: ['http', 'https'], require_tld: true })
+    website: string;
+}
+
 export class ConfigDto {
     @IsOptional()
     @IsInt()
@@ -46,7 +56,7 @@ export class ConfigDto {
     @IsOptional()
     @Min(0.01)
     @Max(1.0)
-    relevance_threshold_content: number = 0.75;
+    relevance_threshold_content: number = 0.85;
 
     @IsOptional()
     @IsInt()
@@ -77,6 +87,21 @@ export class CreateItemsGeneratorDto {
     prompt: string;
 
     @IsOptional()
+    @ValidateNested()
+    @Type(() => CompanyDto)
+    company?: CompanyDto;
+
+    @IsOptional()
+    @IsArray()
+    @IsString({ each: true })
+    initial_categories?: string[];
+
+    @IsOptional()
+    @IsArray()
+    @IsString({ each: true })
+    priority_categories?: string[]; // Categories that should appear first in the final output
+
+    @IsOptional()
     @IsArray()
     @IsString({ each: true })
     target_keywords?: string[];
@@ -91,6 +116,10 @@ export class CreateItemsGeneratorDto {
     @ValidateNested()
     @Type(() => ConfigDto)
     config: ConfigDto = new ConfigDto();
+
+    @IsOptional()
+    @IsString()
+    repository_description?: string;
 
     @IsOptional()
     @IsEnum(GenerationMethod)

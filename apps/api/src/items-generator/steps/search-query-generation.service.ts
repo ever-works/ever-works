@@ -3,51 +3,55 @@ import { ChatOpenAI } from '@langchain/openai';
 import { PromptTemplate } from '@langchain/core/prompts';
 import { StringOutputParser } from '@langchain/core/output_parsers';
 import { formatDate } from 'date-fns';
-import { ConfigDto } from '../dto/create-items-generator.dto';
+import { ConfigDto, CreateItemsGeneratorDto } from '../dto/create-items-generator.dto';
 import { AiService } from '../shared';
 
 @Injectable()
 export class SearchQueryGenerationService {
-  private readonly logger = new Logger(SearchQueryGenerationService.name);
-  private llm: ChatOpenAI;
+    private readonly logger = new Logger(SearchQueryGenerationService.name);
+    private llm: ChatOpenAI;
 
-  constructor(private readonly aiService: AiService) {
-    this.llm = this.aiService.getLlm();
-  }
-
-  async generateSearchQueries(
-    name: string,
-    description: string,
-    targetKeywords: string[] | undefined,
-    config: Required<ConfigDto>,
-  ): Promise<string[]> {
-    this.logger.log(`[${name}] Generating search queries using LLM...`);
-
-    if (!this.llm.apiKey) {
-      this.logger.warn(
-        `[${name}] OpenAI API Key not configured. Falling back to basic query generation.`,
-      );
-      const fallbackQueries = [
-        `best tools for ${name}`,
-        `${name} resources`,
-        `${name} libraries`,
-        `${name} tutorials`,
-        `official documentation ${name}`,
-        `community ${name}`,
-      ];
-      if (targetKeywords && targetKeywords.length > 0) {
-        return [
-          ...new Set([
-            ...targetKeywords.map((kw) => `${kw} ${name}`),
-            ...fallbackQueries,
-          ]),
-        ].slice(0, config.max_search_queries);
-      }
-      return [...new Set(fallbackQueries)].slice(0, config.max_search_queries);
+    constructor(private readonly aiService: AiService) {
+        this.llm = this.aiService.getLlm();
     }
 
-    const promptTemplate = PromptTemplate.fromTemplate(
-      `You are an expert at generating highly relevant and diverse search engine queries to build a "Directory website" about a specific topic.
+    async generateSearchQueries(
+        createItemsGeneratorDto: CreateItemsGeneratorDto,
+        config: Required<ConfigDto>,
+    ): Promise<string[]> {
+        const {
+            name,
+            prompt: description,
+            target_keywords: targetKeywords,
+        } = createItemsGeneratorDto;
+
+        this.logger.log(`[${name}] Generating search queries using LLM...`);
+
+        if (!this.llm.apiKey) {
+            this.logger.warn(
+                `[${name}] OpenAI API Key not configured. Falling back to basic query generation.`,
+            );
+            const fallbackQueries = [
+                `best tools for ${name}`,
+                `${name} resources`,
+                `${name} libraries`,
+                `${name} tutorials`,
+                `official documentation ${name}`,
+                `community ${name}`,
+            ];
+            if (targetKeywords && targetKeywords.length > 0) {
+                return [
+                    ...new Set([
+                        ...targetKeywords.map((kw) => `${kw} ${name}`),
+                        ...fallbackQueries,
+                    ]),
+                ].slice(0, config.max_search_queries);
+            }
+            return [...new Set(fallbackQueries)].slice(0, config.max_search_queries);
+        }
+
+        const promptTemplate = PromptTemplate.fromTemplate(
+            `You are an expert at generating highly relevant and diverse search engine queries to build a "Directory website" about a specific topic.
 The topic is: "{name}"
 Description: "{description}"
 Optional initial keywords: {target_keywords_string}
@@ -67,61 +71,53 @@ Avoid overly broad or generic queries. Be specific.
 
 Generated Queries:
 `,
-    );
+        );
 
-    const now = new Date();
-    const queryGenerationChain = promptTemplate
-      .pipe(this.llm)
-      .pipe(new StringOutputParser());
+        const now = new Date();
+        const queryGenerationChain = promptTemplate.pipe(this.llm).pipe(new StringOutputParser());
 
-    try {
-      const result = await queryGenerationChain.invoke({
-        name,
-        description,
-        target_keywords_string: targetKeywords
-          ? targetKeywords.join(', ')
-          : 'N/A',
-        num_queries: config.max_search_queries * 2,
-        day: formatDate(now, 'cccc'),
-        datetime: formatDate(now, 'yyyy-MM-dd HH:mm'),
-      });
+        try {
+            const result = await queryGenerationChain.invoke({
+                name,
+                description,
+                target_keywords_string: targetKeywords ? targetKeywords.join(', ') : 'N/A',
+                num_queries: config.max_search_queries * 2,
+                day: formatDate(now, 'cccc'),
+                datetime: formatDate(now, 'yyyy-MM-dd HH:mm'),
+            });
 
-      const queries = result
-        .split('\n')
-        .map((q) => q.trim().replace(/^- /, ''))
-        .filter((q) => q.length > 3) // Filter out very short or empty lines
-        .filter((q, index, self) => self.indexOf(q) === index); // Ensure uniqueness
+            const queries = result
+                .split('\n')
+                .map((q) => q.trim().replace(/^- /, ''))
+                .filter((q) => q.length > 3) // Filter out very short or empty lines
+                .filter((q, index, self) => self.indexOf(q) === index); // Ensure uniqueness
 
-      this.logger.log(
-        `[${name}] LLM generated ${queries.length} unique queries.`,
-      );
-      return queries.slice(0, config.max_search_queries);
-    } catch (error) {
-      this.logger.error(
-        `[${name}] Error generating search queries with LLM: ${error.message}`,
-        error.stack,
-      );
-      this.logger.warn(
-        `[${name}] Falling back to basic query generation due to LLM error.`,
-      );
-      // Fallback to simpler generation if LLM fails
-      const fallbackQueries = [
-        `best tools for ${name}`,
-        `${name} resources`,
-        `${name} libraries`,
-        `${name} tutorials`,
-        `official documentation ${name}`,
-        `community ${name}`,
-      ];
-      if (targetKeywords && targetKeywords.length > 0) {
-        return [
-          ...new Set([
-            ...targetKeywords.map((kw) => `${kw} ${name}`),
-            ...fallbackQueries,
-          ]),
-        ].slice(0, config.max_search_queries);
-      }
-      return [...new Set(fallbackQueries)].slice(0, config.max_search_queries);
+            this.logger.log(`[${name}] LLM generated ${queries.length} unique queries.`);
+            return queries.slice(0, config.max_search_queries);
+        } catch (error) {
+            this.logger.error(
+                `[${name}] Error generating search queries with LLM: ${error.message}`,
+                error.stack,
+            );
+            this.logger.warn(`[${name}] Falling back to basic query generation due to LLM error.`);
+            // Fallback to simpler generation if LLM fails
+            const fallbackQueries = [
+                `best tools for ${name}`,
+                `${name} resources`,
+                `${name} libraries`,
+                `${name} tutorials`,
+                `official documentation ${name}`,
+                `community ${name}`,
+            ];
+            if (targetKeywords && targetKeywords.length > 0) {
+                return [
+                    ...new Set([
+                        ...targetKeywords.map((kw) => `${kw} ${name}`),
+                        ...fallbackQueries,
+                    ]),
+                ].slice(0, config.max_search_queries);
+            }
+            return [...new Set(fallbackQueries)].slice(0, config.max_search_queries);
+        }
     }
-  }
 }
