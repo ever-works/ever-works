@@ -56,7 +56,7 @@ export class ConfigDto {
     @IsOptional()
     @Min(0.01)
     @Max(1.0)
-    relevance_threshold_content: number = 0.75;
+    relevance_threshold_content: number = 0.85;
 
     @IsOptional()
     @IsInt()
