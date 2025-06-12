@@ -11,33 +11,29 @@ import { extractedItemsSchema, itemDataSchema } from '../schemas/item-extraction
 
 const ITEMS_EXTRACTION_PROMPT =
     `You are an expert data extractor and technical writer for directory websites.
+Your task is to identify and extract information for one or more distinct items (tools, resources, libraries, articles, etc.) that are **directly and highly relevant to this main topic**.
 
-**TASK OVERVIEW:**
 The **main topic** of this directory is: 
 - topic name: "{topicName}" 
 - topic task: "{topicDescription}".
 
-Your task is to identify and extract information for one or more distinct items (tools, resources, libraries, articles, etc.) that are **directly and highly relevant to this main topic**.
-
+---
+**Featured Item Specifications:**
 {featured_hints_section}
+---
 
 **RESEARCH CONTEXT INSTRUCTIONS:**
-Here is the research context (web page content below), make sure you extract all relevant items and information from the research data.
-Some content might be invalid or irrelevant, make sure to exclude them and align with the task.
+Below is the research context, including content extracted from the referenced web page. 
+Please ensure that all relevant information and items from the research data are included. 
+Exclude any invalid or irrelevant content, and align the findings with the topic and objectives of the task.
 
 **EXTRACTION CRITERIA:**
-- Only extract items that are *directly* relevant to the main topic "{topicName}"
-- Do NOT extract items that are only tangentially related or represent a different category unless it's explicitly part of "{topicName}"
+- Only extract items that are *directly* relevant to the main topic "{topicName}" and topic task.
+- Do NOT extract items that are only tangentially related or represent a different category unless it's explicitly part of "{topicName}" and topic task.
 - For example, if the topic is "Vector Databases", do not extract a general-purpose database or a library for a specific programming language (like Ruby) unless it's explicitly a vector database client/tool directly supporting the core topic
 - Ensure the source_url is for the item itself, not an article *about* the item
+- Featured items are those that match the specifications provided in the "Featured Item Specifications" section above.
 - Do not use URLs for blog posts merely mentioning the item unless the post *is* the primary resource
-
-**EXTRACTION REQUIREMENTS:**
-For each identified item **that directly relates to "{topicName}"**:
-1. **name**: Provide its canonical name
-2. **description**: Write a concise and short description highlighting its specific relevance to "{topicName}"
-3. **source_url**: Determine its most direct and canonical URL (homepage, docs, repo etc.). The URL must be valid and specific to the item
-4. **featured**: A boolean indicating if this item should be highlighted or given special prominence (true/false). Consider the featured item specifications above when making this determination. Default to false if unsure
 
 ---
 **Web Page Content:**

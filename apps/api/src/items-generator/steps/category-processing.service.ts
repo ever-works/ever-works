@@ -41,6 +41,7 @@ const categorizeOutputSchema = z.object({
 export class CategoryProcessingService {
     private readonly logger = new Logger(CategoryProcessingService.name);
     private llm: ChatOpenAI;
+    private readonly BATCH_SIZE = 30;
 
     constructor(private readonly aiService: AiService) {
         this.llm = this.aiService.createLlmWithTemperature(0.3);
@@ -156,7 +157,7 @@ export class CategoryProcessingService {
             }));
 
             // Process in batches if there are many items
-            if (items.length > 50) {
+            if (items.length > this.BATCH_SIZE) {
                 return this.processBatchCategorization(
                     description,
                     itemsForCategorization,
@@ -236,14 +237,13 @@ ${CATEGORIZE_PROMPT}
         existingCategories: Set<string>,
         existingTags: Set<string>,
     ): Promise<ItemData[]> {
-        const BATCH_SIZE = 30;
         const allCategorizedItems: ItemData[] = [];
 
         // Process items in batches
-        for (let i = 0; i < items.length; i += BATCH_SIZE) {
-            const batch = items.slice(i, i + BATCH_SIZE);
-            const batchNumber = Math.floor(i / BATCH_SIZE) + 1;
-            const totalBatches = Math.ceil(items.length / BATCH_SIZE);
+        for (let i = 0; i < items.length; i += this.BATCH_SIZE) {
+            const batch = items.slice(i, i + this.BATCH_SIZE);
+            const batchNumber = Math.floor(i / this.BATCH_SIZE) + 1;
+            const totalBatches = Math.ceil(items.length / this.BATCH_SIZE);
 
             this.logger.log(
                 `Processing batch ${batchNumber} of ${totalBatches} (${batch.length} items)`,
@@ -292,7 +292,7 @@ ${CATEGORIZE_PROMPT}
                 allCategorizedItems.push(...batchResults);
 
                 // Add a small delay between batches to avoid rate limiting
-                if (i + BATCH_SIZE < items.length) {
+                if (i + this.BATCH_SIZE < items.length) {
                     await new Promise((resolve) => setTimeout(resolve, 500));
                 }
             } catch (error) {
