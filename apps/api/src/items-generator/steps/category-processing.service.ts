@@ -29,6 +29,7 @@ Here is the list of items to categorize:
 6. For tags, good examples include: "open-source", "real-time", "cloud-native", "enterprise", etc.
 7. Avoid overly broad categories like "Tools" or "Software" - be more specific.
 8. Avoid overly specific categories that would only contain 1-2 items.
+9. Overwrite existing item category if it doesn't match the item's primary function or purpose.
 </instructions>
 `.trim();
 
@@ -154,6 +155,7 @@ export class CategoryProcessingService {
                 description: i.description,
                 source_url: i.source_url,
                 featured: i.featured,
+                ...(i.category ? { category: i.category } : {}),
             }));
 
             // Process in batches if there are many items

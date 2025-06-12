@@ -7,7 +7,7 @@ export class SharedUtilsService {
     private readonly logger = new Logger(SharedUtilsService.name);
 
     // Shared constants
-    readonly MAX_CLUSTER_SIZE = 40;
+    readonly MAX_CLUSTER_SIZE = 30;
     readonly SIMILARITY_THRESHOLD = 0.5;
 
     /**
@@ -97,7 +97,7 @@ export class SharedUtilsService {
 
             const { item: currentItem, normalizedName: currentName } = normalizedItems[i];
 
-            const cluster: ItemData[] = [currentItem];
+            const cluster: { score: number; item: ItemData }[] = [{ item: currentItem, score: 1 }];
             processed.add(i);
 
             // Find similar items
@@ -122,12 +122,18 @@ export class SharedUtilsService {
 
                 // If similar enough, add to cluster
                 if (similarity >= this.SIMILARITY_THRESHOLD || isSimilarByOccurrence) {
-                    cluster.push(candidateItem);
+                    cluster.push({
+                        item: candidateItem,
+                        score: similarity,
+                    });
                     processed.add(j);
                 }
             }
 
-            clusters.push(cluster);
+            // Sort cluster by score
+            const clusterItems = cluster.sort((a, b) => b.score - a.score).map((c) => c.item);
+
+            clusters.push(clusterItems);
         }
 
         // Merge small clusters if needed
