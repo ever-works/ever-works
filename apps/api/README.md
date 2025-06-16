@@ -172,7 +172,115 @@ To generate data and create a GitHub repository for the directory, send a POST r
 
 > This is a long-running task that may take 5-15 minutes depending on the configuration and number of items processed. The system uses intelligent batching and rate limiting to ensure reliable processing.
 
-### 6. Update website repository
+### 6. Submit Individual Items
+
+To submit individual items to an existing directory, send a POST request to `http://localhost:3001/submit-item/{slug}` with the item details.
+
+**Endpoint:**
+
+```
+POST /submit-item/{slug}
+```
+
+**URL Parameters:**
+
+| Parameter | Type   | Required   | Description                                    |
+| --------- | ------ | ---------- | ---------------------------------------------- |
+| `slug`    | string | `required` | The slug of the directory to submit the item to |
+
+**Request Body:**
+
+```json
+{
+    "name": "Awesome Tool",
+    "description": "A really useful development tool",
+    "source_url": "https://github.com/example/awesome-tool",
+    "category": "Development Tools",
+    "tags": ["productivity", "open-source"],
+    "featured": false,
+    "pay_and_publish_now": false
+}
+```
+
+**Request Parameters:**
+
+| Field                 | Type     | Required   | Description                                                                           |
+| --------------------- | -------- | ---------- | ------------------------------------------------------------------------------------- |
+| `name`                | string   | `required` | Item name                                                                             |
+| `description`         | string   | `required` | Item description                                                                      |
+| `source_url`          | string   | `required` | Valid HTTP/HTTPS URL for the item                                                     |
+| `category`            | string   | `required` | Category name for the item                                                            |
+| `tags`                | string[] | `optional` | Array of tag strings                                                                  |
+| `featured`            | boolean  | `optional` | Whether item should be featured (default: false)                                      |
+| `pay_and_publish_now` | boolean  | `optional` | Force auto-merge regardless of config (default: false)                               |
+| `slug`                | string   | `optional` | Custom slug for the item (auto-generated from name if not provided)                   |
+
+**Response:**
+
+```json
+{
+    "status": "success",
+    "slug": "awesome-time-tracking",
+    "item_name": "Awesome Tool",
+    "message": "Item \"Awesome Tool\" has been submitted for review. PR #42 created.",
+    "pr_number": 42,
+    "pr_url": "https://github.com/owner/repo-data/pull/42",
+    "branch_name": "feature-1640995200000-abc123",
+    "auto_merged": false
+}
+```
+
+**Response Fields:**
+
+| Field         | Type    | Description                                                                    |
+| ------------- | ------- | ------------------------------------------------------------------------------ |
+| `status`      | string  | Status of the operation: `success`, `error`, or `pending`                      |
+| `slug`        | string  | Directory slug                                                                 |
+| `item_name`   | string  | Name of the submitted item                                                     |
+| `message`     | string  | Status message                                                                 |
+| `pr_number`   | number  | _(Success only)_ GitHub PR number if created                                   |
+| `pr_url`      | string  | _(Success only)_ GitHub PR URL if created                                      |
+| `branch_name` | string  | _(Success only)_ Git branch name if created                                    |
+| `auto_merged` | boolean | _(Success only)_ Whether the PR was automatically merged                       |
+| `error_details` | string | _(Error only)_ Additional details about the error that occurred               |
+
+**Auto-Merge Behavior:**
+
+The PR will be automatically merged if either:
+1. `pay_and_publish_now` is set to `true` in the request
+2. `autoapproval` is set to `true` in the repository's config.yml
+
+Otherwise, the PR will be created and require manual review.
+
+**Example with Immediate Publishing:**
+
+```bash
+curl -X POST http://localhost:3001/submit-item/awesome-time-tracking \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Premium Tool",
+    "description": "A premium development tool",
+    "source_url": "https://example.com/premium-tool",
+    "category": "Development Tools",
+    "tags": ["premium", "enterprise"],
+    "featured": true,
+    "pay_and_publish_now": true
+  }'
+```
+
+**Process Flow:**
+
+1. **Validation**: Request body is validated
+2. **Repository Access**: Data repository is cloned/pulled
+3. **Config Check**: Repository config is checked for autoapproval settings
+4. **Branch Creation**: New feature branch is created
+5. **Content Generation**: AI generates markdown content for the item
+6. **File Creation**: Item YAML and markdown files are created
+7. **Commit & Push**: Changes are committed and pushed
+8. **PR Creation**: Pull request is created
+9. **Auto-Merge** (conditional): PR is merged if auto-merge conditions are met
+
+### 7. Update website repository
 
 To update an existing website repository with the latest changes from the template repository, send a POST request to `http://localhost:3001/update-website/{slug}`.
 the `slug` parameter should match the directory slug used when creating the website repository.
@@ -245,7 +353,7 @@ The service automatically tries different update strategies in order of preferen
 - The website repository must exist (created via `/generate` endpoint)
 - Valid GitHub authentication token in environment
 
-### 7. Deploy to Vercel
+### 8. Deploy to Vercel
 
 To deploy the website repository to Vercel, send a POST request to `http://localhost:3001/deploy/{slug}/vercel`.
 the `slug` parameter should match the directory slug used when creating the website repository.

@@ -21,6 +21,7 @@ export interface IDataConfig {
     generation_method?: GenerationMethod;
     pr_update?: PRUpdate | null;
     paging_mode?: string;
+    autoapproval?: boolean;
     metadata?: Record<string, any>;
 }
 

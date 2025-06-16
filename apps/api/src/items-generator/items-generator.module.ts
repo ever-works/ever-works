@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ItemsGeneratorService } from './items-generator.service';
+import { ItemSubmissionService } from './item-submission.service';
 import { AiItemGenerationService } from './steps/ai-item-generation.service';
 import { SearchQueryGenerationService } from './steps/search-query-generation.service';
 import { WebPageRetrievalService } from './steps/web-page-retrieval.service';
@@ -32,6 +33,7 @@ import {
 
     // Main service
     ItemsGeneratorService,
+    ItemSubmissionService,
 
     // Step services
     PromptComparisonService,
@@ -46,6 +48,6 @@ import {
     CategoryProcessingService,
     MarkdownGenerationService,
   ],
-  exports: [ItemsGeneratorService],
+  exports: [ItemsGeneratorService, ItemSubmissionService],
 })
 export class ItemsGeneratorModule {}

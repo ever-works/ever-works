@@ -18,8 +18,10 @@ import { User } from './entities/user.entity';
 import { GithubService } from './git/github.service';
 import { CreateItemsGeneratorDto } from './items-generator/dto/create-items-generator.dto';
 import { ItemsGeneratorResponseDto } from './items-generator/dto/items-generator-response.dto';
+import { SubmitItemDto, SubmitItemResponseDto } from './items-generator/dto';
 import { CreateDirectoryDto } from './dto/create-directory.dto';
 import { UpdateWebsiteRepositoryResponseDto } from './website-generator/dto/update-website-repository.dto';
+import { ItemSubmissionService } from './items-generator/item-submission.service';
 
 @Controller()
 export class AppController {
@@ -29,6 +31,7 @@ export class AppController {
         private readonly websiteGenerator: WebsiteGeneratorService,
         private readonly websiteUpdateService: WebsiteUpdateService,
         private readonly githubService: GithubService,
+        private readonly itemSubmissionService: ItemSubmissionService,
     ) {}
 
     @Post('directories')
@@ -112,6 +115,37 @@ export class AppController {
         console.log(`Generation finished at: ${endTime.toISOString()}`);
         const duration = (endTime.getTime() - startTime.getTime()) / 1000;
         console.log(`Total time taken: ${duration} seconds`);
+    }
+
+    @Post('submit-item/:slug')
+    @HttpCode(HttpStatus.OK)
+    @UsePipes(new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }))
+    async submitItem(
+        @Param('slug') slug: string,
+        @Body() submitItemDto: SubmitItemDto,
+    ): Promise<SubmitItemResponseDto> {
+        try {
+            const user = await User.sessionMock();
+
+            // Check if directory exists for the given slug
+            const directory = await Directory.findMock(slug);
+            if (!directory) {
+                throw new NotFoundException(`Directory with slug '${slug}' not found`);
+            }
+
+            const result = await this.itemSubmissionService.submitItem(directory, user, submitItemDto);
+            return result;
+        } catch (error) {
+            console.error('Error submitting item:', error);
+
+            return {
+                status: 'error',
+                slug,
+                item_name: submitItemDto.name,
+                message: 'Failed to submit item',
+                error_details: error.message,
+            };
+        }
     }
 
     @Post('update-website/:slug')
