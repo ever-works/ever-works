@@ -20,6 +20,8 @@ export interface IDataConfig {
     initial_prompt?: string;
     generation_method?: GenerationMethod;
     pr_update?: PRUpdate | null;
+    paging_mode?: string;
+    metadata?: Record<string, any>;
 }
 
 export const DEFAULT_DATA_CONFIG: IDataConfig = {
@@ -27,6 +29,7 @@ export const DEFAULT_DATA_CONFIG: IDataConfig = {
     content_table: true, // Previous value was false
     item_name: 'Item',
     items_name: 'Items',
+    paging_mode: 'paging',
 };
 
 export class DataRepository {
