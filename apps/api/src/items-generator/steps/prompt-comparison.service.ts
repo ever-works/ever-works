@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ChatOpenAI } from '@langchain/openai';
+import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
 import { z } from 'zod';
 import { AiService } from '../shared';
@@ -55,7 +55,7 @@ export type PromptComparisonResult = z.infer<typeof promptComparisonOutputSchema
 @Injectable()
 export class PromptComparisonService {
     private readonly logger = new Logger(PromptComparisonService.name);
-    private llm: ChatOpenAI;
+    private llm: BaseChatModel;
 
     constructor(private readonly aiService: AiService) {
         // Use low temperature for consistent comparison results

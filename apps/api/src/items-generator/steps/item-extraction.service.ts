@@ -1,5 +1,4 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ChatOpenAI } from '@langchain/openai';
 import { PromptTemplate } from '@langchain/core/prompts';
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
 import { ConfigDto, CreateItemsGeneratorDto } from '../dto/create-items-generator.dto';
@@ -8,6 +7,7 @@ import { slugifyText } from '../utils/text.utils';
 import { AiService } from '../shared';
 import { ItemData } from '../dto';
 import { extractedItemsSchema, itemDataSchema } from '../schemas/item-extraction.schemas';
+import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 
 const ITEMS_EXTRACTION_PROMPT =
     `You are an expert data extractor and technical writer for directory websites.
@@ -43,11 +43,11 @@ Exclude any invalid or irrelevant content, and align the findings with the topic
 @Injectable()
 export class ItemExtractionService {
     private readonly logger = new Logger(ItemExtractionService.name);
-    private llm: ChatOpenAI;
+    private llm: BaseChatModel;
     private textSplitter: RecursiveCharacterTextSplitter;
 
     // Constants for content chunking
-    private readonly MAX_CHUNK_SIZE = 4000; // Characters per chunk
+    private readonly MAX_CHUNK_SIZE = 3000; // Characters per chunk
     private readonly CHUNK_OVERLAP = 200; // Overlap between chunks
 
     constructor(private readonly aiService: AiService) {
@@ -94,7 +94,7 @@ export class ItemExtractionService {
     ): Promise<ItemData[]> {
         const { slug, name: topicName, prompt: topicDescription } = createItemsGeneratorDto;
 
-        if (!this.llm.apiKey) {
+        if (!this.aiService.isAiConfigured()) {
             this.logger.warn(
                 `[${slug}] OpenAI API Key not configured. Skipping AI-driven item extraction.`,
             );

@@ -1,5 +1,4 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ChatOpenAI } from '@langchain/openai';
 import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
 import { AiService } from '../../shared';
 import { slugifyText } from '../../utils/text.utils';
@@ -7,11 +6,12 @@ import { extractedItemsSchema } from '../../schemas/item-extraction.schemas';
 import { ItemData } from '../../dto';
 import { SharedUtilsService } from './shared-utils.service';
 import { EXTRACT_NEW_ITEMS_PROMPT } from './prompts.constants';
+import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 
 @Injectable()
 export class NewItemsExtractorService {
     private readonly logger = new Logger(NewItemsExtractorService.name);
-    private llm: ChatOpenAI;
+    private llm: BaseChatModel;
 
     constructor(
         private readonly aiService: AiService,

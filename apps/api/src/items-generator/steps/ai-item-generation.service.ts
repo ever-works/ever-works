@@ -1,5 +1,4 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ChatOpenAI } from '@langchain/openai';
 import { PromptTemplate } from '@langchain/core/prompts';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import { slugifyText } from '../utils/text.utils';
@@ -10,11 +9,12 @@ import {
     itemDataSchema,
     promptUnderstandingAssessmentSchema,
 } from '../schemas/item-extraction.schemas';
+import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 
 @Injectable()
 export class AiItemGenerationService {
     private readonly logger = new Logger(AiItemGenerationService.name);
-    private llm: ChatOpenAI;
+    private llm: BaseChatModel;
 
     constructor(private readonly aiService: AiService) {
         this.llm = this.aiService.createLlmWithTemperature(0.3);
@@ -34,7 +34,7 @@ export class AiItemGenerationService {
         this.logger.log(`[${slug}] AI-First Item Generation - Starting for topic: ${topicName}`);
         const allGeneratedItems: ItemData[] = [];
 
-        if (!this.llm.apiKey) {
+        if (!this.aiService.isAiConfigured()) {
             this.logger.warn(
                 `[${slug}] OpenAI API Key not configured. Skipping AI-first item generation.`,
             );

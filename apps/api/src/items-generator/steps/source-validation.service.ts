@@ -1,11 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import axios from 'axios';
 import { TavilyClient } from '@tavily/core';
-import { ChatOpenAI } from '@langchain/openai';
 import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
 import { z } from 'zod';
 import { ItemData, ConfigDto } from '../dto';
 import { SearchService, AiService } from '../shared';
+import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 
 // Schema for AI URL validation response
 const urlValidationSchema = z.object({
@@ -71,7 +71,7 @@ Prefer official sources in this order:
 export class SourceValidationService {
     private readonly logger = new Logger(SourceValidationService.name);
     private tavilyClient: TavilyClient | undefined;
-    private llm: ChatOpenAI;
+    private llm: BaseChatModel;
 
     constructor(
         private readonly searchService: SearchService,

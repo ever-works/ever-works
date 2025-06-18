@@ -1,11 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ChatOpenAI } from '@langchain/openai';
 import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
 import { z } from 'zod';
 import { ItemData, Category, Tag, CreateItemsGeneratorDto } from '../dto';
 import { slugifyText } from '../utils/text.utils';
 import { AiService } from '../shared';
 import { itemDataWithCategoriesAndTagsSchema } from '../schemas/item-extraction.schemas';
+import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 
 // Prompt for categorization
 const CATEGORIZE_PROMPT = `
@@ -41,7 +41,7 @@ const categorizeOutputSchema = z.object({
 @Injectable()
 export class CategoryProcessingService {
     private readonly logger = new Logger(CategoryProcessingService.name);
-    private llm: ChatOpenAI;
+    private llm: BaseChatModel;
     private readonly BATCH_SIZE = 30;
 
     constructor(private readonly aiService: AiService) {

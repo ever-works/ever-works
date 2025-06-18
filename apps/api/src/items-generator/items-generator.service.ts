@@ -12,6 +12,7 @@ import {
     MarkdownGenerationService,
     PromptProcessingService,
     PromptComparisonService,
+    BadgeProcessingService,
 } from './steps';
 import { Category, ItemData, Tag } from './dto';
 import { IDataConfig } from '../data-generator/data-repository';
@@ -33,6 +34,7 @@ export class ItemsGeneratorService {
         private readonly dataAggregationService: DataAggregationService,
         private readonly categoryProcessingService: CategoryProcessingService,
         private readonly markdownGenerationService: MarkdownGenerationService,
+        private readonly badgeProcessingService: BadgeProcessingService,
     ) {}
 
     /**
@@ -297,11 +299,19 @@ export class ItemsGeneratorService {
                 slug,
             );
 
+            // 9. Badge Processing for Repository Items
+            this.logger.log(`[${slug}] 9. Badge Processing for Repository Items - Starting`);
+            const itemsWithBadges = await this.badgeProcessingService.processBadges(validatedItems);
+
+            // Log badge statistics
+            const badgeStats = this.badgeProcessingService.getBadgeStatistics(itemsWithBadges);
+            this.logger.log(`[${slug}] Badge processing completed. Statistics: ${JSON.stringify(badgeStats)}`);
+
             // This is where a more robust notification (webhook, websocket, email) would be triggered,
             // potentially including the 'metrics'
 
             return {
-                items: validatedItems,
+                items: itemsWithBadges,
                 categories: categories,
                 tags: tags,
             };
@@ -340,6 +350,26 @@ export class ItemsGeneratorService {
                 ...item,
                 markdown: '',
             };
+        }
+    }
+
+    /**
+     * Process badges for a single item
+     * @param item The item to process badges for
+     * @returns The item with badges
+     */
+    async processSingleItemBadges(item: ItemData): Promise<ItemData> {
+        this.logger.log(`Processing badges for item: ${item.name}`);
+
+        try {
+            return await this.badgeProcessingService.processSingleItemBadges(item);
+        } catch (error) {
+            this.logger.error(
+                `Error processing badges for item ${item.name}: ${error.message}`,
+                error.stack,
+            );
+
+            return item;
         }
     }
 

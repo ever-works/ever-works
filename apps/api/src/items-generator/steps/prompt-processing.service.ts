@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ChatOpenAI } from '@langchain/openai';
 import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
 import { z } from 'zod';
 import { AiService } from '../shared';
+import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 
 // Prompt processing prompt
 const PROMPT_PROCESSING_PROMPT = `
@@ -133,7 +133,7 @@ const promptProcessingOutputSchema = z.object({
 @Injectable()
 export class PromptProcessingService {
     private readonly logger = new Logger(PromptProcessingService.name);
-    private llm: ChatOpenAI;
+    private llm: BaseChatModel;
 
     constructor(private readonly aiService: AiService) {
         this.llm = this.aiService.createLlmWithTemperature(0.0);

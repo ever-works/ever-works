@@ -1,15 +1,15 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ChatOpenAI } from '@langchain/openai';
 import { PromptTemplate } from '@langchain/core/prompts';
 import { StringOutputParser } from '@langchain/core/output_parsers';
 import { formatDate } from 'date-fns';
 import { ConfigDto, CreateItemsGeneratorDto } from '../dto/create-items-generator.dto';
 import { AiService } from '../shared';
+import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 
 @Injectable()
 export class SearchQueryGenerationService {
     private readonly logger = new Logger(SearchQueryGenerationService.name);
-    private llm: ChatOpenAI;
+    private llm: BaseChatModel;
 
     constructor(private readonly aiService: AiService) {
         this.llm = this.aiService.getLlm();
@@ -27,7 +27,7 @@ export class SearchQueryGenerationService {
 
         this.logger.log(`[${name}] Generating search queries using LLM...`);
 
-        if (!this.llm.apiKey) {
+        if (!this.aiService.isAiConfigured()) {
             this.logger.warn(
                 `[${name}] OpenAI API Key not configured. Falling back to basic query generation.`,
             );

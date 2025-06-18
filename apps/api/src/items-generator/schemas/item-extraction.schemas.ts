@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { BadgeType, BadgeValue } from '../dto/badge.dto';
 
 const baseSchema = z.object({
     name: z
@@ -72,4 +73,36 @@ export const promptUnderstandingAssessmentSchema = z.object({
         .describe(
             'Optional: If can_proceed is false, specific questions or suggestions for the user to clarify the prompt.',
         ),
+});
+
+// Badge schemas
+export const badgeSchema = z.object({
+    type: z.nativeEnum(BadgeType),
+    value: z.nativeEnum(BadgeValue),
+    evaluated_at: z.string().optional().describe('ISO date string when badge was evaluated'),
+    details: z.string().optional().describe('Optional details about the evaluation'),
+});
+
+export const itemBadgesSchema = z.object({
+    security: badgeSchema.optional(),
+    license: badgeSchema.optional(),
+    quality: badgeSchema.optional(),
+});
+
+// Extended item schema with badges
+export const itemDataWithBadgesSchema = baseSchema.extend({
+    source_url: z
+        .string()
+        .nullable()
+        .describe(
+            'The most direct, stable, and canonical URL for the item itself (e.g., project homepage, official documentation, GitHub repository etc.). Must be a valid and highly relevant URL.',
+        ),
+    featured: z
+        .boolean()
+        .nullable()
+        .default(false)
+        .describe(
+            "Determine if the item warrants a 'featured' status based on prominence, recommendations, or significance. Default to false.",
+        ),
+    badges: itemBadgesSchema.optional().describe('Optional badges for repository items'),
 });
