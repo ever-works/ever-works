@@ -5,7 +5,7 @@ import { AiService } from '../shared';
 import { SearchService } from '../shared';
 import { ItemData } from '../dto';
 import { extractTextFromSourceURL } from '../utils/text.utils';
-import { BaseChatModel } from '@langchain/core/language_models/chat_models';
+import { BaseChatModel } from '../shared/ai-provider.interface';
 
 // Markdown generation prompt
 export const MARKDOWN_PROMPT = `

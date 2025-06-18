@@ -5,7 +5,7 @@ import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
 import { z } from 'zod';
 import { ItemData, ConfigDto } from '../dto';
 import { SearchService, AiService } from '../shared';
-import { BaseChatModel } from '@langchain/core/language_models/chat_models';
+import { BaseChatModel } from '../shared/ai-provider.interface';
 
 // Schema for AI URL validation response
 const urlValidationSchema = z.object({

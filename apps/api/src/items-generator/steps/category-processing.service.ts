@@ -5,7 +5,7 @@ import { ItemData, Category, Tag, CreateItemsGeneratorDto } from '../dto';
 import { slugifyText } from '../utils/text.utils';
 import { AiService } from '../shared';
 import { itemDataWithCategoriesAndTagsSchema } from '../schemas/item-extraction.schemas';
-import { BaseChatModel } from '@langchain/core/language_models/chat_models';
+import { BaseChatModel } from '../shared/ai-provider.interface';
 
 // Prompt for categorization
 const CATEGORIZE_PROMPT = `

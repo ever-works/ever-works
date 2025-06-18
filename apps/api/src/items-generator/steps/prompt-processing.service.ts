@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
 import { z } from 'zod';
 import { AiService } from '../shared';
-import { BaseChatModel } from '@langchain/core/language_models/chat_models';
+import { BaseChatModel } from '../shared/ai-provider.interface';
 
 // Prompt processing prompt
 const PROMPT_PROCESSING_PROMPT = `

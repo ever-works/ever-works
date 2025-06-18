@@ -6,7 +6,7 @@ import { extractedItemsSchema } from '../../schemas/item-extraction.schemas';
 import { ItemData } from '../../dto';
 import { SharedUtilsService } from './shared-utils.service';
 import { DEDUPLICATOR_PROMPT } from './prompts.constants';
-import { BaseChatModel } from '@langchain/core/language_models/chat_models';
+import { BaseChatModel } from '../../shared/ai-provider.interface';
 
 @Injectable()
 export class AiDeduplicatorService {

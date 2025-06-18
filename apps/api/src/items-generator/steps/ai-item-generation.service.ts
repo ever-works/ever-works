@@ -9,7 +9,7 @@ import {
     itemDataSchema,
     promptUnderstandingAssessmentSchema,
 } from '../schemas/item-extraction.schemas';
-import { BaseChatModel } from '@langchain/core/language_models/chat_models';
+import { BaseChatModel } from '../shared/ai-provider.interface';
 
 @Injectable()
 export class AiItemGenerationService {

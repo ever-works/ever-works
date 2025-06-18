@@ -7,7 +7,7 @@ import { slugifyText } from '../utils/text.utils';
 import { AiService } from '../shared';
 import { ItemData } from '../dto';
 import { extractedItemsSchema, itemDataSchema } from '../schemas/item-extraction.schemas';
-import { BaseChatModel } from '@langchain/core/language_models/chat_models';
+import { BaseChatModel } from '../shared/ai-provider.interface';
 
 const ITEMS_EXTRACTION_PROMPT =
     `You are an expert data extractor and technical writer for directory websites.

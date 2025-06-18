@@ -4,7 +4,7 @@ import { StringOutputParser } from '@langchain/core/output_parsers';
 import { formatDate } from 'date-fns';
 import { ConfigDto, CreateItemsGeneratorDto } from '../dto/create-items-generator.dto';
 import { AiService } from '../shared';
-import { BaseChatModel } from '@langchain/core/language_models/chat_models';
+import { BaseChatModel } from '../shared/ai-provider.interface';
 
 @Injectable()
 export class SearchQueryGenerationService {

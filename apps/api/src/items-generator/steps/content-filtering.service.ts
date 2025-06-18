@@ -3,7 +3,7 @@ import { PromptTemplate } from '@langchain/core/prompts';
 import { ConfigDto } from '../dto/create-items-generator.dto';
 import { WebPageData, RelevanceAssessment } from '../interfaces/items-generator.interfaces';
 import { AiService } from '../shared';
-import { BaseChatModel } from '@langchain/core/language_models/chat_models';
+import { BaseChatModel } from '../shared/ai-provider.interface';
 import z from 'zod';
 
 const relevanceSchema = z.object({
