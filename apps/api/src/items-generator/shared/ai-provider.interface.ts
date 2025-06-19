@@ -4,7 +4,14 @@ import { type ChatGroq } from '@langchain/groq';
 import { type ChatMistralAI } from '@langchain/mistralai';
 import { type ChatOpenAI } from '@langchain/openai';
 
-export type AiProviderType = 'openai' | 'google' | 'anthropic' | 'mistral' | 'groq' | 'deepseek';
+export type AiProviderType =
+    | 'openai'
+    | 'google'
+    | 'anthropic'
+    | 'mistral'
+    | 'groq'
+    | 'deepseek'
+    | 'openrouter';
 
 export type BaseChatModel =
     | ChatOpenAI
@@ -42,6 +49,16 @@ export interface AiProviderCapabilities {
 
 export const AI_PROVIDER_CAPABILITIES: Record<AiProviderType, AiProviderCapabilities> = {
     openai: {
+        supportsStructuredOutput: true,
+        supportsStreaming: true,
+        supportsToolCalling: true,
+        maxContextLength: 128000,
+        costPerToken: {
+            input: 0.0025,
+            output: 0.01,
+        },
+    },
+    openrouter: {
         supportsStructuredOutput: true,
         supportsStreaming: true,
         supportsToolCalling: true,

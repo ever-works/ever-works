@@ -91,7 +91,9 @@ To generate data and create a GitHub repository for the directory, send a POST r
     ],
     "generation_method": "create-update",
     "update_with_pull_request": true,
+    "badge_evaluation_enabled": false,
     "website_repository_creation_method": "duplicate",
+    "repository_description": "A curated list of the best time tracking software and tools for businesses.",
     "config": {
         "max_search_queries": 15,
         "max_results_per_query": 25,
@@ -120,6 +122,7 @@ To generate data and create a GitHub repository for the directory, send a POST r
 | `generation_method`                  | enum     | `optional` | `create-update` | Generation method: `create-update` or `recreate` (see Generation Methods below)                           |
 | `update_with_pull_request`           | boolean  | `optional` | `true`          | Whether to update the repository with a pull request or directly commit the changes to main branch.       |
 | `website_repository_creation_method` | enum     | `optional` | `duplicate`     | Method for creating the website repository: `duplicate`, `fork`, or `create-using-template` (see below)   |
+| `badge_evaluation_enabled`           | boolean  | `optional` | `false`         | Whether to evaluate badges for the generated items                                                        |
 | `config`                             | object   | `optional` | -               | Advanced configuration options                                                                            |
 
 **Company Object:**
@@ -167,6 +170,7 @@ To generate data and create a GitHub repository for the directory, send a POST r
 - **Priority Categories**: Categories can be prioritized to appear first in the final output
 - **Smart Category Extraction**: Priority categories can be extracted from natural language prompts
 - **Source Validation**: URL validation and fallback search for invalid sources
+- **Badge Evaluation**: Optional badge evaluation for generated items
 - **Batch Processing**: Efficient processing with rate limiting and parallel execution
 - **Markdown Generation**: Detailed markdown summaries for each item (available via separate endpoint)
 
@@ -184,8 +188,8 @@ POST /submit-item/{slug}
 
 **URL Parameters:**
 
-| Parameter | Type   | Required   | Description                                    |
-| --------- | ------ | ---------- | ---------------------------------------------- |
+| Parameter | Type   | Required   | Description                                     |
+| --------- | ------ | ---------- | ----------------------------------------------- |
 | `slug`    | string | `required` | The slug of the directory to submit the item to |
 
 **Request Body:**
@@ -204,16 +208,16 @@ POST /submit-item/{slug}
 
 **Request Parameters:**
 
-| Field                 | Type     | Required   | Description                                                                           |
-| --------------------- | -------- | ---------- | ------------------------------------------------------------------------------------- |
-| `name`                | string   | `required` | Item name                                                                             |
-| `description`         | string   | `required` | Item description                                                                      |
-| `source_url`          | string   | `required` | Valid HTTP/HTTPS URL for the item                                                     |
-| `category`            | string   | `required` | Category name for the item                                                            |
-| `tags`                | string[] | `optional` | Array of tag strings                                                                  |
-| `featured`            | boolean  | `optional` | Whether item should be featured (default: false)                                      |
-| `pay_and_publish_now` | boolean  | `optional` | Force auto-merge regardless of config (default: false)                               |
-| `slug`                | string   | `optional` | Custom slug for the item (auto-generated from name if not provided)                   |
+| Field                 | Type     | Required   | Description                                                         |
+| --------------------- | -------- | ---------- | ------------------------------------------------------------------- |
+| `name`                | string   | `required` | Item name                                                           |
+| `description`         | string   | `required` | Item description                                                    |
+| `source_url`          | string   | `required` | Valid HTTP/HTTPS URL for the item                                   |
+| `category`            | string   | `required` | Category name for the item                                          |
+| `tags`                | string[] | `optional` | Array of tag strings                                                |
+| `featured`            | boolean  | `optional` | Whether item should be featured (default: false)                    |
+| `pay_and_publish_now` | boolean  | `optional` | Force auto-merge regardless of config (default: false)              |
+| `slug`                | string   | `optional` | Custom slug for the item (auto-generated from name if not provided) |
 
 **Response:**
 
@@ -232,21 +236,22 @@ POST /submit-item/{slug}
 
 **Response Fields:**
 
-| Field         | Type    | Description                                                                    |
-| ------------- | ------- | ------------------------------------------------------------------------------ |
-| `status`      | string  | Status of the operation: `success`, `error`, or `pending`                      |
-| `slug`        | string  | Directory slug                                                                 |
-| `item_name`   | string  | Name of the submitted item                                                     |
-| `message`     | string  | Status message                                                                 |
-| `pr_number`   | number  | _(Success only)_ GitHub PR number if created                                   |
-| `pr_url`      | string  | _(Success only)_ GitHub PR URL if created                                      |
-| `branch_name` | string  | _(Success only)_ Git branch name if created                                    |
-| `auto_merged` | boolean | _(Success only)_ Whether the PR was automatically merged                       |
-| `error_details` | string | _(Error only)_ Additional details about the error that occurred               |
+| Field           | Type    | Description                                                     |
+| --------------- | ------- | --------------------------------------------------------------- |
+| `status`        | string  | Status of the operation: `success`, `error`, or `pending`       |
+| `slug`          | string  | Directory slug                                                  |
+| `item_name`     | string  | Name of the submitted item                                      |
+| `message`       | string  | Status message                                                  |
+| `pr_number`     | number  | _(Success only)_ GitHub PR number if created                    |
+| `pr_url`        | string  | _(Success only)_ GitHub PR URL if created                       |
+| `branch_name`   | string  | _(Success only)_ Git branch name if created                     |
+| `auto_merged`   | boolean | _(Success only)_ Whether the PR was automatically merged        |
+| `error_details` | string  | _(Error only)_ Additional details about the error that occurred |
 
 **Auto-Merge Behavior:**
 
 The PR will be automatically merged if either:
+
 1. `pay_and_publish_now` is set to `true` in the request
 2. `autoapproval` is set to `true` in the repository's config.yml
 

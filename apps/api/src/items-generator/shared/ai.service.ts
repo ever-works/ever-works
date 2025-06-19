@@ -49,6 +49,14 @@ export class AiService {
                 enabled: !!process.env.OPENAI_API_KEY,
                 maxTokens: parseInt(process.env.OPENAI_MAX_TOKENS || '4096'),
             },
+            openrouter: {
+                type: 'openrouter',
+                apiKey: process.env.OPENROUTER_API_KEY,
+                modelName: process.env.OPENROUTER_MODEL || 'gpt-4.1',
+                temperature: parseFloat(process.env.OPENROUTER_TEMPERATURE || '0.7'),
+                enabled: !!process.env.OPENROUTER_API_KEY,
+                maxTokens: parseInt(process.env.OPENROUTER_MAX_TOKENS || '4096'),
+            },
             google: {
                 type: 'google',
                 apiKey: process.env.GOOGLE_API_KEY,
@@ -150,6 +158,15 @@ export class AiService {
                     model: config.modelName || 'gpt-4.1',
                     configuration: {
                         baseURL: config.baseURL || 'https://api.openai.com',
+                    },
+                });
+
+            case 'openrouter':
+                return new ChatOpenAI({
+                    ...commonOptions,
+                    model: config.modelName || 'openai/gpt-4.1',
+                    configuration: {
+                        baseURL: config.baseURL || 'https://openrouter.ai/api/v1',
                     },
                 });
 

@@ -294,24 +294,28 @@ export class ItemsGeneratorService {
 
             // 8. Filter and Validate Source URLs for all discovered items
             this.logger.log(`[${slug}] 8. Filter and Validate Source URLs - Starting`);
-            const validatedItems = await this.sourceValidationService.filterAndValidateSourceItems(
+            let validatedItems = await this.sourceValidationService.filterAndValidateSourceItems(
                 finalItems,
                 slug,
             );
 
             // 9. Badge Processing for Repository Items
-            this.logger.log(`[${slug}] 9. Badge Processing for Repository Items - Starting`);
-            const itemsWithBadges = await this.badgeProcessingService.processBadges(validatedItems);
+            if (createItemsGeneratorDto.badge_evaluation_enabled) {
+                this.logger.log(`[${slug}] 9. Badge Processing for Repository Items - Starting`);
+                validatedItems = await this.badgeProcessingService.processBadges(validatedItems);
 
-            // Log badge statistics
-            const badgeStats = this.badgeProcessingService.getBadgeStatistics(itemsWithBadges);
-            this.logger.log(`[${slug}] Badge processing completed. Statistics: ${JSON.stringify(badgeStats)}`);
+                // Log badge statistics
+                const badgeStats = this.badgeProcessingService.getBadgeStatistics(validatedItems);
+                this.logger.log(
+                    `[${slug}] Badge processing completed. Statistics: ${JSON.stringify(badgeStats)}`,
+                );
+            }
 
             // This is where a more robust notification (webhook, websocket, email) would be triggered,
             // potentially including the 'metrics'
 
             return {
-                items: itemsWithBadges,
+                items: validatedItems,
                 categories: categories,
                 tags: tags,
             };

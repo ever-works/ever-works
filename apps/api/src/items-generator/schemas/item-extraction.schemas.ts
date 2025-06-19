@@ -79,14 +79,14 @@ export const promptUnderstandingAssessmentSchema = z.object({
 export const badgeSchema = z.object({
     type: z.nativeEnum(BadgeType),
     value: z.nativeEnum(BadgeValue),
-    evaluated_at: z.string().optional().describe('ISO date string when badge was evaluated'),
-    details: z.string().optional().describe('Optional details about the evaluation'),
+    evaluated_at: z.string().nullable().describe('ISO date string when badge was evaluated'),
+    details: z.string().nullable().describe('Optional details about the evaluation'),
 });
 
 export const itemBadgesSchema = z.object({
-    security: badgeSchema.optional(),
-    license: badgeSchema.optional(),
-    quality: badgeSchema.optional(),
+    security: badgeSchema.nullable(),
+    license: badgeSchema.nullable(),
+    quality: badgeSchema.nullable(),
 });
 
 // Extended item schema with badges
@@ -104,5 +104,5 @@ export const itemDataWithBadgesSchema = baseSchema.extend({
         .describe(
             "Determine if the item warrants a 'featured' status based on prominence, recommendations, or significance. Default to false.",
         ),
-    badges: itemBadgesSchema.optional().describe('Optional badges for repository items'),
+    badges: itemBadgesSchema.nullable().describe('Optional badges for repository items'),
 });

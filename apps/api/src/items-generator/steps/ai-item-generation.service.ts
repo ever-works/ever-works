@@ -1,6 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PromptTemplate } from '@langchain/core/prompts';
-import { zodToJsonSchema } from 'zod-to-json-schema';
 import { slugifyText } from '../utils/text.utils';
 import { AiService } from '../shared';
 import { CreateItemsGeneratorDto, ItemData } from '../dto';
@@ -101,14 +100,6 @@ Consider:
             // If the understanding check itself fails, we log the error but still attempt item generation.
             // This is a fallback in case the assessment mechanism has an issue.
         }
-
-        // 2. Proceed with Item Generation if understanding is sufficient (or assessment failed)
-        const itemGenerationFunction = {
-            name: 'generate_awesome_list_items_directly',
-            description:
-                'Generates a list of distinct items (tools, resources, libraries, articles, etc.) that are highly relevant to the directory website topic, including their details.',
-            parameters: zodToJsonSchema(extractedItemsSchema),
-        };
 
         const generationPrompt = PromptTemplate.fromTemplate(
             `You are an expert curator and technical writer tasked with generating an initial list of items for a "Directory website" about a specific topic.

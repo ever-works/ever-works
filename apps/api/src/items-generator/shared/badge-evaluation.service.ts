@@ -9,13 +9,13 @@ import { AiService } from './ai.service';
 const badgeSchema = z.object({
     type: z.nativeEnum(BadgeType),
     value: z.nativeEnum(BadgeValue),
-    details: z.string().optional().describe('Brief explanation of the evaluation result'),
+    details: z.string().nullable().describe('Brief explanation of the evaluation result'),
 });
 
 const badgeEvaluationSchema = z.object({
-    security: badgeSchema.optional(),
-    license: badgeSchema.optional(),
-    quality: badgeSchema.optional(),
+    security: badgeSchema.nullable(),
+    license: badgeSchema.nullable(),
+    quality: badgeSchema.nullable(),
     evaluation_summary: z.string().describe('Brief summary of the overall badge evaluation'),
 });
 

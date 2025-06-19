@@ -58,8 +58,7 @@
     "string-similarity": "^4.0.4",
     "unified": "^11.0.5",
     "yaml": "^2.8.0",
-    "zod": "^3.25.67",
-    "zod-to-json-schema": "^3.24.5"
+    "zod": "^3.25.67"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.1",
