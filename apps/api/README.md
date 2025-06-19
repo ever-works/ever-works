@@ -176,6 +176,49 @@ To generate data and create a GitHub repository for the directory, send a POST r
 
 > This is a long-running task that may take 5-15 minutes depending on the configuration and number of items processed. The system uses intelligent batching and rate limiting to ensure reliable processing.
 
+### 6. Update Directory
+
+This streamlines the process of updating an existing directory without requiring a request body, in contrast to the behavior of the `/generate` endpoint.
+
+**Endpoint:**
+
+```
+POST /update/{slug}
+```
+
+**Request Body (Optional):**
+
+```json
+{
+    "generation_method": "create-update",
+    "update_with_pull_request": true
+}
+```
+
+**Response:**
+
+```json
+{
+    "status": "pending",
+    "slug": "awesome-time-tracking",
+    "parameters": {...},
+    "message": "Directory 'awesome-time-tracking' is being updated. Check back later"
+}
+```
+
+**URL Parameters:**
+
+| Parameter | Type   | Required   | Description                         |
+| --------- | ------ | ---------- | ----------------------------------- |
+| `slug`    | string | `required` | The slug of the directory to update |
+
+**POST Request Body Parameters:**
+
+| Field                      | Type    | Required   | Description                                                                                                           |
+| -------------------------- | ------- | ---------- | --------------------------------------------------------------------------------------------------------------------- |
+| `generation_method`        | enum    | `optional` | Generation method: `create-update` or `recreate` (default: `create-update`)                                           |
+| `update_with_pull_request` | boolean | `optional` | Whether to update the repository with a pull request or directly commit the changes to main branch. (default: `true`) |
+
 ### 6. Submit Individual Items
 
 To submit individual items to an existing directory, send a POST request to `http://localhost:3001/submit-item/{slug}` with the item details.
@@ -409,4 +452,8 @@ POST /deploy/awesome-time-tracking/vercel
     "initial_categories": ["Open Source", "Commercial"],
     "priority_categories": ["Enterprise"]
 }
+```
+
+```
+
 ```

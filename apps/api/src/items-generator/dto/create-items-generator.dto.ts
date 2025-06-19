@@ -138,3 +138,13 @@ export class CreateItemsGeneratorDto {
     website_repository_creation_method?: WebsiteRepositoryCreationMethod =
         WebsiteRepositoryCreationMethod.DUPLICATE;
 }
+
+export class UpdateItemsGeneratorDto {
+    @IsOptional()
+    @IsEnum(GenerationMethod)
+    generation_method?: GenerationMethod = GenerationMethod.CREATE_UPDATE;
+
+    @IsOptional()
+    @IsBoolean()
+    update_with_pull_request?: boolean = true;
+}

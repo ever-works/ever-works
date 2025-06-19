@@ -16,7 +16,10 @@ import { WebsiteUpdateService } from './website-generator/website-update.service
 import { Directory } from './entities/directory.entity';
 import { User } from './entities/user.entity';
 import { GithubService } from './git/github.service';
-import { CreateItemsGeneratorDto } from './items-generator/dto/create-items-generator.dto';
+import {
+    CreateItemsGeneratorDto,
+    UpdateItemsGeneratorDto,
+} from './items-generator/dto/create-items-generator.dto';
 import { ItemsGeneratorResponseDto } from './items-generator/dto/items-generator-response.dto';
 import { SubmitItemDto, SubmitItemResponseDto } from './items-generator/dto';
 import { CreateDirectoryDto } from './dto/create-directory.dto';
@@ -57,15 +60,15 @@ export class AppController {
 
     @Post('generate')
     @HttpCode(HttpStatus.ACCEPTED)
+    @UsePipes(
+        new ValidationPipe({
+            transform: true,
+            whitelist: true,
+            forbidNonWhitelisted: true,
+        }),
+    )
     async generateItemsGenerator(
-        @Body(
-            new ValidationPipe({
-                transform: true,
-                whitelist: true,
-                forbidNonWhitelisted: true,
-            }),
-        )
-        createItemsGeneratorDto: CreateItemsGeneratorDto,
+        @Body() createItemsGeneratorDto: CreateItemsGeneratorDto,
     ): Promise<ItemsGeneratorResponseDto> {
         const user = await User.sessionMock();
         const directory = await Directory.findMock(createItemsGeneratorDto.slug);
@@ -88,20 +91,28 @@ export class AppController {
 
     @Post('update/:slug')
     @HttpCode(HttpStatus.ACCEPTED)
-    async updateItemsGenerator(@Param('slug') slug: string): Promise<ItemsGeneratorResponseDto> {
+    async updateItemsGenerator(
+        @Param('slug') slug: string,
+        @Body() updateItemsGeneratorDto: UpdateItemsGeneratorDto,
+    ): Promise<ItemsGeneratorResponseDto> {
         const user = await User.sessionMock();
         const directory = await Directory.findMock(slug);
         if (!directory) {
             throw new NotFoundException('Directory not found');
         }
 
-        const lastRequestData = await this.dataGenerator
+        let lastRequestData = await this.dataGenerator
             .getLastRequestData(directory, user)
             .catch(() => null);
 
         if (!lastRequestData) {
             throw new NotFoundException('No last request data found');
         }
+
+        lastRequestData = {
+            ...lastRequestData,
+            ...updateItemsGeneratorDto,
+        };
 
         // TODO: Intentionally not awaiting this to allow for an immediate response
         // The actual processing will happen in the background.
@@ -111,6 +122,7 @@ export class AppController {
         return {
             slug,
             status: 'pending',
+            parameters: lastRequestData,
             message: `Processing update for '${directory.name}'. Check logs or data directory for updates.`,
         };
     }
