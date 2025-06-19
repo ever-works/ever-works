@@ -38,7 +38,6 @@ export class AppController {
     ) {}
 
     @Post('directories')
-    @UsePipes(new ValidationPipe({ transform: true }))
     async createDirectory(@Body() createDirectoryDto: CreateDirectoryDto) {
         const { slug, name, description, owner } = createDirectoryDto;
         const user = await User.sessionMock();
@@ -60,13 +59,6 @@ export class AppController {
 
     @Post('generate')
     @HttpCode(HttpStatus.ACCEPTED)
-    @UsePipes(
-        new ValidationPipe({
-            transform: true,
-            whitelist: true,
-            forbidNonWhitelisted: true,
-        }),
-    )
     async generateItemsGenerator(
         @Body() createItemsGeneratorDto: CreateItemsGeneratorDto,
     ): Promise<ItemsGeneratorResponseDto> {
@@ -129,7 +121,6 @@ export class AppController {
 
     @Post('submit-item/:slug')
     @HttpCode(HttpStatus.OK)
-    @UsePipes(new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }))
     async submitItem(
         @Param('slug') slug: string,
         @Body() submitItemDto: SubmitItemDto,
@@ -164,7 +155,6 @@ export class AppController {
 
     @Post('update-website/:slug')
     @HttpCode(HttpStatus.OK)
-    @UsePipes(new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }))
     async updateWebsiteRepository(
         @Param('slug') slug: string,
     ): Promise<UpdateWebsiteRepositoryResponseDto> {
