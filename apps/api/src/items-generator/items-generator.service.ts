@@ -53,7 +53,7 @@ export class ItemsGeneratorService {
             existingConfig?: IDataConfig;
         } = {},
     ) {
-        const { slug, name, target_keywords, source_urls, config } = createItemsGeneratorDto;
+        const { slug, name, source_urls, config } = createItemsGeneratorDto;
 
         this.logger.log(`Starting generation for slug: ${slug}, name: ${name}`);
 
@@ -82,15 +82,16 @@ export class ItemsGeneratorService {
             }
 
             // 1.0. Prompt Comparison
+            const configMetadata = existingConfig?.metadata || {};
             if (
-                existingConfig?.metadata?.initial_prompt &&
+                configMetadata?.initial_prompt &&
                 createItemsGeneratorDto.generation_method === GenerationMethod.CREATE_UPDATE &&
                 existingItems.length > 0
             ) {
                 this.logger.log(`[${slug}] 1.0. Prompt Comparison - Starting`);
                 const comparisonResult = await this.promptComparisonService.comparePrompts(
                     slug,
-                    existingConfig.metadata.initial_prompt,
+                    configMetadata.initial_prompt,
                     createItemsGeneratorDto.prompt,
                 );
 

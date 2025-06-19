@@ -133,7 +133,11 @@ export class AppController {
                 throw new NotFoundException(`Directory with slug '${slug}' not found`);
             }
 
-            const result = await this.itemSubmissionService.submitItem(directory, user, submitItemDto);
+            const result = await this.itemSubmissionService.submitItem(
+                directory,
+                user,
+                submitItemDto,
+            );
             return result;
         } catch (error) {
             console.error('Error submitting item:', error);
