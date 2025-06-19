@@ -83,14 +83,14 @@ export class ItemsGeneratorService {
 
             // 1.0. Prompt Comparison
             if (
-                existingConfig?.initial_prompt &&
+                existingConfig?.metadata?.initial_prompt &&
                 createItemsGeneratorDto.generation_method === GenerationMethod.CREATE_UPDATE &&
                 existingItems.length > 0
             ) {
                 this.logger.log(`[${slug}] 1.0. Prompt Comparison - Starting`);
                 const comparisonResult = await this.promptComparisonService.comparePrompts(
                     slug,
-                    existingConfig.initial_prompt,
+                    existingConfig.metadata.initial_prompt,
                     createItemsGeneratorDto.prompt,
                 );
 

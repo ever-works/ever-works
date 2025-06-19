@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { GithubService } from '../git/github.service';
 import { Directory } from '../entities/directory.entity';
 import { User } from '../entities/user.entity';
-import { DataRepository, DEFAULT_DATA_CONFIG, IDataConfig } from './data-repository';
+import { DataRepository, IDataConfig } from './data-repository';
 import { slugifyText } from '../items-generator/utils/text.utils';
 import { ItemsGeneratorService } from '../items-generator/items-generator.service';
 import {
@@ -158,37 +158,35 @@ export class DataGeneratorService {
                 promises.push(
                     data.writeReadme(this.getDefaultReadme(directory)),
                     data.writeLicense(this.getLicense()),
-                    data.writeConfig(
-                        this.getDefaultConfig({
-                            generation_method: createItemsGeneratorDto.generation_method,
+                    data.mergeConfig({
+                        ...this.withCompanyConfig(createItemsGeneratorDto.company),
+                        metadata: {
                             initial_prompt: createItemsGeneratorDto.prompt,
-                            ...this.withCompanyConfig(createItemsGeneratorDto.company),
-                            ...createItemsGeneratorDto.config,
-                        }),
-                    ),
+                            generation_method: createItemsGeneratorDto.generation_method,
+                            last_request_data: createItemsGeneratorDto,
+                        },
+                    }),
                     data.writeMarkdownTemplate(this.getHeader(directory), this.getFooter()),
                 );
             }
 
             const { title: prTitle, body: prBody } = this.getPRDetails(directory);
-            const preloadedConfig = await data.getConfig().catch(() => null);
 
             // Write PR details in config so that others repositories may use it
             if (newBranchName) {
                 promises.push(
-                    data.writeConfig(
-                        this.getDefaultConfig({
-                            ...preloadedConfig,
+                    data.mergeConfig({
+                        ...this.withCompanyConfig(createItemsGeneratorDto.company),
+                        metadata: {
                             generation_method: createItemsGeneratorDto.generation_method,
-                            ...this.withCompanyConfig(createItemsGeneratorDto.company),
-                            ...createItemsGeneratorDto.config,
+                            last_request_data: createItemsGeneratorDto,
                             pr_update: {
                                 branch: newBranchName,
                                 title: prTitle,
                                 body: prBody,
                             },
-                        }),
-                    ),
+                        },
+                    }),
                 );
             }
 
@@ -352,15 +350,6 @@ export class DataGeneratorService {
                   company_website: company.website,
               }
             : {};
-    }
-
-    private getDefaultConfig(additionalConfig?: Partial<IDataConfig>): IDataConfig {
-        const now = new Date();
-        return {
-            ...DEFAULT_DATA_CONFIG,
-            copyright_year: now.getFullYear(),
-            ...additionalConfig,
-        };
     }
 
     private getDefaultReadme(directory: Directory) {
