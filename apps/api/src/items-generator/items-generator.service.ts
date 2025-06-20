@@ -167,18 +167,13 @@ export class ItemsGeneratorService {
                 );
             }
 
+            this.logger.log(`[${slug}] Rewritten prompt: "${prompt}"`);
+
             // Update the prompt in the DTO
             createItemsGeneratorDto.prompt = prompt;
 
             // Add source_urls to the extractedUrls
             extractedUrls.push(...(source_urls || []));
-
-            if (extractedUrls.length > 0) {
-                this.logger.log(
-                    `[${slug}] Extracted (or source urls) ${extractedUrls.length} URLs from prompt: ${extractedUrls.join(', ')}`,
-                );
-                this.logger.log(`[${slug}] Updated prompt: "${prompt}"`);
-            }
 
             // 1.5. AI-First Item Generation
             let initialAiItems: ItemData[] = [];

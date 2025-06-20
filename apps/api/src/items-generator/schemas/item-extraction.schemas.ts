@@ -35,7 +35,7 @@ export const itemDataSchema = baseSchema.extend({
         ),
 });
 
-export const itemDataWithCategoriesAndTagsSchema = baseSchema.extend({
+export const itemDataWithCategoriesAndTagsSchema = itemDataSchema.extend({
     slug: z.string().describe('URL-friendly slug, auto-generated from item.name if not provided.'),
     category: z
         .string()

@@ -120,7 +120,7 @@ export class DataRepository {
     async resetFiles() {
         const files = await fs.readdir(this.dir);
         for (const file of files) {
-            if (file === '.git' || file.startsWith('.git')) {
+            if (file === '.git') {
                 continue;
             }
 

@@ -30,8 +30,7 @@ Task context:
 Items to categorize:
 <items>
 {items}
-</items>
-`.trim();
+</items>`.trim();
 
 // Output schema for validation
 const categorizeOutputSchema = z.object({
@@ -153,14 +152,7 @@ export class CategoryProcessingService {
 
         try {
             // Prepare items for categorization
-            const itemsForCategorization = items.map((i) => ({
-                slug: i.slug,
-                name: i.name,
-                description: i.description,
-                source_url: i.source_url,
-                featured: i.featured,
-                ...(i.category ? { category: i.category } : {}),
-            }));
+            const itemsForCategorization = items;
 
             // Process in batches if there are many items
             if (items.length > this.BATCH_SIZE) {
@@ -220,6 +212,7 @@ export class CategoryProcessingService {
 - Create new categories or tags only if none of the existing options are suitable.
 - If you create a new category, ensure it matches the abstraction level of the existing ones.
 - Prioritize consistency across items with similar purposes.
+- The featured field should remain the same as in the original item
 </additional_rules>
 
 <existing_categories>
