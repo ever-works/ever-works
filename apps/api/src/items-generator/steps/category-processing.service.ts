@@ -22,7 +22,7 @@ Task context:
 3. Use specific but not overly narrow categories (e.g. "Monitoring", "CI/CD", "Testing")
 4. Use descriptive tags (e.g. "open-source", "real-time", "cloud-native")
 5. Maintain consistency with existing categories and tags
-6. Override any existing item category if it doesn't match the primary function
+6. Override any existing item category if it doesn't match the primary task context
 </rules>
 
 <additional_rules#>

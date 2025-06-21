@@ -30,9 +30,9 @@ Exclude any invalid or irrelevant content, and align the findings with the topic
 **EXTRACTION CRITERIA:**
 - Only extract items that are *directly* relevant to the main topic "{topicName}" and topic task.
 - Do NOT extract items that are only tangentially related or represent a different category unless it's explicitly part of "{topicName}" and topic task.
+- Avoid using blog posts, news articles, or marketing pages as the source_url or item unless the user specifically requests them for their topic task (e.g 'Best Time Tracking Software for Small Businesses', 'Best Time Tracking Tools for Remote Teams', etc.).
 - For example, if the topic is "Vector Databases", do not extract a general-purpose database or a library for a specific programming language (like Ruby) unless it's explicitly a vector database client/tool directly supporting the core topic
 - Ensure the source_url is for the item itself, not an article *about* the item
-- Avoid using blog posts, news articles, or marketing pages as the source_url or item unless the user specifically requests them for their topic task.
 - Featured items are those that match the specifications provided in the "Featured Item Specifications" section above.
 - Do not use URLs for blog posts merely mentioning the item unless the post *is* the primary resource
 
@@ -51,7 +51,7 @@ export class ItemExtractionService {
     private readonly CHUNK_OVERLAP = 200; // Overlap between chunks
 
     constructor(private readonly aiService: AiService) {
-        this.llm = this.aiService.createLlmWithTemperature(0.0);
+        this.llm = this.aiService.createLlmWithTemperature(0.1);
 
         this.textSplitter = new RecursiveCharacterTextSplitter({
             chunkSize: this.MAX_CHUNK_SIZE,
