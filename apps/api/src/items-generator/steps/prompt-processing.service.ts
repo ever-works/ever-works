@@ -1,12 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ChatOpenAI } from '@langchain/openai';
 import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
 import { z } from 'zod';
 import { AiService } from '../shared';
+import { BaseChatModel } from '../shared/ai-provider.interface';
 
 // Prompt processing prompt
 const PROMPT_PROCESSING_PROMPT = `
-You are a helpful assistant tasked with extracting URLs and explicitly mentioned categories from a user's prompt, then rewriting the prompt without the URLs while preserving the context.
+You are a helpful assistant tasked with extracting URLs and explicitly mentioned categories from a user's prompt, then rewriting the prompt to focus only on the core task idea.
 
 <prompt>
 {prompt}
@@ -17,7 +17,7 @@ Your task:
 2. Extract categories that are explicitly mentioned in the prompt that should be considered for categorization.
 3. Extract priority categories that should appear first in the final output based on priority indicators in the prompt.
 4. Extract featured item specifications that indicate which types of items should be marked as featured/highlighted.
-5. Rewrite the prompt without the URLs but preserve the context and meaning.
+5. Rewrite the prompt to focus ONLY on the main task idea, removing ALL hints, instructions, and specifications.
 6. Return the extracted URLs, explicitly mentioned categories, priority categories, featured item hints, and the rewritten prompt.
 
 Guidelines for URL extraction:
@@ -107,6 +107,18 @@ Examples of what NOT to extract as featured item hints:
 - "I want monitoring tools" (no prominence indication)
 - "include various development tools" (no special highlighting)
 - "tools for testing and deployment" (descriptive, not prominence-focused)
+
+Guidelines for prompt rewriting:
+- Remove ALL URLs from the prompt
+- Remove ALL category specifications and hints (e.g., "Be sure to include both open-source and commercial categories")
+- Remove ALL priority indicators (e.g., "starting with open-source projects", "prioritizing commercial solutions")
+- Remove ALL featured item specifications (e.g., "Please prioritize solutions Ever Cloc, Ever Teams, Ever Gauzy")
+- Remove ALL reference instructions (e.g., "For reference, consult: https://...")
+- Remove ALL categorization instructions (e.g., "When listing open-source projects, strictly use the license type as the tag")
+- Keep ONLY the core task description that explains what type of items/content to generate
+- Focus on the main subject matter and purpose of the directory/list
+- Preserve the essential context about what the user wants to accomplish
+- The rewritten prompt should be clean, focused, and contain only the essential task description without any processing hints, categorization instructions, priority specifications, or reference URLs.
 `.trim();
 
 // Output schema for validation
@@ -133,7 +145,7 @@ const promptProcessingOutputSchema = z.object({
 @Injectable()
 export class PromptProcessingService {
     private readonly logger = new Logger(PromptProcessingService.name);
-    private llm: ChatOpenAI;
+    private llm: BaseChatModel;
 
     constructor(private readonly aiService: AiService) {
         this.llm = this.aiService.createLlmWithTemperature(0.0);

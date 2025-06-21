@@ -63,23 +63,25 @@ export class MarkdownGeneratorService {
                     return null;
                 });
 
+            const configMetadata = config?.metadata || {};
+
             let canCreatePR =
-                config.generation_method !== GenerationMethod.RECREATE &&
-                !!config.pr_update?.branch;
+                configMetadata?.generation_method !== GenerationMethod.RECREATE &&
+                !!configMetadata.pr_update?.branch;
 
             // In case of re-creation:
             // Switch to the main branch and remove existing items files.
-            if (config?.generation_method === GenerationMethod.RECREATE) {
+            if (configMetadata?.generation_method === GenerationMethod.RECREATE) {
                 await this.githubService.switchToMainBranch(markdownRepo.dir).catch((err) => {
                     this.logger.error('Failed to switch to main branch', err);
                     return null;
                 });
 
                 await markdownRepo.resetFiles();
-            } else if (config.pr_update?.branch) {
+            } else if (configMetadata.pr_update?.branch) {
                 // Switch to PR branch
                 await this.githubService
-                    .switchToBranch(markdownRepo.dir, config.pr_update.branch, true)
+                    .switchToBranch(markdownRepo.dir, configMetadata.pr_update.branch, true)
                     .catch((err) => {
                         canCreatePR = false;
                         this.logger.error('Failed to switch to PR branch', err);
@@ -135,7 +137,7 @@ export class MarkdownGeneratorService {
 
             if (canCreatePR && defaultBranch) {
                 this.logger.log(
-                    `Creating PR from ${config.pr_update.branch} to ${defaultBranch} for ${directory.slug}`,
+                    `Creating PR from ${configMetadata.pr_update.branch} to ${defaultBranch} for ${directory.slug}`,
                 );
 
                 await this.githubService
@@ -144,9 +146,9 @@ export class MarkdownGeneratorService {
                             owner: directory.owner,
                             repo: directory.slug,
                             base: defaultBranch,
-                            head: config.pr_update.branch,
-                            title: config.pr_update.title,
-                            body: config.pr_update.body,
+                            head: configMetadata.pr_update.branch,
+                            title: configMetadata.pr_update.title,
+                            body: configMetadata.pr_update.body,
                         },
                         token,
                     )
@@ -208,7 +210,10 @@ export class MarkdownGeneratorService {
      * @param categoryIds Array of category IDs to sort
      * @param categories Map of category details
      */
-    private sortCategoriesByPriority(categoryIds: string[], categories: Map<string, Category>): string[] {
+    private sortCategoriesByPriority(
+        categoryIds: string[],
+        categories: Map<string, Category>,
+    ): string[] {
         return categoryIds.sort((aId, bId) => {
             const categoryA = categories.get(aId);
             const categoryB = categories.get(bId);

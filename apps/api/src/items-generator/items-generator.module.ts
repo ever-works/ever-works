@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ItemsGeneratorService } from './items-generator.service';
+import { ItemSubmissionService } from './item-submission.service';
 import { AiItemGenerationService } from './steps/ai-item-generation.service';
 import { SearchQueryGenerationService } from './steps/search-query-generation.service';
 import { WebPageRetrievalService } from './steps/web-page-retrieval.service';
@@ -11,41 +12,49 @@ import { CategoryProcessingService } from './steps/category-processing.service';
 import { MarkdownGenerationService } from './steps/markdown-generation.service';
 import { PromptProcessingService } from './steps/prompt-processing.service';
 import { PromptComparisonService } from './steps/prompt-comparison.service';
-import { AiService, SearchService, NotionService } from './shared';
+import { BadgeProcessingService } from './steps/badge-processing.service';
+import { AiService, SearchService, NotionService, BadgeEvaluationService } from './shared';
 import {
-  SharedUtilsService,
-  NewItemsExtractorService,
-  AiDeduplicatorService
-} from './steps/data-aggregation';
-
-@Module({
-  providers: [
-    // Shared services
-    AiService,
-    SearchService,
-    NotionService,
-
-    // Data aggregation shared services
     SharedUtilsService,
     NewItemsExtractorService,
     AiDeduplicatorService,
+} from './steps/data-aggregation';
+import { GithubService } from '../git/github.service';
 
-    // Main service
-    ItemsGeneratorService,
+@Module({
+    providers: [
+        // Shared services
+        AiService,
+        SearchService,
+        NotionService,
+        BadgeEvaluationService,
 
-    // Step services
-    PromptComparisonService,
-    PromptProcessingService,
-    AiItemGenerationService,
-    SearchQueryGenerationService,
-    WebPageRetrievalService,
-    ContentFilteringService,
-    ItemExtractionService,
-    SourceValidationService,
-    DataAggregationService,
-    CategoryProcessingService,
-    MarkdownGenerationService,
-  ],
-  exports: [ItemsGeneratorService],
+        // Data aggregation shared services
+        SharedUtilsService,
+        NewItemsExtractorService,
+        AiDeduplicatorService,
+
+        // External services
+        GithubService,
+
+        // Main service
+        ItemsGeneratorService,
+        ItemSubmissionService,
+
+        // Step services
+        PromptComparisonService,
+        PromptProcessingService,
+        AiItemGenerationService,
+        SearchQueryGenerationService,
+        WebPageRetrievalService,
+        ContentFilteringService,
+        ItemExtractionService,
+        SourceValidationService,
+        DataAggregationService,
+        CategoryProcessingService,
+        MarkdownGenerationService,
+        BadgeProcessingService,
+    ],
+    exports: [ItemsGeneratorService, ItemSubmissionService],
 })
 export class ItemsGeneratorModule {}

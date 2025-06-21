@@ -1,15 +1,15 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ChatOpenAI } from '@langchain/openai';
 import { PromptTemplate } from '@langchain/core/prompts';
 import { StringOutputParser } from '@langchain/core/output_parsers';
 import { formatDate } from 'date-fns';
 import { ConfigDto, CreateItemsGeneratorDto } from '../dto/create-items-generator.dto';
 import { AiService } from '../shared';
+import { BaseChatModel } from '../shared/ai-provider.interface';
 
 @Injectable()
 export class SearchQueryGenerationService {
     private readonly logger = new Logger(SearchQueryGenerationService.name);
-    private llm: ChatOpenAI;
+    private llm: BaseChatModel;
 
     constructor(private readonly aiService: AiService) {
         this.llm = this.aiService.getLlm();
@@ -27,7 +27,7 @@ export class SearchQueryGenerationService {
 
         this.logger.log(`[${name}] Generating search queries using LLM...`);
 
-        if (!this.llm.apiKey) {
+        if (!this.aiService.isAiConfigured()) {
             this.logger.warn(
                 `[${name}] OpenAI API Key not configured. Falling back to basic query generation.`,
             );
@@ -51,25 +51,21 @@ export class SearchQueryGenerationService {
         }
 
         const promptTemplate = PromptTemplate.fromTemplate(
-            `You are an expert at generating highly relevant and diverse search engine queries to build a "Directory website" about a specific topic.
-The topic is: "{name}"
-Description: "{description}"
-Optional initial keywords: {target_keywords_string}
-Today is {day} the {datetime}
+            `You are a directory website builder, and your task is to generate search queries that will help you find relevant information on the web, based on the given details.
+<details>
+- The topic is: "{name}"
+- Description: "{description}"
+- Optional initial keywords: {target_keywords_string}
+- Today is {day} the {datetime}
+</details>
 
-Generate {num_queries} distinct search queries. Each query should be on a new line.
-The queries should aim to discover:
-- Key tools and software
-- Essential libraries and frameworks
-- Seminal articles and blog posts
-- Official documentation and guides
-- Comparisons and alternatives
-- Awesome lists and directories
 
-Consider variations, long-tail keywords, and queries targeting different facets of the topic.
-Avoid overly broad or generic queries. Be specific.
-
-Generated Queries:
+<instructions>
+- Generate {num_queries} distinct search queries. Each query should be on a new line.  
+- Use terms that will help find official resources related to the topic.
+- If the task description prioritizes specific items or types of items, don't simply generate queries for those items. Instead, create queries designed to help locate official resources related to the topic.
+- Include variations, long-tail keywords, and queries targeting different aspects of the topic.
+</instructions>
 `,
         );
 

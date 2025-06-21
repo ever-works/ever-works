@@ -130,7 +130,21 @@ export class CreateItemsGeneratorDto {
     update_with_pull_request?: boolean = true;
 
     @IsOptional()
+    @IsBoolean()
+    badge_evaluation_enabled?: boolean = false;
+
+    @IsOptional()
     @IsEnum(WebsiteRepositoryCreationMethod)
     website_repository_creation_method?: WebsiteRepositoryCreationMethod =
         WebsiteRepositoryCreationMethod.DUPLICATE;
+}
+
+export class UpdateItemsGeneratorDto {
+    @IsOptional()
+    @IsEnum(GenerationMethod)
+    generation_method?: GenerationMethod = GenerationMethod.CREATE_UPDATE;
+
+    @IsOptional()
+    @IsBoolean()
+    update_with_pull_request?: boolean = true;
 }

@@ -1,9 +1,10 @@
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 import * as yaml from 'yaml';
+import * as deepmerge from 'deepmerge';
 import { format } from 'date-fns';
 import { Category, ItemData, Tag } from '../agent/types';
-import { GenerationMethod } from '../items-generator/dto';
+import { CreateItemsGeneratorDto, GenerationMethod } from '../items-generator/dto';
 
 type PRUpdate = {
     branch: string;
@@ -17,16 +18,23 @@ export interface IDataConfig {
     item_name?: string;
     items_name?: string;
     copyright_year?: number;
-    initial_prompt?: string;
-    generation_method?: GenerationMethod;
-    pr_update?: PRUpdate | null;
+    paging_mode?: string;
+    autoapproval?: boolean;
+    metadata?: {
+        initial_prompt?: string;
+        generation_method?: GenerationMethod;
+        pr_update?: PRUpdate | null;
+        last_request_data?: CreateItemsGeneratorDto;
+    } & (Record<string, any> & {});
 }
 
-export const DEFAULT_DATA_CONFIG: IDataConfig = {
+const DEFAULT_DATA_CONFIG: IDataConfig = {
     company_name: 'Acme',
     content_table: true, // Previous value was false
     item_name: 'Item',
     items_name: 'Items',
+    paging_mode: 'paging',
+    copyright_year: new Date().getFullYear(),
 };
 
 export class DataRepository {
@@ -112,7 +120,7 @@ export class DataRepository {
     async resetFiles() {
         const files = await fs.readdir(this.dir);
         for (const file of files) {
-            if (file === '.git' || file.startsWith('.git')) {
+            if (file === '.git') {
                 continue;
             }
 
@@ -140,7 +148,7 @@ export class DataRepository {
             return this.config;
         } catch (err) {
             if (err?.code === 'ENOENT') {
-                this.config = {}; // set some defaults if needed
+                this.config = { ...DEFAULT_DATA_CONFIG }; // set some defaults if needed
                 return this.config;
             }
             throw err;
@@ -225,6 +233,11 @@ export class DataRepository {
             }
             throw err;
         }
+    }
+
+    async mergeConfig(config: IDataConfig) {
+        const currentConfig = await this.getConfig();
+        await this.writeConfig(deepmerge(currentConfig, config));
     }
 
     async writeConfig(config: IDataConfig) {

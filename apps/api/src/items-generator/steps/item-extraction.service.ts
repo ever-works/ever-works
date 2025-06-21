@@ -1,5 +1,4 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ChatOpenAI } from '@langchain/openai';
 import { PromptTemplate } from '@langchain/core/prompts';
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
 import { ConfigDto, CreateItemsGeneratorDto } from '../dto/create-items-generator.dto';
@@ -8,6 +7,7 @@ import { slugifyText } from '../utils/text.utils';
 import { AiService } from '../shared';
 import { ItemData } from '../dto';
 import { extractedItemsSchema, itemDataSchema } from '../schemas/item-extraction.schemas';
+import { BaseChatModel } from '../shared/ai-provider.interface';
 
 const ITEMS_EXTRACTION_PROMPT =
     `You are an expert data extractor and technical writer for directory websites.
@@ -30,28 +30,29 @@ Exclude any invalid or irrelevant content, and align the findings with the topic
 **EXTRACTION CRITERIA:**
 - Only extract items that are *directly* relevant to the main topic "{topicName}" and topic task.
 - Do NOT extract items that are only tangentially related or represent a different category unless it's explicitly part of "{topicName}" and topic task.
+- Avoid using blog posts, news articles, or marketing pages as the source_url or item unless the user specifically requests them for their topic task (e.g 'Best Time Tracking Software for Small Businesses', 'Best Time Tracking Tools for Remote Teams', etc.).
 - For example, if the topic is "Vector Databases", do not extract a general-purpose database or a library for a specific programming language (like Ruby) unless it's explicitly a vector database client/tool directly supporting the core topic
 - Ensure the source_url is for the item itself, not an article *about* the item
 - Featured items are those that match the specifications provided in the "Featured Item Specifications" section above.
 - Do not use URLs for blog posts merely mentioning the item unless the post *is* the primary resource
 
----
-**Web Page Content:**
+<content>
 {page_content_snippet}
----`.trim();
+<content>`.trim();
 
 @Injectable()
 export class ItemExtractionService {
     private readonly logger = new Logger(ItemExtractionService.name);
-    private llm: ChatOpenAI;
+    private llm: BaseChatModel;
     private textSplitter: RecursiveCharacterTextSplitter;
 
     // Constants for content chunking
-    private readonly MAX_CHUNK_SIZE = 4000; // Characters per chunk
+    private readonly MAX_CHUNK_SIZE = 3000; // Characters per chunk
     private readonly CHUNK_OVERLAP = 200; // Overlap between chunks
 
     constructor(private readonly aiService: AiService) {
-        this.llm = this.aiService.getLlm();
+        this.llm = this.aiService.createLlmWithTemperature(0.1);
+
         this.textSplitter = new RecursiveCharacterTextSplitter({
             chunkSize: this.MAX_CHUNK_SIZE,
             chunkOverlap: this.CHUNK_OVERLAP,
@@ -94,7 +95,7 @@ export class ItemExtractionService {
     ): Promise<ItemData[]> {
         const { slug, name: topicName, prompt: topicDescription } = createItemsGeneratorDto;
 
-        if (!this.llm.apiKey) {
+        if (!this.aiService.isAiConfigured()) {
             this.logger.warn(
                 `[${slug}] OpenAI API Key not configured. Skipping AI-driven item extraction.`,
             );

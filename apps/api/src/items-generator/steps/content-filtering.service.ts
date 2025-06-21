@@ -1,15 +1,25 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ChatOpenAI } from '@langchain/openai';
 import { PromptTemplate } from '@langchain/core/prompts';
-import { JsonOutputFunctionsParser } from 'langchain/output_parsers';
 import { ConfigDto } from '../dto/create-items-generator.dto';
 import { WebPageData, RelevanceAssessment } from '../interfaces/items-generator.interfaces';
 import { AiService } from '../shared';
+import { BaseChatModel } from '../shared/ai-provider.interface';
+import z from 'zod';
+
+const relevanceSchema = z.object({
+    relevant: z.boolean().describe('Whether the content is highly relevant to the topic'),
+    relevance_score: z
+        .number()
+        .min(0)
+        .max(1)
+        .describe('A score between 0.0 (not relevant) and 1.0 (highly relevant)'),
+    reason: z.string().describe('A brief explanation for the relevance assessment'),
+});
 
 @Injectable()
 export class ContentFilteringService {
     private readonly logger = new Logger(ContentFilteringService.name);
-    private llm: ChatOpenAI;
+    private llm: BaseChatModel;
     private BATCH_SIZE = 10;
 
     constructor(private readonly aiService: AiService) {
@@ -59,33 +69,6 @@ export class ContentFilteringService {
             try {
                 this.logger.log(`[${slug}] Assessing relevance for: ${page.source_url}`);
 
-                // Using function calling for structured output
-                const relevanceFunction = {
-                    name: 'assess_content_relevance',
-                    description:
-                        'Assess if the provided web page content is highly relevant to the given topic.',
-                    parameters: {
-                        type: 'object',
-                        properties: {
-                            relevant: {
-                                type: 'boolean',
-                                description:
-                                    'True if the content is highly relevant, false otherwise.',
-                            },
-                            relevance_score: {
-                                type: 'number',
-                                description:
-                                    'A score between 0.0 (not relevant) and 1.0 (highly relevant).',
-                            },
-                            reason: {
-                                type: 'string',
-                                description: 'A brief explanation for the relevance assessment.',
-                            },
-                        },
-                        required: ['relevant', 'relevance_score', 'reason'],
-                    },
-                };
-
                 // Stricter prompt for page relevance
                 const prompt = PromptTemplate.fromTemplate(
                     `You are an expert content analyst. Assess the relevance of the following web page content to the **main topic**: "{topicName}" (Description: "{topicDescription}").
@@ -103,20 +86,20 @@ Provide a relevance score between 0.0 (not relevant) and 1.0 (highly relevant). 
 `,
                 );
 
-                const outputParser = new JsonOutputFunctionsParser();
-                const relevanceChain = prompt
-                    .pipe(
-                        this.llm.bind({
-                            functions: [relevanceFunction],
-                            function_call: { name: 'assess_content_relevance' },
-                        }),
-                    )
-                    .pipe(outputParser);
+                const relevanceChain = prompt.pipe(this.llm.withStructuredOutput(relevanceSchema));
+
+                const page_content_snippet =
+                    page.raw_content.length > 2000
+                        ? page.raw_content.slice(
+                              page.raw_content.length / 2 - 1000,
+                              page.raw_content.length / 2 + 1000,
+                          )
+                        : page.raw_content;
 
                 const assessmentResult = (await relevanceChain.invoke({
                     topicName,
                     topicDescription,
-                    page_content_snippet: page.raw_content.slice(0, 2000),
+                    page_content_snippet,
                 })) as RelevanceAssessment;
 
                 const isRelevant =

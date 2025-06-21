@@ -1,37 +1,36 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ChatOpenAI } from '@langchain/openai';
 import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
 import { z } from 'zod';
 import { ItemData, Category, Tag, CreateItemsGeneratorDto } from '../dto';
 import { slugifyText } from '../utils/text.utils';
 import { AiService } from '../shared';
 import { itemDataWithCategoriesAndTagsSchema } from '../schemas/item-extraction.schemas';
+import { BaseChatModel } from '../shared/ai-provider.interface';
 
 // Prompt for categorization
 const CATEGORIZE_PROMPT = `
-You are directory website builder and your task is to categorize items based on their features and descriptions.
-Take a look at task given by user as it may contain some hints about categories:
+You are directory website builder and your task is to Categorize the given items following these rules and task context.
+
+Task context:
 <task>
 {task}
 </task>
 
-Here is the list of items to categorize:
+<rules>
+1. Assign ONE category per item based on primary function
+2. Add 1-3 relevant tags per item
+3. Use specific but not overly narrow categories (e.g. "Monitoring", "CI/CD", "Testing")
+4. Use descriptive tags (e.g. "open-source", "real-time", "cloud-native")
+5. Maintain consistency with existing categories and tags
+6. Override any existing item category if it doesn't match the primary task context
+</rules>
+
+<additional_rules#>
+
+Items to categorize:
 <items>
 {items}
-</items>
-
-<instructions>
-1. Assign each item to ONE appropriate category based on its primary function or purpose.
-2. Choose concise, descriptive category names that clearly represent groups of similar items.
-3. Assign 2-5 relevant tags to each item that highlight key features, technologies, or use cases.
-4. Ensure categories are consistent and at a similar level of abstraction.
-5. For software/tools, good category examples include: "Monitoring", "CI/CD", "Data Visualization", "Testing", etc.
-6. For tags, good examples include: "open-source", "real-time", "cloud-native", "enterprise", etc.
-7. Avoid overly broad categories like "Tools" or "Software" - be more specific.
-8. Avoid overly specific categories that would only contain 1-2 items.
-9. Overwrite existing item category if it doesn't match the item's primary function or purpose.
-</instructions>
-`.trim();
+</items>`.trim();
 
 // Output schema for validation
 const categorizeOutputSchema = z.object({
@@ -41,7 +40,7 @@ const categorizeOutputSchema = z.object({
 @Injectable()
 export class CategoryProcessingService {
     private readonly logger = new Logger(CategoryProcessingService.name);
-    private llm: ChatOpenAI;
+    private llm: BaseChatModel;
     private readonly BATCH_SIZE = 30;
 
     constructor(private readonly aiService: AiService) {
@@ -85,6 +84,10 @@ export class CategoryProcessingService {
 
         // Add initial categories to existing categories for prioritization
         initialCategories.forEach((category) => existingCategoriesSet.add(category));
+
+        this.logger.log(
+            `[${slug}] Existing categories: ${Array.from(existingCategoriesSet).join(', ')}`,
+        );
 
         try {
             // Categorize items using AI
@@ -149,14 +152,7 @@ export class CategoryProcessingService {
 
         try {
             // Prepare items for categorization
-            const itemsForCategorization = items.map((i) => ({
-                slug: i.slug,
-                name: i.name,
-                description: i.description,
-                source_url: i.source_url,
-                featured: i.featured,
-                ...(i.category ? { category: i.category } : {}),
-            }));
+            const itemsForCategorization = items;
 
             // Process in batches if there are many items
             if (items.length > this.BATCH_SIZE) {
@@ -205,11 +201,19 @@ export class CategoryProcessingService {
      */
     private enhancedPrompt(existingCategories: Set<string>, existingTags: Set<string>) {
         if (!existingCategories.size && !existingTags.size) {
-            return CATEGORIZE_PROMPT;
+            return CATEGORIZE_PROMPT.replace('<additional_rules#>', '');
         }
 
-        const enhancedPromptTemplate = `
-${CATEGORIZE_PROMPT}
+        const enhancedPromptTemplate = CATEGORIZE_PROMPT.replace(
+            '<additional_rules#>',
+            `
+<additional_rules>
+- For consistency, use the existing categories and tags listed below whenever appropriate.
+- Create new categories or tags only if none of the existing options are suitable.
+- If you create a new category, ensure it matches the abstraction level of the existing ones.
+- Prioritize consistency across items with similar purposes.
+- The featured field should remain the same as in the original item
+</additional_rules>
 
 <existing_categories>
 {existing_categories}
@@ -217,13 +221,8 @@ ${CATEGORIZE_PROMPT}
 
 <existing_tags>
 {existing_tags}
-</existing_tags>
-
-<additional_instructions>
-- For consistency, consider using the existing categories and tags listed above when appropriate.
-- You can create new categories or tags if the existing ones don't fit well.
-- Prioritize consistency across items that serve similar purposes.
-</additional_instructions>`.trim();
+</existing_tags>`,
+        ).trim();
 
         return enhancedPromptTemplate;
     }

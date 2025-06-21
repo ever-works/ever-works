@@ -12,6 +12,7 @@ import {
     MarkdownGenerationService,
     PromptProcessingService,
     PromptComparisonService,
+    BadgeProcessingService,
 } from './steps';
 import { Category, ItemData, Tag } from './dto';
 import { IDataConfig } from '../data-generator/data-repository';
@@ -33,6 +34,7 @@ export class ItemsGeneratorService {
         private readonly dataAggregationService: DataAggregationService,
         private readonly categoryProcessingService: CategoryProcessingService,
         private readonly markdownGenerationService: MarkdownGenerationService,
+        private readonly badgeProcessingService: BadgeProcessingService,
     ) {}
 
     /**
@@ -51,7 +53,7 @@ export class ItemsGeneratorService {
             existingConfig?: IDataConfig;
         } = {},
     ) {
-        const { slug, name, target_keywords, source_urls, config } = createItemsGeneratorDto;
+        const { slug, name, source_urls, config } = createItemsGeneratorDto;
 
         this.logger.log(`Starting generation for slug: ${slug}, name: ${name}`);
 
@@ -80,15 +82,16 @@ export class ItemsGeneratorService {
             }
 
             // 1.0. Prompt Comparison
+            const configMetadata = existingConfig?.metadata || {};
             if (
-                existingConfig?.initial_prompt &&
+                configMetadata?.initial_prompt &&
                 createItemsGeneratorDto.generation_method === GenerationMethod.CREATE_UPDATE &&
                 existingItems.length > 0
             ) {
                 this.logger.log(`[${slug}] 1.0. Prompt Comparison - Starting`);
                 const comparisonResult = await this.promptComparisonService.comparePrompts(
                     slug,
-                    existingConfig.initial_prompt,
+                    configMetadata.initial_prompt,
                     createItemsGeneratorDto.prompt,
                 );
 
@@ -164,18 +167,13 @@ export class ItemsGeneratorService {
                 );
             }
 
+            this.logger.log(`[${slug}] Rewritten prompt: "${prompt}"`);
+
             // Update the prompt in the DTO
             createItemsGeneratorDto.prompt = prompt;
 
             // Add source_urls to the extractedUrls
             extractedUrls.push(...(source_urls || []));
-
-            if (extractedUrls.length > 0) {
-                this.logger.log(
-                    `[${slug}] Extracted (or source urls) ${extractedUrls.length} URLs from prompt: ${extractedUrls.join(', ')}`,
-                );
-                this.logger.log(`[${slug}] Updated prompt: "${prompt}"`);
-            }
 
             // 1.5. AI-First Item Generation
             let initialAiItems: ItemData[] = [];
@@ -292,10 +290,22 @@ export class ItemsGeneratorService {
 
             // 8. Filter and Validate Source URLs for all discovered items
             this.logger.log(`[${slug}] 8. Filter and Validate Source URLs - Starting`);
-            const validatedItems = await this.sourceValidationService.filterAndValidateSourceItems(
+            let validatedItems = await this.sourceValidationService.filterAndValidateSourceItems(
                 finalItems,
                 slug,
             );
+
+            // 9. Badge Processing for Repository Items
+            if (createItemsGeneratorDto.badge_evaluation_enabled) {
+                this.logger.log(`[${slug}] 9. Badge Processing for Repository Items - Starting`);
+                validatedItems = await this.badgeProcessingService.processBadges(validatedItems);
+
+                // Log badge statistics
+                const badgeStats = this.badgeProcessingService.getBadgeStatistics(validatedItems);
+                this.logger.log(
+                    `[${slug}] Badge processing completed. Statistics: ${JSON.stringify(badgeStats)}`,
+                );
+            }
 
             // This is where a more robust notification (webhook, websocket, email) would be triggered,
             // potentially including the 'metrics'
@@ -340,6 +350,26 @@ export class ItemsGeneratorService {
                 ...item,
                 markdown: '',
             };
+        }
+    }
+
+    /**
+     * Process badges for a single item
+     * @param item The item to process badges for
+     * @returns The item with badges
+     */
+    async processSingleItemBadges(item: ItemData): Promise<ItemData> {
+        this.logger.log(`Processing badges for item: ${item.name}`);
+
+        try {
+            return await this.badgeProcessingService.processSingleItemBadges(item);
+        } catch (error) {
+            this.logger.error(
+                `Error processing badges for item ${item.name}: ${error.message}`,
+                error.stack,
+            );
+
+            return item;
         }
     }
 

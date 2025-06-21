@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { BadgeType, BadgeValue } from '../dto/badge.dto';
 
 const baseSchema = z.object({
     name: z
@@ -19,12 +20,12 @@ export const itemDataSchema = baseSchema.extend({
         .describe(
             'The most direct, stable, and canonical URL for the item itself (e.g., project homepage, official documentation, GitHub repository etc.). Must be a valid and highly relevant URL.',
         ),
-    // category: z
-    //     .string()
-    //     .nullable()
-    //     .describe(
-    //         "A relevant high-level category name (e.g., 'Monitoring', 'CI/CD', 'Data Visualization').",
-    //     ),
+    category: z
+        .string()
+        .nullable()
+        .describe(
+            "A relevant high-level category name (e.g., 'Monitoring', 'CI/CD', 'Data Visualization').",
+        ),
     featured: z
         .boolean()
         .nullable()
@@ -34,7 +35,7 @@ export const itemDataSchema = baseSchema.extend({
         ),
 });
 
-export const itemDataWithCategoriesAndTagsSchema = baseSchema.extend({
+export const itemDataWithCategoriesAndTagsSchema = itemDataSchema.extend({
     slug: z.string().describe('URL-friendly slug, auto-generated from item.name if not provided.'),
     category: z
         .string()
@@ -72,4 +73,36 @@ export const promptUnderstandingAssessmentSchema = z.object({
         .describe(
             'Optional: If can_proceed is false, specific questions or suggestions for the user to clarify the prompt.',
         ),
+});
+
+// Badge schemas
+export const badgeSchema = z.object({
+    type: z.nativeEnum(BadgeType),
+    value: z.nativeEnum(BadgeValue),
+    evaluated_at: z.string().nullable().describe('ISO date string when badge was evaluated'),
+    details: z.string().nullable().describe('Optional details about the evaluation'),
+});
+
+export const itemBadgesSchema = z.object({
+    security: badgeSchema.nullable(),
+    license: badgeSchema.nullable(),
+    quality: badgeSchema.nullable(),
+});
+
+// Extended item schema with badges
+export const itemDataWithBadgesSchema = baseSchema.extend({
+    source_url: z
+        .string()
+        .nullable()
+        .describe(
+            'The most direct, stable, and canonical URL for the item itself (e.g., project homepage, official documentation, GitHub repository etc.). Must be a valid and highly relevant URL.',
+        ),
+    featured: z
+        .boolean()
+        .nullable()
+        .default(false)
+        .describe(
+            "Determine if the item warrants a 'featured' status based on prominence, recommendations, or significance. Default to false.",
+        ),
+    badges: itemBadgesSchema.nullable().describe('Optional badges for repository items'),
 });

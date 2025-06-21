@@ -1,5 +1,6 @@
 import { Category } from './category.dto';
 import { Tag } from './tag.dto';
+import { ItemBadges } from './badge.dto';
 
 export interface Identifiable {
     id: string;
@@ -15,4 +16,5 @@ export interface ItemData {
     slug?: string;
     tags: string[] | Tag[];
     markdown?: string;
+    badges?: ItemBadges;
 }

@@ -1,5 +1,4 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ChatOpenAI } from '@langchain/openai';
 import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
 import { AiService } from '../../shared';
 import { slugifyText } from '../../utils/text.utils';
@@ -7,6 +6,7 @@ import { extractedItemsSchema } from '../../schemas/item-extraction.schemas';
 import { ItemData } from '../../dto';
 import { SharedUtilsService } from './shared-utils.service';
 import { DEDUPLICATOR_PROMPT } from './prompts.constants';
+import { BaseChatModel } from '../../shared/ai-provider.interface';
 
 @Injectable()
 export class AiDeduplicatorService {
@@ -14,7 +14,7 @@ export class AiDeduplicatorService {
     private readonly GROUP_DELAY_MS = 1000;
 
     private readonly logger = new Logger(AiDeduplicatorService.name);
-    private llm: ChatOpenAI;
+    private llm: BaseChatModel;
 
     constructor(
         private readonly aiService: AiService,

@@ -9,3 +9,4 @@ export * from './data-aggregation.service';
 export * from './category-processing.service';
 export * from './markdown-generation.service';
 export * from './prompt-processing.service';
+export * from './badge-processing.service';

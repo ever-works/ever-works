@@ -1,11 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ChatOpenAI } from '@langchain/openai';
 import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
 import { z } from 'zod';
 import { AiService } from '../shared';
 import { SearchService } from '../shared';
 import { ItemData } from '../dto';
 import { extractTextFromSourceURL } from '../utils/text.utils';
+import { BaseChatModel } from '../shared/ai-provider.interface';
 
 // Markdown generation prompt
 export const MARKDOWN_PROMPT = `
@@ -36,7 +36,7 @@ export const markdownOutputSchema = z.object({
 @Injectable()
 export class MarkdownGenerationService {
     private readonly logger = new Logger(MarkdownGenerationService.name);
-    private llm: ChatOpenAI;
+    private llm: BaseChatModel;
 
     constructor(
         private readonly aiService: AiService,

@@ -1,7 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ChatOpenAI } from '@langchain/openai';
 import { PromptTemplate } from '@langchain/core/prompts';
-import { zodToJsonSchema } from 'zod-to-json-schema';
 import { slugifyText } from '../utils/text.utils';
 import { AiService } from '../shared';
 import { CreateItemsGeneratorDto, ItemData } from '../dto';
@@ -10,11 +8,12 @@ import {
     itemDataSchema,
     promptUnderstandingAssessmentSchema,
 } from '../schemas/item-extraction.schemas';
+import { BaseChatModel } from '../shared/ai-provider.interface';
 
 @Injectable()
 export class AiItemGenerationService {
     private readonly logger = new Logger(AiItemGenerationService.name);
-    private llm: ChatOpenAI;
+    private llm: BaseChatModel;
 
     constructor(private readonly aiService: AiService) {
         this.llm = this.aiService.createLlmWithTemperature(0.3);
@@ -34,7 +33,7 @@ export class AiItemGenerationService {
         this.logger.log(`[${slug}] AI-First Item Generation - Starting for topic: ${topicName}`);
         const allGeneratedItems: ItemData[] = [];
 
-        if (!this.llm.apiKey) {
+        if (!this.aiService.isAiConfigured()) {
             this.logger.warn(
                 `[${slug}] OpenAI API Key not configured. Skipping AI-first item generation.`,
             );
@@ -101,14 +100,6 @@ Consider:
             // If the understanding check itself fails, we log the error but still attempt item generation.
             // This is a fallback in case the assessment mechanism has an issue.
         }
-
-        // 2. Proceed with Item Generation if understanding is sufficient (or assessment failed)
-        const itemGenerationFunction = {
-            name: 'generate_awesome_list_items_directly',
-            description:
-                'Generates a list of distinct items (tools, resources, libraries, articles, etc.) that are highly relevant to the directory website topic, including their details.',
-            parameters: zodToJsonSchema(extractedItemsSchema),
-        };
 
         const generationPrompt = PromptTemplate.fromTemplate(
             `You are an expert curator and technical writer tasked with generating an initial list of items for a "Directory website" about a specific topic.

@@ -384,6 +384,42 @@ export class GithubService extends GitProvider {
     }
 
     /**
+     * Merges a pull request
+     */
+    async mergePR(
+        params: {
+            owner: string;
+            repo: string;
+            pull_number: number;
+            commit_title?: string;
+            commit_message?: string;
+            merge_method?: 'merge' | 'squash' | 'rebase';
+        },
+        token: string,
+    ) {
+        const octokit = new Octokit({ auth: token });
+
+        try {
+            const { data } = await octokit.rest.pulls.merge({
+                owner: params.owner,
+                repo: params.repo,
+                pull_number: params.pull_number,
+                commit_title: params.commit_title,
+                commit_message: params.commit_message,
+                merge_method: params.merge_method || 'merge',
+            });
+
+            return data;
+        } catch (err) {
+            this.logger.error(
+                `Failed to merge PR #${params.pull_number} in ${params.owner}/${params.repo}`,
+                err.message,
+            );
+            throw err;
+        }
+    }
+
+    /**
      * Checks if a repository exists
      */
     async repositoryExists(owner: string, repo: string, token: string): Promise<boolean> {
