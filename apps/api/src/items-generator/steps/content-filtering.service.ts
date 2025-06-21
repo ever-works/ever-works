@@ -88,10 +88,18 @@ Provide a relevance score between 0.0 (not relevant) and 1.0 (highly relevant). 
 
                 const relevanceChain = prompt.pipe(this.llm.withStructuredOutput(relevanceSchema));
 
+                const page_content_snippet =
+                    page.raw_content.length > 2000
+                        ? page.raw_content.slice(
+                              page.raw_content.length / 2 - 1000,
+                              page.raw_content.length / 2 + 1000,
+                          )
+                        : page.raw_content;
+
                 const assessmentResult = (await relevanceChain.invoke({
                     topicName,
                     topicDescription,
-                    page_content_snippet: page.raw_content.slice(0, 2000),
+                    page_content_snippet,
                 })) as RelevanceAssessment;
 
                 const isRelevant =
