@@ -2,6 +2,41 @@
 
 Built with NestJS.
 
+## Table of Contents
+
+- [How to run](#how-to-run)
+    - [1. Clone the repository](#1-clone-the-repository)
+    - [2. Create `.env` file](#2-create-env-file)
+    - [3. Run application using (cd to root of the whole repo, not backend app)](#3-run-application-using-cd-to-root-of-the-whole-repo-not-backend-app)
+    - [4. Create a directory object](#4-create-a-directory-object)
+    - [5. Generate data and GitHub repositories](#5-generate-data-and-github-repositories)
+    - [6. Update Directory](#6-update-directory)
+    - [7. Submit Individual Items](#7-submit-individual-items)
+    - [8. Remove Individual Items](#8-remove-individual-items)
+    - [9. Update website repository](#9-update-website-repository)
+    - [10. Deploy to Vercel](#10-deploy-to-vercel)
+- [API Endpoints](#api-endpoints)
+    - [POST /directories](#post-directories)
+    - [POST /generate](#post-generate)
+    - [POST /update/{slug}](#post-updateslug)
+    - [POST /submit-item/{slug}](#post-submit-itemslug)
+    - [POST /remove-item/{slug}](#post-remove-itemslug)
+    - [POST /update-website/{slug}](#post-update-websiteslug)
+    - [POST /deploy/{slug}/vercel](#post-deployslugvercel)
+- [Configuration](#configuration)
+    - [Request Parameters](#request-parameters)
+    - [Company Object](#company-object)
+    - [Configuration Options](#configuration-options)
+    - [Generation Methods](#generation-methods)
+    - [Website Repository Creation Methods](#website-repository-creation-methods)
+- [Features](#features)
+- [Auto-Merge Behavior](#auto-merge-behavior)
+- [Process Flows](#process-flows)
+- [Error Handling](#error-handling)
+- [Prerequisites](#prerequisites)
+- [Examples](#examples)
+    - [Example Prompt used to generate awesome time tracking in ever works org](#example-prompt-used-to-generate-awesome-time-tracking-in-ever-works-org)
+
 ## How to run
 
 ### 1. Clone the repository
@@ -219,7 +254,7 @@ POST /update/{slug}
 | `generation_method`        | enum    | `optional` | Generation method: `create-update` or `recreate` (default: `create-update`)                                           |
 | `update_with_pull_request` | boolean | `optional` | Whether to update the repository with a pull request or directly commit the changes to main branch. (default: `true`) |
 
-### 6. Submit Individual Items
+### 7. Submit Individual Items
 
 To submit individual items to an existing directory, send a POST request to `http://localhost:3001/submit-item/{slug}` with the item details.
 
@@ -328,7 +363,7 @@ curl -X POST http://localhost:3001/submit-item/awesome-time-tracking \
 8. **PR Creation**: Pull request is created
 9. **Auto-Merge** (conditional): PR is merged if auto-merge conditions are met
 
-### 7. Remove Individual Items
+### 8. Remove Individual Items
 
 To remove individual items from an existing directory, send a POST request to `http://localhost:3001/remove-item/{slug}` with the item details.
 
@@ -403,7 +438,7 @@ curl -X POST http://localhost:3001/remove-item/awesome-time-tracking \
   }'
 ```
 
-### 8. Update website repository
+### 9. Update website repository
 
 To update an existing website repository with the latest changes from the template repository, send a POST request to `http://localhost:3001/update-website/{slug}`.
 the `slug` parameter should match the directory slug used when creating the website repository.
@@ -476,7 +511,7 @@ The service automatically tries different update strategies in order of preferen
 - The website repository must exist (created via `/generate` endpoint)
 - Valid GitHub authentication token in environment
 
-### 9. Deploy to Vercel
+### 10. Deploy to Vercel
 
 To deploy the website repository to Vercel, send a POST request to `http://localhost:3001/deploy/{slug}/vercel`.
 the `slug` parameter should match the directory slug used when creating the website repository.
@@ -527,8 +562,4 @@ POST /deploy/awesome-time-tracking/vercel
     "initial_categories": ["Open Source", "Commercial"],
     "priority_categories": ["Enterprise"]
 }
-```
-
-```
-
 ```
