@@ -328,7 +328,82 @@ curl -X POST http://localhost:3001/submit-item/awesome-time-tracking \
 8. **PR Creation**: Pull request is created
 9. **Auto-Merge** (conditional): PR is merged if auto-merge conditions are met
 
-### 7. Update website repository
+### 7. Remove Individual Items
+
+To remove individual items from an existing directory, send a POST request to `http://localhost:3001/remove-item/{slug}` with the item details.
+
+**Endpoint:**
+
+```
+POST /remove-item/{slug}
+```
+
+**URL Parameters:**
+
+| Parameter | Type   | Required   | Description                                       |
+| --------- | ------ | ---------- | ------------------------------------------------- |
+| `slug`    | string | `required` | The slug of the directory to remove the item from |
+
+**Request Body:**
+
+```json
+{
+    "item_slug": "awesome-tool",
+    "reason": "Item is no longer maintained",
+    "pay_and_publish_now": false
+}
+```
+
+**Request Parameters:**
+
+| Field                 | Type    | Required   | Description                                                       |
+| --------------------- | ------- | ---------- | ----------------------------------------------------------------- |
+| `item_slug`           | string  | `required` | The slug of the item to remove                                    |
+| `reason`              | string  | `optional` | Reason for removing the item (will be included in commit message) |
+| `pay_and_publish_now` | boolean | `optional` | Force auto-merge regardless of config (default: false)            |
+
+**Response:**
+
+```json
+{
+    "status": "success",
+    "slug": "awesome-time-tracking",
+    "item_name": "Awesome Tool",
+    "item_slug": "awesome-tool",
+    "message": "Item \"Awesome Tool\" removal has been submitted for review. PR #43 created.",
+    "pr_number": 43,
+    "pr_url": "https://github.com/owner/repo-data/pull/43",
+    "branch_name": "feature-1640995200000-def456",
+    "auto_merged": false
+}
+```
+
+**Response Fields:**
+
+| Field           | Type   | Description                                                     |
+| --------------- | ------ | --------------------------------------------------------------- |
+| `status`        | string | Status of the operation: `success`, `error`, or `pending`       |
+| `slug`          | string | Directory slug                                                  |
+| `item_name`     | string | Name of the removed item                                        |
+| `item_slug`     | string | Slug of the removed item                                        |
+| `message`       | string | Status message                                                  |
+| `pr_number`     | number | _(Success only)_ GitHub PR number if created                    |
+| `pr_url`        | string | _(Success only)_ GitHub PR URL if created                       |
+| `branch_name`   | string | _(Success only)_ Git branch name if created                     |
+| `error_details` | string | _(Error only)_ Additional details about the error that occurred |
+
+**Example with Immediate Publishing:**
+
+```bash
+curl -X POST http://localhost:3001/remove-item/awesome-time-tracking \
+  -H "Content-Type: application/json" \
+  -d '{
+    "item_slug": "outdated-tool",
+    "reason": "Tool is no longer maintained and has security vulnerabilities"
+  }'
+```
+
+### 8. Update website repository
 
 To update an existing website repository with the latest changes from the template repository, send a POST request to `http://localhost:3001/update-website/{slug}`.
 the `slug` parameter should match the directory slug used when creating the website repository.
@@ -401,7 +476,7 @@ The service automatically tries different update strategies in order of preferen
 - The website repository must exist (created via `/generate` endpoint)
 - Valid GitHub authentication token in environment
 
-### 8. Deploy to Vercel
+### 9. Deploy to Vercel
 
 To deploy the website repository to Vercel, send a POST request to `http://localhost:3001/deploy/{slug}/vercel`.
 the `slug` parameter should match the directory slug used when creating the website repository.

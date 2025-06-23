@@ -21,7 +21,7 @@ import {
     UpdateItemsGeneratorDto,
 } from './items-generator/dto/create-items-generator.dto';
 import { ItemsGeneratorResponseDto } from './items-generator/dto/items-generator-response.dto';
-import { SubmitItemDto, SubmitItemResponseDto } from './items-generator/dto';
+import { SubmitItemDto, SubmitItemResponseDto, RemoveItemDto, RemoveItemResponseDto } from './items-generator/dto';
 import { CreateDirectoryDto } from './dto/create-directory.dto';
 import { UpdateWebsiteRepositoryResponseDto } from './website-generator/dto/update-website-repository.dto';
 import { ItemSubmissionService } from './items-generator/item-submission.service';
@@ -148,6 +148,41 @@ export class AppController {
                 slug,
                 item_name: submitItemDto.name,
                 message: 'Failed to submit item',
+                error_details: error.message,
+            };
+        }
+    }
+
+    @Post('remove-item/:slug')
+    @HttpCode(HttpStatus.OK)
+    async removeItem(
+        @Param('slug') slug: string,
+        @Body() removeItemDto: RemoveItemDto,
+    ): Promise<RemoveItemResponseDto> {
+        try {
+            const user = await User.sessionMock();
+
+            // Check if directory exists for the given slug
+            const directory = await Directory.findMock(slug);
+            if (!directory) {
+                throw new NotFoundException(`Directory with slug '${slug}' not found`);
+            }
+
+            const result = await this.itemSubmissionService.removeItem(
+                directory,
+                user,
+                removeItemDto,
+            );
+            return result;
+        } catch (error) {
+            console.error('Error removing item:', error);
+
+            return {
+                status: 'error',
+                slug,
+                item_name: 'Unknown',
+                item_slug: removeItemDto.item_slug,
+                message: 'Failed to remove item',
                 error_details: error.message,
             };
         }
