@@ -24,6 +24,13 @@ export class SearchService {
     }
 
     /**
+     * Check if the naive search service is configured
+     */
+    isNaiveSearchConfigured(): boolean {
+        return process.env.EXTRACT_CONTENT_SERVICE === 'naive';
+    }
+
+    /**
      * Get the Tavily client instance
      */
     getTavilyClient(): TavilyClient | undefined {
@@ -61,8 +68,14 @@ export class SearchService {
      * @param url The URL to extract content from
      */
     async extractContent(url: string) {
-        if (!this.tavilyClient) {
-            throw new Error('Tavily client not configured');
+        if (this.isNaiveSearchConfigured() || !this.tavilyClient) {
+            const text = await extractTextFromSourceURL(url);
+
+            return {
+                url,
+                images: [],
+                rawContent: text,
+            };
         }
 
         const response = await this.tavilyClient.extract([url], {
