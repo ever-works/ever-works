@@ -166,7 +166,10 @@ export class DataGeneratorService {
                             last_request_data: createItemsGeneratorDto,
                         },
                     }),
-                    data.writeMarkdownTemplate(this.getHeader(directory), this.getFooter()),
+                    data.writeMarkdownTemplate(
+                        this.getHeader(directory),
+                        this.getFooter(directory),
+                    ),
                 );
             }
 
@@ -175,8 +178,14 @@ export class DataGeneratorService {
             // Write PR details in config so that others repositories may use it
             if (newBranchName) {
                 promises.push(
+                    data.writeMarkdownTemplate(
+                        this.getHeader(directory),
+                        this.getFooter(directory),
+                    ),
+
                     data.mergeConfig({
                         ...this.withCompanyConfig(createItemsGeneratorDto.company),
+
                         metadata: {
                             generation_method: createItemsGeneratorDto.generation_method,
                             last_request_data: createItemsGeneratorDto,
@@ -375,11 +384,32 @@ export class DataGeneratorService {
     }
 
     private getHeader(directory: Directory) {
-        return `# ${directory.name}\n\n` + `${directory.description}\n\n`;
+        const readmeConfig = directory.readmeConfig;
+        if (readmeConfig?.header && readmeConfig.overwrite_default_header) {
+            return readmeConfig.header;
+        }
+
+        let additionalHeader = readmeConfig?.header;
+        if (additionalHeader) {
+            additionalHeader = additionalHeader + '\n\n';
+        }
+
+        return `# ${directory.name}\n\n` + `${directory.description}\n\n` + additionalHeader;
     }
 
-    private getFooter() {
+    private getFooter(directory: Directory) {
+        const readmeConfig = directory.readmeConfig;
+        if (readmeConfig?.footer && readmeConfig.overwrite_default_footer) {
+            return readmeConfig.footer;
+        }
+
+        let additionalFooter = readmeConfig?.footer;
+        if (additionalFooter) {
+            additionalFooter = additionalFooter + '\n\n';
+        }
+
         return (
+            additionalFooter +
             this.getLegalNotice() +
             '## License\n\n' +
             'Shield: [![CC BY-SA 4.0][cc-by-sa-shield]][cc-by-sa]\n\n' +

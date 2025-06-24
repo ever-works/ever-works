@@ -50,6 +50,7 @@ export class AppController {
     ) {}
 
     @Post('directories')
+    @HttpCode(HttpStatus.OK)
     async createDirectory(@Body() createDirectoryDto: CreateDirectoryDto) {
         const { slug, name, description, owner } = createDirectoryDto;
         const user = await User.sessionMock();
@@ -59,6 +60,7 @@ export class AppController {
         dir.slug = slug;
         dir.name = name;
         dir.description = description;
+        dir.readmeConfig = createDirectoryDto.readme_config;
 
         const ghOwner = await this.githubService.getUser(user.getGitToken());
         dir.owner = owner || ghOwner.login;

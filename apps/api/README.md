@@ -14,8 +14,8 @@ Built with NestJS.
     - [7. Submit Individual Items](#7-submit-individual-items)
     - [8. Remove Individual Items](#8-remove-individual-items)
     - [9. Extract Item Details](#9-extract-item-details)
-  - [11. Update website repository](#11-update-website-repository)
-    - [12. Deploy to Vercel](#12-deploy-to-vercel)
+    - [11. Update website repository](#11-update-website-repository)
+        - [12. Deploy to Vercel](#12-deploy-to-vercel)
 - [API Endpoints](#api-endpoints)
     - [POST /directories](#post-directories)
     - [POST /generate](#post-generate)
@@ -71,7 +71,14 @@ To create a new directory object, send a POST request to `http://localhost:3001/
 {
     "slug": "awesome-time-tracking",
     "name": "Awesome Time Tracking",
-    "description": "Time Tracking - Software, Methodologies and Practices."
+    "description": "Time Tracking - Software, Methodologies and Practices.",
+    "readme_config": {
+        "header": "This text will be used as additional header in the README.md file",
+        "overwrite_default_header": false, // If true, it will replace the default header in README.md
+
+        "footer": "This text will be used as additional footer in the README.md file",
+        "overwrite_default_footer": false // If true, it will replace the default footer in README.md
+    }
 }
 ```
 
@@ -461,9 +468,9 @@ POST /extract-item-details
 
 **Request Parameters:**
 
-| Field                 | Type     | Required   | Description                                                                                    |
-| --------------------- | -------- | ---------- | ---------------------------------------------------------------------------------------------- |
-| `source_url`          | string   | `required` | Valid HTTP/HTTPS URL to extract item details from                                              |
+| Field                 | Type     | Required   | Description                                                                                   |
+| --------------------- | -------- | ---------- | --------------------------------------------------------------------------------------------- |
+| `source_url`          | string   | `required` | Valid HTTP/HTTPS URL to extract item details from                                             |
 | `existing_categories` | string[] | `optional` | Array of existing categories to consider when categorizing the extracted item (default: `[]`) |
 
 **Response:**

@@ -10,6 +10,7 @@ export class Directory {
     companyName: string;
     organization: boolean;
     description: string;
+    readmeConfig?: MarkdownReadmeConfig;
 
     constructor() {
         this.id = randomUUID();
@@ -34,4 +35,12 @@ export class Directory {
     getWebsiteRepo() {
         return `${this.slug}-website`;
     }
+}
+
+export class MarkdownReadmeConfig {
+    header?: string;
+    overwrite_default_header?: boolean;
+
+    footer?: string;
+    overwrite_default_footer?: boolean;
 }
