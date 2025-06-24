@@ -30,6 +30,7 @@ Exclude any invalid or irrelevant content, and align the findings with the topic
 **EXTRACTION CRITERIA:**
 - Only extract items that are *directly* relevant to the main topic "{topicName}" and topic task.
 - Do NOT extract items that are only tangentially related or represent a different category unless it's explicitly part of "{topicName}" and topic task.
+- Ignore items that has blog posts, news articles, or marketing pages as the item source_url, unless the user specifically requests them for their topic task
 - Avoid using blog posts, news articles, or marketing pages as the source_url or item unless the user specifically requests them for their topic task (e.g 'Best Time Tracking Software for Small Businesses', 'Best Time Tracking Tools for Remote Teams', etc.).
 - For example, if the topic is "Vector Databases", do not extract a general-purpose database or a library for a specific programming language (like Ruby) unless it's explicitly a vector database client/tool directly supporting the core topic
 - Ensure the source_url is for the item itself, not an article *about* the item
@@ -74,11 +75,14 @@ export class ItemExtractionService {
 
         for (const item of items) {
             const normalizedName = item.name.toLowerCase().trim();
+            const existingItem = uniqueItems.get(normalizedName);
 
-            // If we haven't seen this name before, or if this item has a source_url and the existing one doesn't
             if (
                 !uniqueItems.has(normalizedName) ||
-                (!uniqueItems.get(normalizedName)?.source_url && item.source_url)
+                (!existingItem?.source_url && item.source_url) ||
+                (existingItem?.source_url &&
+                    item.source_url &&
+                    existingItem?.source_url.length > item.source_url.length)
             ) {
                 uniqueItems.set(normalizedName, item);
             }
@@ -203,11 +207,6 @@ export class ItemExtractionService {
 
                         // Deduplicate items from different chunks
                         const uniqueItems = this.deduplicateItems(validatedItems);
-                        if (uniqueItems.length < validatedItems.length) {
-                            this.logger.log(
-                                `[${slug}] Deduplicated ${validatedItems.length - uniqueItems.length} duplicate items from chunks in ${page.source_url}`,
-                            );
-                        }
 
                         // Add unique items to the result
                         extractedItems.push(...uniqueItems);
