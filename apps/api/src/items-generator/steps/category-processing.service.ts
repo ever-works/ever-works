@@ -19,10 +19,12 @@ Task context:
 <rules>
 1. Assign ONE category per item based on primary function
 2. Add 1-3 relevant tags per item
-3. Use specific but not overly narrow categories (e.g. "Monitoring", "CI/CD", "Testing")
-4. Use descriptive tags (e.g. "open-source", "real-time", "cloud-native")
-5. Maintain consistency with existing categories and tags
-6. Override any existing item category if it doesn't match the primary task context
+3. Focus on generating categories and tags that are relevant to the task context and align with categorization of directory website and github awesome list.
+4. Use specific but not overly narrow categories (e.g. "Monitoring", "CI/CD", "Testing")
+5. Use descriptive tags (e.g. "open-source", "real-time", "cloud-native")
+6. Maintain consistency with existing categories and tags
+7. Override any existing item category if it doesn't match the primary task context
+8. The featured field should remain the same as in the original item
 </rules>
 
 <additional_rules#>
@@ -210,9 +212,7 @@ export class CategoryProcessingService {
 <additional_rules>
 - For consistency, use the existing categories and tags listed below whenever appropriate.
 - Create new categories or tags only if none of the existing options are suitable.
-- If you create a new category, ensure it matches the abstraction level of the existing ones.
 - Prioritize consistency across items with similar purposes.
-- The featured field should remain the same as in the original item
 </additional_rules>
 
 <existing_categories>
