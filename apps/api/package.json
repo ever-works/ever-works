@@ -57,6 +57,7 @@
     "rxjs": "^7.8.2",
     "slugify": "^1.6.6",
     "string-similarity": "^4.0.4",
+    "turndown": "^7.2.0",
     "unified": "^11.0.5",
     "yaml": "^2.8.0",
     "zod": "^3.25.67"
@@ -74,6 +75,7 @@
     "@types/libsodium-wrappers": "^0.7.14",
     "@types/node": "^22.15.32",
     "@types/supertest": "^6.0.3",
+    "@types/turndown": "^5.0.5",
     "@typescript-eslint/eslint-plugin": "^8.34.1",
     "@typescript-eslint/parser": "^8.34.1",
     "eslint": "^9.29.0",

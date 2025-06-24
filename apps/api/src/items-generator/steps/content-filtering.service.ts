@@ -73,7 +73,7 @@ export class ContentFilteringService {
                 const prompt = PromptTemplate.fromTemplate(
                     `You are an expert content analyst. Assess the relevance of the following web page content to the **main topic**: "{topicName}" (Description: "{topicDescription}").
 
-Web Page Content (first 2000 characters):
+Web Page Content (first 3000 characters):
 <content>
 {page_content_snippet}
 </content>
@@ -89,10 +89,10 @@ Provide a relevance score between 0.0 (not relevant) and 1.0 (highly relevant). 
                 const relevanceChain = prompt.pipe(this.llm.withStructuredOutput(relevanceSchema));
 
                 const page_content_snippet =
-                    page.raw_content.length > 2000
+                    page.raw_content.length > 3000
                         ? page.raw_content.slice(
-                              page.raw_content.length / 2 - 1000,
-                              page.raw_content.length / 2 + 1000,
+                              page.raw_content.length / 2 - 1500,
+                              page.raw_content.length / 2 + 1500,
                           )
                         : page.raw_content;
 
