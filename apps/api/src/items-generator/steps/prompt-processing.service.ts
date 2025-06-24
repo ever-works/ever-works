@@ -116,6 +116,7 @@ Your task:
 - Remove ALL featured item specifications (e.g., "Please prioritize solutions Ever Cloc, Ever Teams, Ever Gauzy")
 - Remove ALL reference instructions (e.g., "For reference, consult: https://...")
 - Remove ALL categorization instructions (e.g., "When listing open-source projects, strictly use the license type as the tag")
+- Separated prompt instructions should be combined into a single, coherent task description
 - Keep ONLY the core task description that explains what type of items/content to generate
 - Focus on the main subject matter and purpose of the directory/list
 - Preserve the essential context about what the user wants to accomplish
