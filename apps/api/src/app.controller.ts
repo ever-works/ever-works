@@ -3,6 +3,7 @@ import {
     Controller,
     HttpCode,
     HttpStatus,
+    Logger,
     NotFoundException,
     Param,
     Post,
@@ -21,13 +22,23 @@ import {
     UpdateItemsGeneratorDto,
 } from './items-generator/dto/create-items-generator.dto';
 import { ItemsGeneratorResponseDto } from './items-generator/dto/items-generator-response.dto';
-import { SubmitItemDto, SubmitItemResponseDto, RemoveItemDto, RemoveItemResponseDto } from './items-generator/dto';
+import {
+    SubmitItemDto,
+    SubmitItemResponseDto,
+    RemoveItemDto,
+    RemoveItemResponseDto,
+    ExtractItemDetailsDto,
+    ExtractItemDetailsResponseDto,
+} from './items-generator/dto';
 import { CreateDirectoryDto } from './dto/create-directory.dto';
 import { UpdateWebsiteRepositoryResponseDto } from './website-generator/dto/update-website-repository.dto';
 import { ItemSubmissionService } from './items-generator/item-submission.service';
+import { ItemsGeneratorService } from './items-generator/items-generator.service';
 
 @Controller()
 export class AppController {
+    private readonly logger = new Logger(AppController.name);
+
     constructor(
         private readonly dataGenerator: DataGeneratorService,
         private readonly markdownGenerator: MarkdownGeneratorService,
@@ -35,6 +46,7 @@ export class AppController {
         private readonly websiteUpdateService: WebsiteUpdateService,
         private readonly githubService: GithubService,
         private readonly itemSubmissionService: ItemSubmissionService,
+        private readonly itemsGeneratorService: ItemsGeneratorService,
     ) {}
 
     @Post('directories')
@@ -183,6 +195,48 @@ export class AppController {
                 item_name: 'Unknown',
                 item_slug: removeItemDto.item_slug,
                 message: 'Failed to remove item',
+                error_details: error.message,
+            };
+        }
+    }
+
+    @Post('extract-item-details')
+    @HttpCode(HttpStatus.OK)
+    async extractItemDetails(
+        @Body() extractItemDetailsDto: ExtractItemDetailsDto,
+    ): Promise<ExtractItemDetailsResponseDto> {
+        try {
+            this.logger.log(
+                `Extracting item details from URL: ${extractItemDetailsDto.source_url}`,
+            );
+
+            const item = await this.itemsGeneratorService.extractItemDetailsFromUrl(
+                extractItemDetailsDto.source_url,
+                extractItemDetailsDto.existing_categories || [],
+            );
+
+            if (!item) {
+                return {
+                    status: 'error',
+                    source_url: extractItemDetailsDto.source_url,
+                    message: 'Failed to extract item details from the provided URL',
+                    error_details: 'No item data could be extracted from the URL content',
+                };
+            }
+
+            return {
+                status: 'success',
+                source_url: extractItemDetailsDto.source_url,
+                item,
+                message: `Successfully extracted item details: "${item.name}"`,
+            };
+        } catch (error) {
+            console.error('Error extracting item details:', error);
+
+            return {
+                status: 'error',
+                source_url: extractItemDetailsDto.source_url,
+                message: 'Failed to extract item details',
                 error_details: error.message,
             };
         }

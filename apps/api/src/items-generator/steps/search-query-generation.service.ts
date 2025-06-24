@@ -17,12 +17,12 @@ export class SearchQueryGenerationService {
 
     async generateSearchQueries(
         createItemsGeneratorDto: CreateItemsGeneratorDto,
-        config: Required<ConfigDto>,
     ): Promise<string[]> {
         const {
             name,
             prompt: description,
             target_keywords: targetKeywords,
+            config,
         } = createItemsGeneratorDto;
 
         this.logger.log(`[${name}] Generating search queries using LLM...`);

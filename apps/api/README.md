@@ -13,14 +13,16 @@ Built with NestJS.
     - [6. Update Directory](#6-update-directory)
     - [7. Submit Individual Items](#7-submit-individual-items)
     - [8. Remove Individual Items](#8-remove-individual-items)
-    - [9. Update website repository](#9-update-website-repository)
-    - [10. Deploy to Vercel](#10-deploy-to-vercel)
+    - [9. Extract Item Details](#9-extract-item-details)
+  - [11. Update website repository](#11-update-website-repository)
+    - [12. Deploy to Vercel](#12-deploy-to-vercel)
 - [API Endpoints](#api-endpoints)
     - [POST /directories](#post-directories)
     - [POST /generate](#post-generate)
     - [POST /update/{slug}](#post-updateslug)
     - [POST /submit-item/{slug}](#post-submit-itemslug)
     - [POST /remove-item/{slug}](#post-remove-itemslug)
+    - [POST /extract-item-details](#post-extract-item-details)
     - [POST /update-website/{slug}](#post-update-websiteslug)
     - [POST /deploy/{slug}/vercel](#post-deployslugvercel)
 - [Configuration](#configuration)
@@ -438,7 +440,126 @@ curl -X POST http://localhost:3001/remove-item/awesome-time-tracking \
   }'
 ```
 
-### 9. Update website repository
+### 9. Extract Item Details
+
+To extract item details from a single URL without adding it to any directory, send a POST request to `http://localhost:3001/extract-item-details` with the URL and optional existing categories.
+
+**Endpoint:**
+
+```
+POST /extract-item-details
+```
+
+**Request Body:**
+
+```json
+{
+    "source_url": "https://github.com/example/awesome-tool",
+    "existing_categories": ["Development Tools", "Open Source", "Productivity"]
+}
+```
+
+**Request Parameters:**
+
+| Field                 | Type     | Required   | Description                                                                                    |
+| --------------------- | -------- | ---------- | ---------------------------------------------------------------------------------------------- |
+| `source_url`          | string   | `required` | Valid HTTP/HTTPS URL to extract item details from                                              |
+| `existing_categories` | string[] | `optional` | Array of existing categories to consider when categorizing the extracted item (default: `[]`) |
+
+**Response:**
+
+```json
+{
+    "status": "success",
+    "source_url": "https://github.com/example/awesome-tool",
+    "item": {
+        "name": "Awesome Tool",
+        "description": "A comprehensive development tool that enhances productivity",
+        "featured": false,
+        "source_url": "https://github.com/example/awesome-tool",
+        "category": "Development Tools",
+        "slug": "awesome-tool",
+        "tags": ["productivity", "development", "open-source"],
+        "markdown": "# Awesome Tool\n\nA comprehensive development tool...",
+        "badges": {
+            "security": {
+                "type": "security",
+                "value": "A",
+                "evaluated_at": "2024-01-15T10:30:00Z",
+                "details": "No known security vulnerabilities"
+            },
+            "license": {
+                "type": "license",
+                "value": "A",
+                "evaluated_at": "2024-01-15T10:30:00Z",
+                "details": "MIT License - permissive"
+            },
+            "quality": {
+                "type": "quality",
+                "value": "A",
+                "evaluated_at": "2024-01-15T10:30:00Z",
+                "details": "Active development, good documentation"
+            }
+        }
+    },
+    "message": "Successfully extracted item details: \"Awesome Tool\""
+}
+```
+
+**Response Fields:**
+
+| Field           | Type     | Description                                                     |
+| --------------- | -------- | --------------------------------------------------------------- |
+| `status`        | string   | Status of the operation: `success` or `error`                   |
+| `source_url`    | string   | The URL that was processed                                      |
+| `item`          | ItemData | _(Success only)_ Complete item data with all extracted details  |
+| `message`       | string   | Status message                                                  |
+| `error_details` | string   | _(Error only)_ Additional details about the error that occurred |
+
+**ItemData Fields:**
+
+| Field         | Type        | Description                                                                |
+| ------------- | ----------- | -------------------------------------------------------------------------- |
+| `name`        | string      | Extracted item name                                                        |
+| `description` | string      | Extracted item description                                                 |
+| `featured`    | boolean     | Always `false` for extracted items                                         |
+| `source_url`  | string      | The source URL (same as input)                                             |
+| `category`    | string      | Extracted or assigned category (considers existing_categories if provided) |
+| `slug`        | string      | Auto-generated URL-friendly slug                                           |
+| `tags`        | string[]    | Array of extracted tags/keywords                                           |
+| `markdown`    | string      | AI-generated markdown content for the item                                 |
+| `badges`      | ItemBadges? | Optional badges evaluation (for repository URLs)                           |
+
+**Example Usage:**
+
+```bash
+curl -X POST http://localhost:3001/extract-item-details \
+  -H "Content-Type: application/json" \
+  -d '{
+    "source_url": "https://github.com/microsoft/vscode",
+    "existing_categories": ["Editors", "Development Tools", "Open Source"]
+  }'
+```
+
+**Process Flow:**
+
+1. **URL Validation**: Source URL is validated for proper format
+2. **Content Retrieval**: Web page content is fetched using Tavily API
+3. **AI Extraction**: AI analyzes content to extract item details
+4. **Category Assignment**: Category is assigned considering existing categories if provided
+5. **Slug Generation**: URL-friendly slug is auto-generated from item name
+6. **Markdown Generation**: AI generates detailed markdown content
+7. **Badge Evaluation**: Badges are evaluated for repository URLs
+8. **Response**: Complete item data is returned
+
+**Use Cases:**
+
+- Preview item details before submitting to a directory
+- Extract structured data from URLs for external processing
+- Validate and enrich item information
+- Batch processing of URLs to extract item details
+
+### 11. Update website repository
 
 To update an existing website repository with the latest changes from the template repository, send a POST request to `http://localhost:3001/update-website/{slug}`.
 the `slug` parameter should match the directory slug used when creating the website repository.
@@ -511,7 +632,7 @@ The service automatically tries different update strategies in order of preferen
 - The website repository must exist (created via `/generate` endpoint)
 - Valid GitHub authentication token in environment
 
-### 10. Deploy to Vercel
+### 12. Deploy to Vercel
 
 To deploy the website repository to Vercel, send a POST request to `http://localhost:3001/deploy/{slug}/vercel`.
 the `slug` parameter should match the directory slug used when creating the website repository.

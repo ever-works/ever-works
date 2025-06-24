@@ -90,10 +90,9 @@ export class ItemExtractionService {
     async extractItemsFromPages(
         createItemsGeneratorDto: CreateItemsGeneratorDto,
         relevantPages: WebPageData[],
-        config: Required<ConfigDto>,
         featuredItemHints: string[] = [],
     ): Promise<ItemData[]> {
-        const { slug, name: topicName, prompt: topicDescription } = createItemsGeneratorDto;
+        const { slug, name: topicName, prompt: topicDescription, config } = createItemsGeneratorDto;
 
         if (!this.aiService.isAiConfigured()) {
             this.logger.warn(

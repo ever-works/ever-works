@@ -181,7 +181,7 @@ export class MarkdownGeneratorService {
         }
 
         // Sort categories by priority, then alphabetically
-        const sortedCategoryIds = this.sortCategoriesByPriority(Object.keys(groups), categories);
+        const sortedCategoryIds = this.sortCategoriesByPriority(groups, categories);
 
         for (const categoryId of sortedCategoryIds) {
             const categoryDetails = categories.get(categoryId);
@@ -207,13 +207,15 @@ export class MarkdownGeneratorService {
 
     /**
      * Sort category IDs by priority, then alphabetically
-     * @param categoryIds Array of category IDs to sort
+     * @param groups Groups of items by category ID
      * @param categories Map of category details
      */
     private sortCategoriesByPriority(
-        categoryIds: string[],
+        groups: Record<string, ItemData[]>,
         categories: Map<string, Category>,
     ): string[] {
+        const categoryIds = Object.keys(groups);
+
         return categoryIds.sort((aId, bId) => {
             const categoryA = categories.get(aId);
             const categoryB = categories.get(bId);
@@ -230,6 +232,14 @@ export class MarkdownGeneratorService {
             if (categoryA?.priority === undefined && categoryB?.priority !== undefined) {
                 return 1;
             }
+
+            // order by items featured count
+            const featuredCountA = groups[aId].filter((item) => item.featured).length;
+            const featuredCountB = groups[bId].filter((item) => item.featured).length;
+            if (featuredCountA !== featuredCountB) {
+                return featuredCountB - featuredCountA;
+            }
+
             // If neither has priority, sort alphabetically by name
             const nameA = categoryA?.name || aId;
             const nameB = categoryB?.name || bId;

@@ -189,10 +189,10 @@ export class ItemsGeneratorService {
 
             // 2. AI-Powered Search Query Generation
             this.logger.log(`[${slug}] 2. AI-Powered Search Query Generation - Starting`);
-            const searchQueries = await this.searchQueryGenerationService.generateSearchQueries(
-                createItemsGeneratorDto,
-                config,
-            );
+            const searchQueries =
+                await this.searchQueryGenerationService.generateSearchQueries(
+                    createItemsGeneratorDto,
+                );
             this.logger.log(`[${slug}] Generated ${searchQueries.length} search queries.`);
 
             // 3. Web Search & Content Retrieval
@@ -242,7 +242,6 @@ export class ItemsGeneratorService {
                 await this.itemExtractionService.extractItemsFromPages(
                     createItemsGeneratorDto,
                     relevantPages,
-                    config,
                     featuredItemHints,
                 );
             this.logger.log(
@@ -393,6 +392,95 @@ export class ItemsGeneratorService {
                 ...item,
                 markdown: '',
             }));
+        }
+    }
+
+    /**
+     * Extract item details from a single source URL
+     * @param sourceUrl The URL to extract item details from
+     * @param existingCategories Optional existing categories to consider
+     * @returns The extracted item data
+     */
+    async extractItemDetailsFromUrl(
+        sourceUrl: string,
+        existingCategories: string[] = [],
+    ): Promise<ItemData | null> {
+        this.logger.log(`Extracting item details from URL: ${sourceUrl}`);
+
+        try {
+            // 1. Retrieve web page content
+            const webPages = await this.webPageRetrievalService.retrieveSpecificUrls(
+                'extract-item',
+                [sourceUrl],
+                new Set(),
+            );
+
+            if (!webPages || webPages.length === 0) {
+                this.logger.warn(`Failed to retrieve content from URL: ${sourceUrl}`);
+                return null;
+            }
+
+            const webPage = webPages[0];
+            if (!webPage.raw_content || webPage.raw_content.trim().length === 0) {
+                this.logger.warn(`No content found for URL: ${sourceUrl}`);
+                return null;
+            }
+
+            // 2. Create a minimal DTO for extraction
+            const extractionDto = {
+                slug: 'extract-item',
+                name: 'Item Extraction',
+                prompt: `Extract details for a single item from the provided content. ${
+                    existingCategories.length > 0
+                        ? `Consider these existing categories when categorizing: ${existingCategories.join(', ')}`
+                        : ''
+                }`,
+                initial_categories: existingCategories,
+            };
+
+            // 3. Extract item details using the existing extraction service
+            const extractedItems = await this.itemExtractionService.extractItemsFromPages(
+                {
+                    ...extractionDto,
+                    config: {
+                        max_search_queries: 1,
+                        max_results_per_query: 1,
+                        max_pages_to_process: 1,
+                        relevance_threshold_content: 0.5,
+                        min_content_length_for_extraction: 100,
+                        ai_first_generation_enabled: false,
+                        prompt_comparison_confidence_threshold: 0.5,
+                    },
+                },
+                [webPage],
+                [], // No featured hints for single item extraction
+            );
+
+            if (!extractedItems || extractedItems.length === 0) {
+                this.logger.warn(`No items extracted from URL: ${sourceUrl}`);
+                return null;
+            }
+
+            // 4. Take the first extracted item and enhance it
+            let item = extractedItems[0];
+
+            // Ensure the source URL matches the input
+            item.source_url = sourceUrl;
+
+            // Ensure featured is always false for extracted items
+            item.featured = false;
+
+            // 5. Generate markdown for the item
+            item = await this.generateMarkdownForItem(item);
+
+            // 6. Process badges for the item
+            item = await this.processSingleItemBadges(item);
+
+            this.logger.log(`Successfully extracted item: ${item.name} from ${sourceUrl}`);
+            return item;
+        } catch (error) {
+            this.logger.error(`Error extracting item details from ${sourceUrl}:`, error);
+            return null;
         }
     }
 }
