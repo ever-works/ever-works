@@ -389,7 +389,7 @@ export class DataGeneratorService {
             return readmeConfig.header;
         }
 
-        let additionalHeader = readmeConfig?.header;
+        let additionalHeader = readmeConfig?.header || '';
         if (additionalHeader) {
             additionalHeader = additionalHeader + '\n\n';
         }
@@ -403,7 +403,7 @@ export class DataGeneratorService {
             return readmeConfig.footer;
         }
 
-        let additionalFooter = readmeConfig?.footer;
+        let additionalFooter = readmeConfig?.footer || '';
         if (additionalFooter) {
             additionalFooter = additionalFooter + '\n\n';
         }

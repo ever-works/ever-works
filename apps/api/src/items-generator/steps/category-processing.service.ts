@@ -210,10 +210,15 @@ export class CategoryProcessingService {
             '<additional_rules#>',
             `
 <additional_rules>
-- For consistency, use the existing categories and tags listed below whenever appropriate.
-- Create new categories or tags only if none of the existing options are suitable.
-- Prioritize consistency across items with similar purposes.
+- For consistency, use the existing categories and tags listed below whenever appropriate otherwise create new ones.
+- The provided category metrics can help you understand the distribution of items across categories. This insight can guide you in deciding when to create new categories to prevent any single category from becoming too large or imbalanced.
+- A category is too large if it contains more than 50 items.
+- When creating a new category because a category is too large, try to find a more specific category name that better reflects the items in that category.
 </additional_rules>
+
+<category_metrics>
+{category_metrics}
+</category_metrics>
 
 <existing_categories>
 {existing_categories}
@@ -255,6 +260,14 @@ export class CategoryProcessingService {
                 const categoriesText = Array.from(existingCategories).join(', ');
                 const tagsText = Array.from(existingTags).join(', ');
 
+                // Format categories metrics for the prompt
+                const categoryMetrics: Record<string, number> = {};
+                allCategorizedItems.forEach((item) => {
+                    const category = typeof item.category === 'string' ? item.category : '';
+                    if (!category) return;
+                    categoryMetrics[category] = (categoryMetrics[category] || 0) + 1;
+                });
+
                 // Use the enhanced prompt if we have existing categories/tags, otherwise use the basic prompt
                 const promptTemplate = this.enhancedPrompt(existingCategories, existingTags);
 
@@ -264,6 +277,7 @@ export class CategoryProcessingService {
                     .invoke({
                         task: description,
                         items: JSON.stringify(batch),
+                        category_metrics: JSON.stringify(categoryMetrics),
                         existing_categories: categoriesText,
                         existing_tags: tagsText,
                     });
@@ -286,8 +300,8 @@ export class CategoryProcessingService {
                 });
 
                 this.logger.log(
-                    `Batch ${batchNumber} complete. Found ${batchResults.length} categorized items. ` +
-                        `Running totals: ${existingCategories.size} categories, ${existingTags.size} tags.`,
+                    `Batch ${batchNumber} complete. Category metrics: ${JSON.stringify(categoryMetrics)} ` +
+                        `Existing tags count: ${existingTags.size}`,
                 );
 
                 allCategorizedItems.push(...batchResults);
