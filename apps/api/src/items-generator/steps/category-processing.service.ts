@@ -11,23 +11,27 @@ import { BaseChatModel } from '../shared/ai-provider.interface';
 const CATEGORIZE_PROMPT = `
 You are directory website builder and your task is to Categorize the given items following these rules and task context.
 
+<rules>
+1. Assign ONE category per item based on primary function
+2. Add 1-3 relevant tags per item
+3. The user may provide category hints based on the task context, but you are not limited to these unless explicitly and clearly instructed to use only the provided categories but better use the provided categories as a starting point.
+4. The provided category metrics can help you understand the distribution of items across categories. 
+    - This insight can guide you in deciding when to create new categories to prevent any single category from becoming too large or imbalanced.
+    - The metrics provide the total number of items that need to be categorized. Based on this information, you should determine whether a category is too large or imbalanced, and create new categories as needed.
+    - You are not limited to the provided categories, feel free to create new ones if necessary.
+5. Use specific but not overly narrow categories (e.g. "Monitoring", "CI/CD", "Testing")
+6. Use descriptive tags (e.g. "open-source", "real-time", "cloud-native")
+7. Maintain consistency with existing categories and tags
+8. Override any existing item category if it doesn't match the primary task context
+9. The featured field should remain the same as in the original item
+</rules>
+
+<additional_rules#>
+
 Task context:
 <task>
 {task}
 </task>
-
-<rules>
-1. Assign ONE category per item based on primary function
-2. Add 1-3 relevant tags per item
-3. Focus on generating categories and tags that are relevant to the task context and align with categorization of directory website and github awesome list.
-4. Use specific but not overly narrow categories (e.g. "Monitoring", "CI/CD", "Testing")
-5. Use descriptive tags (e.g. "open-source", "real-time", "cloud-native")
-6. Maintain consistency with existing categories and tags
-7. Override any existing item category if it doesn't match the primary task context
-8. The featured field should remain the same as in the original item
-</rules>
-
-<additional_rules#>
 
 Items to categorize:
 <items>
@@ -210,10 +214,10 @@ export class CategoryProcessingService {
             '<additional_rules#>',
             `
 <additional_rules>
-- For consistency, use the existing categories and tags listed below whenever appropriate otherwise create new ones.
-- The provided category metrics can help you understand the distribution of items across categories. This insight can guide you in deciding when to create new categories to prevent any single category from becoming too large or imbalanced.
-- A category is too large if it contains more than 50 items.
-- When creating a new category because a category is too large, try to find a more specific category name that better reflects the items in that category.
+- For consistency, use the existing categories and tags listed below whenever appropriate.
+- Create new categories or tags only if none of the existing options are suitable.
+- Prioritize consistency across items with similar purposes.
+- When creating a new category because a existing categories is too large, try to find a more specific category name that better reflects the items in that category.
 </additional_rules>
 
 <category_metrics>
@@ -261,7 +265,9 @@ export class CategoryProcessingService {
                 const tagsText = Array.from(existingTags).join(', ');
 
                 // Format categories metrics for the prompt
-                const categoryMetrics: Record<string, number> = {};
+                const categoryMetrics: Record<string, number> = {
+                    total_items: items.length,
+                };
                 allCategorizedItems.forEach((item) => {
                     const category = typeof item.category === 'string' ? item.category : '';
                     if (!category) return;
