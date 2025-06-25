@@ -37,7 +37,7 @@ export class Directory {
     }
 }
 
-export class MarkdownReadmeConfig {
+export interface MarkdownReadmeConfig {
     header?: string;
     overwrite_default_header?: boolean;
 
