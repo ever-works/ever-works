@@ -16,11 +16,11 @@ Built with NestJS.
     - [2. Generate data and GitHub repositories](#5-generate-data-and-github-repositories)
     - [3. Update Directory](#6-update-directory)
     - [4. Regenerate Markdown](#7-regenerate-markdown)
-    - [5. Submit Individual Items](#7-submit-individual-items)
-    - [6. Remove Individual Items](#8-remove-individual-items)
-    - [7. Extract Item Details](#9-extract-item-details)
+    - [5. Submit Individual Items](#8-submit-individual-items)
+    - [6. Remove Individual Items](#9-remove-individual-items)
+    - [7. Extract Item Details](#10-extract-item-details)
     - [8. Update website repository](#11-update-website-repository)
-    - [8. Deploy to Vercel](#12-deploy-to-vercel)
+    - [9. Deploy to Vercel](#12-deploy-to-vercel)
 
 - [Examples](#examples)
     - [Example Prompt used to generate awesome time tracking in ever works org](#example-prompt-used-to-generate-awesome-time-tracking-in-ever-works-org)
@@ -76,14 +76,18 @@ To create a new directory object, send a POST request to `http://localhost:3001/
     "description": "Time Tracking - Software, Methodologies and Practices.",
     "readme_config": {
         "header": "This text will be used as additional header in the README.md file",
-        "overwrite_default_header": false, // If true, it will replace the default header in README.md
+        "overwrite_default_header": false,
 
         "footer": "This text will be used as additional footer in the README.md file",
-        "overwrite_default_footer": false // If true, it will replace the default footer in README.md
+        "overwrite_default_footer": false
     }
 }
 ```
 
+**Overwrite default header and footer**
+If you want to overwrite the default header and footer in the README.md file, set `overwrite_default_header` and `overwrite_default_footer` to `true`. This will replace the default content with your custom text.
+
+**Request Parameters:**
 By default, the directory will be created with the currently authenticated GitHub user as the owner.
 
 If you want to initialize the directory within an organization, provide the optional `owner` field:

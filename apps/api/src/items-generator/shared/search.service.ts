@@ -90,7 +90,10 @@ export class SearchService {
      * @param config Optional configuration
      */
 
-    async webSearchUsingTavily(query: string, config?: Partial<ConfigDto>) {
+    async webSearchUsingTavily(
+        query: string,
+        config?: Partial<ConfigDto>,
+    ): Promise<SearchResult[]> {
         const DEFAULT_MAX_RESULTS = 20;
 
         const searches = await this.tavilyClient.search(query, {
@@ -105,7 +108,10 @@ export class SearchService {
      * @param query The search query
      * @param config Optional configuration
      */
-    async webSearchUsingGoogle(query: string, config?: Partial<ConfigDto>) {
+    async webSearchUsingGoogle(
+        query: string,
+        config?: Partial<ConfigDto>,
+    ): Promise<SearchResult[]> {
         let results = await search({
             query,
             resultTypes: [OrganicResult, DictionaryResult],

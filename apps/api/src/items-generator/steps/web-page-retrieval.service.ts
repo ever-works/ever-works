@@ -209,7 +209,7 @@ export class WebPageRetrievalService {
     }
 
     /**
-     * Process URLs using Tavily (extracted from original retrieveSpecificUrls method)
+     * Process URLs using the search service (extracted from original retrieveSpecificUrls method)
      */
     private async processUrls(
         slug: string,
