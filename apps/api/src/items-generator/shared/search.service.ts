@@ -106,22 +106,15 @@ export class SearchService {
      * @param config Optional configuration
      */
     async webSearchUsingGoogle(query: string, config?: Partial<ConfigDto>) {
-        const limit = Math.floor(config?.max_results_per_query || 20 / 10);
-
-        const promiseResults = new Array<SearchResult>(limit || 1).fill(null).map((_, index) => {
-            return search({
-                query,
-                resultTypes: [OrganicResult, DictionaryResult],
-                requestConfig: {
-                    params: {
-                        start: index * 10,
-                        safe: 'active',
-                    },
+        let results = await search({
+            query,
+            resultTypes: [OrganicResult, DictionaryResult],
+            requestConfig: {
+                params: {
+                    safe: 'active',
                 },
-            });
+            },
         });
-
-        let results = (await Promise.all(promiseResults)).flat();
 
         results = results.slice(0, config?.max_results_per_query || 20);
 

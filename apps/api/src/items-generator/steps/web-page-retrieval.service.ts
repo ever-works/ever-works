@@ -19,11 +19,6 @@ export class WebPageRetrievalService {
         processedSourceUrls: Set<string>,
         config: Required<ConfigDto>,
     ): Promise<WebPageData[]> {
-        if (!this.searchService.isTavilySearchConfigured()) {
-            this.logger.warn(`[${slug}] Tavily API key not configured. Skipping web search.`);
-            return [];
-        }
-
         const allFetchedPages: WebPageData[] = [];
         const currentRunProcessedUrls = new Set<string>();
 
