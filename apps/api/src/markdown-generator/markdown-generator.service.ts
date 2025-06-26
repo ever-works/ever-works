@@ -129,6 +129,14 @@ export class MarkdownGeneratorService {
                 }
             }
 
+            // Remove detail files
+            if (options?.remove_details && options.remove_details.length > 0) {
+                for (const slug of options.remove_details) {
+                    await markdownRepo.removeDetails(slug);
+                    markdowns.delete(slug);
+                }
+            }
+
             const license = await dataRepo.getLicense();
             if (license) {
                 await markdownRepo.writeLicense(license);
@@ -142,23 +150,7 @@ export class MarkdownGeneratorService {
             );
             await markdownRepo.writeReadme(readme);
 
-            // Remove detail files
-            if (options?.remove_details && options.remove_details.length > 0) {
-                for (const slug of options.remove_details) {
-                    await markdownRepo.removeDetails(slug);
-                    markdowns.delete(slug);
-                }
-
-                // Add all files, including removed ones
-                await this.githubService.addAll(markdownPath);
-            }
-
-            if (generation_method === GenerationMethod.RECREATE) {
-                await this.githubService.addAll(markdownPath);
-            } else {
-                await this.githubService.add(markdownPath, '.');
-            }
-
+            await this.githubService.addAll(markdownPath);
             await this.githubService.commit(markdownPath, 'sync README.md', user.asCommitter());
             await this.githubService.push(markdownPath, token);
 
