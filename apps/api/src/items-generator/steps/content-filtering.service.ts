@@ -88,11 +88,14 @@ Provide a relevance score between 0.0 (not relevant) and 1.0 (highly relevant). 
 
                 const relevanceChain = prompt.pipe(this.llm.withStructuredOutput(relevanceSchema));
 
+                const SNIPPET_LENGTH = 3000;
+                const snippet_middle = Math.floor(page.raw_content.length / 2);
+
                 const page_content_snippet =
-                    page.raw_content.length > 3000
+                    page.raw_content.length > SNIPPET_LENGTH
                         ? page.raw_content.slice(
-                              page.raw_content.length / 2 - 1500,
-                              page.raw_content.length / 2 + 1500,
+                              page.raw_content.length / 2 - snippet_middle,
+                              page.raw_content.length / 2 + snippet_middle,
                           )
                         : page.raw_content;
 
