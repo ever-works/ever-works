@@ -41,7 +41,10 @@ export class ItemSubmissionService {
             const data = await DataRepository.create(dest);
 
             // Get config to check autoapproval settings
-            const config: IDataConfig | null = await data.getConfig().catch(() => null);
+            const config: IDataConfig | null = await data.getConfig().catch((error) => {
+                this.logger.warn('Failed to get config, using defaults', error);
+                return null;
+            });
 
             const shouldAutoMerge =
                 submitItemDto.pay_and_publish_now || (config && config.autoapproval === true);

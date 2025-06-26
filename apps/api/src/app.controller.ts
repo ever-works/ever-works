@@ -171,7 +171,7 @@ export class AppController {
 
             return result;
         } catch (error) {
-            console.error('Error submitting item:', error);
+            this.logger.error('Error submitting item:', error);
 
             return {
                 status: 'error',

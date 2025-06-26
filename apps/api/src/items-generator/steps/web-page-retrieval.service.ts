@@ -225,7 +225,7 @@ export class WebPageRetrievalService {
 
             const extractionPromises = batch.map(async (url: string) => {
                 try {
-                    const response = await this.searchService!.extractContent(url);
+                    const response = await this.searchService.extractContent(url);
 
                     if (!response.rawContent) {
                         this.logger.warn(

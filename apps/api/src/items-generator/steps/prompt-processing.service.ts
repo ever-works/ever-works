@@ -10,12 +10,11 @@ You are a helpful assistant tasked with extracting URLs and explicitly mentioned
 
 <rules>
 1. Extract all URLs mentioned in the prompt.
-2. Extract categories that are *strictly* and *explicitly* mentioned in the prompt that should be considered for categorization.
-3. Extract *only* categories that are explicitly mentioned in the prompt. (e.g "I want categories like Monitoring, CI/CD, and Testing")
-4. Extract priority categories that should appear first in the final output based on priority indicators in the prompt.
-5. Extract featured item specifications that indicate which types of items should be marked as featured/highlighted.
-6. Rewrite the prompt to focus ONLY on the main task idea and important prompt instructions, removing ALL hints and specifications.
-7. Return the extracted URLs, explicitly mentioned categories, priority categories, featured item hints, and the rewritten prompt.
+2. Extract *only* categories that are explicitly mentioned in the prompt. (e.g "I want categories like Monitoring, CI/CD, and Testing")
+3. Extract priority categories that should appear first in the final output based on priority indicators in the prompt.
+4. Extract featured item specifications that indicate which types of items should be marked as featured/highlighted.
+5. Rewrite the prompt to focus ONLY on the main task idea and important prompt instructions, removing ALL hints and specifications.
+6. Return the extracted URLs, explicitly mentioned categories, priority categories, featured item hints, and the rewritten prompt.
 </rules>
 
 <url_extraction_guidelines>

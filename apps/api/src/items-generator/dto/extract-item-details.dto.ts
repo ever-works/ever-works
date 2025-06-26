@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsOptional, IsUrl, IsArray } from 'class-validator';
+import { IsString, IsOptional, IsUrl, IsArray } from 'class-validator';
 
 export class ExtractItemDetailsDto {
     @IsString()
