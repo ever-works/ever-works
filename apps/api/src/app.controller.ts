@@ -157,6 +157,13 @@ export class AppController {
 
             // Regenerate markdown for all items
             if (result.status === 'success') {
+                await this.markdownGenerator.removeItemDetail(
+                    directory,
+                    user,
+                    submitItemDto.slug,
+                    result.pr_branch_name,
+                );
+
                 await this.markdownGenerator.initialize(directory, user, {
                     generation_method: result.auto_merged
                         ? GenerationMethod.RECREATE

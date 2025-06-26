@@ -181,6 +181,26 @@ export class MarkdownGeneratorService {
         }
     }
 
+    async removeItemDetail(directory: Directory, user: User, slug: string, branch?: string) {
+        const token = user.getGitToken();
+
+        const markdownPath = await this.githubService.cloneOrPull(
+            directory.owner,
+            directory.slug,
+            token,
+        );
+
+        const markdownRepo = new MarkdownRepository(markdownPath);
+
+        if (branch) {
+            await this.githubService.switchToBranch(markdownRepo.dir, branch, true).catch((err) => {
+                this.logger.error('Failed to switch to PR branch', err);
+            });
+        }
+
+        await markdownRepo.removeDetails(slug);
+    }
+
     private async generateReadme(
         data: DataRepository,
         markdowns: Set<string>,

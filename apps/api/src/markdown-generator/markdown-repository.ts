@@ -52,6 +52,11 @@ export class MarkdownRepository {
         await fs.writeFile(filename, content, 'utf-8');
     }
 
+    async removeDetails(slug: string) {
+        const filename = path.join(this.detailsPath, `${slug}.md`);
+        await fs.rm(filename, { force: true });
+    }
+
     async writeLicense(content: string) {
         const filepath = path.join(this.dir, 'LICENSE.md');
         await fs.writeFile(filepath, content, 'utf-8');
