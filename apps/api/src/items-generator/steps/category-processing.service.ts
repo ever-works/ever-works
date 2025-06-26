@@ -246,7 +246,7 @@ export class CategoryProcessingService {
 - The category metrics (if provided) can help you understand the distribution of items across categories. 
     - This insight can guide you in deciding when to create new categories to prevent any single category from becoming too large or imbalanced.
     - The metrics provide the total number of items that need to be categorized. Based on this information, you should determine whether a category is too large or imbalanced, and create new categories as needed.
-    - You are not limited to the provided categories, feel free to create new ones if necessary.
+    - You are not limited to the provided existing categories, feel free to create new ones if necessary.
 - Prioritize consistency across items with similar purposes.
 </additional_rules>
 

@@ -53,6 +53,9 @@ export class ItemsGeneratorService {
             existingConfig?: IDataConfig;
         } = {},
     ) {
+        // Make a copy of the DTO to avoid mutating the original
+        createItemsGeneratorDto = { ...createItemsGeneratorDto };
+
         const { slug, name, source_urls, config, prompt: originalPrompt } = createItemsGeneratorDto;
 
         this.logger.log(`Starting generation for slug: ${slug}, name: ${name}`);
@@ -82,16 +85,16 @@ export class ItemsGeneratorService {
             }
 
             // 1.0. Prompt Comparison
-            const configMetadata = existingConfig?.metadata || {};
+            const $configMetadata = existingConfig?.metadata || {};
             if (
-                configMetadata?.initial_prompt &&
+                $configMetadata?.initial_prompt &&
                 createItemsGeneratorDto.generation_method === GenerationMethod.CREATE_UPDATE &&
                 existingItems.length > 0
             ) {
                 this.logger.log(`[${slug}] 1.0. Prompt Comparison - Starting`);
                 const comparisonResult = await this.promptComparisonService.comparePrompts(
                     slug,
-                    configMetadata.initial_prompt,
+                    $configMetadata.initial_prompt,
                     createItemsGeneratorDto.prompt,
                 );
 
@@ -123,7 +126,7 @@ export class ItemsGeneratorService {
                 `[${slug}] 1.1. Prompt Processing (URLs, Categories, Priorities, and Featured Hints) - Starting`,
             );
             const {
-                extractedUrls,
+                extractedUrls: extractedUrlsFromPrompt,
                 suggestedCategories,
                 priorityCategories: promptPriorityCategories,
                 featuredItemHints,
@@ -171,7 +174,22 @@ export class ItemsGeneratorService {
             createItemsGeneratorDto.prompt = prompt;
 
             // Add source_urls to the extractedUrls
+            let extractedUrls = extractedUrlsFromPrompt;
             extractedUrls.push(...(source_urls || []));
+
+            // Remove urls from extractedUrls or source_urls that was processed in previous runs
+            if (
+                createItemsGeneratorDto.generation_method === GenerationMethod.CREATE_UPDATE &&
+                ($configMetadata.last_request_data?.prompt ||
+                    $configMetadata.last_request_data?.source_urls.length)
+            ) {
+                const last_request_data = $configMetadata.last_request_data;
+                extractedUrls = extractedUrls.filter((url) => {
+                    const $source_urls = last_request_data.source_urls || [];
+                    const $prompt = last_request_data.prompt || '';
+                    return !$source_urls.includes(url) && !$prompt.includes(url);
+                });
+            }
 
             // 1.5. AI-First Item Generation
             let initialAiItems: ItemData[] = [];
