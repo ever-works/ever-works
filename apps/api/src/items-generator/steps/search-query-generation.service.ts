@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PromptTemplate } from '@langchain/core/prompts';
 import { StringOutputParser } from '@langchain/core/output_parsers';
 import { formatDate } from 'date-fns';
-import { ConfigDto, CreateItemsGeneratorDto } from '../dto/create-items-generator.dto';
+import { CreateItemsGeneratorDto } from '../dto/create-items-generator.dto';
 import { AiService } from '../shared';
 import { BaseChatModel } from '../shared/ai-provider.interface';
 
