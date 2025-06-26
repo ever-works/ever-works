@@ -4,38 +4,24 @@ Built with NestJS.
 
 ## Table of Contents
 
-- [How to run](#how-to-run)
+- [Setup & Run](#how-to-run)
+
     - [1. Clone the repository](#1-clone-the-repository)
     - [2. Create `.env` file](#2-create-env-file)
     - [3. Run application using (cd to root of the whole repo, not backend app)](#3-run-application-using-cd-to-root-of-the-whole-repo-not-backend-app)
-    - [4. Create a directory object](#4-create-a-directory-object)
-    - [5. Generate data and GitHub repositories](#5-generate-data-and-github-repositories)
-    - [6. Update Directory](#6-update-directory)
-    - [7. Submit Individual Items](#7-submit-individual-items)
-    - [8. Remove Individual Items](#8-remove-individual-items)
-    - [9. Extract Item Details](#9-extract-item-details)
-    - [11. Update website repository](#11-update-website-repository)
-        - [12. Deploy to Vercel](#12-deploy-to-vercel)
+
 - [API Endpoints](#api-endpoints)
-    - [POST /directories](#post-directories)
-    - [POST /generate](#post-generate)
-    - [POST /update/{slug}](#post-updateslug)
-    - [POST /submit-item/{slug}](#post-submit-itemslug)
-    - [POST /remove-item/{slug}](#post-remove-itemslug)
-    - [POST /extract-item-details](#post-extract-item-details)
-    - [POST /update-website/{slug}](#post-update-websiteslug)
-    - [POST /deploy/{slug}/vercel](#post-deployslugvercel)
-- [Configuration](#configuration)
-    - [Request Parameters](#request-parameters)
-    - [Company Object](#company-object)
-    - [Configuration Options](#configuration-options)
-    - [Generation Methods](#generation-methods)
-    - [Website Repository Creation Methods](#website-repository-creation-methods)
-- [Features](#features)
-- [Auto-Merge Behavior](#auto-merge-behavior)
-- [Process Flows](#process-flows)
-- [Error Handling](#error-handling)
-- [Prerequisites](#prerequisites)
+
+    - [1. Create a directory object](#4-create-a-directory-object)
+    - [2. Generate data and GitHub repositories](#5-generate-data-and-github-repositories)
+    - [3. Update Directory](#6-update-directory)
+    - [4. Regenerate Markdown](#7-regenerate-markdown)
+    - [5. Submit Individual Items](#7-submit-individual-items)
+    - [6. Remove Individual Items](#8-remove-individual-items)
+    - [7. Extract Item Details](#9-extract-item-details)
+    - [8. Update website repository](#11-update-website-repository)
+    - [8. Deploy to Vercel](#12-deploy-to-vercel)
+
 - [Examples](#examples)
     - [Example Prompt used to generate awesome time tracking in ever works org](#example-prompt-used-to-generate-awesome-time-tracking-in-ever-works-org)
 
@@ -49,6 +35,18 @@ Make sure you have [pnpm](https://pnpm.io/) installed, then clone the repository
 git clone https://github.com/ever-works/ever-works.git
 ```
 
+Navigate to the `apps/api` directory:
+
+```sh
+cd ever-works/apps/api
+```
+
+Install the dependencies:
+
+```sh
+pnpm install
+```
+
 ### 2. Create `.env` file
 
 Navigate to the `apps/api` directory and create a `.env` file. You can use the example file as a starting point:
@@ -57,11 +55,15 @@ Navigate to the `apps/api` directory and create a `.env` file. You can use the e
 cp .env.example .env
 ```
 
-### 3. Run application using (cd to root of the whole repo, not backend app):
+> Make sure to fill in the required environment variables in the `.env` file.
+
+### 3. Run application:
 
 ```sh
-pnpm dev
+pnpm start
 ```
+
+The application will start running on `http://localhost:3001`.
 
 ### 4. Create a directory object
 
@@ -263,7 +265,31 @@ POST /update/{slug}
 | `generation_method`        | enum    | `optional` | Generation method: `create-update` or `recreate` (default: `create-update`)                                           |
 | `update_with_pull_request` | boolean | `optional` | Whether to update the repository with a pull request or directly commit the changes to main branch. (default: `true`) |
 
-### 7. Submit Individual Items
+### 7. Regenerate Markdown
+
+To regenerate the README markdown file for a GitHub repository, send a POST request to `http://localhost:3001/regenerate-markdown/{slug}`.
+
+**Endpoint:**
+
+```POST /regenerate-markdown/{slug}
+
+```
+
+**URL Parameters:**
+
+| Parameter | Type   | Required   | Description                         |
+| --------- | ------ | ---------- | ----------------------------------- |
+| `slug`    | string | `required` | The slug of the directory to update |
+
+**Response:**
+
+```json
+{
+    "status": "success"
+}
+```
+
+### 8. Submit Individual Items
 
 To submit individual items to an existing directory, send a POST request to `http://localhost:3001/submit-item/{slug}` with the item details.
 
@@ -372,7 +398,7 @@ curl -X POST http://localhost:3001/submit-item/awesome-time-tracking \
 8. **PR Creation**: Pull request is created
 9. **Auto-Merge** (conditional): PR is merged if auto-merge conditions are met
 
-### 8. Remove Individual Items
+### 9. Remove Individual Items
 
 To remove individual items from an existing directory, send a POST request to `http://localhost:3001/remove-item/{slug}` with the item details.
 
@@ -447,7 +473,7 @@ curl -X POST http://localhost:3001/remove-item/awesome-time-tracking \
   }'
 ```
 
-### 9. Extract Item Details
+### 10. Extract Item Details
 
 To extract item details from a single URL without adding it to any directory, send a POST request to `http://localhost:3001/extract-item-details` with the URL and optional existing categories.
 

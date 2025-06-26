@@ -244,6 +244,36 @@ export class AppController {
         }
     }
 
+    @Post('regenerate-markdown/:slug')
+    @HttpCode(HttpStatus.OK)
+    async regenerateMarkdown(
+        @Param('slug') slug: string,
+    ): Promise<{ status: string; error_details?: string }> {
+        try {
+            const user = await User.sessionMock();
+
+            // Check if directory exists for the given slug
+            const directory = await Directory.findMock(slug);
+            if (!directory) {
+                throw new NotFoundException(`Directory with slug '${slug}' not found`);
+            }
+
+            // Regenerate markdown for all items
+            await this.markdownGenerator.initialize(directory, user);
+
+            return {
+                status: 'success',
+            };
+        } catch (error) {
+            console.error('Error regenerating markdown:', error);
+
+            return {
+                status: 'error',
+                error_details: error.message,
+            };
+        }
+    }
+
     @Post('update-website/:slug')
     @HttpCode(HttpStatus.OK)
     async updateWebsiteRepository(
@@ -295,7 +325,9 @@ export class AppController {
 
             if (generated) {
                 await Promise.all([
-                    this.markdownGenerator.initialize(directory, user, dto.repository_description),
+                    this.markdownGenerator.initialize(directory, user, {
+                        repository_description: dto.repository_description,
+                    }),
                     this.websiteGenerator.initialize(
                         directory,
                         user,

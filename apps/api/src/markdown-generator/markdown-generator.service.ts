@@ -10,16 +10,21 @@ import { ReadmeBuilder } from './readme-builder';
 import { MarkdownRepository } from './markdown-repository';
 import { GenerationMethod } from '../items-generator/dto';
 
+type InitializeOptions = {
+    repository_description?: string;
+    generation_method?: GenerationMethod;
+};
+
 @Injectable()
 export class MarkdownGeneratorService {
     private readonly logger = new Logger(MarkdownGeneratorService.name);
 
     constructor(private readonly githubService: GithubService) {}
 
-    async initialize(directory: Directory, user: User, repository_description?: string) {
+    async initialize(directory: Directory, user: User, options: InitializeOptions = {}) {
         const token = user.getGitToken();
 
-        const description = repository_description || directory.description;
+        const description = options?.repository_description || directory.description;
 
         if (directory.organization) {
             await this.githubService.createEmptyRepoAsOrg(
@@ -64,14 +69,16 @@ export class MarkdownGeneratorService {
                 });
 
             const configMetadata = config?.metadata || {};
+            const generation_method =
+                options?.generation_method || configMetadata?.generation_method;
 
             let canCreatePR =
-                configMetadata?.generation_method !== GenerationMethod.RECREATE &&
+                generation_method !== GenerationMethod.RECREATE &&
                 !!configMetadata.pr_update?.branch;
 
             // In case of re-creation:
             // Switch to the main branch and remove existing items files.
-            if (configMetadata?.generation_method === GenerationMethod.RECREATE) {
+            if (generation_method === GenerationMethod.RECREATE) {
                 await this.githubService.switchToMainBranch(markdownRepo.dir).catch((err) => {
                     this.logger.error('Failed to switch to main branch', err);
                     return null;
