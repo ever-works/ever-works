@@ -203,8 +203,18 @@ export class DataGeneratorService {
             await Promise.all(promises);
 
             // Commit changes
-            await this.githubService.add(data.dir, '.');
-            await this.githubService.commit(data.dir, `init repository`, user.asCommitter());
+            if (createItemsGeneratorDto.generation_method === GenerationMethod.RECREATE) {
+                await this.githubService.addAll(data.dir);
+            } else {
+                await this.githubService.add(data.dir, '.');
+            }
+
+            await this.githubService.commit(
+                data.dir,
+                existed ? 'update items' : 'init repository',
+                user.asCommitter(),
+            );
+
             this.logger.debug('files written and committed.');
 
             // Process items (with markdown generation, writing to disk and committing)

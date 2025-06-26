@@ -243,7 +243,7 @@ export class ItemSubmissionService {
             }
 
             // Commit changes
-            await this.githubService.add(dest, '.');
+            await this.githubService.addAll(dest);
             const commitMessage = removeItemDto.reason
                 ? `Remove ${itemData.name} - ${removeItemDto.reason}`
                 : `Remove ${itemData.name}`;

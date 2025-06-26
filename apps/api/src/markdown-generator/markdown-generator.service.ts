@@ -140,7 +140,13 @@ export class MarkdownGeneratorService {
                 categories,
             );
             await markdownRepo.writeReadme(readme);
-            await this.githubService.add(markdownPath, '.');
+
+            if (generation_method === GenerationMethod.RECREATE) {
+                await this.githubService.addAll(markdownPath);
+            } else {
+                await this.githubService.add(markdownPath, '.');
+            }
+
             await this.githubService.commit(markdownPath, 'sync README.md', user.asCommitter());
             await this.githubService.push(markdownPath, token);
 

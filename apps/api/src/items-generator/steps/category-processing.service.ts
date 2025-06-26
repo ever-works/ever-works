@@ -214,6 +214,7 @@ export class CategoryProcessingService {
                     items: JSON.stringify(itemsForCategorization),
                     existing_categories: categoriesText,
                     existing_tags: tagsText,
+                    category_metrics: JSON.stringify(initialCategoryMetrics),
                 });
 
             return result.items as ItemData[];
