@@ -53,7 +53,7 @@ export class ItemsGeneratorService {
             existingConfig?: IDataConfig;
         } = {},
     ) {
-        const { slug, name, source_urls, config } = createItemsGeneratorDto;
+        const { slug, name, source_urls, config, prompt: originalPrompt } = createItemsGeneratorDto;
 
         this.logger.log(`Starting generation for slug: ${slug}, name: ${name}`);
 
@@ -272,6 +272,7 @@ export class ItemsGeneratorService {
             const dtoWithMergedPriorities = {
                 ...createItemsGeneratorDto,
                 priority_categories: allPriorityCategories,
+                prompt: originalPrompt,
             };
 
             const { categories, tags, finalItems } =

@@ -14,7 +14,7 @@ You are a helpful assistant tasked with extracting URLs and explicitly mentioned
 3. Extract *only* categories that are explicitly mentioned in the prompt. (e.g "I want categories like Monitoring, CI/CD, and Testing")
 4. Extract priority categories that should appear first in the final output based on priority indicators in the prompt.
 5. Extract featured item specifications that indicate which types of items should be marked as featured/highlighted.
-6. Rewrite the prompt to focus ONLY on the main task idea, removing ALL hints, instructions, and specifications.
+6. Rewrite the prompt to focus ONLY on the main task idea and important prompt instructions, removing ALL hints and specifications.
 7. Return the extracted URLs, explicitly mentioned categories, priority categories, featured item hints, and the rewritten prompt.
 </rules>
 
@@ -124,10 +124,8 @@ You are a helpful assistant tasked with extracting URLs and explicitly mentioned
 - Remove ALL reference instructions (e.g., "For reference, consult: https://...")
 - Remove ALL categorization instructions (e.g., "When listing open-source projects, strictly use the license type as the tag")
 - Separated prompt instructions should be combined into a single, coherent task description
-- Keep ONLY the core task description that explains what type of items/content to generate
-- Focus on the main subject matter and purpose of the directory/list
-- Preserve the essential context about what the user wants to accomplish
-- The rewritten prompt should be clean, focused, and contain only the essential task description without any processing hints, categorization instructions, priority specifications, or reference URLs.
+- Preserve the essential context about what the user wants to accomplish with separated instructions combined
+- The rewritten prompt should be clean, focused, and contain only the essential instructions without any processing hints, categorization instructions, priority specifications, or reference URLs.
 </prompt_rewriting_guidelines>
 
 <prompt>
