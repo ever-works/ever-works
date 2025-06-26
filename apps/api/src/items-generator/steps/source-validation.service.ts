@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import axios from 'axios';
-import { PromptTemplate } from '@langchain/core/prompts';
+import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
 import { z } from 'zod';
 import { ItemData, ConfigDto } from '../dto';
 import { SearchService, AiService } from '../shared';
@@ -385,7 +385,7 @@ export class SourceValidationService {
             }
 
             // Use AI to validate the URL
-            const promptTemplate = PromptTemplate.fromTemplate(URL_VALIDATION_PROMPT);
+            const promptTemplate = HumanMessagePromptTemplate.fromTemplate(URL_VALIDATION_PROMPT);
             const result = await promptTemplate
                 .pipe(this.llm.withStructuredOutput(urlValidationSchema))
                 .invoke({

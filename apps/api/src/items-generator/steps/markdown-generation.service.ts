@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PromptTemplate } from '@langchain/core/prompts';
+import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
 import { z } from 'zod';
 import { AiService } from '../shared';
 import { SearchService } from '../shared';
@@ -66,7 +66,7 @@ export class MarkdownGenerationService {
             }
 
             // Generate markdown using the extracted content
-            const prompt = PromptTemplate.fromTemplate(MARKDOWN_PROMPT);
+            const prompt = HumanMessagePromptTemplate.fromTemplate(MARKDOWN_PROMPT);
             const result = await prompt
                 .pipe(this.llm.withStructuredOutput(markdownOutputSchema))
                 .invoke({

@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { BaseChatModel } from '../shared/ai-provider.interface';
-import { PromptTemplate } from '@langchain/core/prompts';
+import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
 import { z } from 'zod';
 import { AiService } from '../shared';
 
@@ -92,7 +92,7 @@ export class PromptComparisonService {
         }
 
         try {
-            const promptTemplate = PromptTemplate.fromTemplate(PROMPT_COMPARISON_PROMPT);
+            const promptTemplate = HumanMessagePromptTemplate.fromTemplate(PROMPT_COMPARISON_PROMPT);
             const result = await promptTemplate
                 .pipe(this.llm.withStructuredOutput(promptComparisonOutputSchema))
                 .invoke({

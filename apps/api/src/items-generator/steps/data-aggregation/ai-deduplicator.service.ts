@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PromptTemplate } from '@langchain/core/prompts';
+import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
 import { AiService } from '../../shared';
 import { slugifyText } from '../../utils/text.utils';
 import { extractedItemsSchema } from '../../schemas/item-extraction.schemas';
@@ -53,7 +53,7 @@ export class AiDeduplicatorService {
         items: ItemData[],
     ): Promise<ItemData[]> {
         try {
-            const prompt = PromptTemplate.fromTemplate(DEDUPLICATOR_PROMPT);
+            const prompt = HumanMessagePromptTemplate.fromTemplate(DEDUPLICATOR_PROMPT);
 
             const result = await prompt
                 .pipe(this.llm.withStructuredOutput(extractedItemsSchema))

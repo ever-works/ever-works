@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PromptTemplate } from '@langchain/core/prompts';
+import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
 import { z } from 'zod';
 import { ItemData, Category, Tag, CreateItemsGeneratorDto } from '../dto';
 import { slugifyText } from '../utils/text.utils';
@@ -19,11 +19,12 @@ You are directory website builder and your task is to Categorize the given items
 4. Category divergence is preferable for better grouping of items and directory websites.
 5. The user may provide category hints based on the task context, but you are not limited to these unless explicitly and clearly instructed to use only the provided categories.
 6. Use domain-specific categories (e.g. "open-source projects", "enterprise software", "cloud services")
-7. Use descriptive tags (e.g. "open-source", "real-time", "cloud-native")
-8. Maintain consistency with existing categories and tags
-9. Override any existing item category if it doesn't match the primary task context
-10. The featured field should remain the same as in the original item
-11. Please give careful consideration to the rules outlined in the <additional_rules> section below (if available).
+7. Avoid duplicate categories (e.g. "Monitoring" and "Monitoring Tools", "Open-source" and "Open Source Projects")
+8. Use descriptive tags (e.g. "open-source", "real-time", "cloud-native")
+9. Maintain consistency with existing categories and tags
+10. Override any existing item category if it doesn't match the primary task context
+11. The featured field should remain the same as in the original item
+12. Please give careful consideration to the rules outlined in the <additional_rules> section below (if available).
 </rules>
 
 ${additionalContext || ''}
@@ -206,7 +207,7 @@ export class CategoryProcessingService {
             const promptTemplate = this.enhancedPrompt(existingCategories, existingTags);
 
             // Process all items at once if the count is reasonable
-            const result = await PromptTemplate.fromTemplate(promptTemplate)
+            const result = await HumanMessagePromptTemplate.fromTemplate(promptTemplate)
                 .pipe(this.llm.withStructuredOutput(categorizeOutputSchema))
                 .invoke({
                     task: prompt,
@@ -308,9 +309,11 @@ export class CategoryProcessingService {
                 const tagsText = Array.from(existingTags).join(', ');
 
                 // Format categories metrics for the prompt
+                const total_items = initialCategoryMetrics.total_items || 0;
                 const categoryMetrics: Record<string, number> = {
                     ...initialCategoryMetrics,
-                    total_items: initialCategoryMetrics.total_items + items.length,
+                    categorized_items: total_items + allCategorizedItems.length,
+                    total_items: total_items + items.length,
                 };
                 allCategorizedItems.forEach((item) => {
                     const category = typeof item.category === 'string' ? item.category : '';
@@ -321,7 +324,7 @@ export class CategoryProcessingService {
                 // Use the enhanced prompt if we have existing categories/tags, otherwise use the basic prompt
                 const promptTemplate = this.enhancedPrompt<true>(existingCategories, existingTags);
 
-                const result = await PromptTemplate.fromTemplate(promptTemplate)
+                const result = await HumanMessagePromptTemplate.fromTemplate(promptTemplate)
                     .pipe(this.llm.withStructuredOutput(categorizeOutputSchema))
                     .invoke({
                         task: prompt,

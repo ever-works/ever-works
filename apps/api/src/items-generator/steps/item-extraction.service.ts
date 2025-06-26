@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PromptTemplate } from '@langchain/core/prompts';
+import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
 import { ConfigDto, CreateItemsGeneratorDto } from '../dto/create-items-generator.dto';
 import { WebPageData } from '../interfaces/items-generator.interfaces';
@@ -133,7 +133,7 @@ export class ItemExtractionService {
 
             try {
                 // Stricter prompt for item extraction
-                const promptTemplate = PromptTemplate.fromTemplate(ITEMS_EXTRACTION_PROMPT);
+                const promptTemplate = HumanMessagePromptTemplate.fromTemplate(ITEMS_EXTRACTION_PROMPT);
 
                 const extractionChain = promptTemplate.pipe(
                     this.llm.withStructuredOutput(extractedItemsSchema),

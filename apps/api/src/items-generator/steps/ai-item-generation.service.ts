@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PromptTemplate } from '@langchain/core/prompts';
+import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
 import { slugifyText } from '../utils/text.utils';
 import { AiService } from '../shared';
 import { CreateItemsGeneratorDto, ItemData } from '../dto';
@@ -40,7 +40,7 @@ export class AiItemGenerationService {
             return [];
         }
 
-        const understandingPrompt = PromptTemplate.fromTemplate(
+        const understandingPrompt = HumanMessagePromptTemplate.fromTemplate(
             `You are an AI assistant helping to curate a "Directory website".
 Topic: "{topicName}"
 Description: "{topicDescription}"
@@ -101,7 +101,7 @@ Consider:
             // This is a fallback in case the assessment mechanism has an issue.
         }
 
-        const generationPrompt = PromptTemplate.fromTemplate(
+        const generationPrompt = HumanMessagePromptTemplate.fromTemplate(
             `You are an expert curator and technical writer tasked with generating an initial list of items for a "Directory website" about a specific topic.
 The **main topic** of the Directory website is: "{topicName}"
 Description: "{topicDescription}"

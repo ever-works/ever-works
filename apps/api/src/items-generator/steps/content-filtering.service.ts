@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PromptTemplate } from '@langchain/core/prompts';
+import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
 import { ConfigDto } from '../dto/create-items-generator.dto';
 import { WebPageData, RelevanceAssessment } from '../interfaces/items-generator.interfaces';
 import { AiService } from '../shared';
@@ -70,7 +70,7 @@ export class ContentFilteringService {
                 this.logger.log(`[${slug}] Assessing relevance for: ${page.source_url}`);
 
                 // Stricter prompt for page relevance
-                const prompt = PromptTemplate.fromTemplate(
+                const prompt = HumanMessagePromptTemplate.fromTemplate(
                     `You are an expert content analyst. Assess the relevance of the following web page content to the **main topic**: "{topicName}" (Description: "{topicDescription}").
 
 Web Page Content (first 3000 characters):

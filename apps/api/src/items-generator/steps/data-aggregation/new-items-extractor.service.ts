@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PromptTemplate } from '@langchain/core/prompts';
+import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
 import { AiService } from '../../shared';
 import { slugifyText } from '../../utils/text.utils';
 import { extractedItemsSchema } from '../../schemas/item-extraction.schemas';
@@ -87,7 +87,7 @@ export class NewItemsExtractorService {
                 `AI processing: comparing ${newItems.length} new items against ${relevantExistingItems.length} relevant existing items (filtered from ${existingItems.length} total)`,
             );
 
-            const prompt = PromptTemplate.fromTemplate(EXTRACT_NEW_ITEMS_PROMPT);
+            const prompt = HumanMessagePromptTemplate.fromTemplate(EXTRACT_NEW_ITEMS_PROMPT);
 
             const result = await prompt
                 .pipe(this.llm.withStructuredOutput(extractedItemsSchema))
@@ -224,7 +224,7 @@ export class NewItemsExtractorService {
                 `AI processing: comparing ${newItems.length} new items against ${relevantExistingItems.length} pre-filtered relevant existing items`,
             );
 
-            const prompt = PromptTemplate.fromTemplate(EXTRACT_NEW_ITEMS_PROMPT);
+            const prompt = HumanMessagePromptTemplate.fromTemplate(EXTRACT_NEW_ITEMS_PROMPT);
 
             const result = await prompt
                 .pipe(this.llm.withStructuredOutput(extractedItemsSchema))

@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PromptTemplate } from '@langchain/core/prompts';
+import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
 import { z } from 'zod';
 import { BadgeType, BadgeValue, ItemBadges, BadgeEvaluationResult } from '../dto/badge.dto';
 import { ItemData } from '../dto/item-data.dto';
@@ -42,7 +42,7 @@ export class BadgeEvaluationService {
 
             const llm = this.aiService.getLlm();
 
-            const prompt = PromptTemplate.fromTemplate(`
+            const prompt = HumanMessagePromptTemplate.fromTemplate(`
 You are an expert software engineer tasked with evaluating repository badges based on available information.
 
 **Item Information:**

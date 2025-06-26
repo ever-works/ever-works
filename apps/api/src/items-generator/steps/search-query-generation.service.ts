@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PromptTemplate } from '@langchain/core/prompts';
+import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
 import { StringOutputParser } from '@langchain/core/output_parsers';
 import { formatDate } from 'date-fns';
 import { CreateItemsGeneratorDto } from '../dto/create-items-generator.dto';
@@ -50,7 +50,7 @@ export class SearchQueryGenerationService {
             return [...new Set(fallbackQueries)].slice(0, config.max_search_queries);
         }
 
-        const promptTemplate = PromptTemplate.fromTemplate(
+        const promptTemplate = HumanMessagePromptTemplate.fromTemplate(
             `You are a directory website builder, and your task is to generate search queries that will help you find relevant information on the web, based on the given details.
 <details>
 - The topic is: "{name}"
