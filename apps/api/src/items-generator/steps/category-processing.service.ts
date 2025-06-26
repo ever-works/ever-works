@@ -21,10 +21,11 @@ You are directory website builder and your task is to Categorize the given items
 6. Use domain-specific categories (e.g. "open-source projects", "enterprise software", "cloud services")
 7. Avoid duplicate categories (e.g. "Monitoring" and "Monitoring Tools", "Open-source" and "Open Source Projects")
 8. Use descriptive tags (e.g. "open-source", "real-time", "cloud-native")
-9. Maintain consistency with existing categories and tags
-10. Override any existing item category if it doesn't match the primary task context
-11. The featured field should remain the same as in the original item
-12. Please give careful consideration to the rules outlined in the <additional_rules> section below (if available).
+9. Avoid unnecessary category suffixes
+10. Maintain consistency with existing categories and tags
+11. Override any existing item category if it doesn't match the primary task context
+12. The featured field should remain the same as in the original item
+13. Please give careful consideration to the rules outlined in the <additional_rules> section below (if available).
 </rules>
 
 ${additionalContext || ''}
