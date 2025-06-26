@@ -19,6 +19,7 @@ import { User } from './entities/user.entity';
 import { GithubService } from './git/github.service';
 import {
     CreateItemsGeneratorDto,
+    GenerationMethod,
     UpdateItemsGeneratorDto,
 } from './items-generator/dto/create-items-generator.dto';
 import { ItemsGeneratorResponseDto } from './items-generator/dto/items-generator-response.dto';
@@ -153,6 +154,21 @@ export class AppController {
                 user,
                 submitItemDto,
             );
+
+            // Regenerate markdown for all items
+            if (result.status === 'success') {
+                await this.markdownGenerator.initialize(directory, user, {
+                    generation_method: result.auto_merged
+                        ? GenerationMethod.RECREATE
+                        : GenerationMethod.CREATE_UPDATE,
+                    pr_update: {
+                        branch: result.pr_branch_name,
+                        title: result.pr_title,
+                        body: result.pr_body,
+                    },
+                });
+            }
+
             return result;
         } catch (error) {
             console.error('Error submitting item:', error);
@@ -187,6 +203,19 @@ export class AppController {
                 user,
                 removeItemDto,
             );
+
+            // Regenerate markdown for all items (Always create PR for removal)
+            if (result.status === 'success') {
+                await this.markdownGenerator.initialize(directory, user, {
+                    generation_method: GenerationMethod.CREATE_UPDATE,
+                    pr_update: {
+                        branch: result.pr_branch_name,
+                        title: result.pr_title,
+                        body: result.pr_body,
+                    },
+                });
+            }
+
             return result;
         } catch (error) {
             console.error('Error removing item:', error);
@@ -259,7 +288,9 @@ export class AppController {
             }
 
             // Regenerate markdown for all items
-            await this.markdownGenerator.initialize(directory, user);
+            await this.markdownGenerator.initialize(directory, user, {
+                generation_method: GenerationMethod.RECREATE,
+            });
 
             return {
                 status: 'success',

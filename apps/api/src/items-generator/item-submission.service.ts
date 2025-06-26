@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { GithubService } from '../git/github.service';
 import { Directory } from '../entities/directory.entity';
 import { User } from '../entities/user.entity';
-import { DataRepository } from '../data-generator/data-repository';
+import { DataRepository, IDataConfig } from '../data-generator/data-repository';
 import { slugifyText } from './utils/text.utils';
 import { ItemsGeneratorService } from './items-generator.service';
 import {
@@ -41,7 +41,8 @@ export class ItemSubmissionService {
             const data = await DataRepository.create(dest);
 
             // Get config to check autoapproval settings
-            const config = await data.getConfig().catch(() => null);
+            const config: IDataConfig | null = await data.getConfig().catch(() => null);
+
             const shouldAutoMerge =
                 submitItemDto.pay_and_publish_now || (config && config.autoapproval === true);
 
@@ -171,7 +172,9 @@ export class ItemSubmissionService {
                     : `Item "${itemWithMarkdown.name}" has been submitted for review. PR #${pr.number} created.`,
                 pr_number: pr.number,
                 pr_url: pr.html_url,
-                branch_name: branchName,
+                pr_title: prTitle,
+                pr_body: prBody,
+                pr_branch_name: branchName,
                 auto_merged: autoMerged,
             };
         } catch (error) {
@@ -279,7 +282,9 @@ export class ItemSubmissionService {
                 message: `Item "${itemData.name}" removal has been submitted for review. PR #${pr.number} created.`,
                 pr_number: pr.number,
                 pr_url: pr.html_url,
-                branch_name: branchName,
+                pr_branch_name: branchName,
+                pr_title: prTitle,
+                pr_body: prBody,
             };
         } catch (error) {
             this.logger.error('Failed to remove item', error);

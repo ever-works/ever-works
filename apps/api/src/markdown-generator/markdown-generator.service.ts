@@ -5,7 +5,7 @@ import type { Identifiable, ItemData, Tag } from '../agent/types';
 import { Category } from '../items-generator/dto/category.dto';
 import { Directory } from '../entities/directory.entity';
 import { User } from '../entities/user.entity';
-import { DataRepository } from '../data-generator/data-repository';
+import { DataRepository, PRUpdate } from '../data-generator/data-repository';
 import { ReadmeBuilder } from './readme-builder';
 import { MarkdownRepository } from './markdown-repository';
 import { GenerationMethod } from '../items-generator/dto';
@@ -13,6 +13,7 @@ import { GenerationMethod } from '../items-generator/dto';
 type InitializeOptions = {
     repository_description?: string;
     generation_method?: GenerationMethod;
+    pr_update?: PRUpdate;
 };
 
 @Injectable()
@@ -69,12 +70,13 @@ export class MarkdownGeneratorService {
                 });
 
             const configMetadata = config?.metadata || {};
+
             const generation_method =
                 options?.generation_method || configMetadata?.generation_method;
+            const pr_update = options?.pr_update || configMetadata?.pr_update;
 
             let canCreatePR =
-                generation_method !== GenerationMethod.RECREATE &&
-                !!configMetadata.pr_update?.branch;
+                generation_method !== GenerationMethod.RECREATE && !!pr_update?.branch;
 
             // In case of re-creation:
             // Switch to the main branch and remove existing items files.
@@ -85,10 +87,10 @@ export class MarkdownGeneratorService {
                 });
 
                 await markdownRepo.resetFiles();
-            } else if (configMetadata.pr_update?.branch) {
+            } else if (canCreatePR) {
                 // Switch to PR branch
                 await this.githubService
-                    .switchToBranch(markdownRepo.dir, configMetadata.pr_update.branch, true)
+                    .switchToBranch(markdownRepo.dir, pr_update.branch, true)
                     .catch((err) => {
                         canCreatePR = false;
                         this.logger.error('Failed to switch to PR branch', err);
@@ -144,7 +146,7 @@ export class MarkdownGeneratorService {
 
             if (canCreatePR && defaultBranch) {
                 this.logger.log(
-                    `Creating PR from ${configMetadata.pr_update.branch} to ${defaultBranch} for ${directory.slug}`,
+                    `Creating PR from ${pr_update.branch} to ${defaultBranch} for ${directory.slug}`,
                 );
 
                 await this.githubService
@@ -153,9 +155,9 @@ export class MarkdownGeneratorService {
                             owner: directory.owner,
                             repo: directory.slug,
                             base: defaultBranch,
-                            head: configMetadata.pr_update.branch,
-                            title: configMetadata.pr_update.title,
-                            body: configMetadata.pr_update.body,
+                            head: pr_update.branch,
+                            title: pr_update.title,
+                            body: pr_update.body,
                         },
                         token,
                     )

@@ -5,7 +5,9 @@ export interface SubmitItemResponseDto {
     message: string;
     pr_number?: number;
     pr_url?: string;
-    branch_name?: string;
+    pr_title?: string;
+    pr_body?: string;
+    pr_branch_name?: string;
     auto_merged?: boolean;
     error_details?: string;
 }

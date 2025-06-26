@@ -6,11 +6,12 @@ import { format } from 'date-fns';
 import { Category, ItemData, Tag } from '../agent/types';
 import { CreateItemsGeneratorDto, GenerationMethod } from '../items-generator/dto';
 
-type PRUpdate = {
+export type PRUpdate = {
     branch: string;
     title: string;
     body: string;
 };
+
 export interface IDataConfig {
     company_name?: string;
     company_website?: string;
