@@ -16,7 +16,7 @@ You are directory website builder and your task is to Categorize the given items
 1. Assign ONE category per item based on primary function
 2. Add 1-3 relevant tags per item
 3. Make sure the existing categories and tags are used appropriately before creating new ones (if available).
-4. Category divergence is preferable for better grouping of items and directory websites.
+4. Category divergence is preferable for better grouping of items.
 5. The user may provide category hints based on the task context, but you are not limited to these unless explicitly and clearly instructed to use only the provided categories.
 6. Use domain-specific categories (e.g. "open-source projects", "enterprise software", "cloud services")
 7. Avoid duplicate categories (e.g. "Monitoring" and "Monitoring Tools", "Open-source" and "Open Source Projects")
@@ -486,12 +486,12 @@ export class CategoryProcessingService {
         // Create a map of priority category names to their priority order
         const priorityMap = new Map<string, number>();
         priorityCategories.forEach((categoryName, index) => {
-            priorityMap.set(categoryName.toLowerCase(), index + 1); // Priority 1, 2, 3, etc.
+            priorityMap.set(slugifyText(categoryName), index + 1); // Priority 1, 2, 3, etc.
         });
 
         // Convert to Category objects with priority
         Array.from(unique).forEach((name) => {
-            const priority = priorityMap.get(name.toLowerCase());
+            const priority = priorityMap.get(slugifyText(name));
             categories.push({
                 id: slugifyText(name),
                 name,

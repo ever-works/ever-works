@@ -11,22 +11,26 @@ import { BaseChatModel } from '../shared/ai-provider.interface';
 
 const ITEMS_EXTRACTION_PROMPT =
     `You are an expert data extractor and technical writer for directory websites.
-Your task is to identify and extract information for one or more distinct items (tools, resources, libraries, articles, etc.) that are **directly and highly relevant to this main topic**.
+Your task is to identify and extract information for one or more distinct items (tools, resources, libraries, articles, etc.) 
+that are **directly and highly relevant to the main topic and research context** and should match extraction criteria.
 
 The **main topic** of this directory is: 
 - topic name: "{topicName}" 
 - topic task: "{topicDescription}".
 
----
+<featured_item_hints_section>
 **Featured Item Specifications:**
 {featured_hints_section}
----
+</featured_item_hints_section>
 
+<research_context_instructions>
 **RESEARCH CONTEXT INSTRUCTIONS:**
 Below is the research context, including content extracted from the referenced web page. 
 Please ensure that all relevant information and items from the research data are included. 
 Exclude any invalid or irrelevant content, and align the findings with the topic and objectives of the task.
+</research_context_instructions>
 
+<extraction_criteria>
 **EXTRACTION CRITERIA:**
 - Only extract items that are *directly* relevant to the main topic "{topicName}" and topic task.
 - Do NOT extract items that are only tangentially related or represent a different category unless it's explicitly part of "{topicName}" and topic task.
@@ -36,10 +40,11 @@ Exclude any invalid or irrelevant content, and align the findings with the topic
 - Ensure the source_url is for the item itself, not an article *about* the item
 - Featured items are those that match the specifications provided in the "Featured Item Specifications" section above.
 - Do not use URLs for blog posts merely mentioning the item unless the post *is* the primary resource
+</extraction_criteria>
 
-<content>
+<web_page_content>
 {page_content_snippet}
-<content>`.trim();
+<web_page_content>`.trim();
 
 @Injectable()
 export class ItemExtractionService {
@@ -133,7 +138,8 @@ export class ItemExtractionService {
 
             try {
                 // Stricter prompt for item extraction
-                const promptTemplate = HumanMessagePromptTemplate.fromTemplate(ITEMS_EXTRACTION_PROMPT);
+                const promptTemplate =
+                    HumanMessagePromptTemplate.fromTemplate(ITEMS_EXTRACTION_PROMPT);
 
                 const extractionChain = promptTemplate.pipe(
                     this.llm.withStructuredOutput(extractedItemsSchema),
