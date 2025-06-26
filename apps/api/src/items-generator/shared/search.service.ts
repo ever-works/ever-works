@@ -161,10 +161,12 @@ export class SearchService {
             Accept: 'text/html',
             'Accept-Encoding': 'gzip, deflate',
             'Accept-Language': 'en-US,en',
-            Referer: 'https://www.google.com/',
             'upgrade-insecure-requests': '1',
+            'Accept-language': 'en-US,en;q=0.9',
+            'Cache-control': 'max-age=0',
             // the tested user agent is for Chrome 103 on Windows 10
-            'User-Agent': 'Links (2.29; Linux 6.11.0-13-generic x86_64; GNU C 13.2; text)',
+            'User-Agent':
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36',
         };
 
         const response = await axios.get(source_url, {
