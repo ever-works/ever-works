@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
+import { PromptTemplate } from '@langchain/core/prompts';
 import { z } from 'zod';
 import { AiService } from '../shared';
 import { BaseChatModel } from '../shared/ai-provider.interface';
@@ -132,8 +132,7 @@ You are a helpful assistant tasked with extracting URLs and explicitly mentioned
 
 <prompt>
 {prompt}
-</prompt>
-`.trim();
+</prompt>`;
 
 // Output schema for validation
 const promptProcessingOutputSchema = z.object({
@@ -196,8 +195,7 @@ export class PromptProcessingService {
         try {
             this.logger.log(`[${slug}] Using AI to process prompt for URLs and categories`);
 
-            const promptTemplate =
-                HumanMessagePromptTemplate.fromTemplate(PROMPT_PROCESSING_PROMPT);
+            const promptTemplate = PromptTemplate.fromTemplate(PROMPT_PROCESSING_PROMPT);
             const result = await promptTemplate
                 .pipe(this.llm.withStructuredOutput(promptProcessingOutputSchema))
                 .invoke({

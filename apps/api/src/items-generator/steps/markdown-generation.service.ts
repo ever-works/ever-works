@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
+import { PromptTemplate } from '@langchain/core/prompts';
 import { z } from 'zod';
 import { AiService } from '../shared';
 import { SearchService } from '../shared';
@@ -24,8 +24,7 @@ You are directory website builder and your task is to generate markdown summary 
 Based on this website content:
 <content>
 {content}
-</content>
-`.trim();
+</content>`;
 
 // Output schema for validation
 export const markdownOutputSchema = z.object({
@@ -67,12 +66,12 @@ export class MarkdownGenerationService {
             }
 
             // Generate markdown using the extracted content
-            const prompt = HumanMessagePromptTemplate.fromTemplate(MARKDOWN_PROMPT);
+            const prompt = PromptTemplate.fromTemplate(MARKDOWN_PROMPT);
             const result = await prompt
                 .pipe(this.llm.withStructuredOutput(markdownOutputSchema))
                 .invoke({
                     item: JSON.stringify(item),
-                    content: content.rawContent.slice(0, 8000),
+                    content: content.rawContent.slice(0, 4000),
                 });
 
             return result.markdown || '';

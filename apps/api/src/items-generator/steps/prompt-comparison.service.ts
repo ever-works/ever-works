@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { BaseChatModel } from '../shared/ai-provider.interface';
-import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
+import { PromptTemplate } from '@langchain/core/prompts';
 import { z } from 'zod';
 import { AiService } from '../shared';
 
@@ -33,7 +33,7 @@ Your task:
 5. Provide a clear reasoning for your decision.
 
 Be somewhat lenient in determining relatedness - minor variations, additional details, or slight scope changes should still be considered related if the core intent is similar.
-`.trim();
+`;
 
 // Output schema for validation
 const promptComparisonOutputSchema = z.object({
@@ -92,8 +92,7 @@ export class PromptComparisonService {
         }
 
         try {
-            const promptTemplate =
-                HumanMessagePromptTemplate.fromTemplate(PROMPT_COMPARISON_PROMPT);
+            const promptTemplate = PromptTemplate.fromTemplate(PROMPT_COMPARISON_PROMPT);
             const result = await promptTemplate
                 .pipe(this.llm.withStructuredOutput(promptComparisonOutputSchema))
                 .invoke({

@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import axios from 'axios';
 import { TavilyClient } from '@tavily/core';
-import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
+import { PromptTemplate } from '@langchain/core/prompts';
 import { z } from 'zod';
 import { ItemData, ConfigDto } from '../dto';
 import { SearchService, AiService } from '../shared';
@@ -65,7 +65,7 @@ Prefer official sources in this order:
 3. Official documentation
 4. Package manager pages (npm, PyPI, etc.)
 5. Avoid: blog posts, news articles, tutorials, unless they are the only authoritative source
-`.trim();
+`;
 
 @Injectable()
 export class SourceValidationService {
@@ -398,7 +398,7 @@ export class SourceValidationService {
             }
 
             // Use AI to validate the URL
-            const promptTemplate = HumanMessagePromptTemplate.fromTemplate(URL_VALIDATION_PROMPT);
+            const promptTemplate = PromptTemplate.fromTemplate(URL_VALIDATION_PROMPT);
             const result = await promptTemplate
                 .pipe(this.llm.withStructuredOutput(urlValidationSchema))
                 .invoke({

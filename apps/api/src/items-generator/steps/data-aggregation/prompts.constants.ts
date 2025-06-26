@@ -26,7 +26,7 @@ Here is the list of items to deduplicate:
 <items>
 {items}
 </items>
-`.trim();
+` as const;
 
 export const EXTRACT_NEW_ITEMS_PROMPT = `
 You are directory website builder and your task is to extract new items from the list.
@@ -65,4 +65,4 @@ Here is the list of new items to check:
 </new>
 
 Return only the items from the new list that are NOT duplicates of any existing items.
-`.trim();
+` as const;
