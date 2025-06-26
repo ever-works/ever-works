@@ -14,6 +14,7 @@ type InitializeOptions = {
     repository_description?: string;
     generation_method?: GenerationMethod;
     pr_update?: PRUpdate;
+    remove_details?: string[];
 };
 
 @Injectable()
@@ -140,6 +141,17 @@ export class MarkdownGeneratorService {
                 categories,
             );
             await markdownRepo.writeReadme(readme);
+
+            // Remove detail files
+            if (options?.remove_details && options.remove_details.length > 0) {
+                for (const slug of options.remove_details) {
+                    await markdownRepo.removeDetails(slug);
+                    markdowns.delete(slug);
+                }
+
+                // Add all files, including removed ones
+                await this.githubService.addAll(markdownPath);
+            }
 
             if (generation_method === GenerationMethod.RECREATE) {
                 await this.githubService.addAll(markdownPath);
