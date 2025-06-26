@@ -47,6 +47,7 @@
     "date-fns": "^4.1.0",
     "deepmerge": "^4.3.1",
     "dotenv": "^16.5.0",
+    "google-sr": "^5.0.0",
     "isomorphic-git": "^1.30.3",
     "langchain": "^0.3.28",
     "libsodium-wrappers": "^0.7.15",

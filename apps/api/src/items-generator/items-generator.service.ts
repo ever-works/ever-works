@@ -118,8 +118,6 @@ export class ItemsGeneratorService {
                 }
             }
 
-            const processedSourceUrls = new Set<string>();
-
             // 1.1. Process Prompt (Extract URLs, Categories, Priorities, and Featured Item Hints)
             this.logger.log(
                 `[${slug}] 1.1. Prompt Processing (URLs, Categories, Priorities, and Featured Hints) - Starting`,
@@ -197,6 +195,8 @@ export class ItemsGeneratorService {
 
             // 3. Web Search & Content Retrieval
             this.logger.log(`[${slug}] 3. Web Search & Content Retrieval - Starting`);
+
+            const processedSourceUrls = new Set<string>();
 
             // Process extracted URLs first if any were found
             let initialWebPages: WebPageData[] = [];

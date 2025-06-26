@@ -113,6 +113,9 @@ importers:
       dotenv:
         specifier: ^16.5.0
         version: 16.5.0
+      google-sr:
+        specifier: ^5.0.0
+        version: 5.0.0
       isomorphic-git:
         specifier: ^1.30.3
         version: 1.30.3
@@ -2534,6 +2537,10 @@ packages:
   cheerio-select@2.1.0:
     resolution: {integrity: sha512-9v9kG0LvzrlcungtnJtpGNxY+fzECQKhK4EGJX2vByejiMX84MFNQw4UxPJl3bFbTMw+Dfs37XaIkCwTZfLh4g==}
 
+  cheerio@1.0.0-rc.12:
+    resolution: {integrity: sha512-VqR8m68vM46BNnuZ5NtnGBKIE/DfN0cRIzg9n40EIq9NOv90ayxLBXA8fXC5gquFRGJSTRqBq25Jt2ECLR431Q==}
+    engines: {node: '>= 6'}
+
   cheerio@1.1.0:
     resolution: {integrity: sha512-+0hMx9eYhJvWbgpKV9hN7jg0JcwydpopZE4hgi+KvQtByZXPp04NiCWU0LzcAbP63abZckIHkTQaXVF52mX3xQ==}
     engines: {node: '>=18.17'}
@@ -3401,6 +3408,12 @@ packages:
     resolution: {integrity: sha512-jhIXaOzy1sb8IyocaruWSn1TjmnBVs8Ayhcy83rmxNJ8q2uWKCAj3CnJY+KpGSXCueAPc0i05kVvVKtP1t9S3g==}
     engines: {node: '>=10'}
 
+  google-sr-selectors@2.0.0:
+    resolution: {integrity: sha512-F4wugHiBWu+TEs52ruliMQ0kTm70KVxC9om3GzKZVDR0mAEgAstVFfVPFo3peo64eVLeY1l+doGhVuckf7bw/w==}
+
+  google-sr@5.0.0:
+    resolution: {integrity: sha512-I3Wj6QIT73P9lJ5jfuga/NS2KdNz11nCj+84ZIS5qHQI8vPkwfqsEbhOqzGhodIwtHZfMGNQG86+0EzKG6ZtHg==}
+
   gopd@1.2.0:
     resolution: {integrity: sha512-ZUKRh6/kUFoAiTAtTYPZJ3hw9wNxx+BIBOijnlG9PnrJsCcSjs1wyyD6vJpaYtgnzDrKYRSqf3OO6Rfa93xsRg==}
     engines: {node: '>= 0.4'}
@@ -3447,6 +3460,9 @@ packages:
 
   htmlparser2@10.0.0:
     resolution: {integrity: sha512-TwAZM+zE5Tq3lrEHvOlvwgj1XLWQCtaaibSN11Q+gGBAS7Y1uZSWwXXRe4iF6OXnaq1riyQAPFOBtYc77Mxq0g==}
+
+  htmlparser2@8.0.2:
+    resolution: {integrity: sha512-GYdjWKDkbRLkZ5geuHs5NY1puJ+PXwP7+fHPRz06Eirsb9ugf6d8kkXav6ADhcODhFFPMIXyxkxSuMf3D6NCFA==}
 
   http-cache-semantics@4.2.0:
     resolution: {integrity: sha512-dTxcvPXqPvXBQpq5dUr6mEMJX4oIEFv6bwom3FDwKRDsuIjjJGANqhBuoAn9c1RQJIdAKav33ED65E2ys+87QQ==}
@@ -8723,6 +8739,16 @@ snapshots:
       domhandler: 5.0.3
       domutils: 3.2.2
 
+  cheerio@1.0.0-rc.12:
+    dependencies:
+      cheerio-select: 2.1.0
+      dom-serializer: 2.0.0
+      domhandler: 5.0.3
+      domutils: 3.2.2
+      htmlparser2: 8.0.2
+      parse5: 7.3.0
+      parse5-htmlparser2-tree-adapter: 7.1.0
+
   cheerio@1.1.0:
     dependencies:
       cheerio-select: 2.1.0
@@ -9672,6 +9698,16 @@ snapshots:
       merge2: 1.4.1
       slash: 3.0.0
 
+  google-sr-selectors@2.0.0: {}
+
+  google-sr@5.0.0:
+    dependencies:
+      axios: 1.10.0
+      cheerio: 1.0.0-rc.12
+      google-sr-selectors: 2.0.0
+    transitivePeerDependencies:
+      - debug
+
   gopd@1.2.0: {}
 
   got@13.0.0:
@@ -9730,6 +9766,13 @@ snapshots:
       domhandler: 5.0.3
       domutils: 3.2.2
       entities: 6.0.1
+
+  htmlparser2@8.0.2:
+    dependencies:
+      domelementtype: 2.3.0
+      domhandler: 5.0.3
+      domutils: 3.2.2
+      entities: 4.5.0
 
   http-cache-semantics@4.2.0: {}
 

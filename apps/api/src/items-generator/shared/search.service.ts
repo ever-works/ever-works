@@ -1,39 +1,67 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { tavily, TavilyClient } from '@tavily/core';
 import { ConfigDto } from '../dto/create-items-generator.dto';
-import { extractTextFromSourceURL } from '../utils/text.utils';
+import { search, OrganicResult, DictionaryResult, OrganicResultNode } from 'google-sr';
+
+import * as cheerio from 'cheerio';
+import * as TurndownService from 'turndown';
+import axios from 'axios';
+
+export type SearchResult = {
+    title: string;
+    url: string;
+    score: number;
+    publishedDate: string;
+};
 
 @Injectable()
 export class SearchService {
     private readonly logger = new Logger(SearchService.name);
     private readonly tavilyClient: TavilyClient | undefined;
-    private readonly isConfigured: boolean;
+    private readonly isTavilyConfigured: boolean;
+    private turndownService: TurndownService;
 
     constructor() {
-        this.isConfigured = !!process.env.TAVILY_API_KEY;
+        this.isTavilyConfigured = !!process.env.TAVILY_API_KEY;
 
-        if (!this.isConfigured) {
-            this.logger.warn(
-                'TAVILY_API_KEY not found in .env file. Web search capabilities will be disabled.',
-            );
-        } else {
+        if (this.isTavilyConfigured) {
             this.tavilyClient = tavily({
                 apiKey: process.env.TAVILY_API_KEY,
             });
         }
 
-        if (this.isNaiveSearchConfigured()) {
-            this.logger.log(
-                'Naive search service configured. Tavily will not be used for content extraction.',
-            );
-        }
+        this.turndownService = new TurndownService();
+
+        this.logger.log(
+            `Extract content service configured: ${
+                process.env.EXTRACT_CONTENT_SERVICE || 'Tavily'
+            }`,
+        );
+
+        this.logger.log(
+            `Web search service configured: ${process.env.WEB_SEARCH_SERVICE || 'Tavily'}`,
+        );
     }
 
     /**
      * Check if the naive search service is configured
      */
-    isNaiveSearchConfigured(): boolean {
+    isNaiveExtractContentConfigured(): boolean {
         return process.env.EXTRACT_CONTENT_SERVICE === 'naive';
+    }
+
+    /**
+     * Check if the Google search service is configured
+     */
+    isGoogleSearchConfigured(): boolean {
+        return process.env.WEB_SEARCH_SERVICE === 'google-sr';
+    }
+
+    /**
+     * Check if the search service is properly configured
+     */
+    isTavilySearchConfigured(): boolean {
+        return this.isTavilyConfigured;
     }
 
     /**
@@ -44,22 +72,25 @@ export class SearchService {
     }
 
     /**
-     * Check if the search service is properly configured
-     */
-    isSearchConfigured(): boolean {
-        return this.isConfigured;
-    }
-
-    /**
      * Perform a web search using Tavily
      * @param query The search query
      * @param config Optional configuration
      */
-    async webSearch(query: string, config?: Partial<ConfigDto>) {
-        if (!this.tavilyClient) {
-            return [];
+    async webSearch(query: string, config?: Partial<ConfigDto>): Promise<SearchResult[]> {
+        if (this.isGoogleSearchConfigured() || !this.tavilyClient) {
+            return this.webSearchUsingGoogle(query, config);
         }
 
+        return this.webSearchUsingTavily(query, config);
+    }
+
+    /**
+     * Perform a web search using tavily
+     * @param query The search query
+     * @param config Optional configuration
+     */
+
+    async webSearchUsingTavily(query: string, config?: Partial<ConfigDto>) {
         const DEFAULT_MAX_RESULTS = 20;
 
         const searches = await this.tavilyClient.search(query, {
@@ -70,12 +101,45 @@ export class SearchService {
     }
 
     /**
+     * Perform a web search using Google
+     * @param query The search query
+     * @param config Optional configuration
+     */
+    async webSearchUsingGoogle(query: string, config?: Partial<ConfigDto>) {
+        const limit = Math.floor(config?.max_results_per_query || 20 / 10);
+
+        const promiseResults = new Array<SearchResult>(limit || 1).fill(null).map((_, index) => {
+            return search({
+                query,
+                resultTypes: [OrganicResult, DictionaryResult],
+                requestConfig: {
+                    params: {
+                        start: index * 10,
+                        safe: 'active',
+                    },
+                },
+            });
+        });
+
+        let results = (await Promise.all(promiseResults)).flat();
+
+        results = results.slice(0, config?.max_results_per_query || 20);
+
+        return results.map((result: OrganicResultNode) => ({
+            title: result.title,
+            url: result.link,
+            score: 1,
+            publishedDate: new Date().toISOString(),
+        }));
+    }
+
+    /**
      * Extract content from a URL using Tavily
      * @param url The URL to extract content from
      */
     async extractContent(url: string) {
-        if (this.isNaiveSearchConfigured() || !this.tavilyClient) {
-            const text = await extractTextFromSourceURL(url);
+        if (this.isNaiveExtractContentConfigured() || !this.tavilyClient) {
+            const text = await this.extractTextFromSourceURL(url);
 
             return {
                 url,
@@ -96,6 +160,48 @@ export class SearchService {
     }
 
     async extractContentUsingNaive(url: string) {
-        return await extractTextFromSourceURL(url);
+        return await this.extractTextFromSourceURL(url);
+    }
+
+    private async extractTextFromSourceURL(source_url: string): Promise<string> {
+        const response = await axios.get(source_url, {
+            headers: {
+                'User-Agent': `ItemsGeneratorBuilder/ever-works (Node.js/Axios; +https://github.com/ever-works)`,
+            },
+            timeout: 15000, // 15-second timeout
+            validateStatus: (status) => status >= 200 && status < 400, // Only consider 2xx and 3xx as success
+        });
+
+        if (
+            response.headers['content-type'] &&
+            !response.headers['content-type'].includes('text/html') &&
+            !response.headers['content-type'].includes('text/plain')
+        ) {
+            this.logger.warn(
+                `[extractTextFromSourceURL] Skipping non-HTML/text content at ${source_url} (Content-Type: ${response.headers['content-type']})`,
+            );
+            return '';
+        }
+
+        return this.extractTextFromHtml(response.data);
+    }
+
+    private extractTextFromHtml(htmlContent: string): string {
+        try {
+            const $ = cheerio.load(htmlContent);
+            // Remove script and style elements
+            $(
+                'script, style, noscript, iframe, header, footer, nav, aside, form, [aria-hidden="true"], .noprint',
+            ).remove();
+
+            // Get text from the body, attempt to normalize whitespace
+            let html = $('body').html() || '';
+            html = html.replace(/\s\s+/g, ' ').trim();
+
+            return this.turndownService.turndown(html);
+        } catch (error) {
+            this.logger.error(`Error extracting text with Cheerio: ${error.message}`);
+            return '';
+        }
     }
 }
