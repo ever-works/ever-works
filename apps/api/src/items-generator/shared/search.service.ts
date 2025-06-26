@@ -14,16 +14,6 @@ export type SearchResult = {
     publishedDate: string;
 };
 
-const baseHeaders = {
-    Accept: 'text/html',
-    'Accept-Encoding': 'gzip, deflate',
-    'Accept-Language': 'en-US,en',
-    Referer: 'https://www.google.com/',
-    'upgrade-insecure-requests': '1',
-    // the tested user agent is for Chrome 103 on Windows 10
-    'User-Agent': 'Links (2.29; Linux 6.11.0-13-generic x86_64; GNU C 13.2; text)',
-};
-
 @Injectable()
 export class SearchService {
     private readonly logger = new Logger(SearchService.name);
@@ -167,6 +157,16 @@ export class SearchService {
     }
 
     private async extractTextFromSourceURL(source_url: string): Promise<string> {
+        const baseHeaders = {
+            Accept: 'text/html',
+            'Accept-Encoding': 'gzip, deflate',
+            'Accept-Language': 'en-US,en',
+            Referer: 'https://www.google.com/',
+            'upgrade-insecure-requests': '1',
+            // the tested user agent is for Chrome 103 on Windows 10
+            'User-Agent': 'Links (2.29; Linux 6.11.0-13-generic x86_64; GNU C 13.2; text)',
+        };
+
         const response = await axios.get(source_url, {
             headers: baseHeaders,
             timeout: 15000,
