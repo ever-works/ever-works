@@ -275,13 +275,14 @@ export class ItemsGeneratorService {
             };
 
             const { categories, tags, finalItems } =
-                await this.categoryProcessingService.processCategoriesAndTags(
-                    dtoWithMergedPriorities,
-                    aggregatedItems,
-                    existingCategories || [],
-                    existingTags || [],
-                    allInitialCategories,
-                );
+                await this.categoryProcessingService.processCategoriesAndTags({
+                    createItemsGeneratorDto: dtoWithMergedPriorities,
+                    extractedItems: aggregatedItems,
+                    existingCategories: existingCategories || [],
+                    existingTags: existingTags || [],
+                    initialCategories: allInitialCategories,
+                    existingItems,
+                });
 
             this.logger.log(
                 `[${slug}] Directory data generation complete. Final metrics: ${JSON.stringify(metrics)}`,

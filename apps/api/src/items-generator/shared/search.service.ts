@@ -21,6 +21,12 @@ export class SearchService {
                 apiKey: process.env.TAVILY_API_KEY,
             });
         }
+
+        if (this.isNaiveSearchConfigured()) {
+            this.logger.log(
+                'Naive search service configured. Tavily will not be used for content extraction.',
+            );
+        }
     }
 
     /**
