@@ -2,6 +2,29 @@
 
 Built with NestJS.
 
+## Table of Contents
+
+- [Setup & Run](#how-to-run)
+
+    - [1. Clone the repository](#1-clone-the-repository)
+    - [2. Create `.env` file](#2-create-env-file)
+    - [3. Run application using (cd to root of the whole repo, not backend app)](#3-run-application-using-cd-to-root-of-the-whole-repo-not-backend-app)
+
+- [API Endpoints](#api-endpoints)
+
+    - [1. Create a directory object](#4-create-a-directory-object)
+    - [2. Generate data and GitHub repositories](#5-generate-data-and-github-repositories)
+    - [3. Update Directory](#6-update-directory)
+    - [4. Regenerate Markdown](#7-regenerate-markdown)
+    - [5. Submit Individual Items](#8-submit-individual-items)
+    - [6. Remove Individual Items](#9-remove-individual-items)
+    - [7. Extract Item Details](#10-extract-item-details)
+    - [8. Update website repository](#11-update-website-repository)
+    - [9. Deploy to Vercel](#12-deploy-to-vercel)
+
+- [Examples](#examples)
+    - [Example Prompt used to generate awesome time tracking in ever works org](#example-prompt-used-to-generate-awesome-time-tracking-in-ever-works-org)
+
 ## How to run
 
 ### 1. Clone the repository
@@ -12,6 +35,18 @@ Make sure you have [pnpm](https://pnpm.io/) installed, then clone the repository
 git clone https://github.com/ever-works/ever-works.git
 ```
 
+Navigate to the `apps/api` directory:
+
+```sh
+cd ever-works/apps/api
+```
+
+Install the dependencies:
+
+```sh
+pnpm install
+```
+
 ### 2. Create `.env` file
 
 Navigate to the `apps/api` directory and create a `.env` file. You can use the example file as a starting point:
@@ -20,11 +55,15 @@ Navigate to the `apps/api` directory and create a `.env` file. You can use the e
 cp .env.example .env
 ```
 
-### 3. Run application using (cd to root of the whole repo, not backend app):
+> Make sure to fill in the required environment variables in the `.env` file.
+
+### 3. Run application:
 
 ```sh
-pnpm dev
+pnpm start
 ```
+
+The application will start running on `http://localhost:3001`.
 
 ### 4. Create a directory object
 
@@ -34,10 +73,21 @@ To create a new directory object, send a POST request to `http://localhost:3001/
 {
     "slug": "awesome-time-tracking",
     "name": "Awesome Time Tracking",
-    "description": "Time Tracking - Software, Methodologies and Practices."
+    "description": "Time Tracking - Software, Methodologies and Practices.",
+    "readme_config": {
+        "header": "This text will be used as additional header in the README.md file",
+        "overwrite_default_header": false,
+
+        "footer": "This text will be used as additional footer in the README.md file",
+        "overwrite_default_footer": false
+    }
 }
 ```
 
+**Overwrite default header and footer**
+If you want to overwrite the default header and footer in the README.md file, set `overwrite_default_header` and `overwrite_default_footer` to `true`. This will replace the default content with your custom text.
+
+**Request Parameters:**
 By default, the directory will be created with the currently authenticated GitHub user as the owner.
 
 If you want to initialize the directory within an organization, provide the optional `owner` field:
@@ -219,7 +269,31 @@ POST /update/{slug}
 | `generation_method`        | enum    | `optional` | Generation method: `create-update` or `recreate` (default: `create-update`)                                           |
 | `update_with_pull_request` | boolean | `optional` | Whether to update the repository with a pull request or directly commit the changes to main branch. (default: `true`) |
 
-### 6. Submit Individual Items
+### 7. Regenerate Markdown
+
+To regenerate the README markdown file for a GitHub repository, send a POST request to `http://localhost:3001/regenerate-markdown/{slug}`.
+
+**Endpoint:**
+
+```POST /regenerate-markdown/{slug}
+
+```
+
+**URL Parameters:**
+
+| Parameter | Type   | Required   | Description                         |
+| --------- | ------ | ---------- | ----------------------------------- |
+| `slug`    | string | `required` | The slug of the directory to update |
+
+**Response:**
+
+```json
+{
+    "status": "success"
+}
+```
+
+### 8. Submit Individual Items
 
 To submit individual items to an existing directory, send a POST request to `http://localhost:3001/submit-item/{slug}` with the item details.
 
@@ -328,7 +402,201 @@ curl -X POST http://localhost:3001/submit-item/awesome-time-tracking \
 8. **PR Creation**: Pull request is created
 9. **Auto-Merge** (conditional): PR is merged if auto-merge conditions are met
 
-### 7. Update website repository
+### 9. Remove Individual Items
+
+To remove individual items from an existing directory, send a POST request to `http://localhost:3001/remove-item/{slug}` with the item details.
+
+**Endpoint:**
+
+```
+POST /remove-item/{slug}
+```
+
+**URL Parameters:**
+
+| Parameter | Type   | Required   | Description                                       |
+| --------- | ------ | ---------- | ------------------------------------------------- |
+| `slug`    | string | `required` | The slug of the directory to remove the item from |
+
+**Request Body:**
+
+```json
+{
+    "item_slug": "awesome-tool",
+    "reason": "Item is no longer maintained",
+    "pay_and_publish_now": false
+}
+```
+
+**Request Parameters:**
+
+| Field                 | Type    | Required   | Description                                                       |
+| --------------------- | ------- | ---------- | ----------------------------------------------------------------- |
+| `item_slug`           | string  | `required` | The slug of the item to remove                                    |
+| `reason`              | string  | `optional` | Reason for removing the item (will be included in commit message) |
+| `pay_and_publish_now` | boolean | `optional` | Force auto-merge regardless of config (default: false)            |
+
+**Response:**
+
+```json
+{
+    "status": "success",
+    "slug": "awesome-time-tracking",
+    "item_name": "Awesome Tool",
+    "item_slug": "awesome-tool",
+    "message": "Item \"Awesome Tool\" removal has been submitted for review. PR #43 created.",
+    "pr_number": 43,
+    "pr_url": "https://github.com/owner/repo-data/pull/43",
+    "branch_name": "feature-1640995200000-def456",
+    "auto_merged": false
+}
+```
+
+**Response Fields:**
+
+| Field           | Type   | Description                                                     |
+| --------------- | ------ | --------------------------------------------------------------- |
+| `status`        | string | Status of the operation: `success`, `error`, or `pending`       |
+| `slug`          | string | Directory slug                                                  |
+| `item_name`     | string | Name of the removed item                                        |
+| `item_slug`     | string | Slug of the removed item                                        |
+| `message`       | string | Status message                                                  |
+| `pr_number`     | number | _(Success only)_ GitHub PR number if created                    |
+| `pr_url`        | string | _(Success only)_ GitHub PR URL if created                       |
+| `branch_name`   | string | _(Success only)_ Git branch name if created                     |
+| `error_details` | string | _(Error only)_ Additional details about the error that occurred |
+
+**Example with Immediate Publishing:**
+
+```bash
+curl -X POST http://localhost:3001/remove-item/awesome-time-tracking \
+  -H "Content-Type: application/json" \
+  -d '{
+    "item_slug": "outdated-tool",
+    "reason": "Tool is no longer maintained and has security vulnerabilities"
+  }'
+```
+
+### 10. Extract Item Details
+
+To extract item details from a single URL without adding it to any directory, send a POST request to `http://localhost:3001/extract-item-details` with the URL and optional existing categories.
+
+**Endpoint:**
+
+```
+POST /extract-item-details
+```
+
+**Request Body:**
+
+```json
+{
+    "source_url": "https://github.com/example/awesome-tool",
+    "existing_categories": ["Development Tools", "Open Source", "Productivity"]
+}
+```
+
+**Request Parameters:**
+
+| Field                 | Type     | Required   | Description                                                                                   |
+| --------------------- | -------- | ---------- | --------------------------------------------------------------------------------------------- |
+| `source_url`          | string   | `required` | Valid HTTP/HTTPS URL to extract item details from                                             |
+| `existing_categories` | string[] | `optional` | Array of existing categories to consider when categorizing the extracted item (default: `[]`) |
+
+**Response:**
+
+```json
+{
+    "status": "success",
+    "source_url": "https://github.com/example/awesome-tool",
+    "item": {
+        "name": "Awesome Tool",
+        "description": "A comprehensive development tool that enhances productivity",
+        "featured": false,
+        "source_url": "https://github.com/example/awesome-tool",
+        "category": "Development Tools",
+        "slug": "awesome-tool",
+        "tags": ["productivity", "development", "open-source"],
+        "markdown": "# Awesome Tool\n\nA comprehensive development tool...",
+        "badges": {
+            "security": {
+                "type": "security",
+                "value": "A",
+                "evaluated_at": "2024-01-15T10:30:00Z",
+                "details": "No known security vulnerabilities"
+            },
+            "license": {
+                "type": "license",
+                "value": "A",
+                "evaluated_at": "2024-01-15T10:30:00Z",
+                "details": "MIT License - permissive"
+            },
+            "quality": {
+                "type": "quality",
+                "value": "A",
+                "evaluated_at": "2024-01-15T10:30:00Z",
+                "details": "Active development, good documentation"
+            }
+        }
+    },
+    "message": "Successfully extracted item details: \"Awesome Tool\""
+}
+```
+
+**Response Fields:**
+
+| Field           | Type     | Description                                                     |
+| --------------- | -------- | --------------------------------------------------------------- |
+| `status`        | string   | Status of the operation: `success` or `error`                   |
+| `source_url`    | string   | The URL that was processed                                      |
+| `item`          | ItemData | _(Success only)_ Complete item data with all extracted details  |
+| `message`       | string   | Status message                                                  |
+| `error_details` | string   | _(Error only)_ Additional details about the error that occurred |
+
+**ItemData Fields:**
+
+| Field         | Type        | Description                                                                |
+| ------------- | ----------- | -------------------------------------------------------------------------- |
+| `name`        | string      | Extracted item name                                                        |
+| `description` | string      | Extracted item description                                                 |
+| `featured`    | boolean     | Always `false` for extracted items                                         |
+| `source_url`  | string      | The source URL (same as input)                                             |
+| `category`    | string      | Extracted or assigned category (considers existing_categories if provided) |
+| `slug`        | string      | Auto-generated URL-friendly slug                                           |
+| `tags`        | string[]    | Array of extracted tags/keywords                                           |
+| `markdown`    | string      | AI-generated markdown content for the item                                 |
+| `badges`      | ItemBadges? | Optional badges evaluation (for repository URLs)                           |
+
+**Example Usage:**
+
+```bash
+curl -X POST http://localhost:3001/extract-item-details \
+  -H "Content-Type: application/json" \
+  -d '{
+    "source_url": "https://github.com/microsoft/vscode",
+    "existing_categories": ["Editors", "Development Tools", "Open Source"]
+  }'
+```
+
+**Process Flow:**
+
+1. **URL Validation**: Source URL is validated for proper format
+2. **Content Retrieval**: Web page content is fetched using Tavily API
+3. **AI Extraction**: AI analyzes content to extract item details
+4. **Category Assignment**: Category is assigned considering existing categories if provided
+5. **Slug Generation**: URL-friendly slug is auto-generated from item name
+6. **Markdown Generation**: AI generates detailed markdown content
+7. **Badge Evaluation**: Badges are evaluated for repository URLs
+8. **Response**: Complete item data is returned
+
+**Use Cases:**
+
+- Preview item details before submitting to a directory
+- Extract structured data from URLs for external processing
+- Validate and enrich item information
+- Batch processing of URLs to extract item details
+
+### 11. Update website repository
 
 To update an existing website repository with the latest changes from the template repository, send a POST request to `http://localhost:3001/update-website/{slug}`.
 the `slug` parameter should match the directory slug used when creating the website repository.
@@ -401,7 +669,7 @@ The service automatically tries different update strategies in order of preferen
 - The website repository must exist (created via `/generate` endpoint)
 - Valid GitHub authentication token in environment
 
-### 8. Deploy to Vercel
+### 12. Deploy to Vercel
 
 To deploy the website repository to Vercel, send a POST request to `http://localhost:3001/deploy/{slug}/vercel`.
 the `slug` parameter should match the directory slug used when creating the website repository.
@@ -452,8 +720,4 @@ POST /deploy/awesome-time-tracking/vercel
     "initial_categories": ["Open Source", "Commercial"],
     "priority_categories": ["Enterprise"]
 }
-```
-
-```
-
 ```

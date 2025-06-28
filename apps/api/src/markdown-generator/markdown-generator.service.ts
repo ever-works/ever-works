@@ -5,10 +5,17 @@ import type { Identifiable, ItemData, Tag } from '../agent/types';
 import { Category } from '../items-generator/dto/category.dto';
 import { Directory } from '../entities/directory.entity';
 import { User } from '../entities/user.entity';
-import { DataRepository } from '../data-generator/data-repository';
+import { DataRepository, PRUpdate } from '../data-generator/data-repository';
 import { ReadmeBuilder } from './readme-builder';
 import { MarkdownRepository } from './markdown-repository';
 import { GenerationMethod } from '../items-generator/dto';
+
+type InitializeOptions = {
+    repository_description?: string;
+    generation_method?: GenerationMethod;
+    pr_update?: PRUpdate;
+    remove_details?: string[];
+};
 
 @Injectable()
 export class MarkdownGeneratorService {
@@ -16,10 +23,10 @@ export class MarkdownGeneratorService {
 
     constructor(private readonly githubService: GithubService) {}
 
-    async initialize(directory: Directory, user: User, repository_description?: string) {
+    async initialize(directory: Directory, user: User, options: InitializeOptions = {}) {
         const token = user.getGitToken();
 
-        const description = repository_description || directory.description;
+        const description = options?.repository_description || directory.description;
 
         if (directory.organization) {
             await this.githubService.createEmptyRepoAsOrg(
@@ -65,23 +72,26 @@ export class MarkdownGeneratorService {
 
             const configMetadata = config?.metadata || {};
 
+            const generation_method =
+                options?.generation_method || configMetadata?.generation_method;
+            const pr_update = options?.pr_update || configMetadata?.pr_update;
+
             let canCreatePR =
-                configMetadata?.generation_method !== GenerationMethod.RECREATE &&
-                !!configMetadata.pr_update?.branch;
+                generation_method !== GenerationMethod.RECREATE && !!pr_update?.branch;
 
             // In case of re-creation:
             // Switch to the main branch and remove existing items files.
-            if (configMetadata?.generation_method === GenerationMethod.RECREATE) {
+            if (generation_method === GenerationMethod.RECREATE) {
                 await this.githubService.switchToMainBranch(markdownRepo.dir).catch((err) => {
                     this.logger.error('Failed to switch to main branch', err);
                     return null;
                 });
 
                 await markdownRepo.resetFiles();
-            } else if (configMetadata.pr_update?.branch) {
+            } else if (canCreatePR) {
                 // Switch to PR branch
                 await this.githubService
-                    .switchToBranch(markdownRepo.dir, configMetadata.pr_update.branch, true)
+                    .switchToBranch(markdownRepo.dir, pr_update.branch, true)
                     .catch((err) => {
                         canCreatePR = false;
                         this.logger.error('Failed to switch to PR branch', err);
@@ -119,6 +129,14 @@ export class MarkdownGeneratorService {
                 }
             }
 
+            // Remove detail files
+            if (options?.remove_details && options.remove_details.length > 0) {
+                for (const slug of options.remove_details) {
+                    await markdownRepo.removeDetails(slug);
+                    markdowns.delete(slug);
+                }
+            }
+
             const license = await dataRepo.getLicense();
             if (license) {
                 await markdownRepo.writeLicense(license);
@@ -131,13 +149,14 @@ export class MarkdownGeneratorService {
                 categories,
             );
             await markdownRepo.writeReadme(readme);
-            await this.githubService.add(markdownPath, '.');
+
+            await this.githubService.addAll(markdownPath);
             await this.githubService.commit(markdownPath, 'sync README.md', user.asCommitter());
             await this.githubService.push(markdownPath, token);
 
             if (canCreatePR && defaultBranch) {
                 this.logger.log(
-                    `Creating PR from ${configMetadata.pr_update.branch} to ${defaultBranch} for ${directory.slug}`,
+                    `Creating PR from ${pr_update.branch} to ${defaultBranch} for ${directory.slug}`,
                 );
 
                 await this.githubService
@@ -146,9 +165,9 @@ export class MarkdownGeneratorService {
                             owner: directory.owner,
                             repo: directory.slug,
                             base: defaultBranch,
-                            head: configMetadata.pr_update.branch,
-                            title: configMetadata.pr_update.title,
-                            body: configMetadata.pr_update.body,
+                            head: pr_update.branch,
+                            title: pr_update.title,
+                            body: pr_update.body,
                         },
                         token,
                     )
@@ -166,6 +185,26 @@ export class MarkdownGeneratorService {
         }
     }
 
+    async removeItemDetail(directory: Directory, user: User, slug: string, branch?: string) {
+        const token = user.getGitToken();
+
+        const markdownPath = await this.githubService.cloneOrPull(
+            directory.owner,
+            directory.slug,
+            token,
+        );
+
+        const markdownRepo = new MarkdownRepository(markdownPath);
+
+        if (branch) {
+            await this.githubService.switchToBranch(markdownRepo.dir, branch, true).catch((err) => {
+                this.logger.error('Failed to switch to PR branch', err);
+            });
+        }
+
+        await markdownRepo.removeDetails(slug);
+    }
+
     private async generateReadme(
         data: DataRepository,
         markdowns: Set<string>,
@@ -181,7 +220,7 @@ export class MarkdownGeneratorService {
         }
 
         // Sort categories by priority, then alphabetically
-        const sortedCategoryIds = this.sortCategoriesByPriority(Object.keys(groups), categories);
+        const sortedCategoryIds = this.sortCategoriesByPriority(groups, categories);
 
         for (const categoryId of sortedCategoryIds) {
             const categoryDetails = categories.get(categoryId);
@@ -207,13 +246,15 @@ export class MarkdownGeneratorService {
 
     /**
      * Sort category IDs by priority, then alphabetically
-     * @param categoryIds Array of category IDs to sort
+     * @param groups Groups of items by category ID
      * @param categories Map of category details
      */
     private sortCategoriesByPriority(
-        categoryIds: string[],
+        groups: Record<string, ItemData[]>,
         categories: Map<string, Category>,
     ): string[] {
+        const categoryIds = Object.keys(groups);
+
         return categoryIds.sort((aId, bId) => {
             const categoryA = categories.get(aId);
             const categoryB = categories.get(bId);
@@ -230,6 +271,14 @@ export class MarkdownGeneratorService {
             if (categoryA?.priority === undefined && categoryB?.priority !== undefined) {
                 return 1;
             }
+
+            // order by items featured count
+            const featuredCountA = groups[aId].filter((item) => item.featured).length;
+            const featuredCountB = groups[bId].filter((item) => item.featured).length;
+            if (featuredCountA !== featuredCountB) {
+                return featuredCountB - featuredCountA;
+            }
+
             // If neither has priority, sort alphabetically by name
             const nameA = categoryA?.name || aId;
             const nameB = categoryB?.name || bId;

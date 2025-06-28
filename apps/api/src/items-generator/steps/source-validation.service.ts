@@ -1,6 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
 import axios from 'axios';
-import { TavilyClient } from '@tavily/core';
 import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
 import { z } from 'zod';
 import { ItemData, ConfigDto } from '../dto';
@@ -65,19 +64,17 @@ Prefer official sources in this order:
 3. Official documentation
 4. Package manager pages (npm, PyPI, etc.)
 5. Avoid: blog posts, news articles, tutorials, unless they are the only authoritative source
-`.trim();
+`;
 
 @Injectable()
 export class SourceValidationService {
     private readonly logger = new Logger(SourceValidationService.name);
-    private tavilyClient: TavilyClient | undefined;
     private llm: BaseChatModel;
 
     constructor(
         private readonly searchService: SearchService,
         private readonly aiService: AiService,
     ) {
-        this.tavilyClient = this.searchService.getTavilyClient();
         this.llm = this.aiService.createLlmWithTemperature(0.1); // Low temperature for consistent analysis
     }
 
@@ -217,14 +214,6 @@ export class SourceValidationService {
         const validatedInitialUrl = await validateUrl(sourceUrl);
         if (validatedInitialUrl) {
             return validatedInitialUrl;
-        }
-
-        // If original URL is invalid, try to find a new one using Tavily
-        if (!this.tavilyClient) {
-            this.logger.warn(
-                `Tavily retriever not available. Cannot search for URL for "${itemName}".`,
-            );
-            return undefined;
         }
 
         try {
@@ -386,10 +375,8 @@ export class SourceValidationService {
             // Extract content from the URL using Tavily
             let pageContent = '';
             try {
-                if (this.tavilyClient) {
-                    const extractedContent = await this.searchService.extractContent(candidateUrl);
-                    pageContent = extractedContent.rawContent || '';
-                }
+                const extractedContent = await this.searchService.extractContent(candidateUrl);
+                pageContent = extractedContent.rawContent || '';
             } catch (contentError) {
                 this.logger.warn(
                     `Could not extract content from ${candidateUrl}: ${contentError.message}`,

@@ -1,5 +1,4 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { TavilyClient } from '@tavily/core';
 import { ConfigDto } from '../dto/create-items-generator.dto';
 import { WebPageData } from '../interfaces/items-generator.interfaces';
 import { SearchService, NotionService } from '../shared';
@@ -7,15 +6,12 @@ import { SearchService, NotionService } from '../shared';
 @Injectable()
 export class WebPageRetrievalService {
     private readonly logger = new Logger(WebPageRetrievalService.name);
-    private tavilyClient: TavilyClient | undefined;
     private readonly BATCH_SIZE = 10;
 
     constructor(
         private readonly searchService: SearchService,
         private readonly notionService: NotionService,
-    ) {
-        this.tavilyClient = this.searchService.getTavilyClient();
-    }
+    ) {}
 
     async retrieveWebPages(
         slug: string,
@@ -23,11 +19,6 @@ export class WebPageRetrievalService {
         processedSourceUrls: Set<string>,
         config: Required<ConfigDto>,
     ): Promise<WebPageData[]> {
-        if (!this.tavilyClient) {
-            this.logger.warn(`[${slug}] Tavily API key not configured. Skipping web search.`);
-            return [];
-        }
-
         const allFetchedPages: WebPageData[] = [];
         const currentRunProcessedUrls = new Set<string>();
 
@@ -45,7 +36,7 @@ export class WebPageRetrievalService {
                 return { query, documents, success: true };
             } catch (error) {
                 this.logger.error(
-                    `[${slug}] Error executing search query "${query}" with Tavily: ${error.message}`,
+                    `[${slug}] Error executing search query "${query}": ${error.message}`,
                 );
                 return { query, documents: [], success: false };
             }
@@ -98,22 +89,18 @@ export class WebPageRetrievalService {
 
             const extractionPromises = batch.map(async ({ url, query }) => {
                 try {
-                    const response = await this.tavilyClient.extract([url], {
-                        maxResults: 1,
-                    });
+                    const response = await this.searchService.extractContent(url);
 
-                    if (!response.results[0]) {
+                    if (!response.rawContent) {
                         this.logger.warn(
                             `[${slug}] Skipping document with missing extraction results for query "${query}". URL: ${url}`,
                         );
                         return null;
                     }
 
-                    const extractedResult = response.results[0];
-
                     return {
                         source_url: url,
-                        raw_content: extractedResult.rawContent,
+                        raw_content: response.rawContent,
                         retrieved_at: new Date().toISOString(),
                     };
                 } catch (error) {
@@ -207,23 +194,11 @@ export class WebPageRetrievalService {
             }
         }
 
-        // Process regular URLs with Tavily
+        // Process regular URLs
         if (regularUrls.length > 0) {
-            if (!this.tavilyClient) {
-                this.logger.warn(
-                    `[${slug}] Tavily API key not configured. Skipping ${regularUrls.length} regular URLs.`,
-                );
-            } else {
-                this.logger.log(
-                    `[${slug}] Processing ${regularUrls.length} regular URLs with Tavily`,
-                );
-                const tavilyResults = await this.processUrlsWithTavily(
-                    slug,
-                    regularUrls,
-                    processedSourceUrls,
-                );
-                allFetchedPages.push(...tavilyResults);
-            }
+            this.logger.log(`[${slug}] Processing ${regularUrls.length} regular URLs`);
+            const tavilyResults = await this.processUrls(slug, regularUrls, processedSourceUrls);
+            allFetchedPages.push(...tavilyResults);
         }
 
         this.logger.log(
@@ -234,41 +209,37 @@ export class WebPageRetrievalService {
     }
 
     /**
-     * Process URLs using Tavily (extracted from original retrieveSpecificUrls method)
+     * Process URLs using the search service (extracted from original retrieveSpecificUrls method)
      */
-    private async processUrlsWithTavily(
+    private async processUrls(
         slug: string,
         urls: string[],
         processedSourceUrls: Set<string>,
     ): Promise<WebPageData[]> {
         const allFetchedPages: WebPageData[] = [];
 
-        this.logger.log(`[${slug}] Processing ${urls.length} URLs with Tavily`);
+        this.logger.log(`[${slug}] Processing ${urls.length} URLs`);
 
         for (let i = 0; i < urls.length; i += this.BATCH_SIZE) {
             const batch = urls.slice(i, i + this.BATCH_SIZE);
 
             const extractionPromises = batch.map(async (url: string) => {
                 try {
-                    const response = await this.tavilyClient!.extract([url], {
-                        maxResults: 1,
-                    });
+                    const response = await this.searchService.extractContent(url);
 
-                    if (!response.results[0]) {
+                    if (!response.rawContent) {
                         this.logger.warn(
                             `[${slug}] Skipping URL with missing extraction results: ${url}`,
                         );
                         return null;
                     }
 
-                    const extractedResult = response.results[0];
-
                     // Add to processed URLs set
                     processedSourceUrls.add(url);
 
                     return {
                         source_url: url,
-                        raw_content: extractedResult.rawContent,
+                        raw_content: response.rawContent,
                         retrieved_at: new Date().toISOString(),
                     };
                 } catch (error: any) {

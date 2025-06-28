@@ -3,6 +3,7 @@ import {
     Controller,
     HttpCode,
     HttpStatus,
+    Logger,
     NotFoundException,
     Param,
     Post,
@@ -18,16 +19,27 @@ import { User } from './entities/user.entity';
 import { GithubService } from './git/github.service';
 import {
     CreateItemsGeneratorDto,
+    GenerationMethod,
     UpdateItemsGeneratorDto,
 } from './items-generator/dto/create-items-generator.dto';
 import { ItemsGeneratorResponseDto } from './items-generator/dto/items-generator-response.dto';
-import { SubmitItemDto, SubmitItemResponseDto } from './items-generator/dto';
+import {
+    SubmitItemDto,
+    SubmitItemResponseDto,
+    RemoveItemDto,
+    RemoveItemResponseDto,
+    ExtractItemDetailsDto,
+    ExtractItemDetailsResponseDto,
+} from './items-generator/dto';
 import { CreateDirectoryDto } from './dto/create-directory.dto';
 import { UpdateWebsiteRepositoryResponseDto } from './website-generator/dto/update-website-repository.dto';
 import { ItemSubmissionService } from './items-generator/item-submission.service';
+import { ItemsGeneratorService } from './items-generator/items-generator.service';
 
 @Controller()
 export class AppController {
+    private readonly logger = new Logger(AppController.name);
+
     constructor(
         private readonly dataGenerator: DataGeneratorService,
         private readonly markdownGenerator: MarkdownGeneratorService,
@@ -35,9 +47,11 @@ export class AppController {
         private readonly websiteUpdateService: WebsiteUpdateService,
         private readonly githubService: GithubService,
         private readonly itemSubmissionService: ItemSubmissionService,
+        private readonly itemsGeneratorService: ItemsGeneratorService,
     ) {}
 
     @Post('directories')
+    @HttpCode(HttpStatus.OK)
     async createDirectory(@Body() createDirectoryDto: CreateDirectoryDto) {
         const { slug, name, description, owner } = createDirectoryDto;
         const user = await User.sessionMock();
@@ -47,6 +61,7 @@ export class AppController {
         dir.slug = slug;
         dir.name = name;
         dir.description = description;
+        dir.readmeConfig = createDirectoryDto.readme_config;
 
         const ghOwner = await this.githubService.getUser(user.getGitToken());
         dir.owner = owner || ghOwner.login;
@@ -139,15 +154,153 @@ export class AppController {
                 user,
                 submitItemDto,
             );
+
+            // Regenerate markdown for all items
+            if (result.status === 'success') {
+                await this.markdownGenerator.initialize(directory, user, {
+                    generation_method: result.auto_merged
+                        ? GenerationMethod.RECREATE
+                        : GenerationMethod.CREATE_UPDATE,
+                    pr_update: {
+                        branch: result.pr_branch_name,
+                        title: result.pr_title,
+                        body: result.pr_body,
+                    },
+                });
+            }
+
             return result;
         } catch (error) {
-            console.error('Error submitting item:', error);
+            this.logger.error('Error submitting item:', error);
 
             return {
                 status: 'error',
                 slug,
                 item_name: submitItemDto.name,
                 message: 'Failed to submit item',
+                error_details: error.message,
+            };
+        }
+    }
+
+    @Post('remove-item/:slug')
+    @HttpCode(HttpStatus.OK)
+    async removeItem(
+        @Param('slug') slug: string,
+        @Body() removeItemDto: RemoveItemDto,
+    ): Promise<RemoveItemResponseDto> {
+        try {
+            const user = await User.sessionMock();
+
+            // Check if directory exists for the given slug
+            const directory = await Directory.findMock(slug);
+            if (!directory) {
+                throw new NotFoundException(`Directory with slug '${slug}' not found`);
+            }
+
+            const result = await this.itemSubmissionService.removeItem(
+                directory,
+                user,
+                removeItemDto,
+            );
+
+            // Regenerate markdown for all items (Always create PR for removal)
+            if (result.status === 'success') {
+                await this.markdownGenerator.initialize(directory, user, {
+                    generation_method: GenerationMethod.CREATE_UPDATE,
+                    remove_details: [removeItemDto.item_slug],
+                    pr_update: {
+                        branch: result.pr_branch_name,
+                        title: result.pr_title,
+                        body: result.pr_body,
+                    },
+                });
+            }
+
+            return result;
+        } catch (error) {
+            console.error('Error removing item:', error);
+
+            return {
+                status: 'error',
+                slug,
+                item_name: 'Unknown',
+                item_slug: removeItemDto.item_slug,
+                message: 'Failed to remove item',
+                error_details: error.message,
+            };
+        }
+    }
+
+    @Post('extract-item-details')
+    @HttpCode(HttpStatus.OK)
+    async extractItemDetails(
+        @Body() extractItemDetailsDto: ExtractItemDetailsDto,
+    ): Promise<ExtractItemDetailsResponseDto> {
+        try {
+            this.logger.log(
+                `Extracting item details from URL: ${extractItemDetailsDto.source_url}`,
+            );
+
+            const item = await this.itemsGeneratorService.extractItemDetailsFromUrl(
+                extractItemDetailsDto.source_url,
+                extractItemDetailsDto.existing_categories || [],
+            );
+
+            if (!item) {
+                return {
+                    status: 'error',
+                    source_url: extractItemDetailsDto.source_url,
+                    message: 'Failed to extract item details from the provided URL',
+                    error_details: 'No item data could be extracted from the URL content',
+                };
+            }
+
+            return {
+                status: 'success',
+                source_url: extractItemDetailsDto.source_url,
+                item,
+                message: `Successfully extracted item details: "${item.name}"`,
+            };
+        } catch (error) {
+            console.error('Error extracting item details:', error);
+
+            return {
+                status: 'error',
+                source_url: extractItemDetailsDto.source_url,
+                message: 'Failed to extract item details',
+                error_details: error.message,
+            };
+        }
+    }
+
+    @Post('regenerate-markdown/:slug')
+    @HttpCode(HttpStatus.OK)
+    async regenerateMarkdown(
+        @Param('slug') slug: string,
+    ): Promise<{ status: string; error_details?: string }> {
+        try {
+            const user = await User.sessionMock();
+
+            // Check if directory exists for the given slug
+            const directory = await Directory.findMock(slug);
+            if (!directory) {
+                throw new NotFoundException(`Directory with slug '${slug}' not found`);
+            }
+
+            // Regenerate markdown for all items
+            await this.markdownGenerator.initialize(directory, user, {
+                generation_method: GenerationMethod.RECREATE,
+            });
+
+            return {
+                status: 'success',
+            };
+        } catch (error) {
+            console.error('Error regenerating markdown:', error);
+
+            return {
+                status: 'error',
                 error_details: error.message,
             };
         }
@@ -204,7 +357,9 @@ export class AppController {
 
             if (generated) {
                 await Promise.all([
-                    this.markdownGenerator.initialize(directory, user, dto.repository_description),
+                    this.markdownGenerator.initialize(directory, user, {
+                        repository_description: dto.repository_description,
+                    }),
                     this.websiteGenerator.initialize(
                         directory,
                         user,

@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PromptTemplate } from '@langchain/core/prompts';
+import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
 import { ConfigDto } from '../dto/create-items-generator.dto';
 import { WebPageData, RelevanceAssessment } from '../interfaces/items-generator.interfaces';
 import { AiService } from '../shared';
@@ -70,10 +70,10 @@ export class ContentFilteringService {
                 this.logger.log(`[${slug}] Assessing relevance for: ${page.source_url}`);
 
                 // Stricter prompt for page relevance
-                const prompt = PromptTemplate.fromTemplate(
+                const prompt = HumanMessagePromptTemplate.fromTemplate(
                     `You are an expert content analyst. Assess the relevance of the following web page content to the **main topic**: "{topicName}" (Description: "{topicDescription}").
 
-Web Page Content (first 2000 characters):
+Web Page Content (first 3000 characters):
 <content>
 {page_content_snippet}
 </content>
@@ -88,11 +88,14 @@ Provide a relevance score between 0.0 (not relevant) and 1.0 (highly relevant). 
 
                 const relevanceChain = prompt.pipe(this.llm.withStructuredOutput(relevanceSchema));
 
+                const SNIPPET_LENGTH = 3000;
+                const snippet_middle = Math.floor(page.raw_content.length / 2);
+
                 const page_content_snippet =
-                    page.raw_content.length > 2000
+                    page.raw_content.length > SNIPPET_LENGTH
                         ? page.raw_content.slice(
-                              page.raw_content.length / 2 - 1000,
-                              page.raw_content.length / 2 + 1000,
+                              page.raw_content.length / 2 - snippet_middle,
+                              page.raw_content.length / 2 + snippet_middle,
                           )
                         : page.raw_content;
 

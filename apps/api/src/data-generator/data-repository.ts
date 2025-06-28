@@ -6,11 +6,12 @@ import { format } from 'date-fns';
 import { Category, ItemData, Tag } from '../agent/types';
 import { CreateItemsGeneratorDto, GenerationMethod } from '../items-generator/dto';
 
-type PRUpdate = {
+export type PRUpdate = {
     branch: string;
     title: string;
     body: string;
 };
+
 export interface IDataConfig {
     company_name?: string;
     company_website?: string;
@@ -298,5 +299,39 @@ export class DataRepository {
     async writeLicense(content: string) {
         const filepath = path.join(this.dir, 'LICENSE.md');
         await fs.writeFile(filepath, content, 'utf-8');
+    }
+
+    async removeItem(slug: string): Promise<boolean> {
+        const itemPath = this.getItemPath(slug);
+
+        try {
+            // Check if item directory exists
+            await fs.access(itemPath);
+
+            // Remove the entire item directory
+            await fs.rm(itemPath, { recursive: true, force: true });
+
+            return true;
+        } catch (err) {
+            if (err?.code === 'ENOENT') {
+                // Item doesn't exist
+                return false;
+            }
+            throw err;
+        }
+    }
+
+    async itemExists(slug: string): Promise<boolean> {
+        const itemPath = this.getItemPath(slug);
+
+        try {
+            await fs.access(itemPath);
+            return true;
+        } catch (err) {
+            if (err?.code === 'ENOENT') {
+                return false;
+            }
+            throw err;
+        }
     }
 }

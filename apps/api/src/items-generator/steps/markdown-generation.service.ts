@@ -4,7 +4,6 @@ import { z } from 'zod';
 import { AiService } from '../shared';
 import { SearchService } from '../shared';
 import { ItemData } from '../dto';
-import { extractTextFromSourceURL } from '../utils/text.utils';
 import { BaseChatModel } from '../shared/ai-provider.interface';
 
 // Markdown generation prompt
@@ -25,8 +24,7 @@ You are directory website builder and your task is to generate markdown summary 
 Based on this website content:
 <content>
 {content}
-</content>
-`.trim();
+</content>`;
 
 // Output schema for validation
 export const markdownOutputSchema = z.object({
@@ -73,7 +71,7 @@ export class MarkdownGenerationService {
                 .pipe(this.llm.withStructuredOutput(markdownOutputSchema))
                 .invoke({
                     item: JSON.stringify(item),
-                    content: content.rawContent.slice(0, 8000),
+                    content: content.rawContent.slice(0, 4000),
                 });
 
             return result.markdown || '';
@@ -133,16 +131,11 @@ export class MarkdownGenerationService {
     private async extractContentFrom(url: string) {
         this.logger.log(`Extracting content from ${url}`);
 
-        if (!this.searchService.isSearchConfigured()) {
-            this.logger.warn('Search service not configured. Cannot extract content.');
-            return null;
-        }
-
         try {
             return await this.searchService.extractContent(url);
         } catch (error) {
-            // try again with extractTextFromSourceURL
-            const text = await extractTextFromSourceURL(url).catch(() => null);
+            // try again with extractContentUsingNaive
+            const text = await this.searchService.extractContentUsingNaive(url).catch(() => null);
 
             if (text) {
                 return {

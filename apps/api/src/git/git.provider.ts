@@ -100,12 +100,53 @@ export abstract class GitProvider {
         return committer;
     }
 
+    /**
+     * Add files to the git index (except removed files)
+     *
+     * @param dir
+     * @param paths
+     */
     add(dir: string, paths: string | string[]) {
         return git.add({
             fs,
             filepath: paths,
             dir,
         });
+    }
+
+    /**
+     * Add all files to the git index, including removed files
+     *
+     * @param dir
+     */
+    async addAll(dir: string) {
+        // Get the status of all files
+        const statusMatrix = await git.statusMatrix({
+            fs,
+            dir,
+        });
+
+        for (const [filepath, headStatus, workdirStatus, stageStatus] of statusMatrix) {
+            // File was deleted (exists in HEAD but not in workdir)
+            if (headStatus === 1 && workdirStatus === 0) {
+                await git.remove({
+                    fs,
+                    dir,
+                    filepath,
+                });
+            }
+            // File was added or modified
+            else if (
+                workdirStatus !== 0 &&
+                (headStatus !== workdirStatus || stageStatus !== workdirStatus)
+            ) {
+                await git.add({
+                    fs,
+                    dir,
+                    filepath,
+                });
+            }
+        }
     }
 
     commit(dir: string, message: string, committer: ICommitter = {}) {
@@ -126,6 +167,10 @@ export abstract class GitProvider {
 
     remoteAdd(dir: string, remote: string, url: string) {
         return git.addRemote({ fs, dir, remote, url });
+    }
+
+    status(dir: string) {
+        return git.statusMatrix({ fs, dir });
     }
 
     push(dir: string, token: string) {

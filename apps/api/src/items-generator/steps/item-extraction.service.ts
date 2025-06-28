@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PromptTemplate } from '@langchain/core/prompts';
+import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
 import { ConfigDto, CreateItemsGeneratorDto } from '../dto/create-items-generator.dto';
 import { WebPageData } from '../interfaces/items-generator.interfaces';
@@ -11,34 +11,39 @@ import { BaseChatModel } from '../shared/ai-provider.interface';
 
 const ITEMS_EXTRACTION_PROMPT =
     `You are an expert data extractor and technical writer for directory websites.
-Your task is to identify and extract information for one or more distinct items (tools, resources, libraries, articles, etc.) that are **directly and highly relevant to this main topic**.
+Your task is to identify and extract information for one or more distinct items (tools, resources, libraries, articles, etc.) 
+that are **directly and highly relevant to the main topic and research context** and should match extraction criteria.
 
 The **main topic** of this directory is: 
 - topic name: "{topicName}" 
 - topic task: "{topicDescription}".
 
----
+<featured_item_hints_section>
 **Featured Item Specifications:**
 {featured_hints_section}
----
+</featured_item_hints_section>
 
+<research_context_instructions>
 **RESEARCH CONTEXT INSTRUCTIONS:**
 Below is the research context, including content extracted from the referenced web page. 
 Please ensure that all relevant information and items from the research data are included. 
 Exclude any invalid or irrelevant content, and align the findings with the topic and objectives of the task.
+</research_context_instructions>
 
+<extraction_criteria>
 **EXTRACTION CRITERIA:**
 - Only extract items that are *directly* relevant to the main topic "{topicName}" and topic task.
 - Do NOT extract items that are only tangentially related or represent a different category unless it's explicitly part of "{topicName}" and topic task.
-- Avoid using blog posts, news articles, or marketing pages as the source_url or item unless the user specifically requests them for their topic task (e.g 'Best Time Tracking Software for Small Businesses', 'Best Time Tracking Tools for Remote Teams', etc.).
+- Ignore items that has blog posts, news articles, or marketing pages as the item source_url, unless the user specifically requests them for their topic task
 - For example, if the topic is "Vector Databases", do not extract a general-purpose database or a library for a specific programming language (like Ruby) unless it's explicitly a vector database client/tool directly supporting the core topic
 - Ensure the source_url is for the item itself, not an article *about* the item
 - Featured items are those that match the specifications provided in the "Featured Item Specifications" section above.
 - Do not use URLs for blog posts merely mentioning the item unless the post *is* the primary resource
+</extraction_criteria>
 
-<content>
+<web_page_content>
 {page_content_snippet}
-<content>`.trim();
+<web_page_content>`.trim();
 
 @Injectable()
 export class ItemExtractionService {
@@ -74,11 +79,14 @@ export class ItemExtractionService {
 
         for (const item of items) {
             const normalizedName = item.name.toLowerCase().trim();
+            const existingItem = uniqueItems.get(normalizedName);
 
-            // If we haven't seen this name before, or if this item has a source_url and the existing one doesn't
             if (
                 !uniqueItems.has(normalizedName) ||
-                (!uniqueItems.get(normalizedName)?.source_url && item.source_url)
+                (!existingItem?.source_url && item.source_url) ||
+                (existingItem?.source_url &&
+                    item.source_url &&
+                    existingItem?.source_url.length > item.source_url.length)
             ) {
                 uniqueItems.set(normalizedName, item);
             }
@@ -90,10 +98,9 @@ export class ItemExtractionService {
     async extractItemsFromPages(
         createItemsGeneratorDto: CreateItemsGeneratorDto,
         relevantPages: WebPageData[],
-        config: Required<ConfigDto>,
         featuredItemHints: string[] = [],
     ): Promise<ItemData[]> {
-        const { slug, name: topicName, prompt: topicDescription } = createItemsGeneratorDto;
+        const { slug, name: topicName, prompt: topicDescription, config } = createItemsGeneratorDto;
 
         if (!this.aiService.isAiConfigured()) {
             this.logger.warn(
@@ -130,7 +137,8 @@ export class ItemExtractionService {
 
             try {
                 // Stricter prompt for item extraction
-                const promptTemplate = PromptTemplate.fromTemplate(ITEMS_EXTRACTION_PROMPT);
+                const promptTemplate =
+                    HumanMessagePromptTemplate.fromTemplate(ITEMS_EXTRACTION_PROMPT);
 
                 const extractionChain = promptTemplate.pipe(
                     this.llm.withStructuredOutput(extractedItemsSchema),
@@ -204,11 +212,6 @@ export class ItemExtractionService {
 
                         // Deduplicate items from different chunks
                         const uniqueItems = this.deduplicateItems(validatedItems);
-                        if (uniqueItems.length < validatedItems.length) {
-                            this.logger.log(
-                                `[${slug}] Deduplicated ${validatedItems.length - uniqueItems.length} duplicate items from chunks in ${page.source_url}`,
-                            );
-                        }
 
                         // Add unique items to the result
                         extractedItems.push(...uniqueItems);

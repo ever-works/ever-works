@@ -8,23 +8,23 @@ import { BaseChatModel } from '../shared/ai-provider.interface';
 const PROMPT_PROCESSING_PROMPT = `
 You are a helpful assistant tasked with extracting URLs and explicitly mentioned categories from a user's prompt, then rewriting the prompt to focus only on the core task idea.
 
-<prompt>
-{prompt}
-</prompt>
-
-Your task:
+<rules>
 1. Extract all URLs mentioned in the prompt.
-2. Extract categories that are explicitly mentioned in the prompt that should be considered for categorization.
+2. Extract *only* categories that are explicitly mentioned in the prompt. (e.g "I want categories like Monitoring, CI/CD, and Testing")
 3. Extract priority categories that should appear first in the final output based on priority indicators in the prompt.
 4. Extract featured item specifications that indicate which types of items should be marked as featured/highlighted.
-5. Rewrite the prompt to focus ONLY on the main task idea, removing ALL hints, instructions, and specifications.
+5. Rewrite the prompt to focus ONLY on the main task idea and important prompt instructions, removing ALL hints and specifications.
 6. Return the extracted URLs, explicitly mentioned categories, priority categories, featured item hints, and the rewritten prompt.
+</rules>
 
-Guidelines for URL extraction:
+<url_extraction_guidelines>
+### Guidelines for URL extraction:
 - Only extract URLs that are explicitly mentioned in the prompt
 - Do not infer or generate URLs that aren't directly mentioned
+</url_extraction_guidelines>
 
-Guidelines for category extraction:
+<categories_extraction_guidelines>
+### Guidelines for category extraction:
 - Look for categories that are explicitly mentioned by the user as desired categories
 - Extract categories mentioned in phrases like:
   * "categories like X, Y, Z"
@@ -37,19 +37,22 @@ Guidelines for category extraction:
 - Extract domain-specific categories (e.g., "open-source projects", "enterprise software", "cloud services")
 - Do NOT extract general descriptive terms that aren't meant as categories
 - Do NOT extract categories that are just examples or context, only those the user wants to actually use
+- Do not extract categories from a prompt similar to this (e.g "Generate a list of the best time tracking software for businesses and open source solutions."), here "businesses" and "open source" are not explicit categories.
 - Focus on categories the user explicitly wants to be considered for organizing their directory
 
-Examples of what TO extract as categories:
+### Examples of what TO extract as categories:
 - "I want categories like Monitoring, CI/CD, and Testing"
 - "organize these tools into categories: Development, Design, Marketing"
 - "categorize as open-source projects and commercial tools"
 
-Examples of what NOT to extract as categories:
+### Examples of what NOT to extract as categories:
 - "I'm looking for various development tools" (too general, not explicit categories)
 - "tools for monitoring and testing" (descriptive, not explicit category instruction)
 - "similar to monitoring tools" (example/comparison, not explicit category)
+</categories_extraction_guidelines>
 
-Guidelines for priority category extraction:
+<priority_categories_extraction_guidelines>
+### Guidelines for priority category extraction:
 - Look for categories that are explicitly mentioned with priority indicators
 - Extract categories mentioned with priority phrases like:
   * "start with X category" or "begin with X"
@@ -64,19 +67,21 @@ Guidelines for priority category extraction:
 - Do NOT extract all categories as priority - only those with clear priority indicators
 - Priority categories should also be included in the regular suggestedCategories list
 
-Examples of what TO extract as priority categories:
+### Examples of what TO extract as priority categories:
 - "Start with Open Source tools, then other categories"
 - "Prioritize CI/CD solutions above all else"
 - "Most important category is Monitoring"
 - "1. Open Source, 2. Enterprise, 3. Others" (extract "Open Source" and "Enterprise" as priority)
 - "Focus on Open Source projects first"
 
-Examples of what NOT to extract as priority categories:
+### Examples of what NOT to extract as priority categories:
 - "I want categories like Monitoring, CI/CD, and Testing" (no priority indicators)
 - "organize these tools into categories" (no specific priority mentioned)
 - "categorize as open-source and commercial" (equal treatment, no priority)
+</priority_categories_extraction_guidelines>
 
-Guidelines for featured item extraction:
+<featured_item_hints_extraction_guidelines>
+### Guidelines for featured item extraction:
 - Look for specifications about which items should be highlighted, featured, or given special prominence
 - Extract featured item hints mentioned with phrases like:
   * "highlight X items" or "feature X tools"
@@ -94,7 +99,7 @@ Guidelines for featured item extraction:
 - Do NOT extract general descriptive terms that don't indicate special prominence
 - Focus on specifications that clearly indicate certain items should stand out from others
 
-Examples of what TO extract as featured item hints:
+### Examples of what TO extract as featured item hints:
 - "Feature the top open-source monitoring tools"
 - "Highlight enterprise solutions"
 - "Showcase Docker and Kubernetes prominently"
@@ -103,23 +108,28 @@ Examples of what TO extract as featured item hints:
 - "Spotlight leading cloud platforms"
 - "Make sure to highlight recommended solutions"
 
-Examples of what NOT to extract as featured item hints:
+### Examples of what NOT to extract as featured item hints:
 - "I want monitoring tools" (no prominence indication)
 - "include various development tools" (no special highlighting)
 - "tools for testing and deployment" (descriptive, not prominence-focused)
+</featured_item_hints_extraction_guidelines>
 
-Guidelines for prompt rewriting:
+<prompt_rewriting_guidelines>
+### Guidelines for prompt rewriting:
 - Remove ALL URLs from the prompt
 - Remove ALL category specifications and hints (e.g., "Be sure to include both open-source and commercial categories")
 - Remove ALL priority indicators (e.g., "starting with open-source projects", "prioritizing commercial solutions")
 - Remove ALL featured item specifications (e.g., "Please prioritize solutions Ever Cloc, Ever Teams, Ever Gauzy")
 - Remove ALL reference instructions (e.g., "For reference, consult: https://...")
 - Remove ALL categorization instructions (e.g., "When listing open-source projects, strictly use the license type as the tag")
-- Keep ONLY the core task description that explains what type of items/content to generate
-- Focus on the main subject matter and purpose of the directory/list
-- Preserve the essential context about what the user wants to accomplish
-- The rewritten prompt should be clean, focused, and contain only the essential task description without any processing hints, categorization instructions, priority specifications, or reference URLs.
-`.trim();
+- Separated prompt instructions should be combined into a single, coherent task description
+- Preserve the essential context about what the user wants to accomplish with separated instructions combined
+- The rewritten prompt should be clean, focused, and contain only the essential instructions without any processing hints, categorization instructions, priority specifications, or reference URLs.
+</prompt_rewriting_guidelines>
+
+<prompt>
+{prompt}
+</prompt>`;
 
 // Output schema for validation
 const promptProcessingOutputSchema = z.object({
@@ -182,8 +192,7 @@ export class PromptProcessingService {
         try {
             this.logger.log(`[${slug}] Using AI to process prompt for URLs and categories`);
 
-            const promptTemplate =
-                HumanMessagePromptTemplate.fromTemplate(PROMPT_PROCESSING_PROMPT);
+            const promptTemplate = HumanMessagePromptTemplate.fromTemplate(PROMPT_PROCESSING_PROMPT);
             const result = await promptTemplate
                 .pipe(this.llm.withStructuredOutput(promptProcessingOutputSchema))
                 .invoke({
