@@ -8,3 +8,9 @@ export function slugifyText(text: string): string {
         .replace(/[^\w-]+/g, '')
         .replace(/--+/g, '-');
 }
+
+export function unSlugifyText(slug: string): string {
+    return slug
+        .replace(/-/g, ' ')
+        .replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
+}

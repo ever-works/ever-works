@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
 import { z } from 'zod';
 import { ItemData, Category, Tag, CreateItemsGeneratorDto } from '../dto';
-import { slugifyText } from '../utils/text.utils';
+import { slugifyText, unSlugifyText } from '../utils/text.utils';
 import { AiService } from '../shared';
 import { itemDataWithCategoriesAndTagsSchema } from '../schemas/item-extraction.schemas';
 import { BaseChatModel } from '../shared/ai-provider.interface';
@@ -15,17 +15,19 @@ You are directory website builder and your task is to Categorize the given items
 <rules>
 1. Assign ONE category per item based on primary function
 2. Add 1-3 relevant tags per item
-3. Make sure the existing categories and tags are used appropriately before creating new ones (if available).
-4. Category divergence is preferable for better grouping of items.
-5. The user may provide category hints based on the task context, but you are not limited to these unless explicitly and clearly instructed to use only the provided categories.
-6. Use domain-specific categories (e.g. "open-source projects", "enterprise software", "cloud services")
-7. Avoid duplicate categories (e.g. "Monitoring" and "Monitoring Tools", "Open-source" and "Open Source Projects")
-8. Use descriptive tags (e.g. "open-source", "real-time", "cloud-native")
-9. Avoid unnecessary category suffixes
-10. Maintain consistency with existing categories and tags
-11. Override any existing item category if it doesn't match the primary task context
-12. The featured field should remain the same as in the original item
-13. Please give careful consideration to the rules outlined in the <additional_rules> section below (if available).
+3. Category divergence is preferable for better grouping of items.
+4. You create new categories in addition to the existing ones when the current categories become too large.
+5. Create new categories when the existing categories are too large.
+6. A category is too large if it contains more than 50 items.
+7. The user may provide category hints based on the task context, but you are not limited to these unless explicitly and clearly instructed to use only the provided categories.
+8. Use domain-specific categories (e.g. "open-source projects", "enterprise software", "cloud services")
+9. Avoid duplicate categories (e.g. "Monitoring" and "Monitoring Tools", "Open-source" and "Open Source Projects")
+10. Use descriptive tags (e.g. "open-source", "real-time", "cloud-native")
+11. Avoid unnecessary category suffixes
+12. Maintain consistency with existing categories and tags
+13. Override any existing item category if it doesn't match the primary task context
+14. The featured field should remain the same as in the original item
+15. Please give careful consideration to the rules outlined in the <additional_rules> section below (if available).
 </rules>
 
 ${additionalContext || ''}
@@ -494,7 +496,7 @@ export class CategoryProcessingService {
             const priority = priorityMap.get(slugifyText(name));
             categories.push({
                 id: slugifyText(name),
-                name,
+                name: unSlugifyText(name),
                 priority,
             });
         });

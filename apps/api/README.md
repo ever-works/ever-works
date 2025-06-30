@@ -151,6 +151,7 @@ To generate data and create a GitHub repository for the directory, send a POST r
         "relevance_threshold_content": 0.8,
         "min_content_length_for_extraction": 300,
         "prompt_comparison_confidence_threshold": 0.6,
+        "content_filtering_enabled": true,
         "ai_first_generation_enabled": true
     }
 }
@@ -184,15 +185,16 @@ To generate data and create a GitHub repository for the directory, send a POST r
 
 **Configuration Options:**
 
-| Field                                    | Type    | Default | Range    | Description                                                                                       |
-| ---------------------------------------- | ------- | ------- | -------- | ------------------------------------------------------------------------------------------------- |
-| `max_search_queries`                     | number  | 10      | 1-100    | Maximum number of search queries to execute                                                       |
-| `max_results_per_query`                  | number  | 20      | 1-100    | Maximum results to process per search query                                                       |
-| `max_pages_to_process`                   | number  | 100     | 1-1000   | Maximum web pages to process for content extraction                                               |
-| `relevance_threshold_content`            | number  | 0.75    | 0.01-1.0 | Minimum relevance score for content filtering                                                     |
-| `min_content_length_for_extraction`      | number  | 300     | 0+       | Minimum content length required for item extraction                                               |
-| `ai_first_generation_enabled`            | boolean | true    | -        | Enable AI-first item generation before web search                                                 |
-| `prompt_comparison_confidence_threshold` | number  | 0.5     | 0.01-1.0 | Minimum confidence score for prompt comparison (used when `generation_method` is `create-update`) |
+| Field                                    | Type    | Default    | Range    | Description                                                                                       |
+| ---------------------------------------- | ------- | ---------- | -------- | ------------------------------------------------------------------------------------------------- |
+| `max_search_queries`                     | number  | 10         | 1-100    | Maximum number of search queries to execute                                                       |
+| `max_results_per_query`                  | number  | 20         | 1-100    | Maximum results to process per search query                                                       |
+| `max_pages_to_process`                   | number  | 100        | 1-1000   | Maximum web pages to process for content extraction                                               |
+| `relevance_threshold_content`            | number  | 0.75       | 0.01-1.0 | Minimum relevance score for content filtering                                                     |
+| `min_content_length_for_extraction`      | number  | 300        | 0+       | Minimum content length required for item extraction                                               |
+| `content_filtering_enabled`              | boolean | `optional` | `true`   | Whether to enable content filtering based on relevance and quality                                |
+| `ai_first_generation_enabled`            | boolean | true       | -        | Enable AI-first item generation before web search                                                 |
+| `prompt_comparison_confidence_threshold` | number  | 0.5        | 0.01-1.0 | Minimum confidence score for prompt comparison (used when `generation_method` is `create-update`) |
 
 **Generation Methods:**
 
