@@ -151,7 +151,7 @@ To generate data and create a GitHub repository for the directory, send a POST r
         "relevance_threshold_content": 0.8,
         "min_content_length_for_extraction": 300,
         "prompt_comparison_confidence_threshold": 0.6,
-        "content_filtering_enabled": true,
+        "content_filtering_enabled": false,
         "ai_first_generation_enabled": true
     }
 }
@@ -720,6 +720,9 @@ POST /deploy/awesome-time-tracking/vercel
         "work hours"
     ],
     "initial_categories": ["Open Source", "Commercial"],
-    "priority_categories": ["Enterprise"]
+    "priority_categories": ["Enterprise"],
+    "config": {
+        "content_filtering_enabled": false
+    }
 }
 ```

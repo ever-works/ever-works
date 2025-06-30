@@ -158,6 +158,9 @@ export class AiService {
             apiKey: config.apiKey,
             temperature: config.temperature || 0.7,
             maxTokens: config.maxTokens || 4096,
+            reasoning: {
+                effort: 'low' as const,
+            },
         };
 
         switch (config.type) {
@@ -189,10 +192,21 @@ export class AiService {
                 });
 
             case 'google':
-                return new ChatGoogleGenerativeAI({
+                return new ChatOpenAI({
                     ...commonOptions,
                     model: config.modelName || 'gemini-2.5-flash',
-                }) as BaseChatModel;
+                    configuration: {
+                        baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/',
+                        extra_body: {
+                            google: {
+                                thinking_config: {
+                                    thinking_budget: 0,
+                                    include_thoughts: false,
+                                },
+                            },
+                        },
+                    } as any,
+                });
 
             case 'anthropic':
                 return new ChatAnthropic({

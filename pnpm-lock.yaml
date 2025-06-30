@@ -10984,7 +10984,7 @@ snapshots:
       indent-string: 4.0.0
       lodash.merge: 4.6.2
       loglevel-colored-level-prefix: 1.0.0
-      prettier: 3.5.3
+      prettier: 3.6.2
       pretty-format: 29.7.0
       require-relative: 0.8.7
       tslib: 2.8.1
