@@ -62,9 +62,9 @@ export class AiService {
                 apiKey: process.env.OLLAMA_API_KEY,
                 modelName: process.env.OLLAMA_MODEL || 'llama2',
                 temperature: parseFloat(process.env.OLLAMA_TEMPERATURE || '0.7'),
-                enabled: !!process.env.OLLAMA_API_KEY && !!process.env.OLLAMA_BASE_URL,
-                maxTokens: parseInt(process.env.OLLAMA_MAX_TOKENS || '4096'),
+                enabled: !!process.env.OLLAMA_BASE_URL,
                 baseURL: process.env.OLLAMA_BASE_URL,
+                maxTokens: parseInt(process.env.OLLAMA_MAX_TOKENS || '4096'),
             },
             google: {
                 type: 'google',
@@ -127,7 +127,7 @@ export class AiService {
         let hasConfiguredProvider = false;
 
         for (const [providerType, config] of Object.entries(this.config.providers)) {
-            if (!config.enabled || !config.apiKey) {
+            if (!config.enabled) {
                 continue;
             }
 
@@ -184,7 +184,7 @@ export class AiService {
                     ...commonOptions,
                     model: config.modelName || 'llama2:7b',
                     configuration: {
-                        baseURL: config.baseURL || 'http://localhost:8000',
+                        baseURL: config.baseURL || 'http://localhost:11434/v1',
                     },
                 });
 
