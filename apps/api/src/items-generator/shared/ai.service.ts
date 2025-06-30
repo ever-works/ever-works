@@ -57,6 +57,15 @@ export class AiService {
                 enabled: !!process.env.OPENROUTER_API_KEY,
                 maxTokens: parseInt(process.env.OPENROUTER_MAX_TOKENS || '4096'),
             },
+            ollama: {
+                type: 'ollama',
+                apiKey: process.env.OLLAMA_API_KEY,
+                modelName: process.env.OLLAMA_MODEL || 'llama2',
+                temperature: parseFloat(process.env.OLLAMA_TEMPERATURE || '0.7'),
+                enabled: !!process.env.OLLAMA_API_KEY && !!process.env.OLLAMA_BASE_URL,
+                maxTokens: parseInt(process.env.OLLAMA_MAX_TOKENS || '4096'),
+                baseURL: process.env.OLLAMA_BASE_URL,
+            },
             google: {
                 type: 'google',
                 apiKey: process.env.GOOGLE_API_KEY,
@@ -167,6 +176,15 @@ export class AiService {
                     model: config.modelName || 'openai/gpt-4.1',
                     configuration: {
                         baseURL: config.baseURL || 'https://openrouter.ai/api/v1',
+                    },
+                });
+
+            case 'ollama':
+                return new ChatOpenAI({
+                    ...commonOptions,
+                    model: config.modelName || 'llama2:7b',
+                    configuration: {
+                        baseURL: config.baseURL || 'http://localhost:8000',
                     },
                 });
 

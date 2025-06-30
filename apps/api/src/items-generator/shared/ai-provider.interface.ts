@@ -11,7 +11,8 @@ export type AiProviderType =
     | 'mistral'
     | 'groq'
     | 'deepseek'
-    | 'openrouter';
+    | 'openrouter'
+    | 'ollama';
 
 export type BaseChatModel =
     | ChatOpenAI
@@ -59,6 +60,16 @@ export const AI_PROVIDER_CAPABILITIES: Record<AiProviderType, AiProviderCapabili
         },
     },
     openrouter: {
+        supportsStructuredOutput: true,
+        supportsStreaming: true,
+        supportsToolCalling: true,
+        maxContextLength: 128000,
+        costPerToken: {
+            input: 0.0025,
+            output: 0.01,
+        },
+    },
+    ollama: {
         supportsStructuredOutput: true,
         supportsStreaming: true,
         supportsToolCalling: true,
