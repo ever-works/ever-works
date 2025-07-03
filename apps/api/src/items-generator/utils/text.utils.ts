@@ -12,5 +12,5 @@ export function slugifyText(text: string): string {
 export function unSlugifyText(slug: string): string {
     return slug
         .replace(/-/g, ' ')
-        .replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
+        .replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.substring(1).toLowerCase());
 }
