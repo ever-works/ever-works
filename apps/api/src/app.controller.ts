@@ -69,7 +69,11 @@ export class AppController {
 
         Directory.createMock(dir);
 
-        return dir;
+        return {
+            status: 'success',
+            directory: dir,
+            parameters: createDirectoryDto,
+        };
     }
 
     @Post('generate')

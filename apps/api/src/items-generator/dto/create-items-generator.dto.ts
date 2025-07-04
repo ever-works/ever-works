@@ -68,6 +68,10 @@ export class ConfigDto {
     ai_first_generation_enabled: boolean = true;
 
     @IsOptional()
+    @IsBoolean()
+    content_filtering_enabled: boolean = true;
+
+    @IsOptional()
     @Min(0.01)
     @Max(1.0)
     prompt_comparison_confidence_threshold: number = 0.5;

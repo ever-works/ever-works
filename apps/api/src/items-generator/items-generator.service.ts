@@ -238,19 +238,23 @@ export class ItemsGeneratorService {
             );
 
             // Combine web pages from both sources
-            const webPages = [...initialWebPages, ...searchWebPages];
+            let webPages = [...initialWebPages, ...searchWebPages];
+            const urlsScannedThisRun = webPages.length;
+
             this.logger.log(`[${slug}] Retrieved ${webPages.length} web pages for processing.`);
 
-            // 4. Content Pre-filtering & Relevance Assessment
-            this.logger.log(`[${slug}] 4. Content Pre-filtering & Relevance Assessment - Starting`);
-            const relevantPages = await this.contentFilteringService.filterAndAssessPages(
-                slug,
-                webPages,
-                name,
-                prompt,
-                config,
-            );
-            this.logger.log(`[${slug}] Filtered down to ${relevantPages.length} relevant pages.`);
+            if (config.content_filtering_enabled) {
+                // 4. Content Pre-filtering & Relevance Assessment
+                webPages = await this.contentFilteringService.filterAndAssessPages(
+                    slug,
+                    webPages,
+                    name,
+                    prompt,
+                    config,
+                );
+
+                this.logger.log(`[${slug}] Filtered down to ${webPages.length} relevant pages.`);
+            }
 
             // 5. AI-Driven Structured Data Extraction for Items (from Web)
             this.logger.log(
@@ -259,7 +263,7 @@ export class ItemsGeneratorService {
             const extractedWebItems: ItemData[] =
                 await this.itemExtractionService.extractItemsFromPages(
                     createItemsGeneratorDto,
-                    relevantPages,
+                    webPages,
                     featuredItemHints,
                 );
             this.logger.log(
@@ -279,8 +283,8 @@ export class ItemsGeneratorService {
                     createItemsGeneratorDto,
                     existingItems,
                     allDiscoveredItems,
+                    urlsScannedThisRun,
                     webPages.length,
-                    relevantPages.length,
                 );
 
             // 7. Category and Tag Generation
@@ -469,6 +473,7 @@ export class ItemsGeneratorService {
                         relevance_threshold_content: 0.5,
                         min_content_length_for_extraction: 100,
                         ai_first_generation_enabled: false,
+                        content_filtering_enabled: false,
                         prompt_comparison_confidence_threshold: 0.5,
                     },
                 },

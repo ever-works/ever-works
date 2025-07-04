@@ -20,12 +20,12 @@ export const itemDataSchema = baseSchema.extend({
         .describe(
             'The most direct, stable, and canonical URL for the item itself (e.g., project homepage, official documentation, GitHub repository etc.). Must be a valid and highly relevant URL.',
         ),
-    category: z
-        .string()
-        .nullable()
-        .describe(
-            "A relevant high-level category name (e.g., 'Monitoring', 'CI/CD', 'Data Visualization').",
-        ),
+    // category: z
+    //     .string()
+    //     .nullable()
+    //     .describe(
+    //         "A relevant high-level category name (e.g., 'Monitoring', 'CI/CD', 'Data Visualization').",
+    //     ),
     featured: z
         .boolean()
         .nullable()

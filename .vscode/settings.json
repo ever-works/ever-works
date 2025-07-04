@@ -1,8 +1,13 @@
 {
     "cSpell.words": [
+        "APIKEY",
         "Deduplicator",
         "DEEPSEEK",
+        "GROQ",
         "langchain",
-        "Tavily"
+        "OLLAMA",
+        "OPENROUTER",
+        "Tavily",
+        "VERCEL"
     ]
 }

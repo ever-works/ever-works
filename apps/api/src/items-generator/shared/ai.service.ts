@@ -57,6 +57,15 @@ export class AiService {
                 enabled: !!process.env.OPENROUTER_API_KEY,
                 maxTokens: parseInt(process.env.OPENROUTER_MAX_TOKENS || '4096'),
             },
+            ollama: {
+                type: 'ollama',
+                apiKey: process.env.OLLAMA_API_KEY,
+                modelName: process.env.OLLAMA_MODEL || 'llama2',
+                temperature: parseFloat(process.env.OLLAMA_TEMPERATURE || '0.7'),
+                enabled: !!process.env.OLLAMA_BASE_URL,
+                baseURL: process.env.OLLAMA_BASE_URL,
+                maxTokens: parseInt(process.env.OLLAMA_MAX_TOKENS || '4096'),
+            },
             google: {
                 type: 'google',
                 apiKey: process.env.GOOGLE_API_KEY,
@@ -118,7 +127,7 @@ export class AiService {
         let hasConfiguredProvider = false;
 
         for (const [providerType, config] of Object.entries(this.config.providers)) {
-            if (!config.enabled || !config.apiKey) {
+            if (!config.enabled) {
                 continue;
             }
 
@@ -149,6 +158,9 @@ export class AiService {
             apiKey: config.apiKey,
             temperature: config.temperature || 0.7,
             maxTokens: config.maxTokens || 4096,
+            reasoning: {
+                effort: 'low' as const,
+            },
         };
 
         switch (config.type) {
@@ -170,11 +182,31 @@ export class AiService {
                     },
                 });
 
+            case 'ollama':
+                return new ChatOpenAI({
+                    ...commonOptions,
+                    model: config.modelName || 'llama2:7b',
+                    configuration: {
+                        baseURL: config.baseURL || 'http://localhost:11434/v1',
+                    },
+                });
+
             case 'google':
-                return new ChatGoogleGenerativeAI({
+                return new ChatOpenAI({
                     ...commonOptions,
                     model: config.modelName || 'gemini-2.5-flash',
-                }) as BaseChatModel;
+                    configuration: {
+                        baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/',
+                        extra_body: {
+                            google: {
+                                thinking_config: {
+                                    thinking_budget: 0,
+                                    include_thoughts: false,
+                                },
+                            },
+                        },
+                    } as any,
+                });
 
             case 'anthropic':
                 return new ChatAnthropic({
