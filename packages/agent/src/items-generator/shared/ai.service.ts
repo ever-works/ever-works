@@ -1,7 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 
 // AI Providers
-import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { ChatOpenAI } from '@langchain/openai';
 import { ChatAnthropic } from '@langchain/anthropic';
 import { ChatMistralAI } from '@langchain/mistralai';
