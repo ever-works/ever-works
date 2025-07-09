@@ -1,3 +1,11 @@
 packages:
-  - "apps/*"
-  - "packages/*"
+    - apps/*
+    - packages/*
+
+onlyBuiltDependencies:
+    - better-sqlite3
+    - core-js
+    - msgpackr-extract
+    - sqlite3
+    - '@nestjs/core'
+    - '@swc/core'

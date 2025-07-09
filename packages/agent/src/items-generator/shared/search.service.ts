@@ -4,7 +4,7 @@ import { ConfigDto } from '../dto/create-items-generator.dto';
 import { search, OrganicResult, DictionaryResult, OrganicResultNode } from 'google-sr';
 
 import * as cheerio from 'cheerio';
-import * as TurndownService from 'turndown';
+import TurndownService from 'turndown';
 import axios from 'axios';
 
 export type SearchResult = {

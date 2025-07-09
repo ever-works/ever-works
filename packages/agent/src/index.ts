@@ -24,6 +24,12 @@ export * from './website-generator/website-update.service';
 export * from './git/git.module';
 export * from './git/github.service';
 
+// Database
+export * from './database/database.module';
+export * from './database/database.config';
+export * from './database/database-config.factory';
+export * from './database/directory.repository';
+
 // Entities
 export * from './entities/directory.entity';
 export * from './entities/user.entity';

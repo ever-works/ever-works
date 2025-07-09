@@ -1,46 +1,48 @@
-import { randomUUID } from 'node:crypto';
+import { Entity, Column, PrimaryGeneratedColumn, Index } from 'typeorm';
 
-const directories = new Map<string, Directory>();
-
+@Entity()
+@Index(['owner', 'slug'], { unique: true }) // Unique constraint on owner + slug combination
 export class Directory {
-    id: string;
-    name: string;
-    slug: string;
-    owner: string;
-    companyName: string;
-    organization: boolean;
-    description: string;
-    readmeConfig?: MarkdownReadmeConfig;
+	@PrimaryGeneratedColumn()
+	id: number;
 
-    constructor() {
-        this.id = randomUUID();
-    }
+	@Column()
+	name: string;
 
-    static createMock(directory: Directory) {
-        if (!directory.owner) {
-            throw new Error('Owner is required');
-        }
+	@Column()
+	slug: string;
 
-        directories.set(directory.slug, directory);
-    }
+	@Column({ nullable: true })
+	website: string;
 
-    static async findMock(slug: string) {
-        return directories.get(slug);
-    }
+	@Column()
+	owner: string;
 
-    getDataRepo() {
-        return `${this.slug}-data`;
-    }
+	@Column({ nullable: true })
+	companyName: string;
 
-    getWebsiteRepo() {
-        return `${this.slug}-website`;
-    }
+	@Column({ default: false })
+	organization: boolean;
+
+	@Column()
+	description: string;
+
+	@Column('simple-json', { nullable: true })
+	readmeConfig: MarkdownReadmeConfig;
+
+	getDataRepo() {
+		return `${this.slug}-data`;
+	}
+
+	getWebsiteRepo() {
+		return `${this.slug}-website`;
+	}
 }
 
 export interface MarkdownReadmeConfig {
-    header?: string;
-    overwrite_default_header?: boolean;
+	header?: string;
+	overwrite_default_header?: boolean;
 
-    footer?: string;
-    overwrite_default_footer?: boolean;
+	footer?: string;
+	overwrite_default_footer?: boolean;
 }

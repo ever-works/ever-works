@@ -6,6 +6,7 @@ import { WebsiteUpdateService } from '../website-generator/website-update.servic
 import { Directory } from '../entities/directory.entity';
 import { User } from '../entities/user.entity';
 import { GithubService } from '../git/github.service';
+import { DirectoryRepository } from '../database/directory.repository';
 import {
 	CreateItemsGeneratorDto,
 	GenerationMethod,
@@ -36,7 +37,8 @@ export class AgentHTTPController {
 		private readonly websiteUpdateService: WebsiteUpdateService,
 		private readonly githubService: GithubService,
 		private readonly itemSubmissionService: ItemSubmissionService,
-		private readonly itemsGeneratorService: ItemsGeneratorService
+		private readonly itemsGeneratorService: ItemsGeneratorService,
+		private readonly directoryRepository: DirectoryRepository
 	) {}
 
 	@Post('directories')
@@ -45,18 +47,18 @@ export class AgentHTTPController {
 		const { slug, name, description, owner } = createDirectoryDto;
 		const user = await User.sessionMock();
 
-		const dir = new Directory();
-
-		dir.slug = slug;
-		dir.name = name;
-		dir.description = description;
-		dir.readmeConfig = createDirectoryDto.readme_config;
-
 		const ghOwner = await this.githubService.getUser(user.getGitToken());
-		dir.owner = owner || ghOwner.login;
-		dir.organization = !!owner && owner !== ghOwner.login;
 
-		Directory.createMock(dir);
+		const directoryData = {
+			slug,
+			name,
+			description,
+			readmeConfig: createDirectoryDto.readme_config,
+			owner: owner || ghOwner.login,
+			organization: !!owner && owner !== ghOwner.login
+		};
+
+		const dir = await this.directoryRepository.create(directoryData);
 
 		return {
 			status: 'success',
@@ -71,7 +73,7 @@ export class AgentHTTPController {
 		@Body() createItemsGeneratorDto: CreateItemsGeneratorDto
 	): Promise<ItemsGeneratorResponseDto> {
 		const user = await User.sessionMock();
-		const directory = await Directory.findMock(createItemsGeneratorDto.slug);
+		const directory = await this.directoryRepository.findBySlug(createItemsGeneratorDto.slug);
 		if (!directory) {
 			throw new NotFoundException('Directory not found');
 		}
@@ -96,7 +98,7 @@ export class AgentHTTPController {
 		@Body() updateItemsGeneratorDto: UpdateItemsGeneratorDto
 	): Promise<ItemsGeneratorResponseDto> {
 		const user = await User.sessionMock();
-		const directory = await Directory.findMock(slug);
+		const directory = await this.directoryRepository.findBySlug(slug);
 		if (!directory) {
 			throw new NotFoundException('Directory not found');
 		}
@@ -135,7 +137,7 @@ export class AgentHTTPController {
 			const user = await User.sessionMock();
 
 			// Check if directory exists for the given slug
-			const directory = await Directory.findMock(slug);
+			const directory = await this.directoryRepository.findBySlug(slug);
 			if (!directory) {
 				throw new NotFoundException(`Directory with slug '${slug}' not found`);
 			}
@@ -178,7 +180,7 @@ export class AgentHTTPController {
 			const user = await User.sessionMock();
 
 			// Check if directory exists for the given slug
-			const directory = await Directory.findMock(slug);
+			const directory = await this.directoryRepository.findBySlug(slug);
 			if (!directory) {
 				throw new NotFoundException(`Directory with slug '${slug}' not found`);
 			}
@@ -260,7 +262,7 @@ export class AgentHTTPController {
 			const user = await User.sessionMock();
 
 			// Check if directory exists for the given slug
-			const directory = await Directory.findMock(slug);
+			const directory = await this.directoryRepository.findBySlug(slug);
 			if (!directory) {
 				throw new NotFoundException(`Directory with slug '${slug}' not found`);
 			}
@@ -290,7 +292,7 @@ export class AgentHTTPController {
 			const user = await User.sessionMock();
 
 			// Check if directory exists for the given slug
-			const directory = await Directory.findMock(slug);
+			const directory = await this.directoryRepository.findBySlug(slug);
 			if (!directory) {
 				throw new NotFoundException(`Directory with slug '${slug}' not found`);
 			}

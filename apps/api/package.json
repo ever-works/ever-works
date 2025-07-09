@@ -6,11 +6,12 @@
     "private": true,
     "license": "UNLICENSED",
     "scripts": {
-        "build": "nest build -b swc",
-        "start": "nest start -b swc",
-        "start:dev": "nest start -b swc --watch",
-        "start:debug": "nest start -b swc --debug --watch",
-        "start:prod": "node dist/main"
+        "start": "pnpm build:deps && nest start -b swc",
+        "start:dev": "pnpm build:deps && nest start -b swc --watch",
+        "start:debug": "pnpm build:deps && nest start -b swc --debug --watch",
+        "start:prod": "node dist/main",
+        "build": "pnpm build:deps && nest build -b swc",
+        "build:deps": "pnpm --filter '@packages/*' build"
     },
     "dependencies": {
         "@nestjs/common": "^11.1.3",

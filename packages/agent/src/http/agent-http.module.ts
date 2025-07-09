@@ -6,9 +6,11 @@ import { GitModule } from '../git/git.module';
 import { MarkdownGeneratorModule } from '../markdown-generator/markdown-generator.module';
 import { WebsiteGeneratorModule } from '../website-generator/website-generator.module';
 import { DeployModule } from '../deploy/deploy.module';
+import { DatabaseModule } from '../database/database.module';
 
 @Module({
 	imports: [
+		DatabaseModule,
 		DataGeneratorModule,
 		ItemsGeneratorModule,
 		GitModule,

@@ -1,12 +1,12 @@
 import { NestFactory } from '@nestjs/core';
-import { AgentHTTPModule } from '@packages/agent';
 import { configDotenv } from 'dotenv';
 import { ValidationPipe } from '@nestjs/common';
+import { ApiModule } from './api.module';
 
 async function bootstrap() {
     configDotenv();
 
-    const app = await NestFactory.create(AgentHTTPModule);
+    const app = await NestFactory.create(ApiModule);
 
     app.useGlobalPipes(
         new ValidationPipe({
