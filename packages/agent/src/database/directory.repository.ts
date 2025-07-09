@@ -15,7 +15,15 @@ export class DirectoryRepository {
 			throw new Error('Owner is required');
 		}
 
-		const directory = this.repository.create(directoryData);
+		const exists = await this.findByOwnerAndSlug(directoryData.owner, directoryData.slug);
+
+		let directory: Directory;
+		if (exists) {
+			directory = await this.update(exists.id, directoryData);
+		} else {
+			directory = this.repository.create(directoryData);
+		}
+
 		return await this.repository.save(directory);
 	}
 

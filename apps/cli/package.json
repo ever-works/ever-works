@@ -18,7 +18,8 @@
     "@nestjs/core": "^11.0.1",
     "nest-commander": "^3.17.0",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.1"
+    "rxjs": "^7.8.1",
+    "@packages/agent": "workspace:*"
   },
   "devDependencies": {
     "@nestjs/cli": "^11.0.7",

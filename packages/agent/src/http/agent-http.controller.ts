@@ -62,8 +62,7 @@ export class AgentHTTPController {
 
 		return {
 			status: 'success',
-			directory: dir,
-			parameters: createDirectoryDto
+			directory: dir
 		};
 	}
 
