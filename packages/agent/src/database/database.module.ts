@@ -1,10 +1,8 @@
-import { Module } from '@nestjs/common';
+import { Logger, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { Directory } from '../entities/directory.entity';
-import { User } from '../entities/user.entity';
 import { DirectoryRepository } from './directory.repository';
-import { databaseConfig } from './database.config';
+import { databaseConfig, ENTITIES } from './database.config';
 
 @Module({
 	imports: [
@@ -12,12 +10,14 @@ import { databaseConfig } from './database.config';
 		TypeOrmModule.forRootAsync({
 			imports: [ConfigModule],
 			useFactory: (configService: ConfigService) => {
-				console.log('Database config:', configService.get('database'));
-				return configService.get('database');
+				const config = configService.get('database');
+				const logger = new Logger('DatabaseModule');
+				logger.debug(`Using ${config.type} database: ${config.database}`);
+				return config;
 			},
 			inject: [ConfigService]
 		}),
-		TypeOrmModule.forFeature([Directory, User])
+		TypeOrmModule.forFeature(ENTITIES)
 	],
 	providers: [DirectoryRepository],
 	exports: [TypeOrmModule, DirectoryRepository]

@@ -22,13 +22,15 @@ export interface DatabaseConfig extends Omit<TypeOrmModuleOptions, 'type'> {
 	logging: boolean;
 }
 
+export const ENTITIES = [Directory, User];
+
 export const databaseConfig = registerAs('database', (): DatabaseConfig => {
 	const environment = process.env.NODE_ENV || 'development';
 	const appType = process.env.APP_TYPE || 'api'; // 'cli' or 'api'
 	let dbType = (process.env.DATABASE_TYPE || 'better-sqlite3') as DatabaseType;
 
 	const baseConfig = {
-		entities: [Directory, User],
+		entities: ENTITIES,
 		synchronize: environment !== 'production',
 		logging: process.env.DATABASE_LOGGING === 'true'
 	};
