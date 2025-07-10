@@ -13,7 +13,6 @@ export class DeploymentPromptService extends BasePromptService {
         this.displayInfo('Configure your deployment provider (you can add more providers later)');
 
         const provider = await this.promptSelect(
-            'deploymentProvider',
             'Select a deployment provider:',
             [
                 { name: 'Vercel', value: 'vercel' as const },
@@ -26,7 +25,6 @@ export class DeploymentPromptService extends BasePromptService {
         if (provider === 'vercel') {
             this.displayInfo('You can get your Vercel token from: https://vercel.com/account/tokens');
             vercelToken = await this.promptPassword(
-                'vercelToken',
                 'Enter your Vercel token:'
             );
         }

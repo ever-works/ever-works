@@ -77,8 +77,9 @@ export interface EverWorksConfig {
 
 /**
  * Partial configuration for setup process
+ * Using Record to allow dynamic key assignment
  */
-export type PartialEverWorksConfig = Partial<EverWorksConfig>;
+export type PartialEverWorksConfig = Record<string, string | undefined>;
 
 /**
  * Configuration validation result

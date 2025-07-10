@@ -7,7 +7,7 @@ import { GitHubGitPromptService } from '../../prompts/github-git-prompt.service'
 import { DeploymentPromptService } from '../../prompts/deployment-prompt.service';
 import { AiProviderPromptService } from '../../prompts/ai-provider-prompt.service';
 import { SearchServicePromptService } from '../../prompts/search-service-prompt.service';
-import { AiProviderTesterService } from '../../ai-providers/ai-provider-tester.service';
+
 import { PartialEverWorksConfig } from '../../config/config.interface';
 
 @Injectable()
@@ -23,8 +23,7 @@ export class SetupSubCommand extends CommandRunner {
         private readonly githubGitPrompt: GitHubGitPromptService,
         private readonly deploymentPrompt: DeploymentPromptService,
         private readonly aiProviderPrompt: AiProviderPromptService,
-        private readonly searchServicePrompt: SearchServicePromptService,
-        private readonly aiProviderTester: AiProviderTesterService
+        private readonly searchServicePrompt: SearchServicePromptService
     ) {
         super();
     }
@@ -37,7 +36,6 @@ export class SetupSubCommand extends CommandRunner {
             // Check if configuration already exists
             const configExists = await this.configService.configExists();
             if (configExists) {
-                const existingConfig = await this.configService.loadConfig();
                 console.log(chalk.yellow('⚠ Configuration already exists at:'));
                 console.log(chalk.gray(`   ${this.configService.getConfigPath()}\n`));
 

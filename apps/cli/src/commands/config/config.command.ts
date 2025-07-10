@@ -1,15 +1,16 @@
-import { Command, CommandRunner, SubCommand } from 'nest-commander';
-import { Injectable, Logger } from '@nestjs/common';
+import { Command, CommandRunner } from 'nest-commander';
+import { Injectable } from '@nestjs/common';
+import { SetupSubCommand } from './setup.subcommand';
+import { ShowSubCommand } from './show.subcommand';
+import { TestSubCommand } from './test.subcommand';
 
 @Injectable()
 @Command({
     name: 'config',
     description: 'Configuration management commands',
-    subCommands: ['config:setup', 'config:show', 'config:test'],
+    subCommands: [SetupSubCommand, ShowSubCommand, TestSubCommand],
 })
 export class ConfigCommand extends CommandRunner {
-    private readonly logger = new Logger(ConfigCommand.name);
-
     async run(): Promise<void> {
         console.log('Available config commands:');
         console.log('  setup  - Setup Ever Works CLI configuration');

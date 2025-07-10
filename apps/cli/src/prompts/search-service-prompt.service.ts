@@ -18,7 +18,6 @@ export class SearchServicePromptService extends BasePromptService {
         this.displayInfo('This service extracts content from web pages for analysis');
 
         const extractContentService = await this.promptSelect(
-            'extractContentService',
             'Select content extraction service:',
             [
                 {
@@ -37,7 +36,6 @@ export class SearchServicePromptService extends BasePromptService {
         this.displayInfo('This service searches the web for relevant information');
 
         const webSearchService = await this.promptSelect(
-            'webSearchService',
             'Select web search service:',
             [
                 {
@@ -60,7 +58,6 @@ export class SearchServicePromptService extends BasePromptService {
             this.displayInfo('Tavily provides high-quality AI-powered search and content extraction');
 
             tavilyApiKey = await this.promptPassword(
-                'tavilyApiKey',
                 'Enter your Tavily API key:'
             );
         }

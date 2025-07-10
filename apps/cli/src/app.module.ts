@@ -1,9 +1,15 @@
 import { Module } from '@nestjs/common';
 import { AppService } from './app.service';
-import { DatabaseConfigurations } from '@packages/agent';
+import { DatabaseConfigurations, AiService } from '@packages/agent';
+
+// Config Module
+import { ConfigModule } from './config/config.module';
 
 // Commands
-import { SetupCommand } from './commands/setup.command';
+import { ConfigCommand } from './commands/config/config.command';
+import { SetupSubCommand } from './commands/config/setup.subcommand';
+import { ShowSubCommand } from './commands/config/show.subcommand';
+import { TestSubCommand } from './commands/config/test.subcommand';
 
 // Services
 import { ConfigService } from './config/config.service';
@@ -16,14 +22,21 @@ import { AiProviderPromptService } from './prompts/ai-provider-prompt.service';
 import { SearchServicePromptService } from './prompts/search-service-prompt.service';
 
 @Module({
-    imports: [DatabaseConfigurations.cli()],
+    imports: [
+        DatabaseConfigurations.cli(),
+        ConfigModule,
+    ],
     providers: [
         AppService,
         // Commands
-        SetupCommand,
+        ConfigCommand,
+        SetupSubCommand,
+        ShowSubCommand,
+        TestSubCommand,
         // Core Services
         ConfigService,
         AiProviderRegistryService,
+        AiService,
         // Prompt Services
         GitHubGitPromptService,
         DeploymentPromptService,

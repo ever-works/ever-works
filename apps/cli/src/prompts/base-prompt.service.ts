@@ -45,7 +45,6 @@ export abstract class BasePromptService {
      * Prompts for a required text input
      */
     protected async promptRequiredText(
-        name: string,
         message: string,
         defaultValue?: string
     ): Promise<string> {
@@ -70,7 +69,6 @@ export abstract class BasePromptService {
      * Prompts for an optional text input
      */
     protected async promptOptionalText(
-        name: string,
         message: string,
         defaultValue?: string
     ): Promise<string | undefined> {
@@ -89,10 +87,9 @@ export abstract class BasePromptService {
      * Prompts for a password input
      */
     protected async promptPassword(
-        name: string,
         message: string,
         required: boolean = true
-    ): Promise<string | undefined> {
+    ): Promise<string> {
         const { value } = await inquirer.prompt([
             {
                 type: 'password',
@@ -109,14 +106,13 @@ export abstract class BasePromptService {
                     : undefined,
             },
         ]);
-        return value?.trim() || undefined;
+        return value?.trim() || '';
     }
 
     /**
      * Prompts for a single selection from a list
      */
     protected async promptSelect<T extends string>(
-        name: string,
         message: string,
         choices: Array<{ name: string; value: T }>,
         defaultValue?: T
@@ -137,20 +133,15 @@ export abstract class BasePromptService {
      * Prompts for multiple selections from a list
      */
     protected async promptMultiSelect<T extends string>(
-        name: string,
         message: string,
-        choices: Array<{ name: string; value: T; checked?: boolean }>,
-        validate?: (input: T[]) => boolean | string
+        choices: Array<{ name: string; value: T; checked?: boolean }>
     ): Promise<T[]> {
-        const { value } = await inquirer.prompt([
-            {
-                type: 'checkbox',
-                name: 'value',
-                message,
-                choices,
-                validate,
-            },
-        ]);
+        const { value } = await inquirer.prompt({
+            type: 'checkbox',
+            name: 'value',
+            message,
+            choices,
+        });
         return value;
     }
 
@@ -158,7 +149,6 @@ export abstract class BasePromptService {
      * Prompts for a confirmation
      */
     protected async promptConfirm(
-        name: string,
         message: string,
         defaultValue: boolean = false
     ): Promise<boolean> {
@@ -177,7 +167,6 @@ export abstract class BasePromptService {
      * Prompts for a number input
      */
     protected async promptNumber(
-        name: string,
         message: string,
         defaultValue?: number,
         min?: number,

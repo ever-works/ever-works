@@ -8,7 +8,10 @@ import ora from 'ora';
 
 @Injectable()
 export class AiProviderPromptService extends BasePromptService {
-    constructor(private readonly aiProviderRegistry: AiProviderRegistryService) {
+    constructor(
+        private readonly aiProviderRegistry: AiProviderRegistryService,
+        private readonly aiService: AiService
+    ) {
         super();
     }
 
@@ -18,7 +21,6 @@ export class AiProviderPromptService extends BasePromptService {
 
         // Select default provider
         const defaultProvider = await this.promptSelect(
-            'defaultProvider',
             'Select your default AI provider:',
             this.aiProviderRegistry.getProviderChoicesWithIgnore()
         );
@@ -42,7 +44,6 @@ export class AiProviderPromptService extends BasePromptService {
 
         // Ask for fallback providers
         const wantsFallback = await this.promptConfirm(
-            'wantsFallback',
             'Do you want to configure fallback AI providers? (Recommended for reliability)'
         );
 
@@ -55,7 +56,6 @@ export class AiProviderPromptService extends BasePromptService {
 
             if (availableForFallback.length > 0) {
                 fallbackProviders = await this.promptMultiSelect(
-                    'fallbackProviders',
                     'Select fallback providers (in order of preference):',
                     availableForFallback.map(choice => ({
                         name: choice.name,
@@ -102,25 +102,21 @@ export class AiProviderPromptService extends BasePromptService {
         let apiKey = '';
         if (providerInfo.requiresApiKey) {
             apiKey = await this.promptPassword(
-                'apiKey',
                 `Enter your ${providerInfo.displayName} API key:`
             );
         }
 
         // Model selection
         const model = await this.promptSelect(
-            'model',
             'Select a model:',
             providerInfo.models.map(model => ({
                 name: model,
                 value: model,
-            })),
-            providerInfo.defaults.model
+            }))
         );
 
         // Advanced configuration
         const wantsAdvanced = await this.promptConfirm(
-            'wantsAdvanced',
             'Do you want to configure advanced settings? (temperature, max tokens, etc.)',
             false
         );
@@ -131,7 +127,6 @@ export class AiProviderPromptService extends BasePromptService {
 
         if (wantsAdvanced) {
             temperature = await this.promptNumber(
-                'temperature',
                 'Enter temperature (0.0 = deterministic, 1.0 = creative):',
                 providerInfo.defaults.temperature,
                 0,
@@ -139,7 +134,6 @@ export class AiProviderPromptService extends BasePromptService {
             );
 
             maxTokens = await this.promptNumber(
-                'maxTokens',
                 'Enter max tokens:',
                 providerInfo.defaults.maxTokens,
                 1,
@@ -148,11 +142,44 @@ export class AiProviderPromptService extends BasePromptService {
 
             if (providerInfo.defaults.baseUrl) {
                 const customBaseUrl = await this.promptOptionalText(
-                    'baseUrl',
                     'Enter custom base URL (leave empty for default):',
                     providerInfo.defaults.baseUrl
                 );
                 baseUrl = customBaseUrl || providerInfo.defaults.baseUrl;
+            }
+        }
+
+        // Test the provider configuration
+        const shouldTest = await this.promptConfirm(
+            `Do you want to test the ${providerInfo.displayName} configuration now?`,
+            true
+        );
+
+        if (shouldTest) {
+            const testResult = await this.testProviderConfiguration({
+                name: providerName,
+                apiKey,
+                model,
+                temperature,
+                maxTokens,
+                baseUrl,
+            });
+
+            if (testResult.success) {
+                this.displaySuccess(`${providerInfo.displayName} test passed! Response time: ${testResult.responseTime}ms`);
+                this.displayInfo(`Response: ${testResult.response}`);
+            } else {
+                this.displayError(`${providerInfo.displayName} test failed: ${testResult.error}`);
+
+                const continueAnyway = await this.promptConfirm(
+                    'Do you want to continue with this configuration anyway?',
+                    false
+                );
+
+                if (!continueAnyway) {
+                    this.displayInfo('Provider configuration cancelled');
+                    return null;
+                }
             }
         }
 
@@ -166,5 +193,47 @@ export class AiProviderPromptService extends BasePromptService {
             maxTokens,
             baseUrl,
         };
+    }
+
+    /**
+     * Test a provider configuration using the AI service
+     */
+    private async testProviderConfiguration(config: ConfiguredAiProvider): Promise<{
+        success: boolean;
+        provider: string;
+        model: string;
+        responseTime: number;
+        error?: string;
+        response?: string;
+    }> {
+        const spinner = ora(`Testing ${config.name} provider...`).start();
+
+        try {
+            const result = await this.aiService.testProvider({
+                type: config.name as any,
+                apiKey: config.apiKey,
+                modelName: config.model,
+                temperature: config.temperature,
+                maxTokens: config.maxTokens,
+                baseURL: config.baseUrl,
+            });
+
+            if (result.success) {
+                spinner.succeed(`${config.name} test completed`);
+            } else {
+                spinner.fail(`${config.name} test failed`);
+            }
+
+            return result;
+        } catch (error) {
+            spinner.fail(`${config.name} test failed`);
+            return {
+                success: false,
+                provider: config.name,
+                model: config.model,
+                responseTime: 0,
+                error: error.message,
+            };
+        }
     }
 }
