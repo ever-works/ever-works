@@ -18,5 +18,7 @@
     "forceConsistentCasingInFileNames": false,
     "noFallthroughCasesInSwitch": false
   },
-  "exclude": ["examples/**/*"]
+  "exclude": [
+    "examples/**/*"
+  ]
 }
