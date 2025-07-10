@@ -13,14 +13,15 @@ export class AiProviderPromptService extends BasePromptService {
         super();
     }
 
-    async promptAiProviderConfiguration(): Promise<AiProviderConfiguration> {
+    async promptAiProviderConfiguration(existingConfig?: any): Promise<AiProviderConfiguration> {
         this.displaySectionHeader('AI Provider Configuration');
         this.displayInfo('Configure your AI providers for the agent to work properly');
 
-        // Select default provider
+        // Select default provider with existing config as default
         const defaultProvider = await this.promptSelect(
             'Select your default AI provider:',
             this.aiProviderRegistry.getProviderChoicesWithIgnore(),
+            existingConfig?.AI_DEFAULT_PROVIDER,
         );
 
         if (defaultProvider === 'ignore') {
@@ -37,7 +38,11 @@ export class AiProviderPromptService extends BasePromptService {
         const configuredProviders: ConfiguredAiProvider[] = [];
 
         // Configure the default provider
-        const defaultProviderConfig = await this.configureProvider(defaultProvider, true);
+        const defaultProviderConfig = await this.configureProvider(
+            defaultProvider,
+            true,
+            existingConfig,
+        );
         if (defaultProviderConfig) {
             configuredProviders.push(defaultProviderConfig);
         }
@@ -87,7 +92,12 @@ export class AiProviderPromptService extends BasePromptService {
 
                     // Configure the selected fallback provider
                     this.displayInfo(`\nConfiguring fallback provider: ${selectedProvider}`);
-                    const providerConfig = await this.configureProvider(selectedProvider, false);
+                    const providerConfig = await this.configureProvider(
+                        selectedProvider,
+                        false,
+                        existingConfig,
+                    );
+
                     if (providerConfig) {
                         configuredProviders.push(providerConfig);
                         fallbackProviders.push(selectedProvider);
@@ -134,6 +144,7 @@ export class AiProviderPromptService extends BasePromptService {
     private async configureProvider(
         providerName: string,
         isDefault: boolean,
+        existingConfig?: any,
     ): Promise<ConfiguredAiProvider | null> {
         const providerInfo = this.aiProviderRegistry.getProvider(providerName);
         if (!providerInfo) {
@@ -148,13 +159,33 @@ export class AiProviderPromptService extends BasePromptService {
         this.displayInfo(`Website: ${providerInfo.websiteUrl}`);
         this.displayInfo(`Documentation: ${providerInfo.docsUrl}`);
 
+        // Get existing values for this provider
+        const upperProvider = providerName.toUpperCase();
+        const existingApiKey = existingConfig?.[`${upperProvider}_API_KEY`];
+        const existingModel = existingConfig?.[`${upperProvider}_MODEL`];
+        const existingTemperature = existingConfig?.[`${upperProvider}_TEMPERATURE`];
+        const existingMaxTokens = existingConfig?.[`${upperProvider}_MAX_TOKENS`];
+        const existingBaseUrl = existingConfig?.[`${upperProvider}_BASE_URL`];
+
+        if (existingApiKey) {
+            this.displayInfo(`Found existing configuration for ${providerInfo.displayName}`);
+        }
+
         let apiKey = '';
         if (providerInfo.requiresApiKey) {
             while (true) {
                 try {
                     apiKey = await this.promptPassword(
-                        `Enter your ${providerInfo.displayName} API key:`,
+                        `Enter your ${providerInfo.displayName} API key:${existingApiKey ? ' (leave empty to keep current)' : ''}`,
+                        !existingApiKey,
                     );
+
+                    // If empty and we have existing, use existing
+                    if (!apiKey && existingApiKey) {
+                        apiKey = existingApiKey;
+                        this.displayInfo('Using existing API key');
+                        break;
+                    }
 
                     const validation = this.validateApiKey(apiKey, providerInfo.displayName);
                     if (validation !== true) {
@@ -179,7 +210,14 @@ export class AiProviderPromptService extends BasePromptService {
         ];
 
         let model: string;
-        const selectedModel = await this.promptSelect('Select a model:', modelChoices);
+        // Determine default model selection
+        let defaultModel = existingModel || providerInfo.defaults.model;
+
+        const selectedModel = await this.promptSelect(
+            'Select a model:',
+            modelChoices,
+            defaultModel,
+        );
 
         if (selectedModel === '__custom__') {
             // Show provider-specific examples
@@ -189,7 +227,7 @@ export class AiProviderPromptService extends BasePromptService {
                 try {
                     model = await this.promptRequiredText(
                         `Enter custom model name for ${providerInfo.displayName}:`,
-                        undefined,
+                        existingModel,
                         this.validateModelName.bind(this),
                     );
                     break;
@@ -208,9 +246,15 @@ export class AiProviderPromptService extends BasePromptService {
             false,
         );
 
-        let temperature = providerInfo.defaults.temperature;
-        let maxTokens = providerInfo.defaults.maxTokens;
-        let baseUrl = providerInfo.defaults.baseUrl;
+        let temperature = existingTemperature
+            ? parseFloat(existingTemperature)
+            : providerInfo.defaults.temperature;
+
+        let maxTokens = existingMaxTokens
+            ? parseInt(existingMaxTokens)
+            : providerInfo.defaults.maxTokens;
+
+        let baseUrl = existingBaseUrl || providerInfo.defaults.baseUrl;
 
         if (wantsAdvanced) {
             // Temperature validation with retry
@@ -218,7 +262,7 @@ export class AiProviderPromptService extends BasePromptService {
                 try {
                     temperature = await this.promptNumber(
                         'Enter temperature (0.0 = deterministic, 1.0 = creative):',
-                        providerInfo.defaults.temperature,
+                        temperature,
                         0,
                         2,
                     );
@@ -239,7 +283,7 @@ export class AiProviderPromptService extends BasePromptService {
                 try {
                     const tokensInput = await this.promptNumber(
                         'Enter max tokens:',
-                        providerInfo.defaults.maxTokens,
+                        maxTokens,
                         1,
                         100000,
                     );
@@ -264,7 +308,7 @@ export class AiProviderPromptService extends BasePromptService {
                     try {
                         const customBaseUrl = await this.promptOptionalText(
                             'Enter custom base URL (leave empty for default):',
-                            providerInfo.defaults.baseUrl,
+                            baseUrl,
                         );
 
                         if (customBaseUrl) {
@@ -275,7 +319,7 @@ export class AiProviderPromptService extends BasePromptService {
                             }
                             baseUrl = customBaseUrl;
                         } else {
-                            baseUrl = providerInfo.defaults.baseUrl;
+                            baseUrl = baseUrl || providerInfo.defaults.baseUrl;
                         }
                         break;
                     } catch (error) {
@@ -320,7 +364,7 @@ export class AiProviderPromptService extends BasePromptService {
                     return null;
                 } else if (options === 'retry') {
                     this.displayInfo('Please re-enter your configuration');
-                    return this.configureProvider(providerName, isDefault);
+                    return this.configureProvider(providerName, isDefault, existingConfig);
                 }
                 // If 'continue', we proceed with the current configuration
             }

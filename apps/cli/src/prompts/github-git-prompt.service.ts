@@ -10,7 +10,7 @@ export interface GitHubGitConfig {
 
 @Injectable()
 export class GitHubGitPromptService extends BasePromptService {
-    async promptGitHubGitConfig(): Promise<GitHubGitConfig> {
+    async promptGitHubGitConfig(existingConfig?: any): Promise<GitHubGitConfig> {
         this.displaySectionHeader('GitHub & Git Configuration');
         this.displayInfo('Configure your GitHub API access and Git identity');
 
@@ -50,21 +50,21 @@ export class GitHubGitPromptService extends BasePromptService {
         // GitHub Username/Organization with validation
         const githubOwner = await this.promptRequiredText(
             'Enter your GitHub username/organization:',
-            undefined,
+            existingConfig?.GITHUB_OWNER,
             this.validateGitHubUsername.bind(this)
         );
 
         // Git Name with validation
         const gitName = await this.promptRequiredText(
             'Enter your Git name (for commits):',
-            undefined,
+            existingConfig?.GIT_NAME,
             this.validateGitName.bind(this)
         );
 
         // Git Email with validation
         const gitEmail = await this.promptRequiredText(
             'Enter your Git email (for commits):',
-            undefined,
+            existingConfig?.GIT_EMAIL,
             this.validateEmail.bind(this)
         );
 

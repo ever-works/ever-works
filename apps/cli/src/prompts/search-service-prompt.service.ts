@@ -9,7 +9,7 @@ export interface SearchServiceConfig {
 
 @Injectable()
 export class SearchServicePromptService extends BasePromptService {
-    async promptSearchServiceConfiguration(): Promise<SearchServiceConfig> {
+    async promptSearchServiceConfiguration(existingConfig?: any): Promise<SearchServiceConfig> {
         this.displaySectionHeader('Search Service Configuration');
         this.displayInfo('Configure search and content extraction services');
 
@@ -28,7 +28,8 @@ export class SearchServicePromptService extends BasePromptService {
                     name: 'Naive - Basic content extraction (no API key required)',
                     value: 'naive' as const,
                 },
-            ]
+            ],
+            existingConfig?.EXTRACT_CONTENT_SERVICE,
         );
 
         // Web Search Service Configuration
@@ -46,7 +47,8 @@ export class SearchServicePromptService extends BasePromptService {
                     name: 'Google Search Results - Basic web search (no API key required)',
                     value: 'google-sr' as const,
                 },
-            ]
+            ],
+            existingConfig?.WEB_SEARCH_SERVICE,
         );
 
         // Tavily API Key (if needed)

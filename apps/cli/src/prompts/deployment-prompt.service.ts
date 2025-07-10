@@ -8,14 +8,24 @@ export interface DeploymentConfig {
 
 @Injectable()
 export class DeploymentPromptService extends BasePromptService {
-    async promptDeploymentConfig(): Promise<DeploymentConfig> {
+    async promptDeploymentConfig(existingConfig?: any): Promise<DeploymentConfig> {
         this.displaySectionHeader('Deployment Provider Configuration');
         this.displayInfo('Configure your deployment provider (you can add more providers later)');
 
-        const provider = await this.promptSelect('Select a deployment provider:', [
-            { name: 'Vercel', value: 'vercel' as const },
-            { name: 'Skip deployment configuration', value: 'ignore' as const },
-        ]);
+        // Determine default provider based on existing config
+        let defaultProvider: 'vercel' | 'ignore' = 'ignore';
+        if (existingConfig?.VERCEL_TOKEN) {
+            defaultProvider = 'vercel';
+        }
+
+        const provider = await this.promptSelect(
+            'Select a deployment provider:',
+            [
+                { name: 'Vercel', value: 'vercel' as const },
+                { name: 'Skip deployment configuration', value: 'ignore' as const },
+            ],
+            defaultProvider,
+        );
 
         let vercelToken: string | undefined;
 

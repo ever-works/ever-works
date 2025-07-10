@@ -35,11 +35,15 @@ export class SetupSubCommand extends CommandRunner {
         try {
             // Check if configuration already exists
             const configExists = await this.configService.configExists();
-            if (configExists) {
-                console.log(chalk.yellow('⚠ Configuration already exists at:'));
-                console.log(chalk.gray(`   ${this.configService.getConfigPath()}\n`));
+            let existingConfig: any = null;
 
-                const { overwrite } = await import('inquirer').then(inquirer => 
+            if (configExists) {
+                existingConfig = await this.configService.loadConfig();
+                console.log(chalk.yellow('⚠ Configuration already exists at:'));
+                console.log(chalk.gray(`   ${this.configService.getConfigPath()}`));
+                console.log(chalk.gray('   You can also edit this file manually if needed.\n'));
+
+                const { overwrite } = await import('inquirer').then(inquirer =>
                     inquirer.default.prompt([{
                         type: 'confirm',
                         name: 'overwrite',
@@ -50,8 +54,14 @@ export class SetupSubCommand extends CommandRunner {
 
                 if (!overwrite) {
                     console.log(chalk.blue('ℹ Setup cancelled. Existing configuration preserved.'));
+                    console.log(chalk.gray('To modify specific settings, you can:'));
+                    console.log(chalk.gray('  • Edit the config file manually'));
+                    console.log(chalk.gray('  • Run ') + chalk.cyan('ever-works config show') + chalk.gray(' to view current settings'));
+                    console.log(chalk.gray('  • Run ') + chalk.cyan('ever-works config test') + chalk.gray(' to test your configuration'));
                     return;
                 }
+
+                console.log(chalk.blue('ℹ Using existing values as defaults where available...\n'));
             }
 
             // Start configuration process
@@ -65,20 +75,20 @@ export class SetupSubCommand extends CommandRunner {
             };
 
             // 1. GitHub & Git Configuration
-            const githubGitConfig = await this.githubGitPrompt.promptGitHubGitConfig();
+            const githubGitConfig = await this.githubGitPrompt.promptGitHubGitConfig(existingConfig);
             config.GITHUB_APIKEY = githubGitConfig.githubApiKey;
             config.GITHUB_OWNER = githubGitConfig.githubOwner;
             config.GIT_NAME = githubGitConfig.gitName;
             config.GIT_EMAIL = githubGitConfig.gitEmail;
 
             // 2. Deployment Provider Configuration
-            const deploymentConfig = await this.deploymentPrompt.promptDeploymentConfig();
+            const deploymentConfig = await this.deploymentPrompt.promptDeploymentConfig(existingConfig);
             if (deploymentConfig.provider === 'vercel' && deploymentConfig.vercelToken) {
                 config.VERCEL_TOKEN = deploymentConfig.vercelToken;
             }
 
             // 3. AI Provider Configuration
-            const aiConfig = await this.aiProviderPrompt.promptAiProviderConfiguration();
+            const aiConfig = await this.aiProviderPrompt.promptAiProviderConfiguration(existingConfig);
             if (aiConfig.defaultProvider && aiConfig.defaultProvider !== 'ignore') {
                 config.AI_DEFAULT_PROVIDER = aiConfig.defaultProvider;
                 config.AI_FALLBACK_PROVIDERS = aiConfig.fallbackProviders.join(',');
@@ -90,7 +100,7 @@ export class SetupSubCommand extends CommandRunner {
                     config[`${upperProvider}_MODEL` as keyof PartialEverWorksConfig] = provider.model;
                     config[`${upperProvider}_TEMPERATURE` as keyof PartialEverWorksConfig] = provider.temperature.toString();
                     config[`${upperProvider}_MAX_TOKENS` as keyof PartialEverWorksConfig] = provider.maxTokens.toString();
-                    
+
                     if (provider.baseUrl) {
                         config[`${upperProvider}_BASE_URL` as keyof PartialEverWorksConfig] = provider.baseUrl;
                     }
@@ -98,7 +108,7 @@ export class SetupSubCommand extends CommandRunner {
             }
 
             // 4. Search Service Configuration
-            const searchConfig = await this.searchServicePrompt.promptSearchServiceConfiguration();
+            const searchConfig = await this.searchServicePrompt.promptSearchServiceConfiguration(existingConfig);
             config.EXTRACT_CONTENT_SERVICE = searchConfig.extractContentService;
             config.WEB_SEARCH_SERVICE = searchConfig.webSearchService;
             if (searchConfig.tavilyApiKey) {
