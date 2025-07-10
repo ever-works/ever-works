@@ -8,7 +8,7 @@ import ora from 'ora';
 export class AiProviderPromptService extends BasePromptService {
     constructor(
         private readonly aiProviderRegistry: AiProviderRegistryService,
-        private readonly aiService: AiService
+        private readonly aiService: AiService,
     ) {
         super();
     }
@@ -20,11 +20,13 @@ export class AiProviderPromptService extends BasePromptService {
         // Select default provider
         const defaultProvider = await this.promptSelect(
             'Select your default AI provider:',
-            this.aiProviderRegistry.getProviderChoicesWithIgnore()
+            this.aiProviderRegistry.getProviderChoicesWithIgnore(),
         );
 
         if (defaultProvider === 'ignore') {
-            this.displayWarning('AI configuration skipped. The agent will not work without AI providers.');
+            this.displayWarning(
+                'AI configuration skipped. The agent will not work without AI providers.',
+            );
             return {
                 defaultProvider: '',
                 fallbackProviders: [],
@@ -42,7 +44,7 @@ export class AiProviderPromptService extends BasePromptService {
 
         // Ask for fallback providers
         const wantsFallback = await this.promptConfirm(
-            'Do you want to configure fallback AI providers? (Recommended for reliability)'
+            'Do you want to configure fallback AI providers? (Recommended for reliability)',
         );
 
         let fallbackProviders: string[] = [];
@@ -50,15 +52,15 @@ export class AiProviderPromptService extends BasePromptService {
         if (wantsFallback) {
             const availableForFallback = this.aiProviderRegistry
                 .getProviderChoices()
-                .filter(choice => choice.value !== defaultProvider);
+                .filter((choice) => choice.value !== defaultProvider);
 
             if (availableForFallback.length > 0) {
                 fallbackProviders = await this.promptMultiSelect(
                     'Select fallback providers (in order of preference):',
-                    availableForFallback.map(choice => ({
+                    availableForFallback.map((choice) => ({
                         name: choice.name,
                         value: choice.value,
-                    }))
+                    })),
                 );
 
                 // Configure each fallback provider
@@ -82,7 +84,7 @@ export class AiProviderPromptService extends BasePromptService {
 
     private async configureProvider(
         providerName: string,
-        isDefault: boolean
+        isDefault: boolean,
     ): Promise<ConfiguredAiProvider | null> {
         const providerInfo = this.aiProviderRegistry.getProvider(providerName);
         if (!providerInfo) {
@@ -91,7 +93,7 @@ export class AiProviderPromptService extends BasePromptService {
         }
 
         this.displaySectionHeader(
-            `Configure ${providerInfo.displayName}${isDefault ? ' (Default Provider)' : ''}`
+            `Configure ${providerInfo.displayName}${isDefault ? ' (Default Provider)' : ''}`,
         );
 
         this.displayInfo(`Website: ${providerInfo.websiteUrl}`);
@@ -102,7 +104,7 @@ export class AiProviderPromptService extends BasePromptService {
             while (true) {
                 try {
                     apiKey = await this.promptPassword(
-                        `Enter your ${providerInfo.displayName} API key:`
+                        `Enter your ${providerInfo.displayName} API key:`,
                     );
 
                     const validation = this.validateApiKey(apiKey, providerInfo.displayName);
@@ -118,19 +120,43 @@ export class AiProviderPromptService extends BasePromptService {
             }
         }
 
-        // Model selection
-        const model = await this.promptSelect(
-            'Select a model:',
-            providerInfo.models.map((modelName: string) => ({
+        // Model selection with custom option
+        const modelChoices = [
+            ...providerInfo.models.map((modelName: string) => ({
                 name: modelName,
                 value: modelName,
-            }))
-        );
+            })),
+            { name: 'Enter custom model name', value: '__custom__' },
+        ];
+
+        let model: string;
+        const selectedModel = await this.promptSelect('Select a model:', modelChoices);
+
+        if (selectedModel === '__custom__') {
+            // Show provider-specific examples
+            this.displayInfo(this.getCustomModelExamples(providerName));
+
+            while (true) {
+                try {
+                    model = await this.promptRequiredText(
+                        `Enter custom model name for ${providerInfo.displayName}:`,
+                        undefined,
+                        this.validateModelName.bind(this),
+                    );
+                    break;
+                } catch (error) {
+                    this.displayError('Invalid model name. Please try again.');
+                }
+            }
+            this.displayInfo(`Using custom model: ${model}`);
+        } else {
+            model = selectedModel;
+        }
 
         // Advanced configuration
         const wantsAdvanced = await this.promptConfirm(
             'Do you want to configure advanced settings? (temperature, max tokens, etc.)',
-            false
+            false,
         );
 
         let temperature = providerInfo.defaults.temperature;
@@ -145,7 +171,7 @@ export class AiProviderPromptService extends BasePromptService {
                         'Enter temperature (0.0 = deterministic, 1.0 = creative):',
                         providerInfo.defaults.temperature,
                         0,
-                        2
+                        2,
                     );
 
                     const tempValidation = this.validateTemperature(temperature);
@@ -166,7 +192,7 @@ export class AiProviderPromptService extends BasePromptService {
                         'Enter max tokens:',
                         providerInfo.defaults.maxTokens,
                         1,
-                        100000
+                        100000,
                     );
 
                     // Convert to integer for max tokens
@@ -189,7 +215,7 @@ export class AiProviderPromptService extends BasePromptService {
                     try {
                         const customBaseUrl = await this.promptOptionalText(
                             'Enter custom base URL (leave empty for default):',
-                            providerInfo.defaults.baseUrl
+                            providerInfo.defaults.baseUrl,
                         );
 
                         if (customBaseUrl) {
@@ -213,7 +239,7 @@ export class AiProviderPromptService extends BasePromptService {
         // Test the provider configuration
         const shouldTest = await this.promptConfirm(
             `Do you want to test the ${providerInfo.displayName} configuration now?`,
-            true
+            true,
         );
 
         if (shouldTest) {
@@ -227,19 +253,18 @@ export class AiProviderPromptService extends BasePromptService {
             });
 
             if (testResult.success) {
-                this.displaySuccess(`${providerInfo.displayName} test passed! Response time: ${testResult.responseTime}ms`);
+                this.displaySuccess(
+                    `${providerInfo.displayName} test passed! Response time: ${testResult.responseTime}ms`,
+                );
                 this.displayInfo(`Response: ${testResult.response}`);
             } else {
                 this.displayError(`${providerInfo.displayName} test failed: ${testResult.error}`);
 
-                const options = await this.promptSelect(
-                    'What would you like to do?',
-                    [
-                        { name: 'Continue with this configuration anyway', value: 'continue' },
-                        { name: 'Re-enter the API key', value: 'retry' },
-                        { name: 'Skip this provider', value: 'skip' },
-                    ]
-                );
+                const options = await this.promptSelect('What would you like to do?', [
+                    { name: 'Continue with this configuration anyway', value: 'continue' },
+                    { name: 'Re-enter the API key', value: 'retry' },
+                    { name: 'Skip this provider', value: 'skip' },
+                ]);
 
                 if (options === 'skip') {
                     this.displayInfo('Provider configuration skipped');
@@ -304,5 +329,25 @@ export class AiProviderPromptService extends BasePromptService {
                 error: error.message,
             };
         }
+    }
+
+    /**
+     * Get provider-specific examples for custom models
+     */
+    private getCustomModelExamples(providerName: string): string {
+        const examples: Record<string, string> = {
+            openai: 'Examples: gpt-4.1, gpt-4o, gpt-4o-mini, gpt-3.5-turbo-16k',
+            google: 'Examples: gemini-2.5-flash, gemini-1.5-pro, gemini-1.5-flash-8b',
+            anthropic:
+                'Examples: claude-3-5-sonnet-20241022, claude-3-opus-20240229, claude-3-haiku-20240307',
+            openrouter:
+                'Examples: openai/gpt-4.1, anthropic/claude-3-5-sonnet, google/gemini-2.5-flash',
+            ollama: 'Examples: llama3.1, codellama, mistral, qwen2.5, deepseek-coder',
+            mistral: 'Examples: mistral-large-latest, mistral-small-latest, codestral-latest',
+            deepseek: 'Examples: deepseek-chat, deepseek-coder, deepseek-reasoner',
+            groq: 'Examples: llama-3.1-70b-versatile, mixtral-8x7b-32768, gemma2-9b-it',
+        };
+
+        return examples[providerName] || 'Enter the exact model name as specified by the provider';
     }
 }

@@ -47,7 +47,7 @@ export abstract class BasePromptService {
     protected async promptRequiredText(
         message: string,
         defaultValue?: string,
-        validator?: (input: string) => string | boolean
+        validator?: (input: string) => string | boolean,
     ): Promise<string> {
         const { value } = await inquirer.prompt([
             {
@@ -74,7 +74,7 @@ export abstract class BasePromptService {
      */
     protected async promptOptionalText(
         message: string,
-        defaultValue?: string
+        defaultValue?: string,
     ): Promise<string | undefined> {
         const { value } = await inquirer.prompt([
             {
@@ -90,10 +90,7 @@ export abstract class BasePromptService {
     /**
      * Prompts for a password input
      */
-    protected async promptPassword(
-        message: string,
-        required: boolean = true
-    ): Promise<string> {
+    protected async promptPassword(message: string, required: boolean = true): Promise<string> {
         const { value } = await inquirer.prompt([
             {
                 type: 'password',
@@ -119,7 +116,7 @@ export abstract class BasePromptService {
     protected async promptSelect<T extends string>(
         message: string,
         choices: Array<{ name: string; value: T }>,
-        defaultValue?: T
+        defaultValue?: T,
     ): Promise<T> {
         const { value } = await inquirer.prompt([
             {
@@ -138,7 +135,7 @@ export abstract class BasePromptService {
      */
     protected async promptMultiSelect<T extends string>(
         message: string,
-        choices: Array<{ name: string; value: T; checked?: boolean }>
+        choices: Array<{ name: string; value: T; checked?: boolean }>,
     ): Promise<T[]> {
         const { value } = await inquirer.prompt({
             type: 'checkbox',
@@ -154,7 +151,7 @@ export abstract class BasePromptService {
      */
     protected async promptConfirm(
         message: string,
-        defaultValue: boolean = false
+        defaultValue: boolean = false,
     ): Promise<boolean> {
         const { value } = await inquirer.prompt([
             {
@@ -174,7 +171,7 @@ export abstract class BasePromptService {
         message: string,
         defaultValue?: number,
         min?: number,
-        max?: number
+        max?: number,
     ): Promise<number> {
         const { value } = await inquirer.prompt([
             {
@@ -268,6 +265,21 @@ export abstract class BasePromptService {
         // Ensure it's an integer
         if (!Number.isInteger(tokens)) {
             return 'Max tokens must be a whole number (no decimals)';
+        }
+        return true;
+    }
+
+    protected validateModelName(modelName: string): string | boolean {
+        if (modelName.length < 2) {
+            return 'Model name must be at least 2 characters long';
+        }
+        if (modelName.length > 100) {
+            return 'Model name must be less than 100 characters';
+        }
+        // Allow alphanumeric, hyphens, underscores, dots, and slashes (for provider/model format)
+        const modelRegex = /^[a-zA-Z0-9\-_.\/]+$/;
+        if (!modelRegex.test(modelName)) {
+            return 'Model name can only contain letters, numbers, hyphens, underscores, dots, and slashes (e.g., gpt-4, claude-3-opus, provider/model-name)';
         }
         return true;
     }
