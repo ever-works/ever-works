@@ -21,7 +21,7 @@ export class AiProviderRegistryService {
                 maxTokens: 8192,
             },
             requiresApiKey: true,
-            models: ['gpt-4.1', 'gpt-4', 'gpt-3.5-turbo', 'gpt-4-turbo'],
+            models: ['gpt-4.1', 'gpt-4.1-mini', 'gpt-4.1-mini', 'gpt-4o', 'gpt-4o-mini'],
             websiteUrl: 'https://openai.com',
             docsUrl: 'https://platform.openai.com/docs',
         });

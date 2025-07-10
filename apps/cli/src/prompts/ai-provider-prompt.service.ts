@@ -162,12 +162,15 @@ export class AiProviderPromptService extends BasePromptService {
             // Max tokens validation with retry
             while (true) {
                 try {
-                    maxTokens = await this.promptNumber(
+                    const tokensInput = await this.promptNumber(
                         'Enter max tokens:',
                         providerInfo.defaults.maxTokens,
                         1,
                         100000
                     );
+
+                    // Convert to integer for max tokens
+                    maxTokens = Math.round(tokensInput);
 
                     const tokensValidation = this.validateMaxTokens(maxTokens);
                     if (tokensValidation !== true) {

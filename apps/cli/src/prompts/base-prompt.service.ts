@@ -168,7 +168,7 @@ export abstract class BasePromptService {
     }
 
     /**
-     * Prompts for a number input
+     * Prompts for a number input (supports decimals)
      */
     protected async promptNumber(
         message: string,
@@ -178,25 +178,26 @@ export abstract class BasePromptService {
     ): Promise<number> {
         const { value } = await inquirer.prompt([
             {
-                type: 'number',
+                type: 'input',
                 name: 'value',
                 message,
-                default: defaultValue,
-                validate: (input: number) => {
-                    if (isNaN(input)) {
-                        return 'Please enter a valid number';
+                default: defaultValue?.toString(),
+                validate: (input: string) => {
+                    const num = parseFloat(input);
+                    if (isNaN(num)) {
+                        return 'Please enter a valid number (decimals allowed, e.g., 0.7)';
                     }
-                    if (min !== undefined && input < min) {
+                    if (min !== undefined && num < min) {
                         return `Value must be at least ${min}`;
                     }
-                    if (max !== undefined && input > max) {
+                    if (max !== undefined && num > max) {
                         return `Value must be at most ${max}`;
                     }
                     return true;
                 },
             },
         ]);
-        return value;
+        return parseFloat(value);
     }
 
     /**
@@ -255,14 +256,18 @@ export abstract class BasePromptService {
 
     protected validateTemperature(temp: number): string | boolean {
         if (temp < 0 || temp > 2) {
-            return 'Temperature must be between 0.0 and 2.0';
+            return 'Temperature must be between 0.0 and 2.0 (e.g., 0.7 for balanced, 0.1 for deterministic, 1.5 for creative)';
         }
         return true;
     }
 
     protected validateMaxTokens(tokens: number): string | boolean {
         if (tokens < 1 || tokens > 200000) {
-            return 'Max tokens must be between 1 and 200,000';
+            return 'Max tokens must be between 1 and 200,000 (e.g., 4096 for standard, 8192 for longer responses)';
+        }
+        // Ensure it's an integer
+        if (!Number.isInteger(tokens)) {
+            return 'Max tokens must be a whole number (no decimals)';
         }
         return true;
     }

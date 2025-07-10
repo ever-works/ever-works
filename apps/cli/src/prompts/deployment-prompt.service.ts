@@ -27,6 +27,7 @@ export class DeploymentPromptService extends BasePromptService {
             while (true) {
                 try {
                     vercelToken = await this.promptPassword('Enter your Vercel token:');
+                    vercelToken = vercelToken?.trim();
 
                     const validation = this.validateApiKey(vercelToken, 'Vercel');
                     if (validation !== true) {
