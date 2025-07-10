@@ -37,7 +37,7 @@ export class AiProviderRegistryService {
                 maxTokens: 8192,
             },
             requiresApiKey: true,
-            models: ['gemini-2.5-flash', 'gemini-1.5-pro', 'gemini-1.5-flash'],
+            models: ['gemini-2.5-flash', 'gemini-1.5-flash'],
             websiteUrl: 'https://ai.google.dev',
             docsUrl: 'https://ai.google.dev/docs',
         });
@@ -76,10 +76,9 @@ export class AiProviderRegistryService {
             requiresApiKey: true,
             models: [
                 'openai/gpt-4.1',
-                'openai/gpt-4',
+                'openai/gpt-4o',
                 'anthropic/claude-3-5-sonnet',
                 'google/gemini-2.5-flash',
-                'meta-llama/llama-3.1-70b-instruct',
             ],
             websiteUrl: 'https://openrouter.ai',
             docsUrl: 'https://openrouter.ai/docs',

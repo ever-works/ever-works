@@ -167,9 +167,6 @@ export class AiService {
                 return new ChatOpenAI({
                     ...commonOptions,
                     model: config.modelName || 'gpt-4.1',
-                    configuration: {
-                        baseURL: config.baseURL || 'https://api.openai.com',
-                    },
                 });
 
             case 'openrouter':
@@ -177,7 +174,7 @@ export class AiService {
                     ...commonOptions,
                     model: config.modelName || 'openai/gpt-4.1',
                     configuration: {
-                        baseURL: config.baseURL || 'https://openrouter.ai/api/v1',
+                        baseURL: 'https://openrouter.ai/api/v1',
                     },
                 });
 
@@ -230,7 +227,7 @@ export class AiService {
                     ...commonOptions,
                     model: config.modelName || 'deepseek-chat',
                     configuration: {
-                        baseURL: config.baseURL || 'https://api.deepseek.com',
+                        baseURL: 'https://api.deepseek.com/v1',
                     },
                 });
 
@@ -443,7 +440,9 @@ export class AiService {
         const startTime = Date.now();
 
         try {
-            this.logger.log(`Testing ${providerConfig.type} provider with model ${providerConfig.modelName}...`);
+            this.logger.log(
+                `Testing ${providerConfig.type} provider with model ${providerConfig.modelName}...`,
+            );
 
             // Create a temporary provider instance for testing
             const testProvider = this.createProvider({
@@ -462,7 +461,10 @@ export class AiService {
             }
 
             // Test with a simple prompt
-            const testMessage = { role: 'user', content: 'Hello! Please respond with just "OK" to confirm you are working.' };
+            const testMessage = {
+                role: 'user',
+                content: 'Hello! Please respond with just "OK" to confirm you are working.',
+            };
             const response = await testProvider.invoke([testMessage]);
 
             const responseTime = Date.now() - startTime;
@@ -477,7 +479,6 @@ export class AiService {
                 responseTime,
                 response: responseContent.trim(),
             };
-
         } catch (error) {
             const responseTime = Date.now() - startTime;
             this.logger.error(`${providerConfig.type} test failed: ${error.message}`);
@@ -495,21 +496,25 @@ export class AiService {
     /**
      * Test multiple provider configurations
      */
-    async testMultipleProviders(providerConfigs: Array<{
-        type: AiProviderType;
-        apiKey: string;
-        modelName: string;
-        temperature?: number;
-        maxTokens?: number;
-        baseURL?: string;
-    }>): Promise<Array<{
-        success: boolean;
-        provider: string;
-        model: string;
-        responseTime: number;
-        error?: string;
-        response?: string;
-    }>> {
+    async testMultipleProviders(
+        providerConfigs: Array<{
+            type: AiProviderType;
+            apiKey: string;
+            modelName: string;
+            temperature?: number;
+            maxTokens?: number;
+            baseURL?: string;
+        }>,
+    ): Promise<
+        Array<{
+            success: boolean;
+            provider: string;
+            model: string;
+            responseTime: number;
+            error?: string;
+            response?: string;
+        }>
+    > {
         const results = [];
 
         for (const config of providerConfigs) {

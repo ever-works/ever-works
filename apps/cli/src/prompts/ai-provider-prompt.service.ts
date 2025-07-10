@@ -55,21 +55,70 @@ export class AiProviderPromptService extends BasePromptService {
                 .filter((choice) => choice.value !== defaultProvider);
 
             if (availableForFallback.length > 0) {
-                fallbackProviders = await this.promptMultiSelect(
-                    'Select fallback providers (in order of preference):',
-                    availableForFallback.map((choice) => ({
-                        name: choice.name,
-                        value: choice.value,
-                    })),
-                );
+                // Allow users to add multiple fallback providers one by one
+                while (true) {
+                    const remainingProviders = availableForFallback.filter(
+                        (choice) => !fallbackProviders.includes(choice.value),
+                    );
 
-                // Configure each fallback provider
-                for (const providerName of fallbackProviders) {
-                    const providerConfig = await this.configureProvider(providerName, false);
+                    if (remainingProviders.length === 0) {
+                        this.displayInfo('All available providers have been configured');
+                        break;
+                    }
+
+                    const choices = [
+                        ...remainingProviders.map((choice) => ({
+                            name: `Configure ${choice.name}`,
+                            value: choice.value,
+                        })),
+                        { name: 'Finish configuring fallback providers', value: '__done__' },
+                    ];
+
+                    const selectedProvider = await this.promptSelect(
+                        fallbackProviders.length === 0
+                            ? 'Select a fallback provider to configure:'
+                            : `Select another fallback provider (${fallbackProviders.length} already configured):`,
+                        choices,
+                    );
+
+                    if (selectedProvider === '__done__') {
+                        break;
+                    }
+
+                    // Configure the selected fallback provider
+                    this.displayInfo(`\nConfiguring fallback provider: ${selectedProvider}`);
+                    const providerConfig = await this.configureProvider(selectedProvider, false);
                     if (providerConfig) {
                         configuredProviders.push(providerConfig);
+                        fallbackProviders.push(selectedProvider);
+                        this.displaySuccess(
+                            `${selectedProvider} configured as fallback provider #${fallbackProviders.length}`,
+                        );
+                    } else {
+                        this.displayWarning(`Skipped configuring ${selectedProvider}`);
+                    }
+
+                    // Ask if they want to continue adding more
+                    if (remainingProviders.length > 1) {
+                        const continueAdding = await this.promptConfirm(
+                            'Do you want to configure another fallback provider?',
+                            false,
+                        );
+                        if (!continueAdding) {
+                            break;
+                        }
                     }
                 }
+
+                if (fallbackProviders.length > 0) {
+                    this.displaySuccess(
+                        `Configured ${fallbackProviders.length} fallback provider(s): ${fallbackProviders.join(', ')}`,
+                    );
+                } else {
+                    this.displayInfo('No fallback providers configured');
+                }
+            } else {
+                this.displayWarning('No other providers available for fallback configuration');
             }
         }
 
