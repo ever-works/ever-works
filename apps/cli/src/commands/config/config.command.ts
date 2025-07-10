@@ -11,7 +11,14 @@ import { SwitchAiSubCommand } from './switch-ai.subcommand';
 @Command({
     name: 'config',
     description: 'Configuration management commands',
-    subCommands: [SetupSubCommand, ShowSubCommand, TestSubCommand, SetSubCommand, UnsetSubCommand, SwitchAiSubCommand],
+    subCommands: [
+        SetupSubCommand,
+        ShowSubCommand,
+        TestSubCommand,
+        SetSubCommand,
+        UnsetSubCommand,
+        SwitchAiSubCommand,
+    ],
 })
 export class ConfigCommand extends CommandRunner {
     async run(): Promise<void> {
