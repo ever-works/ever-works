@@ -78,7 +78,7 @@ export class AiProviderRegistryService {
                 'openai/gpt-4.1',
                 'openai/gpt-4',
                 'anthropic/claude-3-5-sonnet',
-                'google/gemini-pro',
+                'google/gemini-2.5-flash',
                 'meta-llama/llama-3.1-70b-instruct',
             ],
             websiteUrl: 'https://openrouter.ai',
@@ -180,7 +180,7 @@ export class AiProviderRegistryService {
      * Get provider choices for inquirer
      */
     getProviderChoices(): Array<{ name: string; value: string }> {
-        return this.getAllProviders().map(provider => ({
+        return this.getAllProviders().map((provider) => ({
             name: `${provider.displayName} - ${provider.description}`,
             value: provider.name,
         }));

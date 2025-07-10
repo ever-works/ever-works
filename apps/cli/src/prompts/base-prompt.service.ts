@@ -42,11 +42,12 @@ export abstract class BasePromptService {
     }
 
     /**
-     * Prompts for a required text input
+     * Prompts for a required text input with custom validation
      */
     protected async promptRequiredText(
         message: string,
-        defaultValue?: string
+        defaultValue?: string,
+        validator?: (input: string) => string | boolean
     ): Promise<string> {
         const { value } = await inquirer.prompt([
             {
@@ -57,6 +58,9 @@ export abstract class BasePromptService {
                 validate: (input: string) => {
                     if (!input || input.trim().length === 0) {
                         return 'This field is required';
+                    }
+                    if (validator) {
+                        return validator(input.trim());
                     }
                     return true;
                 },
@@ -193,5 +197,73 @@ export abstract class BasePromptService {
             },
         ]);
         return value;
+    }
+
+    /**
+     * Validation utilities
+     */
+    protected validateEmail(email: string): string | boolean {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            return 'Please enter a valid email address (e.g., user@example.com)';
+        }
+        return true;
+    }
+
+    protected validateGitHubUsername(username: string): string | boolean {
+        // GitHub username rules: alphanumeric, hyphens, max 39 chars, no consecutive hyphens
+        const githubUsernameRegex = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,37}[a-zA-Z0-9])?$/;
+        if (!githubUsernameRegex.test(username)) {
+            return 'Please enter a valid GitHub username (alphanumeric and hyphens only, max 39 characters)';
+        }
+        return true;
+    }
+
+    protected validateGitName(name: string): string | boolean {
+        if (name.length < 2) {
+            return 'Git name must be at least 2 characters long';
+        }
+        if (name.length > 100) {
+            return 'Git name must be less than 100 characters';
+        }
+        // Check for valid characters (letters, spaces, common punctuation)
+        const nameRegex = /^[a-zA-Z\s\-'.]+$/;
+        if (!nameRegex.test(name)) {
+            return 'Git name can only contain letters, spaces, hyphens, apostrophes, and periods';
+        }
+        return true;
+    }
+
+    protected validateApiKey(apiKey: string, providerName: string): string | boolean {
+        if (apiKey.length < 5) {
+            return `${providerName} API key seems too short. Please check and try again`;
+        }
+        if (apiKey.includes(' ')) {
+            return 'API key should not contain spaces';
+        }
+        return true;
+    }
+
+    protected validateUrl(url: string): string | boolean {
+        try {
+            new URL(url);
+            return true;
+        } catch {
+            return 'Please enter a valid URL (e.g., https://example.com)';
+        }
+    }
+
+    protected validateTemperature(temp: number): string | boolean {
+        if (temp < 0 || temp > 2) {
+            return 'Temperature must be between 0.0 and 2.0';
+        }
+        return true;
+    }
+
+    protected validateMaxTokens(tokens: number): string | boolean {
+        if (tokens < 1 || tokens > 200000) {
+            return 'Max tokens must be between 1 and 200,000';
+        }
+        return true;
     }
 }

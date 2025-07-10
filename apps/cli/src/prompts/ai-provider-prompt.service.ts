@@ -99,9 +99,23 @@ export class AiProviderPromptService extends BasePromptService {
 
         let apiKey = '';
         if (providerInfo.requiresApiKey) {
-            apiKey = await this.promptPassword(
-                `Enter your ${providerInfo.displayName} API key:`
-            );
+            while (true) {
+                try {
+                    apiKey = await this.promptPassword(
+                        `Enter your ${providerInfo.displayName} API key:`
+                    );
+
+                    const validation = this.validateApiKey(apiKey, providerInfo.displayName);
+                    if (validation !== true) {
+                        this.displayError(validation as string);
+                        continue;
+                    }
+
+                    break;
+                } catch (error) {
+                    this.displayError('Failed to get API key. Please try again.');
+                }
+            }
         }
 
         // Model selection
@@ -124,26 +138,72 @@ export class AiProviderPromptService extends BasePromptService {
         let baseUrl = providerInfo.defaults.baseUrl;
 
         if (wantsAdvanced) {
-            temperature = await this.promptNumber(
-                'Enter temperature (0.0 = deterministic, 1.0 = creative):',
-                providerInfo.defaults.temperature,
-                0,
-                2
-            );
+            // Temperature validation with retry
+            while (true) {
+                try {
+                    temperature = await this.promptNumber(
+                        'Enter temperature (0.0 = deterministic, 1.0 = creative):',
+                        providerInfo.defaults.temperature,
+                        0,
+                        2
+                    );
 
-            maxTokens = await this.promptNumber(
-                'Enter max tokens:',
-                providerInfo.defaults.maxTokens,
-                1,
-                100000
-            );
+                    const tempValidation = this.validateTemperature(temperature);
+                    if (tempValidation !== true) {
+                        this.displayError(tempValidation as string);
+                        continue;
+                    }
+                    break;
+                } catch (error) {
+                    this.displayError('Invalid temperature value. Please try again.');
+                }
+            }
 
+            // Max tokens validation with retry
+            while (true) {
+                try {
+                    maxTokens = await this.promptNumber(
+                        'Enter max tokens:',
+                        providerInfo.defaults.maxTokens,
+                        1,
+                        100000
+                    );
+
+                    const tokensValidation = this.validateMaxTokens(maxTokens);
+                    if (tokensValidation !== true) {
+                        this.displayError(tokensValidation as string);
+                        continue;
+                    }
+                    break;
+                } catch (error) {
+                    this.displayError('Invalid max tokens value. Please try again.');
+                }
+            }
+
+            // Base URL validation with retry
             if (providerInfo.defaults.baseUrl) {
-                const customBaseUrl = await this.promptOptionalText(
-                    'Enter custom base URL (leave empty for default):',
-                    providerInfo.defaults.baseUrl
-                );
-                baseUrl = customBaseUrl || providerInfo.defaults.baseUrl;
+                while (true) {
+                    try {
+                        const customBaseUrl = await this.promptOptionalText(
+                            'Enter custom base URL (leave empty for default):',
+                            providerInfo.defaults.baseUrl
+                        );
+
+                        if (customBaseUrl) {
+                            const urlValidation = this.validateUrl(customBaseUrl);
+                            if (urlValidation !== true) {
+                                this.displayError(urlValidation as string);
+                                continue;
+                            }
+                            baseUrl = customBaseUrl;
+                        } else {
+                            baseUrl = providerInfo.defaults.baseUrl;
+                        }
+                        break;
+                    } catch (error) {
+                        this.displayError('Invalid URL format. Please try again.');
+                    }
+                }
             }
         }
 
@@ -169,15 +229,23 @@ export class AiProviderPromptService extends BasePromptService {
             } else {
                 this.displayError(`${providerInfo.displayName} test failed: ${testResult.error}`);
 
-                const continueAnyway = await this.promptConfirm(
-                    'Do you want to continue with this configuration anyway?',
-                    false
+                const options = await this.promptSelect(
+                    'What would you like to do?',
+                    [
+                        { name: 'Continue with this configuration anyway', value: 'continue' },
+                        { name: 'Re-enter the API key', value: 'retry' },
+                        { name: 'Skip this provider', value: 'skip' },
+                    ]
                 );
 
-                if (!continueAnyway) {
-                    this.displayInfo('Provider configuration cancelled');
+                if (options === 'skip') {
+                    this.displayInfo('Provider configuration skipped');
                     return null;
+                } else if (options === 'retry') {
+                    this.displayInfo('Please re-enter your configuration');
+                    return this.configureProvider(providerName, isDefault);
                 }
+                // If 'continue', we proceed with the current configuration
             }
         }
 

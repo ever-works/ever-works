@@ -57,9 +57,33 @@ export class SearchServicePromptService extends BasePromptService {
             this.displayInfo('Get your API key from: https://tavily.com');
             this.displayInfo('Tavily provides high-quality AI-powered search and content extraction');
 
-            tavilyApiKey = await this.promptPassword(
-                'Enter your Tavily API key:'
-            );
+            while (true) {
+                try {
+                    tavilyApiKey = await this.promptPassword(
+                        'Enter your Tavily API key:'
+                    );
+
+                    const validation = this.validateApiKey(tavilyApiKey, 'Tavily');
+                    if (validation !== true) {
+                        this.displayError(validation as string);
+                        continue;
+                    }
+
+                    // Test the Tavily API key
+                    this.displayInfo('Testing Tavily API key...');
+                    const isValid = await this.testTavilyApiKey(tavilyApiKey);
+                    if (!isValid) {
+                        this.displayError('Tavily API key is invalid or lacks required permissions');
+                        this.displayInfo('Please check your API key and try again');
+                        continue;
+                    }
+
+                    this.displaySuccess('Tavily API key validated successfully');
+                    break;
+                } catch (error) {
+                    this.displayError('Failed to validate Tavily API key. Please try again.');
+                }
+            }
         }
 
         // Display configuration summary
@@ -77,5 +101,24 @@ export class SearchServicePromptService extends BasePromptService {
             webSearchService,
             tavilyApiKey,
         };
+    }
+
+    private async testTavilyApiKey(apiKey: string): Promise<boolean> {
+        try {
+            const response = await fetch('https://api.tavily.com/search', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    api_key: apiKey,
+                    query: 'test',
+                    max_results: 1,
+                }),
+            });
+            return response.ok;
+        } catch {
+            return false;
+        }
     }
 }

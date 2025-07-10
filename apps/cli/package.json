@@ -9,7 +9,7 @@
     "start": "pnpm build:deps && nest start -b swc",
     "start:dev": "pnpm build:deps && nest start -b swc --watch",
     "start:debug": "pnpm build:deps && nest start -b swc --debug --watch",
-    "start:prod": "node dist/main",
+    "ever-works": "node dist/main",
     "build": "pnpm build:deps && nest build -b swc",
     "build:deps": "pnpm --filter '@packages/*' build"
   },
