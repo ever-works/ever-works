@@ -1,9 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { BasePromptService } from './base-prompt.service';
 import { AiProviderRegistryService } from '../ai-providers/ai-provider-registry.service';
-import { AiProviderConfiguration, ConfiguredAiProvider } from '../ai-providers/ai-provider.interface';
-import { AiService } from '@packages/agent';
-import chalk from 'chalk';
+import { AiProviderConfiguration, ConfiguredAiProvider, AiService } from '@packages/agent';
 import ora from 'ora';
 
 @Injectable()
@@ -109,9 +107,9 @@ export class AiProviderPromptService extends BasePromptService {
         // Model selection
         const model = await this.promptSelect(
             'Select a model:',
-            providerInfo.models.map(model => ({
-                name: model,
-                value: model,
+            providerInfo.models.map((modelName: string) => ({
+                name: modelName,
+                value: modelName,
             }))
         );
 
