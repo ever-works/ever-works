@@ -13,48 +13,45 @@ import { MarkdownGenerationService } from './steps/markdown-generation.service';
 import { PromptProcessingService } from './steps/prompt-processing.service';
 import { PromptComparisonService } from './steps/prompt-comparison.service';
 import { BadgeProcessingService } from './steps/badge-processing.service';
-import { AiService, SearchService, NotionService, BadgeEvaluationService } from './shared';
-import {
-    SharedUtilsService,
-    NewItemsExtractorService,
-    AiDeduplicatorService,
-} from './steps/data-aggregation';
+import { SearchService, NotionService, BadgeEvaluationService } from './shared';
+import { SharedUtilsService, NewItemsExtractorService, AiDeduplicatorService } from './steps/data-aggregation';
 import { GithubService } from '../git/github.service';
+import { AiModule } from '../ai';
 
 @Module({
-    providers: [
-        // Shared services
-        AiService,
-        SearchService,
-        NotionService,
-        BadgeEvaluationService,
+	imports: [AiModule],
+	providers: [
+		// Shared services
+		SearchService,
+		NotionService,
+		BadgeEvaluationService,
 
-        // Data aggregation shared services
-        SharedUtilsService,
-        NewItemsExtractorService,
-        AiDeduplicatorService,
+		// Data aggregation shared services
+		SharedUtilsService,
+		NewItemsExtractorService,
+		AiDeduplicatorService,
 
-        // External services
-        GithubService,
+		// External services
+		GithubService,
 
-        // Main service
-        ItemsGeneratorService,
-        ItemSubmissionService,
+		// Main service
+		ItemsGeneratorService,
+		ItemSubmissionService,
 
-        // Step services
-        PromptComparisonService,
-        PromptProcessingService,
-        AiItemGenerationService,
-        SearchQueryGenerationService,
-        WebPageRetrievalService,
-        ContentFilteringService,
-        ItemExtractionService,
-        SourceValidationService,
-        DataAggregationService,
-        CategoryProcessingService,
-        MarkdownGenerationService,
-        BadgeProcessingService,
-    ],
-    exports: [ItemsGeneratorService, ItemSubmissionService],
+		// Step services
+		PromptComparisonService,
+		PromptProcessingService,
+		AiItemGenerationService,
+		SearchQueryGenerationService,
+		WebPageRetrievalService,
+		ContentFilteringService,
+		ItemExtractionService,
+		SourceValidationService,
+		DataAggregationService,
+		CategoryProcessingService,
+		MarkdownGenerationService,
+		BadgeProcessingService
+	],
+	exports: [ItemsGeneratorService, ItemSubmissionService]
 })
 export class ItemsGeneratorModule {}

@@ -1,10 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
 import { z } from 'zod';
-import { AiService } from '../shared';
+import { AiService, BaseChatModel } from 'src/ai';
 import { SearchService } from '../shared';
 import { ItemData } from '../dto';
-import { BaseChatModel } from '../shared/ai-provider.interface';
 
 // Markdown generation prompt
 export const MARKDOWN_PROMPT = `

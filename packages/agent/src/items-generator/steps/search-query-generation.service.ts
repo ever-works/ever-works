@@ -3,8 +3,7 @@ import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
 import { StringOutputParser } from '@langchain/core/output_parsers';
 import { formatDate } from 'date-fns';
 import { CreateItemsGeneratorDto } from '../dto/create-items-generator.dto';
-import { AiService } from '../shared';
-import { BaseChatModel } from '../shared/ai-provider.interface';
+import { AiService, BaseChatModel } from 'src/ai';
 
 @Injectable()
 export class SearchQueryGenerationService {

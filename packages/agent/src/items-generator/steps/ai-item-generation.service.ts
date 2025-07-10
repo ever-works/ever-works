@@ -1,14 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
 import { slugifyText } from '../utils/text.utils';
-import { AiService } from '../shared';
+import { AiService, BaseChatModel } from 'src/ai';
 import { CreateItemsGeneratorDto, ItemData } from '../dto';
 import {
     extractedItemsSchema,
     itemDataSchema,
     promptUnderstandingAssessmentSchema,
 } from '../schemas/item-extraction.schemas';
-import { BaseChatModel } from '../shared/ai-provider.interface';
 
 @Injectable()
 export class AiItemGenerationService {

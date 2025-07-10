@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import * as fs from 'fs-extra';
 import * as path from 'path';
 import * as os from 'os';
-import { EverWorksConfig } from './config.interface';
+import { EverWorksConfig, PartialEverWorksConfig, ConfigValidationResult } from './config.interface';
 
 @Injectable()
 export class ConfigService {
@@ -44,10 +44,14 @@ export class ConfigService {
     /**
      * Saves the configuration to the config file
      */
-    async saveConfig(config: EverWorksConfig): Promise<void> {
+    async saveConfig(config: PartialEverWorksConfig): Promise<void> {
         try {
             await this.ensureConfigDir();
-            await fs.writeJson(this.configPath, config, { spaces: 2 });
+
+            // Remove undefined values to keep the config clean
+            const cleanConfig = this.removeUndefinedValues(config);
+
+            await fs.writeJson(this.configPath, cleanConfig, { spaces: 2 });
             this.logger.log('Configuration saved successfully');
         } catch (error) {
             this.logger.error(`Failed to save configuration: ${error.message}`);
@@ -82,46 +86,80 @@ export class ConfigService {
     }
 
     /**
-     * Converts configuration to environment variables format
+     * Loads configuration into process.env
      */
-    configToEnvVars(config: EverWorksConfig): Record<string, string> {
-        const envVars: Record<string, string> = {
-            APP_TYPE: config.appType,
-            GITHUB_APIKEY: config.githubApiKey,
-            GITHUB_OWNER: config.githubOwner,
-            GIT_NAME: config.gitName,
-            GIT_EMAIL: config.gitEmail,
-            AI_DEFAULT_PROVIDER: config.aiDefaultProvider,
-            AI_FALLBACK_PROVIDERS: config.aiFallbackProviders.join(','),
-            EXTRACT_CONTENT_SERVICE: config.searchServices.extractContentService,
-            WEB_SEARCH_SERVICE: config.searchServices.webSearchService,
-        };
-
-        // Add deployment provider configs
-        if (config.deploymentProviders.vercel?.token) {
-            envVars.VERCEL_TOKEN = config.deploymentProviders.vercel.token;
+    async loadConfigIntoEnv(): Promise<void> {
+        const config = await this.loadConfig();
+        if (!config) {
+            this.logger.warn('No configuration found to load into environment');
+            return;
         }
 
-        // Add search service configs
-        if (config.searchServices.tavilyApiKey) {
-            envVars.TAVILY_API_KEY = config.searchServices.tavilyApiKey;
-        }
-
-        // Add AI provider configs
-        Object.entries(config.aiProviders).forEach(([provider, providerConfig]) => {
-            if (providerConfig) {
-                const upperProvider = provider.toUpperCase();
-                envVars[`${upperProvider}_API_KEY`] = providerConfig.apiKey;
-                envVars[`${upperProvider}_MODEL`] = providerConfig.model;
-                envVars[`${upperProvider}_TEMPERATURE`] = providerConfig.temperature.toString();
-                envVars[`${upperProvider}_MAX_TOKENS`] = providerConfig.maxTokens.toString();
-                
-                if (providerConfig.baseUrl) {
-                    envVars[`${upperProvider}_BASE_URL`] = providerConfig.baseUrl;
-                }
+        // Load all config values into process.env
+        Object.entries(config).forEach(([key, value]) => {
+            if (value !== undefined && value !== null) {
+                process.env[key] = String(value);
             }
         });
 
-        return envVars;
+        this.logger.log('Configuration loaded into environment variables');
+    }
+
+    /**
+     * Validates the configuration
+     */
+    validateConfig(config: PartialEverWorksConfig): ConfigValidationResult {
+        const errors: string[] = [];
+        const warnings: string[] = [];
+
+        // Required fields
+        if (!config.GITHUB_APIKEY) errors.push('GITHUB_APIKEY is required');
+        if (!config.GITHUB_OWNER) errors.push('GITHUB_OWNER is required');
+        if (!config.GIT_NAME) errors.push('GIT_NAME is required');
+        if (!config.GIT_EMAIL) errors.push('GIT_EMAIL is required');
+        if (!config.AI_DEFAULT_PROVIDER) errors.push('AI_DEFAULT_PROVIDER is required');
+
+        // AI Provider validation
+        if (config.AI_DEFAULT_PROVIDER) {
+            const providerKey = `${config.AI_DEFAULT_PROVIDER.toUpperCase()}_API_KEY` as keyof EverWorksConfig;
+            if (!config[providerKey] && config.AI_DEFAULT_PROVIDER !== 'ollama') {
+                errors.push(`API key for default provider ${config.AI_DEFAULT_PROVIDER} is required`);
+            }
+        }
+
+        // Warnings
+        if (!config.TAVILY_API_KEY && (config.EXTRACT_CONTENT_SERVICE === 'tavily' || config.WEB_SEARCH_SERVICE === 'tavily')) {
+            warnings.push('TAVILY_API_KEY is recommended when using Tavily services');
+        }
+
+        return {
+            isValid: errors.length === 0,
+            errors,
+            warnings,
+        };
+    }
+
+    /**
+     * Removes undefined values from configuration
+     */
+    private removeUndefinedValues(config: PartialEverWorksConfig): PartialEverWorksConfig {
+        const cleanConfig: PartialEverWorksConfig = {};
+
+        Object.entries(config).forEach(([key, value]) => {
+            if (value !== undefined && value !== null && value !== '') {
+                (cleanConfig as any)[key] = value;
+            }
+        });
+
+        return cleanConfig;
+    }
+
+    /**
+     * Merges new configuration with existing configuration
+     */
+    async mergeConfig(newConfig: PartialEverWorksConfig): Promise<void> {
+        const existingConfig = await this.loadConfig() || {};
+        const mergedConfig = { ...existingConfig, ...newConfig };
+        await this.saveConfig(mergedConfig);
     }
 }

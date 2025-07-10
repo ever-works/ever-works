@@ -1,12 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
-import { AiService } from '../../shared';
+import { AiService, BaseChatModel } from 'src/ai';
 import { slugifyText } from '../../utils/text.utils';
 import { extractedItemsSchema } from '../../schemas/item-extraction.schemas';
 import { ItemData } from '../../dto';
 import { SharedUtilsService } from './shared-utils.service';
 import { DEDUPLICATOR_PROMPT } from './prompts.constants';
-import { BaseChatModel } from '../../shared/ai-provider.interface';
 
 @Injectable()
 export class AiDeduplicatorService {

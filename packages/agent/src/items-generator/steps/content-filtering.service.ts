@@ -2,8 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
 import { ConfigDto } from '../dto/create-items-generator.dto';
 import { WebPageData, RelevanceAssessment } from '../interfaces/items-generator.interfaces';
-import { AiService } from '../shared';
-import { BaseChatModel } from '../shared/ai-provider.interface';
+import { AiService, BaseChatModel } from 'src/ai';
 import z from 'zod';
 
 const relevanceSchema = z.object({

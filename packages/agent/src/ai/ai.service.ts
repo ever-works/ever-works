@@ -423,6 +423,104 @@ export class AiService {
     }
 
     /**
+     * Test a specific AI provider configuration
+     */
+    async testProvider(providerConfig: {
+        type: AiProviderType;
+        apiKey: string;
+        modelName: string;
+        temperature?: number;
+        maxTokens?: number;
+        baseURL?: string;
+    }): Promise<{
+        success: boolean;
+        provider: string;
+        model: string;
+        responseTime: number;
+        error?: string;
+        response?: string;
+    }> {
+        const startTime = Date.now();
+
+        try {
+            this.logger.log(`Testing ${providerConfig.type} provider with model ${providerConfig.modelName}...`);
+
+            // Create a temporary provider instance for testing
+            const testProvider = this.createProvider({
+                ...providerConfig,
+                enabled: true,
+            });
+
+            if (!testProvider) {
+                return {
+                    success: false,
+                    provider: providerConfig.type,
+                    model: providerConfig.modelName,
+                    responseTime: Date.now() - startTime,
+                    error: `Failed to create provider instance for ${providerConfig.type}`,
+                };
+            }
+
+            // Test with a simple prompt
+            const testMessage = { role: 'user', content: 'Hello! Please respond with just "OK" to confirm you are working.' };
+            const response = await testProvider.invoke([testMessage]);
+
+            const responseTime = Date.now() - startTime;
+            const responseContent = response.content as string;
+
+            this.logger.log(`${providerConfig.type} test completed in ${responseTime}ms`);
+
+            return {
+                success: true,
+                provider: providerConfig.type,
+                model: providerConfig.modelName,
+                responseTime,
+                response: responseContent.trim(),
+            };
+
+        } catch (error) {
+            const responseTime = Date.now() - startTime;
+            this.logger.error(`${providerConfig.type} test failed: ${error.message}`);
+
+            return {
+                success: false,
+                provider: providerConfig.type,
+                model: providerConfig.modelName,
+                responseTime,
+                error: error.message,
+            };
+        }
+    }
+
+    /**
+     * Test multiple provider configurations
+     */
+    async testMultipleProviders(providerConfigs: Array<{
+        type: AiProviderType;
+        apiKey: string;
+        modelName: string;
+        temperature?: number;
+        maxTokens?: number;
+        baseURL?: string;
+    }>): Promise<Array<{
+        success: boolean;
+        provider: string;
+        model: string;
+        responseTime: number;
+        error?: string;
+        response?: string;
+    }>> {
+        const results = [];
+
+        for (const config of providerConfigs) {
+            const result = await this.testProvider(config);
+            results.push(result);
+        }
+
+        return results;
+    }
+
+    /**
      * Log provider usage statistics
      */
     logProviderStats(): void {

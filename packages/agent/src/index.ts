@@ -20,6 +20,9 @@ export * from './website-generator/website-generator.module';
 export * from './website-generator/website-generator.service';
 export * from './website-generator/website-update.service';
 
+// AI Service
+export * from './ai';
+
 // Git
 export * from './git/git.module';
 export * from './git/github.service';

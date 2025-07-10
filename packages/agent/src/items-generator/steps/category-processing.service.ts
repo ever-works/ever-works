@@ -3,9 +3,8 @@ import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
 import { z } from 'zod';
 import { ItemData, Category, Tag, CreateItemsGeneratorDto } from '../dto';
 import { slugifyText, unSlugifyText } from '../utils/text.utils';
-import { AiService } from '../shared';
+import { AiService, BaseChatModel } from 'src/ai';
 import { itemDataWithCategoriesAndTagsSchema } from '../schemas/item-extraction.schemas';
-import { BaseChatModel } from '../shared/ai-provider.interface';
 
 // Prompt for categorization
 const categoryPrompt = <T extends string>(additionalContext?: T) =>

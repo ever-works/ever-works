@@ -3,7 +3,7 @@ import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
 import { z } from 'zod';
 import { BadgeType, BadgeValue, ItemBadges, BadgeEvaluationResult } from '../dto/badge.dto';
 import { ItemData } from '../dto/item-data.dto';
-import { AiService } from './ai.service';
+import { AiService } from '../../ai';
 
 // Zod schema for badge evaluation
 const badgeSchema = z.object({

@@ -2,6 +2,9 @@ import { Injectable } from '@nestjs/common';
 import { BasePromptService } from './base-prompt.service';
 import { AiProviderRegistryService } from '../ai-providers/ai-provider-registry.service';
 import { AiProviderConfiguration, ConfiguredAiProvider } from '../ai-providers/ai-provider.interface';
+import { AiService } from '@packages/agent';
+import chalk from 'chalk';
+import ora from 'ora';
 
 @Injectable()
 export class AiProviderPromptService extends BasePromptService {

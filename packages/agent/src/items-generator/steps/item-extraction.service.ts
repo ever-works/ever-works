@@ -1,13 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
-import { ConfigDto, CreateItemsGeneratorDto } from '../dto/create-items-generator.dto';
+import { CreateItemsGeneratorDto } from '../dto/create-items-generator.dto';
 import { WebPageData } from '../interfaces/items-generator.interfaces';
 import { slugifyText } from '../utils/text.utils';
-import { AiService } from '../shared';
+import { AiService, BaseChatModel } from 'src/ai';
 import { ItemData } from '../dto';
 import { extractedItemsSchema, itemDataSchema } from '../schemas/item-extraction.schemas';
-import { BaseChatModel } from '../shared/ai-provider.interface';
 
 const ITEMS_EXTRACTION_PROMPT =
     `You are an expert data extractor and technical writer for directory websites.
