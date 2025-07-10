@@ -2,7 +2,11 @@ import { Injectable, Logger } from '@nestjs/common';
 import * as fs from 'fs-extra';
 import * as path from 'path';
 import * as os from 'os';
-import { EverWorksConfig, PartialEverWorksConfig, ConfigValidationResult } from './config.interface';
+import {
+    EverWorksConfig,
+    PartialEverWorksConfig,
+    ConfigValidationResult,
+} from './config.interface';
 
 @Injectable()
 export class ConfigService {
@@ -121,14 +125,21 @@ export class ConfigService {
 
         // AI Provider validation
         if (config.AI_DEFAULT_PROVIDER) {
-            const providerKey = `${config.AI_DEFAULT_PROVIDER.toUpperCase()}_API_KEY` as keyof EverWorksConfig;
+            const providerKey =
+                `${config.AI_DEFAULT_PROVIDER.toUpperCase()}_API_KEY` as keyof EverWorksConfig;
+
             if (!config[providerKey] && config.AI_DEFAULT_PROVIDER !== 'ollama') {
-                errors.push(`API key for default provider ${config.AI_DEFAULT_PROVIDER} is required`);
+                errors.push(
+                    `API key for default provider ${config.AI_DEFAULT_PROVIDER} is required`,
+                );
             }
         }
 
         // Warnings
-        if (!config.TAVILY_API_KEY && (config.EXTRACT_CONTENT_SERVICE === 'tavily' || config.WEB_SEARCH_SERVICE === 'tavily')) {
+        if (
+            !config.TAVILY_API_KEY &&
+            (config.EXTRACT_CONTENT_SERVICE === 'tavily' || config.WEB_SEARCH_SERVICE === 'tavily')
+        ) {
             warnings.push('TAVILY_API_KEY is recommended when using Tavily services');
         }
 
@@ -158,7 +169,7 @@ export class ConfigService {
      * Merges new configuration with existing configuration
      */
     async mergeConfig(newConfig: PartialEverWorksConfig): Promise<void> {
-        const existingConfig = await this.loadConfig() || {};
+        const existingConfig = (await this.loadConfig()) || {};
         const mergedConfig = { ...existingConfig, ...newConfig };
         await this.saveConfig(mergedConfig);
     }

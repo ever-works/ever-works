@@ -3,10 +3,10 @@ import { Injectable, Logger } from '@nestjs/common';
 import chalk from 'chalk';
 import ora from 'ora';
 import { ConfigService } from '../../config/config.service';
-import { GitHubGitPromptService } from '../../prompts/github-git-prompt.service';
-import { DeploymentPromptService } from '../../prompts/deployment-prompt.service';
-import { AiProviderPromptService } from '../../prompts/ai-provider-prompt.service';
-import { SearchServicePromptService } from '../../prompts/search-service-prompt.service';
+import { GitHubGitPromptService } from './prompts/github-git-prompt.service';
+import { DeploymentPromptService } from './prompts/deployment-prompt.service';
+import { AiProviderPromptService } from './prompts/ai-provider-prompt.service';
+import { SearchServicePromptService } from './prompts/search-service-prompt.service';
 
 import { PartialEverWorksConfig } from '../../config/config.interface';
 
