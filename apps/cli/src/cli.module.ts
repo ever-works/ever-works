@@ -13,4 +13,4 @@ import { ConfigCommands } from './commands/config';
     ],
     controllers: [],
 })
-export class AppModule {}
+export class CLIModule {}

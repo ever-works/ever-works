@@ -1,6 +1,6 @@
 import { NestFactory, NestContainer } from '@nestjs/core';
 import { CommandFactory } from 'nest-commander';
-import { AppModule } from './app.module';
+import { CLIModule } from './cli.module';
 import { ConfigModule } from './config/config.module';
 import { ConfigService } from './config';
 
@@ -12,7 +12,7 @@ async function bootstrap() {
     await config.close(); // we can close the config app context now
 
     // Run the CLI app
-    await CommandFactory.run(AppModule);
+    await CommandFactory.run(CLIModule);
 }
 
 bootstrap();
