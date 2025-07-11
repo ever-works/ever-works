@@ -4,13 +4,14 @@ import { ConfigModule } from './config/config.module';
 
 // Commands
 import { ConfigCommands } from './commands/config';
+import { DirectoryCommands } from './commands/directory';
 
 @Module({
     imports: [DatabaseConfigurations.cli(), ConfigModule, AiModule],
     providers: [
         // Commands
         ...ConfigCommands,
+        ...DirectoryCommands,
     ],
-    controllers: [],
 })
 export class CLIModule {}

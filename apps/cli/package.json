@@ -6,11 +6,11 @@
     "private": true,
     "license": "UNLICENSED",
     "scripts": {
-        "start": "pnpm build:deps && nest start",
-        "start:dev": "pnpm build:deps && nest start --watch",
-        "start:debug": "pnpm build:deps && nest start --debug --watch",
+        "start": "nest start",
+        "start:dev": "nest start --watch",
+        "start:debug": "nest start --debug --watch",
         "ever-works": "node dist/main",
-        "build": "pnpm build:deps && nest build",
+        "build": "nest build",
         "build:deps": "pnpm --filter '@packages/*' build"
     },
     "dependencies": {

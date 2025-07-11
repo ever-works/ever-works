@@ -1,4 +1,4 @@
-import { NestFactory, NestContainer } from '@nestjs/core';
+import { NestFactory } from '@nestjs/core';
 import { CommandFactory } from 'nest-commander';
 import { CLIModule } from './cli.module';
 import { ConfigModule } from './config/config.module';
