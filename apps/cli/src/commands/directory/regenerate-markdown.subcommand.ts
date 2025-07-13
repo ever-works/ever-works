@@ -3,10 +3,7 @@ import { Logger } from '@nestjs/common';
 import chalk from 'chalk';
 import ora from 'ora';
 import inquirer from 'inquirer';
-import {
-    DirectoryRepository,
-    AgentService
-} from '@packages/agent';
+import { DirectoryRepository, AgentService } from '@packages/agent';
 import { DirectoryPromptService } from './directory-prompt.service';
 import { ConfigCheckService } from './config-check.service';
 
@@ -34,7 +31,9 @@ export class RegenerateMarkdownSubCommand extends CommandRunner {
             await this.configCheck.requireConfiguration();
 
             // Select directory
-            const selection = await this.directoryPrompt.promptDirectorySelection(this.directoryRepository);
+            const selection = await this.directoryPrompt.promptDirectorySelection(
+                this.directoryRepository,
+            );
             if (selection.cancelled || !selection.directory) {
                 console.log(chalk.yellow('\n⚠ Operation cancelled.'));
                 return;
@@ -72,26 +71,25 @@ export class RegenerateMarkdownSubCommand extends CommandRunner {
                 // Call the agent service method directly
                 const result = await this.agentService.regenerateMarkdown(directory.slug);
 
-                spinner.succeed('Markdown files regenerated successfully');
-
-                console.log(chalk.green('\n✓ Markdown regeneration completed successfully!'));
-                console.log(chalk.gray('Status:'), chalk.white(result.status));
-
                 if (result.status === 'success') {
+                    spinner.succeed('Markdown files regenerated successfully');
+
+                    console.log(chalk.green('\n✓ Markdown regeneration completed successfully!'));
+                    console.log(chalk.gray('Status:'), chalk.white(result.status));
+
                     console.log(chalk.cyan('\n--- Next Steps ---'));
                     console.log(chalk.gray('  • Check your repository for updated files'));
                     console.log(chalk.gray('  • Review the generated markdown content'));
                     console.log(chalk.gray('  • The changes have been committed automatically'));
                 } else if (result.error_details) {
+                    spinner.fail();
                     console.log(chalk.red('\n--- Error Details ---'));
                     console.log(chalk.red(result.error_details));
                 }
-
             } catch (error) {
                 spinner.fail('Failed to regenerate markdown files');
                 throw error;
             }
-
         } catch (error) {
             this.logger.error('Failed to regenerate markdown:', error);
             console.log(chalk.red('\n✗ Failed to regenerate markdown:'), error.message);
