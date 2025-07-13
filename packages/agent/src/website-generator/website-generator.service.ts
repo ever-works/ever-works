@@ -81,4 +81,19 @@ export class WebsiteGeneratorService {
             }
         }
     }
+
+    /**
+     * Remove repository for a directory
+     */
+    async removeRepository(directory: Directory, user: User): Promise<void> {
+        const token = user.getGitToken();
+        const websiteRepo = directory.getWebsiteRepo();
+
+        try {
+            // Delete the GitHub repository
+            await this.githubService.deleteRepository(directory.owner, websiteRepo, token);
+        } catch (error) {
+            throw error;
+        }
+    }
 }

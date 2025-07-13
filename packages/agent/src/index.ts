@@ -1,6 +1,7 @@
 // Agent HTTP
 export * from './http/agent-http.module';
 export * from './http/agent-http.controller';
+export * from './http/agent.service';
 
 // Data Generator
 export * from './data-generator/data-generator.module';
@@ -39,3 +40,8 @@ export * from './entities/user.entity';
 
 // DTOs
 export * from './dto/create-directory.dto';
+export * from './items-generator/dto';
+export * from './website-generator/dto/update-website-repository.dto';
+
+// Deploy
+export * from './deploy/vercel.service';

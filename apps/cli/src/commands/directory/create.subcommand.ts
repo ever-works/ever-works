@@ -117,8 +117,8 @@ export class CreateSubCommand extends CommandRunner {
             console.log(chalk.cyan('\nNext Steps:'));
             console.log(
                 chalk.gray('  • Use ') +
-                    chalk.cyan('directory list') +
-                    chalk.gray(' to see all your directories'),
+                    chalk.cyan('directory generate') +
+                    chalk.gray(' to generate content for your directory.'),
             );
             console.log(chalk.gray('  • Start adding content to your new directory'));
         } catch (error) {

@@ -268,6 +268,23 @@ export class DataGeneratorService {
     }
 
     /**
+     * Remove repository for a directory
+     */
+    async removeRepository(directory: Directory, user: User): Promise<void> {
+        const token = user.getGitToken();
+        const repo = directory.getDataRepo();
+
+        try {
+            // Delete the GitHub repository
+            await this.githubService.deleteRepository(directory.owner, repo, token);
+            this.logger.log(`Successfully deleted data repository: ${directory.owner}/${repo}`);
+        } catch (error) {
+            this.logger.error(`Failed to delete data repository ${directory.owner}/${repo}:`, error);
+            throw error;
+        }
+    }
+
+    /**
      * Get last request data from config
      */
     async getLastRequestData(directory: Directory, user: User) {

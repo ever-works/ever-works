@@ -428,6 +428,25 @@ export class GithubService extends GitProvider {
     }
 
     /**
+     * Deletes a repository
+     */
+    async deleteRepository(owner: string, repo: string, token: string): Promise<void> {
+        const octokit = new Octokit({ auth: token });
+
+        try {
+            await octokit.rest.repos.delete({
+                owner,
+                repo,
+            });
+
+            this.logger.log(`Successfully deleted repository: ${owner}/${repo}`);
+        } catch (err) {
+            this.logger.error(`Failed to delete repository ${owner}/${repo}:`, err.message);
+            throw err;
+        }
+    }
+
+    /**
      * Checks if a repository has a fork relationship with another repository
      */
     async hasForkRelationship(

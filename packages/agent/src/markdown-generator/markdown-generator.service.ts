@@ -205,6 +205,22 @@ export class MarkdownGeneratorService {
         await markdownRepo.removeDetails(slug);
     }
 
+    /**
+     * Remove repository for a directory
+     */
+    async removeRepository(directory: Directory, user: User): Promise<void> {
+        const token = user.getGitToken();
+
+        try {
+            // Delete the GitHub repository
+            await this.githubService.deleteRepository(directory.owner, directory.slug, token);
+            this.logger.log(`Successfully deleted markdown repository: ${directory.owner}/${directory.slug}`);
+        } catch (error) {
+            this.logger.error(`Failed to delete markdown repository ${directory.owner}/${directory.slug}:`, error);
+            throw error;
+        }
+    }
+
     private async generateReadme(
         data: DataRepository,
         markdowns: Set<string>,

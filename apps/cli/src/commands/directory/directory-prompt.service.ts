@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import chalk from 'chalk';
 import inquirer from 'inquirer';
 import { BasePromptService } from '../config/prompts/base-prompt.service';
-import { MarkdownReadmeConfigDto } from '@packages/agent';
+import { MarkdownReadmeConfigDto, DirectoryRepository, Directory } from '@packages/agent';
 
 export interface DirectoryInputData {
     slug: string;
@@ -15,6 +15,11 @@ export interface DirectoryInputData {
 export interface SlugConflictResolution {
     action: 'use_suggested' | 'modify' | 'cancel';
     finalSlug?: string;
+}
+
+export interface DirectorySelection {
+    directory: Directory | null;
+    cancelled: boolean;
 }
 
 @Injectable()
@@ -206,5 +211,61 @@ export class DirectoryPromptService extends BasePromptService {
             return 'Description must be less than 500 characters';
         }
         return true;
+    }
+
+    /**
+     * Prompts user to select a directory from available directories
+     */
+    async promptDirectorySelection(
+        directoryRepository: DirectoryRepository,
+    ): Promise<DirectorySelection> {
+        try {
+            const directories = await directoryRepository.findAll();
+
+            if (directories.length === 0) {
+                console.log(chalk.yellow('\n⚠ No directories found.'));
+                console.log(
+                    chalk.gray('Create your first directory with: ') +
+                        chalk.cyan('directory create'),
+                );
+                return { directory: null, cancelled: true };
+            }
+
+            this.displaySectionHeader('Directory Selection');
+            this.displayInfo(`Found ${directories.length} directories. Please select one:`);
+
+            type Choice = { name: string; value: Directory | null; short: string };
+
+            const choices: Choice[] = directories.map((dir) => ({
+                name: `${chalk.cyan(dir.slug)} - ${dir.name} ${chalk.gray(`(${dir.owner})`)}`,
+                value: dir,
+                short: dir.slug,
+            }));
+
+            choices.push({
+                name: chalk.gray('Cancel'),
+                value: null,
+                short: 'cancel',
+            });
+
+            const { selectedDirectory } = await inquirer.prompt([
+                {
+                    type: 'list',
+                    name: 'selectedDirectory',
+                    message: 'Select a directory:',
+                    choices,
+                    pageSize: 10,
+                },
+            ]);
+
+            if (!selectedDirectory) {
+                return { directory: null, cancelled: true };
+            }
+
+            return { directory: selectedDirectory, cancelled: false };
+        } catch (error) {
+            console.log(chalk.red('\n✗ Failed to load directories:'), error.message);
+            return { directory: null, cancelled: true };
+        }
     }
 }

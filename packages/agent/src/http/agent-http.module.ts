@@ -7,17 +7,20 @@ import { MarkdownGeneratorModule } from '../markdown-generator/markdown-generato
 import { WebsiteGeneratorModule } from '../website-generator/website-generator.module';
 import { DeployModule } from '../deploy/deploy.module';
 import { DatabaseModule } from '../database/database.module';
+import { AgentService } from './agent.service';
 
 @Module({
-	imports: [
-		DatabaseModule,
-		DataGeneratorModule,
-		ItemsGeneratorModule,
-		GitModule,
-		MarkdownGeneratorModule,
-		WebsiteGeneratorModule,
-		DeployModule
-	],
-	controllers: [AgentHTTPController]
+    imports: [
+        DatabaseModule,
+        DataGeneratorModule,
+        ItemsGeneratorModule,
+        GitModule,
+        MarkdownGeneratorModule,
+        WebsiteGeneratorModule,
+        DeployModule,
+        AgentService,
+    ],
+    controllers: [AgentHTTPController],
+    providers: [AgentService],
 })
 export class AgentHTTPModule {}

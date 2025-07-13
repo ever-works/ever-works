@@ -1,14 +1,12 @@
 import { DirectoryCommand } from './directory.command';
-import { CreateSubCommand } from './create.subcommand';
-import { ListSubCommand } from './list.subcommand';
 import { DirectoryPromptService } from './directory-prompt.service';
+import { ConfigCheckService } from './config-check.service';
 
 export const DirectoryCommands = [
     // Commands
-    DirectoryCommand,
-    CreateSubCommand,
-    ListSubCommand,
+    ...DirectoryCommand.registerWithSubCommands(),
 
     // Services
     DirectoryPromptService,
+    ConfigCheckService,
 ];
