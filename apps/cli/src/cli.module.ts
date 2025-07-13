@@ -16,6 +16,7 @@ import { ConfigModule } from './config/config.module';
 // Commands
 import { ConfigCommands } from './commands/config';
 import { DirectoryCommands } from './commands/directory';
+import { ServeCommands } from './commands/serve';
 
 @Module({
     imports: [
@@ -35,6 +36,7 @@ import { DirectoryCommands } from './commands/directory';
         // Commands
         ...ConfigCommands,
         ...DirectoryCommands,
+        ...ServeCommands,
     ],
 })
 export class CLIModule {}
