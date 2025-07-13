@@ -1,5 +1,4 @@
 import { Command, CommandRunner } from 'nest-commander';
-import { Injectable } from '@nestjs/common';
 import { SetupSubCommand } from './setup.subcommand';
 import { ShowSubCommand } from './show.subcommand';
 import { TestSubCommand } from './test.subcommand';
@@ -7,7 +6,6 @@ import { SetSubCommand } from './set.subcommand';
 import { UnsetSubCommand } from './unset.subcommand';
 import { SwitchAiSubCommand } from './switch-ai.subcommand';
 
-@Injectable()
 @Command({
     name: 'config',
     description: 'Configuration management commands',

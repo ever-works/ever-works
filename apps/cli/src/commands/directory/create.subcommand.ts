@@ -1,11 +1,11 @@
 import { SubCommand, CommandRunner } from 'nest-commander';
-import { Injectable, Logger } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 import chalk from 'chalk';
+import inquirer from 'inquirer';
 import ora from 'ora';
 import { DirectoryRepository, GithubService, User } from '@packages/agent';
 import { DirectoryPromptService } from './directory-prompt.service';
 
-@Injectable()
 @SubCommand({
     name: 'create',
     description: 'Create a new directory',
@@ -24,9 +24,6 @@ export class CreateSubCommand extends CommandRunner {
     async run(): Promise<void> {
         try {
             console.log(chalk.cyan.bold('\n📁 Create New Directory\n'));
-            console.log(
-                chalk.gray('This will create a new directory in your Ever Works workspace.\n'),
-            );
 
             // Collect directory information
             const directoryData = await this.directoryPrompt.promptDirectoryCreation();
@@ -54,16 +51,14 @@ export class CreateSubCommand extends CommandRunner {
                     ),
                 );
 
-                const { shouldChooseDifferent } = await import('inquirer').then((inquirer) =>
-                    inquirer.default.prompt([
-                        {
-                            type: 'confirm',
-                            name: 'shouldChooseDifferent',
-                            message: 'Would you like to choose a different slug?',
-                            default: true,
-                        },
-                    ]),
-                );
+                const { shouldChooseDifferent } = await inquirer.prompt([
+                    {
+                        type: 'confirm',
+                        name: 'shouldChooseDifferent',
+                        message: 'Would you like to choose a different slug?',
+                        default: true,
+                    },
+                ]);
 
                 if (shouldChooseDifferent) {
                     console.log(

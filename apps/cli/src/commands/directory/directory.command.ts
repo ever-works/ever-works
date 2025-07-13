@@ -1,9 +1,7 @@
 import { Command, CommandRunner } from 'nest-commander';
-import { Injectable } from '@nestjs/common';
 import { CreateSubCommand } from './create.subcommand';
 import { ListSubCommand } from './list.subcommand';
 
-@Injectable()
 @Command({
     name: 'directory',
     description: 'Directory management commands',

@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { tavily, TavilyClient } from '@tavily/core';
 import { ConfigDto } from '../dto/create-items-generator.dto';
+// @ts-ignore
 import { search, OrganicResult, DictionaryResult, OrganicResultNode } from 'google-sr';
 
 import * as cheerio from 'cheerio';

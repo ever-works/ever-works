@@ -7,8 +7,6 @@
     "license": "UNLICENSED",
     "scripts": {
         "start": "nest start",
-        "start:dev": "nest start --watch",
-        "start:debug": "nest start --debug --watch",
         "ever-works": "node dist/main",
         "build": "nest build",
         "build:deps": "pnpm --filter '@packages/*' build"

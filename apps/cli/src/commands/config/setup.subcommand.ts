@@ -1,7 +1,8 @@
 import { SubCommand, CommandRunner } from 'nest-commander';
-import { Injectable, Logger } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 import chalk from 'chalk';
 import ora from 'ora';
+import inquirer from 'inquirer';
 import { ConfigService } from '../../config/config.service';
 import { GitHubGitPromptService } from './prompts/github-git-prompt.service';
 import { DeploymentPromptService } from './prompts/deployment-prompt.service';
@@ -10,7 +11,6 @@ import { SearchServicePromptService } from './prompts/search-service-prompt.serv
 
 import { PartialEverWorksConfig } from '../../config/config.interface';
 
-@Injectable()
 @SubCommand({
     name: 'setup',
     description: 'Setup Ever Works CLI configuration',
@@ -23,14 +23,18 @@ export class SetupSubCommand extends CommandRunner {
         private readonly githubGitPrompt: GitHubGitPromptService,
         private readonly deploymentPrompt: DeploymentPromptService,
         private readonly aiProviderPrompt: AiProviderPromptService,
-        private readonly searchServicePrompt: SearchServicePromptService
+        private readonly searchServicePrompt: SearchServicePromptService,
     ) {
         super();
     }
 
     async run(): Promise<void> {
         console.log(chalk.cyan.bold('\n🚀 Ever Works CLI Setup\n'));
-        console.log(chalk.gray('This setup will configure all necessary settings for the Ever Works agent to function properly.\n'));
+        console.log(
+            chalk.gray(
+                'This setup will configure all necessary settings for the Ever Works agent to function properly.\n',
+            ),
+        );
 
         try {
             // Check if configuration already exists
@@ -43,30 +47,42 @@ export class SetupSubCommand extends CommandRunner {
                 console.log(chalk.gray(`   ${this.configService.getConfigPath()}`));
                 console.log(chalk.gray('   You can also edit this file manually if needed.\n'));
 
-                const { overwrite } = await import('inquirer').then(inquirer =>
-                    inquirer.default.prompt([{
+                const { overwrite } = await inquirer.prompt([
+                    {
                         type: 'confirm',
                         name: 'overwrite',
                         message: 'Do you want to overwrite the existing configuration?',
                         default: false,
-                    }])
-                );
+                    },
+                ]);
 
                 if (!overwrite) {
-                    console.log(chalk.blue('ℹ Setup cancelled. Existing configuration preserved.'));
+                    console.log(
+                        chalk.blue('ℹ Setup cancelled. Existing configuration preserved.'),
+                    );
                     console.log(chalk.gray('To modify specific settings, you can:'));
                     console.log(chalk.gray('  • Edit the config file manually'));
-                    console.log(chalk.gray('  • Run ') + chalk.cyan('ever-works config show') + chalk.gray(' to view current settings'));
-                    console.log(chalk.gray('  • Run ') + chalk.cyan('ever-works config test') + chalk.gray(' to test your configuration'));
+                    console.log(
+                        chalk.gray('  • Run ') +
+                            chalk.cyan('ever-works config show') +
+                            chalk.gray(' to view current settings'),
+                    );
+                    console.log(
+                        chalk.gray('  • Run ') +
+                            chalk.cyan('ever-works config test') +
+                            chalk.gray(' to test your configuration'),
+                    );
                     return;
                 }
 
-                console.log(chalk.blue('ℹ Using existing values as defaults where available...\n'));
+                console.log(
+                    chalk.blue('ℹ Using existing values as defaults where available...\n'),
+                );
             }
 
             // Start configuration process
             const spinner = ora('Initializing setup...').start();
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            await new Promise((resolve) => setTimeout(resolve, 1000));
             spinner.succeed('Setup initialized');
 
             // Build configuration step by step
@@ -75,20 +91,23 @@ export class SetupSubCommand extends CommandRunner {
             };
 
             // 1. GitHub & Git Configuration
-            const githubGitConfig = await this.githubGitPrompt.promptGitHubGitConfig(existingConfig);
+            const githubGitConfig =
+                await this.githubGitPrompt.promptGitHubGitConfig(existingConfig);
             config.GITHUB_APIKEY = githubGitConfig.githubApiKey;
             config.GITHUB_OWNER = githubGitConfig.githubOwner;
             config.GIT_NAME = githubGitConfig.gitName;
             config.GIT_EMAIL = githubGitConfig.gitEmail;
 
             // 2. Deployment Provider Configuration
-            const deploymentConfig = await this.deploymentPrompt.promptDeploymentConfig(existingConfig);
+            const deploymentConfig =
+                await this.deploymentPrompt.promptDeploymentConfig(existingConfig);
             if (deploymentConfig.provider === 'vercel' && deploymentConfig.vercelToken) {
                 config.VERCEL_TOKEN = deploymentConfig.vercelToken;
             }
 
             // 3. AI Provider Configuration
-            const aiConfig = await this.aiProviderPrompt.promptAiProviderConfiguration(existingConfig);
+            const aiConfig =
+                await this.aiProviderPrompt.promptAiProviderConfiguration(existingConfig);
             if (aiConfig.defaultProvider && aiConfig.defaultProvider !== 'ignore') {
                 config.AI_DEFAULT_PROVIDER = aiConfig.defaultProvider;
                 config.AI_FALLBACK_PROVIDERS = aiConfig.fallbackProviders.join(',');
@@ -96,19 +115,25 @@ export class SetupSubCommand extends CommandRunner {
                 // Add AI provider configurations
                 for (const provider of aiConfig.providers) {
                     const upperProvider = provider.name.toUpperCase();
-                    config[`${upperProvider}_API_KEY` as keyof PartialEverWorksConfig] = provider.apiKey;
-                    config[`${upperProvider}_MODEL` as keyof PartialEverWorksConfig] = provider.model;
-                    config[`${upperProvider}_TEMPERATURE` as keyof PartialEverWorksConfig] = provider.temperature.toString();
-                    config[`${upperProvider}_MAX_TOKENS` as keyof PartialEverWorksConfig] = provider.maxTokens.toString();
+                    config[`${upperProvider}_API_KEY` as keyof PartialEverWorksConfig] =
+                        provider.apiKey;
+                    config[`${upperProvider}_MODEL` as keyof PartialEverWorksConfig] =
+                        provider.model;
+                    config[`${upperProvider}_TEMPERATURE` as keyof PartialEverWorksConfig] =
+                        provider.temperature.toString();
+                    config[`${upperProvider}_MAX_TOKENS` as keyof PartialEverWorksConfig] =
+                        provider.maxTokens.toString();
 
                     if (provider.baseUrl) {
-                        config[`${upperProvider}_BASE_URL` as keyof PartialEverWorksConfig] = provider.baseUrl;
+                        config[`${upperProvider}_BASE_URL` as keyof PartialEverWorksConfig] =
+                            provider.baseUrl;
                     }
                 }
             }
 
             // 4. Search Service Configuration
-            const searchConfig = await this.searchServicePrompt.promptSearchServiceConfiguration(existingConfig);
+            const searchConfig =
+                await this.searchServicePrompt.promptSearchServiceConfiguration(existingConfig);
             config.EXTRACT_CONTENT_SERVICE = searchConfig.extractContentService;
             config.WEB_SEARCH_SERVICE = searchConfig.webSearchService;
             if (searchConfig.tavilyApiKey) {
@@ -119,13 +144,15 @@ export class SetupSubCommand extends CommandRunner {
             const validation = this.configService.validateConfig(config);
             if (!validation.isValid) {
                 console.log(chalk.red('\n✗ Configuration validation failed:'));
-                validation.errors.forEach(error => console.log(chalk.red(`  • ${error}`)));
+                validation.errors.forEach((error) => console.log(chalk.red(`  • ${error}`)));
                 return;
             }
 
             if (validation.warnings.length > 0) {
                 console.log(chalk.yellow('\n⚠ Configuration warnings:'));
-                validation.warnings.forEach(warning => console.log(chalk.yellow(`  • ${warning}`)));
+                validation.warnings.forEach((warning) =>
+                    console.log(chalk.yellow(`  • ${warning}`)),
+                );
             }
 
             // 6. Save configuration
@@ -135,7 +162,6 @@ export class SetupSubCommand extends CommandRunner {
 
             // 7. Display success message
             this.displaySuccessMessage();
-
         } catch (error) {
             this.logger.error('Setup failed:', error);
             console.log(chalk.red('\n✗ Setup failed:'), error.message);
@@ -147,10 +173,17 @@ export class SetupSubCommand extends CommandRunner {
         console.log(chalk.green.bold('\n🎉 Setup completed successfully!\n'));
         console.log(chalk.gray('Configuration saved to:'));
         console.log(chalk.cyan(`   ${this.configService.getConfigPath()}\n`));
-        
-        console.log(chalk.gray('You can now use the Ever Works CLI with your configured settings.'));
+
+        console.log(
+            chalk.gray('You can now use the Ever Works CLI with your configured settings.'),
+        );
         console.log(chalk.gray('To reconfigure, run: ') + chalk.cyan('ever-works config setup'));
-        console.log(chalk.gray('To view your configuration, run: ') + chalk.cyan('ever-works config show'));
-        console.log(chalk.gray('To test your configuration, run: ') + chalk.cyan('ever-works config test\n'));
+        console.log(
+            chalk.gray('To view your configuration, run: ') + chalk.cyan('ever-works config show'),
+        );
+        console.log(
+            chalk.gray('To test your configuration, run: ') +
+                chalk.cyan('ever-works config test\n'),
+        );
     }
 }

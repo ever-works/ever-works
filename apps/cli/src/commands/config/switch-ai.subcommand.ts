@@ -1,10 +1,9 @@
 import { SubCommand, CommandRunner } from 'nest-commander';
-import { Injectable, Logger } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 import chalk from 'chalk';
 import inquirer from 'inquirer';
 import { ConfigService } from '../../config/config.service';
 
-@Injectable()
 @SubCommand({
     name: 'switch-ai',
     description: 'Switch between configured AI providers',

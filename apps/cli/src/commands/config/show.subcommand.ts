@@ -1,9 +1,8 @@
 import { SubCommand, CommandRunner } from 'nest-commander';
-import { Injectable, Logger } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 import chalk from 'chalk';
 import { ConfigService } from '../../config/config.service';
 
-@Injectable()
 @SubCommand({
     name: 'show',
     description: 'Show current configuration',
@@ -18,10 +17,14 @@ export class ShowSubCommand extends CommandRunner {
     async run(): Promise<void> {
         try {
             const config = await this.configService.loadConfig();
-            
+
             if (!config) {
                 console.log(chalk.yellow('⚠ No configuration found.'));
-                console.log(chalk.gray('Run ') + chalk.cyan('ever-works config setup') + chalk.gray(' to create a configuration.'));
+                console.log(
+                    chalk.gray('Run ') +
+                        chalk.cyan('ever-works config setup') +
+                        chalk.gray(' to create a configuration.'),
+                );
                 return;
             }
 
@@ -41,7 +44,9 @@ export class ShowSubCommand extends CommandRunner {
             });
 
             this.displaySection('Deployment', {
-                'Vercel Token': config.VERCEL_TOKEN ? this.maskSecret(config.VERCEL_TOKEN) : 'Not configured',
+                'Vercel Token': config.VERCEL_TOKEN
+                    ? this.maskSecret(config.VERCEL_TOKEN)
+                    : 'Not configured',
             });
 
             this.displaySection('AI Configuration', {
@@ -52,23 +57,33 @@ export class ShowSubCommand extends CommandRunner {
             // Display configured AI providers
             const aiProviders = this.getConfiguredAiProviders(config);
             if (aiProviders.length > 0) {
-                this.displaySection('AI Providers', 
-                    aiProviders.reduce((acc, provider) => {
-                        acc[provider] = 'Configured ✓';
-                        return acc;
-                    }, {} as Record<string, string>)
+                this.displaySection(
+                    'AI Providers',
+                    aiProviders.reduce(
+                        (acc, provider) => {
+                            acc[provider] = 'Configured ✓';
+                            return acc;
+                        },
+                        {} as Record<string, string>,
+                    ),
                 );
             }
 
             this.displaySection('Search Services', {
                 'Content Extraction': config.EXTRACT_CONTENT_SERVICE,
                 'Web Search': config.WEB_SEARCH_SERVICE,
-                'Tavily API Key': config.TAVILY_API_KEY ? this.maskSecret(config.TAVILY_API_KEY) : 'Not configured',
+                'Tavily API Key': config.TAVILY_API_KEY
+                    ? this.maskSecret(config.TAVILY_API_KEY)
+                    : 'Not configured',
             });
 
-            console.log(chalk.gray('\nTo modify configuration, run: ') + chalk.cyan('ever-works config setup'));
-            console.log(chalk.gray('To test configuration, run: ') + chalk.cyan('ever-works config test\n'));
-
+            console.log(
+                chalk.gray('\nTo modify configuration, run: ') +
+                    chalk.cyan('ever-works config setup'),
+            );
+            console.log(
+                chalk.gray('To test configuration, run: ') + chalk.cyan('ever-works config test\n'),
+            );
         } catch (error) {
             this.logger.error('Failed to show configuration:', error);
             console.log(chalk.red('\n✗ Failed to load configuration:'), error.message);
@@ -89,15 +104,31 @@ export class ShowSubCommand extends CommandRunner {
         if (!secret || secret.length < 8) {
             return '***';
         }
-        return secret.substring(0, 4) + '*'.repeat(secret.length - 8) + secret.substring(secret.length - 4);
+        return (
+            secret.substring(0, 4) +
+            '*'.repeat(secret.length - 8) +
+            secret.substring(secret.length - 4)
+        );
     }
 
     private getConfiguredAiProviders(config: any): string[] {
         const providers: string[] = [];
-        const providerKeys = ['OPENAI', 'GOOGLE', 'ANTHROPIC', 'OPENROUTER', 'OLLAMA', 'MISTRAL', 'DEEPSEEK', 'GROQ'];
+        const providerKeys = [
+            'OPENAI',
+            'GOOGLE',
+            'ANTHROPIC',
+            'OPENROUTER',
+            'OLLAMA',
+            'MISTRAL',
+            'DEEPSEEK',
+            'GROQ',
+        ];
 
         for (const provider of providerKeys) {
-            if (config[`${provider}_API_KEY`] || (provider === 'OLLAMA' && config[`${provider}_BASE_URL`])) {
+            if (
+                config[`${provider}_API_KEY`] ||
+                (provider === 'OLLAMA' && config[`${provider}_BASE_URL`])
+            ) {
                 providers.push(provider.toLowerCase());
             }
         }

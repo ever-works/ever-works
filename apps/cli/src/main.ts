@@ -6,13 +6,19 @@ import { ConfigService } from './config';
 
 async function bootstrap() {
     // Load config into environment variables
-    const config = await NestFactory.createApplicationContext(ConfigModule, { logger: false });
+    const config = await NestFactory.createApplicationContext(ConfigModule, {
+        logger: ['error', 'warn'],
+    });
     const configService = config.get(ConfigService);
     await configService.loadConfigIntoEnv();
-    await config.close(); // we can close the config app context now
 
-    // Run the CLI app
-    await CommandFactory.run(CLIModule);
+    // Run the CLI app with explicit logging
+    await CommandFactory.run(CLIModule, {
+        logger: ['error', 'warn'],
+    });
 }
 
-bootstrap();
+bootstrap().catch((error) => {
+    console.error('Unhandled error:', error);
+    process.exit(1);
+});

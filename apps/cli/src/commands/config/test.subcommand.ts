@@ -1,11 +1,10 @@
 import { SubCommand, CommandRunner } from 'nest-commander';
-import { Injectable, Logger } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 import chalk from 'chalk';
 import ora from 'ora';
 import { ConfigService } from '../../config/config.service';
 import { AiService } from '@packages/agent';
 
-@Injectable()
 @SubCommand({
     name: 'test',
     description: 'Test configuration connectivity',
@@ -15,7 +14,7 @@ export class TestSubCommand extends CommandRunner {
 
     constructor(
         private readonly configService: ConfigService,
-        private readonly aiService: AiService
+        private readonly aiService: AiService,
     ) {
         super();
     }
@@ -25,10 +24,14 @@ export class TestSubCommand extends CommandRunner {
 
         try {
             const config = await this.configService.loadConfig();
-            
+
             if (!config) {
                 console.log(chalk.yellow('⚠ No configuration found.'));
-                console.log(chalk.gray('Run ') + chalk.cyan('ever-works config setup') + chalk.gray(' to create a configuration.'));
+                console.log(
+                    chalk.gray('Run ') +
+                        chalk.cyan('ever-works config setup') +
+                        chalk.gray(' to create a configuration.'),
+                );
                 return;
             }
 
@@ -52,11 +55,16 @@ export class TestSubCommand extends CommandRunner {
             // Display final results
             console.log('\n' + chalk.cyan.bold('📊 Test Summary'));
             if (allTestsPassed) {
-                console.log(chalk.green('✓ All tests passed! Your configuration is working correctly.'));
+                console.log(
+                    chalk.green('✓ All tests passed! Your configuration is working correctly.'),
+                );
             } else {
-                console.log(chalk.yellow('⚠ Some tests failed. Please check the configuration and try again.'));
+                console.log(
+                    chalk.yellow(
+                        '⚠ Some tests failed. Please check the configuration and try again.',
+                    ),
+                );
             }
-
         } catch (error) {
             this.logger.error('Configuration test failed:', error);
             console.log(chalk.red('\n✗ Configuration test failed:'), error.message);
@@ -81,14 +89,19 @@ export class TestSubCommand extends CommandRunner {
                 const result = await this.aiService.testProvider({
                     type: provider as any,
                     apiKey: config[`${provider.toUpperCase()}_API_KEY`],
-                    modelName: config[`${provider.toUpperCase()}_MODEL`] || this.getDefaultModel(provider),
-                    temperature: parseFloat(config[`${provider.toUpperCase()}_TEMPERATURE`] || '0.7'),
+                    modelName:
+                        config[`${provider.toUpperCase()}_MODEL`] || this.getDefaultModel(provider),
+                    temperature: parseFloat(
+                        config[`${provider.toUpperCase()}_TEMPERATURE`] || '0.7',
+                    ),
                     maxTokens: parseInt(config[`${provider.toUpperCase()}_MAX_TOKENS`] || '4096'),
                     baseURL: config[`${provider.toUpperCase()}_BASE_URL`],
                 });
 
                 if (result.success) {
-                    spinner.succeed(`${provider}: ${chalk.green('✓ Connected')} (${result.responseTime}ms)`);
+                    spinner.succeed(
+                        `${provider}: ${chalk.green('✓ Connected')} (${result.responseTime}ms)`,
+                    );
                     console.log(chalk.gray(`  Response: ${result.response}`));
                 } else {
                     spinner.fail(`${provider}: ${chalk.red('✗ Failed')}`);
@@ -139,11 +152,11 @@ export class TestSubCommand extends CommandRunner {
 
     private async testGitHubApi(apiKey: string): Promise<boolean> {
         const spinner = ora('Testing GitHub API...').start();
-        
+
         try {
             const response = await fetch('https://api.github.com/user', {
                 headers: {
-                    'Authorization': `token ${apiKey}`,
+                    Authorization: `token ${apiKey}`,
                     'User-Agent': 'ever-works-cli',
                 },
             });
@@ -165,17 +178,19 @@ export class TestSubCommand extends CommandRunner {
 
     private async testVercelApi(token: string): Promise<boolean> {
         const spinner = ora('Testing Vercel API...').start();
-        
+
         try {
             const response = await fetch('https://api.vercel.com/v2/user', {
                 headers: {
-                    'Authorization': `Bearer ${token}`,
+                    Authorization: `Bearer ${token}`,
                 },
             });
 
             if (response.ok) {
                 const user = await response.json();
-                spinner.succeed(`Vercel API: ${chalk.green('✓ Connected')} (User: ${user.user.username})`);
+                spinner.succeed(
+                    `Vercel API: ${chalk.green('✓ Connected')} (User: ${user.user.username})`,
+                );
                 return true;
             } else {
                 spinner.fail(`Vercel API: ${chalk.red('✗ Failed')} (Status: ${response.status})`);
@@ -190,7 +205,7 @@ export class TestSubCommand extends CommandRunner {
 
     private async testTavilyApi(apiKey: string): Promise<boolean> {
         const spinner = ora('Testing Tavily API...').start();
-        
+
         try {
             const response = await fetch('https://api.tavily.com/search', {
                 method: 'POST',
@@ -220,11 +235,23 @@ export class TestSubCommand extends CommandRunner {
 
     private getConfiguredAiProviders(config: any): string[] {
         const providers: string[] = [];
-        const providerKeys = ['openai', 'google', 'anthropic', 'openrouter', 'ollama', 'mistral', 'deepseek', 'groq'];
+        const providerKeys = [
+            'openai',
+            'google',
+            'anthropic',
+            'openrouter',
+            'ollama',
+            'mistral',
+            'deepseek',
+            'groq',
+        ];
 
         for (const provider of providerKeys) {
             const upperProvider = provider.toUpperCase();
-            if (config[`${upperProvider}_API_KEY`] || (provider === 'ollama' && config[`${upperProvider}_BASE_URL`])) {
+            if (
+                config[`${upperProvider}_API_KEY`] ||
+                (provider === 'ollama' && config[`${upperProvider}_BASE_URL`])
+            ) {
                 providers.push(provider);
             }
         }

@@ -1,5 +1,5 @@
 import { SubCommand, CommandRunner, Option } from 'nest-commander';
-import { Injectable, Logger } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 import chalk from 'chalk';
 import { ConfigService } from '../../config/config.service';
 
@@ -8,7 +8,6 @@ interface SetCommandOptions {
     value?: string;
 }
 
-@Injectable()
 @SubCommand({
     name: 'set',
     description: 'Set a configuration value',
