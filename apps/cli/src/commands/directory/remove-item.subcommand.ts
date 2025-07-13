@@ -3,10 +3,7 @@ import { Logger } from '@nestjs/common';
 import chalk from 'chalk';
 import ora from 'ora';
 import inquirer from 'inquirer';
-import {
-    DirectoryRepository,
-    AgentService
-} from '@packages/agent';
+import { DirectoryRepository, AgentService } from '@packages/agent';
 import { DirectoryPromptService } from './directory-prompt.service';
 import { ConfigCheckService } from './config-check.service';
 
@@ -34,7 +31,9 @@ export class RemoveItemSubCommand extends CommandRunner {
             await this.configCheck.requireConfiguration();
 
             // Select directory
-            const selection = await this.directoryPrompt.promptDirectorySelection(this.directoryRepository);
+            const selection = await this.directoryPrompt.promptDirectorySelection(
+                this.directoryRepository,
+            );
             if (selection.cancelled || !selection.directory) {
                 console.log(chalk.yellow('\n⚠ Operation cancelled.'));
                 return;
@@ -54,7 +53,11 @@ export class RemoveItemSubCommand extends CommandRunner {
                 console.log(chalk.gray('Reason:'), chalk.white(removalData.reason));
             }
 
-            console.log(chalk.red('\n⚠ WARNING: This action will permanently remove the item from the directory.'));
+            console.log(
+                chalk.red(
+                    '\n⚠ WARNING: This action will permanently remove the item from the directory.',
+                ),
+            );
 
             const confirmed = await inquirer.prompt([
                 {
@@ -77,6 +80,12 @@ export class RemoveItemSubCommand extends CommandRunner {
                 // Call the agent service method directly
                 const result = await this.agentService.removeItem(directory.slug, removalData);
 
+                if (result.status === 'error') {
+                    spinner.fail('Failed to remove item');
+                    console.log(chalk.red('\n✗ Failed to remove item:'), result.error_details);
+                    return;
+                }
+
                 spinner.succeed('Item removed successfully');
 
                 console.log(chalk.green('\n✓ Item removed successfully!'));
@@ -89,12 +98,10 @@ export class RemoveItemSubCommand extends CommandRunner {
                     console.log(chalk.gray('PR Title:'), chalk.white(result.pr_title));
                     console.log(chalk.gray('Branch:'), chalk.white(result.pr_branch_name));
                 }
-
             } catch (error) {
                 spinner.fail('Failed to remove item');
                 throw error;
             }
-
         } catch (error) {
             this.logger.error('Failed to remove item:', error);
             console.log(chalk.red('\n✗ Failed to remove item:'), error.message);
