@@ -1,7 +1,6 @@
 import { SubCommand, CommandRunner } from 'nest-commander';
 import { Logger } from '@nestjs/common';
 import chalk from 'chalk';
-import inquirer from 'inquirer';
 import ora from 'ora';
 import { DirectoryRepository, GithubService, User } from '@packages/agent';
 import { DirectoryPromptService } from './directory-prompt.service';
@@ -25,59 +24,72 @@ export class CreateSubCommand extends CommandRunner {
         try {
             console.log(chalk.cyan.bold('\n📁 Create New Directory\n'));
 
-            // Collect directory information
-            const directoryData = await this.directoryPrompt.promptDirectoryCreation();
+            // Show loading message
+            const loadingSpinner = ora('Loading...').start();
 
             // Get user information
             const user = await User.sessionMock();
             const ghOwner = await this.githubService.getUser(user.getGitToken());
 
+            loadingSpinner.stop();
+
+            // Collect directory information
+            const directoryData = await this.directoryPrompt.promptDirectoryCreation(ghOwner.login);
+
             // Determine owner
             const owner = directoryData.owner || ghOwner.login;
             const organization = !!directoryData.owner && directoryData.owner !== ghOwner.login;
 
-            // Check if directory already exists
+            // Check if directory already exists and handle conflicts
             const spinner = ora('Checking if directory exists...').start();
-            const exists = await this.directoryRepository.existsByOwnerAndSlug(
-                owner,
-                directoryData.slug,
-            );
+            let finalSlug = directoryData.slug;
+            let slugExists = await this.directoryRepository.existsByOwnerAndSlug(owner, finalSlug);
 
-            if (exists) {
-                spinner.fail('Directory already exists');
-                console.log(
-                    chalk.red(
-                        `\n✗ A directory with slug "${directoryData.slug}" already exists for owner "${owner}"`,
-                    ),
+            if (slugExists) {
+                spinner.stop();
+
+                // Generate a suggested alternative slug
+                const suggestedSlug = await this.generateAvailableSlug(owner, directoryData.slug);
+
+                // Prompt user for conflict resolution
+                const resolution = await this.directoryPrompt.promptSlugConflictResolution(
+                    directoryData.slug,
+                    suggestedSlug,
                 );
 
-                const { shouldChooseDifferent } = await inquirer.prompt([
-                    {
-                        type: 'confirm',
-                        name: 'shouldChooseDifferent',
-                        message: 'Would you like to choose a different slug?',
-                        default: true,
-                    },
-                ]);
-
-                if (shouldChooseDifferent) {
-                    console.log(
-                        chalk.blue('\nℹ Please run the command again with a different slug.'),
-                    );
-                    return;
-                } else {
+                if (resolution.action === 'cancel') {
                     console.log(chalk.blue('\nℹ Directory creation cancelled.'));
                     return;
+                } else if (resolution.action === 'use_suggested') {
+                    finalSlug = suggestedSlug;
+                } else if (resolution.action === 'modify' && resolution.finalSlug) {
+                    // Check if the manually entered slug is available
+                    const manualSlugExists = await this.directoryRepository.existsByOwnerAndSlug(
+                        owner,
+                        resolution.finalSlug,
+                    );
+                    if (manualSlugExists) {
+                        console.log(
+                            chalk.red(`\n✗ The slug "${resolution.finalSlug}" is also taken.`),
+                        );
+                        console.log(
+                            chalk.blue('Please run the command again with a different name.'),
+                        );
+                        return;
+                    }
+                    finalSlug = resolution.finalSlug;
                 }
-            }
 
-            spinner.succeed('Directory slug is available');
+                console.log(chalk.green(`✓ Using slug: "${finalSlug}"`));
+            } else {
+                spinner.succeed('Directory slug is available');
+            }
 
             // Create directory
             const createSpinner = ora('Creating directory...').start();
 
             const finalDirectoryData = {
-                slug: directoryData.slug,
+                slug: finalSlug,
                 name: directoryData.name,
                 description: directoryData.description,
                 readmeConfig: directoryData.readme_config,
@@ -124,5 +136,17 @@ export class CreateSubCommand extends CommandRunner {
                 );
             }
         }
+    }
+
+    private async generateAvailableSlug(owner: string, baseSlug: string): Promise<string> {
+        let counter = 1;
+        let suggestedSlug = `${baseSlug}-${counter}`;
+
+        while (await this.directoryRepository.existsByOwnerAndSlug(owner, suggestedSlug)) {
+            counter++;
+            suggestedSlug = `${baseSlug}-${counter}`;
+        }
+
+        return suggestedSlug;
     }
 }

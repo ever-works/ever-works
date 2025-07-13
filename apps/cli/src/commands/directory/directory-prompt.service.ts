@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import chalk from 'chalk';
 import inquirer from 'inquirer';
 import { BasePromptService } from '../config/prompts/base-prompt.service';
-import { CreateDirectoryDto, MarkdownReadmeConfigDto } from '@packages/agent';
+import { MarkdownReadmeConfigDto } from '@packages/agent';
 
 export interface DirectoryInputData {
     slug: string;
@@ -12,24 +12,26 @@ export interface DirectoryInputData {
     readme_config?: MarkdownReadmeConfigDto;
 }
 
+export interface SlugConflictResolution {
+    action: 'use_suggested' | 'modify' | 'cancel';
+    finalSlug?: string;
+}
+
 @Injectable()
 export class DirectoryPromptService extends BasePromptService {
-    async promptDirectoryCreation(): Promise<DirectoryInputData> {
+    async promptDirectoryCreation(ownerDefault?: string): Promise<DirectoryInputData> {
         this.displaySectionHeader('Directory Creation');
         this.displayInfo('Please provide the following information to create a new directory:');
 
-        // Required fields
-        const slug = await this.promptRequiredText(
-            'Directory slug (URL-friendly identifier):',
-            undefined,
-            this.validateSlug.bind(this),
-        );
-
+        // Required fields - start with name first
         const name = await this.promptRequiredText(
             'Directory name (display name):',
             undefined,
             this.validateName.bind(this),
         );
+
+        // Generate initial slug from name
+        const initialSlug = this.slugifyName(name);
 
         const description = await this.promptRequiredText(
             'Directory description:',
@@ -51,6 +53,7 @@ export class DirectoryPromptService extends BasePromptService {
         if (wantsOptionalFields) {
             owner = await this.promptOptionalText(
                 'Owner (leave empty to use default GitHub user):',
+                ownerDefault,
             );
 
             const wantsReadmeConfig = await this.promptConfirm(
@@ -64,12 +67,47 @@ export class DirectoryPromptService extends BasePromptService {
         }
 
         return {
-            slug,
+            slug: initialSlug, // This will be the initial slug, may be modified later
             name,
             description,
             owner,
             readme_config,
         };
+    }
+
+    async promptSlugConflictResolution(
+        originalSlug: string,
+        suggestedSlug: string,
+    ): Promise<SlugConflictResolution> {
+        this.displayWarning(`The slug "${originalSlug}" is already taken.`);
+        this.displayInfo(`We suggest using "${suggestedSlug}" instead.`);
+
+        const action = await this.promptSelect('What would you like to do?', [
+            { name: `Use suggested slug: "${suggestedSlug}"`, value: 'use_suggested' },
+            { name: 'Modify the slug manually', value: 'modify' },
+            { name: 'Cancel directory creation', value: 'cancel' },
+        ]);
+
+        if (action === 'modify') {
+            const finalSlug = await this.promptRequiredText(
+                'Enter your preferred slug:',
+                suggestedSlug,
+                this.validateSlug.bind(this),
+            );
+            return { action, finalSlug };
+        }
+
+        return { action, finalSlug: action === 'use_suggested' ? suggestedSlug : undefined };
+    }
+
+    private slugifyName(name: string): string {
+        return name
+            .toLowerCase()
+            .trim()
+            .replace(/[^a-z0-9\s\-_]/g, '') // Remove special characters except spaces, hyphens, underscores
+            .replace(/\s+/g, '-') // Replace spaces with hyphens
+            .replace(/[-_]+/g, '-') // Replace multiple consecutive hyphens/underscores with single hyphen
+            .replace(/^-+|-+$/g, ''); // Remove leading/trailing hyphens
     }
 
     private async promptReadmeConfig(): Promise<MarkdownReadmeConfigDto> {

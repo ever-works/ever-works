@@ -19,6 +19,8 @@
     "noFallthroughCasesInSwitch": false
   },
   "exclude": [
-    "examples/**/*"
+    "examples/**/*",
+    "dist/**/*",
+    "**/*.d.ts"
   ]
 }

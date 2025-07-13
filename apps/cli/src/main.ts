@@ -6,11 +6,12 @@ import { ConfigService } from './config';
 
 async function bootstrap() {
     // Load config into environment variables
-    const config = await NestFactory.createApplicationContext(ConfigModule, {
+    const ac = await NestFactory.createApplicationContext(ConfigModule, {
         logger: ['error', 'warn'],
     });
-    const configService = config.get(ConfigService);
+    const configService = ac.get(ConfigService);
     await configService.loadConfigIntoEnv();
+    await ac.close();
 
     // Run the CLI app with explicit logging
     await CommandFactory.run(CLIModule, {
