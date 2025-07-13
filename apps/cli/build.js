@@ -3,6 +3,8 @@ const fs = require('fs-extra');
 const path = require('path');
 const { execSync } = require('child_process');
 
+const AUTHOR = 'Ever Co. LTD <evereq@gmail.com>';
+
 async function buildCLI() {
     const buildDir = path.join(__dirname, 'dist');
     const tempDir = path.join(__dirname, 'temp-build');
@@ -123,7 +125,7 @@ async function buildCLI() {
             },
         ],
         format: 'cjs',
-        minify: false, // Keep readable for debugging
+        minify: true, // Keep readable for debugging
         sourcemap: false,
         metafile: true,
         // Preserve decorator metadata for TypeORM
@@ -148,7 +150,7 @@ async function buildCLI() {
         name: 'ever-works-cli',
         version: currentPackageJson.version,
         description: 'Ever Works CLI - Open Directory Builder Platform Command Line Interface',
-        author: 'Ever Co. LTD <ever@ever.co>',
+        author: AUTHOR,
         license: 'MIT',
         homepage: 'https://ever.works',
         repository: {
