@@ -9,7 +9,10 @@
         "start": "nest start",
         "ever-works": "node dist/main",
         "build": "nest build",
-        "build:deps": "pnpm --filter '@packages/*' build"
+        "build:deps": "pnpm --filter '@packages/*' build",
+        "build:cli": "node build.js",
+        "publish:cli": "npm run build:cli && cd dist && npm publish",
+        "test:cli": "cd dist && npm install && node cli.js --help"
     },
     "dependencies": {
         "@nestjs/common": "^11.0.1",
@@ -31,6 +34,7 @@
         "@swc/cli": "^0.6.0",
         "@swc/core": "^1.12.9",
         "@types/node": "^22.16.0",
+        "esbuild": "^0.25.6",
         "globals": "^16.3.0",
         "source-map-support": "^0.5.21",
         "ts-loader": "^9.5.2",

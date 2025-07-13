@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 import * as yaml from 'yaml';
-import * as deepmerge from 'deepmerge';
+import deepmerge from 'deepmerge';
 import { format } from 'date-fns';
 import { Category, ItemData, Tag } from '../agent/types';
 import { CreateItemsGeneratorDto, GenerationMethod } from '../items-generator/dto';

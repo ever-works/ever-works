@@ -33,8 +33,6 @@ export class ServeCommand extends CommandRunner {
                 chalk.white(process.env.NODE_ENV || 'development'),
             );
 
-            const spinner = ora('Starting server...').start();
-
             try {
                 // Create NestJS application
                 const app = await NestFactory.create(AgentHTTPModule, {
@@ -58,7 +56,6 @@ export class ServeCommand extends CommandRunner {
 
                 // Start listening
                 await app.listen(port, host);
-                spinner.stop();
 
                 console.log(chalk.yellow('\n--- Controls ---'));
                 console.log(
@@ -84,7 +81,6 @@ export class ServeCommand extends CommandRunner {
                     });
                 });
             } catch (error) {
-                spinner.fail('Failed to start server');
                 throw error;
             }
         } catch (error) {
