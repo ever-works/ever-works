@@ -6,8 +6,9 @@ import { WebsiteGeneratorModule } from '../website-generator/website-generator.m
 import { DatabaseModule } from '../database/database.module';
 
 @Module({
-	imports: [DatabaseModule, GitModule, WebsiteGeneratorModule],
-	providers: [VercelService],
-	controllers: [DeployController]
+    imports: [DatabaseModule, GitModule, WebsiteGeneratorModule],
+    providers: [VercelService],
+    controllers: [DeployController],
+    exports: [VercelService],
 })
 export class DeployModule {}

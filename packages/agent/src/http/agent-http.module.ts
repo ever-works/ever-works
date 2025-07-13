@@ -18,9 +18,9 @@ import { AgentService } from './agent.service';
         MarkdownGeneratorModule,
         WebsiteGeneratorModule,
         DeployModule,
-        AgentService,
     ],
     controllers: [AgentHTTPController],
     providers: [AgentService],
+    exports: [AgentService],
 })
 export class AgentHTTPModule {}

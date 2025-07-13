@@ -44,4 +44,5 @@ export * from './items-generator/dto';
 export * from './website-generator/dto/update-website-repository.dto';
 
 // Deploy
+export * from './deploy/deploy.module';
 export * from './deploy/vercel.service';
