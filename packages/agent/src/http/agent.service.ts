@@ -68,6 +68,7 @@ export class AgentService {
 
     async generateItemsGenerator(
         createItemsGeneratorDto: CreateItemsGeneratorDto,
+        awaitCompletion = true,
     ): Promise<ItemsGeneratorResponseDto> {
         const user = await User.sessionMock();
         const directory = await this.directoryRepository.findBySlug(createItemsGeneratorDto.slug);
@@ -75,10 +76,11 @@ export class AgentService {
             throw new NotFoundException('Directory not found');
         }
 
-        // TODO: Intentionally not awaiting this to allow for an immediate response
-        // The actual processing will happen in the background.
-        // A more robust solution might involve job queues, webhooks, or websockets for status updates.
-        void this.processGeneration(directory, user, createItemsGeneratorDto);
+        if (awaitCompletion) {
+            await this.processGeneration(directory, user, createItemsGeneratorDto);
+        } else {
+            void this.processGeneration(directory, user, createItemsGeneratorDto);
+        }
 
         return {
             status: 'pending',
@@ -91,6 +93,7 @@ export class AgentService {
     async updateItemsGenerator(
         slug: string,
         updateItemsGeneratorDto: UpdateItemsGeneratorDto,
+        awaitCompletion = true,
     ): Promise<ItemsGeneratorResponseDto> {
         const user = await User.sessionMock();
         const directory = await this.directoryRepository.findBySlug(slug);
@@ -111,10 +114,11 @@ export class AgentService {
             ...updateItemsGeneratorDto,
         };
 
-        // TODO: Intentionally not awaiting this to allow for an immediate response
-        // The actual processing will happen in the background.
-        // A more robust solution might involve job queues, webhooks, or websockets for status updates.
-        void this.processGeneration(directory, user, lastRequestData);
+        if (awaitCompletion) {
+            await this.processGeneration(directory, user, lastRequestData);
+        } else {
+            void this.processGeneration(directory, user, lastRequestData);
+        }
 
         return {
             slug,

@@ -33,7 +33,8 @@ export class AgentHTTPController {
     async generateItemsGenerator(
         @Body() createItemsGeneratorDto: CreateItemsGeneratorDto,
     ): Promise<ItemsGeneratorResponseDto> {
-        return this.agentService.generateItemsGenerator(createItemsGeneratorDto);
+        // We don't await completion here, as the request can take a long time
+        return this.agentService.generateItemsGenerator(createItemsGeneratorDto, false);
     }
 
     @Post('update/:slug')
@@ -42,7 +43,8 @@ export class AgentHTTPController {
         @Param('slug') slug: string,
         @Body() updateItemsGeneratorDto: UpdateItemsGeneratorDto,
     ): Promise<ItemsGeneratorResponseDto> {
-        return this.agentService.updateItemsGenerator(slug, updateItemsGeneratorDto);
+        // We don't await completion here, as the request can take a long time
+        return this.agentService.updateItemsGenerator(slug, updateItemsGeneratorDto, false);
     }
 
     @Post('submit-item/:slug')

@@ -16,7 +16,7 @@ async function buildCLI() {
     await fs.ensureDir(buildDir);
     await fs.ensureDir(tempDir);
 
-    console.log('🔨 Step 1: Building agent package...');
+    console.log('Building agent package...');
 
     // First, ensure the agent package is built
     try {
@@ -29,7 +29,7 @@ async function buildCLI() {
         throw error;
     }
 
-    console.log('🔨 Step 2: Compiling CLI TypeScript with decorators...');
+    console.log('Compiling CLI TypeScript with decorators...');
 
     // Then, compile CLI TypeScript with proper decorator support
     try {
@@ -45,7 +45,7 @@ async function buildCLI() {
         throw error;
     }
 
-    console.log('🔨 Step 3: Bundling with esbuild...');
+    console.log('Bundling with esbuild...');
 
     // Then bundle the compiled JavaScript
     await esbuild.build({
@@ -140,8 +140,6 @@ async function buildCLI() {
         },
     });
 
-    console.log('📦 Creating publishable package.json...');
-
     // Read the current package.json
     const currentPackageJson = await fs.readJson(packageJsonPath);
 
@@ -195,8 +193,6 @@ async function buildCLI() {
 
     // Write the publishable package.json
     await fs.writeJson(path.join(buildDir, 'package.json'), publishablePackageJson, { spaces: 2 });
-
-    console.log('📄 Copying additional files...');
 
     // Copy README if it exists
     const readmePath = path.join(__dirname, 'README.md');
@@ -269,9 +265,8 @@ SOFTWARE.`;
     // Clean up temporary directory
     await fs.remove(tempDir);
 
-    console.log('✅ CLI build completed successfully!');
-    console.log(`📁 Output directory: ${buildDir}`);
-    console.log('🚀 Ready for publishing with: npm publish dist/');
+    console.log('CLI build completed successfully!');
+    console.log(`Output directory: ${buildDir}`);
 }
 
 buildCLI().catch((error) => {

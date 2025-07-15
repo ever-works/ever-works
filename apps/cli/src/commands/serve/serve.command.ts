@@ -3,8 +3,8 @@ import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import chalk from 'chalk';
-import ora from 'ora';
 import { AgentHTTPModule } from '@packages/agent';
+import { ConfigCheckService } from '../directory/config-check.service';
 
 interface ServeOptions {
     port?: string;
@@ -18,9 +18,15 @@ interface ServeOptions {
 export class ServeCommand extends CommandRunner {
     private readonly logger = new Logger(ServeCommand.name);
 
+    constructor(private readonly configCheck: ConfigCheckService) {
+        super();
+    }
+
     async run(passedParams: string[], options?: ServeOptions): Promise<void> {
         try {
             console.log(chalk.cyan.bold('\n🚀 Starting API Server\n'));
+
+            await this.configCheck.requireConfiguration();
 
             const port = parseInt(options?.port || '3001', 10);
             const host = options?.host || 'localhost';

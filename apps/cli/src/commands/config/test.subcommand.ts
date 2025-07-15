@@ -20,8 +20,6 @@ export class TestSubCommand extends CommandRunner {
     }
 
     async run(): Promise<void> {
-        console.log(chalk.cyan.bold('\n🧪 Testing Ever Works Configuration\n'));
-
         try {
             const config = await this.configService.loadConfig();
 
@@ -53,7 +51,7 @@ export class TestSubCommand extends CommandRunner {
             }
 
             // Display final results
-            console.log('\n' + chalk.cyan.bold('📊 Test Summary'));
+            console.log('\n' + chalk.cyan.bold('Test Summary'));
             if (allTestsPassed) {
                 console.log(
                     chalk.green('✓ All tests passed! Your configuration is working correctly.'),
@@ -72,7 +70,7 @@ export class TestSubCommand extends CommandRunner {
     }
 
     private async testAiProviders(config: any): Promise<boolean> {
-        console.log(chalk.blue.bold('🤖 Testing AI Providers\n'));
+        console.log(chalk.blue.bold('Testing AI Providers\n'));
 
         const providers = this.getConfiguredAiProviders(config);
         if (providers.length === 0) {
@@ -119,7 +117,7 @@ export class TestSubCommand extends CommandRunner {
     }
 
     private async testOtherServices(config: any): Promise<boolean> {
-        console.log(chalk.blue.bold('\n🔧 Testing Other Services\n'));
+        console.log(chalk.blue.bold('\nTesting Other Services\n'));
 
         let allPassed = true;
 

@@ -12,7 +12,7 @@ async function bootstrap() {
 
     // Load config into environment variables
     const ac = await NestFactory.createApplicationContext(ConfigModule, {
-        logger: shouldLog ? ['error', 'warn'] : false,
+        logger: ['error', 'warn'],
     });
     const configService = ac.get(ConfigService);
     await configService.loadConfigIntoEnv();
@@ -20,7 +20,7 @@ async function bootstrap() {
 
     // Run the CLI app with minimal logging for production CLI
     await CommandFactory.run(CLIModule, {
-        logger: shouldLog ? ['error', 'warn'] : false,
+        logger: ['error', 'warn'],
     });
 }
 
