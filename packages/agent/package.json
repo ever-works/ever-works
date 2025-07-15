@@ -4,8 +4,52 @@
     "description": "ai agent for ever works",
     "private": true,
     "license": "UNLICENSED",
-    "main": "dist/index.js",
-    "typings": "dist/index.d.ts",
+    "exports": {
+        "./ai": {
+            "types": "./dist/ai/index.d.ts",
+            "default": "./dist/ai/index.js"
+        },
+        "./data-generator": {
+            "types": "./dist/data-generator/index.d.ts",
+            "default": "./dist/data-generator/index.js"
+        },
+        "./database": {
+            "types": "./dist/database/index.d.ts",
+            "default": "./dist/database/index.js"
+        },
+        "./deploy": {
+            "types": "./dist/deploy/index.d.ts",
+            "default": "./dist/deploy/index.js"
+        },
+        "./dto": {
+            "types": "./dist/dto/index.d.ts",
+            "default": "./dist/dto/index.js"
+        },
+        "./entities": {
+            "types": "./dist/entities/index.d.ts",
+            "default": "./dist/entities/index.js"
+        },
+        "./git": {
+            "types": "./dist/git/index.d.ts",
+            "default": "./dist/git/index.js"
+        },
+        "./http": {
+            "types": "./dist/http/index.d.ts",
+            "default": "./dist/http/index.js"
+        },
+        "./items-generator": {
+            "types": "./dist/items-generator/index.d.ts",
+            "default": "./dist/items-generator/index.js"
+        },
+        "./markdown-generator": {
+            "types": "./dist/markdown-generator/index.d.ts",
+            "default": "./dist/markdown-generator/index.js"
+        },
+        "./website-generator": {
+            "types": "./dist/website-generator/index.d.ts",
+            "default": "./dist/website-generator/index.js"
+        }
+    },
     "scripts": {
         "build": "nest build -b swc && tsc --emitDeclarationOnly --declarationMap true",
         "build:dev": "nest build -b swc --watch"

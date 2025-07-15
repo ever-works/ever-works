@@ -3,7 +3,7 @@ import { Logger } from '@nestjs/common';
 import chalk from 'chalk';
 import ora from 'ora';
 import { ConfigService } from '../../config/config.service';
-import { AiService } from '@packages/agent';
+import { AiService } from '@packages/agent/ai';
 
 @SubCommand({
     name: 'test',

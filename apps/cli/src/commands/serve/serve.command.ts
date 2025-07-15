@@ -3,7 +3,7 @@ import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import chalk from 'chalk';
-import { AgentHTTPModule } from '@packages/agent';
+import { AgentHTTPModule } from '@packages/agent/http';
 import { ConfigCheckService } from '../directory/config-check.service';
 
 interface ServeOptions {

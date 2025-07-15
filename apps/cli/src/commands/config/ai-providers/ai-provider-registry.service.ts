@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { AiProviderInfo } from '@packages/agent';
+import { AiProviderInfo } from '@packages/agent/ai';
 
 @Injectable()
 export class AiProviderRegistryService {

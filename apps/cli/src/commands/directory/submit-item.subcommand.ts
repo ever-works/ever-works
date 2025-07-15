@@ -3,10 +3,8 @@ import { Logger } from '@nestjs/common';
 import chalk from 'chalk';
 import ora from 'ora';
 import inquirer from 'inquirer';
-import {
-    DirectoryRepository,
-    AgentService
-} from '@packages/agent';
+import { DirectoryRepository } from '@packages/agent/database';
+import { AgentService } from '@packages/agent/http';
 import { DirectoryPromptService } from './directory-prompt.service';
 import { ConfigCheckService } from './config-check.service';
 

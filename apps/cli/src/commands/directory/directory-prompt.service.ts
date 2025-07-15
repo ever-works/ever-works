@@ -2,7 +2,9 @@ import { Injectable } from '@nestjs/common';
 import chalk from 'chalk';
 import inquirer from 'inquirer';
 import { BasePromptService } from '../config/prompts/base-prompt.service';
-import { MarkdownReadmeConfigDto, DirectoryRepository, Directory } from '@packages/agent';
+import { MarkdownReadmeConfigDto } from '@packages/agent/dto';
+import { DirectoryRepository } from '@packages/agent/database';
+import { Directory } from '@packages/agent/entities';
 
 export interface DirectoryInputData {
     slug: string;

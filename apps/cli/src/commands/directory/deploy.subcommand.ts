@@ -3,11 +3,9 @@ import { Logger } from '@nestjs/common';
 import chalk from 'chalk';
 import ora from 'ora';
 import inquirer from 'inquirer';
-import { 
-    DirectoryRepository, 
-    VercelService,
-    User
-} from '@packages/agent';
+import { DirectoryRepository } from '@packages/agent/database';
+import { VercelService } from '@packages/agent/deploy';
+import { User } from '@packages/agent/entities';
 import { DirectoryPromptService } from './directory-prompt.service';
 import { ConfigCheckService } from './config-check.service';
 

@@ -3,15 +3,15 @@ import { Logger } from '@nestjs/common';
 import chalk from 'chalk';
 import ora from 'ora';
 import inquirer from 'inquirer';
+import { DirectoryRepository } from '@packages/agent/database';
+import { AgentService } from '@packages/agent/http';
 import {
-    DirectoryRepository,
-    AgentService,
     CreateItemsGeneratorDto,
     CompanyDto,
     ConfigDto,
     GenerationMethod,
     WebsiteRepositoryCreationMethod,
-} from '@packages/agent';
+} from '@packages/agent/items-generator';
 import { DirectoryPromptService } from './directory-prompt.service';
 import { ConfigCheckService } from './config-check.service';
 

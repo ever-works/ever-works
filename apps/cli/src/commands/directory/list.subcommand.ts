@@ -2,7 +2,7 @@ import { SubCommand, CommandRunner } from 'nest-commander';
 import { Logger } from '@nestjs/common';
 import chalk from 'chalk';
 import ora from 'ora';
-import { DirectoryRepository } from '@packages/agent';
+import { DirectoryRepository } from '@packages/agent/database';
 
 @SubCommand({
     name: 'list',

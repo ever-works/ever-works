@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { AgentHTTPModule } from '@packages/agent';
+import { AgentHTTPModule } from '@packages/agent/http';
 
 @Module({
     imports: [AgentHTTPModule],

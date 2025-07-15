@@ -2,7 +2,9 @@ import { SubCommand, CommandRunner } from 'nest-commander';
 import { Logger } from '@nestjs/common';
 import chalk from 'chalk';
 import ora from 'ora';
-import { DirectoryRepository, GithubService, User } from '@packages/agent';
+import { DirectoryRepository } from '@packages/agent/database';
+import { GithubService } from '@packages/agent/git';
+import { User } from '@packages/agent/entities';
 import { DirectoryPromptService } from './directory-prompt.service';
 
 @SubCommand({

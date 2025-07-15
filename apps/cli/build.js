@@ -34,7 +34,7 @@ async function buildCLI() {
     // Then, compile CLI TypeScript with proper decorator support
     try {
         execSync(
-            'npx tsc --project tsconfig.json --outDir temp-build --emitDecoratorMetadata true --experimentalDecorators true --target ES2020 --module CommonJS --moduleResolution node --esModuleInterop true --allowSyntheticDefaultImports true --skipLibCheck true',
+            'npx tsc --project tsconfig.json --outDir temp-build --emitDecoratorMetadata true --experimentalDecorators true --target ES2020 --module Node16 --moduleResolution Node16 --esModuleInterop true --allowSyntheticDefaultImports true --skipLibCheck true',
             {
                 cwd: __dirname,
                 stdio: 'inherit',
@@ -89,10 +89,21 @@ async function buildCLI() {
             {
                 name: 'workspace-resolver',
                 setup(build) {
-                    // Resolve @packages/* imports to their compiled files
-                    build.onResolve({ filter: /^@packages\/agent$/ }, () => {
+                    // Resolve @packages/agent imports to their compiled files
+                    build.onResolve({ filter: /^@packages\/agent/ }, (args) => {
+                        const importPath = args.path;
+                        if (importPath === '@packages/agent') {
+                            return {
+                                path: path.resolve(__dirname, '../../packages/agent/dist/index.js'),
+                            };
+                        }
+                        // Handle subfolder imports like @packages/agent/database
+                        const subfolder = importPath.replace('@packages/agent/', '');
                         return {
-                            path: path.resolve(__dirname, '../../packages/agent/dist/index.js'),
+                            path: path.resolve(
+                                __dirname,
+                                `../../packages/agent/dist/${subfolder}/index.js`,
+                            ),
                         };
                     });
 

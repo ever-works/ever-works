@@ -1,16 +1,14 @@
 import { Module } from '@nestjs/common';
-import {
-    DatabaseConfigurations,
-    AiModule,
-    AgentHTTPModule,
-    GitModule,
-    DatabaseModule,
-    DataGeneratorModule,
-    ItemsGeneratorModule,
-    MarkdownGeneratorModule,
-    WebsiteGeneratorModule,
-    DeployModule,
-} from '@packages/agent';
+import { DatabaseConfigurations } from '@packages/agent/database';
+import { AiModule } from '@packages/agent/ai';
+import { AgentHTTPModule } from '@packages/agent/http';
+import { GitModule } from '@packages/agent/git';
+import { DatabaseModule } from '@packages/agent/database';
+import { DataGeneratorModule } from '@packages/agent/data-generator';
+import { ItemsGeneratorModule } from '@packages/agent/items-generator';
+import { MarkdownGeneratorModule } from '@packages/agent/markdown-generator';
+import { WebsiteGeneratorModule } from '@packages/agent/website-generator';
+import { DeployModule } from '@packages/agent/deploy';
 import { ConfigModule } from './config/config.module';
 
 // Commands

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { BasePromptService } from './base-prompt.service';
 import { AiProviderRegistryService } from '../ai-providers/ai-provider-registry.service';
-import { AiProviderConfiguration, ConfiguredAiProvider, AiService } from '@packages/agent';
+import { AiProviderConfiguration, ConfiguredAiProvider, AiService } from '@packages/agent/ai';
 import ora from 'ora';
 
 @Injectable()
