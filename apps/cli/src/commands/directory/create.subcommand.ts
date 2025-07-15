@@ -105,7 +105,6 @@ export class CreateSubCommand extends CommandRunner {
             // Display success information
             console.log(chalk.green('\n✓ Directory created successfully!'));
             console.log(chalk.gray('\nDirectory Details:'));
-            console.log(chalk.gray(`  ID: ${directory.id}`));
             console.log(chalk.gray(`  Slug: ${directory.slug}`));
             console.log(chalk.gray(`  Name: ${directory.name}`));
             console.log(chalk.gray(`  Description: ${directory.description}`));
