@@ -18,6 +18,7 @@
 	"private": true,
 	"scripts": {
 		"dev": "turbo start:dev",
+		"dev:api": "turbo start:dev --filter=api",
 		"build": "turbo build",
 		"prepare:husky": "npx husky install .husky",
 		"lint": "turbo lint",
@@ -40,7 +41,7 @@
 		"node": ">=20",
 		"pnpm": ">=9.9.0"
 	},
-	"packageManager": "pnpm@10.12.4",
+	"packageManager": "pnpm@10.13.1",
 	"prettier": {
 		"printWidth": 120,
 		"singleQuote": true,
