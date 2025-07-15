@@ -209,68 +209,16 @@ async function buildCLI() {
     const readmePath = path.join(__dirname, 'README.md');
     if (await fs.pathExists(readmePath)) {
         await fs.copy(readmePath, path.join(buildDir, 'README.md'));
-    } else {
-        // Create a basic README
-        const readmeContent = `# Ever Works CLI
-
-The command-line interface for Ever Works - Open Directory Builder Platform.
-
-## Installation
-
-\`\`\`bash
-npm install -g ever-works-cli
-\`\`\`
-
-## Usage
-
-\`\`\`bash
-ever-works --help
-\`\`\`
-
-Or use the short alias:
-
-\`\`\`bash
-ew --help
-\`\`\`
-
-## Commands
-
-- \`ever-works config\` - Configure the CLI
-- \`ever-works directory\` - Manage directories
-- \`ever-works serve\` - Start local development server
-
-For more information, visit: https://ever.works
-`;
-        await fs.writeFile(path.join(buildDir, 'README.md'), readmeContent);
     }
 
     // Copy LICENSE if it exists, otherwise create MIT license
     const licensePath = path.join(__dirname, '../../LICENSE');
-    if (await fs.pathExists(licensePath)) {
+    if (
+        (await fs.pathExists(licensePath)) ||
+        (await fs.pathExists(licensePath + '.md')) ||
+        (await fs.pathExists(licensePath + '.txt'))
+    ) {
         await fs.copy(licensePath, path.join(buildDir, 'LICENSE'));
-    } else {
-        const licenseContent = `MIT License
-
-Copyright (c) ${new Date().getFullYear()} Ever Co. LTD
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.`;
-        await fs.writeFile(path.join(buildDir, 'LICENSE'), licenseContent);
     }
 
     // Clean up temporary directory
