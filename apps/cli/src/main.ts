@@ -1,30 +1,11 @@
-import { NestFactory } from '@nestjs/core';
-import { CommandFactory } from 'nest-commander';
-import { CLIModule } from './cli.module';
-import { ConfigModule } from './config/config.module';
-import { ConfigService } from './config';
+import { program } from 'commander';
+import * as fs from 'fs';
+import * as path from 'path';
 
-async function bootstrap() {
-    // Determine if we should show debug logs (only in development or when explicitly requested)
-    const isDevelopment = process.env.NODE_ENV === 'development';
-    const isVerbose = process.env.CLI_VERBOSE === 'true' || process.argv.includes('--verbose');
-    const shouldLog = isDevelopment || isVerbose;
+program.version(JSON.parse(fs.readFileSync(path.join(__dirname, '../package.json'), { encoding: 'utf-8' })).version);
 
-    // Load config into environment variables
-    const ac = await NestFactory.createApplicationContext(ConfigModule, {
-        logger: ['error', 'warn'],
-    });
-    const configService = ac.get(ConfigService);
-    await configService.loadConfigIntoEnv();
-    await ac.close();
+program.parse(process.argv);
 
-    // Run the CLI app with minimal logging for production CLI
-    await CommandFactory.run(CLIModule, {
-        logger: ['error', 'warn'],
-    });
-}
+const options = program.opts();
 
-bootstrap().catch((error) => {
-    console.error('Unhandled error:', error);
-    process.exit(1);
-});
+console.log('options: ', options);
