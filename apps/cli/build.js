@@ -11,7 +11,14 @@ esbuild
 			js: '#!/usr/bin/env node'
 		},
 		external: [
+			// Core dependencies
 			'commander',
+			'axios',
+			'inquirer',
+			'chalk',
+			'ora',
+			'fs-extra',
+			'dotenv',
 			// Native modules that can't be bundled
 			'fs',
 			'path',
@@ -24,7 +31,15 @@ esbuild
 			'stream',
 			'events',
 			'buffer',
-			'child_process'
-		]
+			'child_process',
+			'tty',
+			'readline'
+		],
+		// Ensure production build
+		define: {
+			'process.env.NODE_ENV': '"production"'
+		},
+		minify: true, // Keep readable for debugging
+		sourcemap: false
 	})
 	.catch(() => process.exit(1));

@@ -93,10 +93,34 @@ importers:
 
   apps/cli:
     dependencies:
+      axios:
+        specifier: ^1.10.0
+        version: 1.10.0
+      chalk:
+        specifier: ^4.1.2
+        version: 4.1.2
       commander:
         specifier: ^14.0.0
         version: 14.0.0
+      dotenv:
+        specifier: ^17.2.0
+        version: 17.2.0
+      fs-extra:
+        specifier: ^11.3.0
+        version: 11.3.0
+      inquirer:
+        specifier: ^12.7.0
+        version: 12.7.0(@types/node@22.16.3)
+      ora:
+        specifier: ^5.4.1
+        version: 5.4.1
     devDependencies:
+      '@types/fs-extra':
+        specifier: ^11.0.4
+        version: 11.0.4
+      '@types/inquirer':
+        specifier: ^9.0.8
+        version: 9.0.8
       '@types/node':
         specifier: ^22.16.3
         version: 22.16.3
@@ -8544,7 +8568,7 @@ snapshots:
 
   dotenv-expand@12.0.1:
     dependencies:
-      dotenv: 16.4.7
+      dotenv: 16.6.1
 
   dotenv@16.4.7: {}
 

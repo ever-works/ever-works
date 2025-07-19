@@ -1,11 +1,26 @@
 import { program } from 'commander';
 import * as fs from 'fs';
 import * as path from 'path';
+import dotenv from 'dotenv';
+import { authCommand } from './commands/auth';
+import { directoryCommand } from './commands/directory';
 
-program.version(JSON.parse(fs.readFileSync(path.join(__dirname, '../package.json'), { encoding: 'utf-8' })).version);
+// Load environment variables
+dotenv.config({ debug: false, quiet: true });
 
+// Get package version
+const packageJson = JSON.parse(fs.readFileSync(path.join(__dirname, '../package.json'), { encoding: 'utf-8' }));
+
+program.name('ever-works').description('Ever Works CLI - Open Directory Builder Platform').version(packageJson.version);
+
+// Add commands
+program.addCommand(authCommand);
+program.addCommand(directoryCommand);
+
+// Parse arguments
 program.parse(process.argv);
 
-const options = program.opts();
-
-console.log('options: ', options);
+// Show help if no command provided
+if (!process.argv.slice(2).length) {
+	program.outputHelp();
+}
