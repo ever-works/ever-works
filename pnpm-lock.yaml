@@ -93,6 +93,9 @@ importers:
 
   apps/cli:
     dependencies:
+      '@packages/cli-shared':
+        specifier: workspace:*
+        version: link:../../packages/cli-shared
       axios:
         specifier: ^1.10.0
         version: 1.10.0
@@ -411,6 +414,31 @@ importers:
       typescript-eslint:
         specifier: ^8.35.1
         version: 8.36.0(eslint@9.31.0(jiti@2.4.2))(typescript@5.8.3)
+
+  packages/cli-shared:
+    dependencies:
+      chalk:
+        specifier: ^4.1.2
+        version: 4.1.2
+      fs-extra:
+        specifier: ^11.3.0
+        version: 11.3.0
+      inquirer:
+        specifier: ^12.7.0
+        version: 12.7.0(@types/node@22.16.3)
+    devDependencies:
+      '@types/fs-extra':
+        specifier: ^11.0.4
+        version: 11.0.4
+      '@types/inquirer':
+        specifier: ^9.0.8
+        version: 9.0.8
+      '@types/node':
+        specifier: ^22.16.3
+        version: 22.16.3
+      typescript:
+        specifier: ^5.8.3
+        version: 5.8.3
 
 packages:
 

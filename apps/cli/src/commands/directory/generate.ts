@@ -3,9 +3,10 @@ import chalk from 'chalk';
 import ora from 'ora';
 import inquirer from 'inquirer';
 import { requireAuth } from '../auth';
-import { getHttpClient } from '../../services/http-client';
+import { getApiService, CreateItemsGeneratorDto } from '../../services/api.service';
 import { DirectoryPromptService } from './directory-prompt.service';
 
+// Use enums for better type safety
 enum GenerationMethod {
     CREATE_UPDATE = 'create-update',
     RECREATE = 'recreate',
@@ -17,37 +18,6 @@ enum WebsiteRepositoryCreationMethod {
     CREATE_USING_TEMPLATE = 'create-using-template',
 }
 
-interface CompanyDto {
-    name: string;
-    website: string;
-}
-
-interface ConfigDto {
-    max_search_queries?: number;
-    max_results_per_query?: number;
-    max_pages_to_process?: number;
-    relevance_threshold_content?: number;
-    min_content_length_for_extraction?: number;
-    ai_first_generation_enabled?: boolean;
-    content_filtering_enabled?: boolean;
-    prompt_comparison_confidence_threshold?: number;
-}
-
-interface CreateItemsGeneratorDto {
-    slug: string;
-    name: string;
-    prompt: string;
-    company?: CompanyDto;
-    initial_categories?: string[];
-    priority_categories?: string[];
-    target_keywords?: string[];
-    source_urls?: string[];
-    generation_method?: GenerationMethod;
-    website_repository_creation_method?: WebsiteRepositoryCreationMethod;
-    repository_description?: string;
-    config?: ConfigDto;
-}
-
 export const generateCommand = new Command('generate')
     .description('Generate data and create a GitHub repository for a directory')
     .action(async () => {
@@ -57,7 +27,7 @@ export const generateCommand = new Command('generate')
             // Ensure user is authenticated
             await requireAuth();
 
-            const httpClient = getHttpClient();
+            const apiService = getApiService();
             const directoryPrompt = new DirectoryPromptService();
 
             // Select directory
@@ -220,13 +190,15 @@ export const generateCommand = new Command('generate')
             const spinner = ora('Starting generation process...').start();
 
             try {
-                const response = await httpClient.post('/generate', createItemsGeneratorDto);
-                
+                const response = await apiService.generateContent(createItemsGeneratorDto);
+
                 spinner.succeed('Generation started successfully');
 
                 console.log(chalk.green('\n✓ Generation process started!'));
-                console.log(chalk.gray('Status:'), chalk.white(response.data.status));
-                console.log(chalk.gray('Message:'), chalk.white(response.data.message));
+                console.log(chalk.gray('Status:'), chalk.white(response.status));
+                if (response.message) {
+                    console.log(chalk.gray('Message:'), chalk.white(response.message));
+                }
                 
                 console.log(chalk.cyan('\nNext Steps:'));
                 console.log(chalk.gray('  • Monitor the generation progress in your logs'));

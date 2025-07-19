@@ -43,6 +43,33 @@ export class AgentService {
         private readonly directoryRepository: DirectoryRepository,
     ) {}
 
+    async getDirectories(options: {
+        owner?: string;
+        limit?: number;
+        offset?: number;
+    } = {}) {
+        const { owner, limit = 20, offset = 0 } = options;
+
+        try {
+            const directories = await this.directoryRepository.findAll({
+                owner,
+                limit,
+                offset,
+            });
+
+            return {
+                status: 'success',
+                directories,
+                total: directories.length,
+                limit,
+                offset,
+            };
+        } catch (error) {
+            this.logger.error('Failed to get directories:', error);
+            throw error;
+        }
+    }
+
     async createDirectory(createDirectoryDto: CreateDirectoryDto) {
         const { slug, name, description, owner } = createDirectoryDto;
         const user = await User.sessionMock();

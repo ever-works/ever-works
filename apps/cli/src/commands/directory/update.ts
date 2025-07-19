@@ -3,7 +3,7 @@ import chalk from 'chalk';
 import ora from 'ora';
 import inquirer from 'inquirer';
 import { requireAuth } from '../auth';
-import { getHttpClient } from '../../services/http-client';
+import { getApiService } from '../../services/api.service';
 import { DirectoryPromptService } from './directory-prompt.service';
 
 export const updateCommand = new Command('update')
@@ -15,7 +15,7 @@ export const updateCommand = new Command('update')
             // Ensure user is authenticated
             await requireAuth();
 
-            const httpClient = getHttpClient();
+            const apiService = getApiService();
             const directoryPrompt = new DirectoryPromptService();
 
             // Select directory
@@ -74,13 +74,15 @@ export const updateCommand = new Command('update')
                     prompt: answers.prompt
                 };
 
-                const response = await httpClient.post(`/update/${directory.slug}`, updateDto);
-                
+                const response = await apiService.updateDirectory(directory.slug, updateDto);
+
                 spinner.succeed('Update started successfully');
 
                 console.log(chalk.green('\n✓ Update process started!'));
-                console.log(chalk.gray('Status:'), chalk.white(response.data.status));
-                console.log(chalk.gray('Message:'), chalk.white(response.data.message));
+                console.log(chalk.gray('Status:'), chalk.white(response.status));
+                if (response.message) {
+                    console.log(chalk.gray('Message:'), chalk.white(response.message));
+                }
 
             } catch (error) {
                 spinner.fail('Update failed');

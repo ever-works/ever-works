@@ -1,4 +1,14 @@
-import { Body, Controller, HttpCode, HttpStatus, Logger, Param, Post } from '@nestjs/common';
+import {
+    Body,
+    Controller,
+    Get,
+    HttpCode,
+    HttpStatus,
+    Logger,
+    Param,
+    Post,
+    Query,
+} from '@nestjs/common';
 import {
     CreateItemsGeneratorDto,
     UpdateItemsGeneratorDto,
@@ -21,6 +31,20 @@ import { AgentService } from './agent.service';
 @Controller()
 export class AgentHTTPController {
     constructor(private readonly agentService: AgentService) {}
+
+    @Get('directories')
+    @HttpCode(HttpStatus.OK)
+    async getDirectories(
+        @Query('owner') owner?: string,
+        @Query('limit') limit?: string,
+        @Query('offset') offset?: string,
+    ) {
+        return this.agentService.getDirectories({
+            owner,
+            limit: limit ? parseInt(limit, 10) : undefined,
+            offset: offset ? parseInt(offset, 10) : undefined,
+        });
+    }
 
     @Post('directories')
     @HttpCode(HttpStatus.OK)

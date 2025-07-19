@@ -2,21 +2,8 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import ora from 'ora';
 import { requireAuth } from '../auth';
-import { getHttpClient } from '../../services/http-client';
+import { getApiService, CreateDirectoryDto } from '../../services/api.service';
 import { DirectoryPromptService } from './directory-prompt.service';
-
-interface CreateDirectoryDto {
-    slug: string;
-    name: string;
-    description: string;
-    owner?: string;
-    readme_config?: {
-        header?: string;
-        overwrite_default_header?: boolean;
-        footer?: string;
-        overwrite_default_footer?: boolean;
-    };
-}
 
 export const createCommand = new Command('create')
     .description('Create a new directory')
@@ -27,7 +14,7 @@ export const createCommand = new Command('create')
             // Ensure user is authenticated
             await requireAuth();
 
-            const httpClient = getHttpClient();
+            const apiService = getApiService();
             const directoryPrompt = new DirectoryPromptService();
 
             // Show loading message
@@ -60,17 +47,17 @@ export const createCommand = new Command('create')
                         readme_config: directoryData.readme_config
                     };
 
-                    const response = await httpClient.post('/directories', createDirectoryDto);
+                    const response = await apiService.createDirectory(createDirectoryDto);
                     
                     spinner.succeed('Directory created successfully');
                     conflictResolved = true;
 
                     console.log(chalk.green('\n✓ Directory created successfully!'));
                     console.log(chalk.gray('Directory details:'));
-                    console.log(chalk.white(`  Name: ${response.data.directory.name}`));
-                    console.log(chalk.white(`  Slug: ${response.data.directory.slug}`));
-                    console.log(chalk.white(`  Owner: ${response.data.directory.owner}`));
-                    console.log(chalk.white(`  Description: ${response.data.directory.description}`));
+                    console.log(chalk.white(`  Name: ${response.directory.name}`));
+                    console.log(chalk.white(`  Slug: ${response.directory.slug}`));
+                    console.log(chalk.white(`  Owner: ${response.directory.owner}`));
+                    console.log(chalk.white(`  Description: ${response.directory.description}`));
 
                     console.log(chalk.cyan('\nNext Steps:'));
                     console.log(
