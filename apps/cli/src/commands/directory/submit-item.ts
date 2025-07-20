@@ -41,23 +41,24 @@ export const submitItemCommand = new Command('submit-item')
                         } catch {
                             return 'Please enter a valid URL';
                         }
-                    }
+                    },
                 },
                 {
                     type: 'input',
                     name: 'name',
-                    message: 'Item name (optional, will be extracted if not provided):'
+                    message: 'Item name (optional, will be extracted if not provided):',
                 },
                 {
                     type: 'input',
                     name: 'description',
-                    message: 'Item description (optional, will be extracted if not provided):'
+                    message: 'Item description (optional, will be extracted if not provided):',
                 },
                 {
                     type: 'input',
                     name: 'category',
-                    message: 'Category (optional, will be determined automatically if not provided):'
-                }
+                    message:
+                        'Category (optional, will be determined automatically if not provided):',
+                },
             ]);
 
             // Show summary and confirm
@@ -65,16 +66,18 @@ export const submitItemCommand = new Command('submit-item')
             console.log(chalk.gray('Directory:'), chalk.white(directory.slug));
             console.log(chalk.gray('URL:'), chalk.white(answers.source_url));
             if (answers.name) console.log(chalk.gray('Name:'), chalk.white(answers.name));
-            if (answers.description) console.log(chalk.gray('Description:'), chalk.white(answers.description));
-            if (answers.category) console.log(chalk.gray('Category:'), chalk.white(answers.category));
+            if (answers.description)
+                console.log(chalk.gray('Description:'), chalk.white(answers.description));
+            if (answers.category)
+                console.log(chalk.gray('Category:'), chalk.white(answers.category));
 
             const confirmed = await inquirer.prompt([
                 {
                     type: 'confirm',
                     name: 'proceed',
                     message: 'Submit this item?',
-                    default: true
-                }
+                    default: true,
+                },
             ]);
 
             if (!confirmed.proceed) {
@@ -90,11 +93,11 @@ export const submitItemCommand = new Command('submit-item')
                     source_url: answers.source_url,
                     name: answers.name || undefined,
                     description: answers.description || undefined,
-                    category: answers.category || undefined
+                    category: answers.category || undefined,
                 };
 
                 const response = await httpClient.post(`/submit-item/${directory.slug}`, submitDto);
-                
+
                 spinner.succeed('Item submitted successfully');
 
                 console.log(chalk.green('\n✓ Item submitted successfully!'));
@@ -106,20 +109,23 @@ export const submitItemCommand = new Command('submit-item')
                     console.log(chalk.gray('Name:'), chalk.white(response.data.item.name));
                     console.log(chalk.gray('Category:'), chalk.white(response.data.item.category));
                 }
-
             } catch (error) {
                 spinner.fail('Item submission failed');
                 throw error;
             }
-
         } catch (error) {
-            console.error(chalk.red('\n✗ Failed to submit item:'), error.response?.data?.message || error.message);
+            console.error(
+                chalk.red('\n✗ Failed to submit item:'),
+                error.response?.data?.message || error.message,
+            );
 
             if (error.response?.status === 401) {
                 console.log(chalk.yellow('\n⚠ Authentication failed. Please login again.'));
                 console.log(chalk.gray('Run: ever-works auth login'));
             } else if (error.response?.status === 404) {
-                console.log(chalk.yellow('\n⚠ Directory not found. Please check the slug and try again.'));
+                console.log(
+                    chalk.yellow('\n⚠ Directory not found. Please check the slug and try again.'),
+                );
             }
 
             process.exit(1);

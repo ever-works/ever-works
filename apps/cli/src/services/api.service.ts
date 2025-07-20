@@ -116,15 +116,17 @@ export class ApiService {
         if (options?.offset) queryParams.append('offset', options.offset.toString());
 
         const response = await this.httpClient.get<DirectoriesResponse>(
-            `/directories?${queryParams.toString()}`
+            `/directories?${queryParams.toString()}`,
         );
         return response.data;
     }
 
-    async createDirectory(data: CreateDirectoryDto): Promise<ApiResponse<{ directory: Directory }>> {
+    async createDirectory(
+        data: CreateDirectoryDto,
+    ): Promise<ApiResponse<{ directory: Directory }>> {
         const response = await this.httpClient.post<ApiResponse<{ directory: Directory }>>(
             '/directories',
-            data
+            data,
         );
         return response.data;
     }

@@ -3,12 +3,18 @@ import inquirer from 'inquirer';
 import {
     DirectoryPromptService as BaseDirectoryPromptService,
     DirectorySelection,
-    Directory
+    Directory,
 } from '@packages/cli-shared';
 import { getApiService } from '../../services/api.service';
 
 // Re-export types from shared package for convenience
-export type { DirectoryInputData, MarkdownReadmeConfigDto, SlugConflictResolution, DirectorySelection, Directory } from '@packages/cli-shared';
+export type {
+    DirectoryInputData,
+    MarkdownReadmeConfigDto,
+    SlugConflictResolution,
+    DirectorySelection,
+    Directory,
+} from '@packages/cli-shared';
 
 export class DirectoryPromptService extends BaseDirectoryPromptService {
     private apiService = getApiService();
@@ -24,7 +30,6 @@ export class DirectoryPromptService extends BaseDirectoryPromptService {
 
             // Use the base class implementation with the fetched directories
             return super.promptDirectorySelection(directories);
-
         } catch (error) {
             console.error(chalk.red('Error fetching directories:'), error.message);
 
@@ -37,8 +42,8 @@ export class DirectoryPromptService extends BaseDirectoryPromptService {
                     type: 'input',
                     name: 'slug',
                     message: 'Directory slug:',
-                    validate: (input) => input.trim().length > 0 || 'Directory slug is required'
-                }
+                    validate: (input) => input.trim().length > 0 || 'Directory slug is required',
+                },
             ]);
 
             // Mock directory object for fallback
@@ -48,7 +53,7 @@ export class DirectoryPromptService extends BaseDirectoryPromptService {
                 slug: answer.slug,
                 owner: 'unknown',
                 organization: false,
-                description: 'Directory selected by slug'
+                description: 'Directory selected by slug',
             };
 
             return { directory, cancelled: false };

@@ -41,13 +41,13 @@ export const removeItemCommand = new Command('remove-item')
                         } catch {
                             return 'Please enter a valid URL';
                         }
-                    }
+                    },
                 },
                 {
                     type: 'input',
                     name: 'reason',
-                    message: 'Reason for removal (optional):'
-                }
+                    message: 'Reason for removal (optional):',
+                },
             ]);
 
             // Show summary and confirm
@@ -61,8 +61,8 @@ export const removeItemCommand = new Command('remove-item')
                     type: 'confirm',
                     name: 'proceed',
                     message: chalk.red('Are you sure you want to remove this item?'),
-                    default: false
-                }
+                    default: false,
+                },
             ]);
 
             if (!confirmed.proceed) {
@@ -76,30 +76,35 @@ export const removeItemCommand = new Command('remove-item')
             try {
                 const removeDto = {
                     source_url: answers.source_url,
-                    reason: answers.reason || undefined
+                    reason: answers.reason || undefined,
                 };
 
                 const response = await httpClient.post(`/remove-item/${directory.slug}`, removeDto);
-                
+
                 spinner.succeed('Item removed successfully');
 
                 console.log(chalk.green('\n✓ Item removed successfully!'));
                 console.log(chalk.gray('Status:'), chalk.white(response.data.status));
                 console.log(chalk.gray('Message:'), chalk.white(response.data.message));
-
             } catch (error) {
                 spinner.fail('Item removal failed');
                 throw error;
             }
-
         } catch (error) {
-            console.error(chalk.red('\n✗ Failed to remove item:'), error.response?.data?.message || error.message);
+            console.error(
+                chalk.red('\n✗ Failed to remove item:'),
+                error.response?.data?.message || error.message,
+            );
 
             if (error.response?.status === 401) {
                 console.log(chalk.yellow('\n⚠ Authentication failed. Please login again.'));
                 console.log(chalk.gray('Run: ever-works auth login'));
             } else if (error.response?.status === 404) {
-                console.log(chalk.yellow('\n⚠ Directory or item not found. Please check the details and try again.'));
+                console.log(
+                    chalk.yellow(
+                        '\n⚠ Directory or item not found. Please check the details and try again.',
+                    ),
+                );
             }
 
             process.exit(1);

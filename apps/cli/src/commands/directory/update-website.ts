@@ -36,15 +36,18 @@ export const updateWebsiteCommand = new Command('update-website')
             console.log(chalk.gray('  • Prepare the website for deployment'));
 
             const websiteRepo = `${directory.slug}-website`;
-            console.log(chalk.gray('\nTarget repository:'), chalk.white(`${directory.owner}/${websiteRepo}`));
+            console.log(
+                chalk.gray('\nTarget repository:'),
+                chalk.white(`${directory.owner}/${websiteRepo}`),
+            );
 
             const confirmed = await inquirer.prompt([
                 {
                     type: 'confirm',
                     name: 'proceed',
                     message: 'Proceed with website update?',
-                    default: true
-                }
+                    default: true,
+                },
             ]);
 
             if (!confirmed.proceed) {
@@ -57,7 +60,7 @@ export const updateWebsiteCommand = new Command('update-website')
 
             try {
                 const response = await httpClient.post(`/update-website/${directory.slug}`);
-                
+
                 spinner.succeed('Website updated successfully');
 
                 console.log(chalk.green('\n✓ Website updated successfully!'));
@@ -65,27 +68,33 @@ export const updateWebsiteCommand = new Command('update-website')
                 console.log(chalk.gray('Message:'), chalk.white(response.data.message));
 
                 if (response.data.repository_url) {
-                    console.log(chalk.blue('\nRepository:'), chalk.white(response.data.repository_url));
+                    console.log(
+                        chalk.blue('\nRepository:'),
+                        chalk.white(response.data.repository_url),
+                    );
                 }
 
                 console.log(chalk.cyan('\nNext Steps:'));
                 console.log(chalk.gray('  • Check the website repository for updates'));
                 console.log(chalk.gray('  • Use "directory deploy" to deploy the website'));
                 console.log(chalk.gray('  • Review the changes before deployment'));
-
             } catch (error) {
                 spinner.fail('Website update failed');
                 throw error;
             }
-
         } catch (error) {
-            console.error(chalk.red('\n✗ Failed to update website:'), error.response?.data?.message || error.message);
+            console.error(
+                chalk.red('\n✗ Failed to update website:'),
+                error.response?.data?.message || error.message,
+            );
 
             if (error.response?.status === 401) {
                 console.log(chalk.yellow('\n⚠ Authentication failed. Please login again.'));
                 console.log(chalk.gray('Run: ever-works auth login'));
             } else if (error.response?.status === 404) {
-                console.log(chalk.yellow('\n⚠ Directory not found. Please check the slug and try again.'));
+                console.log(
+                    chalk.yellow('\n⚠ Directory not found. Please check the slug and try again.'),
+                );
             }
 
             process.exit(1);

@@ -19,11 +19,11 @@ export const createCommand = new Command('create')
 
             // Show loading message
             const loadingSpinner = ora('Loading...').start();
-            
+
             // TODO: Get user information from API when available
             // For now, we'll use a placeholder
             const defaultOwner = 'user'; // This should come from API
-            
+
             loadingSpinner.stop();
 
             // Collect directory information
@@ -44,11 +44,11 @@ export const createCommand = new Command('create')
                         name: directoryData.name,
                         description: directoryData.description,
                         owner: directoryData.owner,
-                        readme_config: directoryData.readme_config
+                        readme_config: directoryData.readme_config,
                     };
 
                     const response = await apiService.createDirectory(createDirectoryDto);
-                    
+
                     spinner.succeed('Directory created successfully');
                     conflictResolved = true;
 
@@ -62,20 +62,28 @@ export const createCommand = new Command('create')
                     console.log(chalk.cyan('\nNext Steps:'));
                     console.log(
                         chalk.gray('  • Use ') +
-                        chalk.cyan('directory generate') +
-                        chalk.gray(' to generate content for your directory.')
+                            chalk.cyan('directory generate') +
+                            chalk.gray(' to generate content for your directory.'),
                     );
                     console.log(chalk.gray('  • Start adding content to your new directory'));
-
                 } catch (error) {
                     spinner.stop();
 
                     // Check if it's a conflict error (assuming API returns 409 or similar)
-                    if (error.response?.status === 409 || error.message.includes('already exists')) {
-                        const suggestedSlug = directoryPrompt.generateIncrementedSlug(directoryData.slug, increment);
-                        
-                        const resolution = await directoryPrompt.promptSlugConflictResolution(finalSlug, suggestedSlug);
-                        
+                    if (
+                        error.response?.status === 409 ||
+                        error.message.includes('already exists')
+                    ) {
+                        const suggestedSlug = directoryPrompt.generateIncrementedSlug(
+                            directoryData.slug,
+                            increment,
+                        );
+
+                        const resolution = await directoryPrompt.promptSlugConflictResolution(
+                            finalSlug,
+                            suggestedSlug,
+                        );
+
                         if (resolution.action === 'cancel') {
                             console.log(chalk.yellow('\n⚠ Directory creation cancelled.'));
                             return;
@@ -94,15 +102,19 @@ export const createCommand = new Command('create')
                     }
                 }
             }
-
         } catch (error) {
-            console.error(chalk.red('\n✗ Failed to create directory:'), error.response?.data?.message || error.message);
+            console.error(
+                chalk.red('\n✗ Failed to create directory:'),
+                error.response?.data?.message || error.message,
+            );
 
             if (error.response?.status === 401) {
                 console.log(chalk.yellow('\n⚠ Authentication failed. Please login again.'));
                 console.log(chalk.gray('Run: ever-works auth login'));
             } else if (error.response?.status === 400) {
-                console.log(chalk.yellow('\n⚠ Invalid input. Please check your data and try again.'));
+                console.log(
+                    chalk.yellow('\n⚠ Invalid input. Please check your data and try again.'),
+                );
             }
 
             process.exit(1);
