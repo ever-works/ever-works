@@ -61,14 +61,18 @@ export interface UpdateDirectoryDto {
 }
 
 export interface SubmitItemDto {
+    name: string;
+    description: string;
     source_url: string;
-    name?: string;
-    description?: string;
-    category?: string;
+    category: string;
+    tags?: string[];
+    featured?: boolean;
+    pay_and_publish_now?: boolean;
+    slug?: string;
 }
 
 export interface RemoveItemDto {
-    source_url: string;
+    item_slug: string;
     reason?: string;
 }
 
@@ -78,8 +82,11 @@ export interface DeployDto {
 }
 
 export interface DeleteDirectoryDto {
-    delete_repositories?: boolean;
     reason?: string;
+    force_delete?: boolean;
+    delete_data_repository?: boolean;
+    delete_markdown_repository?: boolean;
+    delete_website_repository?: boolean;
 }
 
 // API Response types

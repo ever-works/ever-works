@@ -46,18 +46,31 @@ export const submitItemCommand = new Command('submit-item')
                 {
                     type: 'input',
                     name: 'name',
-                    message: 'Item name (optional, will be extracted if not provided):',
+                    message: 'Item name:',
+                    validate: (input) => input.trim().length > 0 || 'Item name is required',
                 },
                 {
                     type: 'input',
                     name: 'description',
-                    message: 'Item description (optional, will be extracted if not provided):',
+                    message: 'Item description:',
+                    validate: (input) => input.trim().length > 0 || 'Item description is required',
                 },
                 {
                     type: 'input',
                     name: 'category',
-                    message:
-                        'Category (optional, will be determined automatically if not provided):',
+                    message: 'Item category:',
+                    validate: (input) => input.trim().length > 0 || 'Item category is required',
+                },
+                {
+                    type: 'input',
+                    name: 'tags',
+                    message: 'Tags (comma-separated, optional):',
+                },
+                {
+                    type: 'confirm',
+                    name: 'featured',
+                    message: 'Mark as featured?',
+                    default: false,
                 },
             ]);
 
@@ -90,10 +103,17 @@ export const submitItemCommand = new Command('submit-item')
 
             try {
                 const submitDto = {
+                    name: answers.name,
+                    description: answers.description,
                     source_url: answers.source_url,
-                    name: answers.name || undefined,
-                    description: answers.description || undefined,
-                    category: answers.category || undefined,
+                    category: answers.category,
+                    tags: answers.tags
+                        ? answers.tags
+                              .split(',')
+                              .map((tag: string) => tag.trim())
+                              .filter((tag: string) => tag.length > 0)
+                        : undefined,
+                    featured: answers.featured || false,
                 };
 
                 const response = await apiService.submitItem(directory.slug, submitDto);

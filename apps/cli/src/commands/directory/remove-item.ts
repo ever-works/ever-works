@@ -32,15 +32,14 @@ export const removeItemCommand = new Command('remove-item')
             const answers = await inquirer.prompt([
                 {
                     type: 'input',
-                    name: 'source_url',
-                    message: 'Item URL to remove:',
+                    name: 'item_slug',
+                    message: 'Item slug to remove:',
                     validate: (input) => {
-                        try {
-                            new URL(input);
-                            return true;
-                        } catch {
-                            return 'Please enter a valid URL';
+                        if (!input.trim()) return 'Item slug is required';
+                        if (!/^[a-z0-9-]+$/.test(input)) {
+                            return 'Item slug must contain only lowercase letters, numbers, and hyphens';
                         }
+                        return true;
                     },
                 },
                 {
@@ -53,7 +52,7 @@ export const removeItemCommand = new Command('remove-item')
             // Show summary and confirm
             console.log(chalk.cyan('\n--- Item Removal Summary ---'));
             console.log(chalk.gray('Directory:'), chalk.white(directory.slug));
-            console.log(chalk.gray('URL to remove:'), chalk.white(answers.source_url));
+            console.log(chalk.gray('Item slug to remove:'), chalk.white(answers.item_slug));
             if (answers.reason) console.log(chalk.gray('Reason:'), chalk.white(answers.reason));
 
             const confirmed = await inquirer.prompt([
@@ -75,7 +74,7 @@ export const removeItemCommand = new Command('remove-item')
 
             try {
                 const removeDto = {
-                    source_url: answers.source_url,
+                    item_slug: answers.item_slug,
                     reason: answers.reason || undefined,
                 };
 

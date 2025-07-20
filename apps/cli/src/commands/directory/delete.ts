@@ -39,26 +39,47 @@ export const deleteCommand = new Command('delete')
             const deleteOptions = await inquirer.prompt([
                 {
                     type: 'confirm',
-                    name: 'deleteRepositories',
-                    message: 'Also delete associated GitHub repositories?',
-                    default: false
+                    name: 'delete_data_repository',
+                    message: 'Delete data repository?',
+                    default: true,
+                },
+                {
+                    type: 'confirm',
+                    name: 'delete_markdown_repository',
+                    message: 'Delete markdown repository?',
+                    default: true,
+                },
+                {
+                    type: 'confirm',
+                    name: 'delete_website_repository',
+                    message: 'Delete website repository?',
+                    default: true,
+                },
+                {
+                    type: 'confirm',
+                    name: 'force_delete',
+                    message: 'Force delete (skip safety checks)?',
+                    default: false,
                 },
                 {
                     type: 'input',
                     name: 'reason',
-                    message: 'Reason for deletion (optional):'
-                }
+                    message: 'Reason for deletion (optional):',
+                },
             ]);
 
             // Double confirmation
             console.log(chalk.red('\n--- Deletion Summary ---'));
             console.log(chalk.gray('Directory to delete:'), chalk.white(directory.slug));
-            console.log(chalk.gray('Delete repositories:'), chalk.white(deleteOptions.deleteRepositories ? 'Yes' : 'No'));
+            console.log(chalk.gray('Delete data repository:'), chalk.white(deleteOptions.delete_data_repository ? 'Yes' : 'No'));
+            console.log(chalk.gray('Delete markdown repository:'), chalk.white(deleteOptions.delete_markdown_repository ? 'Yes' : 'No'));
+            console.log(chalk.gray('Delete website repository:'), chalk.white(deleteOptions.delete_website_repository ? 'Yes' : 'No'));
+            console.log(chalk.gray('Force delete:'), chalk.white(deleteOptions.force_delete ? 'Yes' : 'No'));
             if (deleteOptions.reason) {
                 console.log(chalk.gray('Reason:'), chalk.white(deleteOptions.reason));
             }
 
-            const typeConfirmation = await inquirer.prompt([
+            await inquirer.prompt([
                 {
                     type: 'input',
                     name: 'confirmation',
@@ -91,8 +112,11 @@ export const deleteCommand = new Command('delete')
 
             try {
                 const deleteDto = {
-                    delete_repositories: deleteOptions.deleteRepositories,
-                    reason: deleteOptions.reason || undefined
+                    reason: deleteOptions.reason || undefined,
+                    force_delete: deleteOptions.force_delete,
+                    delete_data_repository: deleteOptions.delete_data_repository,
+                    delete_markdown_repository: deleteOptions.delete_markdown_repository,
+                    delete_website_repository: deleteOptions.delete_website_repository,
                 };
 
                 const response = await apiService.deleteDirectory(directory.slug, deleteDto);
@@ -105,11 +129,19 @@ export const deleteCommand = new Command('delete')
                     console.log(chalk.gray('Message:'), chalk.white(response.message));
                 }
 
-                if (!deleteOptions.deleteRepositories) {
-                    console.log(chalk.yellow('\n⚠ Note: GitHub repositories were not deleted.'));
+                const anyRepoNotDeleted = !deleteOptions.delete_data_repository ||
+                                         !deleteOptions.delete_markdown_repository ||
+                                         !deleteOptions.delete_website_repository;
+
+                if (anyRepoNotDeleted) {
+                    console.log(chalk.yellow('\n⚠ Note: Some GitHub repositories were not deleted.'));
                     console.log(chalk.gray('You may want to manually delete them if no longer needed:'));
-                    console.log(chalk.gray(`  • ${directory.owner}/${directory.slug}-data`));
-                    console.log(chalk.gray(`  • ${directory.owner}/${directory.slug}-website`));
+                    if (!deleteOptions.delete_data_repository) {
+                        console.log(chalk.gray(`  • ${directory.owner}/${directory.slug}-data`));
+                    }
+                    if (!deleteOptions.delete_website_repository) {
+                        console.log(chalk.gray(`  • ${directory.owner}/${directory.slug}-website`));
+                    }
                 }
 
             } catch (error) {
