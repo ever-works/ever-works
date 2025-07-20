@@ -18,16 +18,12 @@ export const createCommand = new Command('create')
             const directoryPrompt = new DirectoryPromptService();
 
             // Show loading message
-            const loadingSpinner = ora('Loading...').start();
-
-            // TODO: Get user information from API when available
-            // For now, we'll use a placeholder
-            const defaultOwner = 'user'; // This should come from API
+            const loadingSpinner = ora('Loading user information...').start();
 
             loadingSpinner.stop();
 
             // Collect directory information
-            const directoryData = await directoryPrompt.promptDirectoryCreation(defaultOwner);
+            const directoryData = await directoryPrompt.promptDirectoryCreation();
 
             // Check for slug conflicts and handle them
             let finalSlug = directoryData.slug;

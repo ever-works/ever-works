@@ -3,7 +3,7 @@ import chalk from 'chalk';
 import ora from 'ora';
 import inquirer from 'inquirer';
 import { requireAuth } from '../auth';
-import { getHttpClient } from '../../services/http-client';
+import { getApiService } from '../../services/api.service';
 import { DirectoryPromptService } from './directory-prompt.service';
 
 export const deleteCommand = new Command('delete')
@@ -15,7 +15,7 @@ export const deleteCommand = new Command('delete')
             // Ensure user is authenticated
             await requireAuth();
 
-            const httpClient = getHttpClient();
+            const apiService = getApiService();
             const directoryPrompt = new DirectoryPromptService();
 
             // Select directory
@@ -95,13 +95,15 @@ export const deleteCommand = new Command('delete')
                     reason: deleteOptions.reason || undefined
                 };
 
-                const response = await httpClient.post(`/delete/${directory.slug}`, deleteDto);
-                
+                const response = await apiService.deleteDirectory(directory.slug, deleteDto);
+
                 spinner.succeed('Directory deleted successfully');
 
                 console.log(chalk.green('\n✓ Directory deleted successfully!'));
-                console.log(chalk.gray('Status:'), chalk.white(response.data.status));
-                console.log(chalk.gray('Message:'), chalk.white(response.data.message));
+                console.log(chalk.gray('Status:'), chalk.white(response.status));
+                if (response.message) {
+                    console.log(chalk.gray('Message:'), chalk.white(response.message));
+                }
 
                 if (!deleteOptions.deleteRepositories) {
                     console.log(chalk.yellow('\n⚠ Note: GitHub repositories were not deleted.'));

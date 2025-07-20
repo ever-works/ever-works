@@ -3,7 +3,7 @@ import chalk from 'chalk';
 import ora from 'ora';
 import inquirer from 'inquirer';
 import { requireAuth } from '../auth';
-import { getHttpClient } from '../../services/http-client';
+import { getApiService } from '../../services/api.service';
 import { DirectoryPromptService } from './directory-prompt.service';
 
 export const deployCommand = new Command('deploy')
@@ -15,7 +15,7 @@ export const deployCommand = new Command('deploy')
             // Ensure user is authenticated
             await requireAuth();
 
-            const httpClient = getHttpClient();
+            const apiService = getApiService();
             const directoryPrompt = new DirectoryPromptService();
 
             // Select directory
@@ -82,8 +82,8 @@ export const deployCommand = new Command('deploy')
                     deployDto.GITHUB_TOKEN = deployOptions.GITHUB_TOKEN;
                 }
 
-                const response = await httpClient.post(`/deploy/${directory.slug}/vercel`, deployDto);
-                
+                await apiService.deployWebsite(directory.slug, deployDto);
+
                 spinner.succeed('Deployment started successfully');
 
                 console.log(chalk.green('\n✓ Deployment started successfully!'));

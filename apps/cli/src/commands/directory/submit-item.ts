@@ -3,7 +3,7 @@ import chalk from 'chalk';
 import ora from 'ora';
 import inquirer from 'inquirer';
 import { requireAuth } from '../auth';
-import { getHttpClient } from '../../services/http-client';
+import { getApiService } from '../../services/api.service';
 import { DirectoryPromptService } from './directory-prompt.service';
 
 export const submitItemCommand = new Command('submit-item')
@@ -15,7 +15,7 @@ export const submitItemCommand = new Command('submit-item')
             // Ensure user is authenticated
             await requireAuth();
 
-            const httpClient = getHttpClient();
+            const apiService = getApiService();
             const directoryPrompt = new DirectoryPromptService();
 
             // Select directory
@@ -96,18 +96,20 @@ export const submitItemCommand = new Command('submit-item')
                     category: answers.category || undefined,
                 };
 
-                const response = await httpClient.post(`/submit-item/${directory.slug}`, submitDto);
+                const response = await apiService.submitItem(directory.slug, submitDto);
 
                 spinner.succeed('Item submitted successfully');
 
                 console.log(chalk.green('\n✓ Item submitted successfully!'));
-                console.log(chalk.gray('Status:'), chalk.white(response.data.status));
-                console.log(chalk.gray('Message:'), chalk.white(response.data.message));
+                console.log(chalk.gray('Status:'), chalk.white(response.status));
+                if (response.message) {
+                    console.log(chalk.gray('Message:'), chalk.white(response.message));
+                }
 
-                if (response.data.item) {
+                if (response.item) {
                     console.log(chalk.cyan('\nItem Details:'));
-                    console.log(chalk.gray('Name:'), chalk.white(response.data.item.name));
-                    console.log(chalk.gray('Category:'), chalk.white(response.data.item.category));
+                    console.log(chalk.gray('Name:'), chalk.white(response.item.name));
+                    console.log(chalk.gray('Category:'), chalk.white(response.item.category));
                 }
             } catch (error) {
                 spinner.fail('Item submission failed');

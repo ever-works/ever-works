@@ -3,7 +3,7 @@ import chalk from 'chalk';
 import ora from 'ora';
 import inquirer from 'inquirer';
 import { requireAuth } from '../auth';
-import { getHttpClient } from '../../services/http-client';
+import { getApiService } from '../../services/api.service';
 import { DirectoryPromptService } from './directory-prompt.service';
 
 export const removeItemCommand = new Command('remove-item')
@@ -15,7 +15,7 @@ export const removeItemCommand = new Command('remove-item')
             // Ensure user is authenticated
             await requireAuth();
 
-            const httpClient = getHttpClient();
+            const apiService = getApiService();
             const directoryPrompt = new DirectoryPromptService();
 
             // Select directory
@@ -79,13 +79,15 @@ export const removeItemCommand = new Command('remove-item')
                     reason: answers.reason || undefined,
                 };
 
-                const response = await httpClient.post(`/remove-item/${directory.slug}`, removeDto);
+                const response = await apiService.removeItem(directory.slug, removeDto);
 
                 spinner.succeed('Item removed successfully');
 
                 console.log(chalk.green('\n✓ Item removed successfully!'));
-                console.log(chalk.gray('Status:'), chalk.white(response.data.status));
-                console.log(chalk.gray('Message:'), chalk.white(response.data.message));
+                console.log(chalk.gray('Status:'), chalk.white(response.status));
+                if (response.message) {
+                    console.log(chalk.gray('Message:'), chalk.white(response.message));
+                }
             } catch (error) {
                 spinner.fail('Item removal failed');
                 throw error;

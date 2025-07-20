@@ -3,7 +3,7 @@ import chalk from 'chalk';
 import ora from 'ora';
 import inquirer from 'inquirer';
 import { requireAuth } from '../auth';
-import { getHttpClient } from '../../services/http-client';
+import { getApiService } from '../../services/api.service';
 import { DirectoryPromptService } from './directory-prompt.service';
 
 export const updateWebsiteCommand = new Command('update-website')
@@ -15,7 +15,7 @@ export const updateWebsiteCommand = new Command('update-website')
             // Ensure user is authenticated
             await requireAuth();
 
-            const httpClient = getHttpClient();
+            const apiService = getApiService();
             const directoryPrompt = new DirectoryPromptService();
 
             // Select directory
@@ -59,18 +59,20 @@ export const updateWebsiteCommand = new Command('update-website')
             const spinner = ora('Updating website repository...').start();
 
             try {
-                const response = await httpClient.post(`/update-website/${directory.slug}`);
+                const response = await apiService.updateWebsite(directory.slug);
 
                 spinner.succeed('Website updated successfully');
 
                 console.log(chalk.green('\n✓ Website updated successfully!'));
-                console.log(chalk.gray('Status:'), chalk.white(response.data.status));
-                console.log(chalk.gray('Message:'), chalk.white(response.data.message));
+                console.log(chalk.gray('Status:'), chalk.white(response.status));
+                if (response.message) {
+                    console.log(chalk.gray('Message:'), chalk.white(response.message));
+                }
 
-                if (response.data.repository_url) {
+                if (response.repository_url) {
                     console.log(
                         chalk.blue('\nRepository:'),
-                        chalk.white(response.data.repository_url),
+                        chalk.white(response.repository_url),
                     );
                 }
 

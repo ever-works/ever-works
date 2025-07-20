@@ -3,7 +3,7 @@ import chalk from 'chalk';
 import ora from 'ora';
 import inquirer from 'inquirer';
 import { requireAuth } from '../auth';
-import { getHttpClient } from '../../services/http-client';
+import { getApiService } from '../../services/api.service';
 import { DirectoryPromptService } from './directory-prompt.service';
 
 export const regenerateMarkdownCommand = new Command('regenerate-markdown')
@@ -15,7 +15,7 @@ export const regenerateMarkdownCommand = new Command('regenerate-markdown')
             // Ensure user is authenticated
             await requireAuth();
 
-            const httpClient = getHttpClient();
+            const apiService = getApiService();
             const directoryPrompt = new DirectoryPromptService();
 
             // Select directory
@@ -53,15 +53,15 @@ export const regenerateMarkdownCommand = new Command('regenerate-markdown')
             const spinner = ora('Regenerating markdown...').start();
 
             try {
-                const response = await httpClient.post(`/regenerate-markdown/${directory.slug}`);
-                
+                const response = await apiService.regenerateMarkdown(directory.slug);
+
                 spinner.succeed('Markdown regenerated successfully');
 
                 console.log(chalk.green('\n✓ Markdown regenerated successfully!'));
-                console.log(chalk.gray('Status:'), chalk.white(response.data.status));
-                
-                if (response.data.error_details) {
-                    console.log(chalk.yellow('\n⚠ Warning:'), chalk.white(response.data.error_details));
+                console.log(chalk.gray('Status:'), chalk.white(response.status));
+
+                if (response.error_details) {
+                    console.log(chalk.yellow('\n⚠ Warning:'), chalk.white(response.error_details));
                 }
 
                 console.log(chalk.cyan('\nNext Steps:'));
