@@ -31,33 +31,39 @@ export const updateCommand = new Command('update')
             // Prompt for update parameters
             const answers = await inquirer.prompt([
                 {
-                    type: 'input',
-                    name: 'name',
-                    message: 'Update name:',
-                    default: `${directory.name} Update`,
-                    validate: (input) => input.trim().length > 0 || 'Update name is required'
+                    type: 'list',
+                    name: 'generation_method',
+                    message: 'Generation method:',
+                    choices: [
+                        { name: 'Create/Update (incremental)', value: 'create-update' },
+                        { name: 'Recreate (full rebuild)', value: 'recreate' },
+                    ],
+                    default: 'create-update',
                 },
                 {
-                    type: 'input',
-                    name: 'prompt',
-                    message: 'Update prompt (describe what changes you want):',
-                    validate: (input) => input.trim().length > 0 || 'Update prompt is required'
-                }
+                    type: 'confirm',
+                    name: 'update_with_pull_request',
+                    message: 'Update with pull request?',
+                    default: true,
+                },
             ]);
 
             // Show summary and confirm
             console.log(chalk.cyan('\n--- Update Summary ---'));
             console.log(chalk.gray('Directory:'), chalk.white(directory.slug));
-            console.log(chalk.gray('Update Name:'), chalk.white(answers.name));
-            console.log(chalk.gray('Prompt:'), chalk.white(answers.prompt));
+            console.log(chalk.gray('Generation Method:'), chalk.white(answers.generation_method));
+            console.log(
+                chalk.gray('Use Pull Request:'),
+                chalk.white(answers.update_with_pull_request ? 'Yes' : 'No'),
+            );
 
             const confirmed = await inquirer.prompt([
                 {
                     type: 'confirm',
                     name: 'proceed',
                     message: 'Proceed with update?',
-                    default: true
-                }
+                    default: true,
+                },
             ]);
 
             if (!confirmed.proceed) {
@@ -70,8 +76,8 @@ export const updateCommand = new Command('update')
 
             try {
                 const updateDto = {
-                    name: answers.name,
-                    prompt: answers.prompt
+                    generation_method: answers.generation_method,
+                    update_with_pull_request: answers.update_with_pull_request,
                 };
 
                 const response = await apiService.updateDirectory(directory.slug, updateDto);
@@ -83,20 +89,23 @@ export const updateCommand = new Command('update')
                 if (response.message) {
                     console.log(chalk.gray('Message:'), chalk.white(response.message));
                 }
-
             } catch (error) {
                 spinner.fail('Update failed');
                 throw error;
             }
-
         } catch (error) {
-            console.error(chalk.red('\n✗ Failed to start update:'), error.response?.data?.message || error.message);
+            console.error(
+                chalk.red('\n✗ Failed to start update:'),
+                error.response?.data?.message || error.message,
+            );
 
             if (error.response?.status === 401) {
                 console.log(chalk.yellow('\n⚠ Authentication failed. Please login again.'));
                 console.log(chalk.gray('Run: ever-works auth login'));
             } else if (error.response?.status === 404) {
-                console.log(chalk.yellow('\n⚠ Directory not found. Please check the slug and try again.'));
+                console.log(
+                    chalk.yellow('\n⚠ Directory not found. Please check the slug and try again.'),
+                );
             }
 
             process.exit(1);

@@ -56,8 +56,8 @@ export interface CreateItemsGeneratorDto {
 }
 
 export interface UpdateDirectoryDto {
-    name: string;
-    prompt: string;
+    generation_method?: 'create-update' | 'recreate';
+    update_with_pull_request?: boolean;
 }
 
 export interface SubmitItemDto {
