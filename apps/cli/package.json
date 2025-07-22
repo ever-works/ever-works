@@ -1,7 +1,7 @@
 {
     "name": "ever-works-cli",
-    "version": "1.0.0",
-    "description": "",
+    "version": "0.1.0",
+    "description": "Ever Works CLI",
     "main": "index.js",
     "scripts": {
         "build": "node build.js",
@@ -14,8 +14,12 @@
         "test:cli": "cd dist && npm install && node cli.js --help"
     },
     "keywords": [],
-    "author": "",
-    "license": "ISC",
+    "author": {
+		"name": "Ever Co. LTD",
+		"email": "ever@ever.co",
+		"url": "https://ever.co"
+	},
+    "license": "MIT",
     "packageManager": "pnpm@10.13.1",
     "devDependencies": {
         "@types/fs-extra": "^11.0.4",
