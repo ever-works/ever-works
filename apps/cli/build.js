@@ -108,7 +108,7 @@ async function buildCLI() {
         main: './cli.js',
         files: ['cli.js', 'README.md', 'LICENSE'],
         engines: {
-            node: '>=18.0.0',
+            node: '>=20.0.0',
         },
         // Runtime dependencies
         dependencies: {
