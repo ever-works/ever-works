@@ -36,7 +36,7 @@ async function buildCLI() {
         target: 'node18',
         outfile: 'dist/cli.js',
         banner: {
-            js: '#!/usr/bin/env node\nprocess.env.NODE_NO_DEPRECATION = "1";\nprocess.env.NODE_ENV = process.env.NODE_ENV || "production";',
+            js: '#!/usr/bin/env node\nprocess.env.NODE_ENV = process.env.NODE_ENV || "production";',
         },
         // External dependencies that should not be bundled
         external: [
