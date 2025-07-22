@@ -16,6 +16,26 @@ const API_URL = process.env.API_URL || 'http://localhost:3000';
 
 const AUTHOR = 'Ever Co. LTD <evereq@gmail.com>';
 
+// Create an esbuild plugin to replace environment variables
+const envPlugin = {
+    name: 'env',
+    setup(build) {
+        // Replace process.env.API_URL with the actual value
+        build.onLoad({ filter: /\.(ts|js)$/ }, async (args) => {
+            let contents = await fs.readFile(args.path, 'utf8');
+
+            // Replace process.env.API_URL with the actual value
+            // This handles cases like: process.env.API_URL || 'default'
+            contents = contents.replace(/process\.env\.API_URL/g, JSON.stringify(API_URL));
+
+            return {
+                contents,
+                loader: args.path.endsWith('.ts') ? 'ts' : 'js',
+            };
+        });
+    },
+};
+
 async function buildCLI() {
     const buildDir = path.join(__dirname, 'dist');
     const packageJsonPath = path.join(__dirname, 'package.json');
@@ -50,9 +70,7 @@ async function buildCLI() {
         banner: {
             js: '#!/usr/bin/env node\nprocess.env.NODE_ENV = process.env.NODE_ENV || "production";',
         },
-        define: {
-            'process.env.API_URL': JSON.stringify(API_URL),
-        },
+        plugins: [envPlugin],
         // External dependencies that should not be bundled
         external: [
             // Core dependencies that users need to install
