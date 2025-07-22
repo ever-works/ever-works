@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { BasePromptService } from './base-prompt.service';
 import { AiProviderRegistryService } from '../ai-providers/ai-provider-registry.service';
 import { AiProviderConfiguration, ConfiguredAiProvider, AiService } from '@packages/agent/ai';
 import ora from 'ora';
+import { BasePromptService } from '@packages/cli-shared';
 
 @Injectable()
 export class AiProviderPromptService extends BasePromptService {
@@ -175,7 +175,7 @@ export class AiProviderPromptService extends BasePromptService {
         if (providerInfo.requiresApiKey) {
             while (true) {
                 try {
-                    apiKey = await this.promptPassword(
+                    apiKey = await this.promptPasswordRequired(
                         `Enter your ${providerInfo.displayName} API key:${existingApiKey ? ' (leave empty to keep current)' : ''}`,
                         !existingApiKey,
                     );
@@ -187,7 +187,10 @@ export class AiProviderPromptService extends BasePromptService {
                         break;
                     }
 
-                    const validation = this.validateApiKey(apiKey, providerInfo.displayName);
+                    const validation = this.validateApiKeyWithProvider(
+                        apiKey,
+                        providerInfo.displayName,
+                    );
                     if (validation !== true) {
                         this.displayError(validation as string);
                         continue;
@@ -260,7 +263,7 @@ export class AiProviderPromptService extends BasePromptService {
             // Temperature validation with retry
             while (true) {
                 try {
-                    temperature = await this.promptNumber(
+                    temperature = await this.promptNumberMinMax(
                         'Enter temperature (0.0 = deterministic, 1.0 = creative):',
                         temperature,
                         0,
@@ -281,7 +284,7 @@ export class AiProviderPromptService extends BasePromptService {
             // Max tokens validation with retry
             while (true) {
                 try {
-                    const tokensInput = await this.promptNumber(
+                    const tokensInput = await this.promptNumberMinMax(
                         'Enter max tokens:',
                         maxTokens,
                         1,

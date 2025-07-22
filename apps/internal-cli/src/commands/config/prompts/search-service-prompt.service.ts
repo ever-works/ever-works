@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { BasePromptService } from './base-prompt.service';
+import { BasePromptService } from '@packages/cli-shared';
 
 export interface SearchServiceConfig {
     extractContentService: 'tavily' | 'naive';
@@ -57,15 +57,15 @@ export class SearchServicePromptService extends BasePromptService {
         if (extractContentService === 'tavily' || webSearchService === 'tavily') {
             this.displayInfo('\n🔑 Tavily API Configuration');
             this.displayInfo('Get your API key from: https://tavily.com');
-            this.displayInfo('Tavily provides high-quality AI-powered search and content extraction');
+            this.displayInfo(
+                'Tavily provides high-quality AI-powered search and content extraction',
+            );
 
             while (true) {
                 try {
-                    tavilyApiKey = await this.promptPassword(
-                        'Enter your Tavily API key:'
-                    );
+                    tavilyApiKey = await this.promptPassword('Enter your Tavily API key:');
 
-                    const validation = this.validateApiKey(tavilyApiKey, 'Tavily');
+                    const validation = this.validateApiKeyWithProvider(tavilyApiKey, 'Tavily');
                     if (validation !== true) {
                         this.displayError(validation as string);
                         continue;
@@ -75,7 +75,9 @@ export class SearchServicePromptService extends BasePromptService {
                     this.displayInfo('Testing Tavily API key...');
                     const isValid = await this.testTavilyApiKey(tavilyApiKey);
                     if (!isValid) {
-                        this.displayError('Tavily API key is invalid or lacks required permissions');
+                        this.displayError(
+                            'Tavily API key is invalid or lacks required permissions',
+                        );
                         this.displayInfo('Please check your API key and try again');
                         continue;
                     }

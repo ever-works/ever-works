@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { BasePromptService } from './base-prompt.service';
+import { BasePromptService } from '@packages/cli-shared';
 
 export interface DeploymentConfig {
     provider: 'vercel' | 'ignore';
@@ -39,7 +39,7 @@ export class DeploymentPromptService extends BasePromptService {
                     vercelToken = await this.promptPassword('Enter your Vercel token:');
                     vercelToken = vercelToken?.trim();
 
-                    const validation = this.validateApiKey(vercelToken, 'Vercel');
+                    const validation = this.validateApiKeyWithProvider(vercelToken, 'Vercel');
                     if (validation !== true) {
                         this.displayError(validation as string);
                         continue;

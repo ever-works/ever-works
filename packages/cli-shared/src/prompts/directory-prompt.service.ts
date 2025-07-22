@@ -1,6 +1,7 @@
 import chalk from 'chalk';
 import inquirer from 'inquirer';
 import { BasePromptService } from './base-prompt.service';
+import { validateSlug } from '../utils/slug-utils';
 
 export interface DirectoryInputData {
 	slug: string;
@@ -107,7 +108,7 @@ export class DirectoryPromptService extends BasePromptService {
 			const finalSlug = await this.promptRequiredText(
 				'Enter your preferred slug:',
 				suggestedSlug,
-				this.validateSlug.bind(this)
+				validateSlug.bind(this)
 			);
 			return { action, finalSlug };
 		}

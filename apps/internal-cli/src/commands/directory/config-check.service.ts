@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import chalk from 'chalk';
 import { ConfigService } from '../../config/config.service';
+import { ConfigChecker, displayConfigurationError } from '@packages/cli-shared';
 
 @Injectable()
-export class ConfigCheckService {
+export class ConfigCheckService implements ConfigChecker {
     constructor(private readonly configService: ConfigService) {}
 
     /**
@@ -15,7 +15,7 @@ export class ConfigCheckService {
             const config = await this.configService.loadConfig();
 
             if (!config) {
-                this.displayConfigurationError('No configuration found');
+                displayConfigurationError('No configuration found');
                 return false;
             }
 
@@ -23,10 +23,7 @@ export class ConfigCheckService {
             const validation = this.configService.validateConfig(config);
 
             if (!validation.isValid) {
-                this.displayConfigurationError(
-                    'Configuration validation failed',
-                    validation.errors,
-                );
+                displayConfigurationError('Configuration validation failed', validation.errors);
                 return false;
             }
 
@@ -35,28 +32,9 @@ export class ConfigCheckService {
 
             return true;
         } catch (error) {
-            this.displayConfigurationError('Failed to load configuration', [error.message]);
+            displayConfigurationError('Failed to load configuration', [error.message]);
             return false;
         }
-    }
-
-    /**
-     * Displays configuration error message and setup instructions
-     */
-    private displayConfigurationError(message: string, errors?: string[]): void {
-        console.log(chalk.red('\n✗ Configuration Error:'), message);
-
-        if (errors && errors.length > 0) {
-            console.log(chalk.red('\nErrors:'));
-            errors.forEach((error) => console.log(chalk.red(`  • ${error}`)));
-        }
-
-        console.log(chalk.yellow('\n⚠ Please complete the setup configuration first.'));
-        console.log(
-            chalk.gray('Run ') +
-                chalk.cyan('ever-works config setup') +
-                chalk.gray(' to configure your settings.'),
-        );
     }
 
     /**

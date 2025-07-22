@@ -5,6 +5,7 @@ import { BasePromptService } from '../config/prompts/base-prompt.service';
 import { MarkdownReadmeConfigDto } from '@packages/agent/dto';
 import { DirectoryRepository } from '@packages/agent/database';
 import { Directory } from '@packages/agent/entities';
+import { validateSlug } from '@packages/cli-shared';
 
 export interface DirectoryInputData {
     slug: string;
@@ -99,7 +100,7 @@ export class DirectoryPromptService extends BasePromptService {
             const finalSlug = await this.promptRequiredText(
                 'Enter your preferred slug:',
                 suggestedSlug,
-                this.validateSlug.bind(this),
+                validateSlug.bind(this),
             );
             return { action, finalSlug };
         }
@@ -178,21 +179,6 @@ export class DirectoryPromptService extends BasePromptService {
         }
 
         return lines.join('\n').trim();
-    }
-
-    private validateSlug(slug: string): string | boolean {
-        // Slug should be URL-friendly: lowercase, alphanumeric, hyphens, underscores
-        const slugRegex = /^[a-z0-9][a-z0-9\-_]*[a-z0-9]$|^[a-z0-9]$/;
-        if (!slugRegex.test(slug)) {
-            return 'Slug must be lowercase, start and end with alphanumeric characters, and can contain hyphens or underscores';
-        }
-        if (slug.length < 2) {
-            return 'Slug must be at least 2 characters long';
-        }
-        if (slug.length > 50) {
-            return 'Slug must be less than 50 characters';
-        }
-        return true;
     }
 
     private validateName(name: string): string | boolean {

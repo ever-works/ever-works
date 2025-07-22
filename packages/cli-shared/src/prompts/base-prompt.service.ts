@@ -118,6 +118,29 @@ export abstract class BasePromptService {
 	}
 
 	/**
+	 * Prompts for a password input
+	 */
+	protected async promptPasswordRequired(message: string, required: boolean = true): Promise<string> {
+		const { value } = await inquirer.prompt([
+			{
+				type: 'password',
+				name: 'value',
+				message,
+				mask: '*',
+				validate: required
+					? (input: string) => {
+							if (!input || input.trim().length === 0) {
+								return 'This field is required';
+							}
+							return true;
+						}
+					: undefined
+			}
+		]);
+		return value?.trim() || '';
+	}
+
+	/**
 	 * Prompts for a single selection from a list
 	 */
 	protected async promptSelect<T extends string>(
@@ -245,6 +268,16 @@ export abstract class BasePromptService {
 		return true;
 	}
 
+	protected validateApiKeyWithProvider(apiKey: string, providerName: string): string | boolean {
+		if (apiKey.length < 5) {
+			return `${providerName} API key seems too short. Please check and try again`;
+		}
+		if (apiKey.includes(' ')) {
+			return 'API key should not contain spaces';
+		}
+		return true;
+	}
+
 	/**
 	 * Validates model name format
 	 */
@@ -287,6 +320,39 @@ export abstract class BasePromptService {
 	}
 
 	/**
+	 * Prompts for a number input (supports decimals)
+	 */
+	protected async promptNumberMinMax(
+		message: string,
+		defaultValue?: number,
+		min?: number,
+		max?: number
+	): Promise<number> {
+		const { value } = await inquirer.prompt([
+			{
+				type: 'input',
+				name: 'value',
+				message,
+				default: defaultValue?.toString(),
+				validate: (input: string) => {
+					const num = parseFloat(input);
+					if (isNaN(num)) {
+						return 'Please enter a valid number (decimals allowed, e.g., 0.7)';
+					}
+					if (min !== undefined && num < min) {
+						return `Value must be at least ${min}`;
+					}
+					if (max !== undefined && num > max) {
+						return `Value must be at most ${max}`;
+					}
+					return true;
+				}
+			}
+		]);
+		return parseFloat(value);
+	}
+
+	/**
 	 * Generates a slug from a name
 	 */
 	protected slugifyName(name: string): string {
@@ -296,5 +362,38 @@ export abstract class BasePromptService {
 			.replace(/\s+/g, '-')
 			.replace(/-+/g, '-')
 			.replace(/^-|-$/g, '');
+	}
+
+	protected validateTemperature(temp: number): string | boolean {
+		if (temp < 0 || temp > 2) {
+			return 'Temperature must be between 0.0 and 2.0 (e.g., 0.7 for balanced, 0.1 for deterministic, 1.5 for creative)';
+		}
+		return true;
+	}
+
+	protected validateMaxTokens(tokens: number): string | boolean {
+		if (tokens < 1 || tokens > 200000) {
+			return 'Max tokens must be between 1 and 200,000 (e.g., 4096 for standard, 8192 for longer responses)';
+		}
+		// Ensure it's an integer
+		if (!Number.isInteger(tokens)) {
+			return 'Max tokens must be a whole number (no decimals)';
+		}
+		return true;
+	}
+
+	protected validateGitName(name: string): string | boolean {
+		if (name.length < 2) {
+			return 'Git name must be at least 2 characters long';
+		}
+		if (name.length > 100) {
+			return 'Git name must be less than 100 characters';
+		}
+		// Check for valid characters (letters, spaces, common punctuation)
+		const nameRegex = /^[a-zA-Z\s\-'.]+$/;
+		if (!nameRegex.test(name)) {
+			return 'Git name can only contain letters, spaces, hyphens, apostrophes, and periods';
+		}
+		return true;
 	}
 }

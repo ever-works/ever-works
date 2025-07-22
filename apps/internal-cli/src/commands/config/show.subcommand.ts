@@ -2,6 +2,7 @@ import { SubCommand, CommandRunner } from 'nest-commander';
 import { Logger } from '@nestjs/common';
 import chalk from 'chalk';
 import { ConfigService } from '../../config/config.service';
+import { maskSecret } from '@packages/cli-shared';
 
 @SubCommand({
     name: 'show',
@@ -38,14 +39,14 @@ export class ShowSubCommand extends CommandRunner {
 
             this.displaySection('GitHub & Git', {
                 'GitHub Owner': config.GITHUB_OWNER,
-                'GitHub API Key': this.maskSecret(config.GITHUB_APIKEY),
+                'GitHub API Key': maskSecret(config.GITHUB_APIKEY),
                 'Git Name': config.GIT_NAME,
                 'Git Email': config.GIT_EMAIL,
             });
 
             this.displaySection('Deployment', {
                 'Vercel Token': config.VERCEL_TOKEN
-                    ? this.maskSecret(config.VERCEL_TOKEN)
+                    ? maskSecret(config.VERCEL_TOKEN)
                     : 'Not configured',
             });
 
@@ -73,7 +74,7 @@ export class ShowSubCommand extends CommandRunner {
                 'Content Extraction': config.EXTRACT_CONTENT_SERVICE,
                 'Web Search': config.WEB_SEARCH_SERVICE,
                 'Tavily API Key': config.TAVILY_API_KEY
-                    ? this.maskSecret(config.TAVILY_API_KEY)
+                    ? maskSecret(config.TAVILY_API_KEY)
                     : 'Not configured',
             });
 
@@ -98,17 +99,6 @@ export class ShowSubCommand extends CommandRunner {
             }
         });
         console.log();
-    }
-
-    private maskSecret(secret: string): string {
-        if (!secret || secret.length < 8) {
-            return '***';
-        }
-        return (
-            secret.substring(0, 4) +
-            '*'.repeat(secret.length - 8) +
-            secret.substring(secret.length - 4)
-        );
     }
 
     private getConfiguredAiProviders(config: any): string[] {
