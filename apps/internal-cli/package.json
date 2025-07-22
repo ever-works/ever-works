@@ -18,6 +18,7 @@
         "@nestjs/common": "^11.0.1",
         "@nestjs/core": "^11.0.1",
         "@packages/agent": "workspace:*",
+        "@packages/cli-shared": "workspace:*",
         "chalk": "^4.1.2",
         "fs-extra": "^11.3.0",
         "inquirer": "^12.7.0",

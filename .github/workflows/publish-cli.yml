@@ -2,14 +2,11 @@ name: Build and Publish CLIs
 
 on:
   push:
-    branches:
-      - main
-      - develop
-    paths:
-      - 'apps/cli/**'
-      - 'apps/internal-cli/**'
-      - 'packages/**'
-      - '.github/workflows/publish-cli.yml'
+    tags:
+      - 'v*'
+      - 'cli-v*'
+      - 'internal-cli-v*'
+
   workflow_dispatch:
     inputs:
       publish_internal_cli:
@@ -17,11 +14,13 @@ on:
         required: true
         type: boolean
         default: false
+
       publish_external_cli:
         description: 'Publish external CLI to npm (public)'
         required: true
         type: boolean
         default: false
+
       version_bump:
         description: 'Version bump type (patch, minor, major)'
         required: false
@@ -35,11 +34,11 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    
+
     strategy:
       matrix:
         node-version: [18.x, 20.x]
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -96,8 +95,8 @@ jobs:
     runs-on: ubuntu-latest
     if: |
       (github.event_name == 'workflow_dispatch' && github.event.inputs.publish_internal_cli == 'true') ||
-      (github.event_name == 'push' && github.ref == 'refs/heads/main')
-    
+      (github.event_name == 'push' && (startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/tags/internal-cli-v')))
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -151,8 +150,8 @@ jobs:
     runs-on: ubuntu-latest
     if: |
       (github.event_name == 'workflow_dispatch' && github.event.inputs.publish_external_cli == 'true') ||
-      (github.event_name == 'push' && github.ref == 'refs/heads/main')
-    
+      (github.event_name == 'push' && (startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/tags/cli-v')))
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -202,8 +201,8 @@ jobs:
   create-release:
     needs: [publish-internal-cli, publish-external-cli]
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -221,31 +220,31 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: cli-v${{ steps.version.outputs.external_version }}
-          release_name: CLI Release v${{ steps.version.outputs.external_version }}
+          tag_name: ${{ github.ref_name }}
+          release_name: CLI Release ${{ github.ref_name }}
           body: |
             ## Ever Works CLI Release
-            
+
             ### Published Packages:
             - **External CLI (public)**: `ever-works@${{ steps.version.outputs.external_version }}`
             - **Internal CLI (private)**: `@ever-works/cli@${{ steps.version.outputs.internal_version }}`
-            
+
             ### Installation:
-            
+
             **External CLI (API-based)**:
             ```bash
             npm install -g ever-works
             # or
             pnpm install -g ever-works
             ```
-            
+
             **Internal CLI (Direct access)**:
             ```bash
             npm install -g @ever-works/cli
             # or  
             pnpm install -g @ever-works/cli
             ```
-            
+
             ### Changes:
             See [commit history](https://github.com/ever-works/ever-works/commits/main) for details.
           draft: false

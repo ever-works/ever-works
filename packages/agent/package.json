@@ -1,6 +1,6 @@
 {
     "name": "@packages/agent",
-    "version": "0.0.1",
+    "version": "1.0.0",
     "description": "ai agent for ever works",
     "private": true,
     "license": "UNLICENSED",
