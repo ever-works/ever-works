@@ -5,18 +5,7 @@ import inquirer from 'inquirer';
 import { requireAuth } from '../auth';
 import { getApiService, CreateItemsGeneratorDto } from '../../services/api.service';
 import { DirectoryPromptService } from './directory-prompt.service';
-
-// Use enums for better type safety
-enum GenerationMethod {
-    CREATE_UPDATE = 'create-update',
-    RECREATE = 'recreate',
-}
-
-enum WebsiteRepositoryCreationMethod {
-    DUPLICATE = 'duplicate',
-    FORK = 'fork',
-    CREATE_USING_TEMPLATE = 'create-using-template',
-}
+import { GeneratePromptService } from './generate-prompt.service';
 
 export const generateCommand = new Command('generate')
     .description('Generate data and create a GitHub repository for a directory')
@@ -29,6 +18,7 @@ export const generateCommand = new Command('generate')
 
             const apiService = getApiService();
             const directoryPrompt = new DirectoryPromptService();
+            const generatePrompt = new GeneratePromptService();
 
             // Select directory
             const selection = await directoryPrompt.promptDirectorySelection();
@@ -43,21 +33,10 @@ export const generateCommand = new Command('generate')
             // Collect generation parameters
             console.log(chalk.cyan('\n📝 Generation Configuration'));
 
-            const basicAnswers = await inquirer.prompt([
-                {
-                    type: 'input',
-                    name: 'name',
-                    message: 'Generation name:',
-                    default: `${directory.name} Content Generation`,
-                    validate: (input) => input.trim().length > 0 || 'Generation name is required',
-                },
-                {
-                    type: 'input',
-                    name: 'prompt',
-                    message: 'Generation prompt (describe what you want to generate):',
-                    validate: (input) => input.trim().length > 0 || 'Generation prompt is required',
-                },
-            ]);
+            // Prompt for required fields
+            const requiredData = await generatePrompt.promptRequiredFields(
+                `${directory.name} Content Generation`,
+            );
 
             // Ask for advanced configuration
             const advancedConfig = await inquirer.prompt([
@@ -71,108 +50,16 @@ export const generateCommand = new Command('generate')
 
             let createItemsGeneratorDto: CreateItemsGeneratorDto = {
                 slug: directory.slug,
-                name: basicAnswers.name,
-                prompt: basicAnswers.prompt,
+                name: requiredData.name,
+                prompt: requiredData.prompt,
             };
 
             if (advancedConfig.configureAdvanced) {
-                const advancedAnswers = await inquirer.prompt([
-                    {
-                        type: 'list',
-                        name: 'generation_method',
-                        message: 'Generation method:',
-                        choices: [
-                            {
-                                name: 'Create/Update (recommended)',
-                                value: GenerationMethod.CREATE_UPDATE,
-                            },
-                            {
-                                name: 'Recreate (replace existing)',
-                                value: GenerationMethod.RECREATE,
-                            },
-                        ],
-                        default: GenerationMethod.CREATE_UPDATE,
-                    },
-                    {
-                        type: 'list',
-                        name: 'website_repository_creation_method',
-                        message: 'Website repository creation method:',
-                        choices: [
-                            { name: 'Duplicate', value: WebsiteRepositoryCreationMethod.DUPLICATE },
-                            { name: 'Fork', value: WebsiteRepositoryCreationMethod.FORK },
-                            {
-                                name: 'Create using template',
-                                value: WebsiteRepositoryCreationMethod.CREATE_USING_TEMPLATE,
-                            },
-                        ],
-                        default: WebsiteRepositoryCreationMethod.DUPLICATE,
-                    },
-                    {
-                        type: 'input',
-                        name: 'repository_description',
-                        message: 'Repository description (optional):',
-                    },
-                    {
-                        type: 'input',
-                        name: 'initial_categories',
-                        message: 'Initial categories (comma-separated, optional):',
-                        filter: (input) =>
-                            input
-                                ? input
-                                      .split(',')
-                                      .map((s: string) => s.trim())
-                                      .filter(Boolean)
-                                : undefined,
-                    },
-                    {
-                        type: 'input',
-                        name: 'priority_categories',
-                        message: 'Priority categories (comma-separated, optional):',
-                        filter: (input) =>
-                            input
-                                ? input
-                                      .split(',')
-                                      .map((s: string) => s.trim())
-                                      .filter(Boolean)
-                                : undefined,
-                    },
-                    {
-                        type: 'input',
-                        name: 'target_keywords',
-                        message: 'Target keywords (comma-separated, optional):',
-                        filter: (input) =>
-                            input
-                                ? input
-                                      .split(',')
-                                      .map((s: string) => s.trim())
-                                      .filter(Boolean)
-                                : undefined,
-                    },
-                    {
-                        type: 'input',
-                        name: 'source_urls',
-                        message: 'Source URLs (comma-separated, optional):',
-                        filter: (input) =>
-                            input
-                                ? input
-                                      .split(',')
-                                      .map((s: string) => s.trim())
-                                      .filter(Boolean)
-                                : undefined,
-                    },
-                    {
-                        type: 'confirm',
-                        name: 'update_with_pull_request',
-                        message: 'Update with pull request?',
-                        default: true,
-                    },
-                    {
-                        type: 'confirm',
-                        name: 'badge_evaluation_enabled',
-                        message: 'Enable badge evaluation?',
-                        default: false,
-                    },
-                ]);
+                // Get advanced options from the prompt service
+                const advancedOptions = await generatePrompt.promptAdvancedOptions();
+
+                // Merge advanced options
+                Object.assign(createItemsGeneratorDto, advancedOptions);
 
                 // Company information
                 const companyConfig = await inquirer.prompt([
@@ -185,34 +72,8 @@ export const generateCommand = new Command('generate')
                 ]);
 
                 if (companyConfig.addCompany) {
-                    const companyAnswers = await inquirer.prompt([
-                        {
-                            type: 'input',
-                            name: 'name',
-                            message: 'Company name:',
-                            validate: (input) =>
-                                input.trim().length > 0 || 'Company name is required',
-                        },
-                        {
-                            type: 'input',
-                            name: 'website',
-                            message: 'Company website:',
-                            validate: (input) => {
-                                try {
-                                    new URL(input);
-                                    return true;
-                                } catch {
-                                    return 'Please enter a valid URL';
-                                }
-                            },
-                        },
-                    ]);
-
-                    createItemsGeneratorDto.company = companyAnswers;
+                    createItemsGeneratorDto.company = await generatePrompt.promptCompanyInfo();
                 }
-
-                // Merge advanced configuration
-                Object.assign(createItemsGeneratorDto, advancedAnswers);
 
                 // Ask for configuration settings
                 const configConfig = await inquirer.prompt([
@@ -225,171 +86,12 @@ export const generateCommand = new Command('generate')
                 ]);
 
                 if (configConfig.configureAdvancedSettings) {
-                    const configAnswers = await inquirer.prompt([
-                        {
-                            type: 'number',
-                            name: 'max_search_queries',
-                            message: 'Max search queries (1-100):',
-                            default: 10,
-                            validate: (input) => {
-                                const num = parseInt(String(input));
-                                if (isNaN(num) || num < 1 || num > 100) {
-                                    return 'Please enter a number between 1 and 100';
-                                }
-                                return true;
-                            },
-                        },
-                        {
-                            type: 'number',
-                            name: 'max_results_per_query',
-                            message: 'Max results per query (1-100):',
-                            default: 20,
-                            validate: (input) => {
-                                const num = parseInt(String(input));
-                                if (isNaN(num) || num < 1 || num > 100) {
-                                    return 'Please enter a number between 1 and 100';
-                                }
-                                return true;
-                            },
-                        },
-                        {
-                            type: 'number',
-                            name: 'max_pages_to_process',
-                            message: 'Max pages to process (1-1000):',
-                            default: 100,
-                            validate: (input) => {
-                                const num = parseInt(String(input));
-                                if (isNaN(num) || num < 1 || num > 1000) {
-                                    return 'Please enter a number between 1 and 1000';
-                                }
-                                return true;
-                            },
-                        },
-                        {
-                            type: 'number',
-                            name: 'relevance_threshold_content',
-                            message: 'Relevance threshold for content (0.01-1.0):',
-                            default: 0.85,
-                            validate: (input) => {
-                                const num = parseFloat(String(input));
-                                if (isNaN(num) || num < 0.01 || num > 1.0) {
-                                    return 'Please enter a number between 0.01 and 1.0';
-                                }
-                                return true;
-                            },
-                        },
-                        {
-                            type: 'number',
-                            name: 'min_content_length_for_extraction',
-                            message: 'Minimum content length for extraction:',
-                            default: 300,
-                            validate: (input) => {
-                                const num = parseInt(String(input));
-                                if (isNaN(num) || num < 0) {
-                                    return 'Please enter a non-negative number';
-                                }
-                                return true;
-                            },
-                        },
-                        {
-                            type: 'confirm',
-                            name: 'ai_first_generation_enabled',
-                            message: 'Enable AI-first generation?',
-                            default: true,
-                        },
-                        {
-                            type: 'confirm',
-                            name: 'content_filtering_enabled',
-                            message: 'Enable content filtering?',
-                            default: true,
-                        },
-                        {
-                            type: 'number',
-                            name: 'prompt_comparison_confidence_threshold',
-                            message: 'Prompt comparison confidence threshold (0.01-1.0):',
-                            default: 0.5,
-                            validate: (input) => {
-                                const num = parseFloat(String(input));
-                                if (isNaN(num) || num < 0.01 || num > 1.0) {
-                                    return 'Please enter a number between 0.01 and 1.0';
-                                }
-                                return true;
-                            },
-                        },
-                    ]);
-
-                    createItemsGeneratorDto.config = configAnswers;
+                    createItemsGeneratorDto.config = await generatePrompt.promptConfigOptions();
                 }
             }
 
             // Show summary and confirm
-            console.log(chalk.cyan('\n--- Generation Summary ---'));
-            console.log(chalk.gray('Directory:'), chalk.white(directory.slug));
-            console.log(chalk.gray('Name:'), chalk.white(createItemsGeneratorDto.name));
-            console.log(chalk.gray('Prompt:'), chalk.white(createItemsGeneratorDto.prompt));
-            if (createItemsGeneratorDto.company) {
-                console.log(
-                    chalk.gray('Company:'),
-                    chalk.white(
-                        `${createItemsGeneratorDto.company.name} (${createItemsGeneratorDto.company.website})`,
-                    ),
-                );
-            }
-            if (createItemsGeneratorDto.initial_categories?.length) {
-                console.log(
-                    chalk.gray('Initial Categories:'),
-                    chalk.white(createItemsGeneratorDto.initial_categories.join(', ')),
-                );
-            }
-            if (createItemsGeneratorDto.priority_categories?.length) {
-                console.log(
-                    chalk.gray('Priority Categories:'),
-                    chalk.white(createItemsGeneratorDto.priority_categories.join(', ')),
-                );
-            }
-            if (createItemsGeneratorDto.target_keywords?.length) {
-                console.log(
-                    chalk.gray('Target Keywords:'),
-                    chalk.white(createItemsGeneratorDto.target_keywords.join(', ')),
-                );
-            }
-            if (createItemsGeneratorDto.source_urls?.length) {
-                console.log(
-                    chalk.gray('Source URLs:'),
-                    chalk.white(`${createItemsGeneratorDto.source_urls.length} URLs`),
-                );
-            }
-            if (createItemsGeneratorDto.repository_description) {
-                console.log(
-                    chalk.gray('Repository Description:'),
-                    chalk.white(createItemsGeneratorDto.repository_description),
-                );
-            }
-            if (createItemsGeneratorDto.generation_method) {
-                console.log(
-                    chalk.gray('Generation Method:'),
-                    chalk.white(createItemsGeneratorDto.generation_method),
-                );
-            }
-            if (createItemsGeneratorDto.website_repository_creation_method) {
-                console.log(
-                    chalk.gray('Website Creation Method:'),
-                    chalk.white(createItemsGeneratorDto.website_repository_creation_method),
-                );
-            }
-            console.log(
-                chalk.gray('Update with PR:'),
-                chalk.white(
-                    createItemsGeneratorDto.update_with_pull_request !== false ? 'Yes' : 'No',
-                ),
-            );
-            console.log(
-                chalk.gray('Badge Evaluation:'),
-                chalk.white(createItemsGeneratorDto.badge_evaluation_enabled ? 'Yes' : 'No'),
-            );
-            if (createItemsGeneratorDto.config) {
-                console.log(chalk.gray('Advanced Config:'), chalk.white('Configured'));
-            }
+            generatePrompt.displayGenerationSummary(createItemsGeneratorDto);
 
             const confirmed = await inquirer.prompt([
                 {

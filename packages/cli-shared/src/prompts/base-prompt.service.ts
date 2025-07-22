@@ -352,6 +352,23 @@ export abstract class BasePromptService {
 		return parseFloat(value);
 	}
 
+	protected async promptFloat(message: string, defaultValue: number, min: number, max: number): Promise<number> {
+		const { value } = await inquirer.prompt({
+			type: 'input',
+			name: 'value',
+			message: chalk.yellow(message),
+			default: defaultValue.toString(),
+			validate: (input: string) => {
+				const num = parseFloat(input);
+				if (isNaN(num) || num < min || num > max) {
+					return `Please enter a number between ${min} and ${max}`;
+				}
+				return true;
+			}
+		});
+		return parseFloat(value);
+	}
+
 	/**
 	 * Generates a slug from a name
 	 */
