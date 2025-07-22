@@ -55,7 +55,7 @@ async function buildCLI() {
         target: 'node18',
         outfile: 'dist/cli.js',
         banner: {
-            js: '#!/usr/bin/env node\nprocess.env.NODE_ENV = process.env.NODE_ENV || "production";\nrequire("reflect-metadata");',
+            js: '#!/usr/bin/env node\nprocess.env.NODE_NO_DEPRECATION = "1";\nprocess.env.NODE_ENV = process.env.NODE_ENV || "production";\nrequire("reflect-metadata");',
         },
         // External dependencies that should not be bundled
         external: [
@@ -153,7 +153,7 @@ async function buildCLI() {
         // Remove dev dependencies and workspace dependencies
         scripts: {
             postinstall:
-                'echo "Ever Works CLI installed successfully! Run \'ever-works --help\' to get started."',
+                'echo "Ever Works CLI installed successfully! Run \'ew --help\' to get started."',
         },
     };
 
