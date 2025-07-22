@@ -43,6 +43,8 @@ export interface CreateItemsGeneratorDto {
     generation_method?: 'create-update' | 'recreate';
     website_repository_creation_method?: 'duplicate' | 'fork' | 'create-using-template';
     repository_description?: string;
+    update_with_pull_request?: boolean;
+    badge_evaluation_enabled?: boolean;
     config?: {
         max_search_queries?: number;
         max_results_per_query?: number;

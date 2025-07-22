@@ -59,4 +59,11 @@ export class DirectoryPromptService extends BaseDirectoryPromptService {
             return { directory, cancelled: false };
         }
     }
+
+    /**
+     * Generate an incremented slug for conflict resolution
+     */
+    generateIncrementedSlug(baseSlug: string, increment: number): string {
+        return `${baseSlug}-${increment}`;
+    }
 }
