@@ -5,10 +5,10 @@
 	"homepage": "https://ever.works",
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/ever-co/ever-works.git"
+		"url": "https://github.com/ever-works/ever-works.git"
 	},
 	"bugs": {
-		"url": "https://github.com/ever-co/ever-works/issues"
+		"url": "https://github.com/ever-works/ever-works/issues"
 	},
 	"author": {
 		"name": "Ever Co. LTD",

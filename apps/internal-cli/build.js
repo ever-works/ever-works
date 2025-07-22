@@ -70,6 +70,10 @@ async function buildCLI() {
             '@nestjs/microservices',
             '@nestjs/websockets/socket-module',
 
+            // Build Dependencies
+            'fs-extra',
+            'inquirer',
+
             // Node.js built-ins (esbuild handles these automatically, but being explicit)
             'fs',
             'path',
@@ -83,57 +87,8 @@ async function buildCLI() {
             'events',
             'buffer',
             'child_process',
-        ],
-        // Resolve workspace dependencies
-        plugins: [
-            {
-                name: 'workspace-resolver',
-                setup(build) {
-                    // Resolve @packages/agent imports to their compiled files
-                    build.onResolve({ filter: /^@packages\/agent/ }, (args) => {
-                        const importPath = args.path;
-                        if (importPath === '@packages/agent') {
-                            return {
-                                path: path.resolve(__dirname, '../../packages/agent/dist/index.js'),
-                            };
-                        }
-                        // Handle subfolder imports like @packages/agent/database
-                        const subfolder = importPath.replace('@packages/agent/', '');
-                        return {
-                            path: path.resolve(
-                                __dirname,
-                                `../../packages/agent/dist/${subfolder}/index.js`,
-                            ),
-                        };
-                    });
-
-                    // Resolve internal src/ imports within the agent package
-                    build.onResolve({ filter: /^src\// }, (args) => {
-                        // Check if this is being resolved from within the agent package
-                        if (args.importer.includes('packages/agent/src')) {
-                            const relativePath = args.path.replace(/^src\//, '');
-                            const resolvedPath = path.resolve(
-                                __dirname,
-                                '../../packages/agent/src',
-                                relativePath,
-                            );
-
-                            // Try with .ts extension first, then .js
-                            const extensions = ['.ts', '.js', '/index.ts', '/index.js'];
-                            for (const ext of extensions) {
-                                const fullPath = resolvedPath + ext;
-                                if (fs.existsSync(fullPath)) {
-                                    return { path: fullPath };
-                                }
-                            }
-
-                            // If no file found, return the original path and let esbuild handle it
-                            return { path: resolvedPath + '.ts' };
-                        }
-                        return undefined;
-                    });
-                },
-            },
+            'tty',
+            'readline',
         ],
         format: 'cjs',
         minify: true, // Keep readable for debugging
@@ -164,11 +119,11 @@ async function buildCLI() {
         homepage: 'https://ever.works',
         repository: {
             type: 'git',
-            url: 'https://github.com/ever-co/ever-works.git',
-            directory: 'apps/cli',
+            url: 'https://github.com/ever-works/ever-works.git',
+            directory: 'apps/internal-cli',
         },
         bugs: {
-            url: 'https://github.com/ever-co/ever-works/issues',
+            url: 'https://github.com/ever-works/ever-works/issues',
         },
         keywords: [
             'cli',
@@ -181,7 +136,6 @@ async function buildCLI() {
             'website-generator',
         ],
         bin: {
-            'ever-works': './cli.js',
             ew: './cli.js',
         },
         main: './cli.js',
@@ -194,6 +148,7 @@ async function buildCLI() {
             'better-sqlite3': '^11.10.0',
             'libsodium-wrappers': '^0.7.15',
             'reflect-metadata': '^0.2.2',
+            inquirer: '^12.7.0',
         },
         // Remove dev dependencies and workspace dependencies
         scripts: {

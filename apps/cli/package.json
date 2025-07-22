@@ -1,37 +1,37 @@
 {
-	"name": "ever-works-cli",
-	"version": "1.0.0",
-	"description": "",
-	"main": "index.js",
-	"bin": {
-		"ever-works": "dist/cli.js"
-	},
-	"scripts": {
-		"build": "node build.js",
-		"dev": "node build.js && node dist/cli.js",
-		"start": "node dist/cli.js",
-		"test": "echo \"Error: no test specified\" && exit 1",
-		"clean": "rm -rf dist"
-	},
-	"keywords": [],
-	"author": "",
-	"license": "ISC",
-	"packageManager": "pnpm@10.13.1",
-	"devDependencies": {
-		"@types/fs-extra": "^11.0.4",
-		"@types/inquirer": "^9.0.8",
-		"@types/node": "^22.16.3",
-		"esbuild": "^0.25.6",
-		"typescript": "^5.8.3"
-	},
-	"dependencies": {
-		"axios": "^1.10.0",
-		"chalk": "^4.1.2",
-		"commander": "^14.0.0",
-		"dotenv": "^17.2.0",
-		"fs-extra": "^11.3.0",
-		"inquirer": "^12.7.0",
-		"ora": "^5.4.1",
-		"@packages/cli-shared": "workspace:*"
-	}
+    "name": "ever-works-cli",
+    "version": "1.0.0",
+    "description": "",
+    "main": "index.js",
+    "scripts": {
+        "build": "node build.js",
+        "build:cli": "node build.js",
+        "dev": "node build.js && node dist/cli.js",
+        "start": "node dist/cli.js",
+        "test": "echo \"Error: no test specified\" && exit 1",
+        "clean": "rm -rf dist",
+        "publish:cli": "npm run build:cli && cd dist && npm publish",
+        "test:cli": "cd dist && npm install && node cli.js --help"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "packageManager": "pnpm@10.13.1",
+    "devDependencies": {
+        "@types/fs-extra": "^11.0.4",
+        "@types/inquirer": "^9.0.8",
+        "@types/node": "^22.16.3",
+        "esbuild": "^0.25.6",
+        "typescript": "^5.8.3"
+    },
+    "dependencies": {
+        "axios": "^1.10.0",
+        "chalk": "^4.1.2",
+        "commander": "^14.0.0",
+        "dotenv": "^17.2.0",
+        "fs-extra": "^11.3.0",
+        "inquirer": "^12.7.0",
+        "ora": "^5.4.1",
+        "@packages/cli-shared": "workspace:*"
+    }
 }

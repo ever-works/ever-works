@@ -145,12 +145,6 @@ importers:
       '@packages/agent':
         specifier: workspace:*
         version: link:../../packages/agent
-      '@types/fs-extra':
-        specifier: ^11.0.4
-        version: 11.0.4
-      '@types/inquirer':
-        specifier: ^9.0.8
-        version: 9.0.8
       chalk:
         specifier: ^4.1.2
         version: 4.1.2
@@ -185,6 +179,12 @@ importers:
       '@swc/core':
         specifier: ^1.12.9
         version: 1.12.11
+      '@types/fs-extra':
+        specifier: ^11.0.4
+        version: 11.0.4
+      '@types/inquirer':
+        specifier: ^9.0.8
+        version: 9.0.8
       '@types/node':
         specifier: ^22.16.0
         version: 22.16.3
