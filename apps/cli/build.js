@@ -14,7 +14,7 @@ if (envExists) {
 // Get API_URL from environment with default fallback
 const API_URL = process.env.API_URL || 'http://localhost:3000';
 
-const AUTHOR = 'Ever Co. LTD <evereq@gmail.com>';
+const AUTHOR = 'Ever Co. LTD <ever@ever.co>';
 
 // Create an esbuild plugin to replace environment variables
 const envPlugin = {
