@@ -26,6 +26,7 @@ export class ServeCommand extends CommandRunner {
         try {
             console.log(chalk.cyan.bold('\n🚀 Starting API Server\n'));
 
+            // Check configuration first
             await this.configCheck.requireConfiguration();
 
             const port = parseInt(options?.port || '3001', 10);

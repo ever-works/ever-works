@@ -6,6 +6,7 @@ import { DirectoryRepository } from '@packages/agent/database';
 import { GithubService } from '@packages/agent/git';
 import { User } from '@packages/agent/entities';
 import { DirectoryPromptService } from './directory-prompt.service';
+import { ConfigCheckService } from './config-check.service';
 
 @SubCommand({
     name: 'create',
@@ -18,6 +19,7 @@ export class CreateSubCommand extends CommandRunner {
         private readonly directoryRepository: DirectoryRepository,
         private readonly githubService: GithubService,
         private readonly directoryPrompt: DirectoryPromptService,
+        private readonly configCheck: ConfigCheckService,
     ) {
         super();
     }
@@ -25,6 +27,9 @@ export class CreateSubCommand extends CommandRunner {
     async run(): Promise<void> {
         try {
             console.log(chalk.cyan.bold('\n📁 Create New Directory\n'));
+
+            // Check configuration first
+            await this.configCheck.requireConfiguration();
 
             // Show loading message
             const loadingSpinner = ora('Loading...').start();

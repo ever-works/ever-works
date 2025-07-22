@@ -3,6 +3,7 @@ import { Logger } from '@nestjs/common';
 import chalk from 'chalk';
 import ora from 'ora';
 import { DirectoryRepository } from '@packages/agent/database';
+import { ConfigCheckService } from './config-check.service';
 
 @SubCommand({
     name: 'list',
@@ -11,13 +12,19 @@ import { DirectoryRepository } from '@packages/agent/database';
 export class ListSubCommand extends CommandRunner {
     private readonly logger = new Logger(ListSubCommand.name);
 
-    constructor(private readonly directoryRepository: DirectoryRepository) {
+    constructor(
+        private readonly directoryRepository: DirectoryRepository,
+        private readonly configCheck: ConfigCheckService,
+    ) {
         super();
     }
 
     async run(): Promise<void> {
         try {
             console.log(chalk.cyan.bold('\n📋 Directory List\n'));
+
+            // Check configuration first
+            await this.configCheck.requireConfiguration();
 
             const spinner = ora('Loading directories...').start();
             const directories = await this.directoryRepository.findAll();
