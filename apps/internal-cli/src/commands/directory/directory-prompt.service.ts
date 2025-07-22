@@ -1,11 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import chalk from 'chalk';
 import inquirer from 'inquirer';
-import { BasePromptService } from '../config/prompts/base-prompt.service';
 import { MarkdownReadmeConfigDto } from '@packages/agent/dto';
 import { DirectoryRepository } from '@packages/agent/database';
 import { Directory } from '@packages/agent/entities';
-import { validateSlug } from '@packages/cli-shared';
+import { validateSlug, BasePromptService } from '@packages/cli-shared';
 
 export interface DirectoryInputData {
     slug: string;
@@ -106,16 +105,6 @@ export class DirectoryPromptService extends BasePromptService {
         }
 
         return { action, finalSlug: action === 'use_suggested' ? suggestedSlug : undefined };
-    }
-
-    private slugifyName(name: string): string {
-        return name
-            .toLowerCase()
-            .trim()
-            .replace(/[^a-z0-9\s\-_]/g, '') // Remove special characters except spaces, hyphens, underscores
-            .replace(/\s+/g, '-') // Replace spaces with hyphens
-            .replace(/[-_]+/g, '-') // Replace multiple consecutive hyphens/underscores with single hyphen
-            .replace(/^-+|-+$/g, ''); // Remove leading/trailing hyphens
     }
 
     private async promptReadmeConfig(): Promise<MarkdownReadmeConfigDto> {
