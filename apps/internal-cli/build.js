@@ -114,7 +114,7 @@ async function buildCLI() {
         version: currentPackageJson.version,
         description: 'Ever Works CLI - Open Directory Builder Platform Command Line Interface',
         author: AUTHOR,
-        license: 'MIT',
+        license: 'UNLICENSED',
         homepage: 'https://ever.works',
         repository: {
             type: 'git',
@@ -164,7 +164,7 @@ async function buildCLI() {
         await fs.copy(readmePath, path.join(buildDir, 'README.md'));
     }
 
-    // Copy LICENSE if it exists, otherwise create MIT license
+    // Copy LICENSE if it exists
     const licensePath = path.join(__dirname, '../../LICENSE');
     if (
         (await fs.pathExists(licensePath)) ||
