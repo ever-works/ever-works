@@ -7,7 +7,7 @@ export class HttpClient {
 	private apiUrl: string;
 
 	constructor(apiUrl?: string) {
-		this.apiUrl = apiUrl || process.env.API_URL || 'http://localhost:3000';
+		this.apiUrl = apiUrl || process.env.API_URL || 'http://localhost:3001';
 		this.client = axios.create({
 			baseURL: this.apiUrl,
 			timeout: 30000,

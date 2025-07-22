@@ -2,6 +2,17 @@ const esbuild = require('esbuild');
 const fs = require('fs-extra');
 const path = require('path');
 const { execSync } = require('child_process');
+const dotenv = require('dotenv');
+
+// Load environment variables from .env file
+const envPath = path.join(__dirname, '.env');
+const envExists = fs.existsSync(envPath);
+if (envExists) {
+    dotenv.config({ path: envPath });
+}
+
+// Get API_URL from environment with default fallback
+const API_URL = process.env.API_URL || 'http://localhost:3000';
 
 const AUTHOR = 'Ever Co. LTD <evereq@gmail.com>';
 
@@ -27,6 +38,7 @@ async function buildCLI() {
     }
 
     console.log('Bundling with esbuild...');
+    console.log(`Using API_URL: ${API_URL}`);
 
     // Bundle the compiled JavaScript
     await esbuild.build({
@@ -37,6 +49,9 @@ async function buildCLI() {
         outfile: 'dist/cli.js',
         banner: {
             js: '#!/usr/bin/env node\nprocess.env.NODE_ENV = process.env.NODE_ENV || "production";',
+        },
+        define: {
+            'process.env.API_URL': JSON.stringify(API_URL),
         },
         // External dependencies that should not be bundled
         external: [
