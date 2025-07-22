@@ -226,16 +226,16 @@ jobs:
             ## Ever Works CLI Release
 
             ### Published Packages:
-            - **External CLI (public)**: `ever-works@${{ steps.version.outputs.external_version }}`
+            - **External CLI (public)**: `ever-works-cli@${{ steps.version.outputs.external_version }}`
             - **Internal CLI (private)**: `@ever-works/cli@${{ steps.version.outputs.internal_version }}`
 
             ### Installation:
 
             **External CLI (API-based)**:
             ```bash
-            npm install -g ever-works
+            npm install -g ever-works-cli
             # or
-            pnpm install -g ever-works
+            pnpm install -g ever-works-cli
             ```
 
             **Internal CLI (Direct access)**:
