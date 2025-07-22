@@ -33,7 +33,7 @@ async function buildCLI() {
         entryPoints: ['src/main.ts'],
         bundle: true,
         platform: 'node',
-        target: 'node18',
+        target: 'node20',
         outfile: 'dist/cli.js',
         banner: {
             js: '#!/usr/bin/env node\nprocess.env.NODE_ENV = process.env.NODE_ENV || "production";',

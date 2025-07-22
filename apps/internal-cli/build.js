@@ -52,7 +52,7 @@ async function buildCLI() {
         entryPoints: ['temp-build/main.js'],
         bundle: true,
         platform: 'node',
-        target: 'node18',
+        target: 'node20',
         outfile: 'dist/cli.js',
         banner: {
             js: '#!/usr/bin/env node\nprocess.env.NODE_ENV = process.env.NODE_ENV || "production";\nrequire("reflect-metadata");\nrequire("process").removeAllListeners("warning")',
@@ -72,7 +72,6 @@ async function buildCLI() {
 
             // Build Dependencies
             'fs-extra',
-            'inquirer',
 
             // Node.js built-ins (esbuild handles these automatically, but being explicit)
             'fs',
@@ -148,7 +147,6 @@ async function buildCLI() {
             'better-sqlite3': '^11.10.0',
             'libsodium-wrappers': '^0.7.15',
             'reflect-metadata': '^0.2.2',
-            inquirer: '^12.7.0',
         },
         // Remove dev dependencies and workspace dependencies
         scripts: {
