@@ -2,7 +2,7 @@ import { SubCommand, CommandRunner } from 'nest-commander';
 import { Logger } from '@nestjs/common';
 import chalk from 'chalk';
 import { ConfigService } from '../../config/config.service';
-import { COMMAND } from 'src/config';
+import { COMMAND } from '../../config';
 
 interface SetCommandOptions {
     key?: string;

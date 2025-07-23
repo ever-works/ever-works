@@ -10,7 +10,7 @@ import { AiProviderPromptService } from './prompts/ai-provider-prompt.service';
 import { SearchServicePromptService } from './prompts/search-service-prompt.service';
 
 import { PartialEverWorksConfig } from '../../config/config.interface';
-import { COMMAND } from 'src/config';
+import { COMMAND } from '../../config';
 
 @SubCommand({
     name: 'setup',

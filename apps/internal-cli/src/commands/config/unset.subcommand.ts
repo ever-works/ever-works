@@ -3,7 +3,7 @@ import { Logger } from '@nestjs/common';
 import chalk from 'chalk';
 import inquirer from 'inquirer';
 import { ConfigService } from '../../config/config.service';
-import { COMMAND } from 'src/config';
+import { COMMAND } from '../../config';
 
 @SubCommand({
     name: 'unset',

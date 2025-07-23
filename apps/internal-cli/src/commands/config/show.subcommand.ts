@@ -3,7 +3,7 @@ import { Logger } from '@nestjs/common';
 import chalk from 'chalk';
 import { ConfigService } from '../../config/config.service';
 import { maskSecret } from '@packages/cli-shared';
-import { COMMAND } from 'src/config';
+import { COMMAND } from '../../config';
 
 @SubCommand({
     name: 'show',

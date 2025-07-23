@@ -4,7 +4,7 @@ import chalk from 'chalk';
 import ora from 'ora';
 import { ConfigService } from '../../config/config.service';
 import { AiService } from '@packages/agent/ai';
-import { COMMAND } from 'src/config';
+import { COMMAND } from '../../config';
 
 @SubCommand({
     name: 'test',

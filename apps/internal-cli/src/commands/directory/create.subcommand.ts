@@ -7,7 +7,7 @@ import { GithubService } from '@packages/agent/git';
 import { User } from '@packages/agent/entities';
 import { DirectoryPromptService } from './directory-prompt.service';
 import { ConfigCheckService } from './config-check.service';
-import { COMMAND } from 'src/config';
+import { COMMAND } from '../../config';
 
 @SubCommand({
     name: 'create',
