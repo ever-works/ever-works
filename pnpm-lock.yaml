@@ -227,8 +227,8 @@ importers:
         specifier: ^4.0.2
         version: 4.0.2
       axios:
-        specifier: ^1.10.0
-        version: 1.10.0
+        specifier: ^1.11.0
+        version: 1.11.0
       better-sqlite3:
         specifier: ^11.10.0
         version: 11.10.0
@@ -258,7 +258,7 @@ importers:
         version: 1.32.1
       langchain:
         specifier: ^0.3.29
-        version: 0.3.29(@langchain/anthropic@0.3.24(@langchain/core@0.3.62(openai@4.104.0(ws@8.18.3)(zod@3.25.76))))(@langchain/core@0.3.62(openai@4.104.0(ws@8.18.3)(zod@3.25.76)))(@langchain/deepseek@0.0.1(@langchain/core@0.3.62(openai@4.104.0(ws@8.18.3)(zod@3.25.76)))(ws@8.18.3))(@langchain/groq@0.2.3(@langchain/core@0.3.62(openai@4.104.0(ws@8.18.3)(zod@3.25.76))))(@langchain/mistralai@0.2.1(@langchain/core@0.3.62(openai@4.104.0(ws@8.18.3)(zod@3.25.76)))(zod@3.25.76))(axios@1.10.0)(cheerio@1.1.0)(openai@4.104.0(ws@8.18.3)(zod@3.25.76))(typeorm@0.3.25(better-sqlite3@11.10.0)(ioredis@5.6.1)(reflect-metadata@0.2.2)(ts-node@10.9.2(@swc/core@1.12.11)(@types/node@22.16.3)(typescript@5.8.3)))(ws@8.18.3)
+        version: 0.3.29(@langchain/anthropic@0.3.24(@langchain/core@0.3.62(openai@4.104.0(ws@8.18.3)(zod@3.25.76))))(@langchain/core@0.3.62(openai@4.104.0(ws@8.18.3)(zod@3.25.76)))(@langchain/deepseek@0.0.1(@langchain/core@0.3.62(openai@4.104.0(ws@8.18.3)(zod@3.25.76)))(ws@8.18.3))(@langchain/groq@0.2.3(@langchain/core@0.3.62(openai@4.104.0(ws@8.18.3)(zod@3.25.76))))(@langchain/mistralai@0.2.1(@langchain/core@0.3.62(openai@4.104.0(ws@8.18.3)(zod@3.25.76)))(zod@3.25.76))(axios@1.11.0)(cheerio@1.1.0)(openai@4.104.0(ws@8.18.3)(zod@3.25.76))(typeorm@0.3.25(better-sqlite3@11.10.0)(ioredis@5.6.1)(reflect-metadata@0.2.2)(ts-node@10.9.2(@swc/core@1.12.11)(@types/node@22.16.3)(typescript@5.8.3)))(ws@8.18.3)
       libsodium-wrappers:
         specifier: ^0.7.15
         version: 0.7.15
@@ -2328,8 +2328,8 @@ packages:
     resolution: {integrity: sha512-wvUjBtSGN7+7SjNpq/9M2Tg350UZD3q62IFZLbRAR1bSMlCo1ZaeW+BJ+D090e4hIIZLBcTDWe4Mh4jvUDajzQ==}
     engines: {node: '>= 0.4'}
 
-  axios@1.10.0:
-    resolution: {integrity: sha512-/1xYAC4MP/HEG+3duIhFr4ZQXR4sQXOIe+o6sdqzeykGLx6Upp/1p8MHqhINOvGeP7xyNHe7tsiJByc4SSVUxw==}
+  axios@1.11.0:
+    resolution: {integrity: sha512-1Lx3WLFQWm3ooKDYZD1eXmoGO9fxYQjrycfHFC8P0sCfQVXyROp0p9PFWBehewBOdCwHc+f/b8I0fMto5eSfwA==}
 
   b4a@1.6.7:
     resolution: {integrity: sha512-OnAYlL5b7LEkALw87fUVafQw5rVR9RjwGd4KUwNQ6DrrNmaVaUCgLipfVlzrPQ4tWOR9P0IXGNOx50jYCCdSJg==}
@@ -3294,8 +3294,8 @@ packages:
     resolution: {integrity: sha512-yDYSgNMraqvnxiEXO4hi88+YZxaHC6QKzb5N84iRCTDeRO7ZALpir/lVmf/uXUhnwUr2O4HU8s/n6x+yNjQkHw==}
     engines: {node: '>= 14.17'}
 
-  form-data@4.0.3:
-    resolution: {integrity: sha512-qsITQPfmvMOSAdeyZ+12I1c+CKSstAFAwu+97zrnWAbIr5u8wfsExUzCesVLC8NgHuRUqNN4Zy6UPWUTRGslcA==}
+  form-data@4.0.4:
+    resolution: {integrity: sha512-KrGhL9Q4zjj0kiUt5OO4Mr/A/jlI2jDYs5eHBpYHPcBEVSiipAvn2Ko2HnPe20rmcuuvMHNdZFp+4IlGTMF0Ow==}
     engines: {node: '>= 6'}
 
   formdata-node@4.4.1:
@@ -7290,7 +7290,7 @@ snapshots:
 
   '@tavily/core@0.3.7':
     dependencies:
-      axios: 1.10.0
+      axios: 1.11.0
       https-proxy-agent: 7.0.6
       js-tiktoken: 1.0.20
     transitivePeerDependencies:
@@ -7441,7 +7441,7 @@ snapshots:
   '@types/node-fetch@2.6.12':
     dependencies:
       '@types/node': 22.16.3
-      form-data: 4.0.3
+      form-data: 4.0.4
 
   '@types/node@18.19.118':
     dependencies:
@@ -7479,7 +7479,7 @@ snapshots:
       '@types/cookiejar': 2.1.5
       '@types/methods': 1.1.4
       '@types/node': 22.16.3
-      form-data: 4.0.3
+      form-data: 4.0.4
 
   '@types/supertest@6.0.3':
     dependencies:
@@ -7919,10 +7919,10 @@ snapshots:
     dependencies:
       possible-typed-array-names: 1.1.0
 
-  axios@1.10.0:
+  axios@1.11.0:
     dependencies:
       follow-redirects: 1.15.9
-      form-data: 4.0.3
+      form-data: 4.0.4
       proxy-from-env: 1.1.0
     transitivePeerDependencies:
       - debug
@@ -9038,7 +9038,7 @@ snapshots:
 
   form-data-encoder@2.1.4: {}
 
-  form-data@4.0.3:
+  form-data@4.0.4:
     dependencies:
       asynckit: 0.4.0
       combined-stream: 1.0.8
@@ -9187,7 +9187,7 @@ snapshots:
 
   google-sr@5.0.0:
     dependencies:
-      axios: 1.10.0
+      axios: 1.11.0
       cheerio: 1.0.0-rc.12
       google-sr-selectors: 2.0.0
     transitivePeerDependencies:
@@ -9903,7 +9903,7 @@ snapshots:
 
   kleur@3.0.3: {}
 
-  langchain@0.3.29(@langchain/anthropic@0.3.24(@langchain/core@0.3.62(openai@4.104.0(ws@8.18.3)(zod@3.25.76))))(@langchain/core@0.3.62(openai@4.104.0(ws@8.18.3)(zod@3.25.76)))(@langchain/deepseek@0.0.1(@langchain/core@0.3.62(openai@4.104.0(ws@8.18.3)(zod@3.25.76)))(ws@8.18.3))(@langchain/groq@0.2.3(@langchain/core@0.3.62(openai@4.104.0(ws@8.18.3)(zod@3.25.76))))(@langchain/mistralai@0.2.1(@langchain/core@0.3.62(openai@4.104.0(ws@8.18.3)(zod@3.25.76)))(zod@3.25.76))(axios@1.10.0)(cheerio@1.1.0)(openai@4.104.0(ws@8.18.3)(zod@3.25.76))(typeorm@0.3.25(better-sqlite3@11.10.0)(ioredis@5.6.1)(reflect-metadata@0.2.2)(ts-node@10.9.2(@swc/core@1.12.11)(@types/node@22.16.3)(typescript@5.8.3)))(ws@8.18.3):
+  langchain@0.3.29(@langchain/anthropic@0.3.24(@langchain/core@0.3.62(openai@4.104.0(ws@8.18.3)(zod@3.25.76))))(@langchain/core@0.3.62(openai@4.104.0(ws@8.18.3)(zod@3.25.76)))(@langchain/deepseek@0.0.1(@langchain/core@0.3.62(openai@4.104.0(ws@8.18.3)(zod@3.25.76)))(ws@8.18.3))(@langchain/groq@0.2.3(@langchain/core@0.3.62(openai@4.104.0(ws@8.18.3)(zod@3.25.76))))(@langchain/mistralai@0.2.1(@langchain/core@0.3.62(openai@4.104.0(ws@8.18.3)(zod@3.25.76)))(zod@3.25.76))(axios@1.11.0)(cheerio@1.1.0)(openai@4.104.0(ws@8.18.3)(zod@3.25.76))(typeorm@0.3.25(better-sqlite3@11.10.0)(ioredis@5.6.1)(reflect-metadata@0.2.2)(ts-node@10.9.2(@swc/core@1.12.11)(@types/node@22.16.3)(typescript@5.8.3)))(ws@8.18.3):
     dependencies:
       '@langchain/core': 0.3.62(openai@4.104.0(ws@8.18.3)(zod@3.25.76))
       '@langchain/openai': 0.5.12(@langchain/core@0.3.62(openai@4.104.0(ws@8.18.3)(zod@3.25.76)))(ws@8.18.3)
@@ -9922,7 +9922,7 @@ snapshots:
       '@langchain/deepseek': 0.0.1(@langchain/core@0.3.62(openai@4.104.0(ws@8.18.3)(zod@3.25.76)))(ws@8.18.3)
       '@langchain/groq': 0.2.3(@langchain/core@0.3.62(openai@4.104.0(ws@8.18.3)(zod@3.25.76)))
       '@langchain/mistralai': 0.2.1(@langchain/core@0.3.62(openai@4.104.0(ws@8.18.3)(zod@3.25.76)))(zod@3.25.76)
-      axios: 1.10.0
+      axios: 1.11.0
       cheerio: 1.1.0
       typeorm: 0.3.25(better-sqlite3@11.10.0)(ioredis@5.6.1)(reflect-metadata@0.2.2)(ts-node@10.9.2(@swc/core@1.12.11)(@types/node@22.16.3)(typescript@5.8.3))
     transitivePeerDependencies:
@@ -10960,7 +10960,7 @@ snapshots:
       cookiejar: 2.1.4
       debug: 4.4.1
       fast-safe-stringify: 2.1.1
-      form-data: 4.0.3
+      form-data: 4.0.4
       formidable: 3.5.4
       methods: 1.1.2
       mime: 2.6.0
