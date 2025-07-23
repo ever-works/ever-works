@@ -35,28 +35,8 @@ export class DirectoryPromptService extends BaseDirectoryPromptService {
 
             // Fallback to manual slug entry
             console.log(chalk.yellow('\n⚠ Could not fetch directories from API.'));
-            console.log(chalk.gray('Please enter the directory slug manually:'));
 
-            const answer = await inquirer.prompt([
-                {
-                    type: 'input',
-                    name: 'slug',
-                    message: 'Directory slug:',
-                    validate: (input) => input.trim().length > 0 || 'Directory slug is required',
-                },
-            ]);
-
-            // Mock directory object for fallback
-            const directory: Directory = {
-                id: 1,
-                name: answer.slug,
-                slug: answer.slug,
-                owner: 'unknown',
-                organization: false,
-                description: 'Directory selected by slug',
-            };
-
-            return { directory, cancelled: false };
+            return { directory: null, cancelled: true };
         }
     }
 

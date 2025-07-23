@@ -105,11 +105,7 @@ export class DirectoryPromptService extends BasePromptService {
 		]);
 
 		if (action === 'modify') {
-			const finalSlug = await this.promptRequiredText(
-				'Enter your preferred slug:',
-				suggestedSlug,
-				validateSlug.bind(this)
-			);
+			const finalSlug = await this.promptRequiredText('Enter your preferred slug:', suggestedSlug, validateSlug);
 			return { action, finalSlug };
 		}
 

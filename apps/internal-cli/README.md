@@ -14,12 +14,6 @@ npm install -g @ever-works/cli
 ew --help
 ```
 
-Or use the short alias:
-
-```bash
-ew --help
-```
-
 ## Commands
 
 - `ew config` - Configure the CLI
