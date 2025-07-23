@@ -19,8 +19,11 @@ export class AiService {
     private readonly config: AiServiceConfig;
     private readonly providers: Map<AiProviderType, BaseChatModel> = new Map();
     private readonly isConfigured: boolean;
+    private readonly isCLI: boolean;
 
     constructor() {
+        this.isCLI = process.env.APP_TYPE === 'cli';
+
         this.config = this.loadConfiguration();
         this.isConfigured = this.initializeProviders();
 
@@ -237,6 +240,10 @@ export class AiService {
         }
     }
 
+    private createDefaultProvider(): BaseChatModel {
+        return new ChatOpenAI();
+    }
+
     /**
      * Check if any AI provider is configured
      */
@@ -284,6 +291,10 @@ export class AiService {
                 return anyProvider;
             }
 
+            if (this.isCLI) {
+                return this.createDefaultProvider();
+            }
+
             throw new Error(
                 `No AI providers available. Provider ${providerType} not found and no fallbacks configured.`,
             );
@@ -299,6 +310,10 @@ export class AiService {
         const config = this.config.providers[targetProvider];
 
         if (!config || !config.enabled) {
+            if (this.isCLI) {
+                return this.createDefaultProvider();
+            }
+
             throw new Error(`Provider ${targetProvider} is not configured or enabled`);
         }
 
@@ -306,6 +321,10 @@ export class AiService {
         const provider = this.createProvider(tempConfig);
 
         if (!provider) {
+            if (this.isCLI) {
+                return this.createDefaultProvider();
+            }
+
             throw new Error(`Failed to create temporary provider for ${targetProvider}`);
         }
 

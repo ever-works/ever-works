@@ -2,75 +2,87 @@ const esbuild = require('esbuild');
 const fs = require('fs-extra');
 const path = require('path');
 const { execSync } = require('child_process');
+const dotenv = require('dotenv');
 
-const AUTHOR = 'Ever Co. LTD <evereq@gmail.com>';
+// Load environment variables from .env file
+const envPath = path.join(__dirname, '.env');
+const envExists = fs.existsSync(envPath);
+if (envExists) {
+    dotenv.config({ path: envPath });
+}
+
+// Get API_URL from environment with default fallback
+const API_URL = process.env.API_URL || 'http://localhost:3100';
+
+const AUTHOR = 'Ever Co. LTD <ever@ever.co>';
+
+// Create an esbuild plugin to replace environment variables
+const envPlugin = {
+    name: 'env',
+    setup(build) {
+        // Replace process.env.API_URL with the actual value
+        build.onLoad({ filter: /\.(ts|js)$/ }, async (args) => {
+            let contents = await fs.readFile(args.path, 'utf8');
+
+            // Replace process.env.API_URL with the actual value
+            // This handles cases like: process.env.API_URL || 'default'
+            contents = contents.replace(/process\.env\.API_URL/g, JSON.stringify(API_URL));
+
+            return {
+                contents,
+                loader: args.path.endsWith('.ts') ? 'ts' : 'js',
+            };
+        });
+    },
+};
 
 async function buildCLI() {
     const buildDir = path.join(__dirname, 'dist');
-    const tempDir = path.join(__dirname, 'temp-build');
     const packageJsonPath = path.join(__dirname, 'package.json');
 
     // Clean build directories
     await fs.remove(buildDir);
-    await fs.remove(tempDir);
     await fs.ensureDir(buildDir);
-    await fs.ensureDir(tempDir);
 
-    console.log('Building agent package...');
+    console.log('Building cli-shared package...');
 
-    // First, ensure the agent package is built
+    // First, ensure the cli-shared package is built
     try {
-        execSync('pnpm --filter "@packages/agent" build', {
+        execSync('pnpm --filter "@packages/cli-shared" build', {
             cwd: path.resolve(__dirname, '../..'),
             stdio: 'inherit',
         });
     } catch (error) {
-        console.error('Agent package build failed:', error.message);
-        throw error;
-    }
-
-    console.log('Compiling CLI TypeScript with decorators...');
-
-    // Then, compile CLI TypeScript with proper decorator support
-    try {
-        execSync(
-            'npx tsc --project tsconfig.json --outDir temp-build --emitDecoratorMetadata true --experimentalDecorators true --target ES2020 --module Node16 --moduleResolution Node16 --esModuleInterop true --allowSyntheticDefaultImports true --skipLibCheck true',
-            {
-                cwd: __dirname,
-                stdio: 'inherit',
-            },
-        );
-    } catch (error) {
-        console.error('TypeScript compilation failed:', error.message);
+        console.error('CLI shared package build failed:', error.message);
         throw error;
     }
 
     console.log('Bundling with esbuild...');
+    console.log(`Using API_URL: ${API_URL}`);
 
-    // Then bundle the compiled JavaScript
+    // Bundle the compiled JavaScript
     await esbuild.build({
-        entryPoints: ['temp-build/main.js'],
+        entryPoints: ['src/main.ts'],
         bundle: true,
         platform: 'node',
-        target: 'node18',
+        target: 'node20',
         outfile: 'dist/cli.js',
         banner: {
-            js: '#!/usr/bin/env node\nprocess.env.NODE_ENV = process.env.NODE_ENV || "production";\nrequire("reflect-metadata");',
+            js: '#!/usr/bin/env node\nprocess.env.NODE_ENV = process.env.NODE_ENV || "production";',
         },
+        plugins: [envPlugin],
         // External dependencies that should not be bundled
         external: [
-            // Native modules that can't be bundled
-            'better-sqlite3',
-            'libsodium-wrappers',
+            // Core dependencies that users need to install
+            'commander',
+            'axios',
+            'inquirer',
+            'chalk',
+            'ora',
+            'fs-extra',
+            'dotenv',
 
-            // Required for TypeORM decorators
-            'reflect-metadata',
-
-            // Optional NestJS modules
-            '@nestjs/microservices',
-            '@nestjs/websockets/socket-module',
-
-            // Node.js built-ins (esbuild handles these automatically, but being explicit)
+            // Node.js built-ins
             'fs',
             'path',
             'os',
@@ -83,72 +95,14 @@ async function buildCLI() {
             'events',
             'buffer',
             'child_process',
-        ],
-        // Resolve workspace dependencies
-        plugins: [
-            {
-                name: 'workspace-resolver',
-                setup(build) {
-                    // Resolve @packages/agent imports to their compiled files
-                    build.onResolve({ filter: /^@packages\/agent/ }, (args) => {
-                        const importPath = args.path;
-                        if (importPath === '@packages/agent') {
-                            return {
-                                path: path.resolve(__dirname, '../../packages/agent/dist/index.js'),
-                            };
-                        }
-                        // Handle subfolder imports like @packages/agent/database
-                        const subfolder = importPath.replace('@packages/agent/', '');
-                        return {
-                            path: path.resolve(
-                                __dirname,
-                                `../../packages/agent/dist/${subfolder}/index.js`,
-                            ),
-                        };
-                    });
-
-                    // Resolve internal src/ imports within the agent package
-                    build.onResolve({ filter: /^src\// }, (args) => {
-                        // Check if this is being resolved from within the agent package
-                        if (args.importer.includes('packages/agent/src')) {
-                            const relativePath = args.path.replace(/^src\//, '');
-                            const resolvedPath = path.resolve(
-                                __dirname,
-                                '../../packages/agent/src',
-                                relativePath,
-                            );
-
-                            // Try with .ts extension first, then .js
-                            const extensions = ['.ts', '.js', '/index.ts', '/index.js'];
-                            for (const ext of extensions) {
-                                const fullPath = resolvedPath + ext;
-                                if (fs.existsSync(fullPath)) {
-                                    return { path: fullPath };
-                                }
-                            }
-
-                            // If no file found, return the original path and let esbuild handle it
-                            return { path: resolvedPath + '.ts' };
-                        }
-                        return undefined;
-                    });
-                },
-            },
+            'tty',
+            'readline',
         ],
         format: 'cjs',
-        minify: true, // Keep readable for debugging
+        minify: true,
         sourcemap: false,
         metafile: true,
-        // Preserve decorator metadata for TypeORM
         keepNames: true,
-        // Enable experimental decorators support
-        tsconfigRaw: {
-            compilerOptions: {
-                experimentalDecorators: true,
-                emitDecoratorMetadata: true,
-                useDefineForClassFields: false,
-            },
-        },
     });
 
     // Read the current package.json
@@ -164,11 +118,11 @@ async function buildCLI() {
         homepage: 'https://ever.works',
         repository: {
             type: 'git',
-            url: 'https://github.com/ever-co/ever-works.git',
+            url: 'https://github.com/ever-works/ever-works.git',
             directory: 'apps/cli',
         },
         bugs: {
-            url: 'https://github.com/ever-co/ever-works/issues',
+            url: 'https://github.com/ever-works/ever-works/issues',
         },
         keywords: [
             'cli',
@@ -179,23 +133,26 @@ async function buildCLI() {
             'ai',
             'markdown',
             'website-generator',
+            'api-client',
         ],
         bin: {
             'ever-works': './cli.js',
-            ew: './cli.js',
         },
         main: './cli.js',
         files: ['cli.js', 'README.md', 'LICENSE'],
         engines: {
-            node: '>=18.0.0',
+            node: '>=20.0.0',
         },
-        // Only include runtime dependencies that are external
+        // Runtime dependencies
         dependencies: {
-            'better-sqlite3': '^11.10.0',
-            'libsodium-wrappers': '^0.7.15',
-            'reflect-metadata': '^0.2.2',
+            commander: '^14.0.0',
+            axios: '^1.10.0',
+            inquirer: '^12.7.0',
+            chalk: '^4.1.2',
+            ora: '^5.4.1',
+            'fs-extra': '^11.3.0',
+            dotenv: '^17.2.0',
         },
-        // Remove dev dependencies and workspace dependencies
         scripts: {
             postinstall:
                 'echo "Ever Works CLI installed successfully! Run \'ever-works --help\' to get started."',
@@ -220,9 +177,6 @@ async function buildCLI() {
     ) {
         await fs.copy(licensePath, path.join(buildDir, 'LICENSE'));
     }
-
-    // Clean up temporary directory
-    await fs.remove(tempDir);
 
     console.log('CLI build completed successfully!');
     console.log(`Output directory: ${buildDir}`);

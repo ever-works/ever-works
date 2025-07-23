@@ -39,8 +39,30 @@ export class DirectoryRepository {
 		return await this.repository.findOne({ where: { id } });
 	}
 
-	async findAll(): Promise<Directory[]> {
-		return await this.repository.find();
+	async findAll(options?: {
+		owner?: string;
+		limit?: number;
+		offset?: number;
+	}): Promise<Directory[]> {
+		const { owner, limit, offset } = options || {};
+
+		const queryBuilder = this.repository.createQueryBuilder('directory');
+
+		if (owner) {
+			queryBuilder.where('directory.owner = :owner', { owner });
+		}
+
+		if (limit) {
+			queryBuilder.limit(limit);
+		}
+
+		if (offset) {
+			queryBuilder.offset(offset);
+		}
+
+		queryBuilder.orderBy('directory.id', 'DESC');
+
+		return await queryBuilder.getMany();
 	}
 
 	async update(id: number, updateData: Partial<Directory>): Promise<Directory | null> {

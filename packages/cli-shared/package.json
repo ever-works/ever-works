@@ -1,0 +1,29 @@
+{
+	"name": "@packages/cli-shared",
+	"version": "0.1.0",
+	"description": "Shared utilities and services for Ever Works CLI applications",
+	"author": {
+		"name": "Ever Co. LTD",
+		"email": "ever@ever.co",
+		"url": "https://ever.co"
+	},
+        "license": "MIT",
+	"main": "dist/index.js",	
+	"types": "dist/index.d.ts",
+	"scripts": {
+		"build": "tsc",
+		"dev": "tsc --watch",
+		"clean": "rm -rf dist"
+	},
+	"dependencies": {
+		"chalk": "^4.1.2",
+		"inquirer": "^12.7.0",
+		"fs-extra": "^11.3.0"
+	},
+	"devDependencies": {
+		"@types/inquirer": "^9.0.8",
+		"@types/fs-extra": "^11.0.4",
+		"@types/node": "^22.16.3",
+		"typescript": "^5.8.3"
+	}
+}

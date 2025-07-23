@@ -17,13 +17,12 @@ ever-works --help
 Or use the short alias:
 
 ```bash
-ew --help
+ever-works --help
 ```
 
 ## Commands
 
-- `ever-works config` - Configure the CLI
 - `ever-works directory` - Manage directories
-- `ever-works serve` - Start local development server
+- `ever-works auth` - Authentication commands
 
 For more information, visit: https://ever.works

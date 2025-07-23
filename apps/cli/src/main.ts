@@ -1,30 +1,32 @@
-import { NestFactory } from '@nestjs/core';
-import { CommandFactory } from 'nest-commander';
-import { CLIModule } from './cli.module';
-import { ConfigModule } from './config/config.module';
-import { ConfigService } from './config';
+import { program } from 'commander';
+import * as fs from 'fs';
+import * as path from 'path';
+import dotenv from 'dotenv';
+// import { authCommand } from './commands/auth';
+import { directoryCommand } from './commands/directory';
 
-async function bootstrap() {
-    // Determine if we should show debug logs (only in development or when explicitly requested)
-    const isDevelopment = process.env.NODE_ENV === 'development';
-    const isVerbose = process.env.CLI_VERBOSE === 'true' || process.argv.includes('--verbose');
-    const shouldLog = isDevelopment || isVerbose;
+// Load environment variables
+dotenv.config({ debug: false, quiet: true });
 
-    // Load config into environment variables
-    const ac = await NestFactory.createApplicationContext(ConfigModule, {
-        logger: ['error', 'warn'],
-    });
-    const configService = ac.get(ConfigService);
-    await configService.loadConfigIntoEnv();
-    await ac.close();
+// Get package version
+const packageJson = JSON.parse(
+    fs.readFileSync(path.join(__dirname, '../package.json'), { encoding: 'utf-8' }),
+);
 
-    // Run the CLI app with minimal logging for production CLI
-    await CommandFactory.run(CLIModule, {
-        logger: ['error', 'warn'],
-    });
+program
+    .name('ever-works')
+    .description('Ever Works CLI - Open Directory Builder Platform')
+    .version(packageJson.version);
+
+// commands
+// program.addCommand(authCommand); // TODO: Uncomment this when customer authentication is supported by the API.
+program.addCommand(directoryCommand);
+
+// Parse arguments
+program.parse(process.argv);
+
+// Show help if no command provided
+if (!process.argv.slice(2).length) {
+    program.outputHelp();
+    process.exit(0);
 }
-
-bootstrap().catch((error) => {
-    console.error('Unhandled error:', error);
-    process.exit(1);
-});

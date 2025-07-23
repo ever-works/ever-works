@@ -13,6 +13,15 @@
 			"dependsOn": ["^build"],
 			"persistent": true,
 			"cache": false
+		},
+		"lint": {
+			"outputs": []
+		},
+		"type-check": {
+			"outputs": []
+		},
+		"clean": {
+			"outputs": []
 		}
 	}
 }

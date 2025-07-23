@@ -1,45 +1,41 @@
 {
     "name": "ever-works-cli",
-    "version": "0.0.1",
+    "version": "0.1.0",
     "description": "",
-    "author": "",
-    "private": true,
-    "license": "UNLICENSED",
+    "main": "index.js",
     "scripts": {
-        "start": "nest start",
-        "ever-works": "node dist/main",
-        "build": "nest build",
-        "build:deps": "pnpm --filter '@packages/*' build",
+        "build": "node build.js",
         "build:cli": "node build.js",
+        "dev": "node build.js && node dist/cli.js",
+        "start": "node dist/cli.js",
+        "test": "echo \"Error: no test specified\" && exit 1",
+        "clean": "rm -rf dist",
         "publish:cli": "npm run build:cli && cd dist && npm publish",
         "test:cli": "cd dist && npm install && node cli.js --help"
     },
-    "dependencies": {
-        "@nestjs/common": "^11.0.1",
-        "@nestjs/core": "^11.0.1",
-        "@packages/agent": "workspace:*",
+    "keywords": [],
+    "author": {
+		"name": "Ever Co. LTD",
+		"email": "ever@ever.co",
+		"url": "https://ever.co"
+	},
+    "license": "MIT",
+    "packageManager": "pnpm@10.13.1",
+    "devDependencies": {
         "@types/fs-extra": "^11.0.4",
         "@types/inquirer": "^9.0.8",
+        "@types/node": "^22.16.3",
+        "esbuild": "^0.25.6",
+        "typescript": "^5.8.3"
+    },
+    "dependencies": {
+        "axios": "^1.10.0",
         "chalk": "^4.1.2",
+        "commander": "^14.0.0",
+        "dotenv": "^17.2.0",
         "fs-extra": "^11.3.0",
         "inquirer": "^12.7.0",
-        "nest-commander": "^3.17.0",
         "ora": "^5.4.1",
-        "reflect-metadata": "^0.2.2",
-        "rxjs": "^7.8.1"
-    },
-    "devDependencies": {
-        "@nestjs/cli": "^11.0.7",
-        "@nestjs/schematics": "^11.0.5",
-        "@swc/cli": "^0.6.0",
-        "@swc/core": "^1.12.9",
-        "@types/node": "^22.16.0",
-        "esbuild": "^0.25.6",
-        "globals": "^16.3.0",
-        "source-map-support": "^0.5.21",
-        "ts-loader": "^9.5.2",
-        "ts-node": "^10.9.2",
-        "tsconfig-paths": "^4.2.0",
-        "typescript": "^5.8.3"
+        "@packages/cli-shared": "workspace:*"
     }
 }

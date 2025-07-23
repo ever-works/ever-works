@@ -1,4 +1,4 @@
-import { Body, Injectable, Logger, NotFoundException, Param } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { DataGeneratorService } from '../data-generator/data-generator.service';
 import { MarkdownGeneratorService } from '../markdown-generator/markdown-generator.service';
 import { WebsiteGeneratorService } from '../website-generator/website-generator.service';
@@ -42,6 +42,35 @@ export class AgentService {
         private readonly itemsGeneratorService: ItemsGeneratorService,
         private readonly directoryRepository: DirectoryRepository,
     ) {}
+
+    async getDirectories(
+        options: {
+            owner?: string;
+            limit?: number;
+            offset?: number;
+        } = {},
+    ) {
+        const { owner, limit = 20, offset = 0 } = options;
+
+        try {
+            const directories = await this.directoryRepository.findAll({
+                owner,
+                limit,
+                offset,
+            });
+
+            return {
+                status: 'success',
+                directories,
+                total: directories.length,
+                limit,
+                offset,
+            };
+        } catch (error) {
+            this.logger.error('Failed to get directories:', error);
+            throw error;
+        }
+    }
 
     async createDirectory(createDirectoryDto: CreateDirectoryDto) {
         const { slug, name, description, owner } = createDirectoryDto;
@@ -106,7 +135,7 @@ export class AgentService {
             .catch(() => null);
 
         if (!lastRequestData) {
-            throw new NotFoundException('No last request data found');
+            throw new BadRequestException('No last request data found');
         }
 
         lastRequestData = {
