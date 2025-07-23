@@ -12,7 +12,7 @@ if (envExists) {
 }
 
 // Get API_URL from environment with default fallback
-const API_URL = process.env.API_URL || 'http://localhost:3000';
+const API_URL = process.env.API_URL || 'http://localhost:3100';
 
 const AUTHOR = 'Ever Co. LTD <ever@ever.co>';
 

@@ -19,7 +19,7 @@ export const authCommand = new Command('auth')
     .addCommand(
         new Command('login')
             .description('Login to Ever Works API')
-            .option('--api-url <url>', 'API URL', process.env.API_URL || 'http://localhost:3000')
+            .option('--api-url <url>', 'API URL', process.env.API_URL || 'http://localhost:3100')
             .action(async (options) => {
                 try {
                     console.log(chalk.cyan.bold('\n🔐 Ever Works Login\n'));
