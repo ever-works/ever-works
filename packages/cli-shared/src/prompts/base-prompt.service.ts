@@ -1,5 +1,6 @@
 import inquirer from 'inquirer';
 import chalk from 'chalk';
+import { GITHUB_USERNAME_REGEX } from '../utils/validation-utils';
 
 export abstract class BasePromptService {
 	/**
@@ -248,8 +249,8 @@ export abstract class BasePromptService {
 		if (username.length < 1 || username.length > 39) {
 			return 'GitHub username must be between 1 and 39 characters';
 		}
-		const usernameRegex = /^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?$/;
-		if (!usernameRegex.test(username)) {
+
+		if (!GITHUB_USERNAME_REGEX.test(username)) {
 			return 'GitHub username can only contain alphanumeric characters and hyphens, and cannot start or end with a hyphen';
 		}
 		return true;

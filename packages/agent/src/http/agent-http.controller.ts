@@ -39,10 +39,13 @@ export class AgentHTTPController {
         @Query('limit') limit?: string,
         @Query('offset') offset?: string,
     ) {
+        const parsedLimit = limit !== undefined ? Number(limit) : undefined;
+        const parsedOffset = offset !== undefined ? Number(offset) : undefined;
+
         return this.agentService.getDirectories({
             owner,
-            limit: limit ? parseInt(limit, 10) : undefined,
-            offset: offset ? parseInt(offset, 10) : undefined,
+            limit: parsedLimit && !isNaN(parsedLimit) ? parsedLimit : undefined,
+            offset: parsedOffset && !isNaN(parsedOffset) ? parsedOffset : undefined,
         });
     }
 
