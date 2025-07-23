@@ -7,6 +7,7 @@ import { GithubService } from '@packages/agent/git';
 import { User } from '@packages/agent/entities';
 import { DirectoryPromptService } from './directory-prompt.service';
 import { ConfigCheckService } from './config-check.service';
+import { COMMAND } from 'src/config';
 
 @SubCommand({
     name: 'create',
@@ -131,13 +132,13 @@ export class CreateSubCommand extends CommandRunner {
             this.logger.error('Failed to create directory:', error);
             console.log(chalk.red('\n✗ Failed to create directory:'), error.message);
 
-            if (error.message.includes('Owner is required')) {
+            if (error.message?.includes('Owner is required')) {
                 console.log(
                     chalk.yellow('\n⚠ Make sure your GitHub configuration is set up correctly.'),
                 );
                 console.log(
                     chalk.gray('Run ') +
-                        chalk.cyan('ever-works config setup') +
+                        chalk.cyan(`${COMMAND} config setup`) +
                         chalk.gray(' to configure GitHub settings.'),
                 );
             }

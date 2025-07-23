@@ -4,6 +4,7 @@ import chalk from 'chalk';
 import ora from 'ora';
 import { ConfigService } from '../../config/config.service';
 import { AiService } from '@packages/agent/ai';
+import { COMMAND } from 'src/config';
 
 @SubCommand({
     name: 'test',
@@ -27,7 +28,7 @@ export class TestSubCommand extends CommandRunner {
                 console.log(chalk.yellow('⚠ No configuration found.'));
                 console.log(
                     chalk.gray('Run ') +
-                        chalk.cyan('ever-works config setup') +
+                        chalk.cyan(`${COMMAND} config setup`) +
                         chalk.gray(' to create a configuration.'),
                 );
                 return;

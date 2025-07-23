@@ -3,6 +3,7 @@ import { Logger } from '@nestjs/common';
 import chalk from 'chalk';
 import { ConfigService } from '../../config/config.service';
 import { maskSecret } from '@packages/cli-shared';
+import { COMMAND } from 'src/config';
 
 @SubCommand({
     name: 'show',
@@ -23,7 +24,7 @@ export class ShowSubCommand extends CommandRunner {
                 console.log(chalk.yellow('⚠ No configuration found.'));
                 console.log(
                     chalk.gray('Run ') +
-                        chalk.cyan('ever-works config setup') +
+                        chalk.cyan(`${COMMAND} config setup`) +
                         chalk.gray(' to create a configuration.'),
                 );
                 return;
@@ -80,10 +81,10 @@ export class ShowSubCommand extends CommandRunner {
 
             console.log(
                 chalk.gray('\nTo modify configuration, run: ') +
-                    chalk.cyan('ever-works config setup'),
+                    chalk.cyan(`${COMMAND} config setup`),
             );
             console.log(
-                chalk.gray('To test configuration, run: ') + chalk.cyan('ever-works config test\n'),
+                chalk.gray('To test configuration, run: ') + chalk.cyan(`${COMMAND} config test\n`),
             );
         } catch (error) {
             this.logger.error('Failed to show configuration:', error);

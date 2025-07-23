@@ -3,6 +3,7 @@ import { Logger } from '@nestjs/common';
 import chalk from 'chalk';
 import inquirer from 'inquirer';
 import { ConfigService } from '../../config/config.service';
+import { COMMAND } from 'src/config';
 
 @SubCommand({
     name: 'switch-ai',
@@ -24,7 +25,7 @@ export class SwitchAiSubCommand extends CommandRunner {
                 console.log(chalk.yellow('⚠ No configuration found'));
                 console.log(
                     chalk.gray('Run ') +
-                        chalk.cyan('ever-works config setup') +
+                        chalk.cyan(`${COMMAND} config setup`) +
                         chalk.gray(' to create a configuration.'),
                 );
                 return;
@@ -38,7 +39,7 @@ export class SwitchAiSubCommand extends CommandRunner {
                 console.log(chalk.yellow('⚠ No default AI provider configured'));
                 console.log(
                     chalk.gray('Run ') +
-                        chalk.cyan('ever-works config setup') +
+                        chalk.cyan(`${COMMAND} config setup`) +
                         chalk.gray(' to configure AI providers.'),
                 );
                 return;
@@ -51,7 +52,7 @@ export class SwitchAiSubCommand extends CommandRunner {
                 console.log(chalk.yellow('⚠ Only one AI provider is configured'));
                 console.log(
                     chalk.gray('Configure additional providers with ') +
-                        chalk.cyan('ever-works config setup') +
+                        chalk.cyan(`${COMMAND} config setup`) +
                         chalk.gray(' to enable switching.'),
                 );
                 return;

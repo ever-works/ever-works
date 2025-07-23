@@ -17,11 +17,6 @@ export const createCommand = new Command('create')
             const apiService = getApiService();
             const directoryPrompt = new DirectoryPromptService();
 
-            // Show loading message
-            const loadingSpinner = ora('Loading user information...').start();
-
-            loadingSpinner.stop();
-
             // Collect directory information
             const directoryData = await directoryPrompt.promptDirectoryCreation();
 
@@ -68,7 +63,7 @@ export const createCommand = new Command('create')
                     // Check if it's a conflict error (assuming API returns 409 or similar)
                     if (
                         error.response?.status === 409 ||
-                        error.message.includes('already exists')
+                        error.message?.includes('already exists')
                     ) {
                         const suggestedSlug = directoryPrompt.generateIncrementedSlug(
                             directoryData.slug,

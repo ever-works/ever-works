@@ -253,6 +253,7 @@ export abstract class BasePromptService {
 		if (!GITHUB_USERNAME_REGEX.test(username)) {
 			return 'GitHub username can only contain alphanumeric characters and hyphens, and cannot start or end with a hyphen';
 		}
+
 		return true;
 	}
 

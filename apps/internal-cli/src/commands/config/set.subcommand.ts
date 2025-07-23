@@ -1,7 +1,8 @@
-import { SubCommand, CommandRunner, Option } from 'nest-commander';
+import { SubCommand, CommandRunner } from 'nest-commander';
 import { Logger } from '@nestjs/common';
 import chalk from 'chalk';
 import { ConfigService } from '../../config/config.service';
+import { COMMAND } from 'src/config';
 
 interface SetCommandOptions {
     key?: string;
@@ -24,9 +25,9 @@ export class SetSubCommand extends CommandRunner {
         try {
             if (passedParams.length < 2) {
                 console.log(chalk.red('✗ Error: Both key and value are required'));
-                console.log(chalk.gray('Usage: ever-works config set <key> <value>'));
+                console.log(chalk.gray(`'Usage: ${COMMAND} config set <key> <value>'`));
                 console.log(
-                    chalk.gray('Example: ever-works config set AI_DEFAULT_PROVIDER openai'),
+                    chalk.gray(`Example: ${COMMAND} config set AI_DEFAULT_PROVIDER openai`),
                 );
                 return;
             }
@@ -225,7 +226,7 @@ export class SetSubCommand extends CommandRunner {
         if (testableKeys.includes(key)) {
             console.log(
                 chalk.gray('Run ') +
-                    chalk.cyan('ever-works config test') +
+                    chalk.cyan(`${COMMAND} config test`) +
                     chalk.gray(' to verify this setting.'),
             );
         }

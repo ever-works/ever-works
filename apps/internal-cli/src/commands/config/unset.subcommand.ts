@@ -3,6 +3,7 @@ import { Logger } from '@nestjs/common';
 import chalk from 'chalk';
 import inquirer from 'inquirer';
 import { ConfigService } from '../../config/config.service';
+import { COMMAND } from 'src/config';
 
 @SubCommand({
     name: 'unset',
@@ -25,7 +26,7 @@ export class UnsetSubCommand extends CommandRunner {
                 console.log(chalk.yellow('⚠ No configuration found to modify'));
                 console.log(
                     chalk.gray('Run ') +
-                        chalk.cyan('ever-works config setup') +
+                        chalk.cyan(`${COMMAND} config setup`) +
                         chalk.gray(' to create a configuration.'),
                 );
                 return;

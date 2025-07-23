@@ -45,8 +45,10 @@ export function displayConfigurationWarnings(warnings: string[]): void {
  * Masks sensitive values for display
  */
 export function maskSecret(secret: string): string {
-	if (!secret || secret.length < 8) {
-		return '***';
+	const MIN_SECRET_LENGTH = 8;
+	if (!secret || secret.length < MIN_SECRET_LENGTH) {
+		return '****';
 	}
-	return secret.substring(0, 4) + '*'.repeat(secret.length - 8) + secret.substring(secret.length - 4);
+
+	return secret.substring(0, 4) + '*'.repeat(secret.length - MIN_SECRET_LENGTH) + secret.substring(secret.length - 4);
 }

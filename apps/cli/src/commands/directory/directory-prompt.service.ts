@@ -1,9 +1,7 @@
 import chalk from 'chalk';
-import inquirer from 'inquirer';
 import {
     DirectoryPromptService as BaseDirectoryPromptService,
     DirectorySelection,
-    Directory,
 } from '@packages/cli-shared';
 import { getApiService } from '../../services/api.service';
 

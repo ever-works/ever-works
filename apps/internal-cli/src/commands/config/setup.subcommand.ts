@@ -10,6 +10,7 @@ import { AiProviderPromptService } from './prompts/ai-provider-prompt.service';
 import { SearchServicePromptService } from './prompts/search-service-prompt.service';
 
 import { PartialEverWorksConfig } from '../../config/config.interface';
+import { COMMAND } from 'src/config';
 
 @SubCommand({
     name: 'setup',
@@ -64,12 +65,12 @@ export class SetupSubCommand extends CommandRunner {
                     console.log(chalk.gray('  • Edit the config file manually'));
                     console.log(
                         chalk.gray('  • Run ') +
-                            chalk.cyan('ever-works config show') +
+                            chalk.cyan(`${COMMAND} config show`) +
                             chalk.gray(' to view current settings'),
                     );
                     console.log(
                         chalk.gray('  • Run ') +
-                            chalk.cyan('ever-works config test') +
+                            chalk.cyan(`${COMMAND} config test`) +
                             chalk.gray(' to test your configuration'),
                     );
                     return;
@@ -177,13 +178,13 @@ export class SetupSubCommand extends CommandRunner {
         console.log(
             chalk.gray('You can now use the Ever Works CLI with your configured settings.'),
         );
-        console.log(chalk.gray('To reconfigure, run: ') + chalk.cyan('ever-works config setup'));
+        console.log(chalk.gray('To reconfigure, run: ') + chalk.cyan(`${COMMAND} config setup`));
         console.log(
-            chalk.gray('To view your configuration, run: ') + chalk.cyan('ever-works config show'),
+            chalk.gray('To view your configuration, run: ') + chalk.cyan(`${COMMAND} config show`),
         );
         console.log(
             chalk.gray('To test your configuration, run: ') +
-                chalk.cyan('ever-works config test\n'),
+                chalk.cyan(`${COMMAND} config test\n`),
         );
     }
 }

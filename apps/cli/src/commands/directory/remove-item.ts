@@ -53,7 +53,9 @@ export const removeItemCommand = new Command('remove-item')
             console.log(chalk.cyan('\n--- Item Removal Summary ---'));
             console.log(chalk.gray('Directory:'), chalk.white(directory.slug));
             console.log(chalk.gray('Item slug to remove:'), chalk.white(answers.item_slug));
-            if (answers.reason) console.log(chalk.gray('Reason:'), chalk.white(answers.reason));
+            if (answers.reason) {
+                console.log(chalk.gray('Reason:'), chalk.white(answers.reason));
+            }
 
             const confirmed = await inquirer.prompt([
                 {
