@@ -105,7 +105,7 @@
         "@types/cheerio": "^1.0.0",
         "@types/fs-extra": "^11.0.4",
         "@types/string-similarity": "^4.0.2",
-        "axios": "^1.10.0",
+        "axios": "^1.11.0",
         "better-sqlite3": "^11.10.0",
         "bullmq": "^5.56.1",
         "cheerio": "^1.1.0",
