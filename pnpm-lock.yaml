@@ -98,7 +98,7 @@ importers:
         version: link:../../packages/cli-shared
       axios:
         specifier: ^1.10.0
-        version: 1.10.0
+        version: 1.11.0
       chalk:
         specifier: ^4.1.2
         version: 4.1.2
