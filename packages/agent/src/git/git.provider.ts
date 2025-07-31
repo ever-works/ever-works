@@ -15,7 +15,7 @@ export interface IGitAuth {
     password: string;
 }
 
-interface ICommitter {
+export interface ICommitter {
     name?: string;
     email?: string;
 }
@@ -32,12 +32,17 @@ export abstract class GitProvider {
     /**
      *  Clones or pulls repository to/from a persistent location using slugified name
      */
-    async cloneOrPull(
-        owner: string,
-        repo: string,
-        token: string,
-        committer: ICommitter = {},
-    ): Promise<string> {
+    async cloneOrPull({
+        owner,
+        repo,
+        token,
+        committer,
+    }: {
+        owner: string;
+        repo: string;
+        token: string;
+        committer: ICommitter;
+    }): Promise<string> {
         const dir = this.getDir(owner, repo);
         const url = this.getURL(owner, repo);
         const auth = this.getAuth(token);

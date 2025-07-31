@@ -24,7 +24,8 @@ export class MarkdownGeneratorService {
     constructor(private readonly githubService: GithubService) {}
 
     async initialize(directory: Directory, user: User, options: InitializeOptions = {}) {
-        const token = user.getGitToken();
+        const token = await user.getGitToken();
+        const committer = user.asCommitter();
 
         const description = options?.repository_description || directory.description;
 
@@ -39,17 +40,19 @@ export class MarkdownGeneratorService {
             await this.githubService.createEmptyRepo(directory.slug, description, token);
         }
 
-        const markdownPath = await this.githubService.cloneOrPull(
-            directory.owner,
-            directory.slug,
+        const markdownPath = await this.githubService.cloneOrPull({
+            owner: directory.owner,
+            repo: directory.slug,
             token,
-        );
+            committer,
+        });
 
-        const dataPath = await this.githubService.cloneOrPull(
-            directory.owner,
-            directory.getDataRepo(),
+        const dataPath = await this.githubService.cloneOrPull({
+            owner: directory.owner,
+            repo: directory.getDataRepo(),
             token,
-        );
+            committer,
+        });
 
         const markdownRepo = new MarkdownRepository(markdownPath);
         const dataRepo = await DataRepository.create(dataPath);
@@ -186,13 +189,15 @@ export class MarkdownGeneratorService {
     }
 
     async removeItemDetail(directory: Directory, user: User, slug: string, branch?: string) {
-        const token = user.getGitToken();
+        const token = await user.getGitToken();
+        const committer = user.asCommitter();
 
-        const markdownPath = await this.githubService.cloneOrPull(
-            directory.owner,
-            directory.slug,
+        const markdownPath = await this.githubService.cloneOrPull({
+            owner: directory.owner,
+            repo: directory.slug,
             token,
-        );
+            committer,
+        });
 
         const markdownRepo = new MarkdownRepository(markdownPath);
 
@@ -209,14 +214,19 @@ export class MarkdownGeneratorService {
      * Remove repository for a directory
      */
     async removeRepository(directory: Directory, user: User): Promise<void> {
-        const token = user.getGitToken();
+        const token = await user.getGitToken();
 
         try {
             // Delete the GitHub repository
             await this.githubService.deleteRepository(directory.owner, directory.slug, token);
-            this.logger.log(`Successfully deleted markdown repository: ${directory.owner}/${directory.slug}`);
+            this.logger.log(
+                `Successfully deleted markdown repository: ${directory.owner}/${directory.slug}`,
+            );
         } catch (error) {
-            this.logger.error(`Failed to delete markdown repository ${directory.owner}/${directory.slug}:`, error);
+            this.logger.error(
+                `Failed to delete markdown repository ${directory.owner}/${directory.slug}:`,
+                error,
+            );
             throw error;
         }
     }

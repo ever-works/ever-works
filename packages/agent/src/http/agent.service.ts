@@ -76,7 +76,7 @@ export class AgentService {
         const { slug, name, description, owner } = createDirectoryDto;
         const user = await User.sessionMock();
 
-        const ghOwner = await this.githubService.getUser(user.getGitToken());
+        const ghOwner = await this.githubService.getUser(await user.getGitToken());
 
         const directoryData = {
             slug,

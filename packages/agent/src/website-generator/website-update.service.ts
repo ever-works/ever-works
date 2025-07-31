@@ -19,7 +19,7 @@ export class WebsiteUpdateService {
         directory: Directory,
         user: User,
     ): Promise<{ method: string; message: string }> {
-        const token = user.getGitToken();
+        const token = await user.getGitToken();
         const websiteRepo = directory.getWebsiteRepo();
 
         // Check if the target repository exists
@@ -73,16 +73,19 @@ export class WebsiteUpdateService {
      * Updates a forked repository by pulling from upstream
      */
     private async updateFork(directory: Directory, user: User): Promise<boolean> {
-        const token = user.getGitToken();
+        const token = await user.getGitToken();
+        const committer = user.asCommitter();
+
         const websiteRepo = directory.getWebsiteRepo();
 
         try {
             // Clone the target repository
-            const targetDir = await this.githubService.cloneOrPull(
-                directory.owner,
-                websiteRepo,
+            const targetDir = await this.githubService.cloneOrPull({
+                owner: directory.owner,
+                repo: websiteRepo,
                 token,
-            );
+                committer,
+            });
 
             // Check if this is actually a fork by looking for upstream remote
             const isActualFork = await this.githubService.hasForkRelationship(
@@ -121,15 +124,16 @@ export class WebsiteUpdateService {
      * Updates using duplicate method: clone original, replace remote, push
      */
     private async updateDuplicate(directory: Directory, user: User): Promise<void> {
-        const token = user.getGitToken();
+        const token = await user.getGitToken();
         const websiteRepo = directory.getWebsiteRepo();
 
         // Clone the original template repository
-        const originalDir = await this.githubService.cloneOrPull(
-            WEBSITE_TEMPLATE_CONFIG.owner,
-            WEBSITE_TEMPLATE_CONFIG.repo,
+        const originalDir = await this.githubService.cloneOrPull({
+            owner: WEBSITE_TEMPLATE_CONFIG.owner,
+            repo: WEBSITE_TEMPLATE_CONFIG.repo,
             token,
-        );
+            committer: user.asCommitter(),
+        });
 
         // Get the target repository URL
         const targetRepoUrl = this.githubService.getURL(directory.owner, websiteRepo);
@@ -150,17 +154,26 @@ export class WebsiteUpdateService {
      * Updates using template method: clone both repos, replace files, commit and push
      */
     private async updateTemplate(directory: Directory, user: User): Promise<void> {
-        const token = user.getGitToken();
+        const token = await user.getGitToken();
+        const committer = user.asCommitter();
+
         const websiteRepo = directory.getWebsiteRepo();
 
         // Clone both repositories
         const [originalDir, targetDir] = await Promise.all([
-            this.githubService.cloneOrPull(
-                WEBSITE_TEMPLATE_CONFIG.owner,
-                WEBSITE_TEMPLATE_CONFIG.repo,
+            this.githubService.cloneOrPull({
+                owner: WEBSITE_TEMPLATE_CONFIG.owner,
+                repo: WEBSITE_TEMPLATE_CONFIG.repo,
                 token,
-            ),
-            this.githubService.cloneOrPull(directory.owner, websiteRepo, token),
+                committer,
+            }),
+
+            this.githubService.cloneOrPull({
+                owner: directory.owner,
+                repo: websiteRepo,
+                token,
+                committer,
+            }),
         ]);
 
         // Copy files from original to target (excluding .git directory)
@@ -169,7 +182,6 @@ export class WebsiteUpdateService {
         // Add, commit, and push changes
         await this.githubService.add(targetDir, '.');
 
-        const committer = user.asCommitter();
         await this.githubService.commit(targetDir, 'Update website from template', committer);
 
         await this.githubService.push(targetDir, token);

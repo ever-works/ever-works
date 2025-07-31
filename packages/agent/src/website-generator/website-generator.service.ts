@@ -11,28 +11,31 @@ export class WebsiteGeneratorService {
     constructor(private readonly githubService: GithubService) {}
 
     private async duplicate(directory: Directory, user: User) {
-        const token = user.getGitToken();
+        const token = await user.getGitToken();
+        const committer = user.asCommitter();
 
         if (directory.organization) {
-            return this.githubService.duplicateAsOrg(
-                WEBSITE_TEMPLATE_CONFIG.owner,
-                WEBSITE_TEMPLATE_CONFIG.repo,
-                directory.owner,
-                directory.getWebsiteRepo(),
+            return this.githubService.duplicateAsOrg({
+                owner: WEBSITE_TEMPLATE_CONFIG.owner,
+                repo: WEBSITE_TEMPLATE_CONFIG.repo,
+                org: directory.owner,
+                name: directory.getWebsiteRepo(),
                 token,
-            );
+                committer,
+            });
         }
 
-        return this.githubService.duplicate(
-            WEBSITE_TEMPLATE_CONFIG.owner,
-            WEBSITE_TEMPLATE_CONFIG.repo,
-            directory.getWebsiteRepo(),
+        return this.githubService.duplicate({
+            owner: WEBSITE_TEMPLATE_CONFIG.owner,
+            repo: WEBSITE_TEMPLATE_CONFIG.repo,
+            name: directory.getWebsiteRepo(),
             token,
-        );
+            committer,
+        });
     }
 
     private async fork(directory: Directory, user: User) {
-        const token = user.getGitToken();
+        const token = await user.getGitToken();
 
         return this.githubService.fork(
             {
@@ -46,7 +49,7 @@ export class WebsiteGeneratorService {
     }
 
     private async createUsingTemplate(directory: Directory, user: User) {
-        const token = user.getGitToken();
+        const token = await user.getGitToken();
 
         return this.githubService.createRepoFromTemplate(
             WEBSITE_TEMPLATE_CONFIG.owner,
@@ -86,7 +89,7 @@ export class WebsiteGeneratorService {
      * Remove repository for a directory
      */
     async removeRepository(directory: Directory, user: User): Promise<void> {
-        const token = user.getGitToken();
+        const token = await user.getGitToken();
         const websiteRepo = directory.getWebsiteRepo();
 
         try {

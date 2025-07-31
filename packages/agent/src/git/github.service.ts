@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Octokit, RequestError } from 'octokit';
-import { GitProvider, IGitAuth } from './git.provider';
+import { GitProvider, ICommitter, IGitAuth } from './git.provider';
 import * as sodium from 'libsodium-wrappers';
 import * as fs from 'node:fs';
 import * as http from 'isomorphic-git/http/node';
@@ -175,13 +175,31 @@ export class GithubService extends GitProvider {
         throw new Error(`Fork ${newRepoOwner}/${newRepoName} timed out after maximum attempts.`);
     }
 
-    async duplicate(owner: string, repo: string, name: string, token: string) {
+    async duplicate({
+        owner,
+        repo,
+        name,
+        token,
+        committer,
+    }: {
+        owner: string;
+        repo: string;
+        name: string;
+        token: string;
+        committer: ICommitter;
+    }) {
         const duplicated = await this.createEmptyRepo(name, '', token);
         const origin = duplicated.clone_url;
 
         this.logger.log(`Duplicated ${owner}/${repo} to ${duplicated.owner.login}/${name}`);
 
-        const originalDir = await this.cloneOrPull(owner, repo, token);
+        const originalDir = await this.cloneOrPull({
+            owner,
+            repo,
+            token,
+            committer,
+        });
+
         await this.remoteRemove(originalDir, 'origin');
         await this.remoteAdd(originalDir, 'origin', origin);
         await this.push(originalDir, token);
@@ -189,13 +207,33 @@ export class GithubService extends GitProvider {
         return originalDir;
     }
 
-    async duplicateAsOrg(owner: string, repo: string, org: string, name: string, token: string) {
+    async duplicateAsOrg({
+        owner,
+        repo,
+        org,
+        name,
+        token,
+        committer,
+    }: {
+        owner: string;
+        repo: string;
+        org: string;
+        name: string;
+        token: string;
+        committer: ICommitter;
+    }) {
         const duplicated = await this.createEmptyRepoAsOrg(org, name, '', token);
         const origin = duplicated.clone_url;
 
         this.logger.log(`Duplicated ${owner}/${repo} to ${duplicated.owner.login}/${name}`);
 
-        const originalDir = await this.cloneOrPull(owner, repo, token);
+        const originalDir = await this.cloneOrPull({
+            owner,
+            repo,
+            token,
+            committer,
+        });
+
         await this.remoteRemove(originalDir, 'origin');
         await this.remoteAdd(originalDir, 'origin', origin);
         await this.push(originalDir, token);

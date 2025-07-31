@@ -71,7 +71,9 @@ export class DataGeneratorService {
 
         const description = `machine-readable data for ${directory.slug}`;
 
-        const token = user.getGitToken();
+        const token = await user.getGitToken();
+        const committer = user.asCommitter();
+
         const repo = directory.getDataRepo();
 
         // Creating GitHub repository
@@ -90,7 +92,12 @@ export class DataGeneratorService {
 
         // Cloning repository
         const dest = await this.githubService
-            .cloneOrPull(directory.owner, repo, token)
+            .cloneOrPull({
+                owner: directory.owner,
+                repo,
+                token,
+                committer,
+            })
             .catch((err) => {
                 this.logger.error('Failed to clone repository', err);
                 return null;
@@ -271,7 +278,7 @@ export class DataGeneratorService {
      * Remove repository for a directory
      */
     async removeRepository(directory: Directory, user: User): Promise<void> {
-        const token = user.getGitToken();
+        const token = await user.getGitToken();
         const repo = directory.getDataRepo();
 
         try {
@@ -279,7 +286,10 @@ export class DataGeneratorService {
             await this.githubService.deleteRepository(directory.owner, repo, token);
             this.logger.log(`Successfully deleted data repository: ${directory.owner}/${repo}`);
         } catch (error) {
-            this.logger.error(`Failed to delete data repository ${directory.owner}/${repo}:`, error);
+            this.logger.error(
+                `Failed to delete data repository ${directory.owner}/${repo}:`,
+                error,
+            );
             throw error;
         }
     }
@@ -288,10 +298,17 @@ export class DataGeneratorService {
      * Get last request data from config
      */
     async getLastRequestData(directory: Directory, user: User) {
-        const token = user.getGitToken();
+        const token = await user.getGitToken();
+        const committer = user.asCommitter();
+
         const repo = directory.getDataRepo();
 
-        const dest = await this.githubService.cloneOrPull(directory.owner, repo, token);
+        const dest = await this.githubService.cloneOrPull({
+            owner: directory.owner,
+            repo,
+            token,
+            committer,
+        });
         const data = await DataRepository.create(dest);
 
         const config = await data.getConfig();
@@ -304,13 +321,20 @@ export class DataGeneratorService {
     private async getExistingData(directory: Directory, user: User) {
         this.logger.debug(`Getting existing data for directory: ${directory.slug}`);
 
-        const token = user.getGitToken();
+        const token = await user.getGitToken();
+        const committer = user.asCommitter();
+
         const repo = directory.getDataRepo();
 
         try {
             // Try to clone or pull the repository using persistent directory
             this.logger.log(`Checking for existing repository ${directory.owner}/${repo}`);
-            const dest = await this.githubService.cloneOrPull(directory.owner, repo, token);
+            const dest = await this.githubService.cloneOrPull({
+                owner: directory.owner,
+                repo,
+                token,
+                committer,
+            });
             const data = await DataRepository.create(dest);
             this.logger.log(`Found existing repository at ${dest}`);
 
