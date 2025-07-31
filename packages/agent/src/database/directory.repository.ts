@@ -35,7 +35,7 @@ export class DirectoryRepository {
 		return await this.repository.findOne({ where: { owner, slug } });
 	}
 
-	async findById(id: number): Promise<Directory | null> {
+	async findById(id: string): Promise<Directory | null> {
 		return await this.repository.findOne({ where: { id } });
 	}
 
@@ -65,12 +65,12 @@ export class DirectoryRepository {
 		return await queryBuilder.getMany();
 	}
 
-	async update(id: number, updateData: Partial<Directory>): Promise<Directory | null> {
+	async update(id: string, updateData: Partial<Directory>): Promise<Directory | null> {
 		await this.repository.update(id, updateData);
 		return await this.findById(id);
 	}
 
-	async delete(id: number): Promise<boolean> {
+	async delete(id: string): Promise<boolean> {
 		const result = await this.repository.delete(id);
 		return result.affected > 0;
 	}
