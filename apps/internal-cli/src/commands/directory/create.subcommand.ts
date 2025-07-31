@@ -37,7 +37,7 @@ export class CreateSubCommand extends CommandRunner {
 
             // Get user information
             const user = await User.sessionMock();
-            const ghOwner = await this.githubService.getUser(user.getGitToken());
+            const ghOwner = await this.githubService.getUser(await user.getGitToken());
 
             loadingSpinner.stop();
 
