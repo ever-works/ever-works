@@ -16,6 +16,7 @@ import { RegisterDto, UpdatePasswordDto } from '../dto/auth.dto';
 import { randomBytes, randomUUID } from 'crypto';
 import { jwtConstants, authConstants, AuthProviders } from '@src/config/constants';
 import { User } from '@packages/agent/entities';
+import { JwtPayload, TokenResponse } from '../types/jwt.types';
 
 @Injectable()
 export class AuthService {
@@ -98,11 +99,18 @@ export class AuthService {
         userAgent?: string,
         ipAddress?: string,
         oldRefreshToken?: string,
-    ) {
-        const payload = {
-            email: user.email,
+    ): Promise<TokenResponse> {
+        const payload: JwtPayload = {
             sub: user.id,
+            email: user.email,
             provider: user.registrationProvider,
+            username: user.username,
+            emailVerified: user.emailVerified,
+            isActive: user.isActive,
+            avatar: user.avatar,
+            iat: Math.floor(Date.now() / 1000),
+            iss: 'ever-works-api',
+            aud: 'ever-works-users',
         };
 
         const accessToken = this.jwtService.sign(payload, {
@@ -462,19 +470,20 @@ export class AuthService {
             emailVerificationExpires,
             passwordResetToken,
             passwordResetExpires,
+            oauthTokens,
             ...userProfile
         } = user;
 
         // Add connected providers info
         const connectedProviders =
-            user.oauthTokens?.map((token) => ({
+            oauthTokens?.map((token) => ({
                 provider: token.provider,
-                connectedAt: token.createdAt,
+                createdAt: token.createdAt,
             })) || [];
 
         return {
             ...userProfile,
-            connectedProviders,
+            oauthTokens: connectedProviders,
         };
     }
 

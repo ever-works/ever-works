@@ -65,6 +65,13 @@ export class AuthController {
     @Get('profile')
     async getProfile(@Request() req) {
         // Get fresh user data from database
+        return req.user;
+    }
+
+    @UseGuards(JwtAuthGuard)
+    @Get('profile/fresh')
+    async getFreshProfile(@Request() req) {
+        // Get fresh user data from database
         return this.authService.getUserProfile(req.user.userId);
     }
 
