@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { UserRepository } from './user.repository';
 import { User } from '../entities/user.entity';
+import { config } from '@src/config';
 
 /**
  * Service to handle GitHub token retrieval for users
@@ -8,9 +9,7 @@ import { User } from '../entities/user.entity';
  */
 @Injectable()
 export class UserGitHubService {
-    constructor(
-        private readonly userRepository: UserRepository,
-    ) {}
+    constructor(private readonly userRepository: UserRepository) {}
 
     /**
      * Get GitHub token for a user
@@ -18,8 +17,8 @@ export class UserGitHubService {
      */
     async getGitToken(user: User): Promise<string | null> {
         // For mocked/system users, use environment variable
-        if (user.mocked) {
-            return process.env.GITHUB_APIKEY || null;
+        if (user.local) {
+            return config.github.getApiKey() || null;
         }
 
         // If oauth tokens aren't loaded, fetch the user with relations
@@ -39,8 +38,8 @@ export class UserGitHubService {
      * Check if user has GitHub connected with required scopes
      */
     async hasGitHubAccess(user: User, requiredScopes?: string[]): Promise<boolean> {
-        if (user.mocked) {
-            return !!process.env.GITHUB_APIKEY;
+        if (user.local) {
+            return !!config.github.getApiKey();
         }
 
         // Ensure oauth tokens are loaded
@@ -52,7 +51,7 @@ export class UserGitHubService {
             user = userWithTokens;
         }
 
-        const githubToken = user.oauthTokens.find(token => token.provider === 'github');
+        const githubToken = user.oauthTokens.find((token) => token.provider === 'github');
         if (!githubToken) {
             return false;
         }
@@ -64,18 +63,18 @@ export class UserGitHubService {
 
         // Check if token has all required scopes
         const tokenScopes = githubToken.scope?.split(' ') || [];
-        return requiredScopes.every(scope => tokenScopes.includes(scope));
+        return requiredScopes.every((scope) => tokenScopes.includes(scope));
     }
 
     /**
      * Get OAuth token metadata
      */
     async getGitHubTokenInfo(user: User) {
-        if (user.mocked) {
+        if (user.local) {
             return {
                 type: 'environment',
                 scopes: ['all'], // Env token typically has full access
-                username: process.env.GIT_NAME,
+                username: config.github.getOwner(),
             };
         }
 
@@ -88,7 +87,7 @@ export class UserGitHubService {
             user = userWithTokens;
         }
 
-        const githubToken = user.oauthTokens.find(token => token.provider === 'github');
+        const githubToken = user.oauthTokens.find((token) => token.provider === 'github');
         if (!githubToken) {
             return null;
         }

@@ -1,11 +1,12 @@
-import { HumanMessagePromptTemplate } from "@langchain/core/prompts";
-import { ChatOpenAI } from "@langchain/openai";
-import { Logger } from "@nestjs/common";
-import { z } from "zod";
-import { ItemData } from "./types";
-import { categorizeOutputSchema } from "./categorize";
-import { itemDataSchema } from "./schemas";
-import { slugifyText } from "src/items-generator/utils/text.utils";
+import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
+import { ChatOpenAI } from '@langchain/openai';
+import { Logger } from '@nestjs/common';
+import { z } from 'zod';
+import { ItemData } from './types';
+import { categorizeOutputSchema } from './categorize';
+import { itemDataSchema } from './schemas';
+import { slugifyText } from 'src/items-generator/utils/text.utils';
+import { config } from '@src/config';
 
 const DEDUPLICATOR_PROMPT = `
 You are directory website builder and your task is to deduplicate items.
@@ -69,37 +70,36 @@ const outputSchema = z.object({
 export async function deduplicate(task: string, items: object[]) {
     Logger.log(`Deduplicating items with length: ${items.length}`, 'Agent');
     const llm = new ChatOpenAI({
-        model: process.env.OPENAI_MODEL || 'gpt-4.1',
+        model: config.ai.openAi.getModel(),
         temperature: 0.0,
     });
 
     const prompt = HumanMessagePromptTemplate.fromTemplate(DEDUPLICATOR_PROMPT);
-    const result = await prompt
-        .pipe(llm.withStructuredOutput(outputSchema))
-        .invoke({
-            task,
-            items: JSON.stringify(items),
-        });
-    
+    const result = await prompt.pipe(llm.withStructuredOutput(outputSchema)).invoke({
+        task,
+        items: JSON.stringify(items),
+    });
+
     Logger.log(`Got ${result.items.length} after deduplication with LLM`, 'Agent');
-    return result.items.map(item => ({ slug: slugifyText(item.name,), ...item }));
+    return result.items.map((item) => ({ slug: slugifyText(item.name), ...item }));
 }
 
-export async function extractNewItems(existingItems: Partial<ItemData>[], newItems: Partial<ItemData>[]) {
+export async function extractNewItems(
+    existingItems: Partial<ItemData>[],
+    newItems: Partial<ItemData>[],
+) {
     Logger.log(`Extracting new items with length: ${newItems.length}`, 'Agent');
     const llm = new ChatOpenAI({
-        model: process.env.OPENAI_MODEL || 'gpt-4.1',
+        model: config.ai.openAi.getModel(),
         temperature: 0.0,
     });
 
     const prompt = HumanMessagePromptTemplate.fromTemplate(EXTRACT_NEW_ITEMS_PROMPT);
-    const result = await prompt
-        .pipe(llm.withStructuredOutput(categorizeOutputSchema))
-        .invoke({
-            existing: JSON.stringify(existingItems),
-            new: JSON.stringify(newItems),
-        });
+    const result = await prompt.pipe(llm.withStructuredOutput(categorizeOutputSchema)).invoke({
+        existing: JSON.stringify(existingItems),
+        new: JSON.stringify(newItems),
+    });
 
     Logger.log(`Got ${result.items.length} after extracting new items with LLM`, 'Agent');
-    return result.items.map(item => ({ slug: slugifyText(item.name,), ...item }));
+    return result.items.map((item) => ({ slug: slugifyText(item.name), ...item }));
 }

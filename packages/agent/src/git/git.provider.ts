@@ -5,6 +5,7 @@ import * as http from 'isomorphic-git/http/node';
 import git from 'isomorphic-git';
 import { slugifyText } from '../items-generator/utils/text.utils';
 import { Logger } from '@nestjs/common';
+import { config } from '@src/config';
 
 /*
     'oauth2'         - GitLab
@@ -99,8 +100,8 @@ export abstract class GitProvider {
     }
 
     getCommitter(committer: ICommitter = {}): ICommitter {
-        committer.email = committer.email || process.env.GIT_EMAIL;
-        committer.name = committer.name || process.env.GIT_NAME;
+        committer.name = committer.name || config.git.getName();
+        committer.email = committer.email || config.git.getEmail();
 
         return committer;
     }

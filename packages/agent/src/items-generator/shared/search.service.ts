@@ -7,6 +7,7 @@ import { search, OrganicResult, DictionaryResult, OrganicResultNode } from 'goog
 import * as cheerio from 'cheerio';
 import TurndownService from 'turndown';
 import axios from 'axios';
+import { config } from '@src/config';
 
 export type SearchResult = {
     title: string;
@@ -23,39 +24,35 @@ export class SearchService {
     private turndownService: TurndownService;
 
     constructor() {
-        this.isTavilyConfigured = !!process.env.TAVILY_API_KEY;
+        this.isTavilyConfigured = !!config.tavily.getApiKey();
 
         if (this.isTavilyConfigured) {
             this.tavilyClient = tavily({
-                apiKey: process.env.TAVILY_API_KEY,
+                apiKey: config.tavily.getApiKey(),
             });
         }
 
         this.turndownService = new TurndownService();
 
         this.logger.log(
-            `Extract content service configured: ${
-                process.env.EXTRACT_CONTENT_SERVICE || 'Tavily'
-            }`,
+            `Extract content service configured: ${config.search.getExtractContentService()}`,
         );
 
-        this.logger.log(
-            `Web search service configured: ${process.env.WEB_SEARCH_SERVICE || 'Tavily'}`,
-        );
+        this.logger.log(`Web search service configured: ${config.search.getWebSearchService()}`);
     }
 
     /**
      * Check if the naive search service is configured
      */
     isNaiveExtractContentConfigured(): boolean {
-        return process.env.EXTRACT_CONTENT_SERVICE === 'naive';
+        return config.search.getExtractContentService() === 'naive';
     }
 
     /**
      * Check if the Google search service is configured
      */
     isGoogleSearchConfigured(): boolean {
-        return process.env.WEB_SEARCH_SERVICE === 'google-sr';
+        return config.search.getWebSearchService() === 'google-sr';
     }
 
     /**

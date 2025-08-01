@@ -1,9 +1,10 @@
-import { HumanMessagePromptTemplate } from "@langchain/core/prompts";
-import { ChatOpenAI } from "@langchain/openai";
-import { Logger } from "@nestjs/common";
-import { z } from "zod";
-import { itemDataSchema } from "./schemas";
-import { slugifyText } from "src/items-generator/utils/text.utils";
+import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
+import { ChatOpenAI } from '@langchain/openai';
+import { Logger } from '@nestjs/common';
+import { z } from 'zod';
+import { itemDataSchema } from './schemas';
+import { slugifyText } from 'src/items-generator/utils/text.utils';
+import { config } from '@src/config';
 
 const GENERATOR_PROMPT = `
 You are directory website builder and your task is to generate items to be displayed on the website, based on given task:
@@ -25,18 +26,20 @@ const outputSchema = z.object({
 export async function generateItemsSubarray(task: string, url: string, research: string) {
     Logger.log(`Generating items from ${url}`, 'Agent');
     const llm = new ChatOpenAI({
-        model: process.env.OPENAI_MODEL || 'gpt-4.1',
+        model: config.ai.openAi.getModel(),
         temperature: 0.0,
     });
 
     const prompt = HumanMessagePromptTemplate.fromTemplate(GENERATOR_PROMPT);
-    const result = await prompt
-        .pipe(llm.withStructuredOutput(outputSchema))
-        .invoke({
-            task,
-            research,
-        });
-    
+    const result = await prompt.pipe(llm.withStructuredOutput(outputSchema)).invoke({
+        task,
+        research,
+    });
+
     Logger.log(`Generated ${result.items.length} items from "${url}"`, 'Agent');
-    return result.items.map(item => ({ slug: slugifyText(item.name), ...item, source_url: item.source_url?.replace(/\/$/, '') }));
+    return result.items.map((item) => ({
+        slug: slugifyText(item.name),
+        ...item,
+        source_url: item.source_url?.replace(/\/$/, ''),
+    }));
 }

@@ -1,9 +1,10 @@
-import { HumanMessagePromptTemplate } from "@langchain/core/prompts";
-import { ChatOpenAI } from "@langchain/openai";
-import { Logger } from "@nestjs/common";
-import { ItemData } from "./types";
-import { z } from "zod";
-import { extractContentFrom } from "./tavily";
+import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
+import { ChatOpenAI } from '@langchain/openai';
+import { Logger } from '@nestjs/common';
+import { ItemData } from './types';
+import { z } from 'zod';
+import { extractContentFrom } from './tavily';
+import { config } from '@src/config';
 
 export const MARKDOWN_PROMPT = `
 You are directory website builder and your task is to generate markdown summary for item:
@@ -44,17 +45,15 @@ export async function markdown(item: Partial<ItemData>): Promise<string> {
     }
 
     const llm = new ChatOpenAI({
-        model: process.env.OPENAI_MODEL || 'gpt-4.1',
+        model: config.ai.openAi.getModel(),
         temperature: 0.6,
     });
 
     const prompt = HumanMessagePromptTemplate.fromTemplate(MARKDOWN_PROMPT);
-    const result = await prompt
-        .pipe(llm.withStructuredOutput(markdownOutputSchema))
-        .invoke({
-            item: JSON.stringify(item),
-            content: content.rawContent,
-        });
-    
+    const result = await prompt.pipe(llm.withStructuredOutput(markdownOutputSchema)).invoke({
+        item: JSON.stringify(item),
+        content: content.rawContent,
+    });
+
     return result.markdown || '';
 }

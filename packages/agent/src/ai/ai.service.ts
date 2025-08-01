@@ -12,6 +12,7 @@ import {
     AI_PROVIDER_CAPABILITIES,
     BaseChatModel,
 } from './ai-provider.interface';
+import { config } from '@src/config';
 
 @Injectable()
 export class AiService {
@@ -22,7 +23,7 @@ export class AiService {
     private readonly isCLI: boolean;
 
     constructor() {
-        this.isCLI = process.env.APP_TYPE === 'cli';
+        this.isCLI = config.isCli();
 
         this.config = this.loadConfiguration();
         this.isConfigured = this.initializeProviders();
@@ -40,80 +41,84 @@ export class AiService {
      * Load AI service configuration from environment variables
      */
     private loadConfiguration(): AiServiceConfig {
-        const defaultProvider = (process.env.AI_DEFAULT_PROVIDER as AiProviderType) || 'openai';
+        const defaultProvider = config.ai.getDefaultProvider();
 
         const providers: Record<AiProviderType, AiProviderConfig> = {
             openai: {
                 type: 'openai',
-                apiKey: process.env.OPENAI_API_KEY,
-                modelName: process.env.OPENAI_MODEL || 'gpt-4.1',
-                temperature: parseFloat(process.env.OPENAI_TEMPERATURE || '0.7'),
-                enabled: !!process.env.OPENAI_API_KEY,
-                maxTokens: parseInt(process.env.OPENAI_MAX_TOKENS || '4096'),
+                apiKey: config.ai.openAi.getKey(),
+                modelName: config.ai.openAi.getModel(),
+                temperature: config.ai.openAi.getTemperature(),
+                enabled: !!config.ai.openAi.getKey(),
+                maxTokens: config.ai.openAi.getMaxTokens(),
             },
             openrouter: {
                 type: 'openrouter',
-                apiKey: process.env.OPENROUTER_API_KEY,
-                modelName: process.env.OPENROUTER_MODEL || 'gpt-4.1',
-                temperature: parseFloat(process.env.OPENROUTER_TEMPERATURE || '0.7'),
-                enabled: !!process.env.OPENROUTER_API_KEY,
-                maxTokens: parseInt(process.env.OPENROUTER_MAX_TOKENS || '4096'),
+                apiKey: config.ai.openRouter.getKey(),
+                modelName: config.ai.openRouter.getModel(),
+                temperature: config.ai.openRouter.getTemperature(),
+                enabled: !!config.ai.openRouter.getKey(),
+                maxTokens: config.ai.openRouter.getMaxTokens(),
+                baseURL: config.ai.openRouter.getBaseUrl(),
             },
             ollama: {
                 type: 'ollama',
-                apiKey: process.env.OLLAMA_API_KEY,
-                modelName: process.env.OLLAMA_MODEL || 'llama2',
-                temperature: parseFloat(process.env.OLLAMA_TEMPERATURE || '0.7'),
-                enabled: !!process.env.OLLAMA_BASE_URL,
-                baseURL: process.env.OLLAMA_BASE_URL,
-                maxTokens: parseInt(process.env.OLLAMA_MAX_TOKENS || '4096'),
+                apiKey: config.ai.ollama.getKey(),
+                modelName: config.ai.ollama.getModel(),
+                temperature: config.ai.ollama.getTemperature(),
+                enabled: !!config.ai.ollama.getBaseUrl(),
+                baseURL: config.ai.ollama.getBaseUrl(),
+                maxTokens: config.ai.ollama.getMaxTokens(),
             },
             google: {
                 type: 'google',
-                apiKey: process.env.GOOGLE_API_KEY,
-                modelName: process.env.GOOGLE_MODEL || 'gemini-2.5-flash',
-                temperature: parseFloat(process.env.GOOGLE_TEMPERATURE || '0.7'),
-                enabled: !!process.env.GOOGLE_API_KEY,
-                maxTokens: parseInt(process.env.GOOGLE_MAX_TOKENS || '4096'),
+                apiKey: config.ai.google.getKey(),
+                modelName: config.ai.google.getModel(),
+                temperature: config.ai.google.getTemperature(),
+                enabled: !!config.ai.google.getKey(),
+                maxTokens: config.ai.google.getMaxTokens(),
+                baseURL: config.ai.google.getBaseUrl(),
             },
             anthropic: {
                 type: 'anthropic',
-                apiKey: process.env.ANTHROPIC_API_KEY,
-                modelName: process.env.ANTHROPIC_MODEL || 'claude-3-5-sonnet-20241022',
-                temperature: parseFloat(process.env.ANTHROPIC_TEMPERATURE || '0.7'),
-                enabled: !!process.env.ANTHROPIC_API_KEY,
-                maxTokens: parseInt(process.env.ANTHROPIC_MAX_TOKENS || '4096'),
+                apiKey: config.ai.anthropic.getKey(),
+                modelName: config.ai.anthropic.getModel(),
+                temperature: config.ai.anthropic.getTemperature(),
+                enabled: !!config.ai.anthropic.getKey(),
+                maxTokens: config.ai.anthropic.getMaxTokens(),
             },
             mistral: {
                 type: 'mistral',
-                apiKey: process.env.MISTRAL_API_KEY,
-                modelName: process.env.MISTRAL_MODEL || 'mistral-large-latest',
-                temperature: parseFloat(process.env.MISTRAL_TEMPERATURE || '0.7'),
-                enabled: !!process.env.MISTRAL_API_KEY,
-                maxTokens: parseInt(process.env.MISTRAL_MAX_TOKENS || '4096'),
+                apiKey: config.ai.mistral.getKey(),
+                modelName: config.ai.mistral.getModel(),
+                temperature: config.ai.mistral.getTemperature(),
+                enabled: !!config.ai.mistral.getKey(),
+                maxTokens: config.ai.mistral.getMaxTokens(),
             },
             groq: {
                 type: 'groq',
-                apiKey: process.env.GROQ_API_KEY,
-                modelName: process.env.GROQ_MODEL || 'llama-3.1-70b-versatile',
-                temperature: parseFloat(process.env.GROQ_TEMPERATURE || '0.7'),
-                enabled: !!process.env.GROQ_API_KEY,
-                maxTokens: parseInt(process.env.GROQ_MAX_TOKENS || '4096'),
+                apiKey: config.ai.groq.getKey(),
+                modelName: config.ai.groq.getModel(),
+                temperature: config.ai.groq.getTemperature(),
+                enabled: !!config.ai.groq.getKey(),
+                maxTokens: config.ai.groq.getMaxTokens(),
             },
             deepseek: {
                 type: 'deepseek',
-                apiKey: process.env.DEEPSEEK_API_KEY,
-                modelName: process.env.DEEPSEEK_MODEL || 'deepseek-chat',
-                temperature: parseFloat(process.env.DEEPSEEK_TEMPERATURE || '0.7'),
-                enabled: !!process.env.DEEPSEEK_API_KEY,
-                maxTokens: parseInt(process.env.DEEPSEEK_MAX_TOKENS || '4096'),
-                baseURL: process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com',
+                apiKey: config.ai.deepseek.getKey(),
+                modelName: config.ai.deepseek.getModel(),
+                temperature: config.ai.deepseek.getTemperature(),
+                enabled: !!config.ai.deepseek.getKey(),
+                maxTokens: config.ai.deepseek.getMaxTokens(),
+                baseURL: config.ai.deepseek.getBaseUrl(),
             },
         };
 
         const fallbackProviders =
-            process.env.AI_FALLBACK_PROVIDERS?.split(',').map((p) => p.trim() as AiProviderType) ||
-            [];
+            config.ai
+                .getFallbackProviders()
+                ?.split(',')
+                .map((p) => p.trim() as AiProviderType) || [];
 
         return {
             defaultProvider,
@@ -169,33 +174,33 @@ export class AiService {
             case 'openai':
                 return new ChatOpenAI({
                     ...commonOptions,
-                    model: config.modelName || 'gpt-4.1',
+                    model: config.modelName,
                 });
 
             case 'openrouter':
                 return new ChatOpenAI({
                     ...commonOptions,
-                    model: config.modelName || 'openai/gpt-4.1',
+                    model: config.modelName,
                     configuration: {
-                        baseURL: 'https://openrouter.ai/api/v1',
+                        baseURL: config.baseURL,
                     },
                 });
 
             case 'ollama':
                 return new ChatOpenAI({
                     ...commonOptions,
-                    model: config.modelName || 'llama2:7b',
+                    model: config.modelName,
                     configuration: {
-                        baseURL: config.baseURL || 'http://localhost:11434/v1',
+                        baseURL: config.baseURL,
                     },
                 });
 
             case 'google':
                 return new ChatOpenAI({
                     ...commonOptions,
-                    model: config.modelName || 'gemini-2.5-flash',
+                    model: config.modelName,
                     configuration: {
-                        baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/',
+                        baseURL: config.baseURL,
                         extra_body: {
                             google: {
                                 thinking_config: {
@@ -210,27 +215,27 @@ export class AiService {
             case 'anthropic':
                 return new ChatAnthropic({
                     ...commonOptions,
-                    model: config.modelName || 'claude-3-5-sonnet-20241022',
+                    model: config.modelName,
                 }) as unknown as BaseChatModel;
 
             case 'mistral':
                 return new ChatMistralAI({
                     ...commonOptions,
-                    model: config.modelName || 'mistral-large-latest',
+                    model: config.modelName,
                 }) as unknown as BaseChatModel;
 
             case 'groq':
                 return new ChatGroq({
                     ...commonOptions,
-                    model: config.modelName || 'llama-3.1-70b-versatile',
+                    model: config.modelName,
                 }) as unknown as BaseChatModel;
 
             case 'deepseek':
                 return new ChatOpenAI({
                     ...commonOptions,
-                    model: config.modelName || 'deepseek-chat',
+                    model: config.modelName,
                     configuration: {
-                        baseURL: 'https://api.deepseek.com/v1',
+                        baseURL: config.baseURL,
                     },
                 });
 

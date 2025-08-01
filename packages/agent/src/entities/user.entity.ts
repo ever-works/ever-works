@@ -3,6 +3,7 @@ import { Entity, Column, PrimaryGeneratedColumn, OneToMany } from 'typeorm';
 import { slugifyText } from '../items-generator/utils/text.utils';
 import { OAuthToken } from './oauth-token.entity';
 import { ClassToObject } from './types';
+import { config } from '@src/config';
 
 @Entity({ name: 'users' })
 export class User {
@@ -65,17 +66,17 @@ export class User {
     static async createLocalUser() {
         const user = new User();
 
-        user.id = slugifyText(process.env.GIT_NAME || randomUUID());
+        user.id = randomUUID();
         user.local = true;
-        user.username = process.env.GIT_NAME;
-        user.email = process.env.GIT_EMAIL;
+        user.username = config.git.getName();
+        user.email = config.git.getEmail();
 
         return user;
     }
 
     async getGitToken(): Promise<string | null> {
         if (this.local) {
-            return process.env.GITHUB_APIKEY || null;
+            return config.github.getApiKey() || null;
         }
 
         // Check if oauth tokens are loaded

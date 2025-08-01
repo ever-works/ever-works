@@ -1,8 +1,9 @@
-import { HumanMessagePromptTemplate } from "@langchain/core/prompts";
-import { ChatOpenAI } from "@langchain/openai";
-import { Logger } from "@nestjs/common";
-import { formatDate } from "date-fns";
-import { z } from "zod";
+import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
+import { ChatOpenAI } from '@langchain/openai';
+import { Logger } from '@nestjs/common';
+import { config } from '@src/config';
+import { formatDate } from 'date-fns';
+import { z } from 'zod';
 
 const QUERY_PROMPT = `
 You are directory website builder and your task is to generate search queries to find relevant information on the web, based on given task:
@@ -29,25 +30,21 @@ export async function generateQueries(task: string, max = 5): Promise<string[]> 
     Logger.log('Generating queries', 'Agent');
 
     const llm = new ChatOpenAI({
-        model: process.env.OPENAI_MODEL || 'gpt-4.1',
+        model: config.ai.openAi.getModel(),
         temperature: 0.6,
     });
 
     const now = new Date();
     const prompt = HumanMessagePromptTemplate.fromTemplate(QUERY_PROMPT);
 
-    const result = await prompt
-        .pipe(llm.withStructuredOutput(queriesOutputSchema))
-        .invoke({
-            task,
-            max,
-            day: formatDate(now, 'cccc'),
-            datetime: formatDate(now, 'yyyy-MM-dd HH:mm'),
-        });
+    const result = await prompt.pipe(llm.withStructuredOutput(queriesOutputSchema)).invoke({
+        task,
+        max,
+        day: formatDate(now, 'cccc'),
+        datetime: formatDate(now, 'yyyy-MM-dd HH:mm'),
+    });
 
-    return result.queries
-        .slice(0, max)
-        .map(q => stripQuotes(q));
+    return result.queries.slice(0, max).map((q) => stripQuotes(q));
 }
 
 function stripQuotes(str: string): string {
