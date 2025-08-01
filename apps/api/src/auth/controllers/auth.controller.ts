@@ -5,12 +5,15 @@ import {
     UseGuards,
     Request,
     Get,
+    Put,
     HttpCode,
     HttpStatus,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { AuthService } from '../services/auth.service';
 import { RegisterDto, RefreshTokenDto, UpdatePasswordDto } from '../dto/auth.dto';
+import { VerifyEmailDto, ForgotPasswordDto, ResetPasswordDto } from '../dto/email-verification.dto';
+import { UpdateProfileDto } from '../dto/update-profile.dto';
 import { LocalAuthGuard } from '../guards/local-auth.guard';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { Public } from '../decorators/public.decorator';
@@ -60,8 +63,9 @@ export class AuthController {
 
     @UseGuards(JwtAuthGuard)
     @Get('profile')
-    getProfile(@Request() req) {
-        return req.user;
+    async getProfile(@Request() req) {
+        // Get fresh user data from database
+        return this.authService.getUserProfile(req.user.userId);
     }
 
     @UseGuards(JwtAuthGuard)
@@ -69,6 +73,13 @@ export class AuthController {
     @HttpCode(HttpStatus.OK)
     async updatePassword(@Request() req, @Body() updatePasswordDto: UpdatePasswordDto) {
         return this.authService.updatePassword(req.user.userId, updatePasswordDto);
+    }
+
+    @UseGuards(JwtAuthGuard)
+    @Put('profile')
+    @HttpCode(HttpStatus.OK)
+    async updateProfile(@Request() req, @Body() updateProfileDto: UpdateProfileDto) {
+        return this.authService.updateUserProfile(req.user.userId, updateProfileDto);
     }
 
     @Public()
@@ -97,5 +108,33 @@ export class AuthController {
         const userAgent = req.headers['user-agent'];
         const ipAddress = req.ip || req.headers['x-forwarded-for'];
         return this.authService.login(req.user, userAgent, ipAddress);
+    }
+
+    @UseGuards(JwtAuthGuard)
+    @Post('send-verification')
+    @HttpCode(HttpStatus.OK)
+    async sendVerification(@Request() req) {
+        return this.authService.sendVerificationEmail(req.user.userId);
+    }
+
+    @Public()
+    @Post('verify-email')
+    @HttpCode(HttpStatus.OK)
+    async verifyEmail(@Body() verifyEmailDto: VerifyEmailDto) {
+        return this.authService.verifyEmail(verifyEmailDto.token);
+    }
+
+    @Public()
+    @Post('forgot-password')
+    @HttpCode(HttpStatus.OK)
+    async forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
+        return this.authService.forgotPassword(forgotPasswordDto.email);
+    }
+
+    @Public()
+    @Post('reset-password')
+    @HttpCode(HttpStatus.OK)
+    async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
+        return this.authService.resetPassword(resetPasswordDto.token, resetPasswordDto.newPassword);
     }
 }

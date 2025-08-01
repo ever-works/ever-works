@@ -15,6 +15,7 @@ import * as bcrypt from 'bcrypt';
 import { RegisterDto, UpdatePasswordDto } from '../dto/auth.dto';
 import { randomBytes, randomUUID } from 'crypto';
 import { jwtConstants, authConstants, AuthProviders } from '@src/config/constants';
+import { User } from '@packages/agent/entities';
 
 @Injectable()
 export class AuthService {
@@ -35,6 +36,18 @@ export class AuthService {
 
         const isMatch = await bcrypt.compare(password, user.password);
         if (isMatch) {
+            // Check if user is active
+            if (!user.isActive) {
+                throw new UnauthorizedException('Account is suspended');
+            }
+
+            // Check if email is verified (optional - you can make this required)
+            if (!user.emailVerified) {
+                this.logger.warn(`User ${user.id} logged in with unverified email`);
+                // You can throw here to require email verification:
+                // throw new UnauthorizedException('Please verify your email before logging in');
+            }
+
             const { password, ...result } = user;
             return result;
         }
@@ -61,7 +74,9 @@ export class AuthService {
             username,
             email,
             password: hashedPassword,
-            provider: AuthProviders.LOCAL,
+            registrationProvider: AuthProviders.LOCAL,
+            emailVerified: false,
+            isActive: true,
         });
 
         const { password: _, ...userWithoutPassword } = user;
@@ -69,16 +84,27 @@ export class AuthService {
     }
 
     async login(user: any, userAgent?: string, ipAddress?: string) {
+        // Update last login info
+        await this.userRepository.update(user.id, {
+            lastLoginAt: new Date(),
+            lastLoginIp: ipAddress,
+        });
+
         return this.generateTokens(user, userAgent, ipAddress);
     }
 
     private async generateTokens(
-        user: any,
+        user: Omit<User, 'password' | 'getGitToken' | 'asCommitter'>,
         userAgent?: string,
         ipAddress?: string,
         oldRefreshToken?: string,
     ) {
-        const payload = { email: user.email, sub: user.id };
+        const payload = {
+            email: user.email,
+            sub: user.id,
+            provider: user.registrationProvider,
+        };
+
         const accessToken = this.jwtService.sign(payload, {
             expiresIn: jwtConstants.accessTokenExpiration(),
             secret: jwtConstants.secret(),
@@ -218,15 +244,16 @@ export class AuthService {
                 username: profile.username || profile.displayName,
                 email: email,
                 password: hashedPassword,
-                githubId: profile.id,
-                provider: AuthProviders.GITHUB,
+                registrationProvider: AuthProviders.GITHUB,
                 avatar: profile.photos?.[0]?.value,
+                emailVerified: true, // GitHub emails are pre-verified
+                isActive: true,
             });
         } else {
             // Update user info if exists
             await this.userRepository.update(user.id, {
-                githubId: profile.id,
                 avatar: profile.photos?.[0]?.value || user.avatar,
+                lastLoginAt: new Date(),
             });
         }
 
@@ -268,15 +295,16 @@ export class AuthService {
                 username: profile.displayName || email.split('@')[0],
                 email: email,
                 password: hashedPassword,
-                googleId: profile.id,
-                provider: AuthProviders.GOOGLE,
+                registrationProvider: AuthProviders.GOOGLE,
                 avatar: profile.photos?.[0]?.value,
+                emailVerified: true, // Google emails are pre-verified
+                isActive: true,
             });
         } else {
             // Update user info if exists
             await this.userRepository.update(user.id, {
-                googleId: profile.id,
                 avatar: profile.photos?.[0]?.value || user.avatar,
+                lastLoginAt: new Date(),
             });
         }
 
@@ -315,5 +343,162 @@ export class AuthService {
             'User logged out from all devices',
         );
         return { message: 'Logged out from all devices successfully' };
+    }
+
+    async sendVerificationEmail(userId: string) {
+        const user = await this.userRepository.findById(userId);
+        if (!user) {
+            throw new BadRequestException('User not found');
+        }
+
+        if (user.emailVerified) {
+            throw new BadRequestException('Email already verified');
+        }
+
+        const verificationToken = randomBytes(32).toString('hex');
+        const expires = new Date();
+        expires.setHours(expires.getHours() + 24); // 24 hour expiry
+
+        await this.userRepository.update(userId, {
+            emailVerificationToken: verificationToken,
+            emailVerificationExpires: expires,
+        });
+
+        // TODO: Send email with verification link
+        // For now, return the token (in production, this would be sent via email)
+        return {
+            message: 'Verification email sent',
+            // Remove this in production
+            verificationToken,
+            expiresAt: expires,
+        };
+    }
+
+    async verifyEmail(token: string) {
+        const user = await this.userRepository.findOne({
+            where: { emailVerificationToken: token },
+        });
+
+        if (!user) {
+            throw new BadRequestException('Invalid verification token');
+        }
+
+        if (user.emailVerificationExpires && new Date() > user.emailVerificationExpires) {
+            throw new BadRequestException('Verification token expired');
+        }
+
+        await this.userRepository.update(user.id, {
+            emailVerified: true,
+            emailVerificationToken: null,
+            emailVerificationExpires: null,
+        });
+
+        return { message: 'Email verified successfully' };
+    }
+
+    async forgotPassword(email: string) {
+        const user = await this.userRepository.findByEmail(email);
+        if (!user) {
+            // Don't reveal if email exists
+            return { message: 'If the email exists, a reset link has been sent' };
+        }
+
+        const resetToken = randomBytes(32).toString('hex');
+        const expires = new Date();
+        expires.setHours(expires.getHours() + 1); // 1 hour expiry
+
+        await this.userRepository.update(user.id, {
+            passwordResetToken: resetToken,
+            passwordResetExpires: expires,
+        });
+
+        // TODO: Send email with reset link
+        // For now, return the token (in production, this would be sent via email)
+        return {
+            message: 'If the email exists, a reset link has been sent',
+            // Remove this in production
+            resetToken,
+            expiresAt: expires,
+        };
+    }
+
+    async resetPassword(token: string, newPassword: string) {
+        const user = await this.userRepository.findOne({
+            where: { passwordResetToken: token },
+        });
+
+        if (!user) {
+            throw new BadRequestException('Invalid reset token');
+        }
+
+        if (user.passwordResetExpires && new Date() > user.passwordResetExpires) {
+            throw new BadRequestException('Reset token expired');
+        }
+
+        const hashedPassword = await bcrypt.hash(newPassword, authConstants.bcryptSaltRounds);
+
+        await this.userRepository.update(user.id, {
+            password: hashedPassword,
+            passwordResetToken: null,
+            passwordResetExpires: null,
+        });
+
+        // Revoke all refresh tokens for security
+        await this.refreshTokenRepository.revokeAllUserTokens(user.id, 'Password reset');
+
+        return { message: 'Password reset successfully' };
+    }
+
+    async getUserProfile(userId: string) {
+        const user = await this.userRepository.findById(userId);
+        if (!user) {
+            throw new BadRequestException('User not found');
+        }
+
+        // Return user data without sensitive fields
+        const {
+            password,
+            emailVerificationToken,
+            emailVerificationExpires,
+            passwordResetToken,
+            passwordResetExpires,
+            ...userProfile
+        } = user;
+
+        // Add connected providers info
+        const connectedProviders =
+            user.oauthTokens?.map((token) => ({
+                provider: token.provider,
+                connectedAt: token.createdAt,
+            })) || [];
+
+        return {
+            ...userProfile,
+            connectedProviders,
+        };
+    }
+
+    async updateUserProfile(userId: string, updateData: { username?: string; avatar?: string }) {
+        const user = await this.userRepository.findById(userId);
+        if (!user) {
+            throw new BadRequestException('User not found');
+        }
+
+        // Check if username is being changed and if it's already taken
+        if (updateData.username && updateData.username !== user.username) {
+            const existingUser = await this.userRepository.findByUsername(updateData.username);
+            if (existingUser) {
+                throw new ConflictException('Username already taken');
+            }
+        }
+
+        // Update user profile
+        await this.userRepository.update(userId, {
+            ...(updateData.username && { username: updateData.username }),
+            ...(updateData.avatar && { avatar: updateData.avatar }),
+        });
+
+        // Return updated profile
+        return this.getUserProfile(userId);
     }
 }

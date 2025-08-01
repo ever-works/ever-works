@@ -11,23 +11,44 @@ export class User {
     @Column()
     username: string;
 
-    @Column()
+    @Column({ unique: true })
     email: string;
 
     @Column()
     password: string;
 
-    @Column({ nullable: true })
-    githubId: string;
-
-    @Column({ nullable: true })
-    googleId: string;
-
     @Column({ default: 'local' })
-    provider: string;
+    registrationProvider: string; // 'local', 'github', 'google' - how user initially signed up
 
     @Column({ nullable: true })
     avatar: string;
+
+    // Email verification
+    @Column({ default: false })
+    emailVerified: boolean;
+
+    @Column({ nullable: true })
+    emailVerificationToken: string;
+
+    @Column({ nullable: true })
+    emailVerificationExpires: Date;
+
+    // User status
+    @Column({ default: true })
+    isActive: boolean;
+
+    @Column({ nullable: true })
+    lastLoginAt: Date;
+
+    @Column({ nullable: true })
+    lastLoginIp: string;
+
+    // Password reset
+    @Column({ nullable: true })
+    passwordResetToken: string;
+
+    @Column({ nullable: true })
+    passwordResetExpires: Date;
 
     @Column({ default: () => 'CURRENT_TIMESTAMP' })
     createdAt: Date;
@@ -62,8 +83,8 @@ export class User {
         }
 
         // Find GitHub token
-        const githubToken = this.oauthTokens.find(token => token.provider === 'github');
-        
+        const githubToken = this.oauthTokens.find((token) => token.provider === 'github');
+
         if (!githubToken) {
             return null;
         }
