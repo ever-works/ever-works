@@ -4,9 +4,10 @@ import chalk from 'chalk';
 import ora from 'ora';
 import inquirer from 'inquirer';
 import { DirectoryRepository } from '@packages/agent/database';
-import { AgentService } from '@packages/agent/http';
+import { AgentService } from '@packages/agent/services';
 import { DirectoryPromptService } from './directory-prompt.service';
 import { ConfigCheckService } from './config-check.service';
+import { User } from '@packages/agent/entities';
 
 @SubCommand({
     name: 'remove-item',
@@ -78,8 +79,14 @@ export class RemoveItemSubCommand extends CommandRunner {
             const spinner = ora('Removing item...').start();
 
             try {
+                const user = await User.sessionMock();
+
                 // Call the agent service method directly
-                const result = await this.agentService.removeItem(directory.slug, removalData);
+                const result = await this.agentService.removeItem(
+                    directory.slug,
+                    removalData,
+                    user,
+                );
 
                 if (result.status === 'error') {
                     spinner.fail('Failed to remove item');

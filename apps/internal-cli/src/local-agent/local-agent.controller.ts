@@ -1,49 +1,36 @@
-import {
-    Body,
-    Controller,
-    Get,
-    HttpCode,
-    HttpStatus,
-    Logger,
-    Param,
-    Post,
-    Query,
-} from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Query } from '@nestjs/common';
+import { CreateDirectoryDto } from '@packages/agent/dto';
+import { User } from '@packages/agent/entities';
 import {
     CreateItemsGeneratorDto,
-    UpdateItemsGeneratorDto,
-} from '../items-generator/dto/create-items-generator.dto';
-import { ItemsGeneratorResponseDto } from '../items-generator/dto/items-generator-response.dto';
-import {
-    SubmitItemDto,
-    SubmitItemResponseDto,
-    RemoveItemDto,
-    RemoveItemResponseDto,
-    ExtractItemDetailsDto,
-    ExtractItemDetailsResponseDto,
     DeleteItemsGeneratorDto,
     DeleteItemsGeneratorResponseDto,
-} from '../items-generator/dto';
-import { CreateDirectoryDto } from '../dto/create-directory.dto';
-import { UpdateWebsiteRepositoryResponseDto } from '../website-generator/dto/update-website-repository.dto';
-import { AgentService } from './agent.service';
+    ExtractItemDetailsDto,
+    ExtractItemDetailsResponseDto,
+    ItemsGeneratorResponseDto,
+    RemoveItemDto,
+    RemoveItemResponseDto,
+    SubmitItemDto,
+    SubmitItemResponseDto,
+    UpdateItemsGeneratorDto,
+} from '@packages/agent/items-generator';
+import { AgentService } from '@packages/agent/services';
+import { UpdateWebsiteRepositoryResponseDto } from '@packages/agent/website-generator';
 
 @Controller()
-export class AgentHTTPController {
+export class LocalAgentController {
     constructor(private readonly agentService: AgentService) {}
 
     @Get('directories')
     @HttpCode(HttpStatus.OK)
-    async getDirectories(
-        @Query('owner') owner?: string,
-        @Query('limit') limit?: string,
-        @Query('offset') offset?: string,
-    ) {
+    async getDirectories(@Query('limit') limit?: string, @Query('offset') offset?: string) {
         const parsedLimit = limit !== undefined ? Number(limit) : undefined;
         const parsedOffset = offset !== undefined ? Number(offset) : undefined;
 
+        const user = await User.sessionMock();
+
         return this.agentService.getDirectories({
-            owner,
+            owner: user.username,
             limit: parsedLimit && !isNaN(parsedLimit) ? parsedLimit : undefined,
             offset: parsedOffset && !isNaN(parsedOffset) ? parsedOffset : undefined,
         });
@@ -52,7 +39,8 @@ export class AgentHTTPController {
     @Post('directories')
     @HttpCode(HttpStatus.OK)
     async createDirectory(@Body() createDirectoryDto: CreateDirectoryDto) {
-        return this.agentService.createDirectory(createDirectoryDto);
+        const user = await User.sessionMock();
+        return this.agentService.createDirectory(createDirectoryDto, user);
     }
 
     @Post('generate')
@@ -60,8 +48,9 @@ export class AgentHTTPController {
     async generateItemsGenerator(
         @Body() createItemsGeneratorDto: CreateItemsGeneratorDto,
     ): Promise<ItemsGeneratorResponseDto> {
+        const user = await User.sessionMock();
         // We don't await completion here, as the request can take a long time
-        return this.agentService.generateItemsGenerator(createItemsGeneratorDto, false);
+        return this.agentService.generateItemsGenerator(createItemsGeneratorDto, user, false);
     }
 
     @Post('update/:slug')
@@ -70,8 +59,10 @@ export class AgentHTTPController {
         @Param('slug') slug: string,
         @Body() updateItemsGeneratorDto: UpdateItemsGeneratorDto,
     ): Promise<ItemsGeneratorResponseDto> {
+        const user = await User.sessionMock();
+
         // We don't await completion here, as the request can take a long time
-        return this.agentService.updateItemsGenerator(slug, updateItemsGeneratorDto, false);
+        return this.agentService.updateItemsGenerator(slug, updateItemsGeneratorDto, user, false);
     }
 
     @Post('submit-item/:slug')
@@ -80,7 +71,9 @@ export class AgentHTTPController {
         @Param('slug') slug: string,
         @Body() submitItemDto: SubmitItemDto,
     ): Promise<SubmitItemResponseDto> {
-        return this.agentService.submitItem(slug, submitItemDto);
+        const user = await User.sessionMock();
+
+        return this.agentService.submitItem(slug, submitItemDto, user);
     }
 
     @Post('remove-item/:slug')
@@ -89,7 +82,9 @@ export class AgentHTTPController {
         @Param('slug') slug: string,
         @Body() removeItemDto: RemoveItemDto,
     ): Promise<RemoveItemResponseDto> {
-        return this.agentService.removeItem(slug, removeItemDto);
+        const user = await User.sessionMock();
+
+        return this.agentService.removeItem(slug, removeItemDto, user);
     }
 
     @Post('extract-item-details')
@@ -105,7 +100,9 @@ export class AgentHTTPController {
     async regenerateMarkdown(
         @Param('slug') slug: string,
     ): Promise<{ status: string; error_details?: string }> {
-        return this.agentService.regenerateMarkdown(slug);
+        const user = await User.sessionMock();
+
+        return this.agentService.regenerateMarkdown(slug, user);
     }
 
     @Post('update-website/:slug')
@@ -113,7 +110,9 @@ export class AgentHTTPController {
     async updateWebsiteRepository(
         @Param('slug') slug: string,
     ): Promise<UpdateWebsiteRepositoryResponseDto> {
-        return this.agentService.updateWebsiteRepository(slug);
+        const user = await User.sessionMock();
+
+        return this.agentService.updateWebsiteRepository(slug, user);
     }
 
     @Post('delete/:slug')
@@ -122,6 +121,8 @@ export class AgentHTTPController {
         @Param('slug') slug: string,
         @Body() deleteItemsGeneratorDto: DeleteItemsGeneratorDto,
     ): Promise<DeleteItemsGeneratorResponseDto> {
-        return this.agentService.deleteItemsGenerator(slug, deleteItemsGeneratorDto);
+        const user = await User.sessionMock();
+
+        return this.agentService.deleteItemsGenerator(slug, deleteItemsGeneratorDto, user);
     }
 }

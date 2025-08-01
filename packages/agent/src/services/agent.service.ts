@@ -72,9 +72,8 @@ export class AgentService {
         }
     }
 
-    async createDirectory(createDirectoryDto: CreateDirectoryDto) {
+    async createDirectory(createDirectoryDto: CreateDirectoryDto, user: User) {
         const { slug, name, description, owner } = createDirectoryDto;
-        const user = await User.sessionMock();
 
         const ghOwner = await this.githubService.getUser(await user.getGitToken());
 
@@ -97,9 +96,9 @@ export class AgentService {
 
     async generateItemsGenerator(
         createItemsGeneratorDto: CreateItemsGeneratorDto,
+        user: User,
         awaitCompletion = true,
     ): Promise<ItemsGeneratorResponseDto> {
-        const user = await User.sessionMock();
         const directory = await this.directoryRepository.findBySlug(createItemsGeneratorDto.slug);
         if (!directory) {
             throw new NotFoundException('Directory not found');
@@ -122,9 +121,9 @@ export class AgentService {
     async updateItemsGenerator(
         slug: string,
         updateItemsGeneratorDto: UpdateItemsGeneratorDto,
+        user: User,
         awaitCompletion = true,
     ): Promise<ItemsGeneratorResponseDto> {
-        const user = await User.sessionMock();
         const directory = await this.directoryRepository.findBySlug(slug);
         if (!directory) {
             throw new NotFoundException('Directory not found');
@@ -157,10 +156,12 @@ export class AgentService {
         };
     }
 
-    async submitItem(slug: string, submitItemDto: SubmitItemDto): Promise<SubmitItemResponseDto> {
+    async submitItem(
+        slug: string,
+        submitItemDto: SubmitItemDto,
+        user: User,
+    ): Promise<SubmitItemResponseDto> {
         try {
-            const user = await User.sessionMock();
-
             // Check if directory exists for the given slug
             const directory = await this.directoryRepository.findBySlug(slug);
             if (!directory) {
@@ -201,10 +202,12 @@ export class AgentService {
         }
     }
 
-    async removeItem(slug: string, removeItemDto: RemoveItemDto): Promise<RemoveItemResponseDto> {
+    async removeItem(
+        slug: string,
+        removeItemDto: RemoveItemDto,
+        user: User,
+    ): Promise<RemoveItemResponseDto> {
         try {
-            const user = await User.sessionMock();
-
             // Check if directory exists for the given slug
             const directory = await this.directoryRepository.findBySlug(slug);
             if (!directory) {
@@ -285,10 +288,11 @@ export class AgentService {
         }
     }
 
-    async regenerateMarkdown(slug: string): Promise<{ status: string; error_details?: string }> {
+    async regenerateMarkdown(
+        slug: string,
+        user: User,
+    ): Promise<{ status: string; error_details?: string }> {
         try {
-            const user = await User.sessionMock();
-
             // Check if directory exists for the given slug
             const directory = await this.directoryRepository.findBySlug(slug);
             if (!directory) {
@@ -313,10 +317,11 @@ export class AgentService {
         }
     }
 
-    async updateWebsiteRepository(slug: string): Promise<UpdateWebsiteRepositoryResponseDto> {
+    async updateWebsiteRepository(
+        slug: string,
+        user: User,
+    ): Promise<UpdateWebsiteRepositoryResponseDto> {
         try {
-            const user = await User.sessionMock();
-
             // Check if directory exists for the given slug
             const directory = await this.directoryRepository.findBySlug(slug);
             if (!directory) {
@@ -350,10 +355,9 @@ export class AgentService {
     async deleteItemsGenerator(
         slug: string,
         deleteItemsGeneratorDto: DeleteItemsGeneratorDto,
+        user: User,
     ): Promise<DeleteItemsGeneratorResponseDto> {
         try {
-            const user = await User.sessionMock();
-
             // Check if directory exists for the given slug
             const directory = await this.directoryRepository.findBySlug(slug);
             if (!directory) {

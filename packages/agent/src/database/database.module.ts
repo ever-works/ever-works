@@ -6,7 +6,7 @@ import { RefreshTokenRepository } from './refresh-token.repository';
 import { OAuthTokenRepository } from './oauth-token.repository';
 import { databaseConfig, ENTITIES } from './database.config';
 import { UserRepository } from './user.repository';
-import { UserGitHubService } from '../services/user-github.service';
+import { UserGitHubService } from './user-github.service';
 
 @Module({
     imports: [
@@ -23,7 +23,20 @@ import { UserGitHubService } from '../services/user-github.service';
         }),
         TypeOrmModule.forFeature(ENTITIES),
     ],
-    providers: [DirectoryRepository, RefreshTokenRepository, UserRepository, OAuthTokenRepository, UserGitHubService],
-    exports: [TypeOrmModule, DirectoryRepository, UserRepository, RefreshTokenRepository, OAuthTokenRepository, UserGitHubService],
+    providers: [
+        DirectoryRepository,
+        RefreshTokenRepository,
+        UserRepository,
+        OAuthTokenRepository,
+        UserGitHubService,
+    ],
+    exports: [
+        TypeOrmModule,
+        DirectoryRepository,
+        UserRepository,
+        RefreshTokenRepository,
+        OAuthTokenRepository,
+        UserGitHubService,
+    ],
 })
 export class DatabaseModule {}

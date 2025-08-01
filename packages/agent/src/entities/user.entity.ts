@@ -2,8 +2,9 @@ import { randomUUID } from 'node:crypto';
 import { Entity, Column, PrimaryGeneratedColumn, OneToMany } from 'typeorm';
 import { slugifyText } from '../items-generator/utils/text.utils';
 import { OAuthToken } from './oauth-token.entity';
+import { ClassToObject } from './types';
 
-@Entity()
+@Entity({ name: 'users' })
 export class User {
     @PrimaryGeneratedColumn('uuid')
     id: string;
@@ -57,7 +58,7 @@ export class User {
     updatedAt: Date;
 
     @OneToMany(() => OAuthToken, (token) => token.user)
-    oauthTokens: OAuthToken[];
+    oauthTokens: ClassToObject<OAuthToken>[];
 
     mocked: boolean;
 

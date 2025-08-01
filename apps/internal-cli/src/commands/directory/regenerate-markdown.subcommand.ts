@@ -4,9 +4,10 @@ import chalk from 'chalk';
 import ora from 'ora';
 import inquirer from 'inquirer';
 import { DirectoryRepository } from '@packages/agent/database';
-import { AgentService } from '@packages/agent/http';
+import { AgentService } from '@packages/agent/services';
 import { DirectoryPromptService } from './directory-prompt.service';
 import { ConfigCheckService } from './config-check.service';
+import { User } from '@packages/agent/entities';
 
 @SubCommand({
     name: 'regenerate-markdown',
@@ -69,8 +70,10 @@ export class RegenerateMarkdownSubCommand extends CommandRunner {
             const spinner = ora('Regenerating markdown files...').start();
 
             try {
+                const user = await User.sessionMock();
+
                 // Call the agent service method directly
-                const result = await this.agentService.regenerateMarkdown(directory.slug);
+                const result = await this.agentService.regenerateMarkdown(directory.slug, user);
 
                 if (result.status === 'success') {
                     spinner.succeed('Markdown files regenerated successfully');

@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { AgentHTTPController } from './agent-http.controller';
 import { DataGeneratorModule } from '../data-generator/data-generator.module';
 import { ItemsGeneratorModule } from '../items-generator/items-generator.module';
 import { GitModule } from '../git/git.module';
@@ -19,8 +18,7 @@ import { AgentService } from './agent.service';
         WebsiteGeneratorModule,
         DeployModule,
     ],
-    controllers: [AgentHTTPController],
     providers: [AgentService],
     exports: [AgentService],
 })
-export class AgentHTTPModule {}
+export class AgentModule {}

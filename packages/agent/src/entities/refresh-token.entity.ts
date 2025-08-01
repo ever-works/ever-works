@@ -7,8 +7,9 @@ import {
     Index,
 } from 'typeorm';
 import { User } from './user.entity';
+import { ClassToObject } from './types';
 
-@Entity()
+@Entity({ name: 'refresh_tokens' })
 @Index(['token'], { unique: true })
 @Index(['expiresAt'])
 export class RefreshToken {
@@ -22,7 +23,7 @@ export class RefreshToken {
     userId: string;
 
     @ManyToOne(() => User, { onDelete: 'CASCADE' })
-    user: User;
+    user: ClassToObject<User>;
 
     @Column()
     expiresAt: Date;

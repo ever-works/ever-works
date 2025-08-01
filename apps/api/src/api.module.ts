@@ -1,13 +1,12 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
-import { AgentHTTPModule } from '@packages/agent/http';
 import { AuthModule } from './auth/auth.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { throttlerConfig } from './config/throttler.config';
 
 @Module({
-    imports: [ThrottlerModule.forRoot(throttlerConfig), AgentHTTPModule, AuthModule],
+    imports: [ThrottlerModule.forRoot(throttlerConfig), AuthModule],
     providers: [
         {
             provide: APP_GUARD,

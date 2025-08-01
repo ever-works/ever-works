@@ -109,10 +109,9 @@ export async function getCredentials(): Promise<Credentials | null> {
 export async function requireAuth(): Promise<void> {
     const credentials = await getCredentials();
     if (!credentials) {
-        //TODO: Uncomment this when customer authentication is supported by the API.
-        // console.error(
-        //     chalk.red('\n✗ Not authenticated. Please run "ever-works auth login" first.'),
-        // );
-        // process.exit(1);
+        console.error(
+            chalk.red('\n✗ Not authenticated. Please run "ever-works auth login" first.'),
+        );
+        process.exit(1);
     }
 }

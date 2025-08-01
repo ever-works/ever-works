@@ -4,7 +4,7 @@ import chalk from 'chalk';
 import ora from 'ora';
 import inquirer from 'inquirer';
 import { DirectoryRepository } from '@packages/agent/database';
-import { AgentService } from '@packages/agent/http';
+import { AgentService } from '@packages/agent/services';
 import {
     CreateItemsGeneratorDto,
     CompanyDto,
@@ -14,6 +14,7 @@ import {
 } from '@packages/agent/items-generator';
 import { DirectoryPromptService } from './directory-prompt.service';
 import { ConfigCheckService } from './config-check.service';
+import { User } from '@packages/agent/entities';
 
 @SubCommand({
     name: 'generate',
@@ -97,7 +98,13 @@ export class GenerateSubCommand extends CommandRunner {
             const spinner = ora('Starting generation process...').start();
 
             try {
-                const result = await this.agentService.generateItemsGenerator(createDto, true);
+                const user = await User.sessionMock();
+
+                const result = await this.agentService.generateItemsGenerator(
+                    createDto,
+                    user,
+                    true,
+                );
                 spinner.succeed('Generation started successfully');
 
                 console.log(chalk.green('\n✓ Generation process started!'));

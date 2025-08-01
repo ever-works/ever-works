@@ -2,7 +2,7 @@ import { program } from 'commander';
 import * as fs from 'fs';
 import * as path from 'path';
 import dotenv from 'dotenv';
-// import { authCommand } from './commands/auth';
+import { authCommand } from './commands/auth';
 import { directoryCommand } from './commands/directory';
 
 // Load environment variables
@@ -19,7 +19,7 @@ program
     .version(packageJson.version);
 
 // commands
-// program.addCommand(authCommand); // TODO: Uncomment this when customer authentication is supported by the API.
+program.addCommand(authCommand);
 program.addCommand(directoryCommand);
 
 // Parse arguments

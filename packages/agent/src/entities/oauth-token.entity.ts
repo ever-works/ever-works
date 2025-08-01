@@ -5,21 +5,19 @@ import {
     ManyToOne,
     CreateDateColumn,
     UpdateDateColumn,
-    Index,
 } from 'typeorm';
 import { User } from './user.entity';
+import { ClassToObject } from './types';
 
-@Entity()
-@Index(['userId', 'provider'], { unique: true })
+@Entity({ name: 'oauth_tokens' })
 export class OAuthToken {
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
-    @Column()
     userId: string;
 
-    @ManyToOne(() => User, { onDelete: 'CASCADE' })
-    user: User;
+    @ManyToOne(() => User, (user) => user.oauthTokens, { onDelete: 'CASCADE' })
+    user: ClassToObject<User>;
 
     @Column()
     provider: string; // 'github', 'google', etc.

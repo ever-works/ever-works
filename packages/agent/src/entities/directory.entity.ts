@@ -1,6 +1,6 @@
 import { Entity, Column, PrimaryGeneratedColumn, Index } from 'typeorm';
 
-@Entity()
+@Entity({ name: 'directories' })
 @Index(['owner'], { unique: true })
 export class Directory {
     @PrimaryGeneratedColumn('uuid')

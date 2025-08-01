@@ -3,8 +3,8 @@ import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import chalk from 'chalk';
-import { AgentHTTPModule } from '@packages/agent/http';
 import { ConfigCheckService } from '../directory/config-check.service';
+import { LocalAgentModule } from '@src/local-agent/local-agent.module';
 
 interface ServeOptions {
     port?: string;
@@ -42,7 +42,7 @@ export class ServeCommand extends CommandRunner {
 
             try {
                 // Create NestJS application
-                const app = await NestFactory.create(AgentHTTPModule, {
+                const app = await NestFactory.create(LocalAgentModule, {
                     logger: ['error', 'warn', 'log'],
                 });
 
