@@ -1,2 +1,4 @@
 export * from './directory.entity';
 export * from './user.entity';
+export * from './refresh-token.entity';
+export * from './oauth-token.entity';

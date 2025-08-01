@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import { Entity, Column, PrimaryGeneratedColumn } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, OneToMany } from 'typeorm';
 import { slugifyText } from '../items-generator/utils/text.utils';
+import { OAuthToken } from './oauth-token.entity';
 
 @Entity()
 export class User {
@@ -34,6 +35,9 @@ export class User {
     @Column({ default: () => 'CURRENT_TIMESTAMP', onUpdate: 'CURRENT_TIMESTAMP' })
     updatedAt: Date;
 
+    @OneToMany(() => OAuthToken, (token) => token.user)
+    oauthTokens: OAuthToken[];
+
     mocked: boolean;
 
     static async sessionMock() {
@@ -47,12 +51,29 @@ export class User {
         return user;
     }
 
-    async getGitToken() {
+    async getGitToken(): Promise<string | null> {
         if (this.mocked) {
-            return process.env.GITHUB_APIKEY;
+            return process.env.GITHUB_APIKEY || null;
         }
 
-        return process.env.GITHUB_APIKEY;
+        // Check if oauth tokens are loaded
+        if (!this.oauthTokens) {
+            return null;
+        }
+
+        // Find GitHub token
+        const githubToken = this.oauthTokens.find(token => token.provider === 'github');
+        
+        if (!githubToken) {
+            return null;
+        }
+
+        // Check if token is expired
+        if (githubToken.expiresAt && new Date() > githubToken.expiresAt) {
+            return null;
+        }
+
+        return githubToken.accessToken;
     }
 
     asCommitter() {

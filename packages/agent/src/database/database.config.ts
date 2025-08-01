@@ -2,6 +2,8 @@ import { registerAs } from '@nestjs/config';
 import { TypeOrmModuleOptions } from '@nestjs/typeorm';
 import { Directory } from '../entities/directory.entity';
 import { User } from '../entities/user.entity';
+import { RefreshToken } from '../entities/refresh-token.entity';
+import { OAuthToken } from '../entities/oauth-token.entity';
 import * as path from 'path';
 import * as os from 'os';
 
@@ -22,7 +24,7 @@ export interface DatabaseConfig extends Omit<TypeOrmModuleOptions, 'type'> {
 	logging: boolean;
 }
 
-export const ENTITIES = [Directory, User];
+export const ENTITIES = [Directory, User, RefreshToken, OAuthToken];
 
 export const databaseConfig = registerAs('database', (): DatabaseConfig => {
 	const environment = process.env.NODE_ENV || 'development';

@@ -197,7 +197,7 @@ export class GithubService extends GitProvider {
             owner,
             repo,
             token,
-            committer,
+            committer: this.getCommitter(committer),
         });
 
         await this.remoteRemove(originalDir, 'origin');
@@ -231,7 +231,7 @@ export class GithubService extends GitProvider {
             owner,
             repo,
             token,
-            committer,
+            committer: this.getCommitter(committer),
         });
 
         await this.remoteRemove(originalDir, 'origin');

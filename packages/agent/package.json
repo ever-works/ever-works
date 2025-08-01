@@ -48,6 +48,10 @@
         "./website-generator": {
             "types": "./dist/website-generator/index.d.ts",
             "default": "./dist/website-generator/index.js"
+        },
+        "./services": {
+            "types": "./dist/services/index.d.ts",
+            "default": "./dist/services/index.js"
         }
     },
     "scripts": {
