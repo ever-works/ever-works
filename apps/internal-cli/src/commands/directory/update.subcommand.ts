@@ -77,7 +77,7 @@ export class UpdateSubCommand extends CommandRunner {
             const spinner = ora('Updating directory...').start();
 
             try {
-                const user = await User.sessionMock();
+                const user = await User.createLocalUser();
 
                 // Call the agent service method directly
                 const result = await this.agentService.updateItemsGenerator(

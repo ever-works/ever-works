@@ -120,7 +120,7 @@ export class DeleteSubCommand extends CommandRunner {
             const spinner = ora('Deleting directory and repositories...').start();
 
             try {
-                const user = await User.sessionMock();
+                const user = await User.createLocalUser();
 
                 // Call the agent service method directly
                 const result = await this.agentService.deleteItemsGenerator(

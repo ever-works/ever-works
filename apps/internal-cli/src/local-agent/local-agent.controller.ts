@@ -27,7 +27,7 @@ export class LocalAgentController {
         const parsedLimit = limit !== undefined ? Number(limit) : undefined;
         const parsedOffset = offset !== undefined ? Number(offset) : undefined;
 
-        const user = await User.sessionMock();
+        const user = await User.createLocalUser();
 
         return this.agentService.getDirectories({
             owner: user.username,
@@ -39,7 +39,7 @@ export class LocalAgentController {
     @Post('directories')
     @HttpCode(HttpStatus.OK)
     async createDirectory(@Body() createDirectoryDto: CreateDirectoryDto) {
-        const user = await User.sessionMock();
+        const user = await User.createLocalUser();
         return this.agentService.createDirectory(createDirectoryDto, user);
     }
 
@@ -48,7 +48,7 @@ export class LocalAgentController {
     async generateItemsGenerator(
         @Body() createItemsGeneratorDto: CreateItemsGeneratorDto,
     ): Promise<ItemsGeneratorResponseDto> {
-        const user = await User.sessionMock();
+        const user = await User.createLocalUser();
         // We don't await completion here, as the request can take a long time
         return this.agentService.generateItemsGenerator(createItemsGeneratorDto, user, false);
     }
@@ -59,7 +59,7 @@ export class LocalAgentController {
         @Param('slug') slug: string,
         @Body() updateItemsGeneratorDto: UpdateItemsGeneratorDto,
     ): Promise<ItemsGeneratorResponseDto> {
-        const user = await User.sessionMock();
+        const user = await User.createLocalUser();
 
         // We don't await completion here, as the request can take a long time
         return this.agentService.updateItemsGenerator(slug, updateItemsGeneratorDto, user, false);
@@ -71,7 +71,7 @@ export class LocalAgentController {
         @Param('slug') slug: string,
         @Body() submitItemDto: SubmitItemDto,
     ): Promise<SubmitItemResponseDto> {
-        const user = await User.sessionMock();
+        const user = await User.createLocalUser();
 
         return this.agentService.submitItem(slug, submitItemDto, user);
     }
@@ -82,7 +82,7 @@ export class LocalAgentController {
         @Param('slug') slug: string,
         @Body() removeItemDto: RemoveItemDto,
     ): Promise<RemoveItemResponseDto> {
-        const user = await User.sessionMock();
+        const user = await User.createLocalUser();
 
         return this.agentService.removeItem(slug, removeItemDto, user);
     }
@@ -100,7 +100,7 @@ export class LocalAgentController {
     async regenerateMarkdown(
         @Param('slug') slug: string,
     ): Promise<{ status: string; error_details?: string }> {
-        const user = await User.sessionMock();
+        const user = await User.createLocalUser();
 
         return this.agentService.regenerateMarkdown(slug, user);
     }
@@ -110,7 +110,7 @@ export class LocalAgentController {
     async updateWebsiteRepository(
         @Param('slug') slug: string,
     ): Promise<UpdateWebsiteRepositoryResponseDto> {
-        const user = await User.sessionMock();
+        const user = await User.createLocalUser();
 
         return this.agentService.updateWebsiteRepository(slug, user);
     }
@@ -121,7 +121,7 @@ export class LocalAgentController {
         @Param('slug') slug: string,
         @Body() deleteItemsGeneratorDto: DeleteItemsGeneratorDto,
     ): Promise<DeleteItemsGeneratorResponseDto> {
-        const user = await User.sessionMock();
+        const user = await User.createLocalUser();
 
         return this.agentService.deleteItemsGenerator(slug, deleteItemsGeneratorDto, user);
     }

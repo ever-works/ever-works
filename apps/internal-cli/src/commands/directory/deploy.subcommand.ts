@@ -74,7 +74,7 @@ export class DeploySubCommand extends CommandRunner {
 
             try {
                 // Get user and call the service method directly
-                const user = await User.sessionMock();
+                const user = await User.createLocalUser();
                 
                 // Call the vercel service
                 await this.vercelService.deploy(

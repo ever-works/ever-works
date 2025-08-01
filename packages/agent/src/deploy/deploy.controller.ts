@@ -21,7 +21,7 @@ export class DeployController {
 		if (!directory) {
 			throw new NotFoundException('Directory not found');
 		}
-		const user = await User.sessionMock();
+		const user = await User.createLocalUser();
 
 		await this.vercelService.deploy(
 			{

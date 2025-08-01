@@ -98,7 +98,7 @@ export class GenerateSubCommand extends CommandRunner {
             const spinner = ora('Starting generation process...').start();
 
             try {
-                const user = await User.sessionMock();
+                const user = await User.createLocalUser();
 
                 const result = await this.agentService.generateItemsGenerator(
                     createDto,

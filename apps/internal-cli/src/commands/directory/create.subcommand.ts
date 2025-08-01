@@ -36,7 +36,7 @@ export class CreateSubCommand extends CommandRunner {
             const loadingSpinner = ora('Loading...').start();
 
             // Get user information
-            const user = await User.sessionMock();
+            const user = await User.createLocalUser();
             const token = await user.getGitToken();
             if (!token) {
                 throw new Error('GitHub token is required');

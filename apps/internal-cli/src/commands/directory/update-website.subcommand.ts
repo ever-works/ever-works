@@ -76,7 +76,7 @@ export class UpdateWebsiteSubCommand extends CommandRunner {
             const spinner = ora('Updating website repository...').start();
 
             try {
-                const user = await User.sessionMock();
+                const user = await User.createLocalUser();
 
                 // Call the agent service method directly
                 const result = await this.agentService.updateWebsiteRepository(

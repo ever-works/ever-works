@@ -70,7 +70,7 @@ export class RegenerateMarkdownSubCommand extends CommandRunner {
             const spinner = ora('Regenerating markdown files...').start();
 
             try {
-                const user = await User.sessionMock();
+                const user = await User.createLocalUser();
 
                 // Call the agent service method directly
                 const result = await this.agentService.regenerateMarkdown(directory.slug, user);

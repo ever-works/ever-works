@@ -80,7 +80,7 @@ export class SubmitItemSubCommand extends CommandRunner {
             const spinner = ora('Submitting item...').start();
 
             try {
-                const user = await User.sessionMock();
+                const user = await User.createLocalUser();
 
                 // Call the agent service method directly
                 const result = await this.agentService.submitItem(directory.slug, itemData, user);

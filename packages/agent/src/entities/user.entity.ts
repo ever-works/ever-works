@@ -60,13 +60,13 @@ export class User {
     @OneToMany(() => OAuthToken, (token) => token.user)
     oauthTokens: ClassToObject<OAuthToken>[];
 
-    mocked: boolean;
+    local: boolean = false;
 
-    static async sessionMock() {
+    static async createLocalUser() {
         const user = new User();
 
         user.id = slugifyText(process.env.GIT_NAME || randomUUID());
-        user.mocked = true;
+        user.local = true;
         user.username = process.env.GIT_NAME;
         user.email = process.env.GIT_EMAIL;
 
@@ -74,7 +74,7 @@ export class User {
     }
 
     async getGitToken(): Promise<string | null> {
-        if (this.mocked) {
+        if (this.local) {
             return process.env.GITHUB_APIKEY || null;
         }
 
