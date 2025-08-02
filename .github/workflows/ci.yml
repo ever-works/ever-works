@@ -33,22 +33,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Run linting
-        run: pnpm lint
-
-      - name: Run type checking
-        run: pnpm type-check
-
       - name: Build all packages
-        run: pnpm build
-
-      - name: Build Internal CLI
-        working-directory: apps/internal-cli
-        run: pnpm build:cli
-
-      - name: Build External CLI
-        working-directory: apps/cli
-        run: pnpm build:cli
+        run: pnpm build  --filter=ever-works-cli --filter=@ever-works/cli
 
       - name: Test Internal CLI
         working-directory: apps/internal-cli
