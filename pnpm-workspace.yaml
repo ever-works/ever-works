@@ -1,12 +1,15 @@
 packages:
-    - apps/*
-    - packages/*
+  - apps/*
+  - packages/*
 
 onlyBuiltDependencies:
-    - '@nestjs/core'
-    - '@swc/core'
-    - better-sqlite3
-    - core-js
-    - esbuild
-    - msgpackr-extract
-    - sqlite3
+  - '@nestjs/core'
+  - '@swc/core'
+  - '@tailwindcss/oxide'
+  - bcrypt
+  - better-sqlite3
+  - core-js
+  - esbuild
+  - msgpackr-extract
+  - sharp
+  - sqlite3
