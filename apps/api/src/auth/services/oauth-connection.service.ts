@@ -4,7 +4,7 @@ import { OAuthTokenRepository } from '@packages/agent/database';
 import { OAuthTokenService } from './oauth-token.service';
 import { firstValueFrom } from 'rxjs';
 import { randomBytes } from 'crypto';
-import { AuthProviders } from '@src/config/constants';
+import { AuthProviders, config } from '@src/config/constants';
 import { GitHubScopePresets, hasRequiredAgentScopes } from '../config/github-scopes.config';
 
 interface ConnectionInfo {
@@ -27,6 +27,10 @@ interface GitHubRepository {
     };
 }
 
+/**
+ * Service to manage OAuth connections for users
+ * Handles connection, disconnection, and scope management
+ */
 @Injectable()
 export class OAuthConnectionService {
     private readonly logger = new Logger(OAuthConnectionService.name);
@@ -43,7 +47,7 @@ export class OAuthConnectionService {
      */
     async getUserConnections(userId: string): Promise<ConnectionInfo[]> {
         const tokens = await this.oauthTokenRepository.findByUserId(userId);
-        
+
         const connections: ConnectionInfo[] = [
             {
                 provider: AuthProviders.GITHUB,
@@ -56,7 +60,7 @@ export class OAuthConnectionService {
         ];
 
         for (const token of tokens) {
-            const connection = connections.find(c => c.provider === token.provider);
+            const connection = connections.find((c) => c.provider === token.provider);
             if (connection) {
                 connection.connected = true;
                 connection.scopes = token.scope?.split(' ') || [];
@@ -73,7 +77,7 @@ export class OAuthConnectionService {
      */
     async checkConnection(userId: string, provider: string): Promise<ConnectionInfo> {
         const token = await this.oauthTokenRepository.findByUserAndProvider(userId, provider);
-        
+
         return {
             provider,
             connected: !!token,
@@ -86,9 +90,13 @@ export class OAuthConnectionService {
     /**
      * Generate OAuth authorization URL for connecting a provider
      */
-    async getConnectionUrl(userId: string, provider: string, additionalScopes?: string[]): Promise<string> {
+    async getConnectionUrl(
+        userId: string,
+        provider: string,
+        additionalScopes?: string[],
+    ): Promise<string> {
         const state = this.generateState(userId);
-        
+
         switch (provider) {
             case AuthProviders.GITHUB:
                 return this.getGitHubAuthUrl(state, additionalScopes);
@@ -101,41 +109,46 @@ export class OAuthConnectionService {
 
     private getGitHubAuthUrl(state: string, additionalScopes?: string[]): string {
         // Use comprehensive agent scopes by default
-        const scopes = additionalScopes && additionalScopes.length > 0 
-            ? additionalScopes 
-            : GitHubScopePresets.AGENT;
-        
+        const scopes =
+            additionalScopes && additionalScopes.length > 0
+                ? additionalScopes
+                : GitHubScopePresets.AGENT;
+
         const params = new URLSearchParams({
-            client_id: process.env.GITHUB_CLIENT_ID!,
-            redirect_uri: process.env.GITHUB_CONNECT_CALLBACK_URL || 'http://localhost:3100/auth/connections/github/callback',
+            client_id: config.github.clientId(),
+            redirect_uri: config.github.connectCallbackUrl(),
             scope: scopes.join(' '),
             state,
         });
-        
+
         return `https://github.com/login/oauth/authorize?${params}`;
     }
 
     private getGoogleAuthUrl(state: string, additionalScopes?: string[]): string {
         const baseScopes = ['email', 'profile'];
         const scopes = [...baseScopes, ...(additionalScopes || [])];
-        
+
         const params = new URLSearchParams({
-            client_id: process.env.GOOGLE_CLIENT_ID!,
-            redirect_uri: process.env.GOOGLE_CONNECT_CALLBACK_URL || 'http://localhost:3100/auth/connections/google/callback',
+            client_id: config.google.clientId()!,
+            redirect_uri: config.google.callbackUrl(),
             response_type: 'code',
             scope: scopes.join(' '),
             state,
             access_type: 'offline',
             prompt: 'consent', // Force consent to get refresh token
         });
-        
+
         return `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
     }
 
     /**
      * Handle OAuth callback for connecting a provider
      */
-    async handleConnectionCallback(userId: string, provider: string, code: string): Promise<ConnectionInfo> {
+    async handleConnectionCallback(
+        userId: string,
+        provider: string,
+        code: string,
+    ): Promise<ConnectionInfo> {
         switch (provider) {
             case AuthProviders.GITHUB:
                 return this.handleGitHubCallback(userId, code);
@@ -152,8 +165,8 @@ export class OAuthConnectionService {
             this.httpService.post(
                 'https://github.com/login/oauth/access_token',
                 {
-                    client_id: process.env.GITHUB_CLIENT_ID,
-                    client_secret: process.env.GITHUB_CLIENT_SECRET,
+                    client_id: config.github.clientId(),
+                    client_secret: config.github.clientSecret(),
                     code,
                 },
                 {
@@ -206,9 +219,9 @@ export class OAuthConnectionService {
         const tokenResponse = await firstValueFrom(
             this.httpService.post('https://oauth2.googleapis.com/token', {
                 code,
-                client_id: process.env.GOOGLE_CLIENT_ID,
-                client_secret: process.env.GOOGLE_CLIENT_SECRET,
-                redirect_uri: process.env.GOOGLE_CONNECT_CALLBACK_URL || 'http://localhost:3100/auth/connections/google/callback',
+                client_id: config.google.clientId(),
+                client_secret: config.google.clientSecret(),
+                redirect_uri: config.google.callbackUrl(),
                 grant_type: 'authorization_code',
             }),
         );
@@ -257,22 +270,32 @@ export class OAuthConnectionService {
     /**
      * Request additional scopes for an existing connection
      */
-    async requestAdditionalScopes(userId: string, provider: string, scopes: string[]): Promise<{ authUrl: string }> {
-        const existingToken = await this.oauthTokenRepository.findByUserAndProvider(userId, provider);
-        
+    async requestAdditionalScopes(
+        userId: string,
+        provider: string,
+        scopes: string[],
+    ): Promise<{ authUrl: string }> {
+        const existingToken = await this.oauthTokenRepository.findByUserAndProvider(
+            userId,
+            provider,
+        );
+
         if (!existingToken) {
             throw new BadRequestException(`${provider} is not connected`);
         }
 
         const existingScopes = existingToken.scope?.split(' ') || [];
-        const newScopes = scopes.filter(s => !existingScopes.includes(s));
+        const newScopes = scopes.filter((s) => !existingScopes.includes(s));
 
         if (newScopes.length === 0) {
             throw new BadRequestException('All requested scopes are already granted');
         }
 
-        const authUrl = await this.getConnectionUrl(userId, provider, [...existingScopes, ...newScopes]);
-        
+        const authUrl = await this.getConnectionUrl(userId, provider, [
+            ...existingScopes,
+            ...newScopes,
+        ]);
+
         return { authUrl };
     }
 
@@ -288,7 +311,7 @@ export class OAuthConnectionService {
      */
     async getGitHubRepositories(userId: string): Promise<GitHubRepository[]> {
         const token = await this.oauthTokenService.getGitHubToken(userId);
-        
+
         if (!token) {
             throw new BadRequestException('GitHub is not connected');
         }
@@ -317,14 +340,17 @@ export class OAuthConnectionService {
     /**
      * Check if user has required GitHub scopes
      */
-    async checkGitHubScopes(userId: string, requiredScopes?: string[]): Promise<{
+    async checkGitHubScopes(
+        userId: string,
+        requiredScopes?: string[],
+    ): Promise<{
         hasScopes: boolean;
         currentScopes: string[];
         missingScopes: string[];
         hasAgentScopes: boolean;
     }> {
         const connection = await this.checkConnection(userId, AuthProviders.GITHUB);
-        
+
         if (!connection.connected) {
             const agentCheck = hasRequiredAgentScopes([]);
             return {
@@ -337,7 +363,7 @@ export class OAuthConnectionService {
 
         const currentScopes = connection.scopes || [];
         const agentCheck = hasRequiredAgentScopes(currentScopes);
-        
+
         // If no specific scopes requested, check for agent scopes
         if (!requiredScopes || requiredScopes.length === 0) {
             return {
@@ -347,8 +373,8 @@ export class OAuthConnectionService {
                 hasAgentScopes: agentCheck.hasAll,
             };
         }
-        
-        const missingScopes = requiredScopes.filter(s => !currentScopes.includes(s));
+
+        const missingScopes = requiredScopes.filter((s) => !currentScopes.includes(s));
 
         return {
             hasScopes: missingScopes.length === 0,
@@ -367,10 +393,10 @@ export class OAuthConnectionService {
         expires.setMinutes(expires.getMinutes() + 10); // 10 minute expiry
 
         this.stateStore.set(state, { userId, expires });
-        
+
         // Clean up expired states
         this.cleanupExpiredStates();
-        
+
         return state;
     }
 
@@ -379,7 +405,7 @@ export class OAuthConnectionService {
      */
     verifyState(state: string, userId: string): boolean {
         const stored = this.stateStore.get(state);
-        
+
         if (!stored || stored.userId !== userId || new Date() > stored.expires) {
             return false;
         }

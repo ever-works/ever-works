@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { Strategy as GithubStrategy } from 'passport-github2';
 import { GitHubScopePresets } from '../config/github-scopes.config';
+import { config } from '@src/config/constants';
 
 /**
  * GitHub strategy specifically for connecting accounts (not login)
@@ -10,9 +11,9 @@ import { GitHubScopePresets } from '../config/github-scopes.config';
 export class GithubConnectStrategy extends PassportStrategy(GithubStrategy, 'github-connect') {
     constructor() {
         super({
-            clientID: process.env.GITHUB_CLIENT_ID,
-            clientSecret: process.env.GITHUB_CLIENT_SECRET,
-            callbackURL: process.env.GITHUB_CONNECT_CALLBACK_URL || 'http://localhost:3100/auth/connections/github/callback',
+            clientID: config.github.clientId(),
+            clientSecret: config.github.clientSecret(),
+            callbackURL: config.github.connectCallbackUrl(),
             scope: GitHubScopePresets.AGENT,
             passReqToCallback: true,
         });
@@ -25,7 +26,7 @@ export class GithubConnectStrategy extends PassportStrategy(GithubStrategy, 'git
             refreshToken,
             profile,
         };
-        
+
         // Return the authenticated user from the JWT
         return req.user;
     }

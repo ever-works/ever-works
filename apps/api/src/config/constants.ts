@@ -3,7 +3,7 @@ export const jwtConstants = {
     accessTokenExpiration: () => {
         const expiration = process.env.JWT_ACCESS_TOKEN_EXPIRATION;
         // Return undefined to disable expiration
-        return expiration === 'never' ? undefined : (expiration || '15m');
+        return expiration === 'never' ? undefined : expiration || '15m';
     },
     refreshTokenExpiration: () => {
         const days = process.env.JWT_REFRESH_TOKEN_EXPIRATION_DAYS;
@@ -26,3 +26,36 @@ export enum AuthProviders {
     GITHUB = 'github',
     GOOGLE = 'google',
 }
+
+export const config = {
+    google: {
+        clientId: () => process.env.GOOGLE_CLIENT_ID,
+        clientSecret: () => process.env.GOOGLE_CLIENT_SECRET,
+        callbackUrl: () => {
+            return (
+                process.env.GOOGLE_CALLBACK_URL || 'http://localhost:3100/api/auth/google/callback'
+            );
+        },
+        connectCallbackUrl: () => {
+            return (
+                process.env.GOOGLE_CONNECT_CALLBACK_URL ||
+                'http://localhost:3100/api/auth/connections/google/callback'
+            );
+        },
+    },
+    github: {
+        clientId: () => process.env.GITHUB_CLIENT_ID,
+        clientSecret: () => process.env.GITHUB_CLIENT_SECRET,
+        callbackUrl: () => {
+            return (
+                process.env.GITHUB_CALLBACK_URL || 'http://localhost:3100/api/auth/github/callback'
+            );
+        },
+        connectCallbackUrl: () => {
+            return (
+                process.env.GITHUB_CONNECT_CALLBACK_URL ||
+                'http://localhost:3100/api/auth/connections/github/callback'
+            );
+        },
+    },
+};

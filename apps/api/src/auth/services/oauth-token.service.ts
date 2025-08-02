@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { OAuthTokenRepository } from '@packages/agent/database';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
+import { config } from '@src/config/constants';
 
 @Injectable()
 export class OAuthTokenService {
@@ -18,7 +19,7 @@ export class OAuthTokenService {
      */
     async getValidToken(userId: string, provider: string): Promise<string | null> {
         const tokenData = await this.oauthTokenRepository.findByUserAndProvider(userId, provider);
-        
+
         if (!tokenData) {
             return null;
         }
@@ -26,12 +27,12 @@ export class OAuthTokenService {
         // Check if token is expired
         if (await this.oauthTokenRepository.isTokenExpired(tokenData)) {
             this.logger.debug(`OAuth token expired for user ${userId}, provider ${provider}`);
-            
+
             // Try to refresh if we have a refresh token
             if (tokenData.refreshToken && provider === 'google') {
                 return await this.refreshGoogleToken(userId, tokenData.refreshToken);
             }
-            
+
             // GitHub tokens don't expire by default
             // For other providers, return null if expired without refresh capability
             return null;
@@ -47,8 +48,8 @@ export class OAuthTokenService {
         try {
             const response = await firstValueFrom(
                 this.httpService.post('https://oauth2.googleapis.com/token', {
-                    client_id: process.env.GOOGLE_CLIENT_ID,
-                    client_secret: process.env.GOOGLE_CLIENT_SECRET,
+                    client_id: config.google.clientId(),
+                    client_secret: config.google.clientSecret(),
                     refresh_token: refreshToken,
                     grant_type: 'refresh_token',
                 }),
@@ -95,7 +96,7 @@ export class OAuthTokenService {
      */
     async revokeTokens(userId: string, provider: string): Promise<void> {
         const tokenData = await this.oauthTokenRepository.findByUserAndProvider(userId, provider);
-        
+
         if (!tokenData) {
             return;
         }
@@ -117,28 +118,26 @@ export class OAuthTokenService {
 
     private async revokeGoogleToken(accessToken: string): Promise<void> {
         await firstValueFrom(
-            this.httpService.post(
-                `https://oauth2.googleapis.com/revoke?token=${accessToken}`,
-            ),
+            this.httpService.post(`https://oauth2.googleapis.com/revoke?token=${accessToken}`),
         );
     }
 
     private async revokeGitHubToken(accessToken: string): Promise<void> {
+        const clientId = config.github.clientId();
+        const clientSecret = config.github.clientSecret();
+
         await firstValueFrom(
-            this.httpService.delete(
-                `https://api.github.com/applications/${process.env.GITHUB_CLIENT_ID}/token`,
-                {
-                    headers: {
-                        Accept: 'application/vnd.github+json',
-                        Authorization: `Basic ${Buffer.from(
-                            `${process.env.GITHUB_CLIENT_ID}:${process.env.GITHUB_CLIENT_SECRET}`,
-                        ).toString('base64')}`,
-                    },
-                    data: {
-                        access_token: accessToken,
-                    },
+            this.httpService.delete(`https://api.github.com/applications/${clientId}/token`, {
+                headers: {
+                    Accept: 'application/vnd.github+json',
+                    Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString(
+                        'base64',
+                    )}`,
                 },
-            ),
+                data: {
+                    access_token: accessToken,
+                },
+            }),
         );
     }
 }

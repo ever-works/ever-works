@@ -6,7 +6,7 @@ import { GitHubScopePresets } from '../config/github-scopes.config';
 
 /**
  * Service to ensure GitHub token access with proper permissions
- * This is used by the agent package to get tokens for GitHub operations
+ * This maybe used by the agent package to get tokens for GitHub operations
  */
 @Injectable()
 export class GitHubTokenService {
