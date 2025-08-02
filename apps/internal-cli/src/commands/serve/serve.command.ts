@@ -4,7 +4,7 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import chalk from 'chalk';
 import { ConfigCheckService } from '../directory/config-check.service';
-import { LocalAgentModule } from '@src/local-agent/local-agent.module';
+import { LocalAgentModule } from '../../local-agent/local-agent.module';
 
 interface ServeOptions {
     port?: string;
