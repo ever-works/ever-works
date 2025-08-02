@@ -4,7 +4,7 @@ import { OAuthTokenRepository } from '@packages/agent/database';
 import { OAuthTokenService } from './oauth-token.service';
 import { firstValueFrom } from 'rxjs';
 import { randomBytes } from 'crypto';
-import { AuthProviders, config } from '@src/config/constants';
+import { AuthProviders, config } from '../../config/constants';
 import { GitHubScopePresets, hasRequiredAgentScopes } from '../config/github-scopes.config';
 
 interface ConnectionInfo {

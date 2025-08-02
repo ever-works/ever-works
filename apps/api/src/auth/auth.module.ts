@@ -21,7 +21,7 @@ import {
     RefreshTokenRepository,
     OAuthTokenRepository,
 } from '@packages/agent/database';
-import { jwtConstants } from '@src/config/constants';
+import { jwtConstants } from '../config/constants';
 
 @Module({
     imports: [

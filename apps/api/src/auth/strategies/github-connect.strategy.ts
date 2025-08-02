@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { Strategy as GithubStrategy } from 'passport-github2';
 import { GitHubScopePresets } from '../config/github-scopes.config';
-import { config } from '@src/config/constants';
+import { config } from '../../config/constants';
 
 /**
  * GitHub strategy specifically for connecting accounts (not login)

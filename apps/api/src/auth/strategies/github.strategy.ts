@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { Strategy as GithubStrategy } from 'passport-github2';
 import { AuthService } from '../services/auth.service';
-import { AuthProviders, config } from '@src/config/constants';
+import { AuthProviders, config } from '../../config/constants';
 import { GitHubScopePresets } from '../config/github-scopes.config';
 
 @Injectable()

@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { OAuthTokenRepository } from '@packages/agent/database';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
-import { config } from '@src/config/constants';
+import { config } from '../../config/constants';
 
 @Injectable()
 export class OAuthTokenService {

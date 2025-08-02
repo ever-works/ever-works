@@ -14,7 +14,7 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { RegisterDto, UpdatePasswordDto } from '../dto/auth.dto';
 import { randomBytes, randomUUID } from 'crypto';
-import { jwtConstants, authConstants, AuthProviders } from '@src/config/constants';
+import { jwtConstants, authConstants, AuthProviders } from '../../config/constants';
 import { User } from '@packages/agent/entities';
 import { JwtPayload, TokenResponse } from '../types/jwt.types';
 

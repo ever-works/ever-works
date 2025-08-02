@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { RefreshTokenRepository } from '@packages/agent/database';
-import { authConstants, jwtConstants } from '@src/config/constants';
+import { authConstants, jwtConstants } from '../../config/constants';
 
 @Injectable()
 export class TokenCleanupService {

@@ -1,7 +1,7 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { OAuthTokenService } from './oauth-token.service';
 import { OAuthConnectionService } from './oauth-connection.service';
-import { AuthProviders } from '@src/config/constants';
+import { AuthProviders } from '../../config/constants';
 import { GitHubScopePresets } from '../config/github-scopes.config';
 
 /**
