@@ -60,11 +60,19 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build packages
-        run: pnpm build --filter=ever-works-cli --filter=@ever-works/cli
+        run: pnpm build
+
+      - name: Build Internal CLI
+        working-directory: apps/internal-cli
+        run: pnpm build:cli
 
       - name: Test Internal CLI build
         working-directory: apps/internal-cli
         run: pnpm test:cli
+
+      - name: Build External CLI
+        working-directory: apps/cli
+        run: pnpm build:cli
 
       - name: Test External CLI build
         working-directory: apps/cli
