@@ -27,6 +27,7 @@ import {
 import { AgentService } from '@packages/agent/services';
 import { UpdateWebsiteRepositoryResponseDto } from '@packages/agent/website-generator';
 import { AuthService, CurrentUser, JwtAuthGuard } from '../auth';
+import { AuthenticatedUser } from '@src/auth/types/jwt.types';
 
 @Controller('api')
 export class AgentHttpController {
@@ -36,7 +37,7 @@ export class AgentHttpController {
     @UseGuards(JwtAuthGuard)
     @HttpCode(HttpStatus.OK)
     async getDirectories(
-        @CurrentUser() user: any,
+        @CurrentUser() user: AuthenticatedUser,
         @Query('limit') limit?: string,
         @Query('offset') offset?: string,
     ) {
@@ -44,7 +45,7 @@ export class AgentHttpController {
         const parsedOffset = offset !== undefined ? Number(offset) : undefined;
 
         return this.agentService.getDirectories({
-            owner: user.username,
+            userId: user.userId,
             limit: parsedLimit && !isNaN(parsedLimit) ? parsedLimit : undefined,
             offset: parsedOffset && !isNaN(parsedOffset) ? parsedOffset : undefined,
         });

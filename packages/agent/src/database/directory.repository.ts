@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Directory } from '../entities/directory.entity';
+import { User } from '../entities';
 
 @Injectable()
 export class DirectoryRepository {
@@ -10,12 +11,8 @@ export class DirectoryRepository {
         private readonly repository: Repository<Directory>,
     ) {}
 
-    async create(directoryData: Partial<Directory>): Promise<Directory> {
-        if (!directoryData.userId) {
-            throw new Error('Owner is required');
-        }
-
-        const exists = await this.findByOwnerAndSlug(directoryData.userId, directoryData.slug);
+    async create(directoryData: Partial<Directory>, user: User): Promise<Directory> {
+        const exists = await this.findByUserAndSlug(user.id, directoryData.slug);
 
         let directory: Directory;
         if (exists) {
@@ -31,7 +28,7 @@ export class DirectoryRepository {
         return await this.repository.findOne({ where: { slug } });
     }
 
-    async findByOwnerAndSlug(userId: string, slug: string): Promise<Directory | null> {
+    async findByUserAndSlug(userId: string, slug: string): Promise<Directory | null> {
         return await this.repository.findOne({ where: { userId, slug } });
     }
 
@@ -40,16 +37,16 @@ export class DirectoryRepository {
     }
 
     async findAll(options?: {
-        owner?: string;
+        userId?: string;
         limit?: number;
         offset?: number;
     }): Promise<Directory[]> {
-        const { owner, limit, offset } = options || {};
+        const { userId, limit, offset } = options || {};
 
         const queryBuilder = this.repository.createQueryBuilder('directory');
 
-        if (owner) {
-            queryBuilder.where('directory.getRepoOwner() = :owner', { owner });
+        if (userId) {
+            queryBuilder.where('userId = :userId', { userId });
         }
 
         if (limit) {
@@ -62,7 +59,14 @@ export class DirectoryRepository {
 
         queryBuilder.orderBy('directory.id', 'DESC');
 
-        return await queryBuilder.getMany();
+        const directories = await queryBuilder.getMany();
+
+        return directories.map((dir) => {
+            return {
+                ...dir,
+                owner: dir.getRepoOwner(),
+            } as Directory;
+        });
     }
 
     async update(id: string, updateData: Partial<Directory>): Promise<Directory | null> {
@@ -75,22 +79,22 @@ export class DirectoryRepository {
         return result.affected > 0;
     }
 
-    async deleteBySlug(slug: string): Promise<boolean> {
-        const result = await this.repository.delete({ slug });
+    async deleteBySlug(slug: string, userId: string): Promise<boolean> {
+        const result = await this.repository.delete({ slug, userId });
         return result.affected > 0;
     }
 
-    async exists(slug: string): Promise<boolean> {
-        const count = await this.repository.count({ where: { slug } });
+    async exists(slug: string, userId: string): Promise<boolean> {
+        const count = await this.repository.count({ where: { slug, userId } });
         return count > 0;
     }
 
-    async existsByOwnerAndSlug(userId: string, slug: string): Promise<boolean> {
+    async existsByUserAndSlug(userId: string, slug: string): Promise<boolean> {
         const count = await this.repository.count({ where: { userId, slug } });
         return count > 0;
     }
 
-    async findByOwner(userId: string): Promise<Directory[]> {
+    async findByUser(userId: string): Promise<Directory[]> {
         return await this.repository.find({ where: { userId } });
     }
 }

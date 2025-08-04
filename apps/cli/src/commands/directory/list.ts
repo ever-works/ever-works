@@ -6,7 +6,6 @@ import { getApiService, Directory } from '../../services/api.service';
 
 export const listCommand = new Command('list')
     .description('List all directories')
-    .option('--owner <owner>', 'Filter by owner')
     .option('--limit <limit>', 'Limit number of results', '20')
     .action(async (options) => {
         try {
@@ -20,8 +19,7 @@ export const listCommand = new Command('list')
 
             try {
                 const response = await apiService.getDirectories({
-                    owner: options.owner,
-                    limit: options.limit ? parseInt(options.limit, 10) : undefined
+                    limit: options.limit ? parseInt(options.limit, 10) : undefined,
                 });
                 const directories: Directory[] = response.directories || [];
 
@@ -29,7 +27,9 @@ export const listCommand = new Command('list')
 
                 if (directories.length === 0) {
                     console.log(chalk.yellow('\n⚠ No directories found.'));
-                    console.log(chalk.gray('Create your first directory with: ever-works directory create'));
+                    console.log(
+                        chalk.gray('Create your first directory with: ever-works directory create'),
+                    );
                     return;
                 }
 
@@ -39,7 +39,11 @@ export const listCommand = new Command('list')
                 directories.forEach((dir, index) => {
                     console.log(chalk.white(`${index + 1}. ${dir.name}`));
                     console.log(chalk.gray(`   Slug: ${dir.slug}`));
-                    console.log(chalk.gray(`   Owner: ${dir.owner}${dir.organization ? ' (Organization)' : ''}`));
+                    console.log(
+                        chalk.gray(
+                            `   Owner: ${dir.owner}${dir.organization ? ' (Organization)' : ''}`,
+                        ),
+                    );
                     console.log(chalk.gray(`   Description: ${dir.description}`));
                     if (dir.website) {
                         console.log(chalk.blue(`   Website: ${dir.website}`));
@@ -49,14 +53,15 @@ export const listCommand = new Command('list')
 
                 console.log(chalk.gray('─'.repeat(80)));
                 console.log(chalk.cyan(`Total: ${directories.length} directories`));
-
             } catch (error) {
                 spinner.fail('Failed to load directories');
                 throw error;
             }
-
         } catch (error) {
-            console.error(chalk.red('\n✗ Failed to list directories:'), error.response?.data?.message || error.message);
+            console.error(
+                chalk.red('\n✗ Failed to list directories:'),
+                error.response?.data?.message || error.message,
+            );
 
             if (error.response?.status === 401) {
                 console.log(chalk.yellow('\n⚠ Authentication failed. Please login again.'));

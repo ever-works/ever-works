@@ -115,12 +115,10 @@ export class ApiService {
 
     // Directory operations
     async getDirectories(options?: {
-        owner?: string;
         limit?: number;
         offset?: number;
     }): Promise<DirectoriesResponse> {
         const queryParams = new URLSearchParams();
-        if (options?.owner) queryParams.append('owner', options.owner);
         if (options?.limit) queryParams.append('limit', options.limit.toString());
         if (options?.offset) queryParams.append('offset', options.offset.toString());
 

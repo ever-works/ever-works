@@ -5,7 +5,6 @@ import { WebsiteGeneratorService } from '../website-generator/website-generator.
 import { WebsiteUpdateService } from '../website-generator/website-update.service';
 import { Directory } from '../entities/directory.entity';
 import { User } from '../entities/user.entity';
-import { GithubService } from '../git/github.service';
 import { DirectoryRepository } from '../database/directory.repository';
 import {
     CreateItemsGeneratorDto,
@@ -37,7 +36,6 @@ export class AgentService {
         private readonly markdownGenerator: MarkdownGeneratorService,
         private readonly websiteGenerator: WebsiteGeneratorService,
         private readonly websiteUpdateService: WebsiteUpdateService,
-        private readonly githubService: GithubService,
         private readonly itemSubmissionService: ItemSubmissionService,
         private readonly itemsGeneratorService: ItemsGeneratorService,
         private readonly directoryRepository: DirectoryRepository,
@@ -45,16 +43,16 @@ export class AgentService {
 
     async getDirectories(
         options: {
-            owner?: string;
+            userId?: string;
             limit?: number;
             offset?: number;
         } = {},
     ) {
-        const { owner, limit = 20, offset = 0 } = options;
+        const { userId, limit = 20, offset = 0 } = options;
 
         try {
             const directories = await this.directoryRepository.findAll({
-                owner,
+                userId,
                 limit,
                 offset,
             });
@@ -73,20 +71,21 @@ export class AgentService {
     }
 
     async createDirectory(createDirectoryDto: CreateDirectoryDto, user: User) {
-        const { slug, name, description, owner } = createDirectoryDto;
+        const { slug, name, description, owner, readme_config, organization, repo_provider } =
+            createDirectoryDto;
 
-        const ghOwner = await this.githubService.getUser(user.getGitToken());
-
-        const directoryData = {
+        const directoryData: Partial<Directory> = {
             slug,
             name,
             description,
-            readmeConfig: createDirectoryDto.readme_config,
-            owner: owner || ghOwner.login,
-            organization: !!owner && owner !== ghOwner.login,
+            userId: user.id,
+            owner: owner,
+            repo_provider: repo_provider,
+            readmeConfig: readme_config,
+            organization: organization,
         };
 
-        const dir = await this.directoryRepository.create(directoryData);
+        const dir = await this.directoryRepository.create(directoryData, user);
 
         return {
             status: 'success',

@@ -1,7 +1,6 @@
 import { Entity, Column, PrimaryGeneratedColumn, Index, ManyToOne } from 'typeorm';
 import { User } from './user.entity';
 import { ClassToObject } from './types';
-import { th } from 'zod/v4/locales';
 
 @Entity({ name: 'directories' })
 @Index(['owner'], { unique: true })
@@ -19,6 +18,9 @@ export class Directory {
 
     @ManyToOne(() => User, (user) => user.directories, { onDelete: 'CASCADE', eager: true })
     user: ClassToObject<User>;
+
+    @Column({ nullable: true })
+    owner?: string;
 
     @Column({ default: 'github' })
     repo_provider: string; // 'github', 'gitlab', etc.
@@ -51,7 +53,9 @@ export class Directory {
             (token) => token.provider === this.repo_provider,
         );
 
-        return oauthToken.username || oauthToken.metadata?.login || this.user.username;
+        return (
+            this.owner || oauthToken.username || oauthToken.metadata?.login || this.user.username
+        );
     }
 }
 
