@@ -15,6 +15,7 @@ import { TokenCleanupService } from './tasks/token-cleanup.service';
 import { OAuthTokenService } from './services/oauth-token.service';
 import { OAuthConnectionService } from './services/oauth-connection.service';
 import { GitHubTokenService } from './services/github-token.service';
+import { OAuthUrlService } from './services/oauth-url.service';
 import {
     DatabaseModule,
     UserRepository,
@@ -50,6 +51,7 @@ import { jwtConstants } from '../config/constants';
         OAuthTokenService,
         OAuthConnectionService,
         GitHubTokenService,
+        OAuthUrlService,
     ],
     controllers: [AuthController, OAuthConnectionsController],
     exports: [AuthService, OAuthTokenService, OAuthConnectionService, GitHubTokenService],

@@ -6,11 +6,13 @@ import {
     Request,
     Get,
     Put,
+    Query,
     HttpCode,
     HttpStatus,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { AuthService } from '../services/auth.service';
+import { OAuthUrlService } from '../services/oauth-url.service';
 import { RegisterDto, RefreshTokenDto, UpdatePasswordDto } from '../dto/auth.dto';
 import { VerifyEmailDto, ForgotPasswordDto, ResetPasswordDto } from '../dto/email-verification.dto';
 import { UpdateProfileDto } from '../dto/update-profile.dto';
@@ -21,7 +23,10 @@ import { AuthProviders } from '../../config/constants';
 
 @Controller('api/auth')
 export class AuthController {
-    constructor(private authService: AuthService) {}
+    constructor(
+        private authService: AuthService,
+        private oauthUrlService: OAuthUrlService,
+    ) {}
 
     @Public()
     @Post('register')
@@ -87,6 +92,26 @@ export class AuthController {
     @HttpCode(HttpStatus.OK)
     async updateProfile(@Request() req, @Body() updateProfileDto: UpdateProfileDto) {
         return this.authService.updateUserProfile(req.user.userId, updateProfileDto);
+    }
+
+    @Public()
+    @Get('github/url')
+    async getGitHubAuthUrl(
+        @Query('callbackUrl') callbackUrl?: string,
+        @Query('state') state?: string,
+    ) {
+        const url = this.oauthUrlService.generateGitHubAuthUrl(callbackUrl, state);
+        return { url };
+    }
+
+    @Public()
+    @Get('google/url')
+    async getGoogleAuthUrl(
+        @Query('callbackUrl') callbackUrl?: string,
+        @Query('state') state?: string,
+    ) {
+        const url = this.oauthUrlService.generateGoogleAuthUrl(callbackUrl, state);
+        return { url };
     }
 
     @Public()
