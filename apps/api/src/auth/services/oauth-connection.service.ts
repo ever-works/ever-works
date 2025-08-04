@@ -387,7 +387,7 @@ export class OAuthConnectionService {
     /**
      * Generate and store state for OAuth flow
      */
-    private generateState(userId: string): string {
+    generateState(userId: string): string {
         const state = randomBytes(16).toString('hex');
         const expires = new Date();
         expires.setMinutes(expires.getMinutes() + 10); // 10 minute expiry

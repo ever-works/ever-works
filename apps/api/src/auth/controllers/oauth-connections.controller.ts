@@ -15,11 +15,16 @@ import {
 import { AuthGuard } from '@nestjs/passport';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { OAuthConnectionService } from '../services/oauth-connection.service';
+import { OAuthUrlService } from '../services/oauth-url.service';
+import { AuthProviders, config } from '../../config/constants';
 
 @Controller('api/auth/connections')
 @UseGuards(JwtAuthGuard)
 export class OAuthConnectionsController {
-    constructor(private oauthConnectionService: OAuthConnectionService) {}
+    constructor(
+        private oauthConnectionService: OAuthConnectionService,
+        private oauthUrlService: OAuthUrlService,
+    ) {}
 
     /**
      * Get all connected OAuth accounts for the current user
@@ -38,7 +43,40 @@ export class OAuthConnectionsController {
     }
 
     /**
-     * Initiate OAuth connection flow for a provider
+     * Get OAuth URL for connecting a provider (returns JSON)
+     */
+    @Get(':provider/connect/url')
+    async getConnectUrl(
+        @Request() req,
+        @Param('provider') provider: AuthProviders,
+        @Query('callbackUrl') callbackUrl?: string,
+        @Query('state') state?: string,
+    ) {
+        // Generate state if not provided for CSRF protection
+        const finalState = state || this.oauthConnectionService.generateState(req.user.userId);
+
+        let url: string;
+        switch (provider.toLowerCase() as AuthProviders) {
+            case 'github':
+                // Use connect callback URL for connections
+                const githubCallbackUrl = callbackUrl || config.github.connectCallbackUrl();
+                url = this.oauthUrlService.generateGitHubAuthUrl(githubCallbackUrl, finalState);
+                break;
+
+            case 'google':
+                // For now, use same callback pattern for Google connections
+                const googleCallbackUrl = callbackUrl || config.google.connectCallbackUrl();
+                url = this.oauthUrlService.generateGoogleAuthUrl(googleCallbackUrl, finalState);
+                break;
+            default:
+                throw new BadRequestException(`Unsupported provider: ${provider}`);
+        }
+
+        return { url, state: finalState };
+    }
+
+    /**
+     * Initiate OAuth connection flow for a provider (redirect approach)
      * Used when user wants to connect an additional OAuth provider
      */
     @Get(':provider/connect')
