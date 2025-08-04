@@ -61,7 +61,7 @@ export const deployCommand = new Command('deploy')
             const websiteRepo = `${directory.slug}-website`;
             console.log(
                 chalk.gray('\nSource repository:'),
-                chalk.white(`${directory.owner}/${websiteRepo}`),
+                chalk.white(`${directory.getOwner()}/${websiteRepo}`),
             );
 
             const confirmed = await inquirer.prompt([

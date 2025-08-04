@@ -50,17 +50,17 @@ export class DeleteSubCommand extends CommandRunner {
             // Show what will be deleted
             console.log(chalk.cyan('\n--- Deletion Summary ---'));
             console.log(chalk.gray('Directory:'), chalk.white(directory.slug));
-            console.log(chalk.gray('Owner:'), chalk.white(directory.owner));
+            console.log(chalk.gray('Owner:'), chalk.white(directory.getOwner()));
 
             const repositoriesToDelete: string[] = [];
             if (deleteOptions.delete_data_repository) {
-                repositoriesToDelete.push(`${directory.owner}/${directory.getDataRepo()}`);
+                repositoriesToDelete.push(`${directory.getOwner()}/${directory.getDataRepo()}`);
             }
             if (deleteOptions.delete_markdown_repository) {
-                repositoriesToDelete.push(`${directory.owner}/${directory.slug}`);
+                repositoriesToDelete.push(`${directory.getOwner()}/${directory.slug}`);
             }
             if (deleteOptions.delete_website_repository) {
-                repositoriesToDelete.push(`${directory.owner}/${directory.getWebsiteRepo()}`);
+                repositoriesToDelete.push(`${directory.getOwner()}/${directory.getWebsiteRepo()}`);
             }
 
             if (repositoriesToDelete.length > 0) {

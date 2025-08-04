@@ -47,7 +47,7 @@ export const createCommand = new Command('create')
                     console.log(chalk.gray('Directory details:'));
                     console.log(chalk.white(`  Name: ${response.directory.name}`));
                     console.log(chalk.white(`  Slug: ${response.directory.slug}`));
-                    console.log(chalk.white(`  Owner: ${response.directory.owner}`));
+                    console.log(chalk.white(`  Owner: ${response.directory.getOwner()}`));
                     console.log(chalk.white(`  Description: ${response.directory.description}`));
 
                     console.log(chalk.cyan('\nNext Steps:'));

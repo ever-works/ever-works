@@ -119,7 +119,7 @@ export class CreateSubCommand extends CommandRunner {
             console.log(chalk.gray(`  Slug: ${directory.slug}`));
             console.log(chalk.gray(`  Name: ${directory.name}`));
             console.log(chalk.gray(`  Description: ${directory.description}`));
-            console.log(chalk.gray(`  Owner: ${directory.owner}`));
+            console.log(chalk.gray(`  Owner: ${directory.getOwner()}`));
             console.log(chalk.gray(`  Organization: ${directory.organization ? 'Yes' : 'No'}`));
 
             if (directory.readmeConfig) {

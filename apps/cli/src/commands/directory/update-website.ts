@@ -38,7 +38,7 @@ export const updateWebsiteCommand = new Command('update-website')
             const websiteRepo = `${directory.slug}-website`;
             console.log(
                 chalk.gray('\nTarget repository:'),
-                chalk.white(`${directory.owner}/${websiteRepo}`),
+                chalk.white(`${directory.getOwner()}/${websiteRepo}`),
             );
 
             const confirmed = await inquirer.prompt([
