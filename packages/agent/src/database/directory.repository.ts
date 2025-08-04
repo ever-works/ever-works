@@ -12,10 +12,16 @@ export class DirectoryRepository {
     ) {}
 
     async create(directoryData: Partial<Directory>, user: User): Promise<Directory> {
-        const exists = await this.findByUserAndSlug(user.id, directoryData.slug);
+        let exists: Directory | null = null;
+        if (directoryData.owner) {
+            exists = await this.findByOwnerAndSlug(directoryData.owner, directoryData.slug);
+            exists ??= await this.findByUserAndSlug(user.id, directoryData.slug);
+        } else {
+            exists = await this.findByUserAndSlug(user.id, directoryData.slug);
+        }
 
         let directory: Directory;
-        if (exists) {
+        if (exists && exists.userId === user.id) {
             directory = await this.update(exists.id, directoryData);
         } else {
             directory = this.repository.create(directoryData);
@@ -30,6 +36,10 @@ export class DirectoryRepository {
 
     async findByUserAndSlug(userId: string, slug: string): Promise<Directory | null> {
         return await this.repository.findOne({ where: { userId, slug } });
+    }
+
+    async findByOwnerAndSlug(owner: string, slug: string): Promise<Directory | null> {
+        return await this.repository.findOne({ where: { owner, slug } });
     }
 
     async findById(id: string): Promise<Directory | null> {
