@@ -43,16 +43,16 @@ export class AgentService {
 
     async getDirectories(
         options: {
-            userId?: string;
             limit?: number;
             offset?: number;
         } = {},
+        user: User,
     ) {
-        const { userId, limit = 20, offset = 0 } = options;
+        const { limit = 20, offset = 0 } = options;
 
         try {
             const directories = await this.directoryRepository.findAll({
-                userId,
+                userId: user.id,
                 limit,
                 offset,
             });

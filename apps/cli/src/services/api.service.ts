@@ -135,6 +135,12 @@ export class ApiService {
             '/directories',
             data,
         );
+
+        return response.data;
+    }
+
+    async getDirectory(slug: string): Promise<ApiResponse<Directory>> {
+        const response = await this.httpClient.get<ApiResponse<Directory>>(`/directories/${slug}`);
         return response.data;
     }
 

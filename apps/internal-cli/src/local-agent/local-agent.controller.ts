@@ -45,11 +45,13 @@ export class LocalAgentController {
 
         const user = await User.createLocalUser();
 
-        return this.agentService.getDirectories({
-            userId: user.id,
-            limit: parsedLimit && !isNaN(parsedLimit) ? parsedLimit : undefined,
-            offset: parsedOffset && !isNaN(parsedOffset) ? parsedOffset : undefined,
-        });
+        return this.agentService.getDirectories(
+            {
+                limit: parsedLimit && !isNaN(parsedLimit) ? parsedLimit : undefined,
+                offset: parsedOffset && !isNaN(parsedOffset) ? parsedOffset : undefined,
+            },
+            user,
+        );
     }
 
     @Post('directories')

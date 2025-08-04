@@ -39,18 +39,22 @@ export class AgentHttpController {
     @UseGuards(JwtAuthGuard)
     @HttpCode(HttpStatus.OK)
     async getDirectories(
-        @CurrentUser() user: AuthenticatedUser,
+        @CurrentUser() auth: AuthenticatedUser,
         @Query('limit') limit?: string,
         @Query('offset') offset?: string,
     ) {
         const parsedLimit = limit !== undefined ? Number(limit) : undefined;
         const parsedOffset = offset !== undefined ? Number(offset) : undefined;
 
-        return this.agentService.getDirectories({
-            userId: user.userId,
-            limit: parsedLimit && !isNaN(parsedLimit) ? parsedLimit : undefined,
-            offset: parsedOffset && !isNaN(parsedOffset) ? parsedOffset : undefined,
-        });
+        const user = await this.authService.getUser(auth.userId);
+
+        return this.agentService.getDirectories(
+            {
+                limit: parsedLimit && !isNaN(parsedLimit) ? parsedLimit : undefined,
+                offset: parsedOffset && !isNaN(parsedOffset) ? parsedOffset : undefined,
+            },
+            user,
+        );
     }
 
     @Post('directories')
