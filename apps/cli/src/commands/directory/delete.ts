@@ -137,10 +137,10 @@ export const deleteCommand = new Command('delete')
                     console.log(chalk.yellow('\n⚠ Note: Some GitHub repositories were not deleted.'));
                     console.log(chalk.gray('You may want to manually delete them if no longer needed:'));
                     if (!deleteOptions.delete_data_repository) {
-                        console.log(chalk.gray(`  • ${directory.getOwner()}/${directory.slug}-data`));
+                        console.log(chalk.gray(`  • ${directory.getRepoOwner()}/${directory.slug}-data`));
                     }
                     if (!deleteOptions.delete_website_repository) {
-                        console.log(chalk.gray(`  • ${directory.getOwner()}/${directory.slug}-website`));
+                        console.log(chalk.gray(`  • ${directory.getRepoOwner()}/${directory.slug}-website`));
                     }
                 }
 

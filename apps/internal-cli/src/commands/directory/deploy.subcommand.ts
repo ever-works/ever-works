@@ -53,7 +53,7 @@ export class DeploySubCommand extends CommandRunner {
             console.log(chalk.gray('  • Trigger the deployment workflow'));
 
             const websiteRepo = `${directory.slug}-website`;
-            console.log(chalk.gray('\nSource repository:'), chalk.white(`${directory.getOwner()}/${websiteRepo}`));
+            console.log(chalk.gray('\nSource repository:'), chalk.white(`${directory.getRepoOwner()}/${websiteRepo}`));
 
             const confirmed = await inquirer.prompt([
                 {
@@ -79,7 +79,7 @@ export class DeploySubCommand extends CommandRunner {
                 // Call the vercel service
                 await this.vercelService.deploy(
                     {
-                        owner: directory.getOwner(),
+                        owner: directory.getRepoOwner(),
                         repo: directory.getWebsiteRepo(),
                         provider: 'vercel',
                         data: {
@@ -94,7 +94,7 @@ export class DeploySubCommand extends CommandRunner {
                 spinner.succeed('Website deployed successfully');
 
                 console.log(chalk.green('\n✓ Website deployment initiated successfully!'));
-                console.log(chalk.gray('Repository:'), chalk.white(`${directory.getOwner()}/${directory.getWebsiteRepo()}`));
+                console.log(chalk.gray('Repository:'), chalk.white(`${directory.getRepoOwner()}/${directory.getWebsiteRepo()}`));
 
                 console.log(chalk.cyan('\n--- Next Steps ---'));
                 console.log(chalk.gray('  • Check Vercel dashboard for deployment status'));

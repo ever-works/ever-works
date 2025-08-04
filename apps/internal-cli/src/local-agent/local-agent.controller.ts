@@ -1,4 +1,16 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Query } from '@nestjs/common';
+import {
+    Body,
+    Controller,
+    Get,
+    HttpCode,
+    HttpStatus,
+    NotFoundException,
+    Param,
+    Post,
+    Query,
+} from '@nestjs/common';
+import { DirectoryRepository } from '@packages/agent/database';
+import { DeployVercelDto, VercelService } from '@packages/agent/deploy';
 import { CreateDirectoryDto } from '@packages/agent/dto';
 import { User } from '@packages/agent/entities';
 import {
@@ -17,9 +29,13 @@ import {
 import { AgentService } from '@packages/agent/services';
 import { UpdateWebsiteRepositoryResponseDto } from '@packages/agent/website-generator';
 
-@Controller()
+@Controller('api')
 export class LocalAgentController {
-    constructor(private readonly agentService: AgentService) {}
+    constructor(
+        private readonly agentService: AgentService,
+        private readonly vercelService: VercelService,
+        private readonly directoryRepository: DirectoryRepository,
+    ) {}
 
     @Get('directories')
     @HttpCode(HttpStatus.OK)
@@ -124,5 +140,37 @@ export class LocalAgentController {
         const user = await User.createLocalUser();
 
         return this.agentService.deleteItemsGenerator(slug, deleteItemsGeneratorDto, user);
+    }
+
+    @Post('deploy/:dirname/vercel')
+    async toVercel(@Body() deployVercel: DeployVercelDto, @Param('dirname') slug: string) {
+        const { VERCEL_TOKEN: vercelToken, GITHUB_TOKEN: ghToken } = deployVercel;
+
+        // some db query result:
+        const directory = await this.directoryRepository.findBySlug(slug);
+        if (!directory) {
+            throw new NotFoundException('Directory not found');
+        }
+
+        const vercel = vercelToken || process.env.VERCEL_TOKEN;
+        if (!vercel) {
+            throw new NotFoundException('Vercel token is required');
+        }
+
+        const user = await User.createLocalUser();
+
+        await this.vercelService.deploy(
+            {
+                owner: directory.getRepoOwner(),
+                repo: directory.getWebsiteRepo(),
+                provider: 'vercel',
+                data: {
+                    vercelToken: vercel,
+                    ghToken: ghToken || process.env.GITHUB_APIKEY,
+                },
+            },
+            directory,
+            user,
+        );
     }
 }

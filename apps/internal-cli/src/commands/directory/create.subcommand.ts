@@ -37,7 +37,7 @@ export class CreateSubCommand extends CommandRunner {
 
             // Get user information
             const user = await User.createLocalUser();
-            const token = await user.getGitToken();
+            const token = user.getGitToken();
             if (!token) {
                 throw new Error('GitHub token is required');
             }
@@ -119,7 +119,7 @@ export class CreateSubCommand extends CommandRunner {
             console.log(chalk.gray(`  Slug: ${directory.slug}`));
             console.log(chalk.gray(`  Name: ${directory.name}`));
             console.log(chalk.gray(`  Description: ${directory.description}`));
-            console.log(chalk.gray(`  Owner: ${directory.getOwner()}`));
+            console.log(chalk.gray(`  Owner: ${directory.getRepoOwner()}`));
             console.log(chalk.gray(`  Organization: ${directory.organization ? 'Yes' : 'No'}`));
 
             if (directory.readmeConfig) {
