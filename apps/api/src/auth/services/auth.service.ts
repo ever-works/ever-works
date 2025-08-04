@@ -268,6 +268,7 @@ export class AuthService {
         // Store OAuth tokens separately
         await this.oauthTokenRepository.upsert({
             userId: user.id,
+            username: profile.username,
             provider: AuthProviders.GITHUB,
             accessToken: profile.accessToken,
             refreshToken: profile.refreshToken,
@@ -455,6 +456,10 @@ export class AuthService {
         await this.refreshTokenRepository.revokeAllUserTokens(user.id, 'Password reset');
 
         return { message: 'Password reset successfully' };
+    }
+
+    async getUser(userId: string): Promise<User | null> {
+        return await this.userRepository.findById(userId);
     }
 
     async getUserProfile(userId: string) {
