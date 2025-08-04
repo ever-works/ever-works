@@ -17,6 +17,7 @@ import { UpdateProfileDto } from '../dto/update-profile.dto';
 import { LocalAuthGuard } from '../guards/local-auth.guard';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { Public } from '../decorators/public.decorator';
+import { AuthProviders } from '@src/config/constants';
 
 @Controller('api/auth')
 export class AuthController {
@@ -90,12 +91,12 @@ export class AuthController {
 
     @Public()
     @Get('github')
-    @UseGuards(AuthGuard('github'))
+    @UseGuards(AuthGuard(AuthProviders.GITHUB))
     async githubAuth(@Request() req) {}
 
     @Public()
     @Get('github/callback')
-    @UseGuards(AuthGuard('github'))
+    @UseGuards(AuthGuard(AuthProviders.GITHUB))
     async githubAuthRedirect(@Request() req) {
         const userAgent = req.headers['user-agent'];
         const ipAddress = req.ip || req.headers['x-forwarded-for'];
@@ -104,12 +105,12 @@ export class AuthController {
 
     @Public()
     @Get('google')
-    @UseGuards(AuthGuard('google'))
+    @UseGuards(AuthGuard(AuthProviders.GOOGLE))
     async googleAuth(@Request() req) {}
 
     @Public()
     @Get('google/callback')
-    @UseGuards(AuthGuard('google'))
+    @UseGuards(AuthGuard(AuthProviders.GOOGLE))
     async googleAuthRedirect(@Request() req) {
         const userAgent = req.headers['user-agent'];
         const ipAddress = req.ip || req.headers['x-forwarded-for'];

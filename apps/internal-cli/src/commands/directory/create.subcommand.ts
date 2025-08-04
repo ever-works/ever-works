@@ -56,7 +56,7 @@ export class CreateSubCommand extends CommandRunner {
             // Check if directory already exists and handle conflicts
             const spinner = ora('Checking if directory exists...').start();
             let finalSlug = directoryData.slug;
-            let slugExists = await this.directoryRepository.existsByOwnerAndSlug(owner, finalSlug);
+            let slugExists = await this.directoryRepository.findByOwnerAndSlug(owner, finalSlug);
 
             if (slugExists) {
                 spinner.stop();
@@ -77,7 +77,7 @@ export class CreateSubCommand extends CommandRunner {
                     finalSlug = suggestedSlug;
                 } else if (resolution.action === 'modify' && resolution.finalSlug) {
                     // Check if the manually entered slug is available
-                    const manualSlugExists = await this.directoryRepository.existsByOwnerAndSlug(
+                    const manualSlugExists = await this.directoryRepository.findByOwnerAndSlug(
                         owner,
                         resolution.finalSlug,
                     );
@@ -110,7 +110,7 @@ export class CreateSubCommand extends CommandRunner {
                 organization,
             };
 
-            const directory = await this.directoryRepository.create(finalDirectoryData);
+            const directory = await this.directoryRepository.create(finalDirectoryData, user);
             createSpinner.succeed('Directory created successfully');
 
             // Display success information
@@ -154,7 +154,7 @@ export class CreateSubCommand extends CommandRunner {
         let counter = 1;
         let suggestedSlug = `${baseSlug}-${counter}`;
 
-        while (await this.directoryRepository.existsByOwnerAndSlug(owner, suggestedSlug)) {
+        while (await this.directoryRepository.findByOwnerAndSlug(owner, suggestedSlug)) {
             counter++;
             suggestedSlug = `${baseSlug}-${counter}`;
         }
