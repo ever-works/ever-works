@@ -26,7 +26,7 @@ import {
 } from '@packages/agent/items-generator';
 import { AgentService } from '@packages/agent/services';
 import { UpdateWebsiteRepositoryResponseDto } from '@packages/agent/website-generator';
-import { CurrentUser, JwtAuthGuard } from '../auth';
+import { AuthService, CurrentUser, JwtAuthGuard } from '../auth';
 
 @Controller('api')
 export class AgentHttpController {
