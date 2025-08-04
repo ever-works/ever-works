@@ -17,7 +17,7 @@ import { UpdateProfileDto } from '../dto/update-profile.dto';
 import { LocalAuthGuard } from '../guards/local-auth.guard';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { Public } from '../decorators/public.decorator';
-import { AuthProviders } from '@src/config/constants';
+import { AuthProviders } from '../../config/constants';
 
 @Controller('api/auth')
 export class AuthController {
