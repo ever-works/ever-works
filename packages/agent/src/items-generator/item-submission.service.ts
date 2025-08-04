@@ -33,14 +33,14 @@ export class ItemSubmissionService {
         );
 
         try {
-            const token = await user.getGitToken();
+            const token = user.getGitToken();
             const committer = user.asCommitter();
 
             const repo = directory.getDataRepo();
 
             // Clone or pull the data repository
             const dest = await this.githubService.cloneOrPull({
-                owner: directory.owner,
+                owner: directory.getRepoOwner(),
                 repo: repo,
                 token: token,
                 committer: committer,
@@ -137,7 +137,7 @@ export class ItemSubmissionService {
 
             const pr = await this.githubService.createPR(
                 {
-                    owner: directory.owner,
+                    owner: directory.getRepoOwner(),
                     repo: repo,
                     head: branchName,
                     base: defaultBranch,
@@ -154,7 +154,7 @@ export class ItemSubmissionService {
                 try {
                     await this.githubService.mergePR(
                         {
-                            owner: directory.owner,
+                            owner: directory.getRepoOwner(),
                             repo: repo,
                             pull_number: pr.number,
                             commit_title: `Merge: ${prTitle}`,
@@ -210,14 +210,14 @@ export class ItemSubmissionService {
         );
 
         try {
-            const token = await user.getGitToken();
+            const token = user.getGitToken();
             const committer = user.asCommitter();
 
             const repo = directory.getDataRepo();
 
             // Clone or pull the data repository
             const dest = await this.githubService.cloneOrPull({
-                owner: directory.owner,
+                owner: directory.getRepoOwner(),
                 repo: repo,
                 token: token,
                 committer: committer,
@@ -283,7 +283,7 @@ export class ItemSubmissionService {
 
             const pr = await this.githubService.createPR(
                 {
-                    owner: directory.owner,
+                    owner: directory.getRepoOwner(),
                     repo: repo,
                     head: branchName,
                     base: defaultBranch,

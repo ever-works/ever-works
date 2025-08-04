@@ -15,7 +15,7 @@ export class VercelService implements IDeployService {
     ) {}
 
     async deploy({ data, owner, repo }: VercelInput, directory: Directory, user: User) {
-        const token = await user.getGitToken();
+        const token = user.getGitToken();
         const publicKey = await this.githubService.repositoryPublickey(owner, repo, token);
 
         const promises = [

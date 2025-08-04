@@ -11,14 +11,14 @@ export class WebsiteGeneratorService {
     constructor(private readonly githubService: GithubService) {}
 
     private async duplicate(directory: Directory, user: User) {
-        const token = await user.getGitToken();
+        const token = user.getGitToken();
         const committer = user.asCommitter();
 
         if (directory.organization) {
             return this.githubService.duplicateAsOrg({
                 owner: WEBSITE_TEMPLATE_CONFIG.owner,
                 repo: WEBSITE_TEMPLATE_CONFIG.repo,
-                org: directory.owner,
+                org: directory.getRepoOwner(),
                 name: directory.getWebsiteRepo(),
                 token,
                 committer,
@@ -35,7 +35,7 @@ export class WebsiteGeneratorService {
     }
 
     private async fork(directory: Directory, user: User) {
-        const token = await user.getGitToken();
+        const token = user.getGitToken();
 
         return this.githubService.fork(
             {
@@ -49,12 +49,12 @@ export class WebsiteGeneratorService {
     }
 
     private async createUsingTemplate(directory: Directory, user: User) {
-        const token = await user.getGitToken();
+        const token = user.getGitToken();
 
         return this.githubService.createRepoFromTemplate(
             WEBSITE_TEMPLATE_CONFIG.owner,
             WEBSITE_TEMPLATE_CONFIG.repo,
-            directory.owner,
+            directory.getRepoOwner(),
             directory.getWebsiteRepo(),
             token,
         );
@@ -89,12 +89,12 @@ export class WebsiteGeneratorService {
      * Remove repository for a directory
      */
     async removeRepository(directory: Directory, user: User): Promise<void> {
-        const token = await user.getGitToken();
+        const token = user.getGitToken();
         const websiteRepo = directory.getWebsiteRepo();
 
         try {
             // Delete the GitHub repository
-            await this.githubService.deleteRepository(directory.owner, websiteRepo, token);
+            await this.githubService.deleteRepository(directory.getRepoOwner(), websiteRepo, token);
         } catch (error) {
             throw error;
         }

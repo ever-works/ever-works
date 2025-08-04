@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import { Entity, Column, PrimaryGeneratedColumn, OneToMany } from 'typeorm';
-import { slugifyText } from '../items-generator/utils/text.utils';
 import { OAuthToken } from './oauth-token.entity';
 import { ClassToObject } from './types';
 import { config } from '@src/config';
+import { Directory } from './directory.entity';
 
 @Entity({ name: 'users' })
 export class User {
@@ -35,6 +35,10 @@ export class User {
     @Column({ nullable: true })
     emailVerificationExpires: Date;
 
+    // Tokens and API keys
+    @Column({ nullable: true })
+    vercelToken: string;
+
     // User status
     @Column({ default: true })
     isActive: boolean;
@@ -52,29 +56,36 @@ export class User {
     @Column({ nullable: true })
     passwordResetExpires: Date;
 
+    // Timestamps
     @Column({ default: () => 'CURRENT_TIMESTAMP' })
     createdAt: Date;
 
     @Column({ default: () => 'CURRENT_TIMESTAMP', onUpdate: 'CURRENT_TIMESTAMP' })
     updatedAt: Date;
 
-    @OneToMany(() => OAuthToken, (token) => token.user)
+    // Relationships
+    @OneToMany(() => OAuthToken, (token) => token.user, { eager: true })
     oauthTokens: ClassToObject<OAuthToken>[];
+
+    @OneToMany(() => Directory, (directory) => directory.user, { lazy: true })
+    directories: Promise<ClassToObject<Directory>[]>;
 
     local: boolean = false;
 
     static async createLocalUser() {
         const user = new User();
-
-        user.id = randomUUID();
         user.local = true;
-        user.username = config.git.getName();
+
+        const username = config.github.getOwner() || config.git.getName();
+
+        user.id = username || randomUUID();
+        user.username = username;
         user.email = config.git.getEmail();
 
         return user;
     }
 
-    async getGitToken(): Promise<string | null> {
+    getGitToken(): string | null {
         if (this.local) {
             return config.github.getApiKey() || null;
         }
@@ -86,7 +97,6 @@ export class User {
 
         // Find GitHub token
         const githubToken = this.oauthTokens.find((token) => token.provider === 'github');
-
         if (!githubToken) {
             return null;
         }

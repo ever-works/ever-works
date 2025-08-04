@@ -16,8 +16,8 @@ export class OAuthToken {
 
     userId: string;
 
-    @ManyToOne(() => User, (user) => user.oauthTokens, { onDelete: 'CASCADE' })
-    user: ClassToObject<User>;
+    @ManyToOne(() => User, (user) => user.oauthTokens, { onDelete: 'CASCADE', lazy: true })
+    user: Promise<ClassToObject<User>>;
 
     @Column()
     provider: string; // 'github', 'google', etc.
@@ -27,6 +27,9 @@ export class OAuthToken {
 
     @Column({ type: 'text', nullable: true })
     refreshToken: string;
+
+    @Column({ nullable: true })
+    username: string;
 
     @Column({ nullable: true })
     tokenType: string; // Usually 'Bearer'

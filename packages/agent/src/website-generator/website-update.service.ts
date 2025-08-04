@@ -19,18 +19,18 @@ export class WebsiteUpdateService {
         directory: Directory,
         user: User,
     ): Promise<{ method: string; message: string }> {
-        const token = await user.getGitToken();
+        const token = user.getGitToken();
         const websiteRepo = directory.getWebsiteRepo();
 
         // Check if the target repository exists
         const repositoryExists = await this.githubService.repositoryExists(
-            directory.owner,
+            directory.getRepoOwner(),
             websiteRepo,
             token,
         );
         if (!repositoryExists) {
             throw new NotFoundException(
-                `Website repository '${directory.owner}/${websiteRepo}' does not exist`,
+                `Website repository '${directory.getRepoOwner()}/${websiteRepo}' does not exist`,
             );
         }
 
@@ -73,7 +73,7 @@ export class WebsiteUpdateService {
      * Updates a forked repository by pulling from upstream
      */
     private async updateFork(directory: Directory, user: User): Promise<boolean> {
-        const token = await user.getGitToken();
+        const token = user.getGitToken();
         const committer = user.asCommitter();
 
         const websiteRepo = directory.getWebsiteRepo();
@@ -81,7 +81,7 @@ export class WebsiteUpdateService {
         try {
             // Clone the target repository
             const targetDir = await this.githubService.cloneOrPull({
-                owner: directory.owner,
+                owner: directory.getRepoOwner(),
                 repo: websiteRepo,
                 token,
                 committer,
@@ -89,7 +89,7 @@ export class WebsiteUpdateService {
 
             // Check if this is actually a fork by looking for upstream remote
             const isActualFork = await this.githubService.hasForkRelationship(
-                directory.owner,
+                directory.getRepoOwner(),
                 websiteRepo,
                 WEBSITE_TEMPLATE_CONFIG.owner,
                 WEBSITE_TEMPLATE_CONFIG.repo,
@@ -124,7 +124,7 @@ export class WebsiteUpdateService {
      * Updates using duplicate method: clone original, replace remote, push
      */
     private async updateDuplicate(directory: Directory, user: User): Promise<void> {
-        const token = await user.getGitToken();
+        const token = user.getGitToken();
         const websiteRepo = directory.getWebsiteRepo();
 
         // Clone the original template repository
@@ -136,7 +136,7 @@ export class WebsiteUpdateService {
         });
 
         // Get the target repository URL
-        const targetRepoUrl = this.githubService.getURL(directory.owner, websiteRepo);
+        const targetRepoUrl = this.githubService.getURL(directory.getRepoOwner(), websiteRepo);
 
         // Remove existing origin and add new one
         await this.githubService.remoteRemove(originalDir, 'origin');
@@ -146,7 +146,7 @@ export class WebsiteUpdateService {
         await this.githubService.push(originalDir, token);
 
         this.logger.log(
-            `Successfully updated ${directory.owner}/${websiteRepo} using duplicate method`,
+            `Successfully updated ${directory.getRepoOwner()}/${websiteRepo} using duplicate method`,
         );
     }
 
@@ -154,7 +154,7 @@ export class WebsiteUpdateService {
      * Updates using template method: clone both repos, replace files, commit and push
      */
     private async updateTemplate(directory: Directory, user: User): Promise<void> {
-        const token = await user.getGitToken();
+        const token = user.getGitToken();
         const committer = user.asCommitter();
 
         const websiteRepo = directory.getWebsiteRepo();
@@ -169,7 +169,7 @@ export class WebsiteUpdateService {
             }),
 
             this.githubService.cloneOrPull({
-                owner: directory.owner,
+                owner: directory.getRepoOwner(),
                 repo: websiteRepo,
                 token,
                 committer,
@@ -187,7 +187,7 @@ export class WebsiteUpdateService {
         await this.githubService.push(targetDir, token);
 
         this.logger.log(
-            `Successfully updated ${directory.owner}/${websiteRepo} using template method`,
+            `Successfully updated ${directory.getRepoOwner()}/${websiteRepo} using template method`,
         );
     }
 

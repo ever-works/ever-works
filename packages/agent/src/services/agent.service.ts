@@ -75,7 +75,7 @@ export class AgentService {
     async createDirectory(createDirectoryDto: CreateDirectoryDto, user: User) {
         const { slug, name, description, owner } = createDirectoryDto;
 
-        const ghOwner = await this.githubService.getUser(await user.getGitToken());
+        const ghOwner = await this.githubService.getUser(user.getGitToken());
 
         const directoryData = {
             slug,
@@ -333,8 +333,8 @@ export class AgentService {
             return {
                 status: 'success',
                 slug: directory.slug,
-                owner: directory.owner,
-                repository: `${directory.owner}/${directory.slug}-website`,
+                owner: directory.getRepoOwner(),
+                repository: `${directory.getRepoOwner()}/${directory.slug}-website`,
                 message: result.message,
                 method_used: result.method,
             };
@@ -370,7 +370,9 @@ export class AgentService {
             if (deleteItemsGeneratorDto.delete_data_repository !== false) {
                 try {
                     await this.dataGenerator.removeRepository(directory, user);
-                    deletedRepositories.push(`${directory.owner}/${directory.getDataRepo()}`);
+                    deletedRepositories.push(
+                        `${directory.getRepoOwner()}/${directory.getDataRepo()}`,
+                    );
                 } catch (error) {
                     this.logger.error('Failed to delete data repository:', error);
                 }
@@ -380,7 +382,7 @@ export class AgentService {
             if (deleteItemsGeneratorDto.delete_markdown_repository !== false) {
                 try {
                     await this.markdownGenerator.removeRepository(directory, user);
-                    deletedRepositories.push(`${directory.owner}/${directory.slug}`);
+                    deletedRepositories.push(`${directory.getRepoOwner()}/${directory.slug}`);
                 } catch (error) {
                     this.logger.error('Failed to delete markdown repository:', error);
                 }
@@ -390,7 +392,9 @@ export class AgentService {
             if (deleteItemsGeneratorDto.delete_website_repository !== false) {
                 try {
                     await this.websiteGenerator.removeRepository(directory, user);
-                    deletedRepositories.push(`${directory.owner}/${directory.getWebsiteRepo()}`);
+                    deletedRepositories.push(
+                        `${directory.getRepoOwner()}/${directory.getWebsiteRepo()}`,
+                    );
                 } catch (error) {
                     this.logger.error('Failed to delete website repository:', error);
                 }
