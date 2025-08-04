@@ -8,8 +8,8 @@ import { AuthProviders, config } from '../../config/constants';
 export class GoogleAuthStrategy extends PassportStrategy(GoogleStrategy, AuthProviders.GOOGLE) {
     constructor(private authService: AuthService) {
         super({
-            clientID: config.google.clientId(),
-            clientSecret: config.google.clientSecret(),
+            clientID: config.google.clientId() || 'placeholder',
+            clientSecret: config.google.clientSecret() || 'placeholder',
             callbackURL: config.google.callbackUrl(),
             scope: ['email', 'profile'],
             passReqToCallback: true,

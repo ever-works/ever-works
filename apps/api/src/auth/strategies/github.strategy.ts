@@ -9,8 +9,8 @@ import { GitHubScopePresets } from '../config/github-scopes.config';
 export class GithubAuthStrategy extends PassportStrategy(GithubStrategy, AuthProviders.GITHUB) {
     constructor(private authService: AuthService) {
         super({
-            clientID: config.github.clientId(),
-            clientSecret: config.github.clientSecret(),
+            clientID: config.github.clientId() || 'placeholder',
+            clientSecret: config.github.clientSecret() || 'placeholder',
             callbackURL: config.github.callbackUrl(),
             scope: GitHubScopePresets.AGENT,
             passReqToCallback: true,

@@ -11,8 +11,8 @@ import { config } from '../../config/constants';
 export class GithubConnectStrategy extends PassportStrategy(GithubStrategy, 'github-connect') {
     constructor() {
         super({
-            clientID: config.github.clientId(),
-            clientSecret: config.github.clientSecret(),
+            clientID: config.github.clientId() || 'placeholder',
+            clientSecret: config.github.clientSecret() || 'placeholder',
             callbackURL: config.github.connectCallbackUrl(),
             scope: GitHubScopePresets.AGENT,
             passReqToCallback: true,
