@@ -38,7 +38,7 @@ export const updateWebsiteCommand = new Command('update-website')
             const websiteRepo = `${directory.slug}-website`;
             console.log(
                 chalk.gray('\nTarget repository:'),
-                chalk.white(`${directory.getRepoOwner()}/${websiteRepo}`),
+                chalk.white(`${directory.owner}/${websiteRepo}`),
             );
 
             const confirmed = await inquirer.prompt([
@@ -70,10 +70,7 @@ export const updateWebsiteCommand = new Command('update-website')
                 }
 
                 if (response.repository_url) {
-                    console.log(
-                        chalk.blue('\nRepository:'),
-                        chalk.white(response.repository_url),
-                    );
+                    console.log(chalk.blue('\nRepository:'), chalk.white(response.repository_url));
                 }
 
                 console.log(chalk.cyan('\nNext Steps:'));

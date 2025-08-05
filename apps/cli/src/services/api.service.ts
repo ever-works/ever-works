@@ -91,14 +91,6 @@ export interface DeleteDirectoryDto {
     delete_website_repository?: boolean;
 }
 
-// API Response types
-export interface ApiResponse<T = any> {
-    status: string;
-    message?: string;
-    data?: T;
-    [key: string]: any;
-}
-
 export interface DirectoriesResponse {
     status: string;
     directories: Directory[];
@@ -128,19 +120,13 @@ export class ApiService {
         return response.data;
     }
 
-    async createDirectory(
-        data: CreateDirectoryDto,
-    ): Promise<ApiResponse<{ directory: Directory }>> {
-        const response = await this.httpClient.post<ApiResponse<{ directory: Directory }>>(
-            '/directories',
-            data,
-        );
-
+    async createDirectory(data: CreateDirectoryDto): Promise<{ directory: Directory }> {
+        const response = await this.httpClient.post<{ directory: Directory }>('/directories', data);
         return response.data;
     }
 
-    async getDirectory(slug: string): Promise<ApiResponse<Directory>> {
-        const response = await this.httpClient.get<ApiResponse<Directory>>(`/directories/${slug}`);
+    async getDirectory(id: string): Promise<Directory> {
+        const response = await this.httpClient.get<Directory>(`/directories/${id}`);
         return response.data;
     }
 

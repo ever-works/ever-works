@@ -106,6 +106,7 @@ export class AgentService {
         };
 
         const dir = await this.directoryRepository.create(directoryData, user);
+        dir.owner = dir.getRepoOwner();
 
         return {
             status: 'success',
