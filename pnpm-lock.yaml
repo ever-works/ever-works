@@ -287,6 +287,9 @@ importers:
       next-intl:
         specifier: ^4.3.4
         version: 4.3.4(next@15.4.4(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(react@19.1.0)(typescript@5.8.3)
+      path-to-regexp:
+        specifier: ^8.2.0
+        version: 8.2.0
       react:
         specifier: 19.1.0
         version: 19.1.0
