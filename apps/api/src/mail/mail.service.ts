@@ -57,7 +57,7 @@ export class MailService {
      */
     @OnEvent(UserPasswordChangedEvent.EVENT_NAME)
     async sendPasswordChanged(data: UserPasswordChangedEvent): Promise<void> {
-        const secureAccountUrl = data.secureAccountUrl || `${this.webAppUrl}/secure-account`;
+        const secureAccountUrl = data.secureAccountUrl;
 
         await this.mailerService.sendMail({
             to: data.user.email,
@@ -80,7 +80,7 @@ export class MailService {
      */
     @OnEvent(UserConfirmedEvent.EVENT_NAME)
     async sendWelcomeEmail(data: UserConfirmedEvent): Promise<void> {
-        const dashboardUrl = data.dashboardUrl || `${this.webAppUrl}/dashboard`;
+        const dashboardUrl = data.dashboardUrl;
 
         await this.mailerService.sendMail({
             to: data.user.email,
@@ -98,9 +98,8 @@ export class MailService {
      */
     @OnEvent(UserNewDeviceLoginEvent.EVENT_NAME)
     async sendNewDeviceAlert(data: UserNewDeviceLoginEvent): Promise<void> {
-        const verifyUrl =
-            data.verifyUrl || `${this.webAppUrl}/verify-device?token=${data.verifyToken}`;
-        const secureAccountUrl = data.secureAccountUrl || `${this.webAppUrl}/secure-account`;
+        const verifyUrl = data.verifyUrl;
+        const secureAccountUrl = data.secureAccountUrl;
 
         await this.mailerService.sendMail({
             to: data.user.email,
@@ -125,9 +124,8 @@ export class MailService {
      */
     @OnEvent(UserAccountDeletionEvent.EVENT_NAME)
     async sendAccountDeletionConfirmation(data: UserAccountDeletionEvent): Promise<void> {
-        const deleteUrl =
-            data.deleteUrl || `${this.webAppUrl}/delete-account?token=${data.deleteToken}`;
-        const keepAccountUrl = data.keepAccountUrl || `${this.webAppUrl}/dashboard`;
+        const deleteUrl = data.deleteUrl;
+        const keepAccountUrl = data.keepAccountUrl;
 
         await this.mailerService.sendMail({
             to: data.user.email,
