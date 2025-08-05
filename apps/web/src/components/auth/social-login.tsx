@@ -11,11 +11,13 @@ export function SocialLoginButtons() {
 
     const handleConnectProvider = async (provider: string) => {
         startTransition(async () => {
-            try {
-                await connectProvider(provider);
-            } catch (error) {
-                console.error(error);
+            const response = await connectProvider(provider);
+            if (!response.success || !response.url) {
+                console.error(response.error || 'Failed to connect provider');
+                return;
             }
+
+            window.location.href = response.url;
         });
     };
 

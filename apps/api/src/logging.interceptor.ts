@@ -7,10 +7,6 @@ import { config } from './config/constants';
 export class LoggingInterceptor implements NestInterceptor {
     private logger = new Logger('HTTP');
 
-    constructor() {
-        this.logger.log('Logging interceptor initialized', config.debug());
-    }
-
     intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
         if (!config.debug()) {
             return next.handle();
@@ -20,7 +16,7 @@ export class LoggingInterceptor implements NestInterceptor {
         const request = context.switchToHttp().getRequest();
         const { method, originalUrl } = request;
 
-        this.logger.debug(`Incoming Request: ${method} ${originalUrl}`);
+        this.logger.log(`Incoming Request: ${method} ${originalUrl}`);
 
         return next.handle().pipe(
             tap(() => {
@@ -28,7 +24,7 @@ export class LoggingInterceptor implements NestInterceptor {
                 const { statusCode } = response;
                 const delay = Date.now() - now;
 
-                this.logger.debug(
+                this.logger.log(
                     `Outgoing Response: ${method} ${originalUrl} ${statusCode} - ${delay}ms`,
                 );
             }),

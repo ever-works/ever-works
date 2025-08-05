@@ -13,6 +13,7 @@ import { ROUTES, routeWithParams, withAppUrl } from '@/lib/constants';
 import { VALIDATION_RULES } from './validation';
 import { authAPI } from '@/lib/api';
 import { redirect } from '@/i18n/navigation';
+import { redirect as nextRedirect } from 'next/navigation';
 import { getLocale, getTranslations } from 'next-intl/server';
 
 export async function login(identifier: string, password: string) {
@@ -172,28 +173,25 @@ export async function connectProvider(provider: string) {
         switch (provider) {
             case 'github': {
                 const { url } = await authAPI.getGitHubAuthUrl(withAppUrl(callbackUrl), state);
-                redirect({
-                    locale: await getLocale(),
-                    href: url,
-                });
-                break;
+                return {
+                    success: true,
+                    url,
+                };
             }
             case 'google': {
                 const { url } = await authAPI.getGoogleAuthUrl(withAppUrl(callbackUrl), state);
-                redirect({
-                    locale: await getLocale(),
-                    href: url,
-                });
-                break;
+                return {
+                    success: true,
+                    url,
+                };
             }
             default:
                 const t = await getTranslations('api.errors');
-                throw new Error(t('unsupportedProvider'));
+                return {
+                    success: false,
+                    error: t('unsupportedProvider'),
+                };
         }
-
-        return {
-            success: true,
-        };
     } catch (error) {
         console.error(error);
         const t = await getTranslations('api.errors');
