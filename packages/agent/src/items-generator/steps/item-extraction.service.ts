@@ -95,15 +95,16 @@ export class ItemExtractionService {
     }
 
     async extractItemsFromPages(
+        directorySlug: string,
         createItemsGeneratorDto: CreateItemsGeneratorDto,
         relevantPages: WebPageData[],
         featuredItemHints: string[] = [],
     ): Promise<ItemData[]> {
-        const { slug, name: topicName, prompt: topicDescription, config } = createItemsGeneratorDto;
+        const { name: topicName, prompt: topicDescription, config } = createItemsGeneratorDto;
 
         if (!this.aiService.isAiConfigured()) {
             this.logger.warn(
-                `[${slug}] OpenAI API Key not configured. Skipping AI-driven item extraction.`,
+                `[${directorySlug}] OpenAI API Key not configured. Skipping AI-driven item extraction.`,
             );
             return [];
         }
@@ -116,7 +117,7 @@ export class ItemExtractionService {
 
             if (!hasSufficientContent) {
                 this.logger.log(
-                    `[${slug}] Skipping item extraction for page (insufficient content): ${page.source_url}`,
+                    `[${directorySlug}] Skipping item extraction for page (insufficient content): ${page.source_url}`,
                 );
             }
 
@@ -145,13 +146,13 @@ export class ItemExtractionService {
                 // Check if content is large enough to require chunking
                 if (page.raw_content && page.raw_content.length > this.MAX_CHUNK_SIZE) {
                     this.logger.log(
-                        `[${slug}] Content size (${page.raw_content.length} chars) exceeds chunk size limit. Processing in chunks for ${page.source_url}`,
+                        `[${directorySlug}] Content size (${page.raw_content.length} chars) exceeds chunk size limit. Processing in chunks for ${page.source_url}`,
                     );
 
                     // Split the content into chunks
                     const chunks = await this.textSplitter.splitText(page.raw_content);
                     this.logger.log(
-                        `[${slug}] Split content into ${chunks.length} chunks for processing from ${page.source_url}`,
+                        `[${directorySlug}] Split content into ${chunks.length} chunks for processing from ${page.source_url}`,
                     );
 
                     // Process each chunk
@@ -159,7 +160,7 @@ export class ItemExtractionService {
                         chunks.map(async (chunk: string, index: number) => {
                             try {
                                 this.logger.log(
-                                    `[${slug}] Processing chunk ${index + 1}/${chunks.length} (${chunk.length} chars) from ${page.source_url}`,
+                                    `[${directorySlug}] Processing chunk ${index + 1}/${chunks.length} (${chunk.length} chars) from ${page.source_url}`,
                                 );
 
                                 const chunkResult = (await extractionChain.invoke({
@@ -172,7 +173,7 @@ export class ItemExtractionService {
                                 return chunkResult?.items || [];
                             } catch (chunkError: any) {
                                 this.logger.error(
-                                    `[${slug}] Error processing chunk ${index + 1} from ${page.source_url}: ${chunkError.message}`,
+                                    `[${directorySlug}] Error processing chunk ${index + 1} from ${page.source_url}: ${chunkError.message}`,
                                 );
                                 return [];
                             }
@@ -184,7 +185,7 @@ export class ItemExtractionService {
 
                     if (allExtractedItems.length > 0) {
                         this.logger.log(
-                            `[${slug}] Found ${allExtractedItems.length} potential items across ${chunks.length} chunks in ${page.source_url}`,
+                            `[${directorySlug}] Found ${allExtractedItems.length} potential items across ${chunks.length} chunks in ${page.source_url}`,
                         );
 
                         // Process and validate each extracted item
@@ -200,11 +201,11 @@ export class ItemExtractionService {
 
                                 validatedItems.push(validatedItem);
                                 this.logger.log(
-                                    `[${slug}] Extracted item: "${validatedItem.name}" (Slug: ${validatedItem.slug})`,
+                                    `[${directorySlug}] Extracted item: "${validatedItem.name}" (Slug: ${validatedItem.slug})`,
                                 );
                             } catch (validationError) {
                                 this.logger.warn(
-                                    `[${slug}] Discarding item due to validation error: ${validationError.errors.map((e: any) => e.message).join(', ')}. Item: ${JSON.stringify(extractedItem)} from ${page.source_url}`,
+                                    `[${directorySlug}] Discarding item due to validation error: ${validationError.errors.map((e: any) => e.message).join(', ')}. Item: ${JSON.stringify(extractedItem)} from ${page.source_url}`,
                                 );
                             }
                         }
@@ -216,7 +217,7 @@ export class ItemExtractionService {
                         extractedItems.push(...uniqueItems);
                     } else {
                         this.logger.log(
-                            `[${slug}] No items extracted by LLM from any chunks in ${page.source_url}`,
+                            `[${directorySlug}] No items extracted by LLM from any chunks in ${page.source_url}`,
                         );
                     }
                 } else {
@@ -234,7 +235,7 @@ export class ItemExtractionService {
                         extractionResult.items.length > 0
                     ) {
                         this.logger.log(
-                            `[${slug}] Found ${extractionResult.items.length} potential items in ${page.source_url}`,
+                            `[${directorySlug}] Found ${extractionResult.items.length} potential items in ${page.source_url}`,
                         );
 
                         // Process and validate each extracted item
@@ -250,11 +251,11 @@ export class ItemExtractionService {
 
                                 validatedItems.push(validatedItem);
                                 this.logger.log(
-                                    `[${slug}] Extracted item: "${validatedItem.name}" (Slug: ${validatedItem.slug})`,
+                                    `[${directorySlug}] Extracted item: "${validatedItem.name}" (Slug: ${validatedItem.slug})`,
                                 );
                             } catch (validationError) {
                                 this.logger.warn(
-                                    `[${slug}] Discarding item due to validation error: ${validationError.errors.map((e: any) => e.message).join(', ')}. Item: ${JSON.stringify(extractedItem)} from ${page.source_url}`,
+                                    `[${directorySlug}] Discarding item due to validation error: ${validationError.errors.map((e: any) => e.message).join(', ')}. Item: ${JSON.stringify(extractedItem)} from ${page.source_url}`,
                                 );
                             }
                         }
@@ -263,13 +264,13 @@ export class ItemExtractionService {
                         extractedItems.push(...validatedItems);
                     } else {
                         this.logger.log(
-                            `[${slug}] No items extracted by LLM from ${page.source_url}`,
+                            `[${directorySlug}] No items extracted by LLM from ${page.source_url}`,
                         );
                     }
                 }
             } catch (error: any) {
                 this.logger.error(
-                    `[${slug}] Error extracting items from ${page.source_url}: ${error.message}`,
+                    `[${directorySlug}] Error extracting items from ${page.source_url}: ${error.message}`,
                     error.stack,
                 );
             }
@@ -281,7 +282,9 @@ export class ItemExtractionService {
         const BATCH_SIZE = 10;
         const allExtractedItems: ItemData[] = [];
 
-        this.logger.log(`[${slug}] Processing item extraction in batches of ${BATCH_SIZE}`);
+        this.logger.log(
+            `[${directorySlug}] Processing item extraction in batches of ${BATCH_SIZE}`,
+        );
 
         // Process pages in batches
         for (let i = 0; i < pagesWithSufficientContent.length; i += BATCH_SIZE) {
@@ -306,12 +309,12 @@ export class ItemExtractionService {
 
         if (uniqueExtractedItems.length < allExtractedItems.length) {
             this.logger.log(
-                `[${slug}] Deduplicated ${allExtractedItems.length - uniqueExtractedItems.length} duplicate items across all pages.`,
+                `[${directorySlug}] Deduplicated ${allExtractedItems.length - uniqueExtractedItems.length} duplicate items across all pages.`,
             );
         }
 
         this.logger.log(
-            `[${slug}] Item extraction complete. Extracted ${uniqueExtractedItems.length} unique items from ${pagesWithSufficientContent.length} pages.`,
+            `[${directorySlug}] Item extraction complete. Extracted ${uniqueExtractedItems.length} unique items from ${pagesWithSufficientContent.length} pages.`,
         );
         return uniqueExtractedItems;
     }

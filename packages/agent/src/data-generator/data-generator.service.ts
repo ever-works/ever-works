@@ -49,7 +49,7 @@ export class DataGeneratorService {
 
         // Generate items, the items generator will always to generate new items
         const generatedItems = await this.itemsGeneratorService
-            .generateItemsGenerator(createItemsGeneratorDto, existingData)
+            .generateItemsGenerator(directory, createItemsGeneratorDto, existingData)
             .catch((err) => {
                 this.logger.error('Failed to generate items from ItemsGeneratorService.', err);
                 return null;
@@ -92,7 +92,9 @@ export class DataGeneratorService {
             await this.githubService.createEmptyRepo(repo, description, token);
         }
 
-        this.logger.log(`Successfully created GitHub repository: ${directory.getRepoOwner()}/${repo}`);
+        this.logger.log(
+            `Successfully created GitHub repository: ${directory.getRepoOwner()}/${repo}`,
+        );
 
         // Cloning repository
         const dest = await this.githubService

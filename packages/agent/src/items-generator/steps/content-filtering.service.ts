@@ -26,13 +26,15 @@ export class ContentFilteringService {
     }
 
     async filterAndAssessPages(
-        slug: string,
+        directorySlug: string,
         webPages: WebPageData[],
         topicName: string,
         topicDescription: string,
         config: Required<ConfigDto>,
     ): Promise<WebPageData[]> {
-        this.logger.log(`[${slug}] Starting content filtering for ${webPages.length} pages`);
+        this.logger.log(
+            `[${directorySlug}] Starting content filtering for ${webPages.length} pages`,
+        );
 
         const filteredPages = webPages
             .filter((page, index, self) => {
@@ -50,7 +52,9 @@ export class ContentFilteringService {
             return filteredPages;
         }
 
-        this.logger.log(`[${slug}] ${filteredPages.length} pages passed initial length filter`);
+        this.logger.log(
+            `[${directorySlug}] ${filteredPages.length} pages passed initial length filter`,
+        );
 
         if (filteredPages.length === 0) {
             return [];
@@ -66,7 +70,7 @@ export class ContentFilteringService {
             error?: any;
         }> => {
             try {
-                this.logger.log(`[${slug}] Assessing relevance for: ${page.source_url}`);
+                this.logger.log(`[${directorySlug}] Assessing relevance for: ${page.source_url}`);
 
                 // Stricter prompt for page relevance
                 const prompt = HumanMessagePromptTemplate.fromTemplate(
@@ -110,22 +114,22 @@ Provide a relevance score between 0.0 (not relevant) and 1.0 (highly relevant). 
 
                 if (isRelevant) {
                     this.logger.log(
-                        `[${slug}] Relevant page (Score: ${assessmentResult.relevance_score}): ${page.source_url} - Reason: ${assessmentResult.reason}`,
+                        `[${directorySlug}] Relevant page (Score: ${assessmentResult.relevance_score}): ${page.source_url} - Reason: ${assessmentResult.reason}`,
                     );
                 } else {
                     this.logger.log(
-                        `[${slug}] Discarding page (Not relevant/Score too low: ${assessmentResult.relevance_score}): ${page.source_url} - Reason: ${assessmentResult.reason}`,
+                        `[${directorySlug}] Discarding page (Not relevant/Score too low: ${assessmentResult.relevance_score}): ${page.source_url} - Reason: ${assessmentResult.reason}`,
                     );
                 }
 
                 return { page, isRelevant, assessment: assessmentResult };
             } catch (error) {
                 this.logger.error(
-                    `[${slug}] Error assessing relevance for ${page.source_url}: ${error.message}`,
+                    `[${directorySlug}] Error assessing relevance for ${page.source_url}: ${error.message}`,
                     error.stack,
                 );
                 this.logger.warn(
-                    `[${slug}] Keeping page due to relevance assessment error (will rely on later extraction quality): ${page.source_url}`,
+                    `[${directorySlug}] Keeping page due to relevance assessment error (will rely on later extraction quality): ${page.source_url}`,
                 );
                 return { page, isRelevant: true, error };
             }
@@ -135,7 +139,7 @@ Provide a relevance score between 0.0 (not relevant) and 1.0 (highly relevant). 
         const relevantPages: WebPageData[] = [];
 
         this.logger.log(
-            `[${slug}] Processing relevance assessment in batches of ${this.BATCH_SIZE}`,
+            `[${directorySlug}] Processing relevance assessment in batches of ${this.BATCH_SIZE}`,
         );
 
         // Process pages in batches
@@ -160,7 +164,7 @@ Provide a relevance score between 0.0 (not relevant) and 1.0 (highly relevant). 
         }
 
         this.logger.log(
-            `[${slug}] Content filtering complete. ${relevantPages.length} relevant pages found out of ${webPages.length} total pages.`,
+            `[${directorySlug}] Content filtering complete. ${relevantPages.length} relevant pages found out of ${webPages.length} total pages.`,
         );
         return relevantPages;
     }

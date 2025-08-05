@@ -70,57 +70,58 @@ export class AgentHttpController {
         return this.agentService.createDirectory(createDirectoryDto, user);
     }
 
-    @Post('generate')
+    @Post('directories/:id/generate')
     @UseGuards(JwtAuthGuard)
     @HttpCode(HttpStatus.ACCEPTED)
     async generateItemsGenerator(
         @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') id: string,
         @Body() createItemsGeneratorDto: CreateItemsGeneratorDto,
     ): Promise<ItemsGeneratorResponseDto> {
         const user = await this.authService.getUser(auth.userId);
 
         // We don't await completion here, as the request can take a long time
-        return this.agentService.generateItemsGenerator(createItemsGeneratorDto, user, false);
+        return this.agentService.generateItemsGenerator(id, createItemsGeneratorDto, user, false);
     }
 
-    @Post('update/:slug')
+    @Post('directories/:id/update')
     @UseGuards(JwtAuthGuard)
     @HttpCode(HttpStatus.ACCEPTED)
     async updateItemsGenerator(
         @CurrentUser() auth: AuthenticatedUser,
-        @Param('slug') slug: string,
+        @Param('id') id: string,
         @Body() updateItemsGeneratorDto: UpdateItemsGeneratorDto,
     ): Promise<ItemsGeneratorResponseDto> {
         const user = await this.authService.getUser(auth.userId);
 
         // We don't await completion here, as the request can take a long time
-        return this.agentService.updateItemsGenerator(slug, updateItemsGeneratorDto, user, false);
+        return this.agentService.updateItemsGenerator(id, updateItemsGeneratorDto, user, false);
     }
 
-    @Post('submit-item/:slug')
+    @Post('directories/:id/submit-item')
     @UseGuards(JwtAuthGuard)
     @HttpCode(HttpStatus.OK)
     async submitItem(
         @CurrentUser() auth: AuthenticatedUser,
-        @Param('slug') slug: string,
+        @Param('id') id: string,
         @Body() submitItemDto: SubmitItemDto,
     ): Promise<SubmitItemResponseDto> {
         const user = await this.authService.getUser(auth.userId);
 
-        return this.agentService.submitItem(slug, submitItemDto, user);
+        return this.agentService.submitItem(id, submitItemDto, user);
     }
 
-    @Post('remove-item/:slug')
+    @Post('directories/:id/remove-item')
     @UseGuards(JwtAuthGuard)
     @HttpCode(HttpStatus.OK)
     async removeItem(
         @CurrentUser() auth: AuthenticatedUser,
-        @Param('slug') slug: string,
+        @Param('id') id: string,
         @Body() removeItemDto: RemoveItemDto,
     ): Promise<RemoveItemResponseDto> {
         const user = await this.authService.getUser(auth.userId);
 
-        return this.agentService.removeItem(slug, removeItemDto, user);
+        return this.agentService.removeItem(id, removeItemDto, user);
     }
 
     @Post('extract-item-details')
@@ -132,28 +133,28 @@ export class AgentHttpController {
         return this.agentService.extractItemDetails(extractItemDetailsDto);
     }
 
-    @Post('regenerate-markdown/:slug')
+    @Post('directories/:id/regenerate-markdown')
     @UseGuards(JwtAuthGuard)
     @HttpCode(HttpStatus.OK)
     async regenerateMarkdown(
         @CurrentUser() auth: AuthenticatedUser,
-        @Param('slug') slug: string,
+        @Param('id') id: string,
     ): Promise<{ status: string; error_details?: string }> {
         const user = await this.authService.getUser(auth.userId);
 
-        return this.agentService.regenerateMarkdown(slug, user);
+        return this.agentService.regenerateMarkdown(id, user);
     }
 
-    @Post('update-website/:slug')
+    @Post('directories/:id/update-website')
     @UseGuards(JwtAuthGuard)
     @HttpCode(HttpStatus.OK)
     async updateWebsiteRepository(
         @CurrentUser() auth: AuthenticatedUser,
-        @Param('slug') slug: string,
+        @Param('id') id: string,
     ): Promise<UpdateWebsiteRepositoryResponseDto> {
         const user = await this.authService.getUser(auth.userId);
 
-        return this.agentService.updateWebsiteRepository(slug, user);
+        return this.agentService.updateWebsiteRepository(id, user);
     }
 
     @Post('directories/:id/delete')

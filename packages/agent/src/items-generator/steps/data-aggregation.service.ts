@@ -8,6 +8,15 @@ import {
     AiDeduplicatorService,
 } from './data-aggregation';
 
+type DataAggregationParams = {
+    directorySlug: string;
+    createItemsGeneratorDto: CreateItemsGeneratorDto;
+    existingItems: ItemData[];
+    newlyExtractedItemsThisRun: ItemData[];
+    urlsScannedThisRun: number;
+    pagesProcessedThisRun: number;
+};
+
 @Injectable()
 export class DataAggregationService {
     private readonly logger = new Logger(DataAggregationService.name);
@@ -21,33 +30,35 @@ export class DataAggregationService {
     /**
      * Aggregates and deduplicates data from multiple sources
      */
-    async aggregateAndDeduplicateData(
-        createItemsGeneratorDto: CreateItemsGeneratorDto,
-        existingItems: ItemData[],
-        newlyExtractedItemsThisRun: ItemData[],
-        urlsScannedThisRun: number,
-        pagesProcessedThisRun: number,
-    ) {
-        const { slug, prompt } = createItemsGeneratorDto;
-        this.logger.log(`[${slug}] Starting data aggregation and deduplication.`);
+    async aggregateAndDeduplicateData({
+        directorySlug,
+        createItemsGeneratorDto,
+        existingItems,
+        newlyExtractedItemsThisRun,
+        urlsScannedThisRun,
+        pagesProcessedThisRun,
+    }: DataAggregationParams) {
+        const { prompt } = createItemsGeneratorDto;
+
+        this.logger.log(`[${directorySlug}] Starting data aggregation and deduplication.`);
 
         // Track metrics
         let newItemsAddedToStoreCount = 0;
 
         // Deduplicate by fields first (faster than AI)
-        this.logger.log(`[${slug}] Deduplicating items by fields`);
+        this.logger.log(`[${directorySlug}] Deduplicating items by fields`);
         let deduplicated = this.sharedUtils.deduplicateByField(
             this.sharedUtils.deduplicateByField(newlyExtractedItemsThisRun, 'slug'),
             'source_url',
         );
 
         this.logger.log(
-            `[${slug}] Field-based deduplication: ${newlyExtractedItemsThisRun.length} → ${deduplicated.length} items`,
+            `[${directorySlug}] Field-based deduplication: ${newlyExtractedItemsThisRun.length} → ${deduplicated.length} items`,
         );
 
         // Extract new items (if we have existing items)
         if (existingItems.length > 0 && deduplicated.length > 0) {
-            this.logger.log(`[${slug}] Extracting new items.`);
+            this.logger.log(`[${directorySlug}] Extracting new items.`);
             const previousCount = deduplicated.length;
 
             deduplicated = await this.newItemsExtractor.extractNewItems(
@@ -57,16 +68,16 @@ export class DataAggregationService {
             newItemsAddedToStoreCount = deduplicated.length;
 
             this.logger.log(
-                `[${slug}] New items extraction: ${previousCount} → ${newItemsAddedToStoreCount} items`,
+                `[${directorySlug}] New items extraction: ${previousCount} → ${newItemsAddedToStoreCount} items`,
             );
         }
 
         // Deduplicate with AI (more sophisticated)
         if (deduplicated.length > 0) {
-            this.logger.log(`[${slug}] Deduplicating items with AI.`);
+            this.logger.log(`[${directorySlug}] Deduplicating items with AI.`);
             deduplicated = await this.aiDeduplicator.deduplicateWithAI(prompt, deduplicated);
             this.logger.log(
-                `[${slug}] AI-based deduplication: ${deduplicated.length} items remaining`,
+                `[${directorySlug}] AI-based deduplication: ${deduplicated.length} items remaining`,
             );
         }
 
@@ -80,7 +91,7 @@ export class DataAggregationService {
         };
 
         this.logger.log(
-            `[${slug}] Data aggregation and deduplication complete. Final item count: ${deduplicated.length}`,
+            `[${directorySlug}] Data aggregation and deduplication complete. Final item count: ${deduplicated.length}`,
         );
 
         return { aggregatedItems: deduplicated, metrics };

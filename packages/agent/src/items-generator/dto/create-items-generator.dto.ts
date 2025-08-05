@@ -80,10 +80,6 @@ export class ConfigDto {
 export class CreateItemsGeneratorDto {
     @IsString()
     @IsNotEmpty()
-    slug: string;
-
-    @IsString()
-    @IsNotEmpty()
     name: string;
 
     @IsString()
