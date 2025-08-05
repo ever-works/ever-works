@@ -31,6 +31,14 @@ function AuthErrorContent() {
                 return t('sessionExpired');
             case 'network_error':
                 return t('networkError');
+            case 'reset_password_missing_token':
+                return t('resetPassword.missingToken');
+            case 'reset_password_invalid_token':
+                return t('resetPassword.invalidToken');
+            case 'reset_password_expired_token':
+                return t('resetPassword.expiredToken');
+            case 'reset_password_failed':
+                return t('resetPassword.failed');
             default:
                 return t('generic');
         }
@@ -89,6 +97,25 @@ function AuthErrorContent() {
                         />
                     </svg>
                 );
+            case 'reset_password_missing_token':
+            case 'reset_password_invalid_token':
+            case 'reset_password_expired_token':
+            case 'reset_password_failed':
+                return (
+                    <svg
+                        className="w-12 h-12 text-warning"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                    >
+                        <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H7v4H3v-4l4.257-4.257A6 6 0 1121 9z"
+                        />
+                    </svg>
+                );
             default:
                 return (
                     <svg
@@ -131,6 +158,18 @@ function AuthErrorContent() {
                     className="px-6 py-3 bg-primary hover:bg-primary-hover text-white rounded-lg font-medium transition-colors animate-fade-in"
                 >
                     {t('actions.contactSupport')}
+                </Link>,
+            );
+        }
+
+        if (errorType?.startsWith('reset_password_')) {
+            buttons.push(
+                <Link
+                    key="forgot"
+                    href="/forgot-password"
+                    className="px-6 py-3 bg-primary hover:bg-primary-hover text-white rounded-lg font-medium transition-colors animate-fade-in"
+                >
+                    {t('actions.requestNewReset')}
                 </Link>,
             );
         }
