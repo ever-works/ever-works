@@ -5,8 +5,8 @@ import Link from 'next/link';
 import { AuthLayout } from '@/components/layout/AuthLayout';
 import { useTranslations } from 'next-intl';
 import { Input } from '@/components/ui/input';
-import { authAPI } from '@/lib/api/auth';
-import { withAppUrl, ROUTES } from '@/lib/constants';
+import { ROUTES } from '@/lib/constants';
+import { forgotPassword as forgotPasswordAction } from '@/app/actions/auth';
 
 export default function ForgotPasswordPage() {
     const [isPending, startTransition] = useTransition();
@@ -21,14 +21,11 @@ export default function ForgotPasswordPage() {
 
         startTransition(async () => {
             try {
-                await authAPI.forgotPassword({
-                    email,
-                    resetPasswordCallbackUrl: withAppUrl(ROUTES.API_AUTH_RESET_PASSWORD),
-                });
+                await forgotPasswordAction(email);
                 setSuccess(true);
             } catch (err) {
                 console.error(err);
-                setError(t('errors.failed'));
+                setError(err instanceof Error ? err.message : t('errors.failed'));
             }
         });
     };

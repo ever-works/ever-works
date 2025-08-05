@@ -126,7 +126,11 @@
         "loginButton": "Go to Login"
       },
       "errors": {
-        "failed": "Failed to reset password. Please try again or request a new reset link."
+        "failed": "Failed to reset password. Please try again or request a new reset link.",
+        "noToken": "Invalid reset link",
+        "invalidLink": "Invalid Reset Link",
+        "missingTokenMessage": "The password reset link is invalid or incomplete. Please request a new password reset.",
+        "requestNewLink": "Request New Reset Link"
       },
       "backToLogin": "Back to login"
     },
@@ -223,7 +227,9 @@
       "loginFailed": "Login failed",
       "registerFailed": "Failed to register",
       "unsupportedProvider": "Unsupported provider",
-      "providerConnectFailed": "Failed to connect provider"
+      "providerConnectFailed": "Failed to connect provider",
+      "forgotPasswordFailed": "Failed to send password reset email",
+      "resetPasswordFailed": "Failed to reset password"
     }
   },
   "validation": {

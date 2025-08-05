@@ -1,16 +1,15 @@
 'use client';
 
-import { useState, useTransition, useEffect } from 'react';
+import { useState, useTransition, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { AuthLayout } from '@/components/layout/AuthLayout';
 import { useTranslations } from 'next-intl';
 import { Input } from '@/components/ui/input';
-import { authAPI } from '@/lib/api/auth';
-import { redirect } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
+import { resetPassword as resetPasswordAction } from '@/app/actions/auth';
 
-export default function ResetPasswordPage() {
+function ResetPasswordContent() {
     const [isPending, startTransition] = useTransition();
     const t = useTranslations('auth.resetPassword');
     const searchParams = useSearchParams();
@@ -27,42 +26,66 @@ export default function ResetPasswordPage() {
     }>({});
     const [success, setSuccess] = useState(false);
 
-    useEffect(() => {
-        if (!token) {
-            redirect({
-                locale: 'en',
-                href: ROUTES.AUTH_ERROR + '?error=reset_password_missing_token',
-            });
-        }
-    }, [token]);
+    // If no token, show error message instead of redirecting
+    if (!token) {
+        return (
+            <AuthLayout title={t('title')} subtitle={t('errors.noToken')}>
+                <div className="space-y-6">
+                    <div className="bg-danger/10 border border-danger/20 rounded-lg p-6">
+                        <div className="flex items-start gap-3">
+                            <div className="w-8 h-8 bg-danger/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                                <svg
+                                    className="w-5 h-5 text-danger"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                                    />
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 className="font-medium text-text mb-1">
+                                    {t('errors.invalidLink')}
+                                </h3>
+                                <p className="text-sm text-text-secondary">
+                                    {t('errors.missingTokenMessage')}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
 
-    const validatePassword = (password: string) => {
-        if (password.length < 6) {
-            return t('form.password.errors.minLength');
-        }
-        if (!/[a-z]/.test(password)) {
-            return t('form.password.errors.lowercase');
-        }
-        if (!/(\d|\W)/.test(password)) {
-            return t('form.password.errors.numberOrSpecial');
-        }
-        if (/^[.\n]/.test(password)) {
-            return t('form.password.errors.cannotStartWith');
-        }
-        return '';
-    };
+                    <div className="text-center space-y-4">
+                        <Link
+                            href={ROUTES.AUTH_FORGOT_PASSWORD}
+                            className="inline-block px-6 py-3 bg-primary hover:bg-primary-hover text-white rounded-lg font-medium transition-colors"
+                        >
+                            {t('errors.requestNewLink')}
+                        </Link>
+
+                        <p className="text-sm text-text-secondary">
+                            <Link
+                                href={ROUTES.AUTH_LOGIN}
+                                className="text-primary hover:text-primary-hover transition-colors"
+                            >
+                                {t('backToLogin')}
+                            </Link>
+                        </p>
+                    </div>
+                </div>
+            </AuthLayout>
+        );
+    }
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setErrors({});
 
-        // Validate passwords
-        const passwordError = validatePassword(formData.password);
-        if (passwordError) {
-            setErrors({ password: passwordError });
-            return;
-        }
-
+        // Validate passwords match
         if (formData.password !== formData.confirmPassword) {
             setErrors({ confirmPassword: t('form.confirmPassword.errors.noMatch') });
             return;
@@ -70,14 +93,12 @@ export default function ResetPasswordPage() {
 
         startTransition(async () => {
             try {
-                await authAPI.resetPassword({
-                    token: token!,
-                    newPassword: formData.password,
-                });
+                await resetPasswordAction(token!, formData.password);
                 setSuccess(true);
             } catch (err) {
                 console.error(err);
-                setErrors({ general: t('errors.failed') });
+                // The server action already validates the password, so show the error message
+                setErrors({ general: err instanceof Error ? err.message : t('errors.failed') });
             }
         });
     };
@@ -181,5 +202,21 @@ export default function ResetPasswordPage() {
                 </div>
             </form>
         </AuthLayout>
+    );
+}
+
+export default function ResetPasswordPage() {
+    return (
+        <Suspense
+            fallback={
+                <div className="min-h-screen bg-background flex items-center justify-center">
+                    <div className="animate-pulse">
+                        <div className="w-12 h-12 bg-surface-secondary rounded-full"></div>
+                    </div>
+                </div>
+            }
+        >
+            <ResetPasswordContent />
+        </Suspense>
     );
 }
