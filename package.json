@@ -41,7 +41,7 @@
 		"node": ">=20",
 		"pnpm": ">=9.9.0"
 	},
-	"packageManager": "pnpm@10.13.1",
+	"packageManager": "pnpm@10.14.0",
 	"prettier": {
 		"printWidth": 120,
 		"singleQuote": true,

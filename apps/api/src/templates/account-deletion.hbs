@@ -1,0 +1,123 @@
+<mjml>
+    <mj-head>
+        <mj-title>Confirm account deletion</mj-title>
+        <mj-preview>Are you sure you want to delete your Ever Works account?</mj-preview>
+        <mj-attributes>
+            <mj-all
+                font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif"
+            />
+            <mj-text font-size='16px' color='#475569' line-height='1.6' />
+            <mj-section background-color='#ffffff' padding='0' />
+        </mj-attributes>
+    </mj-head>
+
+    <mj-body background-color='#f8fafc'>
+        <!-- Logo Section -->
+        <mj-section padding='40px 20px 30px'>
+            <mj-column>
+                <mj-text
+                    align='center'
+                    font-size='28px'
+                    font-weight='600'
+                    color='#1e293b'
+                    padding='0'
+                >
+                    Ever Works
+                </mj-text>
+                <mj-text align='center' font-size='14px' color='#94a3b8' padding='5px 0 0'>
+                    by Ever Co.
+                </mj-text>
+            </mj-column>
+        </mj-section>
+
+        <!-- Main Card -->
+        <mj-section padding='0 20px 40px'>
+            <mj-column>
+                <mj-wrapper background-color='#ffffff' border-radius='8px' padding='40px 30px'>
+                    <!-- Icon -->
+                    <mj-text align='center' font-size='40px' padding-bottom='20px'>
+                        ⚠️
+                    </mj-text>
+
+                    <!-- Title -->
+                    <mj-text
+                        font-size='24px'
+                        color='#1e293b'
+                        font-weight='600'
+                        align='center'
+                        padding-bottom='10px'
+                    >
+                        Delete Your Account?
+                    </mj-text>
+
+                    <mj-text align='center' color='#64748b' padding-bottom='20px'>
+                        {{#if firstName}}{{firstName}}, we're{{else}}We're{{/if}}
+                        sorry to see you go. Please confirm that you want to permanently delete your
+                        Ever Works account.
+                    </mj-text>
+
+                    <!-- Warning Box -->
+                    <mj-wrapper
+                        background-color='#fef2f2'
+                        border='1px solid #fecaca'
+                        border-radius='6px'
+                        padding='20px'
+                    >
+                        <mj-text font-size='14px' color='#991b1b' padding='0'>
+                            <strong>This action cannot be undone!</strong><br /><br />
+                            Deleting your account will permanently remove:
+                        </mj-text>
+                        <mj-text font-size='14px' color='#991b1b' padding='10px 0 0 20px'>
+                            • All your projects and data<br />
+                            • Your profile and settings<br />
+                            • Access to Ever Works services
+                        </mj-text>
+                    </mj-wrapper>
+
+                    <!-- Expiry Notice -->
+                    <mj-text align='center' font-size='14px' color='#94a3b8' padding='30px 0 20px'>
+                        This deletion request expires in
+                        {{expiresIn}}.
+                    </mj-text>
+
+                    <!-- Actions -->
+                    <mj-button
+                        background-color='#ef4444'
+                        color='#ffffff'
+                        font-size='16px'
+                        font-weight='500'
+                        padding='0 0 15px'
+                        inner-padding='12px 32px'
+                        border-radius='6px'
+                        href='{{deleteUrl}}'
+                    >
+                        Yes, delete my account
+                    </mj-button>
+
+                    <mj-button
+                        background-color='#1e293b'
+                        color='#ffffff'
+                        font-size='16px'
+                        font-weight='500'
+                        padding='0'
+                        inner-padding='12px 48px'
+                        border-radius='6px'
+                        href='{{keepAccountUrl}}'
+                    >
+                        Keep my account
+                    </mj-button>
+                </mj-wrapper>
+            </mj-column>
+        </mj-section>
+
+        <!-- Footer -->
+        <mj-section padding='0 20px 40px'>
+            <mj-column>
+                <mj-text align='center' font-size='14px' color='#94a3b8'>
+                    If you didn't request this, please ignore this email.<br /><br />
+                    © 2024 Ever Co. All rights reserved.
+                </mj-text>
+            </mj-column>
+        </mj-section>
+    </mj-body>
+</mjml>

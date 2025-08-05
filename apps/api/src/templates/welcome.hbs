@@ -1,0 +1,136 @@
+<mjml>
+    <mj-head>
+        <mj-title>Welcome to Ever Works!</mj-title>
+        <mj-preview>Your account is ready. Here's how to get started.</mj-preview>
+        <mj-attributes>
+            <mj-all
+                font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif"
+            />
+            <mj-text font-size='16px' color='#475569' line-height='1.6' />
+            <mj-section background-color='#ffffff' padding='0' />
+        </mj-attributes>
+    </mj-head>
+
+    <mj-body background-color='#f8fafc'>
+        <!-- Logo Section -->
+        <mj-section padding='40px 20px 30px'>
+            <mj-column>
+                <mj-text
+                    align='center'
+                    font-size='28px'
+                    font-weight='600'
+                    color='#1e293b'
+                    padding='0'
+                >
+                    Ever Works
+                </mj-text>
+                <mj-text align='center' font-size='14px' color='#94a3b8' padding='5px 0 0'>
+                    by Ever Co.
+                </mj-text>
+            </mj-column>
+        </mj-section>
+
+        <!-- Main Card -->
+        <mj-section padding='0 20px 40px'>
+            <mj-column>
+                <mj-wrapper background-color='#ffffff' border-radius='8px' padding='40px 30px'>
+                    <!-- Icon -->
+                    <mj-text align='center' font-size='40px' padding-bottom='20px'>
+                        🎉
+                    </mj-text>
+
+                    <!-- Title -->
+                    <mj-text
+                        font-size='24px'
+                        color='#1e293b'
+                        font-weight='600'
+                        align='center'
+                        padding-bottom='10px'
+                    >
+                        You're all set{{#if firstName}}, {{firstName}}{{/if}}!
+                    </mj-text>
+
+                    <mj-text align='center' color='#64748b' padding-bottom='30px'>
+                        Your Ever Works account is confirmed and ready to use.
+                    </mj-text>
+
+                    <!-- Getting Started Steps -->
+                    <mj-text
+                        font-size='18px'
+                        color='#1e293b'
+                        font-weight='600'
+                        padding-bottom='15px'
+                    >
+                        Get started in 3 easy steps:
+                    </mj-text>
+
+                    <mj-wrapper
+                        background-color='#f8fafc'
+                        border-radius='6px'
+                        padding='20px'
+                        margin-bottom='15px'
+                    >
+                        <mj-text font-size='16px' color='#1e293b' padding='0 0 8px'>
+                            <strong>1. Complete your profile</strong>
+                        </mj-text>
+                        <mj-text font-size='14px' color='#64748b' padding='0'>
+                            Add your details to personalize your experience
+                        </mj-text>
+                    </mj-wrapper>
+
+                    <mj-wrapper
+                        background-color='#f8fafc'
+                        border-radius='6px'
+                        padding='20px'
+                        margin-bottom='15px'
+                    >
+                        <mj-text font-size='16px' color='#1e293b' padding='0 0 8px'>
+                            <strong>2. Explore the dashboard</strong>
+                        </mj-text>
+                        <mj-text font-size='14px' color='#64748b' padding='0'>
+                            Discover all the features available to you
+                        </mj-text>
+                    </mj-wrapper>
+
+                    <mj-wrapper
+                        background-color='#f8fafc'
+                        border-radius='6px'
+                        padding='20px'
+                        margin-bottom='30px'
+                    >
+                        <mj-text font-size='16px' color='#1e293b' padding='0 0 8px'>
+                            <strong>3. Create your first project</strong>
+                        </mj-text>
+                        <mj-text font-size='14px' color='#64748b' padding='0'>
+                            Start building something amazing today
+                        </mj-text>
+                    </mj-wrapper>
+
+                    <!-- CTA Button -->
+                    <mj-button
+                        background-color='#1e293b'
+                        color='#ffffff'
+                        font-size='16px'
+                        font-weight='500'
+                        padding='0'
+                        inner-padding='12px 48px'
+                        border-radius='6px'
+                        href='{{dashboardUrl}}'
+                    >
+                        Go to Dashboard
+                    </mj-button>
+                </mj-wrapper>
+            </mj-column>
+        </mj-section>
+
+        <!-- Footer -->
+        <mj-section padding='0 20px 40px'>
+            <mj-column>
+                <mj-text align='center' font-size='14px' color='#94a3b8'>
+                    Need help? Reply to this email or visit our help center.<br /><br />
+                    © 2024 Ever Co. All rights reserved.
+                </mj-text>
+            </mj-column>
+        </mj-section>
+    </mj-body>
+</mjml>

@@ -5,6 +5,7 @@
     "compilerOptions": {
         "builder": "swc",
         "deleteOutDir": true,
-        "typeCheck": true
+        "typeCheck": true,
+        "assets": ["src/templates/**/*"]
     }
 }

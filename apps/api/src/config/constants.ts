@@ -28,6 +28,22 @@ export enum AuthProviders {
 }
 
 export const config = {
+    webAppUrl: () => process.env.WEB_APP_URL || 'http://localhost:3000',
+
+    mail: {
+        provider: (): 'smtp' | null => {
+            const provider = process.env.MAILER_PROVIDER;
+            return !provider || provider === 'none' ? null : 'smtp';
+        },
+        from: () => process.env.EMAIL_FROM || 'Ever Works <no-reply@ever.works>',
+        smtpHost: () => process.env.SMTP_HOST || '127.0.0.1',
+        smtpPort: () => parseInt(process.env.SMTP_PORT || '587'),
+        smtpUser: () => process.env.SMTP_USER,
+        smtpPassword: () => process.env.SMTP_PASSWORD,
+        smtpSecure: () => process.env.SMTP_SECURE === 'true',
+        smtpIgnoreTLS: () => process.env.SMTP_IGNORE_TLS === 'true',
+    },
+
     google: {
         clientId: () => process.env.GOOGLE_CLIENT_ID,
         clientSecret: () => process.env.GOOGLE_CLIENT_SECRET,

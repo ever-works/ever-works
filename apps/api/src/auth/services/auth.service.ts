@@ -17,6 +17,8 @@ import { randomBytes, randomUUID } from 'crypto';
 import { jwtConstants, authConstants, AuthProviders } from '../../config/constants';
 import { User } from '@packages/agent/entities';
 import { JwtPayload, TokenResponse } from '../types/jwt.types';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { UserCreatedEvent, UserForgotPasswordEvent } from '../../events';
 
 @Injectable()
 export class AuthService {
@@ -27,6 +29,7 @@ export class AuthService {
         private readonly refreshTokenRepository: RefreshTokenRepository,
         private readonly oauthTokenRepository: OAuthTokenRepository,
         private readonly jwtService: JwtService,
+        private eventEmitter: EventEmitter2,
     ) {}
 
     async validateUser(email: string, password: string) {
@@ -373,8 +376,12 @@ export class AuthService {
             emailVerificationExpires: expires,
         });
 
-        // TODO: Send email with verification link
-        // For now, return the token (in production, this would be sent via email)
+        // Emit event to send verification email
+        this.eventEmitter.emit(
+            UserCreatedEvent.EVENT_NAME,
+            new UserCreatedEvent(user, verificationToken),
+        );
+
         return {
             message: 'Verification email sent',
             // Remove this in production
@@ -421,8 +428,12 @@ export class AuthService {
             passwordResetExpires: expires,
         });
 
-        // TODO: Send email with reset link
-        // For now, return the token (in production, this would be sent via email)
+        // Emit event to send reset email
+        this.eventEmitter.emit(
+            UserForgotPasswordEvent.EVENT_NAME,
+            new UserForgotPasswordEvent(user, resetToken, '1 hour'),
+        );
+
         return {
             message: 'If the email exists, a reset link has been sent',
             // Remove this in production
