@@ -246,7 +246,6 @@ export class GeneratePromptService extends BasePromptService {
      */
     displayGenerationSummary(dto: CreateItemsGeneratorDto): void {
         this.displaySectionHeader('Generation Summary');
-        console.log(chalk.gray('Directory:'), chalk.white(dto.slug));
         console.log(chalk.gray('Name:'), chalk.white(dto.name));
         console.log(chalk.gray('Prompt:'), chalk.white(dto.prompt));
 

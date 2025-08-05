@@ -74,7 +74,6 @@ export class GenerateSubCommand extends CommandRunner {
 
             // Build the CreateItemsGeneratorDto
             const createDto: CreateItemsGeneratorDto = {
-                slug: directory.slug,
                 name: requiredData.name,
                 prompt: requiredData.prompt,
                 config: new ConfigDto(), // Default config
@@ -101,6 +100,7 @@ export class GenerateSubCommand extends CommandRunner {
                 const user = await User.createLocalUser();
 
                 const result = await this.agentService.generateItemsGenerator(
+                    directory.id,
                     createDto,
                     user,
                     true,
@@ -359,7 +359,6 @@ export class GenerateSubCommand extends CommandRunner {
 
     private displayGenerationSummary(dto: CreateItemsGeneratorDto): void {
         console.log(chalk.cyan('\n--- Generation Summary ---'));
-        console.log(chalk.gray(`Directory: ${dto.slug}`));
         console.log(chalk.gray(`Name: ${dto.name}`));
         console.log(chalk.gray(`Prompt: ${dto.prompt}`));
 
