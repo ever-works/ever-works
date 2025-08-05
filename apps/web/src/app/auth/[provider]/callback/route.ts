@@ -49,11 +49,10 @@ export async function GET(
                 break;
             }
             default:
-                redirect({
+                return redirect({
                     locale,
                     href: ROUTES.AUTH_ERROR + '?error=oauth_unsupported_provider',
                 });
-                return;
         }
 
         await Promise.all([

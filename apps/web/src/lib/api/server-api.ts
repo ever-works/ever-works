@@ -1,19 +1,21 @@
 import { API_URL } from '../constants';
 import { headers } from 'next/headers';
 import { getAuthCookie } from '../auth/cookies';
+import { getTranslations } from 'next-intl/server';
 
-export function handleServerError(error: unknown): never {
+export async function handleServerError(error: unknown): Promise<never> {
     console.error('Server API Error:', error);
+    const t = await getTranslations('api.errors');
 
     if (error instanceof Error) {
         if (error.message.includes('Unauthorized')) {
-            throw new Error('You are not authorized to perform this action');
+            throw new Error(t('unauthorized'));
         }
 
-        throw new Error(`Server error: ${error.message}`);
+        throw new Error(t('serverError', { message: error.message }));
     }
 
-    throw new Error('Unexpected server error occurred.');
+    throw new Error(t('unexpected'));
 }
 
 export async function getFrontendUrl(): Promise<string> {
@@ -32,6 +34,7 @@ export async function getFrontendUrl(): Promise<string> {
 export async function serverFetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const token = await getAuthCookie();
     const frontendUrl = await getFrontendUrl();
+    const t = await getTranslations('api.errors');
 
     const headers: Record<string, string> = {
         'Content-Type': 'application/json',
@@ -59,12 +62,12 @@ export async function serverFetch<T>(endpoint: string, options: RequestInit = {}
     if (!response.ok) {
         // Handle authentication errors
         if (response.status === 401) {
-            throw new Error('Unauthorized: Please log in again.');
+            throw new Error(t('unauthorizedLogin'));
         }
 
         // Handle forbidden errors
         if (response.status === 403) {
-            let errorMessage = 'Forbidden: You do not have permission to perform this action.';
+            let errorMessage = t('forbidden');
 
             try {
                 const errorData = await response.json();
@@ -81,7 +84,7 @@ export async function serverFetch<T>(endpoint: string, options: RequestInit = {}
         }
 
         // Try to get error message from response body
-        let errorMessage = `API Error: ${response.status} ${response.statusText}`;
+        let errorMessage = t('apiError', { status: response.status, statusText: response.statusText });
         try {
             const errorData = await response.json();
             if (errorData.error?.message) {

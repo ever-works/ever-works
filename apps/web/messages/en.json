@@ -1,7 +1,33 @@
 {
   "auth": {
     "error": {
-      "title": "Auth Error"
+      "title": "Authentication Error",
+      "subtitle": "We encountered an issue with your authentication",
+      "errorOccurred": "An error occurred",
+      "somethingWentWrong": "Something went wrong",
+      "generic": "An unexpected error occurred. Please try again later.",
+      "invalidCredentials": "The email or password you entered is incorrect.",
+      "emailNotVerified": "Please verify your email address before signing in.",
+      "accountLocked": "Your account has been locked for security reasons.",
+      "sessionExpired": "Your session has expired. Please sign in again.",
+      "networkError": "Unable to connect. Please check your internet connection.",
+      "oauth": {
+        "missingCode": "Authorization code is missing. Please try signing in again.",
+        "invalidState": "Invalid authorization state. Please try signing in again.",
+        "unsupportedProvider": "This authentication provider is not supported.",
+        "callbackFailed": "Failed to complete authentication. Please try again."
+      },
+      "actions": {
+        "backToLogin": "Back to Login",
+        "tryRegister": "Try Registering",
+        "resendVerification": "Resend Verification Email",
+        "contactSupport": "Contact Support"
+      },
+      "helpText": "If you continue to experience issues, please check our help resources below.",
+      "links": {
+        "help": "Help Center",
+        "systemStatus": "System Status"
+      }
     },
     "login": {
       "title": "Welcome back",
@@ -114,5 +140,15 @@
   "metadata": {
     "title": "Ever Works - Directory Builder",
     "description": "A SaaS platform for building and managing directories"
+  },
+  "api": {
+    "errors": {
+      "unauthorized": "You are not authorized to perform this action",
+      "unauthorizedLogin": "Unauthorized: Please log in again.",
+      "forbidden": "Forbidden: You do not have permission to perform this action.",
+      "serverError": "Server error: {message}",
+      "unexpected": "Unexpected server error occurred.",
+      "apiError": "API Error: {status} {statusText}"
+    }
   }
 }
