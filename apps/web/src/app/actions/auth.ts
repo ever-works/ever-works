@@ -70,12 +70,10 @@ export async function register(username: string, email: string, password: string
         email: z.string().email(t('email.invalid')),
         password: z
             .string()
-            .min(
-                VALIDATION_RULES.PASSWORD_MIN_LENGTH,
-                t('password.minLength', { length: VALIDATION_RULES.PASSWORD_MIN_LENGTH }),
-            )
+            .min(6, t('password.minLength', { length: 6 }))
             .regex(/[a-z]/, t('password.lowercase'))
-            .regex(/[0-9]/, t('password.digit')),
+            .regex(/(\d|\W)/, t('password.numberOrSpecial'))
+            .regex(/^[^.\n]/, t('password.cannotStartWith')),
     });
 
     // Validate input

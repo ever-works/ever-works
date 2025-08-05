@@ -163,8 +163,10 @@
       },
       "password": {
         "required": "Password cannot be empty",
-        "minLength": "Password must contain at least {length} characters",
+        "minLength": "Password must be at least {length} characters",
         "lowercase": "Password must contain at least one lowercase letter",
+        "numberOrSpecial": "Password must contain at least one number or special character",
+        "cannotStartWith": "Password cannot start with a dot or newline",
         "digit": "Password must contain at least one digit"
       },
       "username": {
