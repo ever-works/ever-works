@@ -15,8 +15,8 @@ import { CreateDirectoryDto } from '@packages/agent/dto';
 import { User } from '@packages/agent/entities';
 import {
     CreateItemsGeneratorDto,
-    DeleteItemsGeneratorDto,
-    DeleteItemsGeneratorResponseDto,
+    DeleteDirectoryDto,
+    DeleteDirectoryResponseDto,
     ExtractItemDetailsDto,
     ExtractItemDetailsResponseDto,
     ItemsGeneratorResponseDto,
@@ -133,15 +133,15 @@ export class LocalAgentController {
         return this.agentService.updateWebsiteRepository(slug, user);
     }
 
-    @Post('delete/:slug')
+    @Post('directories/delete/:slug')
     @HttpCode(HttpStatus.OK)
-    async deleteItemsGenerator(
+    async deleteDirectory(
         @Param('slug') slug: string,
-        @Body() deleteItemsGeneratorDto: DeleteItemsGeneratorDto,
-    ): Promise<DeleteItemsGeneratorResponseDto> {
+        @Body() deleteDirectoryDto: DeleteDirectoryDto,
+    ): Promise<DeleteDirectoryResponseDto> {
         const user = await User.createLocalUser();
 
-        return this.agentService.deleteItemsGenerator(slug, deleteItemsGeneratorDto, user);
+        return this.agentService.deleteDirectory(slug, deleteDirectoryDto, user);
     }
 
     @Post('deploy/:dirname/vercel')

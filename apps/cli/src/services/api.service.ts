@@ -180,7 +180,7 @@ export class ApiService {
     }
 
     async deleteDirectory(slug: string, data?: DeleteDirectoryDto): Promise<ApiResponse> {
-        const response = await this.httpClient.post<ApiResponse>(`/delete/${slug}`, data);
+        const response = await this.httpClient.post<ApiResponse>(`/directories/delete/${slug}`, data);
         return response.data;
     }
 }

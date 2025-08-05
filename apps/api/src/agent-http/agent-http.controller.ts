@@ -12,8 +12,8 @@ import {
 import { CreateDirectoryDto } from '@packages/agent/dto';
 import {
     CreateItemsGeneratorDto,
-    DeleteItemsGeneratorDto,
-    DeleteItemsGeneratorResponseDto,
+    DeleteDirectoryDto,
+    DeleteDirectoryResponseDto,
     ExtractItemDetailsDto,
     ExtractItemDetailsResponseDto,
     ItemsGeneratorResponseDto,
@@ -154,16 +154,16 @@ export class AgentHttpController {
         return this.agentService.updateWebsiteRepository(slug, user);
     }
 
-    @Post('delete/:slug')
+    @Post('directories/delete/:slug')
     @UseGuards(JwtAuthGuard)
     @HttpCode(HttpStatus.OK)
-    async deleteItemsGenerator(
+    async deleteDirectory(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('slug') slug: string,
-        @Body() deleteItemsGeneratorDto: DeleteItemsGeneratorDto,
-    ): Promise<DeleteItemsGeneratorResponseDto> {
+        @Body() deleteDirectoryDto: DeleteDirectoryDto,
+    ): Promise<DeleteDirectoryResponseDto> {
         const user = await this.authService.getUser(auth.userId);
 
-        return this.agentService.deleteItemsGenerator(slug, deleteItemsGeneratorDto, user);
+        return this.agentService.deleteDirectory(slug, deleteDirectoryDto, user);
     }
 }

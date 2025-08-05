@@ -19,8 +19,8 @@ import {
     RemoveItemResponseDto,
     ExtractItemDetailsDto,
     ExtractItemDetailsResponseDto,
-    DeleteItemsGeneratorDto,
-    DeleteItemsGeneratorResponseDto,
+    DeleteDirectoryDto,
+    DeleteDirectoryResponseDto,
 } from '../items-generator/dto';
 import { CreateDirectoryDto } from '../dto/create-directory.dto';
 import { UpdateWebsiteRepositoryResponseDto } from '../website-generator/dto/update-website-repository.dto';
@@ -351,11 +351,11 @@ export class AgentService {
         }
     }
 
-    async deleteItemsGenerator(
+    async deleteDirectory(
         slug: string,
-        deleteItemsGeneratorDto: DeleteItemsGeneratorDto,
+        deleteDirectoryDto: DeleteDirectoryDto,
         user: User,
-    ): Promise<DeleteItemsGeneratorResponseDto> {
+    ): Promise<DeleteDirectoryResponseDto> {
         try {
             // Check if directory exists for the given slug
             const directory = await this.directoryRepository.findBySlug(slug);
@@ -366,7 +366,7 @@ export class AgentService {
             const deletedRepositories: string[] = [];
 
             // Delete data repository if requested
-            if (deleteItemsGeneratorDto.delete_data_repository !== false) {
+            if (deleteDirectoryDto.delete_data_repository !== false) {
                 try {
                     await this.dataGenerator.removeRepository(directory, user);
                     deletedRepositories.push(
@@ -378,7 +378,7 @@ export class AgentService {
             }
 
             // Delete markdown repository if requested
-            if (deleteItemsGeneratorDto.delete_markdown_repository !== false) {
+            if (deleteDirectoryDto.delete_markdown_repository !== false) {
                 try {
                     await this.markdownGenerator.removeRepository(directory, user);
                     deletedRepositories.push(`${directory.getRepoOwner()}/${directory.slug}`);
@@ -388,7 +388,7 @@ export class AgentService {
             }
 
             // Delete website repository if requested
-            if (deleteItemsGeneratorDto.delete_website_repository !== false) {
+            if (deleteDirectoryDto.delete_website_repository !== false) {
                 try {
                     await this.websiteGenerator.removeRepository(directory, user);
                     deletedRepositories.push(

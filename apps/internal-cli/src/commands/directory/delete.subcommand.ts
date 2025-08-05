@@ -123,7 +123,7 @@ export class DeleteSubCommand extends CommandRunner {
                 const user = await User.createLocalUser();
 
                 // Call the agent service method directly
-                const result = await this.agentService.deleteItemsGenerator(
+                const result = await this.agentService.deleteDirectory(
                     directory.slug,
                     deleteOptions,
                     user,
