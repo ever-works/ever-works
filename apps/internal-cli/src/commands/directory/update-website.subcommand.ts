@@ -79,10 +79,7 @@ export class UpdateWebsiteSubCommand extends CommandRunner {
                 const user = await User.createLocalUser();
 
                 // Call the agent service method directly
-                const result = await this.agentService.updateWebsiteRepository(
-                    directory.slug,
-                    user,
-                );
+                const result = await this.agentService.updateWebsiteRepository(directory.id, user);
 
                 spinner.succeed('Website repository updated successfully');
 

@@ -73,7 +73,7 @@ export class RegenerateMarkdownSubCommand extends CommandRunner {
                 const user = await User.createLocalUser();
 
                 // Call the agent service method directly
-                const result = await this.agentService.regenerateMarkdown(directory.slug, user);
+                const result = await this.agentService.regenerateMarkdown(directory.id, user);
 
                 if (result.status === 'success') {
                     spinner.succeed('Markdown files regenerated successfully');

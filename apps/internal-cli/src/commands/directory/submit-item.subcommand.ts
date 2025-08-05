@@ -83,7 +83,7 @@ export class SubmitItemSubCommand extends CommandRunner {
                 const user = await User.createLocalUser();
 
                 // Call the agent service method directly
-                const result = await this.agentService.submitItem(directory.slug, itemData, user);
+                const result = await this.agentService.submitItem(directory.id, itemData, user);
 
                 spinner.succeed('Item submitted successfully');
 

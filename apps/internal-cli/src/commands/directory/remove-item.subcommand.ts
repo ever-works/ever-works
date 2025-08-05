@@ -82,11 +82,7 @@ export class RemoveItemSubCommand extends CommandRunner {
                 const user = await User.createLocalUser();
 
                 // Call the agent service method directly
-                const result = await this.agentService.removeItem(
-                    directory.slug,
-                    removalData,
-                    user,
-                );
+                const result = await this.agentService.removeItem(directory.id, removalData, user);
 
                 if (result.status === 'error') {
                     spinner.fail('Failed to remove item');

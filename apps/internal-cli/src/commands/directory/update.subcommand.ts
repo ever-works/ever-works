@@ -81,7 +81,7 @@ export class UpdateSubCommand extends CommandRunner {
 
                 // Call the agent service method directly
                 const result = await this.agentService.updateItemsGenerator(
-                    directory.slug,
+                    directory.id,
                     updateOptions,
                     user,
                 );
