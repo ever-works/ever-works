@@ -2,7 +2,8 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import ora from 'ora';
 import { requireAuth } from '../auth';
-import { getApiService, Directory } from '../../services/api.service';
+import { getApiService } from '../../services/api.service';
+import { Directory } from '@packages/cli-shared';
 
 export const listCommand = new Command('list')
     .description('List all directories')

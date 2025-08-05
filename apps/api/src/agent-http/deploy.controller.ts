@@ -21,7 +21,7 @@ export class DeployController {
     ) {
         const { VERCEL_TOKEN, GITHUB_TOKEN } = deployVercel;
 
-        const directory = await this.directoryRepository.findBySlug(slug);
+        const directory = await this.directoryRepository.findByUserAndSlug(auth.userId, slug);
         if (!directory) {
             throw new NotFoundException('Directory not found');
         }

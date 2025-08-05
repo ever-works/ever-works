@@ -148,8 +148,10 @@ export class LocalAgentController {
     async toVercel(@Body() deployVercel: DeployVercelDto, @Param('dirname') slug: string) {
         const { VERCEL_TOKEN: vercelToken, GITHUB_TOKEN: ghToken } = deployVercel;
 
+        const user = await User.createLocalUser();
+
         // some db query result:
-        const directory = await this.directoryRepository.findBySlug(slug);
+        const directory = await this.directoryRepository.findByUserAndSlug(user.id, slug);
         if (!directory) {
             throw new NotFoundException('Directory not found');
         }
@@ -158,8 +160,6 @@ export class LocalAgentController {
         if (!vercel) {
             throw new NotFoundException('Vercel token is required');
         }
-
-        const user = await User.createLocalUser();
 
         await this.vercelService.deploy(
             {

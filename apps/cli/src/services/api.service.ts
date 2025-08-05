@@ -1,17 +1,7 @@
+import { Directory } from '@packages/cli-shared';
 import { getHttpClient } from './http-client';
 
 // Types for API responses
-export interface Directory {
-    id: number;
-    name: string;
-    slug: string;
-    website?: string;
-    owner: string;
-    companyName?: string;
-    organization: boolean;
-    description: string;
-    readmeConfig?: MarkdownReadmeConfigDto;
-}
 
 export interface MarkdownReadmeConfigDto {
     header?: string;
@@ -60,6 +50,18 @@ export interface CreateItemsGeneratorDto {
 export interface UpdateDirectoryDto {
     generation_method?: 'create-update' | 'recreate';
     update_with_pull_request?: boolean;
+}
+
+export interface ApiResponse {
+    status: string;
+    message: string;
+    error_details?: string;
+    repository_url?: string;
+    item?: {
+        name: string;
+        slug: string;
+        category: string;
+    };
 }
 
 export interface SubmitItemDto {
