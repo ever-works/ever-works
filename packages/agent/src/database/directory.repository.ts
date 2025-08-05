@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Directory } from '../entities/directory.entity';
 import { User } from '../entities';
+import { prepareLikeSearchTerm } from './utils';
 
 @Injectable()
 export class DirectoryRepository {
@@ -50,13 +51,26 @@ export class DirectoryRepository {
         userId?: string;
         limit?: number;
         offset?: number;
+        search?: string;
     }): Promise<Directory[]> {
-        const { userId, limit, offset } = options || {};
+        const { userId, limit, offset, search } = options || {};
 
         const queryBuilder = this.repository.createQueryBuilder('directory');
 
         if (userId) {
             queryBuilder.where('userId = :userId', { userId });
+        }
+
+        if (search) {
+            const sanitizedSearch = prepareLikeSearchTerm(search);
+
+            if (sanitizedSearch) {
+                // Use LOWER() for case-insensitive search - works across all databases
+                queryBuilder.andWhere(
+                    '(LOWER(directory.name) LIKE LOWER(:search) OR LOWER(directory.description) LIKE LOWER(:search) OR LOWER(directory.slug) LIKE LOWER(:search))',
+                    { search: `%${sanitizedSearch}%` },
+                );
+            }
         }
 
         if (limit) {
@@ -77,6 +91,30 @@ export class DirectoryRepository {
                 owner: dir.getRepoOwner(),
             } as Directory;
         });
+    }
+
+    async countAll(options?: { userId?: string; search?: string }): Promise<number> {
+        const { userId, search } = options || {};
+
+        const queryBuilder = this.repository.createQueryBuilder('directory');
+
+        if (userId) {
+            queryBuilder.where('userId = :userId', { userId });
+        }
+
+        if (search) {
+            const sanitizedSearch = prepareLikeSearchTerm(search);
+
+            if (sanitizedSearch) {
+                // Use LOWER() for case-insensitive search - works across all databases
+                queryBuilder.andWhere(
+                    '(LOWER(directory.name) LIKE LOWER(:search) OR LOWER(directory.description) LIKE LOWER(:search) OR LOWER(directory.slug) LIKE LOWER(:search))',
+                    { search: `%${sanitizedSearch}%` },
+                );
+            }
+        }
+
+        return await queryBuilder.getCount();
     }
 
     async update(id: string, updateData: Partial<Directory>): Promise<Directory | null> {

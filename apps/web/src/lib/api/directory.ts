@@ -53,11 +53,12 @@ export interface DeleteDirectoryResponse {
 }
 
 export const directoryAPI = {
-    // Get all directories with pagination
-    getAll: async (limit?: number, offset?: number) => {
+    // Get all directories with pagination and search
+    getAll: async (options?: { limit?: number; offset?: number; search?: string }) => {
         const params = new URLSearchParams();
-        if (limit !== undefined) params.append('limit', limit.toString());
-        if (offset !== undefined) params.append('offset', offset.toString());
+        if (options?.limit !== undefined) params.append('limit', options.limit.toString());
+        if (options?.offset !== undefined) params.append('offset', options.offset.toString());
+        if (options?.search) params.append('search', options.search);
         const query = params.toString() ? `?${params.toString()}` : '';
 
         return serverFetch<DirectoriesResponse>(`/directories${query}`);

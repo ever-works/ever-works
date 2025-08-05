@@ -45,22 +45,42 @@ export class AgentService {
         options: {
             limit?: number;
             offset?: number;
+            search?: string;
         } = {},
         user: User,
     ) {
-        const { limit = 20, offset = 0 } = options;
+        const { limit = 20, offset = 0, search } = options;
+
+        // Validate and sanitize search input
+        let sanitizedSearch: string | undefined;
+        if (search) {
+            // Trim and limit search length
+            sanitizedSearch = search.trim().slice(0, 100);
+            
+            // If search is empty after trimming, treat as no search
+            if (!sanitizedSearch) {
+                sanitizedSearch = undefined;
+            }
+        }
 
         try {
             const directories = await this.directoryRepository.findAll({
                 userId: user.id,
                 limit,
                 offset,
+                search: sanitizedSearch,
+            });
+
+            // Get the total count of directories for proper pagination
+            const total = await this.directoryRepository.countAll({
+                userId: user.id,
+                search: sanitizedSearch,
             });
 
             return {
                 status: 'success',
                 directories,
-                total: directories.length,
+                total,
                 limit,
                 offset,
             };

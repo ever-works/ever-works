@@ -42,6 +42,7 @@ export class AgentHttpController {
         @CurrentUser() auth: AuthenticatedUser,
         @Query('limit') limit?: string,
         @Query('offset') offset?: string,
+        @Query('search') search?: string,
     ) {
         const parsedLimit = limit !== undefined ? Number(limit) : undefined;
         const parsedOffset = offset !== undefined ? Number(offset) : undefined;
@@ -52,6 +53,7 @@ export class AgentHttpController {
             {
                 limit: parsedLimit && !isNaN(parsedLimit) ? parsedLimit : undefined,
                 offset: parsedOffset && !isNaN(parsedOffset) ? parsedOffset : undefined,
+                search: search || undefined,
             },
             user,
         );
