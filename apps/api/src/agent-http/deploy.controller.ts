@@ -13,17 +13,22 @@ export class DeployController {
         private readonly authService: AuthService,
     ) {}
 
-    @Post('/:dirname/vercel')
+    @Post('/directories/:id/vercel')
     async toVercel(
         @CurrentUser() auth: AuthenticatedUser,
         @Body() deployVercel: DeployVercelDto,
-        @Param('dirname') slug: string,
+        @Param('id') id: string,
     ) {
         const { VERCEL_TOKEN, GITHUB_TOKEN } = deployVercel;
 
-        const directory = await this.directoryRepository.findByUserAndSlug(auth.userId, slug);
+        const directory = await this.directoryRepository.findById(id);
         if (!directory) {
             throw new NotFoundException('Directory not found');
+        }
+
+        // Validate that the user owns this directory
+        if (directory.userId !== auth.userId) {
+            throw new NotFoundException('You do not have permission to deploy this directory');
         }
 
         const user = await this.authService.getUser(auth.userId);

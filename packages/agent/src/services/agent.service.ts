@@ -147,10 +147,6 @@ export class AgentService {
     ): Promise<ItemsGeneratorResponseDto> {
         const directory = await this.validateDirectoryOwnership(directoryId, user.id);
 
-        if (!directory) {
-            throw new NotFoundException('Directory not found');
-        }
-
         if (awaitCompletion) {
             await this.processGeneration(directory, user, createItemsGeneratorDto);
         } else {

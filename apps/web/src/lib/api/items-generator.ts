@@ -30,7 +30,6 @@ export interface ConfigDto {
 }
 
 export interface CreateItemsGeneratorDto {
-    slug: string;
     name: string;
     prompt: string;
     company?: CompanyDto;
@@ -110,9 +109,9 @@ export interface RegenerateMarkdownResponse {
 
 export const itemsGeneratorAPI = {
     // Generate items
-    generate: async (data: CreateItemsGeneratorDto) => {
+    generate: async (directoryId: string, data: CreateItemsGeneratorDto) => {
         return serverMutation<ItemsGeneratorResponse>({
-            endpoint: '/generate',
+            endpoint: `/directories/${directoryId}/generate`,
             data,
             method: 'POST',
             wrapInData: false,
@@ -120,9 +119,9 @@ export const itemsGeneratorAPI = {
     },
 
     // Update items generator
-    update: async (slug: string, data: UpdateItemsGeneratorDto) => {
+    update: async (directoryId: string, data: UpdateItemsGeneratorDto) => {
         return serverMutation<ItemsGeneratorResponse>({
-            endpoint: `/update/${slug}`,
+            endpoint: `/directories/${directoryId}/update`,
             data,
             method: 'POST',
             wrapInData: false,
@@ -130,9 +129,9 @@ export const itemsGeneratorAPI = {
     },
 
     // Submit new item
-    submitItem: async (slug: string, data: SubmitItemDto) => {
+    submitItem: async (directoryId: string, data: SubmitItemDto) => {
         return serverMutation<SubmitItemResponse>({
-            endpoint: `/submit-item/${slug}`,
+            endpoint: `/directories/${directoryId}/submit-item`,
             data,
             method: 'POST',
             wrapInData: false,
@@ -140,9 +139,9 @@ export const itemsGeneratorAPI = {
     },
 
     // Remove item
-    removeItem: async (slug: string, data: RemoveItemDto) => {
+    removeItem: async (directoryId: string, data: RemoveItemDto) => {
         return serverMutation<RemoveItemResponse>({
-            endpoint: `/remove-item/${slug}`,
+            endpoint: `/directories/${directoryId}/remove-item`,
             data,
             method: 'POST',
             wrapInData: false,
@@ -160,9 +159,9 @@ export const itemsGeneratorAPI = {
     },
 
     // Regenerate markdown
-    regenerateMarkdown: async (slug: string) => {
+    regenerateMarkdown: async (directoryId: string) => {
         return serverMutation<RegenerateMarkdownResponse>({
-            endpoint: `/regenerate-markdown/${slug}`,
+            endpoint: `/directories/${directoryId}/regenerate-markdown`,
             data: {},
             method: 'POST',
             wrapInData: false,

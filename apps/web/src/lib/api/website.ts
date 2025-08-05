@@ -13,9 +13,9 @@ export interface UpdateWebsiteRepositoryResponse {
 
 export const websiteAPI = {
     // Update website repository
-    updateRepository: async (slug: string) => {
+    updateRepository: async (directoryId: string) => {
         return serverMutation<UpdateWebsiteRepositoryResponse>({
-            endpoint: `/update-website/${slug}`,
+            endpoint: `/directories/${directoryId}/update-website`,
             data: {},
             method: 'POST',
             wrapInData: false,

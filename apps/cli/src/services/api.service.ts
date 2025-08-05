@@ -19,7 +19,6 @@ export interface CreateDirectoryDto {
 }
 
 export interface CreateItemsGeneratorDto {
-    slug: string;
     name: string;
     prompt: string;
     company?: {
@@ -132,38 +131,60 @@ export class ApiService {
         return response.data;
     }
 
-    async generateContent(data: CreateItemsGeneratorDto): Promise<ApiResponse> {
-        const response = await this.httpClient.post<ApiResponse>('/generate', data);
+    async generateContent(
+        directoryId: string,
+        data: CreateItemsGeneratorDto,
+    ): Promise<ApiResponse> {
+        const response = await this.httpClient.post<ApiResponse>(
+            `/directories/${directoryId}/generate`,
+            data,
+        );
         return response.data;
     }
 
-    async updateDirectory(slug: string, data: UpdateDirectoryDto): Promise<ApiResponse> {
-        const response = await this.httpClient.post<ApiResponse>(`/update/${slug}`, data);
+    async updateDirectory(directoryId: string, data: UpdateDirectoryDto): Promise<ApiResponse> {
+        const response = await this.httpClient.post<ApiResponse>(
+            `/directories/${directoryId}/update`,
+            data,
+        );
         return response.data;
     }
 
-    async submitItem(slug: string, data: SubmitItemDto): Promise<ApiResponse> {
-        const response = await this.httpClient.post<ApiResponse>(`/submit-item/${slug}`, data);
+    async submitItem(directoryId: string, data: SubmitItemDto): Promise<ApiResponse> {
+        const response = await this.httpClient.post<ApiResponse>(
+            `/directories/${directoryId}/submit-item`,
+            data,
+        );
         return response.data;
     }
 
-    async removeItem(slug: string, data: RemoveItemDto): Promise<ApiResponse> {
-        const response = await this.httpClient.post<ApiResponse>(`/remove-item/${slug}`, data);
+    async removeItem(directoryId: string, data: RemoveItemDto): Promise<ApiResponse> {
+        const response = await this.httpClient.post<ApiResponse>(
+            `/directories/${directoryId}/remove-item`,
+            data,
+        );
         return response.data;
     }
 
-    async regenerateMarkdown(slug: string): Promise<ApiResponse> {
-        const response = await this.httpClient.post<ApiResponse>(`/regenerate-markdown/${slug}`);
+    async regenerateMarkdown(directoryId: string): Promise<ApiResponse> {
+        const response = await this.httpClient.post<ApiResponse>(
+            `/directories/${directoryId}/regenerate-markdown`,
+        );
         return response.data;
     }
 
-    async updateWebsite(slug: string): Promise<ApiResponse> {
-        const response = await this.httpClient.post<ApiResponse>(`/update-website/${slug}`);
+    async updateWebsite(directoryId: string): Promise<ApiResponse> {
+        const response = await this.httpClient.post<ApiResponse>(
+            `/directories/${directoryId}/update-website`,
+        );
         return response.data;
     }
 
-    async deployWebsite(slug: string, data?: DeployDto): Promise<ApiResponse> {
-        const response = await this.httpClient.post<ApiResponse>(`/deploy/${slug}/vercel`, data);
+    async deployWebsite(directoryId: string, data?: DeployDto): Promise<ApiResponse> {
+        const response = await this.httpClient.post<ApiResponse>(
+            `/deploy/directories/${directoryId}/vercel`,
+            data,
+        );
         return response.data;
     }
 
