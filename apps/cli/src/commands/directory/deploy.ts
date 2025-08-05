@@ -92,7 +92,7 @@ export const deployCommand = new Command('deploy')
                     deployDto.GITHUB_TOKEN = deployOptions.GITHUB_TOKEN;
                 }
 
-                await apiService.deployWebsite(directory.slug, deployDto);
+                await apiService.deployWebsite(directory.id, deployDto);
 
                 spinner.succeed('Deployment started successfully');
 

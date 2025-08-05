@@ -61,48 +61,49 @@ export class LocalAgentController {
         return this.agentService.createDirectory(createDirectoryDto, user);
     }
 
-    @Post('generate')
+    @Post('directories/:id/generate')
     @HttpCode(HttpStatus.ACCEPTED)
     async generateItemsGenerator(
+        @Param('id') id: string,
         @Body() createItemsGeneratorDto: CreateItemsGeneratorDto,
     ): Promise<ItemsGeneratorResponseDto> {
         const user = await User.createLocalUser();
         // We don't await completion here, as the request can take a long time
-        return this.agentService.generateItemsGenerator(createItemsGeneratorDto, user, false);
+        return this.agentService.generateItemsGenerator(id, createItemsGeneratorDto, user, false);
     }
 
-    @Post('update/:slug')
+    @Post('directories/:id/update')
     @HttpCode(HttpStatus.ACCEPTED)
     async updateItemsGenerator(
-        @Param('slug') slug: string,
+        @Param('id') id: string,
         @Body() updateItemsGeneratorDto: UpdateItemsGeneratorDto,
     ): Promise<ItemsGeneratorResponseDto> {
         const user = await User.createLocalUser();
 
         // We don't await completion here, as the request can take a long time
-        return this.agentService.updateItemsGenerator(slug, updateItemsGeneratorDto, user, false);
+        return this.agentService.updateItemsGenerator(id, updateItemsGeneratorDto, user, false);
     }
 
-    @Post('submit-item/:slug')
+    @Post('directories/:id/submit-item')
     @HttpCode(HttpStatus.OK)
     async submitItem(
-        @Param('slug') slug: string,
+        @Param('id') id: string,
         @Body() submitItemDto: SubmitItemDto,
     ): Promise<SubmitItemResponseDto> {
         const user = await User.createLocalUser();
 
-        return this.agentService.submitItem(slug, submitItemDto, user);
+        return this.agentService.submitItem(id, submitItemDto, user);
     }
 
-    @Post('remove-item/:slug')
+    @Post('directories/:id/remove-item')
     @HttpCode(HttpStatus.OK)
     async removeItem(
-        @Param('slug') slug: string,
+        @Param('id') id: string,
         @Body() removeItemDto: RemoveItemDto,
     ): Promise<RemoveItemResponseDto> {
         const user = await User.createLocalUser();
 
-        return this.agentService.removeItem(slug, removeItemDto, user);
+        return this.agentService.removeItem(id, removeItemDto, user);
     }
 
     @Post('extract-item-details')
@@ -113,24 +114,24 @@ export class LocalAgentController {
         return this.agentService.extractItemDetails(extractItemDetailsDto);
     }
 
-    @Post('regenerate-markdown/:slug')
+    @Post('directories/:id/regenerate-markdown')
     @HttpCode(HttpStatus.OK)
     async regenerateMarkdown(
-        @Param('slug') slug: string,
+        @Param('id') id: string,
     ): Promise<{ status: string; error_details?: string }> {
         const user = await User.createLocalUser();
 
-        return this.agentService.regenerateMarkdown(slug, user);
+        return this.agentService.regenerateMarkdown(id, user);
     }
 
-    @Post('update-website/:slug')
+    @Post('directories/:id/update-website')
     @HttpCode(HttpStatus.OK)
     async updateWebsiteRepository(
-        @Param('slug') slug: string,
+        @Param('id') id: string,
     ): Promise<UpdateWebsiteRepositoryResponseDto> {
         const user = await User.createLocalUser();
 
-        return this.agentService.updateWebsiteRepository(slug, user);
+        return this.agentService.updateWebsiteRepository(id, user);
     }
 
     @Post('directories/:id/delete')
@@ -144,14 +145,14 @@ export class LocalAgentController {
         return this.agentService.deleteDirectory(id, deleteDirectoryDto, user);
     }
 
-    @Post('deploy/:dirname/vercel')
-    async toVercel(@Body() deployVercel: DeployVercelDto, @Param('dirname') slug: string) {
+    @Post('deploy/directories/:id/vercel')
+    async toVercel(@Body() deployVercel: DeployVercelDto, @Param('id') id: string) {
         const { VERCEL_TOKEN: vercelToken, GITHUB_TOKEN: ghToken } = deployVercel;
 
         const user = await User.createLocalUser();
 
         // some db query result:
-        const directory = await this.directoryRepository.findByUserAndSlug(user.id, slug);
+        const directory = await this.directoryRepository.findById(id);
         if (!directory) {
             throw new NotFoundException('Directory not found');
         }

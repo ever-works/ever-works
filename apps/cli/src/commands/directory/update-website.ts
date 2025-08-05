@@ -59,7 +59,7 @@ export const updateWebsiteCommand = new Command('update-website')
             const spinner = ora('Updating website repository...').start();
 
             try {
-                const response = await apiService.updateWebsite(directory.slug);
+                const response = await apiService.updateWebsite(directory.id);
 
                 spinner.succeed('Website updated successfully');
 

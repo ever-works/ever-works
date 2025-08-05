@@ -53,7 +53,7 @@ export const regenerateMarkdownCommand = new Command('regenerate-markdown')
             const spinner = ora('Regenerating markdown...').start();
 
             try {
-                const response = await apiService.regenerateMarkdown(directory.slug);
+                const response = await apiService.regenerateMarkdown(directory.id);
 
                 spinner.succeed('Markdown regenerated successfully');
 

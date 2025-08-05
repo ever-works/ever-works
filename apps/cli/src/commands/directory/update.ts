@@ -80,7 +80,7 @@ export const updateCommand = new Command('update')
                     update_with_pull_request: answers.update_with_pull_request,
                 };
 
-                const response = await apiService.updateDirectory(directory.slug, updateDto);
+                const response = await apiService.updateDirectory(directory.id, updateDto);
 
                 spinner.succeed('Update started successfully');
 
