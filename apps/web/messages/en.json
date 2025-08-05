@@ -148,7 +148,28 @@
       "forbidden": "Forbidden: You do not have permission to perform this action.",
       "serverError": "Server error: {message}",
       "unexpected": "Unexpected server error occurred.",
-      "apiError": "API Error: {status} {statusText}"
+      "apiError": "API Error: {status} {statusText}",
+      "loginFailed": "Login failed",
+      "registerFailed": "Failed to register",
+      "unsupportedProvider": "Unsupported provider",
+      "providerConnectFailed": "Failed to connect provider"
+    }
+  },
+  "validation": {
+    "auth": {
+      "email": {
+        "required": "Email cannot be empty",
+        "invalid": "Invalid email"
+      },
+      "password": {
+        "required": "Password cannot be empty",
+        "minLength": "Password must contain at least {length} characters",
+        "lowercase": "Password must contain at least one lowercase letter",
+        "digit": "Password must contain at least one digit"
+      },
+      "username": {
+        "minLength": "Username must contain at least {length} characters"
+      }
     }
   }
 }

@@ -7,25 +7,25 @@ import {
     removeAuthCookies,
     getRefreshCookie,
     setOAuthState,
-    getOAuthState,
 } from '@/lib/auth/cookies';
 import crypto from 'crypto';
 import { APP_URL, ROUTES, routeWithParams } from '@/lib/constants';
 import { VALIDATION_RULES } from './validation';
-import { authAPI, AuthResponse } from '@/lib/api';
+import { authAPI } from '@/lib/api';
 import { redirect } from '@/i18n/navigation';
-import { getLocale } from 'next-intl/server';
-import { cookies } from 'next/headers';
+import { getLocale, getTranslations } from 'next-intl/server';
 
 export async function login(identifier: string, password: string) {
+    const t = await getTranslations('validation.auth');
+
     // Validation schemas
     const loginSchema = z.object({
-        email: z.string().min(1, 'Email  cannot be empty'),
-        password: z.string().min(1, 'Password cannot be empty'),
+        email: z.string().min(1, t('email.required')),
+        password: z.string().min(1, t('password.required')),
     });
 
     // Validate input
-    const validation = loginSchema.safeParse({ identifier, password });
+    const validation = loginSchema.safeParse({ email: identifier, password });
     if (!validation.success) {
         throw new Error(validation.error.errors[0].message);
     }
@@ -52,27 +52,30 @@ export async function login(identifier: string, password: string) {
         };
     } catch (error) {
         console.error(error);
-        throw new Error(error instanceof Error ? error.message : 'Login failed');
+        const errorT = await getTranslations('api.errors');
+        throw new Error(error instanceof Error ? error.message : errorT('loginFailed'));
     }
 }
 
 export async function register(username: string, email: string, password: string) {
+    const t = await getTranslations('validation.auth');
+
     const registerSchema = z.object({
         username: z
             .string()
             .min(
                 VALIDATION_RULES.USERNAME_MIN_LENGTH,
-                `Username must contain at least ${VALIDATION_RULES.USERNAME_MIN_LENGTH} characters`,
+                t('username.minLength', { length: VALIDATION_RULES.USERNAME_MIN_LENGTH }),
             ),
-        email: z.string().email('Invalid email'),
+        email: z.string().email(t('email.invalid')),
         password: z
             .string()
             .min(
                 VALIDATION_RULES.PASSWORD_MIN_LENGTH,
-                `Password must contain at least ${VALIDATION_RULES.PASSWORD_MIN_LENGTH} characters`,
+                t('password.minLength', { length: VALIDATION_RULES.PASSWORD_MIN_LENGTH }),
             )
-            .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
-            .regex(/[0-9]/, 'Password must contain at least one digit'),
+            .regex(/[a-z]/, t('password.lowercase'))
+            .regex(/[0-9]/, t('password.digit')),
     });
 
     // Validate input
@@ -104,7 +107,8 @@ export async function register(username: string, email: string, password: string
         };
     } catch (error) {
         console.error(error);
-        throw new Error(error instanceof Error ? error.message : 'Failed to register');
+        const errorT = await getTranslations('api.errors');
+        throw new Error(error instanceof Error ? error.message : errorT('registerFailed'));
     }
 }
 
@@ -160,11 +164,13 @@ export async function connectProvider(provider: string) {
                 break;
             }
             default:
-                throw new Error('Unsupported provider');
+                const t = await getTranslations('api.errors');
+                throw new Error(t('unsupportedProvider'));
         }
     } catch (error) {
         console.error(error);
-        throw new Error(error instanceof Error ? error.message : 'Failed to connect provider');
+        const t = await getTranslations('api.errors');
+        throw new Error(error instanceof Error ? error.message : t('providerConnectFailed'));
     }
 }
 
