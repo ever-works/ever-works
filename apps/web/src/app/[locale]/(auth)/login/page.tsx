@@ -45,6 +45,7 @@ export default function LoginPage() {
                 <Input
                     type="email"
                     label={t('form.email.label')}
+                    name="email"
                     placeholder={t('form.email.placeholder')}
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
@@ -66,6 +67,7 @@ export default function LoginPage() {
                     </div>
                     <Input
                         type="password"
+                        name="password"
                         placeholder={t('form.password.placeholder')}
                         value={formData.password}
                         onChange={(e) => setFormData({ ...formData, password: e.target.value })}

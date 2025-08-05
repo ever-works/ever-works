@@ -155,6 +155,7 @@ function ResetPasswordContent() {
                 <Input
                     type="password"
                     label={t('form.password.label')}
+                    name="password"
                     placeholder={t('form.password.placeholder')}
                     value={formData.password}
                     onChange={(e) => {
@@ -170,6 +171,7 @@ function ResetPasswordContent() {
                 <Input
                     type="password"
                     label={t('form.confirmPassword.label')}
+                    name="confirmPassword"
                     placeholder={t('form.confirmPassword.placeholder')}
                     value={formData.confirmPassword}
                     onChange={(e) => {

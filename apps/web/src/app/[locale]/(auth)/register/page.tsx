@@ -59,6 +59,7 @@ export default function RegisterPage() {
                 <Input
                     type="text"
                     label={t('form.name.label')}
+                    name="name"
                     placeholder={t('form.name.placeholder')}
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
@@ -69,6 +70,7 @@ export default function RegisterPage() {
                 <Input
                     type="email"
                     label={t('form.email.label')}
+                    name="email"
                     placeholder={t('form.email.placeholder')}
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
@@ -78,6 +80,7 @@ export default function RegisterPage() {
 
                 <Input
                     type="password"
+                    name="password"
                     label={t('form.password.label')}
                     placeholder={t('form.password.placeholder')}
                     value={formData.password}
@@ -89,6 +92,7 @@ export default function RegisterPage() {
 
                 <Input
                     type="password"
+                    name="confirmPassword"
                     label={t('form.confirmPassword.label')}
                     placeholder={t('form.confirmPassword.placeholder')}
                     value={formData.confirmPassword}
