@@ -13,29 +13,20 @@ import {
 
 @Injectable()
 export class MailService {
-    private readonly logger = new Logger(MailService.name);
-
-    private webAppUrl: string;
-
-    constructor(private readonly mailerService: MailerService) {
-        this.webAppUrl = config.webAppUrl();
-    }
+    constructor(private readonly mailerService: MailerService) {}
 
     /**
      * Send signup confirmation email
      */
     @OnEvent(UserCreatedEvent.EVENT_NAME)
     async sendSignupConfirmation(data: UserCreatedEvent): Promise<void> {
-        const confirmationUrl =
-            data.confirmationUrl || `${this.webAppUrl}/confirm?token=${data.confirmationToken}`;
-
         await this.mailerService.sendMail({
             to: data.user.email,
             subject: 'Confirm your Ever Works account',
             template: 'signup-confirmation',
             context: {
                 firstName: data.user.username,
-                confirmationUrl,
+                confirmationUrl: data.confirmationUrl,
                 confirmationToken: data.confirmationToken,
             },
         });

@@ -14,7 +14,7 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { RegisterDto, UpdatePasswordDto } from '../dto/auth.dto';
 import { randomBytes, randomUUID } from 'crypto';
-import { jwtConstants, authConstants, AuthProviders } from '../../config/constants';
+import { jwtConstants, authConstants, AuthProviders, config } from '../../config/constants';
 import { User } from '@packages/agent/entities';
 import { JwtPayload, TokenResponse } from '../types/jwt.types';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -24,13 +24,17 @@ import { UserCreatedEvent, UserForgotPasswordEvent } from '../../events';
 export class AuthService {
     private readonly logger = new Logger(AuthService.name);
 
+    private webAppUrl: string;
+
     constructor(
         private readonly userRepository: UserRepository,
         private readonly refreshTokenRepository: RefreshTokenRepository,
         private readonly oauthTokenRepository: OAuthTokenRepository,
         private readonly jwtService: JwtService,
         private eventEmitter: EventEmitter2,
-    ) {}
+    ) {
+        this.webAppUrl = config.webAppUrl();
+    }
 
     async validateUser(email: string, password: string) {
         const user = await this.userRepository.findByEmail(email);
@@ -60,7 +64,7 @@ export class AuthService {
     }
 
     async register(registerDto: RegisterDto) {
-        const { username, email, password } = registerDto;
+        const { username, email, password, email_verification_callback_url } = registerDto;
 
         const existingUser = await this.userRepository.findByEmail(email);
         if (existingUser) {
@@ -82,6 +86,8 @@ export class AuthService {
             emailVerified: false,
             isActive: true,
         });
+
+        this.sendVerificationEmail(user.id, email_verification_callback_url);
 
         const { password: _, ...userWithoutPassword } = user;
         return this.generateTokens(userWithoutPassword);
@@ -357,7 +363,7 @@ export class AuthService {
         return { message: 'Logged out from all devices successfully' };
     }
 
-    async sendVerificationEmail(userId: string) {
+    async sendVerificationEmail(userId: string, callbackUrl?: string) {
         const user = await this.userRepository.findById(userId);
         if (!user) {
             throw new BadRequestException('User not found');
@@ -376,10 +382,16 @@ export class AuthService {
             emailVerificationExpires: expires,
         });
 
+        if (callbackUrl && !callbackUrl.includes('token=')) {
+            callbackUrl += `?token=${verificationToken}`;
+        } else {
+            callbackUrl = `${this.webAppUrl}/auth/verify-email?token=${verificationToken}`;
+        }
+
         // Emit event to send verification email
         this.eventEmitter.emit(
             UserCreatedEvent.EVENT_NAME,
-            new UserCreatedEvent(user, verificationToken),
+            new UserCreatedEvent(user, verificationToken, callbackUrl),
         );
 
         return {

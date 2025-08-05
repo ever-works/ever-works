@@ -87,6 +87,7 @@ export async function register(username: string, email: string, password: string
             username: validation.data.username,
             email: validation.data.email,
             password: validation.data.password,
+            email_verification_callback_url: APP_URL + ROUTES.AUTH_LOGIN,
         });
 
         await Promise.all([

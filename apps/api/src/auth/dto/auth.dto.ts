@@ -17,6 +17,10 @@ export class RegisterDto {
         message: 'Password must contain at least letter, and 1 number or special character',
     })
     password: string;
+
+    @IsString()
+    @IsOptional()
+    email_verification_callback_url?: string;
 }
 
 export class LoginDto {
@@ -43,9 +47,8 @@ export class UpdatePasswordDto {
     @IsString()
     @IsNotEmpty()
     @MinLength(8)
-    @Matches(/((?=.*\d)|(?=.*\W+))(?![.\n])(?=.*[A-Z])(?=.*[a-z]).*$/, {
-        message:
-            'Password must contain at least 1 upper case letter, 1 lower case letter, and 1 number or special character',
+    @Matches(/((?=.\d)|(?=.\W+))(?![.\n])(?=.[a-z]).$/, {
+        message: 'Password must contain at least letter, and 1 number or special character',
     })
     newPassword: string;
 }

@@ -10,7 +10,7 @@ export class UserCreatedEvent extends BaseUserEvent {
     constructor(
         public user: User,
         public confirmationToken: string,
-        public confirmationUrl?: string,
+        public confirmationUrl: string,
     ) {
         super();
     }
