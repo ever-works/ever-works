@@ -107,7 +107,7 @@ export async function register(username: string, email: string, password: string
 
         redirect({
             locale: await getLocale(),
-            href: ROUTES.HOME,
+            href: ROUTES.HOME + '?newUser=true',
         });
 
         return {
@@ -115,13 +115,15 @@ export async function register(username: string, email: string, password: string
             user: response.user,
         };
     } catch (error) {
+        console.error(error);
+
         const errorT = await getTranslations('api.errors');
         let message = errorT('registerFailed');
 
         if (error instanceof Error) {
             if (error.message.includes('exists')) {
                 message = t('email.emailAlreadyRegistered');
-            } else {
+            } else if (!error.message.includes('Bad Request')) {
                 message = error.message;
             }
         }

@@ -83,6 +83,9 @@ importers:
       helmet:
         specifier: ^8.1.0
         version: 8.1.0
+      mjml:
+        specifier: ^4.15.3
+        version: 4.15.3
       passport:
         specifier: ^0.7.0
         version: 0.7.0
@@ -7335,8 +7338,7 @@ snapshots:
       '@babel/core': 7.28.0
       '@babel/helper-plugin-utils': 7.27.1
 
-  '@babel/runtime@7.28.2':
-    optional: true
+  '@babel/runtime@7.28.2': {}
 
   '@babel/template@7.27.2':
     dependencies:
@@ -8823,8 +8825,7 @@ snapshots:
       '@octokit/webhooks-types': 7.6.1
       aggregate-error: 3.1.0
 
-  '@one-ini/wasm@0.1.1':
-    optional: true
+  '@one-ini/wasm@0.1.1': {}
 
   '@oxlint/darwin-arm64@1.6.0':
     optional: true
@@ -9636,8 +9637,7 @@ snapshots:
       jsonparse: 1.3.1
       through: 2.3.8
 
-  abbrev@2.0.0:
-    optional: true
+  abbrev@2.0.0: {}
 
   abort-controller@3.0.0:
     dependencies:
@@ -9879,8 +9879,7 @@ snapshots:
       execa: 5.1.1
       find-versions: 5.1.0
 
-  binary-extensions@2.3.0:
-    optional: true
+  binary-extensions@2.3.0: {}
 
   bindings@1.5.0:
     dependencies:
@@ -10011,7 +10010,6 @@ snapshots:
     dependencies:
       no-case: 2.3.2
       upper-case: 1.1.3
-    optional: true
 
   camelcase-keys@9.1.3:
     dependencies:
@@ -10104,7 +10102,6 @@ snapshots:
       readdirp: 3.6.0
     optionalDependencies:
       fsevents: 2.3.3
-    optional: true
 
   chokidar@4.0.3:
     dependencies:
@@ -10131,7 +10128,6 @@ snapshots:
   clean-css@4.2.4:
     dependencies:
       source-map: 0.6.1
-    optional: true
 
   clean-git-ref@2.0.1: {}
 
@@ -10193,8 +10189,7 @@ snapshots:
     dependencies:
       delayed-stream: 1.0.0
 
-  commander@10.0.1:
-    optional: true
+  commander@10.0.1: {}
 
   commander@11.1.0: {}
 
@@ -10238,7 +10233,6 @@ snapshots:
     dependencies:
       ini: 1.3.8
       proto-list: 1.2.4
-    optional: true
 
   consola@3.4.2: {}
 
@@ -10435,8 +10429,7 @@ snapshots:
 
   detect-newline@3.1.0: {}
 
-  detect-node@2.1.0:
-    optional: true
+  detect-node@2.1.0: {}
 
   devlop@1.1.0:
     dependencies:
@@ -10477,7 +10470,6 @@ snapshots:
       domelementtype: 2.3.0
       domhandler: 4.3.1
       entities: 2.2.0
-    optional: true
 
   dom-serializer@2.0.0:
     dependencies:
@@ -10490,12 +10482,10 @@ snapshots:
   domhandler@3.3.0:
     dependencies:
       domelementtype: 2.3.0
-    optional: true
 
   domhandler@4.3.1:
     dependencies:
       domelementtype: 2.3.0
-    optional: true
 
   domhandler@5.0.3:
     dependencies:
@@ -10506,7 +10496,6 @@ snapshots:
       dom-serializer: 1.4.1
       domelementtype: 2.3.0
       domhandler: 4.3.1
-    optional: true
 
   domutils@3.2.2:
     dependencies:
@@ -10546,7 +10535,6 @@ snapshots:
       commander: 10.0.1
       minimatch: 9.0.1
       semver: 7.7.2
-    optional: true
 
   ee-first@1.1.1: {}
 
@@ -10581,8 +10569,7 @@ snapshots:
       graceful-fs: 4.2.11
       tapable: 2.2.2
 
-  entities@2.2.0:
-    optional: true
+  entities@2.2.0: {}
 
   entities@4.5.0: {}
 
@@ -10642,8 +10629,7 @@ snapshots:
 
   escalade@3.2.0: {}
 
-  escape-goat@3.0.0:
-    optional: true
+  escape-goat@3.0.0: {}
 
   escape-html@1.0.3: {}
 
@@ -11320,8 +11306,7 @@ snapshots:
     dependencies:
       function-bind: 1.1.2
 
-  he@1.2.0:
-    optional: true
+  he@1.2.0: {}
 
   helmet@8.1.0: {}
 
@@ -11336,7 +11321,6 @@ snapshots:
       param-case: 2.1.1
       relateurl: 0.2.7
       uglify-js: 3.19.3
-    optional: true
 
   html-to-text@9.0.5:
     dependencies:
@@ -11360,7 +11344,6 @@ snapshots:
       domhandler: 3.3.0
       domutils: 2.8.0
       entities: 2.2.0
-    optional: true
 
   htmlparser2@8.0.2:
     dependencies:
@@ -11375,7 +11358,6 @@ snapshots:
       domhandler: 5.0.3
       domutils: 3.2.2
       entities: 4.5.0
-    optional: true
 
   http-cache-semantics@4.2.0: {}
 
@@ -11513,7 +11495,6 @@ snapshots:
   is-binary-path@2.1.0:
     dependencies:
       binary-extensions: 2.3.0
-    optional: true
 
   is-callable@1.2.7: {}
 
@@ -12000,10 +11981,8 @@ snapshots:
       glob: 10.4.5
       js-cookie: 3.0.5
       nopt: 7.2.1
-    optional: true
 
-  js-cookie@3.0.5:
-    optional: true
+  js-cookie@3.0.5: {}
 
   js-stringify@1.0.2:
     optional: true
@@ -12077,7 +12056,6 @@ snapshots:
       web-resource-inliner: 6.0.1
     transitivePeerDependencies:
       - encoding
-    optional: true
 
   jwa@1.4.2:
     dependencies:
@@ -12300,8 +12278,7 @@ snapshots:
 
   longest-streak@3.1.0: {}
 
-  lower-case@1.1.4:
-    optional: true
+  lower-case@1.1.4: {}
 
   lowercase-keys@3.0.0: {}
 
@@ -12387,8 +12364,7 @@ snapshots:
     dependencies:
       fs-monkey: 1.0.6
 
-  mensch@0.3.4:
-    optional: true
+  mensch@0.3.4: {}
 
   meow@12.1.1: {}
 
@@ -12466,7 +12442,6 @@ snapshots:
   minimatch@9.0.1:
     dependencies:
       brace-expansion: 2.0.2
-    optional: true
 
   minimatch@9.0.3:
     dependencies:
@@ -12495,7 +12470,6 @@ snapshots:
       mjml-core: 4.15.3
     transitivePeerDependencies:
       - encoding
-    optional: true
 
   mjml-body@4.15.3:
     dependencies:
@@ -12504,7 +12478,6 @@ snapshots:
       mjml-core: 4.15.3
     transitivePeerDependencies:
       - encoding
-    optional: true
 
   mjml-button@4.15.3:
     dependencies:
@@ -12513,7 +12486,6 @@ snapshots:
       mjml-core: 4.15.3
     transitivePeerDependencies:
       - encoding
-    optional: true
 
   mjml-carousel@4.15.3:
     dependencies:
@@ -12522,7 +12494,6 @@ snapshots:
       mjml-core: 4.15.3
     transitivePeerDependencies:
       - encoding
-    optional: true
 
   mjml-cli@4.15.3:
     dependencies:
@@ -12540,7 +12511,6 @@ snapshots:
       yargs: 17.7.2
     transitivePeerDependencies:
       - encoding
-    optional: true
 
   mjml-column@4.15.3:
     dependencies:
@@ -12549,7 +12519,6 @@ snapshots:
       mjml-core: 4.15.3
     transitivePeerDependencies:
       - encoding
-    optional: true
 
   mjml-core@4.15.3:
     dependencies:
@@ -12565,7 +12534,6 @@ snapshots:
       mjml-validator: 4.15.3
     transitivePeerDependencies:
       - encoding
-    optional: true
 
   mjml-divider@4.15.3:
     dependencies:
@@ -12574,7 +12542,6 @@ snapshots:
       mjml-core: 4.15.3
     transitivePeerDependencies:
       - encoding
-    optional: true
 
   mjml-group@4.15.3:
     dependencies:
@@ -12583,7 +12550,6 @@ snapshots:
       mjml-core: 4.15.3
     transitivePeerDependencies:
       - encoding
-    optional: true
 
   mjml-head-attributes@4.15.3:
     dependencies:
@@ -12592,7 +12558,6 @@ snapshots:
       mjml-core: 4.15.3
     transitivePeerDependencies:
       - encoding
-    optional: true
 
   mjml-head-breakpoint@4.15.3:
     dependencies:
@@ -12601,7 +12566,6 @@ snapshots:
       mjml-core: 4.15.3
     transitivePeerDependencies:
       - encoding
-    optional: true
 
   mjml-head-font@4.15.3:
     dependencies:
@@ -12610,7 +12574,6 @@ snapshots:
       mjml-core: 4.15.3
     transitivePeerDependencies:
       - encoding
-    optional: true
 
   mjml-head-html-attributes@4.15.3:
     dependencies:
@@ -12619,7 +12582,6 @@ snapshots:
       mjml-core: 4.15.3
     transitivePeerDependencies:
       - encoding
-    optional: true
 
   mjml-head-preview@4.15.3:
     dependencies:
@@ -12628,7 +12590,6 @@ snapshots:
       mjml-core: 4.15.3
     transitivePeerDependencies:
       - encoding
-    optional: true
 
   mjml-head-style@4.15.3:
     dependencies:
@@ -12637,7 +12598,6 @@ snapshots:
       mjml-core: 4.15.3
     transitivePeerDependencies:
       - encoding
-    optional: true
 
   mjml-head-title@4.15.3:
     dependencies:
@@ -12646,7 +12606,6 @@ snapshots:
       mjml-core: 4.15.3
     transitivePeerDependencies:
       - encoding
-    optional: true
 
   mjml-head@4.15.3:
     dependencies:
@@ -12655,7 +12614,6 @@ snapshots:
       mjml-core: 4.15.3
     transitivePeerDependencies:
       - encoding
-    optional: true
 
   mjml-hero@4.15.3:
     dependencies:
@@ -12664,7 +12622,6 @@ snapshots:
       mjml-core: 4.15.3
     transitivePeerDependencies:
       - encoding
-    optional: true
 
   mjml-image@4.15.3:
     dependencies:
@@ -12673,7 +12630,6 @@ snapshots:
       mjml-core: 4.15.3
     transitivePeerDependencies:
       - encoding
-    optional: true
 
   mjml-migrate@4.15.3:
     dependencies:
@@ -12685,7 +12641,6 @@ snapshots:
       yargs: 17.7.2
     transitivePeerDependencies:
       - encoding
-    optional: true
 
   mjml-navbar@4.15.3:
     dependencies:
@@ -12694,7 +12649,6 @@ snapshots:
       mjml-core: 4.15.3
     transitivePeerDependencies:
       - encoding
-    optional: true
 
   mjml-parser-xml@4.15.3:
     dependencies:
@@ -12702,7 +12656,6 @@ snapshots:
       detect-node: 2.1.0
       htmlparser2: 9.1.0
       lodash: 4.17.21
-    optional: true
 
   mjml-preset-core@4.15.3:
     dependencies:
@@ -12734,7 +12687,6 @@ snapshots:
       mjml-wrapper: 4.15.3
     transitivePeerDependencies:
       - encoding
-    optional: true
 
   mjml-raw@4.15.3:
     dependencies:
@@ -12743,7 +12695,6 @@ snapshots:
       mjml-core: 4.15.3
     transitivePeerDependencies:
       - encoding
-    optional: true
 
   mjml-section@4.15.3:
     dependencies:
@@ -12752,7 +12703,6 @@ snapshots:
       mjml-core: 4.15.3
     transitivePeerDependencies:
       - encoding
-    optional: true
 
   mjml-social@4.15.3:
     dependencies:
@@ -12761,7 +12711,6 @@ snapshots:
       mjml-core: 4.15.3
     transitivePeerDependencies:
       - encoding
-    optional: true
 
   mjml-spacer@4.15.3:
     dependencies:
@@ -12770,7 +12719,6 @@ snapshots:
       mjml-core: 4.15.3
     transitivePeerDependencies:
       - encoding
-    optional: true
 
   mjml-table@4.15.3:
     dependencies:
@@ -12779,7 +12727,6 @@ snapshots:
       mjml-core: 4.15.3
     transitivePeerDependencies:
       - encoding
-    optional: true
 
   mjml-text@4.15.3:
     dependencies:
@@ -12788,12 +12735,10 @@ snapshots:
       mjml-core: 4.15.3
     transitivePeerDependencies:
       - encoding
-    optional: true
 
   mjml-validator@4.15.3:
     dependencies:
       '@babel/runtime': 7.28.2
-    optional: true
 
   mjml-wrapper@4.15.3:
     dependencies:
@@ -12803,7 +12748,6 @@ snapshots:
       mjml-section: 4.15.3
     transitivePeerDependencies:
       - encoding
-    optional: true
 
   mjml@4.15.3:
     dependencies:
@@ -12815,7 +12759,6 @@ snapshots:
       mjml-validator: 4.15.3
     transitivePeerDependencies:
       - encoding
-    optional: true
 
   mkdirp-classic@0.5.3: {}
 
@@ -12923,7 +12866,6 @@ snapshots:
   no-case@2.3.2:
     dependencies:
       lower-case: 1.1.4
-    optional: true
 
   node-abi@3.75.0:
     dependencies:
@@ -12962,7 +12904,6 @@ snapshots:
   nopt@7.2.1:
     dependencies:
       abbrev: 2.0.0
-    optional: true
 
   normalize-path@3.0.0: {}
 
@@ -13131,7 +13072,6 @@ snapshots:
   param-case@2.1.1:
     dependencies:
       no-case: 2.3.2
-    optional: true
 
   parent-module@1.0.1:
     dependencies:
@@ -13374,8 +13314,7 @@ snapshots:
       kleur: 3.0.3
       sisteransi: 1.0.5
 
-  proto-list@1.2.4:
-    optional: true
+  proto-list@1.2.4: {}
 
   proxy-addr@2.0.7:
     dependencies:
@@ -13523,7 +13462,6 @@ snapshots:
   readdirp@3.6.0:
     dependencies:
       picomatch: 2.3.1
-    optional: true
 
   readdirp@4.1.2: {}
 
@@ -13535,8 +13473,7 @@ snapshots:
 
   reflect-metadata@0.2.2: {}
 
-  relateurl@0.2.7:
-    optional: true
+  relateurl@0.2.7: {}
 
   remark-stringify@11.0.0:
     dependencies:
@@ -13805,8 +13742,7 @@ snapshots:
 
   slash@3.0.0: {}
 
-  slick@1.12.2:
-    optional: true
+  slick@1.12.2: {}
 
   slugify@1.6.6: {}
 
@@ -14275,8 +14211,7 @@ snapshots:
   uc.micro@2.1.0:
     optional: true
 
-  uglify-js@3.19.3:
-    optional: true
+  uglify-js@3.19.3: {}
 
   uid2@0.0.4: {}
 
@@ -14345,8 +14280,7 @@ snapshots:
       escalade: 3.2.0
       picocolors: 1.1.1
 
-  upper-case@1.1.3:
-    optional: true
+  upper-case@1.1.3: {}
 
   uri-js@4.4.1:
     dependencies:
@@ -14377,8 +14311,7 @@ snapshots:
       '@types/istanbul-lib-coverage': 2.0.6
       convert-source-map: 2.0.0
 
-  valid-data-url@3.0.1:
-    optional: true
+  valid-data-url@3.0.1: {}
 
   validator@13.15.15: {}
 
@@ -14433,7 +14366,6 @@ snapshots:
       valid-data-url: 3.0.1
     transitivePeerDependencies:
       - encoding
-    optional: true
 
   web-streams-polyfill@4.0.0-beta.3: {}
 

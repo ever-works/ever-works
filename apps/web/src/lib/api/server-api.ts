@@ -63,7 +63,12 @@ export async function serverFetch<T>(endpoint: string, options: RequestInit = {}
         let errorMessage: string | null = null;
         try {
             const errorData = await response.json();
-            if (errorData.error?.message) {
+
+            if (errorData?.message) {
+                errorMessage = Array.isArray(errorData.message)
+                    ? errorData.message.join(', ')
+                    : errorData.message;
+            } else if (errorData.error?.message) {
                 errorMessage = errorData.error.message;
             } else if (typeof errorData.error === 'string') {
                 errorMessage = errorData.error;
