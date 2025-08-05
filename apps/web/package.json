@@ -15,7 +15,8 @@
     "next-intl": "^4.3.4",
     "path-to-regexp": "^8.2.0",
     "react": "19.1.0",
-    "react-dom": "19.1.0"
+    "react-dom": "19.1.0",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
