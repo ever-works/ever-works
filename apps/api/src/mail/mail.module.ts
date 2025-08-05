@@ -2,7 +2,6 @@ import path from 'node:path';
 import { Module } from '@nestjs/common';
 import { MailService } from './mail.service';
 import { MailerModule } from '@nestjs-modules/mailer';
-import { MjmlAdapter } from '@nestjs-modules/mailer/dist/adapters/mjml.adapter';
 import { HandlebarsAdapter } from '@nestjs-modules/mailer/dist/adapters/handlebars.adapter';
 
 // Providers
@@ -32,7 +31,7 @@ import { MailerService } from './mailer.service';
                 },
                 template: {
                     dir: path.join(process.cwd(), 'src/templates'),
-                    adapter: new MjmlAdapter(new HandlebarsAdapter()),
+                    adapter: new HandlebarsAdapter(undefined, { inlineCssEnabled: true }),
                     options: {
                         strict: true,
                     },

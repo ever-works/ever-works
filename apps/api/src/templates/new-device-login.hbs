@@ -1,118 +1,170 @@
-<mjml>
-    <mj-head>
-        <mj-title>New login to your Ever Works account</mj-title>
-        <mj-preview>We noticed a login from a new device</mj-preview>
-        <mj-attributes>
-            <mj-all
-                font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif"
-            />
-            <mj-text font-size='16px' color='#475569' line-height='1.6' />
-            <mj-section background-color='#ffffff' padding='0' />
-        </mj-attributes>
-    </mj-head>
-
-    <mj-body background-color='#f8fafc'>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>New login to your Ever Works account</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: #f8fafc;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        .logo-section {
+            padding: 40px 20px 30px;
+            text-align: center;
+        }
+        .logo-title {
+            font-size: 28px;
+            font-weight: 600;
+            color: #1e293b;
+            margin: 0;
+        }
+        .logo-subtitle {
+            font-size: 14px;
+            color: #94a3b8;
+            margin: 5px 0 0;
+        }
+        .main-card {
+            margin: 0 20px 40px;
+            background-color: #ffffff;
+            border-radius: 8px;
+            padding: 40px 30px;
+        }
+        .icon {
+            text-align: center;
+            font-size: 40px;
+            margin-bottom: 20px;
+        }
+        .title {
+            font-size: 24px;
+            color: #1e293b;
+            font-weight: 600;
+            text-align: center;
+            margin: 0 0 10px;
+        }
+        .subtitle {
+            text-align: center;
+            color: #64748b;
+            margin: 0 0 20px;
+            font-size: 16px;
+        }
+        .details-box {
+            background-color: #f8fafc;
+            border-radius: 6px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .details-text {
+            font-size: 14px;
+            color: #64748b;
+            margin: 0;
+            line-height: 1.8;
+        }
+        .question {
+            text-align: center;
+            font-size: 16px;
+            color: #1e293b;
+            margin: 30px 0 20px;
+        }
+        .button {
+            display: inline-block;
+            text-decoration: none;
+            font-size: 16px;
+            font-weight: 500;
+            border-radius: 6px;
+            text-align: center;
+            width: 100%;
+            box-sizing: border-box;
+            margin-bottom: 15px;
+        }
+        .button-primary {
+            background-color: #1e293b;
+            color: #ffffff;
+            padding: 12px 48px;
+        }
+        .button-danger {
+            background-color: #ffffff;
+            color: #ef4444;
+            border: 2px solid #ef4444;
+            padding: 10px 48px;
+        }
+        .button-container {
+            text-align: center;
+        }
+        .footer {
+            padding: 0 20px 40px;
+            text-align: center;
+        }
+        .footer-text {
+            font-size: 14px;
+            color: #94a3b8;
+            margin: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
         <!-- Logo Section -->
-        <mj-section padding='40px 20px 30px'>
-            <mj-column>
-                <mj-text
-                    align='center'
-                    font-size='28px'
-                    font-weight='600'
-                    color='#1e293b'
-                    padding='0'
-                >
-                    Ever Works
-                </mj-text>
-                <mj-text align='center' font-size='14px' color='#94a3b8' padding='5px 0 0'>
-                    by Ever Co.
-                </mj-text>
-            </mj-column>
-        </mj-section>
+        <div class="logo-section">
+            <h1 class="logo-title">Ever Works</h1>
+            <p class="logo-subtitle">by Ever Co.</p>
+        </div>
 
         <!-- Main Card -->
-        <mj-section padding='0 20px 40px'>
-            <mj-column>
-                <mj-wrapper background-color='#ffffff' border-radius='8px' padding='40px 30px'>
-                    <!-- Icon -->
-                    <mj-text align='center' font-size='40px' padding-bottom='20px'>
-                        🔔
-                    </mj-text>
+        <div class="main-card">
+            <!-- Icon -->
+            <div class="icon">🔔</div>
 
-                    <!-- Title -->
-                    <mj-text
-                        font-size='24px'
-                        color='#1e293b'
-                        font-weight='600'
-                        align='center'
-                        padding-bottom='10px'
-                    >
-                        New Device Login
-                    </mj-text>
+            <!-- Title -->
+            <h2 class="title">New Device Login</h2>
 
-                    <mj-text align='center' color='#64748b' padding-bottom='20px'>
-                        {{#if firstName}}{{firstName}}, we{{else}}We{{/if}}
-                        noticed a login to your account from a new device.
-                    </mj-text>
+            <p class="subtitle">
+                {{#if firstName}}{{firstName}}, we{{else}}We{{/if}}
+                noticed a login to your account from a new device.
+            </p>
 
-                    <!-- Login Details -->
-                    <mj-wrapper background-color='#f8fafc' border-radius='6px' padding='20px'>
-                        <mj-text font-size='14px' color='#64748b' padding='0'>
-                            <strong>Time:</strong>
-                            {{loginTime}}<br />
-                            <strong>Device:</strong>
-                            {{device}}<br />
-                            <strong>Browser:</strong>
-                            {{browser}}<br />
-                            <strong>Location:</strong>
-                            {{location}}<br />
-                            <strong>IP Address:</strong>
-                            {{ipAddress}}
-                        </mj-text>
-                    </mj-wrapper>
+            <!-- Login Details -->
+            <div class="details-box">
+                <p class="details-text">
+                    <strong>Time:</strong>
+                    {{loginTime}}<br>
+                    <strong>Device:</strong>
+                    {{device}}<br>
+                    <strong>Browser:</strong>
+                    {{browser}}<br>
+                    <strong>Location:</strong>
+                    {{location}}<br>
+                    <strong>IP Address:</strong>
+                    {{ipAddress}}
+                </p>
+            </div>
 
-                    <!-- Actions -->
-                    <mj-text align='center' font-size='16px' color='#1e293b' padding='30px 0 20px'>
-                        Was this you?
-                    </mj-text>
+            <!-- Actions -->
+            <p class="question">Was this you?</p>
 
-                    <mj-button
-                        background-color='#1e293b'
-                        color='#ffffff'
-                        font-size='16px'
-                        font-weight='500'
-                        padding='0 0 15px'
-                        inner-padding='12px 48px'
-                        border-radius='6px'
-                        href='{{verifyUrl}}'
-                    >
-                        Yes, this was me
-                    </mj-button>
-
-                    <mj-button
-                        background-color='#ffffff'
-                        color='#ef4444'
-                        font-size='16px'
-                        font-weight='500'
-                        border='2px solid #ef4444'
-                        padding='0'
-                        inner-padding='10px 48px'
-                        border-radius='6px'
-                        href='{{secureAccountUrl}}'
-                    >
-                        No, secure my account
-                    </mj-button>
-                </mj-wrapper>
-            </mj-column>
-        </mj-section>
+            <div class="button-container">
+                <a href="{{verifyUrl}}" class="button button-primary">
+                    Yes, this was me
+                </a>
+                <a href="{{secureAccountUrl}}" class="button button-danger">
+                    No, secure my account
+                </a>
+            </div>
+        </div>
 
         <!-- Footer -->
-        <mj-section padding='0 20px 40px'>
-            <mj-column>
-                <mj-text align='center' font-size='14px' color='#94a3b8'>
-                    © 2024 Ever Co. All rights reserved.
-                </mj-text>
-            </mj-column>
-        </mj-section>
-    </mj-body>
-</mjml>
+        <div class="footer">
+            <p class="footer-text">
+                © 2024 Ever Co. All rights reserved.
+            </p>
+        </div>
+    </div>
+</body>
+</html>
