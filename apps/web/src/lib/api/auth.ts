@@ -42,14 +42,13 @@ export interface ResetPasswordDto {
 
 // Response Types
 export interface AuthResponse {
-    accessToken: string;
-    refreshToken: string;
+    access_token: string;
+    refresh_token: string;
     user: {
         id: string;
         username: string;
         email: string;
         avatar?: string;
-        isEmailVerified: boolean;
     };
 }
 
@@ -171,7 +170,7 @@ export const authAPI = {
     },
 
     verifyEmail: async (data: VerifyEmailDto) => {
-        return serverMutation<MessageResponse>({
+        return serverMutation<AuthResponse>({
             endpoint: '/auth/verify-email',
             data,
             method: 'POST',

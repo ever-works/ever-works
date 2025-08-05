@@ -409,7 +409,16 @@ export class AuthService {
             emailVerificationExpires: null,
         });
 
-        return { message: 'Email verified successfully' };
+        // Get updated user data with emailVerified set to true
+        const updatedUser = await this.userRepository.findById(user.id);
+        if (!updatedUser) {
+            throw new BadRequestException('User not found after verification');
+        }
+
+        const { password, ...userWithoutPassword } = updatedUser;
+
+        // Generate new tokens with emailVerified: true in JWT payload
+        return this.generateTokens(userWithoutPassword);
     }
 
     async forgotPassword(email: string) {
