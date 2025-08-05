@@ -23,6 +23,12 @@
         "expiredToken": "Reset password link has expired. Please request a new one.",
         "failed": "Failed to reset password. Please try again or request a new reset link."
       },
+      "verifyEmail": {
+        "missingToken": "Email verification link is invalid. Missing verification token.",
+        "invalidToken": "Email verification link is invalid or has already been used.",
+        "expiredToken": "Email verification link has expired. Please request a new one.",
+        "failed": "Failed to verify email. Please try again or request a new verification link."
+      },
       "actions": {
         "backToLogin": "Back to Login",
         "tryRegister": "Try Registering",

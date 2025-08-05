@@ -40,6 +40,14 @@ function AuthErrorContent() {
                 return t('resetPassword.expiredToken');
             case 'reset_password_failed':
                 return t('resetPassword.failed');
+            case 'verify_email_missing_token':
+                return t('verifyEmail.missingToken');
+            case 'verify_email_invalid_token':
+                return t('verifyEmail.invalidToken');
+            case 'verify_email_expired_token':
+                return t('verifyEmail.expiredToken');
+            case 'verify_email_failed':
+                return t('verifyEmail.failed');
             default:
                 return t('generic');
         }
@@ -117,6 +125,25 @@ function AuthErrorContent() {
                         />
                     </svg>
                 );
+            case 'verify_email_missing_token':
+            case 'verify_email_invalid_token':
+            case 'verify_email_expired_token':
+            case 'verify_email_failed':
+                return (
+                    <svg
+                        className="w-12 h-12 text-warning"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                    >
+                        <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                        />
+                    </svg>
+                );
             default:
                 return (
                     <svg
@@ -143,7 +170,7 @@ function AuthErrorContent() {
             buttons.push(
                 <Link
                     key="resend"
-                    href="/resend-verification"
+                    href="/"
                     className="px-6 py-3 bg-primary hover:bg-primary-hover text-white rounded-lg font-medium transition-colors animate-fade-in"
                 >
                     {t('actions.resendVerification')}
@@ -171,6 +198,18 @@ function AuthErrorContent() {
                     className="px-6 py-3 bg-primary hover:bg-primary-hover text-white rounded-lg font-medium transition-colors animate-fade-in"
                 >
                     {t('actions.requestNewReset')}
+                </Link>,
+            );
+        }
+
+        if (errorType?.startsWith('verify_email_')) {
+            buttons.push(
+                <Link
+                    key="resend-verification"
+                    href="/"
+                    className="px-6 py-3 bg-primary hover:bg-primary-hover text-white rounded-lg font-medium transition-colors animate-fade-in"
+                >
+                    {t('actions.resendVerification')}
                 </Link>,
             );
         }
