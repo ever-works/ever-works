@@ -1,3 +1,9 @@
+'use client';
+
+import { useTranslations } from 'next-intl';
+
 export default function AuthErrorPage() {
-    return <div>Auth Error</div>;
+    const t = useTranslations('auth.error');
+
+    return <div>{t('title')}</div>;
 }

@@ -1,1 +1,118 @@
-{}
+{
+  "auth": {
+    "error": {
+      "title": "Auth Error"
+    },
+    "login": {
+      "title": "Welcome back",
+      "subtitle": "Sign in to your account to continue",
+      "form": {
+        "email": {
+          "label": "Email address",
+          "placeholder": "you@example.com"
+        },
+        "password": {
+          "label": "Password",
+          "placeholder": "Enter your password"
+        },
+        "forgotPassword": "Forgot password?",
+        "rememberMe": "Remember me for 30 days",
+        "submit": "Sign in",
+        "submitting": "Signing in..."
+      },
+      "socialLogin": {
+        "divider": "Or continue with",
+        "google": "Google",
+        "github": "GitHub"
+      },
+      "signUp": {
+        "text": "Don't have an account?",
+        "link": "Sign up"
+      },
+      "errors": {
+        "invalidCredentials": "Invalid email or password"
+      }
+    },
+    "register": {
+      "title": "Create your account",
+      "subtitle": "Start building amazing directories today",
+      "form": {
+        "name": {
+          "label": "Full name",
+          "placeholder": "John Doe"
+        },
+        "email": {
+          "label": "Email address",
+          "placeholder": "you@example.com"
+        },
+        "password": {
+          "label": "Password",
+          "placeholder": "Create a strong password",
+          "hint": "Must be at least 8 characters"
+        },
+        "confirmPassword": {
+          "label": "Confirm password",
+          "placeholder": "Confirm your password"
+        },
+        "terms": {
+          "text": "I agree to the",
+          "termsLink": "Terms of Service",
+          "and": "and",
+          "privacyLink": "Privacy Policy"
+        },
+        "submit": "Create account",
+        "submitting": "Creating account..."
+      },
+      "socialSignUp": {
+        "divider": "Or sign up with",
+        "google": "Google",
+        "github": "GitHub"
+      },
+      "signIn": {
+        "text": "Already have an account?",
+        "link": "Sign in"
+      },
+      "errors": {
+        "passwordsDoNotMatch": "Passwords do not match",
+        "passwordTooShort": "Password must be at least 8 characters",
+        "generic": "An error occurred. Please try again."
+      }
+    }
+  },
+  "dashboard": {
+    "title": "Dashboard"
+  },
+  "layout": {
+    "auth": {
+      "backToHome": "Back to home",
+      "feature": {
+        "title": "Build Directories with AI",
+        "subtitle": "Create beautiful, searchable directories in minutes using natural language. No coding required.",
+        "benefits": {
+          "ai": {
+            "title": "AI-Powered Creation",
+            "description": "Describe what you want and let AI do the work"
+          },
+          "templates": {
+            "title": "Professional Templates",
+            "description": "Start with beautiful, customizable designs"
+          },
+          "management": {
+            "title": "Easy Management",
+            "description": "Update and organize your content effortlessly"
+          }
+        }
+      }
+    }
+  },
+  "errors": {
+    "global": {
+      "title": "Something went wrong!",
+      "tryAgain": "Try again"
+    }
+  },
+  "metadata": {
+    "title": "Ever Works - Directory Builder",
+    "description": "A SaaS platform for building and managing directories"
+  }
+}

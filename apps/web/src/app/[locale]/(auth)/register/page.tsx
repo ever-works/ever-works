@@ -4,9 +4,11 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { AuthLayout } from '@/components/layout/AuthLayout';
+import { useTranslations } from 'next-intl';
 
 export default function RegisterPage() {
     const router = useRouter();
+    const t = useTranslations('auth.register');
     const [formData, setFormData] = useState({
         name: '',
         email: '',
@@ -23,12 +25,12 @@ export default function RegisterPage() {
 
         // Validation
         if (formData.password !== formData.confirmPassword) {
-            setError('Passwords do not match');
+            setError(t('errors.passwordsDoNotMatch'));
             return;
         }
 
         if (formData.password.length < 8) {
-            setError('Password must be at least 8 characters');
+            setError(t('errors.passwordTooShort'));
             return;
         }
 
@@ -41,14 +43,14 @@ export default function RegisterPage() {
             // On success, redirect to dashboard
             router.push('/dashboard');
         } catch (err) {
-            setError('An error occurred. Please try again.');
+            setError(t('errors.generic'));
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <AuthLayout title="Create your account" subtitle="Start building amazing directories today">
+        <AuthLayout title={t('title')} subtitle={t('subtitle')}>
             <form onSubmit={handleSubmit} className="space-y-6">
                 {error && (
                     <div className="bg-danger/10 border border-danger/20 text-danger px-4 py-3 rounded-lg text-sm">
@@ -58,7 +60,7 @@ export default function RegisterPage() {
 
                 <div>
                     <label htmlFor="name" className="block text-sm font-medium text-text mb-2">
-                        Full name
+                        {t('form.name.label')}
                     </label>
                     <input
                         id="name"
@@ -67,13 +69,13 @@ export default function RegisterPage() {
                         value={formData.name}
                         onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                         className="w-full px-4 py-3 bg-surface-secondary border border-border rounded-lg text-text placeholder-text-muted focus:outline-none focus:border-primary transition-colors"
-                        placeholder="John Doe"
+                        placeholder={t('form.name.placeholder')}
                     />
                 </div>
 
                 <div>
                     <label htmlFor="email" className="block text-sm font-medium text-text mb-2">
-                        Email address
+                        {t('form.email.label')}
                     </label>
                     <input
                         id="email"
@@ -82,13 +84,13 @@ export default function RegisterPage() {
                         value={formData.email}
                         onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                         className="w-full px-4 py-3 bg-surface-secondary border border-border rounded-lg text-text placeholder-text-muted focus:outline-none focus:border-primary transition-colors"
-                        placeholder="you@example.com"
+                        placeholder={t('form.email.placeholder')}
                     />
                 </div>
 
                 <div>
                     <label htmlFor="password" className="block text-sm font-medium text-text mb-2">
-                        Password
+                        {t('form.password.label')}
                     </label>
                     <input
                         id="password"
@@ -97,9 +99,9 @@ export default function RegisterPage() {
                         value={formData.password}
                         onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                         className="w-full px-4 py-3 bg-surface-secondary border border-border rounded-lg text-text placeholder-text-muted focus:outline-none focus:border-primary transition-colors"
-                        placeholder="Create a strong password"
+                        placeholder={t('form.password.placeholder')}
                     />
-                    <p className="mt-1 text-xs text-text-muted">Must be at least 8 characters</p>
+                    <p className="mt-1 text-xs text-text-muted">{t('form.password.hint')}</p>
                 </div>
 
                 <div>
@@ -107,7 +109,7 @@ export default function RegisterPage() {
                         htmlFor="confirmPassword"
                         className="block text-sm font-medium text-text mb-2"
                     >
-                        Confirm password
+                        {t('form.confirmPassword.label')}
                     </label>
                     <input
                         id="confirmPassword"
@@ -118,7 +120,7 @@ export default function RegisterPage() {
                             setFormData({ ...formData, confirmPassword: e.target.value })
                         }
                         className="w-full px-4 py-3 bg-surface-secondary border border-border rounded-lg text-text placeholder-text-muted focus:outline-none focus:border-primary transition-colors"
-                        placeholder="Confirm your password"
+                        placeholder={t('form.confirmPassword.placeholder')}
                     />
                 </div>
 
@@ -131,13 +133,13 @@ export default function RegisterPage() {
                     />
 
                     <label htmlFor="terms" className="ml-2 text-sm text-text-secondary">
-                        I agree to the{' '}
+                        {t('form.terms.text')}{' '}
                         <Link href="/terms" className="text-primary hover:text-primary-hover">
-                            Terms of Service
+                            {t('form.terms.termsLink')}
                         </Link>{' '}
-                        and{' '}
+                        {t('form.terms.and')}{' '}
                         <Link href="/privacy" className="text-primary hover:text-primary-hover">
-                            Privacy Policy
+                            {t('form.terms.privacyLink')}
                         </Link>
                     </label>
                 </div>
@@ -147,7 +149,7 @@ export default function RegisterPage() {
                     disabled={loading}
                     className="w-full py-3 bg-primary hover:bg-primary-hover text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                    {loading ? 'Creating account...' : 'Create account'}
+                    {loading ? t('form.submitting') : t('form.submit')}
                 </button>
 
                 <div className="relative">
@@ -155,7 +157,7 @@ export default function RegisterPage() {
                         <div className="w-full border-t border-border" />
                     </div>
                     <div className="relative flex justify-center text-sm">
-                        <span className="bg-background px-2 text-text-muted">Or sign up with</span>
+                        <span className="bg-background px-2 text-text-muted">{t('socialSignUp.divider')}</span>
                     </div>
                 </div>
 
@@ -182,7 +184,7 @@ export default function RegisterPage() {
                                 d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
                             />
                         </svg>
-                        Google
+                        {t('socialSignUp.google')}
                     </button>
                     <button
                         type="button"
@@ -191,17 +193,17 @@ export default function RegisterPage() {
                         <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                             <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
                         </svg>
-                        GitHub
+                        {t('socialSignUp.github')}
                     </button>
                 </div>
 
                 <p className="text-center text-sm text-text-secondary">
-                    Already have an account?{' '}
+                    {t('signIn.text')}{' '}
                     <Link
                         href="/login"
                         className="text-primary hover:text-primary-hover font-medium transition-colors"
                     >
-                        Sign in
+                        {t('signIn.link')}
                     </Link>
                 </p>
             </form>

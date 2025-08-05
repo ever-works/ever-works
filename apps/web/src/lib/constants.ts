@@ -21,7 +21,6 @@ export const ROUTES = {
 export const API_ROUTES = [ROUTES.AUTH_CALLBACK] as const;
 
 export const PUBLIC_ROUTES = [
-    ROUTES.HOME,
     ROUTES.AUTH_LOGIN,
     ROUTES.AUTH_REGISTER,
     ROUTES.AUTH_ERROR,

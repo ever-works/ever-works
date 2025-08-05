@@ -1,4 +1,7 @@
+'use client';
+
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 
 interface AuthLayoutProps {
     children: React.ReactNode;
@@ -7,6 +10,7 @@ interface AuthLayoutProps {
 }
 
 export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
+    const t = useTranslations('layout.auth');
     return (
         <div className="min-h-screen bg-background flex">
             {/* Left side - Form */}
@@ -29,7 +33,7 @@ export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
                                 d="M10 19l-7-7m0 0l7-7m-7 7h18"
                             />
                         </svg>
-                        Back to home
+                        {t('backToHome')}
                     </Link>
 
                     <div className="mb-8">
@@ -63,11 +67,10 @@ export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
                             </svg>
                         </div>
                         <h2 className="text-2xl font-bold text-text mb-4">
-                            Build Directories with AI
+                            {t('feature.title')}
                         </h2>
                         <p className="text-text-secondary mb-8">
-                            Create beautiful, searchable directories in minutes using natural
-                            language. No coding required.
+                            {t('feature.subtitle')}
                         </p>
                     </div>
 
@@ -89,9 +92,9 @@ export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
                                 </svg>
                             </div>
                             <div>
-                                <h3 className="font-medium text-text mb-1">AI-Powered Creation</h3>
+                                <h3 className="font-medium text-text mb-1">{t('feature.benefits.ai.title')}</h3>
                                 <p className="text-sm text-text-secondary">
-                                    Describe what you want and let AI do the work
+                                    {t('feature.benefits.ai.description')}
                                 </p>
                             </div>
                         </div>
@@ -114,10 +117,10 @@ export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
                             </div>
                             <div>
                                 <h3 className="font-medium text-text mb-1">
-                                    Professional Templates
+                                    {t('feature.benefits.templates.title')}
                                 </h3>
                                 <p className="text-sm text-text-secondary">
-                                    Start with beautiful, customizable designs
+                                    {t('feature.benefits.templates.description')}
                                 </p>
                             </div>
                         </div>
@@ -139,9 +142,9 @@ export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
                                 </svg>
                             </div>
                             <div>
-                                <h3 className="font-medium text-text mb-1">Easy Management</h3>
+                                <h3 className="font-medium text-text mb-1">{t('feature.benefits.management.title')}</h3>
                                 <p className="text-sm text-text-secondary">
-                                    Update and organize your content effortlessly
+                                    {t('feature.benefits.management.description')}
                                 </p>
                             </div>
                         </div>
