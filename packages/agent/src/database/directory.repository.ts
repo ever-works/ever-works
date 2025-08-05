@@ -31,10 +31,6 @@ export class DirectoryRepository {
         return await this.repository.save(directory);
     }
 
-    async findBySlug(slug: string): Promise<Directory | null> {
-        return await this.repository.findOne({ where: { slug } });
-    }
-
     async findByUserAndSlug(userId: string, slug: string): Promise<Directory | null> {
         return await this.repository.findOne({ where: { userId, slug } });
     }

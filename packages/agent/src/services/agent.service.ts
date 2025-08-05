@@ -119,7 +119,10 @@ export class AgentService {
         user: User,
         awaitCompletion = true,
     ): Promise<ItemsGeneratorResponseDto> {
-        const directory = await this.directoryRepository.findBySlug(createItemsGeneratorDto.slug);
+        const directory = await this.directoryRepository.findByUserAndSlug(
+            user.id,
+            createItemsGeneratorDto.slug,
+        );
         if (!directory) {
             throw new NotFoundException('Directory not found');
         }
@@ -144,7 +147,7 @@ export class AgentService {
         user: User,
         awaitCompletion = true,
     ): Promise<ItemsGeneratorResponseDto> {
-        const directory = await this.directoryRepository.findBySlug(slug);
+        const directory = await this.directoryRepository.findByUserAndSlug(user.id, slug);
         if (!directory) {
             throw new NotFoundException('Directory not found');
         }
@@ -183,7 +186,7 @@ export class AgentService {
     ): Promise<SubmitItemResponseDto> {
         try {
             // Check if directory exists for the given slug
-            const directory = await this.directoryRepository.findBySlug(slug);
+            const directory = await this.directoryRepository.findByUserAndSlug(user.id, slug);
             if (!directory) {
                 throw new NotFoundException(`Directory with slug '${slug}' not found`);
             }
@@ -229,7 +232,7 @@ export class AgentService {
     ): Promise<RemoveItemResponseDto> {
         try {
             // Check if directory exists for the given slug
-            const directory = await this.directoryRepository.findBySlug(slug);
+            const directory = await this.directoryRepository.findByUserAndSlug(user.id, slug);
             if (!directory) {
                 throw new NotFoundException(`Directory with slug '${slug}' not found`);
             }
@@ -314,7 +317,7 @@ export class AgentService {
     ): Promise<{ status: string; error_details?: string }> {
         try {
             // Check if directory exists for the given slug
-            const directory = await this.directoryRepository.findBySlug(slug);
+            const directory = await this.directoryRepository.findByUserAndSlug(user.id, slug);
             if (!directory) {
                 throw new NotFoundException(`Directory with slug '${slug}' not found`);
             }
@@ -343,7 +346,7 @@ export class AgentService {
     ): Promise<UpdateWebsiteRepositoryResponseDto> {
         try {
             // Check if directory exists for the given slug
-            const directory = await this.directoryRepository.findBySlug(slug);
+            const directory = await this.directoryRepository.findByUserAndSlug(user.id, slug);
             if (!directory) {
                 throw new NotFoundException(`Directory with slug '${slug}' not found`);
             }
