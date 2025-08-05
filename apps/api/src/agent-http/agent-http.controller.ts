@@ -156,16 +156,16 @@ export class AgentHttpController {
         return this.agentService.updateWebsiteRepository(slug, user);
     }
 
-    @Post('directories/delete/:slug')
+    @Post('directories/:id/delete')
     @UseGuards(JwtAuthGuard)
     @HttpCode(HttpStatus.OK)
     async deleteDirectory(
         @CurrentUser() auth: AuthenticatedUser,
-        @Param('slug') slug: string,
+        @Param('id') id: string,
         @Body() deleteDirectoryDto: DeleteDirectoryDto,
     ): Promise<DeleteDirectoryResponseDto> {
         const user = await this.authService.getUser(auth.userId);
 
-        return this.agentService.deleteDirectory(slug, deleteDirectoryDto, user);
+        return this.agentService.deleteDirectory(id, deleteDirectoryDto, user);
     }
 }

@@ -56,7 +56,7 @@ export class AgentService {
         if (search) {
             // Trim and limit search length
             sanitizedSearch = search.trim().slice(0, 100);
-            
+
             // If search is empty after trimming, treat as no search
             if (!sanitizedSearch) {
                 sanitizedSearch = undefined;
@@ -372,15 +372,24 @@ export class AgentService {
     }
 
     async deleteDirectory(
-        slug: string,
+        id: string,
         deleteDirectoryDto: DeleteDirectoryDto,
         user: User,
     ): Promise<DeleteDirectoryResponseDto> {
+        let directory: Directory | null = null;
+
         try {
-            // Check if directory exists for the given slug
-            const directory = await this.directoryRepository.findBySlug(slug);
+            // Check if directory exists and belongs to the user
+            directory = await this.directoryRepository.findById(id);
             if (!directory) {
-                throw new NotFoundException(`Directory with slug '${slug}' not found`);
+                throw new NotFoundException(`Directory with id '${id}' not found`);
+            }
+
+            // Verify the directory belongs to the user
+            if (directory.userId !== user.id) {
+                throw new BadRequestException(
+                    'You do not have permission to delete this directory',
+                );
             }
 
             const deletedRepositories: string[] = [];
@@ -433,7 +442,7 @@ export class AgentService {
 
             return {
                 status: 'error',
-                slug,
+                slug: directory?.slug || '',
                 message: 'Failed to delete directory',
                 error_details: error.message,
             };

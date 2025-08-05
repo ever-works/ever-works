@@ -133,15 +133,15 @@ export class LocalAgentController {
         return this.agentService.updateWebsiteRepository(slug, user);
     }
 
-    @Post('directories/delete/:slug')
+    @Post('directories/:id/delete')
     @HttpCode(HttpStatus.OK)
     async deleteDirectory(
-        @Param('slug') slug: string,
+        @Param('id') id: string,
         @Body() deleteDirectoryDto: DeleteDirectoryDto,
     ): Promise<DeleteDirectoryResponseDto> {
         const user = await User.createLocalUser();
 
-        return this.agentService.deleteDirectory(slug, deleteDirectoryDto, user);
+        return this.agentService.deleteDirectory(id, deleteDirectoryDto, user);
     }
 
     @Post('deploy/:dirname/vercel')

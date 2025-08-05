@@ -29,7 +29,7 @@ export interface DirectorySelection {
 }
 
 export interface Directory {
-	id: number;
+	id: string;
 	name: string;
 	slug: string;
 	website?: string;

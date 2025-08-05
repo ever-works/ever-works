@@ -179,8 +179,8 @@ export class ApiService {
         return response.data;
     }
 
-    async deleteDirectory(slug: string, data?: DeleteDirectoryDto): Promise<ApiResponse> {
-        const response = await this.httpClient.post<ApiResponse>(`/directories/delete/${slug}`, data);
+    async deleteDirectory(id: string, data?: DeleteDirectoryDto): Promise<ApiResponse> {
+        const response = await this.httpClient.post<ApiResponse>(`/directories/${id}/delete`, data);
         return response.data;
     }
 }

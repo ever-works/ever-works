@@ -124,7 +124,7 @@ export class DeleteSubCommand extends CommandRunner {
 
                 // Call the agent service method directly
                 const result = await this.agentService.deleteDirectory(
-                    directory.slug,
+                    directory.id,
                     deleteOptions,
                     user,
                 );

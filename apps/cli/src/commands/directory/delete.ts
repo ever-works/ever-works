@@ -33,7 +33,9 @@ export const deleteCommand = new Command('delete')
             console.log(chalk.gray('This will delete:'));
             console.log(chalk.gray('  • The directory record from the database'));
             console.log(chalk.gray('  • Associated data and configurations'));
-            console.log(chalk.gray('  • Note: GitHub repositories will NOT be deleted automatically'));
+            console.log(
+                chalk.gray('  • Note: GitHub repositories will NOT be deleted automatically'),
+            );
 
             // Collect deletion options
             const deleteOptions = await inquirer.prompt([
@@ -71,10 +73,22 @@ export const deleteCommand = new Command('delete')
             // Double confirmation
             console.log(chalk.red('\n--- Deletion Summary ---'));
             console.log(chalk.gray('Directory to delete:'), chalk.white(directory.slug));
-            console.log(chalk.gray('Delete data repository:'), chalk.white(deleteOptions.delete_data_repository ? 'Yes' : 'No'));
-            console.log(chalk.gray('Delete markdown repository:'), chalk.white(deleteOptions.delete_markdown_repository ? 'Yes' : 'No'));
-            console.log(chalk.gray('Delete website repository:'), chalk.white(deleteOptions.delete_website_repository ? 'Yes' : 'No'));
-            console.log(chalk.gray('Force delete:'), chalk.white(deleteOptions.force_delete ? 'Yes' : 'No'));
+            console.log(
+                chalk.gray('Delete data repository:'),
+                chalk.white(deleteOptions.delete_data_repository ? 'Yes' : 'No'),
+            );
+            console.log(
+                chalk.gray('Delete markdown repository:'),
+                chalk.white(deleteOptions.delete_markdown_repository ? 'Yes' : 'No'),
+            );
+            console.log(
+                chalk.gray('Delete website repository:'),
+                chalk.white(deleteOptions.delete_website_repository ? 'Yes' : 'No'),
+            );
+            console.log(
+                chalk.gray('Force delete:'),
+                chalk.white(deleteOptions.force_delete ? 'Yes' : 'No'),
+            );
             if (deleteOptions.reason) {
                 console.log(chalk.gray('Reason:'), chalk.white(deleteOptions.reason));
             }
@@ -89,17 +103,19 @@ export const deleteCommand = new Command('delete')
                             return `You must type "${directory.slug}" exactly to confirm`;
                         }
                         return true;
-                    }
-                }
+                    },
+                },
             ]);
 
             const finalConfirmation = await inquirer.prompt([
                 {
                     type: 'confirm',
                     name: 'proceed',
-                    message: chalk.red('Are you absolutely sure you want to delete this directory?'),
-                    default: false
-                }
+                    message: chalk.red(
+                        'Are you absolutely sure you want to delete this directory?',
+                    ),
+                    default: false,
+                },
             ]);
 
             if (!finalConfirmation.proceed) {
@@ -119,7 +135,7 @@ export const deleteCommand = new Command('delete')
                     delete_website_repository: deleteOptions.delete_website_repository,
                 };
 
-                const response = await apiService.deleteDirectory(directory.slug, deleteDto);
+                const response = await apiService.deleteDirectory(directory.id, deleteDto);
 
                 spinner.succeed('Directory deleted successfully');
 
@@ -129,36 +145,48 @@ export const deleteCommand = new Command('delete')
                     console.log(chalk.gray('Message:'), chalk.white(response.message));
                 }
 
-                const anyRepoNotDeleted = !deleteOptions.delete_data_repository ||
-                                         !deleteOptions.delete_markdown_repository ||
-                                         !deleteOptions.delete_website_repository;
+                const anyRepoNotDeleted =
+                    !deleteOptions.delete_data_repository ||
+                    !deleteOptions.delete_markdown_repository ||
+                    !deleteOptions.delete_website_repository;
 
                 if (anyRepoNotDeleted) {
-                    console.log(chalk.yellow('\n⚠ Note: Some GitHub repositories were not deleted.'));
-                    console.log(chalk.gray('You may want to manually delete them if no longer needed:'));
+                    console.log(
+                        chalk.yellow('\n⚠ Note: Some GitHub repositories were not deleted.'),
+                    );
+                    console.log(
+                        chalk.gray('You may want to manually delete them if no longer needed:'),
+                    );
                     if (!deleteOptions.delete_data_repository) {
-                        console.log(chalk.gray(`  • ${directory.getRepoOwner()}/${directory.slug}-data`));
+                        console.log(chalk.gray(`  • ${directory.owner}/${directory.slug}-data`));
                     }
                     if (!deleteOptions.delete_website_repository) {
-                        console.log(chalk.gray(`  • ${directory.getRepoOwner()}/${directory.slug}-website`));
+                        console.log(chalk.gray(`  • ${directory.owner}/${directory.slug}-website`));
                     }
                 }
-
             } catch (error) {
                 spinner.fail('Directory deletion failed');
                 throw error;
             }
-
         } catch (error) {
-            console.error(chalk.red('\n✗ Failed to delete directory:'), error.response?.data?.message || error.message);
+            console.error(
+                chalk.red('\n✗ Failed to delete directory:'),
+                error.response?.data?.message || error.message,
+            );
 
             if (error.response?.status === 401) {
                 console.log(chalk.yellow('\n⚠ Authentication failed. Please login again.'));
                 console.log(chalk.gray('Run: ever-works auth login'));
             } else if (error.response?.status === 404) {
-                console.log(chalk.yellow('\n⚠ Directory not found. It may have already been deleted.'));
+                console.log(
+                    chalk.yellow('\n⚠ Directory not found. It may have already been deleted.'),
+                );
             } else if (error.response?.status === 403) {
-                console.log(chalk.yellow('\n⚠ Permission denied. You may not have permission to delete this directory.'));
+                console.log(
+                    chalk.yellow(
+                        '\n⚠ Permission denied. You may not have permission to delete this directory.',
+                    ),
+                );
             }
 
             process.exit(1);

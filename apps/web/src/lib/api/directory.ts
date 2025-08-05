@@ -74,10 +74,10 @@ export const directoryAPI = {
         });
     },
 
-    // Delete a directory
-    delete: async (slug: string, data: DeleteDirectoryDto) => {
+    // Delete a directory by ID
+    delete: async (id: string, data: DeleteDirectoryDto) => {
         return serverMutation<DeleteDirectoryResponse>({
-            endpoint: `/directories/delete/${slug}`,
+            endpoint: `/directories/${id}/delete`,
             data,
             method: 'POST',
             wrapInData: false,
