@@ -9,7 +9,7 @@ import {
     setOAuthState,
 } from '@/lib/auth/cookies';
 import crypto from 'crypto';
-import { APP_URL, ROUTES, routeWithParams } from '@/lib/constants';
+import { ROUTES, routeWithParams, withAppUrl } from '@/lib/constants';
 import { VALIDATION_RULES } from './validation';
 import { authAPI } from '@/lib/api';
 import { redirect } from '@/i18n/navigation';
@@ -87,7 +87,7 @@ export async function register(username: string, email: string, password: string
             username: validation.data.username,
             email: validation.data.email,
             password: validation.data.password,
-            email_verification_callback_url: APP_URL + ROUTES.AUTH_LOGIN,
+            emailverificationcallbackurl: withAppUrl(ROUTES.API_AUTH_VERIFY_EMAIL),
         });
 
         await Promise.all([
@@ -143,11 +143,11 @@ export async function connectProvider(provider: string) {
         const state = crypto.randomBytes(16).toString('hex');
         await setOAuthState(state);
 
-        const callbackUrl = routeWithParams(ROUTES.AUTH_CALLBACK, { provider });
+        const callbackUrl = routeWithParams(ROUTES.API_AUTH_CALLBACK, { provider });
 
         switch (provider) {
             case 'github': {
-                const { url } = await authAPI.getGitHubAuthUrl(APP_URL + callbackUrl, state);
+                const { url } = await authAPI.getGitHubAuthUrl(withAppUrl(callbackUrl), state);
                 redirect({
                     locale: await getLocale(),
                     href: url,
@@ -155,7 +155,7 @@ export async function connectProvider(provider: string) {
                 break;
             }
             case 'google': {
-                const { url } = await authAPI.getGoogleAuthUrl(APP_URL + callbackUrl, state);
+                const { url } = await authAPI.getGoogleAuthUrl(withAppUrl(callbackUrl), state);
                 redirect({
                     locale: await getLocale(),
                     href: url,

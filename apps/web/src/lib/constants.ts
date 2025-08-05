@@ -22,8 +22,8 @@ export const ROUTES = {
     AUTH_EMAIL_CONFIRMATION: '/email-confirmation',
     AUTH_RESET_PASSWORD: '/reset-password',
     // NEXTJS API ROUTES
-    AUTH_CALLBACK: '/auth/:provider/callback',
-    AUTH_VERIFY_EMAIL: '/auth/verify-email',
+    API_AUTH_CALLBACK: '/api/auth/:provider/callback',
+    API_AUTH_VERIFY_EMAIL: '/api/auth/verify-email',
 } as const;
 
 export const routeWithParams = (route: string, params: Record<string, string>) => {
@@ -33,7 +33,9 @@ export const routeWithParams = (route: string, params: Record<string, string>) =
     return route;
 };
 
-export const API_ROUTES = [ROUTES.AUTH_CALLBACK, ROUTES.AUTH_VERIFY_EMAIL] as const;
+export const withAppUrl = (route: string) => {
+    return new URL(route, APP_URL).toString();
+};
 
 export const PUBLIC_ROUTES = [
     ROUTES.AUTH_LOGIN,

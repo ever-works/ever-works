@@ -1,4 +1,4 @@
-import { IsEmail, IsNotEmpty, IsString, MinLength, Matches } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsString, MinLength, Matches, IsOptional } from 'class-validator';
 
 export class VerifyEmailDto {
     @IsString()
@@ -16,6 +16,10 @@ export class ForgotPasswordDto {
     @IsEmail()
     @IsNotEmpty()
     email: string;
+
+    @IsString()
+    @IsOptional()
+    resetPasswordCallbackUrl?: string;
 }
 
 export class ResetPasswordDto {

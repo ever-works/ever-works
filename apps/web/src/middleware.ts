@@ -1,7 +1,7 @@
 import createMiddleware from 'next-intl/middleware';
 import { routing } from './i18n/routing';
 import { NextRequest, NextResponse } from 'next/server';
-import { API_ROUTES, PROTECTED_ROUTES, PUBLIC_ROUTES, ROUTES } from './lib/constants';
+import { PROTECTED_ROUTES, PUBLIC_ROUTES, ROUTES } from './lib/constants';
 import { getAuthFromRequest } from './lib/auth/middleware';
 import { AUTH_COOKIE_NAME } from './lib/auth/cookies';
 import { match } from 'path-to-regexp';
@@ -10,13 +10,6 @@ const nextIntlMiddleware = createMiddleware(routing);
 
 function isPublicRoute(pathname: string): boolean {
     return PUBLIC_ROUTES.some((route) => {
-        const matcher = match(route);
-        return pathname === route || !!matcher(pathname);
-    });
-}
-
-function isAPIRoute(pathname: string): boolean {
-    return API_ROUTES.some((route) => {
         const matcher = match(route);
         return pathname === route || !!matcher(pathname);
     });
@@ -38,11 +31,6 @@ export default async function middleware(req: NextRequest) {
     const maybeLocale = segments[0];
     const hasLocale = routing.locales.includes(maybeLocale as any);
     const pathname = hasLocale ? `/${segments.slice(1).join('/')}` : originalPathname;
-
-    // Allow API routes without intl
-    if (isAPIRoute(pathname)) {
-        return NextResponse.next();
-    }
 
     // Allow public routes
     if (isPublicRoute(pathname)) {

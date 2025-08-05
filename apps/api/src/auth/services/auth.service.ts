@@ -19,6 +19,7 @@ import { User } from '@packages/agent/entities';
 import { JwtPayload, TokenResponse } from '../types/jwt.types';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { UserCreatedEvent, UserForgotPasswordEvent } from '../../events';
+import { ForgotPasswordDto } from '../dto/email-verification.dto';
 
 @Injectable()
 export class AuthService {
@@ -64,7 +65,7 @@ export class AuthService {
     }
 
     async register(registerDto: RegisterDto) {
-        const { username, email, password, email_verification_callback_url } = registerDto;
+        const { username, email, password, emailverificationcallbackurl } = registerDto;
 
         const existingUser = await this.userRepository.findByEmail(email);
         if (existingUser) {
@@ -87,7 +88,7 @@ export class AuthService {
             isActive: true,
         });
 
-        this.sendVerificationEmail(user.id, email_verification_callback_url);
+        this.sendVerificationEmail(user.id, emailverificationcallbackurl);
 
         const { password: _, ...userWithoutPassword } = user;
         return this.generateTokens(userWithoutPassword);
@@ -385,7 +386,7 @@ export class AuthService {
         if (callbackUrl && !callbackUrl.includes('token=')) {
             callbackUrl += `?token=${verificationToken}`;
         } else {
-            callbackUrl = `${this.webAppUrl}/auth/verify-email?token=${verificationToken}`;
+            callbackUrl = `${this.webAppUrl}/api/auth/verify-email?token=${verificationToken}`;
         }
 
         // Emit event to send verification email
@@ -433,8 +434,8 @@ export class AuthService {
         return this.generateTokens(userWithoutPassword);
     }
 
-    async forgotPassword(email: string) {
-        const user = await this.userRepository.findByEmail(email);
+    async forgotPassword(forgotPasswordDto: ForgotPasswordDto) {
+        const user = await this.userRepository.findByEmail(forgotPasswordDto.email);
         if (!user) {
             // Don't reveal if email exists
             return { message: 'If the email exists, a reset link has been sent' };
@@ -449,10 +450,17 @@ export class AuthService {
             passwordResetExpires: expires,
         });
 
+        let callbackUrl = forgotPasswordDto.resetPasswordCallbackUrl;
+        if (callbackUrl && !callbackUrl.includes('token=')) {
+            callbackUrl += `?token=${resetToken}`;
+        } else {
+            callbackUrl = `${this.webAppUrl}/api/auth/reset-password?token=${resetToken}`;
+        }
+
         // Emit event to send reset email
         this.eventEmitter.emit(
             UserForgotPasswordEvent.EVENT_NAME,
-            new UserForgotPasswordEvent(user, resetToken, '1 hour'),
+            new UserForgotPasswordEvent(user, resetToken, callbackUrl, '1 hour'),
         );
 
         return {

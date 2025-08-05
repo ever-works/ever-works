@@ -37,8 +37,7 @@ export class MailService {
      */
     @OnEvent(UserForgotPasswordEvent.EVENT_NAME)
     async sendForgotPassword(data: UserForgotPasswordEvent): Promise<void> {
-        const resetUrl =
-            data.resetUrl || `${this.webAppUrl}/reset-password?token=${data.resetToken}`;
+        const resetUrl = data.resetUrl;
 
         await this.mailerService.sendMail({
             to: data.user.email,

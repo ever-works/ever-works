@@ -22,8 +22,8 @@ export class UserForgotPasswordEvent extends BaseUserEvent {
     constructor(
         public user: User,
         public resetToken: string,
+        public resetUrl: string,
         public expiresIn?: string, // e.g. '1 hour'
-        public resetUrl?: string,
     ) {
         super();
     }

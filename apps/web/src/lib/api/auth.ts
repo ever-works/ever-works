@@ -6,7 +6,7 @@ export interface RegisterDto {
     username: string;
     email: string;
     password: string;
-    email_verification_callback_url?: string;
+    emailverificationcallbackurl?: string;
 }
 
 export interface LoginDto {
@@ -35,6 +35,7 @@ export interface VerifyEmailDto {
 
 export interface ForgotPasswordDto {
     email: string;
+    resetPasswordCallbackUrl?: string;
 }
 
 export interface ResetPasswordDto {

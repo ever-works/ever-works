@@ -20,7 +20,7 @@ export class RegisterDto {
 
     @IsString()
     @IsOptional()
-    email_verification_callback_url?: string;
+    emailverificationcallbackurl?: string;
 }
 
 export class LoginDto {
