@@ -1,10 +1,16 @@
+// i18n
 export const LOCALES = ['en', 'de'] as const;
 
 export const DEFAULT_LOCALE = 'en';
 
+// API URL
 const apiUrl = process.env.API_URL || 'http://localhost:3100';
 export const API_URL = apiUrl.endsWith('/api') ? apiUrl : `${apiUrl}/api`;
 
+// App URL
+export const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+
+// ROUTES
 export const ROUTES = {
     HOME: '/',
     DIRECTORIES: '/directories',
@@ -17,6 +23,13 @@ export const ROUTES = {
     AUTH_EMAIL_CONFIRMATION: '/email-confirmation',
     AUTH_RESET_PASSWORD: '/reset-password',
 } as const;
+
+export const routeWithParams = (route: string, params: Record<string, string>) => {
+    Object.entries(params).forEach(([key, value]) => {
+        route = route.replace(`:${key}`, value);
+    });
+    return route;
+};
 
 export const API_ROUTES = [ROUTES.AUTH_CALLBACK] as const;
 

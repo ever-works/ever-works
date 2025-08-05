@@ -1,6 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getAuthCookie } from '@/lib/auth/cookies';
-import { handleServerError } from '@/lib/api/server-api';
+import { redirect } from '@/i18n/navigation';
+import { authAPI, AuthResponse } from '@/lib/api';
+import { getOAuthState, setAuthCookie, setRefreshCookie } from '@/lib/auth';
+import { ROUTES } from '@/lib/constants';
+import { getLocale } from 'next-intl/server';
+import { NextRequest } from 'next/server';
+
+// For oAuth connection check file:
+// Check apps/web/src/app/actions/auth.ts
 
 export async function GET(
     request: NextRequest,
@@ -8,7 +14,61 @@ export async function GET(
 ) {
     const { provider } = await params;
 
-    const queryParams = request.nextUrl.searchParams.toString();
+    const queryParams = request.nextUrl.searchParams;
+    const code = queryParams.get('code');
+    const state = queryParams.get('state');
 
-    return NextResponse.json({ provider, queryParams });
+    const locale = await getLocale();
+
+    try {
+        if (!code) {
+            return redirect({
+                locale,
+                href: ROUTES.AUTH_ERROR + '?error=oauth_missing_code',
+            });
+        }
+
+        const storedState = await getOAuthState();
+        if (state !== storedState) {
+            return redirect({
+                locale,
+                href: ROUTES.AUTH_ERROR + '?error=oauth_invalid_state',
+            });
+        }
+
+        let authReponse: AuthResponse;
+        switch (provider) {
+            case 'github': {
+                const response = await authAPI.connectGitHubCallback(code, state || undefined);
+                authReponse = response;
+                break;
+            }
+            case 'google': {
+                const response = await authAPI.connectGoogleCallback(code, state || undefined);
+                authReponse = response;
+                break;
+            }
+            default:
+                redirect({
+                    locale,
+                    href: ROUTES.AUTH_ERROR + '?error=oauth_unsupported_provider',
+                });
+                return;
+        }
+
+        await Promise.all([
+            setAuthCookie(authReponse.access_token),
+            setRefreshCookie(authReponse.refresh_token),
+        ]);
+
+        return redirect({
+            locale,
+            href: ROUTES.HOME,
+        });
+    } catch (error) {
+        return redirect({
+            locale,
+            href: ROUTES.AUTH_ERROR + '?error=oauth_callback',
+        });
+    }
 }

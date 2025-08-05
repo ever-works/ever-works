@@ -3,17 +3,19 @@
 import { z } from 'zod';
 import {
     setAuthCookie,
-    removeAuthCookie,
     setRefreshCookie,
     removeAuthCookies,
     getRefreshCookie,
+    setOAuthState,
+    getOAuthState,
 } from '@/lib/auth/cookies';
-import { revalidatePath } from 'next/cache';
-import { API_URL, ROUTES } from '@/lib/constants';
+import crypto from 'crypto';
+import { APP_URL, ROUTES, routeWithParams } from '@/lib/constants';
 import { VALIDATION_RULES } from './validation';
-import { authAPI } from '@/lib/api';
+import { authAPI, AuthResponse } from '@/lib/api';
 import { redirect } from '@/i18n/navigation';
 import { getLocale } from 'next-intl/server';
+import { cookies } from 'next/headers';
 
 export async function login(identifier: string, password: string) {
     // Validation schemas
@@ -102,7 +104,7 @@ export async function register(username: string, email: string, password: string
         };
     } catch (error) {
         console.error(error);
-        throw new Error(error instanceof Error ? error.message : "Échec de l'inscription");
+        throw new Error(error instanceof Error ? error.message : 'Failed to register');
     }
 }
 
@@ -123,4 +125,48 @@ export async function logout() {
         locale: await getLocale(),
         href: ROUTES.AUTH_LOGIN,
     });
+
+    return {
+        success: true,
+    };
 }
+
+// =================
+// OAuth
+// =================
+
+export async function connectProvider(provider: string) {
+    try {
+        const state = crypto.randomBytes(16).toString('hex');
+        await setOAuthState(state);
+
+        const callbackUrl = routeWithParams(ROUTES.AUTH_CALLBACK, { provider });
+
+        switch (provider) {
+            case 'github': {
+                const { url } = await authAPI.getGitHubAuthUrl(APP_URL + callbackUrl, state);
+                redirect({
+                    locale: await getLocale(),
+                    href: url,
+                });
+                break;
+            }
+            case 'google': {
+                const { url } = await authAPI.getGoogleAuthUrl(APP_URL + callbackUrl, state);
+                redirect({
+                    locale: await getLocale(),
+                    href: url,
+                });
+                break;
+            }
+            default:
+                throw new Error('Unsupported provider');
+        }
+    } catch (error) {
+        console.error(error);
+        throw new Error(error instanceof Error ? error.message : 'Failed to connect provider');
+    }
+}
+
+// For oAuth connection check file:
+// Check apps/web/src/app/auth/[provider]/callback/route.ts

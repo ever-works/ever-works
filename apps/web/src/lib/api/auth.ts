@@ -159,6 +159,20 @@ export const authAPI = {
         return serverFetch<OAuthUrlResponse>(`/auth/google/url${query}`);
     },
 
+    connectGoogleCallback: async (code: string, state?: string) => {
+        const params = new URLSearchParams({ code });
+        if (state) params.append('state', state);
+
+        return serverFetch<AuthResponse>(`/auth/google/callback?${params.toString()}`);
+    },
+
+    connectGitHubCallback: async (code: string, state?: string) => {
+        const params = new URLSearchParams({ code });
+        if (state) params.append('state', state);
+
+        return serverFetch<AuthResponse>(`/auth/github/callback?${params.toString()}`);
+    },
+
     // Email Verification
     sendVerification: async () => {
         return serverMutation<MessageResponse>({
@@ -197,7 +211,7 @@ export const authAPI = {
     },
 
     // OAuth Connections
-    connections: {
+    oauth_connections: {
         getAll: async () => {
             return serverFetch<OAuthConnectionResponse[]>('/auth/connections');
         },

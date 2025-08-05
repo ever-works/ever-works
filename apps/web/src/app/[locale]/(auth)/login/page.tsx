@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react';
 import Link from 'next/link';
 import { AuthLayout } from '@/components/layout/AuthLayout';
 import { useTranslations } from 'next-intl';
-import { login } from '@/app/actions/auth';
+import { login as loginAction } from '@/app/actions/auth';
 import { SocialLoginButtons } from '@/components/auth/social-login';
 
 export default function LoginPage() {
@@ -24,7 +24,7 @@ export default function LoginPage() {
 
         startTransition(async () => {
             try {
-                await login(formData.email, formData.password);
+                await loginAction(formData.email, formData.password);
             } catch (err) {
                 console.error(err);
                 setError(t('errors.invalidCredentials'));
