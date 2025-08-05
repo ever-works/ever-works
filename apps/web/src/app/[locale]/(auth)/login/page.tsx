@@ -25,11 +25,10 @@ export default function LoginPage() {
         setError('');
 
         startTransition(async () => {
-            try {
-                await loginAction(formData.email, formData.password);
-            } catch (err) {
-                console.error(err);
-                setError(t('errors.invalidCredentials'));
+            const response = await loginAction(formData.email, formData.password);
+            if (!response.success) {
+                setError(response.error || t('errors.invalidCredentials'));
+                return;
             }
         });
     };

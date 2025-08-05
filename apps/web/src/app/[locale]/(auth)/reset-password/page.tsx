@@ -92,13 +92,10 @@ function ResetPasswordContent() {
         }
 
         startTransition(async () => {
-            try {
-                await resetPasswordAction(token!, formData.password);
-                setSuccess(true);
-            } catch (err) {
-                console.error(err);
-                // The server action already validates the password, so show the error message
-                setErrors({ general: err instanceof Error ? err.message : t('errors.failed') });
+            const response = await resetPasswordAction(token!, formData.password);
+            if (!response.success) {
+                setErrors({ general: response.error || t('errors.failed') });
+                return;
             }
         });
     };

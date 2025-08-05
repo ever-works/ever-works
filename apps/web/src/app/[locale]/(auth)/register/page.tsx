@@ -37,18 +37,14 @@ export default function RegisterPage() {
             return;
         }
 
-        try {
-            startTransition(async () => {
-                try {
-                    await registerAction(formData.name, formData.email, formData.password);
-                } catch (err) {
-                    console.error(err);
-                    setError(t('errors.generic'));
-                }
-            });
-        } catch (err) {
-            setError(t('errors.generic'));
-        }
+        startTransition(async () => {
+            const response = await registerAction(formData.name, formData.email, formData.password);
+
+            if (!response.success) {
+                setError(response.error || t('errors.generic'));
+                return;
+            }
+        });
     };
 
     return (

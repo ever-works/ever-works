@@ -27,7 +27,10 @@ export async function login(identifier: string, password: string) {
     // Validate input
     const validation = loginSchema.safeParse({ email: identifier, password });
     if (!validation.success) {
-        throw new Error(validation.error.errors[0].message);
+        return {
+            success: false,
+            error: validation.error.errors[0].message,
+        };
     }
 
     try {
@@ -52,8 +55,11 @@ export async function login(identifier: string, password: string) {
         };
     } catch (error) {
         console.error(error);
-        const errorT = await getTranslations('api.errors');
-        throw new Error(error instanceof Error ? error.message : errorT('loginFailed'));
+
+        return {
+            success: false,
+            error: t('invalidCredentials'),
+        };
     }
 }
 
@@ -79,7 +85,10 @@ export async function register(username: string, email: string, password: string
     // Validate input
     const validation = registerSchema.safeParse({ username, email, password });
     if (!validation.success) {
-        throw new Error(validation.error.errors[0].message);
+        return {
+            success: false,
+            error: validation.error.errors[0].message,
+        };
     }
 
     try {
@@ -105,9 +114,21 @@ export async function register(username: string, email: string, password: string
             user: response.user,
         };
     } catch (error) {
-        console.error(error);
         const errorT = await getTranslations('api.errors');
-        throw new Error(error instanceof Error ? error.message : errorT('registerFailed'));
+        let message = errorT('registerFailed');
+
+        if (error instanceof Error) {
+            if (error.message.includes('exists')) {
+                message = t('email.emailAlreadyRegistered');
+            } else {
+                message = error.message;
+            }
+        }
+
+        return {
+            success: false,
+            error: message,
+        };
     }
 }
 
@@ -120,8 +141,11 @@ export async function logout() {
         promises.push(authAPI.logout({ refreshToken: refresh_token }));
     }
 
-    // Remove the auth cookie
-    await Promise.all(promises);
+    try {
+        await Promise.all(promises);
+    } catch (error) {
+        console.error(error);
+    }
 
     // Redirect to home page
     redirect({
@@ -166,10 +190,18 @@ export async function connectProvider(provider: string) {
                 const t = await getTranslations('api.errors');
                 throw new Error(t('unsupportedProvider'));
         }
+
+        return {
+            success: true,
+        };
     } catch (error) {
         console.error(error);
         const t = await getTranslations('api.errors');
-        throw new Error(error instanceof Error ? error.message : t('providerConnectFailed'));
+
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : t('providerConnectFailed'),
+        };
     }
 }
 
@@ -179,21 +211,24 @@ export async function connectProvider(provider: string) {
 
 export async function forgotPassword(email: string) {
     const t = await getTranslations('validation.auth');
-    
+
     // Validation
     const emailSchema = z.string().email(t('email.invalid'));
-    
+
     const validation = emailSchema.safeParse(email);
     if (!validation.success) {
-        throw new Error(validation.error.errors[0].message);
+        return {
+            success: false,
+            error: validation.error.errors[0].message,
+        };
     }
-    
+
     try {
         await authAPI.forgotPassword({
             email: validation.data,
             resetPasswordCallbackUrl: withAppUrl(ROUTES.API_AUTH_RESET_PASSWORD),
         });
-        
+
         return {
             success: true,
             message: 'Password reset instructions sent to your email',
@@ -201,13 +236,17 @@ export async function forgotPassword(email: string) {
     } catch (error) {
         console.error(error);
         const errorT = await getTranslations('api.errors');
-        throw new Error(error instanceof Error ? error.message : errorT('forgotPasswordFailed'));
+
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : errorT('forgotPasswordFailed'),
+        };
     }
 }
 
 export async function resetPassword(token: string, newPassword: string) {
     const t = await getTranslations('validation.auth');
-    
+
     // Validation
     const resetSchema = z.object({
         token: z.string().min(1, 'Token is required'),
@@ -218,18 +257,21 @@ export async function resetPassword(token: string, newPassword: string) {
             .regex(/(\d|\W)/, t('password.numberOrSpecial'))
             .regex(/^[^.\n]/, t('password.cannotStartWith')),
     });
-    
+
     const validation = resetSchema.safeParse({ token, password: newPassword });
     if (!validation.success) {
-        throw new Error(validation.error.errors[0].message);
+        return {
+            success: false,
+            error: validation.error.errors[0].message,
+        };
     }
-    
+
     try {
         await authAPI.resetPassword({
             token: validation.data.token,
             newPassword: validation.data.password,
         });
-        
+
         return {
             success: true,
             message: 'Password reset successful',
@@ -237,7 +279,11 @@ export async function resetPassword(token: string, newPassword: string) {
     } catch (error) {
         console.error(error);
         const errorT = await getTranslations('api.errors');
-        throw new Error(error instanceof Error ? error.message : errorT('resetPasswordFailed'));
+
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : errorT('resetPasswordFailed'),
+        };
     }
 }
 

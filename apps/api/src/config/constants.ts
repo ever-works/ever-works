@@ -28,12 +28,14 @@ export enum AuthProviders {
 }
 
 export const config = {
+    debug: () => process.env.DEBUG === 'true',
+
     webAppUrl: () => process.env.WEB_APP_URL || 'http://localhost:3000',
 
     mail: {
-        provider: (): 'smtp' | null => {
+        provider: (): 'smtp' | 'faker' => {
             const provider = process.env.MAILER_PROVIDER;
-            return !provider || provider === 'none' ? null : 'smtp';
+            return !provider || provider === 'none' ? 'faker' : 'smtp';
         },
         from: () => process.env.EMAIL_FROM || 'Ever Works <no-reply@ever.works>',
         smtpHost: () => process.env.SMTP_HOST || '127.0.0.1',

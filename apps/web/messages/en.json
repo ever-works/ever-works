@@ -1,260 +1,262 @@
 {
-  "auth": {
-    "error": {
-      "title": "Authentication Error",
-      "subtitle": "We encountered an issue with your authentication",
-      "errorOccurred": "An error occurred",
-      "somethingWentWrong": "Something went wrong",
-      "generic": "An unexpected error occurred. Please try again later.",
-      "invalidCredentials": "The email or password you entered is incorrect.",
-      "emailNotVerified": "Please verify your email address before signing in.",
-      "accountLocked": "Your account has been locked for security reasons.",
-      "sessionExpired": "Your session has expired. Please sign in again.",
-      "networkError": "Unable to connect. Please check your internet connection.",
-      "oauth": {
-        "missingCode": "Authorization code is missing. Please try signing in again.",
-        "invalidState": "Invalid authorization state. Please try signing in again.",
-        "unsupportedProvider": "This authentication provider is not supported.",
-        "callbackFailed": "Failed to complete authentication. Please try again."
-      },
-      "resetPassword": {
-        "missingToken": "Reset password link is invalid. Missing verification token.",
-        "invalidToken": "Reset password link is invalid or has been tampered with.",
-        "expiredToken": "Reset password link has expired. Please request a new one.",
-        "failed": "Failed to reset password. Please try again or request a new reset link."
-      },
-      "verifyEmail": {
-        "missingToken": "Email verification link is invalid. Missing verification token.",
-        "invalidToken": "Email verification link is invalid or has already been used.",
-        "expiredToken": "Email verification link has expired. Please request a new one.",
-        "failed": "Failed to verify email. Please try again or request a new verification link."
-      },
-      "actions": {
-        "backToLogin": "Back to Login",
-        "tryRegister": "Try Registering",
-        "resendVerification": "Resend Verification Email",
-        "contactSupport": "Contact Support",
-        "requestNewReset": "Request New Reset Link"
-      },
-      "helpText": "If you continue to experience issues, please check our help resources below.",
-      "links": {
-        "help": "Help Center",
-        "systemStatus": "System Status"
-      }
-    },
-    "login": {
-      "title": "Welcome back",
-      "subtitle": "Sign in to your account to continue",
-      "form": {
-        "email": {
-          "label": "Email address",
-          "placeholder": "you@example.com"
-        },
-        "password": {
-          "label": "Password",
-          "placeholder": "Enter your password"
-        },
-        "forgotPassword": "Forgot password?",
-        "rememberMe": "Remember me for 30 days",
-        "submit": "Sign in",
-        "submitting": "Signing in..."
-      },
-      "socialLogin": {
-        "divider": "Or continue with",
-        "google": "Google",
-        "github": "GitHub"
-      },
-      "signUp": {
-        "text": "Don't have an account?",
-        "link": "Sign up"
-      },
-      "errors": {
-        "invalidCredentials": "Invalid email or password"
-      }
-    },
-    "forgotPassword": {
-      "title": "Forgot your password?",
-      "subtitle": "No worries, we'll send you reset instructions",
-      "successTitle": "Check your email",
-      "successSubtitle": "We've sent you password reset instructions",
-      "form": {
-        "email": {
-          "label": "Email address",
-          "placeholder": "Enter your email"
-        },
-        "submit": "Send Reset Link",
-        "submitting": "Sending..."
-      },
-      "success": {
-        "title": "Email sent successfully",
-        "message": "We've sent password reset instructions to {email}",
-        "checkSpam": "If you don't see the email, check your spam folder."
-      },
-      "errors": {
-        "failed": "Failed to send reset email. Please try again."
-      },
-      "backToLogin": "Back to login",
-      "noAccount": {
-        "text": "Don't have an account?",
-        "link": "Sign up"
-      }
-    },
-    "resetPassword": {
-      "title": "Reset your password",
-      "subtitle": "Enter your new password below",
-      "successTitle": "Password reset successful",
-      "successSubtitle": "Your password has been updated",
-      "form": {
-        "password": {
-          "label": "New password",
-          "placeholder": "Enter your new password",
-          "helperText": "Must be at least 6 characters with lowercase and number/special character",
-          "errors": {
-            "minLength": "Password must be at least 6 characters",
-            "lowercase": "Password must contain at least one lowercase letter",
-            "numberOrSpecial": "Password must contain at least one number or special character",
-            "cannotStartWith": "Password cannot start with a dot or newline"
-          }
-        },
-        "confirmPassword": {
-          "label": "Confirm new password",
-          "placeholder": "Confirm your new password",
-          "errors": {
-            "noMatch": "Passwords do not match"
-          }
-        },
-        "submit": "Reset Password",
-        "submitting": "Resetting..."
-      },
-      "success": {
-        "title": "Password reset successful",
-        "message": "Your password has been successfully updated. You can now login with your new password.",
-        "loginButton": "Go to Login"
-      },
-      "errors": {
-        "failed": "Failed to reset password. Please try again or request a new reset link.",
-        "noToken": "Invalid reset link",
-        "invalidLink": "Invalid Reset Link",
-        "missingTokenMessage": "The password reset link is invalid or incomplete. Please request a new password reset.",
-        "requestNewLink": "Request New Reset Link"
-      },
-      "backToLogin": "Back to login"
-    },
-    "register": {
-      "title": "Create your account",
-      "subtitle": "Start building amazing directories today",
-      "form": {
-        "name": {
-          "label": "Full name",
-          "placeholder": "John Doe"
-        },
-        "email": {
-          "label": "Email address",
-          "placeholder": "you@example.com"
-        },
-        "password": {
-          "label": "Password",
-          "placeholder": "Create a strong password",
-          "hint": "Must be at least 8 characters"
-        },
-        "confirmPassword": {
-          "label": "Confirm password",
-          "placeholder": "Confirm your password"
-        },
-        "terms": {
-          "text": "I agree to the",
-          "termsLink": "Terms of Service",
-          "and": "and",
-          "privacyLink": "Privacy Policy"
-        },
-        "submit": "Create account",
-        "submitting": "Creating account..."
-      },
-      "socialSignUp": {
-        "divider": "Or sign up with",
-        "google": "Google",
-        "github": "GitHub"
-      },
-      "signIn": {
-        "text": "Already have an account?",
-        "link": "Sign in"
-      },
-      "errors": {
-        "passwordsDoNotMatch": "Passwords do not match",
-        "passwordTooShort": "Password must be at least 8 characters",
-        "generic": "An error occurred. Please try again."
-      }
-    }
-  },
-  "dashboard": {
-    "title": "Dashboard"
-  },
-  "layout": {
     "auth": {
-      "backToHome": "Back to home",
-      "feature": {
-        "title": "Build Directories with AI",
-        "subtitle": "Create beautiful, searchable directories in minutes using natural language. No coding required.",
-        "benefits": {
-          "ai": {
-            "title": "AI-Powered Creation",
-            "description": "Describe what you want and let AI do the work"
-          },
-          "templates": {
-            "title": "Professional Templates",
-            "description": "Start with beautiful, customizable designs"
-          },
-          "management": {
-            "title": "Easy Management",
-            "description": "Update and organize your content effortlessly"
-          }
+        "error": {
+            "title": "Authentication Error",
+            "subtitle": "We encountered an issue with your authentication",
+            "errorOccurred": "An error occurred",
+            "somethingWentWrong": "Something went wrong",
+            "generic": "An unexpected error occurred. Please try again later.",
+            "invalidCredentials": "The email or password you entered is incorrect.",
+            "emailNotVerified": "Please verify your email address before signing in.",
+            "accountLocked": "Your account has been locked for security reasons.",
+            "sessionExpired": "Your session has expired. Please sign in again.",
+            "networkError": "Unable to connect. Please check your internet connection.",
+            "oauth": {
+                "missingCode": "Authorization code is missing. Please try signing in again.",
+                "invalidState": "Invalid authorization state. Please try signing in again.",
+                "unsupportedProvider": "This authentication provider is not supported.",
+                "callbackFailed": "Failed to complete authentication. Please try again."
+            },
+            "resetPassword": {
+                "missingToken": "Reset password link is invalid. Missing verification token.",
+                "invalidToken": "Reset password link is invalid or has been tampered with.",
+                "expiredToken": "Reset password link has expired. Please request a new one.",
+                "failed": "Failed to reset password. Please try again or request a new reset link."
+            },
+            "verifyEmail": {
+                "missingToken": "Email verification link is invalid. Missing verification token.",
+                "invalidToken": "Email verification link is invalid or has already been used.",
+                "expiredToken": "Email verification link has expired. Please request a new one.",
+                "failed": "Failed to verify email. Please try again or request a new verification link."
+            },
+            "actions": {
+                "backToLogin": "Back to Login",
+                "tryRegister": "Try Registering",
+                "resendVerification": "Resend Verification Email",
+                "contactSupport": "Contact Support",
+                "requestNewReset": "Request New Reset Link"
+            },
+            "helpText": "If you continue to experience issues, please check our help resources below.",
+            "links": {
+                "help": "Help Center",
+                "systemStatus": "System Status"
+            }
+        },
+        "login": {
+            "title": "Welcome back",
+            "subtitle": "Sign in to your account to continue",
+            "form": {
+                "email": {
+                    "label": "Email address",
+                    "placeholder": "you@example.com"
+                },
+                "password": {
+                    "label": "Password",
+                    "placeholder": "Enter your password"
+                },
+                "forgotPassword": "Forgot password?",
+                "rememberMe": "Remember me for 30 days",
+                "submit": "Sign in",
+                "submitting": "Signing in..."
+            },
+            "socialLogin": {
+                "divider": "Or continue with",
+                "google": "Google",
+                "github": "GitHub"
+            },
+            "signUp": {
+                "text": "Don't have an account?",
+                "link": "Sign up"
+            },
+            "errors": {
+                "invalidCredentials": "Invalid email or password"
+            }
+        },
+        "forgotPassword": {
+            "title": "Forgot your password?",
+            "subtitle": "No worries, we'll send you reset instructions",
+            "successTitle": "Check your email",
+            "successSubtitle": "We've sent you password reset instructions",
+            "form": {
+                "email": {
+                    "label": "Email address",
+                    "placeholder": "Enter your email"
+                },
+                "submit": "Send Reset Link",
+                "submitting": "Sending..."
+            },
+            "success": {
+                "title": "Email sent successfully",
+                "message": "We've sent password reset instructions to {email}",
+                "checkSpam": "If you don't see the email, check your spam folder."
+            },
+            "errors": {
+                "failed": "Failed to send reset email. Please try again."
+            },
+            "backToLogin": "Back to login",
+            "noAccount": {
+                "text": "Don't have an account?",
+                "link": "Sign up"
+            }
+        },
+        "resetPassword": {
+            "title": "Reset your password",
+            "subtitle": "Enter your new password below",
+            "successTitle": "Password reset successful",
+            "successSubtitle": "Your password has been updated",
+            "form": {
+                "password": {
+                    "label": "New password",
+                    "placeholder": "Enter your new password",
+                    "helperText": "Must be at least 6 characters with lowercase and number/special character",
+                    "errors": {
+                        "minLength": "Password must be at least 6 characters",
+                        "lowercase": "Password must contain at least one lowercase letter",
+                        "numberOrSpecial": "Password must contain at least one number or special character",
+                        "cannotStartWith": "Password cannot start with a dot or newline"
+                    }
+                },
+                "confirmPassword": {
+                    "label": "Confirm new password",
+                    "placeholder": "Confirm your new password",
+                    "errors": {
+                        "noMatch": "Passwords do not match"
+                    }
+                },
+                "submit": "Reset Password",
+                "submitting": "Resetting..."
+            },
+            "success": {
+                "title": "Password reset successful",
+                "message": "Your password has been successfully updated. You can now login with your new password.",
+                "loginButton": "Go to Login"
+            },
+            "errors": {
+                "failed": "Failed to reset password. Please try again or request a new reset link.",
+                "noToken": "Invalid reset link",
+                "invalidLink": "Invalid Reset Link",
+                "missingTokenMessage": "The password reset link is invalid or incomplete. Please request a new password reset.",
+                "requestNewLink": "Request New Reset Link"
+            },
+            "backToLogin": "Back to login"
+        },
+        "register": {
+            "title": "Create your account",
+            "subtitle": "Start building amazing directories today",
+            "form": {
+                "name": {
+                    "label": "Full name",
+                    "placeholder": "John Doe"
+                },
+                "email": {
+                    "label": "Email address",
+                    "placeholder": "you@example.com"
+                },
+                "password": {
+                    "label": "Password",
+                    "placeholder": "Create a strong password",
+                    "hint": "Must be at least 8 characters"
+                },
+                "confirmPassword": {
+                    "label": "Confirm password",
+                    "placeholder": "Confirm your password"
+                },
+                "terms": {
+                    "text": "I agree to the",
+                    "termsLink": "Terms of Service",
+                    "and": "and",
+                    "privacyLink": "Privacy Policy"
+                },
+                "submit": "Create account",
+                "submitting": "Creating account..."
+            },
+            "socialSignUp": {
+                "divider": "Or sign up with",
+                "google": "Google",
+                "github": "GitHub"
+            },
+            "signIn": {
+                "text": "Already have an account?",
+                "link": "Sign in"
+            },
+            "errors": {
+                "passwordsDoNotMatch": "Passwords do not match",
+                "passwordTooShort": "Password must be at least 8 characters",
+                "generic": "An error occurred. Please try again."
+            }
         }
-      }
-    }
-  },
-  "errors": {
-    "global": {
-      "title": "Something went wrong!",
-      "tryAgain": "Try again"
-    }
-  },
-  "metadata": {
-    "title": "Ever Works - Directory Builder",
-    "description": "A SaaS platform for building and managing directories"
-  },
-  "api": {
+    },
+    "dashboard": {
+        "title": "Dashboard"
+    },
+    "layout": {
+        "auth": {
+            "backToHome": "Back to home",
+            "feature": {
+                "title": "Build Directories with AI",
+                "subtitle": "Create beautiful, searchable directories in minutes using natural language. No coding required.",
+                "benefits": {
+                    "ai": {
+                        "title": "AI-Powered Creation",
+                        "description": "Describe what you want and let AI do the work"
+                    },
+                    "templates": {
+                        "title": "Professional Templates",
+                        "description": "Start with beautiful, customizable designs"
+                    },
+                    "management": {
+                        "title": "Easy Management",
+                        "description": "Update and organize your content effortlessly"
+                    }
+                }
+            }
+        }
+    },
     "errors": {
-      "unauthorized": "You are not authorized to perform this action",
-      "unauthorizedLogin": "Unauthorized: Please log in again.",
-      "forbidden": "Forbidden: You do not have permission to perform this action.",
-      "serverError": "Server error: {message}",
-      "unexpected": "Unexpected server error occurred.",
-      "apiError": "API Error: {status} {statusText}",
-      "loginFailed": "Login failed",
-      "registerFailed": "Failed to register",
-      "unsupportedProvider": "Unsupported provider",
-      "providerConnectFailed": "Failed to connect provider",
-      "forgotPasswordFailed": "Failed to send password reset email",
-      "resetPasswordFailed": "Failed to reset password"
+        "global": {
+            "title": "Something went wrong!",
+            "tryAgain": "Try again"
+        }
+    },
+    "metadata": {
+        "title": "Ever Works - Directory Builder",
+        "description": "A SaaS platform for building and managing directories"
+    },
+    "api": {
+        "errors": {
+            "unauthorized": "You are not authorized to perform this action",
+            "unauthorizedLogin": "Unauthorized: Please log in again.",
+            "forbidden": "Forbidden: You do not have permission to perform this action.",
+            "serverError": "Server error: {message}",
+            "unexpected": "Unexpected server error occurred.",
+            "apiError": "API Error: {status} {statusText}",
+            "loginFailed": "Login failed",
+            "registerFailed": "Failed to register",
+            "unsupportedProvider": "Unsupported provider",
+            "providerConnectFailed": "Failed to connect provider",
+            "forgotPasswordFailed": "Failed to send password reset email",
+            "resetPasswordFailed": "Failed to reset password"
+        }
+    },
+    "validation": {
+        "auth": {
+            "invalidCredentials": "Invalid email or password",
+            "email": {
+                "required": "Email cannot be empty",
+                "invalid": "Invalid email",
+                "emailAlreadyRegistered": "Email is already registered"
+            },
+            "password": {
+                "required": "Password cannot be empty",
+                "minLength": "Password must be at least {length} characters",
+                "lowercase": "Password must contain at least one lowercase letter",
+                "numberOrSpecial": "Password must contain at least one number or special character",
+                "cannotStartWith": "Password cannot start with a dot or newline",
+                "digit": "Password must contain at least one digit"
+            },
+            "username": {
+                "minLength": "Username must contain at least {length} characters"
+            }
+        }
     }
-  },
-  "validation": {
-    "auth": {
-      "email": {
-        "required": "Email cannot be empty",
-        "invalid": "Invalid email"
-      },
-      "password": {
-        "required": "Password cannot be empty",
-        "minLength": "Password must be at least {length} characters",
-        "lowercase": "Password must contain at least one lowercase letter",
-        "numberOrSpecial": "Password must contain at least one number or special character",
-        "cannotStartWith": "Password cannot start with a dot or newline",
-        "digit": "Password must contain at least one digit"
-      },
-      "username": {
-        "minLength": "Username must contain at least {length} characters"
-      }
-    }
-  }
 }

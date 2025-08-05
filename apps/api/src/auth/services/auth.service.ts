@@ -72,11 +72,6 @@ export class AuthService {
             throw new ConflictException('User with this email already exists');
         }
 
-        const existingUsername = await this.userRepository.findByUsername(username);
-        if (existingUsername) {
-            throw new ConflictException('Username already taken');
-        }
-
         const hashedPassword = await bcrypt.hash(password, authConstants.bcryptSaltRounds);
 
         const user = await this.userRepository.create({

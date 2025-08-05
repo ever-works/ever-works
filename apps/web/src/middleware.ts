@@ -22,6 +22,12 @@ function isProtectedRoute(pathname: string): boolean {
     });
 }
 
+function redirect(locale: string, to: string, req: NextRequest) {
+    const url = locale ? `/${locale}${to}` : to;
+
+    return NextResponse.redirect(new URL(url, req.url));
+}
+
 export default async function middleware(req: NextRequest) {
     const originalPathname = req.nextUrl.pathname;
 
@@ -55,7 +61,7 @@ export default async function middleware(req: NextRequest) {
             req.cookies.delete(AUTH_COOKIE_NAME);
         }
 
-        return NextResponse.redirect(new URL(`/` + maybeLocale + ROUTES.AUTH_LOGIN, req.url));
+        return redirect(maybeLocale, ROUTES.AUTH_LOGIN, req);
     }
 
     if (auth.isExpired) {
@@ -69,7 +75,7 @@ export default async function middleware(req: NextRequest) {
             req.cookies.delete(AUTH_COOKIE_NAME);
         }
 
-        return NextResponse.redirect(new URL(`/` + maybeLocale + ROUTES.AUTH_LOGIN, req.url));
+        return redirect(maybeLocale, ROUTES.AUTH_LOGIN, req);
     }
 
     return intlResponse;

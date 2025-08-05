@@ -60,43 +60,35 @@ export async function serverFetch<T>(endpoint: string, options: RequestInit = {}
     });
 
     if (!response.ok) {
-        // Handle authentication errors
-        if (response.status === 401) {
-            throw new Error(t('unauthorizedLogin'));
-        }
-
-        // Handle forbidden errors
-        if (response.status === 403) {
-            let errorMessage = t('forbidden');
-
-            try {
-                const errorData = await response.json();
-                if (errorData.error?.message) {
-                    errorMessage = errorData.error.message;
-                } else if (typeof errorData.error === 'string') {
-                    errorMessage = errorData.error;
-                }
-            } catch (e) {
-                // Use default message
-            }
-
-            throw new Error(errorMessage);
-        }
-
-        // Try to get error message from response body
-        let errorMessage = t('apiError', { status: response.status, statusText: response.statusText });
+        let errorMessage: string | null = null;
         try {
             const errorData = await response.json();
             if (errorData.error?.message) {
                 errorMessage = errorData.error.message;
-            } else if (errorData.message) {
-                errorMessage = errorData.message;
+            } else if (typeof errorData.error === 'string') {
+                errorMessage = errorData.error;
             }
         } catch (e) {
-            // If we can't parse the error response, use the default message
+            errorMessage = await response.text().catch(() => null);
+            errorMessage = errorMessage?.trim() || null;
         }
 
-        throw new Error(errorMessage);
+        // Handle authentication errors
+        if (response.status === 401) {
+            throw new Error(errorMessage || t('unauthorizedLogin'));
+        }
+
+        // Handle forbidden errors
+        if (response.status === 403) {
+            throw new Error(errorMessage || t('forbidden'));
+        }
+
+        const apiErro = t('apiError', {
+            status: response.status,
+            statusText: response.statusText,
+        });
+
+        throw new Error(errorMessage || apiErro);
     }
 
     try {

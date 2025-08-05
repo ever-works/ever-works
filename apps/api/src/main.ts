@@ -3,11 +3,15 @@ import { configDotenv } from 'dotenv';
 import { ValidationPipe } from '@nestjs/common';
 import { ApiModule } from './api.module';
 import helmet from 'helmet';
+import { LoggingInterceptor } from './logging.interceptor';
 
 async function bootstrap() {
     configDotenv();
 
     const app = await NestFactory.create(ApiModule);
+
+    // Apply logging interceptor
+    app.useGlobalInterceptors(new LoggingInterceptor());
 
     // Security configurations
     app.use(helmet());

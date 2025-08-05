@@ -20,13 +20,13 @@ export default function ForgotPasswordPage() {
         setError('');
 
         startTransition(async () => {
-            try {
-                await forgotPasswordAction(email);
-                setSuccess(true);
-            } catch (err) {
-                console.error(err);
-                setError(err instanceof Error ? err.message : t('errors.failed'));
+            const response = await forgotPasswordAction(email);
+            if (!response.success) {
+                setError(response.error || t('errors.failed'));
+                return;
             }
+
+            setSuccess(true);
         });
     };
 
