@@ -555,4 +555,46 @@ export class AuthService {
         // Return updated profile
         return this.getUserProfile(userId);
     }
+
+    async validateEmailVerificationToken(token: string) {
+        const user = await this.userRepository.findOne({
+            where: { emailVerificationToken: token },
+        });
+
+        if (!user) {
+            return { valid: false, message: 'Invalid verification token' };
+        }
+
+        if (user.emailVerificationExpires && new Date() > user.emailVerificationExpires) {
+            return { valid: false, message: 'Verification token expired' };
+        }
+
+        return {
+            valid: true,
+            message: 'Token is valid',
+            email: user.email,
+            expiresAt: user.emailVerificationExpires,
+        };
+    }
+
+    async validatePasswordResetToken(token: string) {
+        const user = await this.userRepository.findOne({
+            where: { passwordResetToken: token },
+        });
+
+        if (!user) {
+            return { valid: false, message: 'Invalid reset token' };
+        }
+
+        if (user.passwordResetExpires && new Date() > user.passwordResetExpires) {
+            return { valid: false, message: 'Reset token expired' };
+        }
+
+        return {
+            valid: true,
+            message: 'Token is valid',
+            email: user.email,
+            expiresAt: user.passwordResetExpires,
+        };
+    }
 }

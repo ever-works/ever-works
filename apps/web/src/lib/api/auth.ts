@@ -71,6 +71,13 @@ export interface MessageResponse {
     message: string;
 }
 
+export interface TokenValidationResponse {
+    valid: boolean;
+    message: string;
+    email?: string;
+    expiresAt?: Date;
+}
+
 export const authAPI = {
     // Authentication
     register: async (data: RegisterDto) => {
@@ -211,6 +218,18 @@ export const authAPI = {
             method: 'POST',
             wrapInData: false,
         });
+    },
+
+    validateEmailVerificationToken: async (token: string) => {
+        return serverFetch<TokenValidationResponse>(
+            `/auth/validate-email-token?token=${encodeURIComponent(token)}`,
+        );
+    },
+
+    validatePasswordResetToken: async (token: string) => {
+        return serverFetch<TokenValidationResponse>(
+            `/auth/validate-reset-token?token=${encodeURIComponent(token)}`,
+        );
     },
 
     // OAuth Connections
