@@ -6,6 +6,8 @@ import { AuthLayout } from '@/components/layout/AuthLayout';
 import { useTranslations } from 'next-intl';
 import { SocialLoginButtons } from '@/components/auth/social-login';
 import { register as registerAction } from '@/app/actions/auth';
+import { Input } from '@/components/ui/input';
+import { ROUTES } from '@/lib/constants';
 
 export default function RegisterPage() {
     const t = useTranslations('auth.register');
@@ -58,71 +60,46 @@ export default function RegisterPage() {
                     </div>
                 )}
 
-                <div>
-                    <label htmlFor="name" className="block text-sm font-medium text-text mb-2">
-                        {t('form.name.label')}
-                    </label>
-                    <input
-                        id="name"
-                        type="text"
-                        required
-                        value={formData.name}
-                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                        className="w-full px-4 py-3 bg-surface-secondary border border-border rounded-lg text-text placeholder-text-muted focus:outline-none focus:border-primary transition-colors"
-                        placeholder={t('form.name.placeholder')}
-                    />
-                </div>
+                <Input
+                    type="text"
+                    label={t('form.name.label')}
+                    placeholder={t('form.name.placeholder')}
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    required
+                    disabled={isPending}
+                />
 
-                <div>
-                    <label htmlFor="email" className="block text-sm font-medium text-text mb-2">
-                        {t('form.email.label')}
-                    </label>
-                    <input
-                        id="email"
-                        type="email"
-                        required
-                        value={formData.email}
-                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                        className="w-full px-4 py-3 bg-surface-secondary border border-border rounded-lg text-text placeholder-text-muted focus:outline-none focus:border-primary transition-colors"
-                        placeholder={t('form.email.placeholder')}
-                    />
-                </div>
+                <Input
+                    type="email"
+                    label={t('form.email.label')}
+                    placeholder={t('form.email.placeholder')}
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    required
+                    disabled={isPending}
+                />
 
-                <div>
-                    <label htmlFor="password" className="block text-sm font-medium text-text mb-2">
-                        {t('form.password.label')}
-                    </label>
-                    <input
-                        id="password"
-                        type="password"
-                        required
-                        value={formData.password}
-                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                        className="w-full px-4 py-3 bg-surface-secondary border border-border rounded-lg text-text placeholder-text-muted focus:outline-none focus:border-primary transition-colors"
-                        placeholder={t('form.password.placeholder')}
-                    />
-                    <p className="mt-1 text-xs text-text-muted">{t('form.password.hint')}</p>
-                </div>
+                <Input
+                    type="password"
+                    label={t('form.password.label')}
+                    placeholder={t('form.password.placeholder')}
+                    value={formData.password}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    helperText={t('form.password.hint')}
+                    required
+                    disabled={isPending}
+                />
 
-                <div>
-                    <label
-                        htmlFor="confirmPassword"
-                        className="block text-sm font-medium text-text mb-2"
-                    >
-                        {t('form.confirmPassword.label')}
-                    </label>
-                    <input
-                        id="confirmPassword"
-                        type="password"
-                        required
-                        value={formData.confirmPassword}
-                        onChange={(e) =>
-                            setFormData({ ...formData, confirmPassword: e.target.value })
-                        }
-                        className="w-full px-4 py-3 bg-surface-secondary border border-border rounded-lg text-text placeholder-text-muted focus:outline-none focus:border-primary transition-colors"
-                        placeholder={t('form.confirmPassword.placeholder')}
-                    />
-                </div>
+                <Input
+                    type="password"
+                    label={t('form.confirmPassword.label')}
+                    placeholder={t('form.confirmPassword.placeholder')}
+                    value={formData.confirmPassword}
+                    onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                    required
+                    disabled={isPending}
+                />
 
                 <div className="flex items-start">
                     <input
@@ -169,7 +146,7 @@ export default function RegisterPage() {
                 <p className="text-center text-sm text-text-secondary">
                     {t('signIn.text')}{' '}
                     <Link
-                        href="/login"
+                        href={ROUTES.AUTH_LOGIN}
                         className="text-primary hover:text-primary-hover font-medium transition-colors"
                     >
                         {t('signIn.link')}

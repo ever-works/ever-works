@@ -6,6 +6,8 @@ import { AuthLayout } from '@/components/layout/AuthLayout';
 import { useTranslations } from 'next-intl';
 import { login as loginAction } from '@/app/actions/auth';
 import { SocialLoginButtons } from '@/components/auth/social-login';
+import { Input } from '@/components/ui/input';
+import { ROUTES } from '@/lib/constants';
 
 export default function LoginPage() {
     const [isPending, startTransition] = useTransition();
@@ -41,41 +43,35 @@ export default function LoginPage() {
                     </div>
                 )}
 
-                <div>
-                    <label htmlFor="email" className="block text-sm font-medium text-text mb-2">
-                        {t('form.email.label')}
-                    </label>
-                    <input
-                        id="email"
-                        type="email"
-                        required
-                        value={formData.email}
-                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                        className="w-full px-4 py-3 bg-surface-secondary border border-border rounded-lg text-text placeholder-text-muted focus:outline-none focus:border-primary transition-colors"
-                        placeholder={t('form.email.placeholder')}
-                    />
-                </div>
+                <Input
+                    type="email"
+                    label={t('form.email.label')}
+                    placeholder={t('form.email.placeholder')}
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    required
+                    disabled={isPending}
+                />
 
                 <div>
                     <div className="flex items-center justify-between mb-2">
-                        <label htmlFor="password" className="block text-sm font-medium text-text">
+                        <label className="block text-sm font-medium text-text">
                             {t('form.password.label')}
                         </label>
                         <Link
-                            href="/forgot-password"
+                            href={ROUTES.AUTH_FORGOT_PASSWORD}
                             className="text-sm text-primary hover:text-primary-hover transition-colors"
                         >
                             {t('form.forgotPassword')}
                         </Link>
                     </div>
-                    <input
-                        id="password"
+                    <Input
                         type="password"
-                        required
+                        placeholder={t('form.password.placeholder')}
                         value={formData.password}
                         onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                        className="w-full px-4 py-3 bg-surface-secondary border border-border rounded-lg text-text placeholder-text-muted focus:outline-none focus:border-primary transition-colors"
-                        placeholder={t('form.password.placeholder')}
+                        required
+                        disabled={isPending}
                     />
                 </div>
 
@@ -114,7 +110,7 @@ export default function LoginPage() {
                 <p className="text-center text-sm text-text-secondary">
                     {t('signUp.text')}{' '}
                     <Link
-                        href="/register"
+                        href={ROUTES.AUTH_REGISTER}
                         className="text-primary hover:text-primary-hover font-medium transition-colors"
                     >
                         {t('signUp.link')}

@@ -66,6 +66,70 @@
         "invalidCredentials": "Invalid email or password"
       }
     },
+    "forgotPassword": {
+      "title": "Forgot your password?",
+      "subtitle": "No worries, we'll send you reset instructions",
+      "successTitle": "Check your email",
+      "successSubtitle": "We've sent you password reset instructions",
+      "form": {
+        "email": {
+          "label": "Email address",
+          "placeholder": "Enter your email"
+        },
+        "submit": "Send Reset Link",
+        "submitting": "Sending..."
+      },
+      "success": {
+        "title": "Email sent successfully",
+        "message": "We've sent password reset instructions to {email}",
+        "checkSpam": "If you don't see the email, check your spam folder."
+      },
+      "errors": {
+        "failed": "Failed to send reset email. Please try again."
+      },
+      "backToLogin": "Back to login",
+      "noAccount": {
+        "text": "Don't have an account?",
+        "link": "Sign up"
+      }
+    },
+    "resetPassword": {
+      "title": "Reset your password",
+      "subtitle": "Enter your new password below",
+      "successTitle": "Password reset successful",
+      "successSubtitle": "Your password has been updated",
+      "form": {
+        "password": {
+          "label": "New password",
+          "placeholder": "Enter your new password",
+          "helperText": "Must be at least 6 characters with lowercase and number/special character",
+          "errors": {
+            "minLength": "Password must be at least 6 characters",
+            "lowercase": "Password must contain at least one lowercase letter",
+            "numberOrSpecial": "Password must contain at least one number or special character",
+            "cannotStartWith": "Password cannot start with a dot or newline"
+          }
+        },
+        "confirmPassword": {
+          "label": "Confirm new password",
+          "placeholder": "Confirm your new password",
+          "errors": {
+            "noMatch": "Passwords do not match"
+          }
+        },
+        "submit": "Reset Password",
+        "submitting": "Resetting..."
+      },
+      "success": {
+        "title": "Password reset successful",
+        "message": "Your password has been successfully updated. You can now login with your new password.",
+        "loginButton": "Go to Login"
+      },
+      "errors": {
+        "failed": "Failed to reset password. Please try again or request a new reset link."
+      },
+      "backToLogin": "Back to login"
+    },
     "register": {
       "title": "Create your account",
       "subtitle": "Start building amazing directories today",

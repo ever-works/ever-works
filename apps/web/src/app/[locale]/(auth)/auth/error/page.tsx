@@ -5,6 +5,7 @@ import { AuthLayout } from '@/components/layout/AuthLayout';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Suspense } from 'react';
+import { ROUTES } from '@/lib/constants';
 
 function AuthErrorContent() {
     const t = useTranslations('auth.error');
@@ -166,7 +167,7 @@ function AuthErrorContent() {
             buttons.push(
                 <Link
                     key="forgot"
-                    href="/forgot-password"
+                    href={ROUTES.AUTH_FORGOT_PASSWORD}
                     className="px-6 py-3 bg-primary hover:bg-primary-hover text-white rounded-lg font-medium transition-colors animate-fade-in"
                 >
                     {t('actions.requestNewReset')}
@@ -177,7 +178,7 @@ function AuthErrorContent() {
         buttons.push(
             <Link
                 key="login"
-                href="/login"
+                href={ROUTES.AUTH_LOGIN}
                 className="px-6 py-3 bg-surface-secondary hover:bg-surface-tertiary text-text border border-border rounded-lg font-medium transition-colors animate-fade-in"
             >
                 {t('actions.backToLogin')}
@@ -188,7 +189,7 @@ function AuthErrorContent() {
             buttons.push(
                 <Link
                     key="register"
-                    href="/register"
+                    href={ROUTES.AUTH_REGISTER}
                     className="px-6 py-3 bg-surface-secondary hover:bg-surface-tertiary text-text border border-border rounded-lg font-medium transition-colors animate-fade-in"
                 >
                     {t('actions.tryRegister')}
@@ -217,7 +218,8 @@ function AuthErrorContent() {
                     {getActionButtons()}
                 </div>
 
-                <div className="pt-8 border-t border-border">
+                {/* FOR NOW HIDE */}
+                <div className="pt-8 border-t border-border hidden">
                     <p className="text-sm text-text-muted mb-4">{t('helpText')}</p>
                     <div className="flex justify-center gap-6">
                         <Link

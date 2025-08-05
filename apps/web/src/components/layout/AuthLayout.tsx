@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
+import { ROUTES } from '@/lib/constants';
 
 interface AuthLayoutProps {
     children: React.ReactNode;
@@ -17,7 +18,7 @@ export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
             <div className="flex-1 flex items-center justify-center px-8 py-12">
                 <div className="w-full max-w-md">
                     <Link
-                        href="/"
+                        href={ROUTES.HOME}
                         className="inline-flex items-center gap-2 text-text-secondary hover:text-text mb-8 transition-colors"
                     >
                         <svg
@@ -66,12 +67,8 @@ export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
                                 />
                             </svg>
                         </div>
-                        <h2 className="text-2xl font-bold text-text mb-4">
-                            {t('feature.title')}
-                        </h2>
-                        <p className="text-text-secondary mb-8">
-                            {t('feature.subtitle')}
-                        </p>
+                        <h2 className="text-2xl font-bold text-text mb-4">{t('feature.title')}</h2>
+                        <p className="text-text-secondary mb-8">{t('feature.subtitle')}</p>
                     </div>
 
                     <div className="space-y-4">
@@ -92,7 +89,9 @@ export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
                                 </svg>
                             </div>
                             <div>
-                                <h3 className="font-medium text-text mb-1">{t('feature.benefits.ai.title')}</h3>
+                                <h3 className="font-medium text-text mb-1">
+                                    {t('feature.benefits.ai.title')}
+                                </h3>
                                 <p className="text-sm text-text-secondary">
                                     {t('feature.benefits.ai.description')}
                                 </p>
@@ -142,7 +141,9 @@ export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
                                 </svg>
                             </div>
                             <div>
-                                <h3 className="font-medium text-text mb-1">{t('feature.benefits.management.title')}</h3>
+                                <h3 className="font-medium text-text mb-1">
+                                    {t('feature.benefits.management.title')}
+                                </h3>
                                 <p className="text-sm text-text-secondary">
                                     {t('feature.benefits.management.description')}
                                 </p>
