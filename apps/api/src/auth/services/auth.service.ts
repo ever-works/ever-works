@@ -20,6 +20,7 @@ import { JwtPayload, TokenResponse } from '../types/jwt.types';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { UserCreatedEvent, UserForgotPasswordEvent } from '../../events';
 import { ForgotPasswordDto } from '../dto/email-verification.dto';
+import { GitHubScopePresets } from '../config/github-scopes.config';
 
 @Injectable()
 export class AuthService {
@@ -175,8 +176,10 @@ export class AuthService {
             this.ensureUserIsActive(user);
 
             // Update user info if exists
-            await this.userRepository.update(user.id, {
+            user = await this.userRepository.update(user.id, {
+                username: profile.username || profile.displayName,
                 avatar: profile.photos?.[0]?.value || user.avatar,
+                registrationProvider: AuthProviders.GITHUB,
                 lastLoginAt: new Date(),
             });
         }
@@ -189,9 +192,9 @@ export class AuthService {
             accessToken: accessToken,
             refreshToken: refreshToken,
             tokenType: 'Bearer',
-            scope: profile._json?.scope || 'user:email',
+            scope: profile._json?.scope || GitHubScopePresets.AGENT.join(' '),
             metadata: {
-                login: profile.username,
+                login: profile._json?.login || profile.username,
                 nodeId: profile._json?.node_id,
                 type: profile._json?.type,
             },
@@ -208,12 +211,13 @@ export class AuthService {
         }
 
         let user = await this.userRepository.findByEmail(email);
+        const displayName = profile.displayName || email.split('@')[0];
 
         if (!user) {
             const hashedPassword = await this.randomHashedPassword();
 
             user = await this.userRepository.create({
-                username: profile.displayName || email.split('@')[0],
+                username: displayName,
                 email: email,
                 password: hashedPassword,
                 registrationProvider: AuthProviders.GOOGLE,
@@ -226,7 +230,9 @@ export class AuthService {
             this.ensureUserIsActive(user);
 
             // Update user info if exists
-            await this.userRepository.update(user.id, {
+            user = await this.userRepository.update(user.id, {
+                username: displayName,
+                registrationProvider: AuthProviders.GOOGLE,
                 avatar: profile.photos?.[0]?.value || user.avatar,
                 lastLoginAt: new Date(),
             });
