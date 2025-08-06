@@ -1,11 +1,12 @@
-import { Body, Controller, NotFoundException, Param, Post } from '@nestjs/common';
+import { Body, Controller, NotFoundException, Param, Post, UseGuards } from '@nestjs/common';
 import { DirectoryRepository } from '@packages/agent/database';
 import { DeployVercelDto, VercelService } from '@packages/agent/deploy';
-import { AuthService, CurrentUser } from '@src/auth';
+import { AuthService, CurrentUser, JwtAuthGuard } from '../auth';
 import { config as agentConfig } from '@packages/agent/config';
-import { AuthenticatedUser } from '@src/auth/types/jwt.types';
+import { AuthenticatedUser } from '../auth/types/jwt.types';
 
 @Controller('api/deploy')
+@UseGuards(JwtAuthGuard)
 export class DeployController {
     constructor(
         private readonly vercelService: VercelService,

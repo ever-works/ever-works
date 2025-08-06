@@ -17,8 +17,9 @@
 	},
 	"private": true,
 	"scripts": {
-		"dev": "turbo start:dev",
-		"dev:api": "turbo start:dev --filter=api",
+		"dev": "turbo dev",
+		"dev:api": "turbo dev --filter=ever-works-api",
+		"dev:web": "turbo dev --filter=ever-works-webapp",
 		"build": "turbo build",
 		"prepare:husky": "npx husky install .husky",
 		"lint": "turbo lint",

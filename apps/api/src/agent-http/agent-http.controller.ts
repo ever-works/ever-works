@@ -29,6 +29,7 @@ import { AuthService, CurrentUser, JwtAuthGuard } from '../auth';
 import { AuthenticatedUser } from '@src/auth/types/jwt.types';
 
 @Controller('api')
+@UseGuards(JwtAuthGuard)
 export class AgentHttpController {
     constructor(
         private readonly agentService: AgentService,
@@ -36,7 +37,6 @@ export class AgentHttpController {
     ) {}
 
     @Get('directories')
-    @UseGuards(JwtAuthGuard)
     @HttpCode(HttpStatus.OK)
     async getDirectories(
         @CurrentUser() auth: AuthenticatedUser,
@@ -60,7 +60,6 @@ export class AgentHttpController {
     }
 
     @Post('directories')
-    @UseGuards(JwtAuthGuard)
     @HttpCode(HttpStatus.OK)
     async createDirectory(
         @CurrentUser() auth: AuthenticatedUser,
@@ -71,7 +70,6 @@ export class AgentHttpController {
     }
 
     @Post('directories/:id/generate')
-    @UseGuards(JwtAuthGuard)
     @HttpCode(HttpStatus.ACCEPTED)
     async generateItemsGenerator(
         @CurrentUser() auth: AuthenticatedUser,
@@ -85,7 +83,6 @@ export class AgentHttpController {
     }
 
     @Post('directories/:id/update')
-    @UseGuards(JwtAuthGuard)
     @HttpCode(HttpStatus.ACCEPTED)
     async updateItemsGenerator(
         @CurrentUser() auth: AuthenticatedUser,
@@ -99,7 +96,6 @@ export class AgentHttpController {
     }
 
     @Post('directories/:id/submit-item')
-    @UseGuards(JwtAuthGuard)
     @HttpCode(HttpStatus.OK)
     async submitItem(
         @CurrentUser() auth: AuthenticatedUser,
@@ -112,7 +108,6 @@ export class AgentHttpController {
     }
 
     @Post('directories/:id/remove-item')
-    @UseGuards(JwtAuthGuard)
     @HttpCode(HttpStatus.OK)
     async removeItem(
         @CurrentUser() auth: AuthenticatedUser,
@@ -125,7 +120,6 @@ export class AgentHttpController {
     }
 
     @Post('extract-item-details')
-    @UseGuards(JwtAuthGuard)
     @HttpCode(HttpStatus.OK)
     async extractItemDetails(
         @Body() extractItemDetailsDto: ExtractItemDetailsDto,
@@ -134,7 +128,6 @@ export class AgentHttpController {
     }
 
     @Post('directories/:id/regenerate-markdown')
-    @UseGuards(JwtAuthGuard)
     @HttpCode(HttpStatus.OK)
     async regenerateMarkdown(
         @CurrentUser() auth: AuthenticatedUser,
@@ -146,7 +139,6 @@ export class AgentHttpController {
     }
 
     @Post('directories/:id/update-website')
-    @UseGuards(JwtAuthGuard)
     @HttpCode(HttpStatus.OK)
     async updateWebsiteRepository(
         @CurrentUser() auth: AuthenticatedUser,
@@ -158,7 +150,6 @@ export class AgentHttpController {
     }
 
     @Post('directories/:id/delete')
-    @UseGuards(JwtAuthGuard)
     @HttpCode(HttpStatus.OK)
     async deleteDirectory(
         @CurrentUser() auth: AuthenticatedUser,

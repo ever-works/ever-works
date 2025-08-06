@@ -6,6 +6,7 @@
     "private": true,
     "license": "UNLICENSED",
     "scripts": {
+        "dev": "nest start -b swc --watch",
         "start": "nest start -b swc",
         "start:dev": "nest start -b swc --watch",
         "start:debug": "nest start -b swc --debug --watch",
