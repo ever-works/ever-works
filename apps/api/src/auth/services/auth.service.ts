@@ -238,7 +238,7 @@ export class AuthService {
         return { message: 'Password updated successfully' };
     }
 
-    async validateGithubUser(profile: any) {
+    async validateGithubUser(accessToken: string, refreshToken: string, profile: any) {
         const email = profile.emails?.[0]?.value;
         if (!email) {
             throw new BadRequestException('No email found in GitHub profile');
@@ -275,8 +275,8 @@ export class AuthService {
             userId: user.id,
             username: profile.username,
             provider: AuthProviders.GITHUB,
-            accessToken: profile.accessToken,
-            refreshToken: profile.refreshToken,
+            accessToken: accessToken,
+            refreshToken: refreshToken,
             tokenType: 'Bearer',
             scope: profile._json?.scope || 'user:email',
             metadata: {
@@ -290,7 +290,7 @@ export class AuthService {
         return userWithoutPassword;
     }
 
-    async validateGoogleUser(profile: any) {
+    async validateGoogleUser(accessToken: string, refreshToken: string, profile: any) {
         const email = profile.emails?.[0]?.value;
         if (!email) {
             throw new BadRequestException('No email found in Google profile');
@@ -326,8 +326,8 @@ export class AuthService {
         await this.oauthTokenRepository.upsert({
             userId: user.id,
             provider: AuthProviders.GOOGLE,
-            accessToken: profile.accessToken,
-            refreshToken: profile.refreshToken,
+            accessToken: accessToken,
+            refreshToken: refreshToken,
             tokenType: 'Bearer',
             expiresAt: profile._json?.expires_at ? new Date(profile._json.expires_at * 1000) : null,
             scope: profile._json?.scope || 'email profile',

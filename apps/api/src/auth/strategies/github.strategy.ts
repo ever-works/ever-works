@@ -19,7 +19,7 @@ export class GithubAuthStrategy extends PassportStrategy(GithubStrategy, AuthPro
 
     async validate(req: any, accessToken: string, refreshToken: string, profile: any) {
         profile.accessToken = accessToken;
-        const user = await this.authService.validateGithubUser(profile);
+        const user = await this.authService.validateGithubUser(accessToken, refreshToken, profile);
         return user;
     }
 }
