@@ -40,8 +40,6 @@ export const createCommand = new Command('create')
 
                     const response = await apiService.createDirectory(createDirectoryDto);
 
-                    response;
-
                     spinner.succeed('Directory created successfully');
                     conflictResolved = true;
 
