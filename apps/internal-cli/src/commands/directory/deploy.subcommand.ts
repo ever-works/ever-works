@@ -3,9 +3,8 @@ import { Logger } from '@nestjs/common';
 import chalk from 'chalk';
 import ora from 'ora';
 import inquirer from 'inquirer';
-import { DirectoryRepository } from '@packages/agent/database';
+import { DirectoryRepository, UserRepository } from '@packages/agent/database';
 import { VercelService } from '@packages/agent/deploy';
-import { User } from '@packages/agent/entities';
 import { DirectoryPromptService } from './directory-prompt.service';
 import { ConfigCheckService } from './config-check.service';
 
@@ -21,6 +20,7 @@ export class DeploySubCommand extends CommandRunner {
         private readonly directoryPrompt: DirectoryPromptService,
         private readonly configCheck: ConfigCheckService,
         private readonly vercelService: VercelService,
+        private readonly userRepository: UserRepository,
     ) {
         super();
     }
@@ -33,7 +33,9 @@ export class DeploySubCommand extends CommandRunner {
             await this.configCheck.requireConfiguration();
 
             // Select directory
-            const selection = await this.directoryPrompt.promptDirectorySelection(this.directoryRepository);
+            const selection = await this.directoryPrompt.promptDirectorySelection(
+                this.directoryRepository,
+            );
             if (selection.cancelled || !selection.directory) {
                 console.log(chalk.yellow('\n⚠ Operation cancelled.'));
                 return;
@@ -53,7 +55,10 @@ export class DeploySubCommand extends CommandRunner {
             console.log(chalk.gray('  • Trigger the deployment workflow'));
 
             const websiteRepo = `${directory.slug}-website`;
-            console.log(chalk.gray('\nSource repository:'), chalk.white(`${directory.owner}/${websiteRepo}`));
+            console.log(
+                chalk.gray('\nSource repository:'),
+                chalk.white(`${directory.getRepoOwner()}/${websiteRepo}`),
+            );
 
             const confirmed = await inquirer.prompt([
                 {
@@ -74,38 +79,41 @@ export class DeploySubCommand extends CommandRunner {
 
             try {
                 // Get user and call the service method directly
-                const user = await User.sessionMock();
-                
+                const user = await this.userRepository.createOrGetLocalUser();
+
                 // Call the vercel service
                 await this.vercelService.deploy(
                     {
-                        owner: directory.owner,
+                        owner: directory.getRepoOwner(),
                         repo: directory.getWebsiteRepo(),
                         provider: 'vercel',
                         data: {
                             vercelToken: deployOptions.VERCEL_TOKEN || process.env.VERCEL_TOKEN,
-                            ghToken: deployOptions.GITHUB_TOKEN || process.env.GITHUB_APIKEY
-                        }
+                            ghToken: deployOptions.GITHUB_TOKEN || process.env.GITHUB_APIKEY,
+                        },
                     },
                     directory,
-                    user
+                    user,
                 );
-                
+
                 spinner.succeed('Website deployed successfully');
 
                 console.log(chalk.green('\n✓ Website deployment initiated successfully!'));
-                console.log(chalk.gray('Repository:'), chalk.white(`${directory.owner}/${directory.getWebsiteRepo()}`));
+                console.log(
+                    chalk.gray('Repository:'),
+                    chalk.white(`${directory.getRepoOwner()}/${directory.getWebsiteRepo()}`),
+                );
 
                 console.log(chalk.cyan('\n--- Next Steps ---'));
                 console.log(chalk.gray('  • Check Vercel dashboard for deployment status'));
                 console.log(chalk.gray('  • Monitor GitHub Actions for workflow progress'));
-                console.log(chalk.gray('  • The website will be available once deployment completes'));
-
+                console.log(
+                    chalk.gray('  • The website will be available once deployment completes'),
+                );
             } catch (error) {
                 spinner.fail('Failed to deploy website');
                 throw error;
             }
-
         } catch (error) {
             this.logger.error('Failed to deploy website:', error);
             console.log(chalk.red('\n✗ Failed to deploy website:'), error.message);

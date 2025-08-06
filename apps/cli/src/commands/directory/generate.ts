@@ -49,7 +49,6 @@ export const generateCommand = new Command('generate')
             ]);
 
             let createItemsGeneratorDto: CreateItemsGeneratorDto = {
-                slug: directory.slug,
                 name: requiredData.name,
                 prompt: requiredData.prompt,
             };
@@ -111,7 +110,7 @@ export const generateCommand = new Command('generate')
             const spinner = ora('Starting generation process...').start();
 
             try {
-                const response = await apiService.generateContent(createItemsGeneratorDto);
+                const response = await apiService.generateContent(directory.id, createItemsGeneratorDto);
 
                 spinner.succeed('Generation started successfully');
 

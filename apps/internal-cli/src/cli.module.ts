@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { DatabaseConfigurations } from '@packages/agent/database';
 import { AiModule } from '@packages/agent/ai';
-import { AgentHTTPModule } from '@packages/agent/http';
+import { AgentModule } from '@packages/agent/services';
 import { GitModule } from '@packages/agent/git';
 import { DatabaseModule } from '@packages/agent/database';
 import { DataGeneratorModule } from '@packages/agent/data-generator';
@@ -28,7 +28,7 @@ import { ServeCommands } from './commands/serve';
         MarkdownGeneratorModule,
         WebsiteGeneratorModule,
         DeployModule,
-        AgentHTTPModule,
+        AgentModule,
     ],
     providers: [
         // Commands

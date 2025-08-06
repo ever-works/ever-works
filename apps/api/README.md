@@ -5,13 +5,11 @@ Built with NestJS.
 ## Table of Contents
 
 - [Setup & Run](#how-to-run)
-
     - [1. Clone the repository](#1-clone-the-repository)
     - [2. Create `.env` file](#2-create-env-file)
     - [3. Run application using (cd to root of the whole repo, not backend app)](#3-run-application-using-cd-to-root-of-the-whole-repo-not-backend-app)
 
 - [API Endpoints](#api-endpoints)
-
     - [1. Create a directory object](#4-create-a-directory-object)
     - [2. Generate data and GitHub repositories](#5-generate-data-and-github-repositories)
     - [3. Update Directory](#6-update-directory)
@@ -67,7 +65,7 @@ The application will start running on `http://localhost:3100`.
 
 ### 4. Create a directory object
 
-To create a new directory object, send a POST request to `http://localhost:3100/directories` with the following JSON body:
+To create a new directory object, send a POST request to `http://localhost:3100/api/api/directories` with the following JSON body:
 
 ```json
 {
@@ -103,13 +101,20 @@ If you want to initialize the directory within an organization, provide the opti
 
 ### 5. Generate data and GitHub repositories
 
-To generate data and create a GitHub repository for the directory, send a POST request to `http://localhost:3100/generate` with the following JSON body:
+To generate data and create a GitHub repository for the directory, send a POST request to `http://localhost:3100/api/directories/{id}/generate` with the following JSON body.
+
+**URL Parameters:**
+
+| Parameter | Type   | Required   | Description                       |
+| --------- | ------ | ---------- | --------------------------------- |
+| `id`      | string | `required` | The ID of the directory           |
+
+**Request Body:**
 
 **Basic Request:**
 
 ```json
 {
-    "slug": "awesome-time-tracking",
     "name": "Awesome Time Tracking",
     "prompt": "Generate list of best time tracking software"
 }
@@ -119,7 +124,6 @@ To generate data and create a GitHub repository for the directory, send a POST r
 
 ```json
 {
-    "slug": "awesome-time-tracking",
     "name": "Awesome Time Tracking",
     "prompt": "Generate list of best time tracking software for business. Start with Open Source projects first, then prioritize Commercial solutions. Include both open-source and commercial solutions. You can check these URLs for reference: https://github.com/awesome-lists/awesome-time-tracking https://alternativeto.net/category/productivity/time-tracking/",
     "company": {
@@ -161,7 +165,6 @@ To generate data and create a GitHub repository for the directory, send a POST r
 
 | Field                                | Type     | Required   | Default         | Description                                                                                               |
 | ------------------------------------ | -------- | ---------- | --------------- | --------------------------------------------------------------------------------------------------------- |
-| `slug`                               | string   | `required` | -               | Unique identifier for the directory                                                                       |
 | `name`                               | string   | `required` | -               | Display name for the directory                                                                            |
 | `prompt`                             | string   | `required` | -               | Description/prompt for item generation. URLs mentioned here will be automatically extracted and processed |
 | `company`                            | object   | `optional` | -               | Company information (see Company Object below)                                                            |
@@ -235,7 +238,7 @@ This streamlines the process of updating an existing directory without requiring
 **Endpoint:**
 
 ```
-POST /update/{slug}
+POST /api/directories/{id}/update
 ```
 
 **Request Body (Optional):**
@@ -254,15 +257,15 @@ POST /update/{slug}
     "status": "pending",
     "slug": "awesome-time-tracking",
     "parameters": {...},
-    "message": "Directory 'awesome-time-tracking' is being updated. Check back later"
+    "message": "Processing update for 'Awesome Time Tracking'. Check logs or data directory for updates."
 }
 ```
 
 **URL Parameters:**
 
-| Parameter | Type   | Required   | Description                         |
-| --------- | ------ | ---------- | ----------------------------------- |
-| `slug`    | string | `required` | The slug of the directory to update |
+| Parameter | Type   | Required   | Description                       |
+| --------- | ------ | ---------- | --------------------------------- |
+| `id`      | string | `required` | The ID of the directory to update |
 
 **POST Request Body Parameters:**
 
@@ -273,19 +276,19 @@ POST /update/{slug}
 
 ### 7. Regenerate Markdown
 
-To regenerate the README markdown file for a GitHub repository, send a POST request to `http://localhost:3100/regenerate-markdown/{slug}`.
+To regenerate the README markdown file for a GitHub repository, send a POST request to `http://localhost:3100/api/directories/{id}/regenerate-markdown`.
 
 **Endpoint:**
 
-```POST /regenerate-markdown/{slug}
+```POST /api/directories/{id}/regenerate-markdown
 
 ```
 
 **URL Parameters:**
 
-| Parameter | Type   | Required   | Description                         |
-| --------- | ------ | ---------- | ----------------------------------- |
-| `slug`    | string | `required` | The slug of the directory to update |
+| Parameter | Type   | Required   | Description                       |
+| --------- | ------ | ---------- | --------------------------------- |
+| `id`      | string | `required` | The ID of the directory to update |
 
 **Response:**
 
@@ -297,19 +300,19 @@ To regenerate the README markdown file for a GitHub repository, send a POST requ
 
 ### 8. Submit Individual Items
 
-To submit individual items to an existing directory, send a POST request to `http://localhost:3100/submit-item/{slug}` with the item details.
+To submit individual items to an existing directory, send a POST request to `http://localhost:3100/api/directories/{id}/submit-item` with the item details.
 
 **Endpoint:**
 
 ```
-POST /submit-item/{slug}
+POST /api/directories/{id}/submit-item
 ```
 
 **URL Parameters:**
 
-| Parameter | Type   | Required   | Description                                     |
-| --------- | ------ | ---------- | ----------------------------------------------- |
-| `slug`    | string | `required` | The slug of the directory to submit the item to |
+| Parameter | Type   | Required   | Description                                   |
+| --------- | ------ | ---------- | --------------------------------------------- |
+| `id`      | string | `required` | The ID of the directory to submit the item to |
 
 **Request Body:**
 
@@ -379,7 +382,7 @@ Otherwise, the PR will be created and require manual review.
 **Example with Immediate Publishing:**
 
 ```bash
-curl -X POST http://localhost:3100/submit-item/awesome-time-tracking \
+curl -X POST http://localhost:3100/api/directories/{directory-id}/submit-item \
   -H "Content-Type: application/json" \
   -d '{
     "name": "Premium Tool",
@@ -406,19 +409,19 @@ curl -X POST http://localhost:3100/submit-item/awesome-time-tracking \
 
 ### 9. Remove Individual Items
 
-To remove individual items from an existing directory, send a POST request to `http://localhost:3100/remove-item/{slug}` with the item details.
+To remove individual items from an existing directory, send a POST request to `http://localhost:3100/api/directories/{id}/remove-item` with the item details.
 
 **Endpoint:**
 
 ```
-POST /remove-item/{slug}
+POST /api/directories/{id}/remove-item
 ```
 
 **URL Parameters:**
 
-| Parameter | Type   | Required   | Description                                       |
-| --------- | ------ | ---------- | ------------------------------------------------- |
-| `slug`    | string | `required` | The slug of the directory to remove the item from |
+| Parameter | Type   | Required   | Description                                     |
+| --------- | ------ | ---------- | ----------------------------------------------- |
+| `id`      | string | `required` | The ID of the directory to remove the item from |
 
 **Request Body:**
 
@@ -471,7 +474,7 @@ POST /remove-item/{slug}
 **Example with Immediate Publishing:**
 
 ```bash
-curl -X POST http://localhost:3100/remove-item/awesome-time-tracking \
+curl -X POST http://localhost:3100/api/directories/{directory-id}/remove-item \
   -H "Content-Type: application/json" \
   -d '{
     "item_slug": "outdated-tool",
@@ -481,12 +484,12 @@ curl -X POST http://localhost:3100/remove-item/awesome-time-tracking \
 
 ### 10. Extract Item Details
 
-To extract item details from a single URL without adding it to any directory, send a POST request to `http://localhost:3100/extract-item-details` with the URL and optional existing categories.
+To extract item details from a single URL without adding it to any directory, send a POST request to `http://localhost:3100/api/extract-item-details` with the URL and optional existing categories.
 
 **Endpoint:**
 
 ```
-POST /extract-item-details
+POST /api/extract-item-details
 ```
 
 **Request Body:**
@@ -572,7 +575,7 @@ POST /extract-item-details
 **Example Usage:**
 
 ```bash
-curl -X POST http://localhost:3100/extract-item-details \
+curl -X POST http://localhost:3100/api/extract-item-details \
   -H "Content-Type: application/json" \
   -d '{
     "source_url": "https://github.com/microsoft/vscode",
@@ -600,22 +603,22 @@ curl -X POST http://localhost:3100/extract-item-details \
 
 ### 11. Update website repository
 
-To update an existing website repository with the latest changes from the template repository, send a POST request to `http://localhost:3100/update-website/{slug}`.
-the `slug` parameter should match the directory slug used when creating the website repository.
+To update an existing website repository with the latest changes from the template repository, send a POST request to `http://localhost:3100/api/directories/{id}/update-website`.
+the `id` parameter should be the directory ID.
 
 This endpoint updates an existing website repository by pulling the latest changes from the template repository. It automatically detects the original creation method and applies the appropriate update strategy.
 
 **Request:**
 
 ```
-POST /update-website/awesome-time-tracking
+POST /api/directories/{id}/update-website
 ```
 
 **URL Parameters:**
 
-| Parameter | Type   | Required   | Description                                    |
-| --------- | ------ | ---------- | ---------------------------------------------- |
-| `slug`    | string | `required` | The slug of the directory/repository to update |
+| Parameter | Type   | Required   | Description                                  |
+| --------- | ------ | ---------- | -------------------------------------------- |
+| `id`      | string | `required` | The ID of the directory/repository to update |
 
 **Response:**
 
@@ -673,19 +676,19 @@ The service automatically tries different update strategies in order of preferen
 
 ### 12. Deploy to Vercel
 
-To deploy the website repository to Vercel, send a POST request to `http://localhost:3100/deploy/{slug}/vercel`.
-the `slug` parameter should match the directory slug used when creating the website repository.
+To deploy the website repository to Vercel, send a POST request to `http://localhost:3100/api/deploy/directories/{id}/vercel`.
+the `id` parameter should be the directory ID.
 **Request:**
 
 ```
-POST /deploy/awesome-time-tracking/vercel
+POST /api/deploy/directories/{id}/vercel
 ```
 
 **URL Parameters:**
 
-| Parameter | Type   | Required   | Description                                    |
-| --------- | ------ | ---------- | ---------------------------------------------- |
-| `slug`    | string | `required` | The slug of the directory/repository to deploy |
+| Parameter | Type   | Required   | Description                                  |
+| --------- | ------ | ---------- | -------------------------------------------- |
+| `id`      | string | `required` | The ID of the directory/repository to deploy |
 
 **Request Body:**
 
@@ -705,7 +708,6 @@ POST /deploy/awesome-time-tracking/vercel
 
 ```json
 {
-    "slug": "awesome-time-tracking",
     "name": "Awesome Time Tracking",
     "prompt": "Generate list of best time tracking software for business. Start with Open Source projects first, then prioritize Commercial solutions. Include both open-source and commercial solutions. You can check these URLs for reference: https://github.com/awesome-lists/awesome-time-tracking https://alternativeto.net/category/productivity/time-tracking/",
     "company": {

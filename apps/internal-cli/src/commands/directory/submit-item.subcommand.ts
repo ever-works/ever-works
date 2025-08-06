@@ -3,8 +3,8 @@ import { Logger } from '@nestjs/common';
 import chalk from 'chalk';
 import ora from 'ora';
 import inquirer from 'inquirer';
-import { DirectoryRepository } from '@packages/agent/database';
-import { AgentService } from '@packages/agent/http';
+import { DirectoryRepository, UserRepository } from '@packages/agent/database';
+import { AgentService } from '@packages/agent/services';
 import { DirectoryPromptService } from './directory-prompt.service';
 import { ConfigCheckService } from './config-check.service';
 
@@ -20,6 +20,7 @@ export class SubmitItemSubCommand extends CommandRunner {
         private readonly directoryPrompt: DirectoryPromptService,
         private readonly configCheck: ConfigCheckService,
         private readonly agentService: AgentService,
+        private readonly userRepository: UserRepository,
     ) {
         super();
     }
@@ -32,7 +33,9 @@ export class SubmitItemSubCommand extends CommandRunner {
             await this.configCheck.requireConfiguration();
 
             // Select directory
-            const selection = await this.directoryPrompt.promptDirectorySelection(this.directoryRepository);
+            const selection = await this.directoryPrompt.promptDirectorySelection(
+                this.directoryRepository,
+            );
             if (selection.cancelled || !selection.directory) {
                 console.log(chalk.yellow('\n⚠ Operation cancelled.'));
                 return;
@@ -54,7 +57,10 @@ export class SubmitItemSubCommand extends CommandRunner {
                 console.log(chalk.gray('Tags:'), chalk.white(itemData.tags.join(', ')));
             }
             console.log(chalk.gray('Featured:'), chalk.white(itemData.featured ? 'Yes' : 'No'));
-            console.log(chalk.gray('Pay and Publish Now:'), chalk.white(itemData.pay_and_publish_now ? 'Yes' : 'No'));
+            console.log(
+                chalk.gray('Pay and Publish Now:'),
+                chalk.white(itemData.pay_and_publish_now ? 'Yes' : 'No'),
+            );
 
             const confirmed = await inquirer.prompt([
                 {
@@ -74,8 +80,10 @@ export class SubmitItemSubCommand extends CommandRunner {
             const spinner = ora('Submitting item...').start();
 
             try {
+                const user = await this.userRepository.createOrGetLocalUser();
+
                 // Call the agent service method directly
-                const result = await this.agentService.submitItem(directory.slug, itemData);
+                const result = await this.agentService.submitItem(directory.id, itemData, user);
 
                 spinner.succeed('Item submitted successfully');
 
@@ -89,12 +97,10 @@ export class SubmitItemSubCommand extends CommandRunner {
                     console.log(chalk.gray('PR Title:'), chalk.white(result.pr_title));
                     console.log(chalk.gray('Branch:'), chalk.white(result.pr_branch_name));
                 }
-
             } catch (error) {
                 spinner.fail('Failed to submit item');
                 throw error;
             }
-
         } catch (error) {
             this.logger.error('Failed to submit item:', error);
             console.log(chalk.red('\n✗ Failed to submit item:'), error.message);
@@ -168,7 +174,10 @@ export class SubmitItemSubCommand extends CommandRunner {
                 message: 'Tags (comma-separated, optional):',
                 filter: (input: string) => {
                     if (!input.trim()) return [];
-                    return input.split(',').map((tag: string) => tag.trim()).filter((tag: string) => tag.length > 0);
+                    return input
+                        .split(',')
+                        .map((tag: string) => tag.trim())
+                        .filter((tag: string) => tag.length > 0);
                 },
             },
         ]);

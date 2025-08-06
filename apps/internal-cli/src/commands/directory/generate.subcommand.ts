@@ -3,8 +3,8 @@ import { Logger } from '@nestjs/common';
 import chalk from 'chalk';
 import ora from 'ora';
 import inquirer from 'inquirer';
-import { DirectoryRepository } from '@packages/agent/database';
-import { AgentService } from '@packages/agent/http';
+import { DirectoryRepository, UserRepository } from '@packages/agent/database';
+import { AgentService } from '@packages/agent/services';
 import {
     CreateItemsGeneratorDto,
     CompanyDto,
@@ -27,6 +27,7 @@ export class GenerateSubCommand extends CommandRunner {
         private readonly agentService: AgentService,
         private readonly directoryPrompt: DirectoryPromptService,
         private readonly configCheck: ConfigCheckService,
+        private readonly userRepository: UserRepository,
     ) {
         super();
     }
@@ -73,7 +74,6 @@ export class GenerateSubCommand extends CommandRunner {
 
             // Build the CreateItemsGeneratorDto
             const createDto: CreateItemsGeneratorDto = {
-                slug: directory.slug,
                 name: requiredData.name,
                 prompt: requiredData.prompt,
                 config: new ConfigDto(), // Default config
@@ -97,7 +97,14 @@ export class GenerateSubCommand extends CommandRunner {
             const spinner = ora('Starting generation process...').start();
 
             try {
-                const result = await this.agentService.generateItemsGenerator(createDto, true);
+                const user = await this.userRepository.createOrGetLocalUser();
+
+                const result = await this.agentService.generateItemsGenerator(
+                    directory.id,
+                    createDto,
+                    user,
+                    true,
+                );
                 spinner.succeed('Generation started successfully');
 
                 console.log(chalk.green('\n✓ Generation process started!'));
@@ -352,7 +359,6 @@ export class GenerateSubCommand extends CommandRunner {
 
     private displayGenerationSummary(dto: CreateItemsGeneratorDto): void {
         console.log(chalk.cyan('\n--- Generation Summary ---'));
-        console.log(chalk.gray(`Directory: ${dto.slug}`));
         console.log(chalk.gray(`Name: ${dto.name}`));
         console.log(chalk.gray(`Prompt: ${dto.prompt}`));
 

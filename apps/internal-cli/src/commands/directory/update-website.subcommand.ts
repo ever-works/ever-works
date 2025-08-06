@@ -3,8 +3,8 @@ import { Logger } from '@nestjs/common';
 import chalk from 'chalk';
 import ora from 'ora';
 import inquirer from 'inquirer';
-import { DirectoryRepository } from '@packages/agent/database';
-import { AgentService } from '@packages/agent/http';
+import { DirectoryRepository, UserRepository } from '@packages/agent/database';
+import { AgentService } from '@packages/agent/services';
 import { DirectoryPromptService } from './directory-prompt.service';
 import { ConfigCheckService } from './config-check.service';
 
@@ -20,6 +20,7 @@ export class UpdateWebsiteSubCommand extends CommandRunner {
         private readonly directoryPrompt: DirectoryPromptService,
         private readonly configCheck: ConfigCheckService,
         private readonly agentService: AgentService,
+        private readonly userRepository: UserRepository,
     ) {
         super();
     }
@@ -32,7 +33,9 @@ export class UpdateWebsiteSubCommand extends CommandRunner {
             await this.configCheck.requireConfiguration();
 
             // Select directory
-            const selection = await this.directoryPrompt.promptDirectorySelection(this.directoryRepository);
+            const selection = await this.directoryPrompt.promptDirectorySelection(
+                this.directoryRepository,
+            );
             if (selection.cancelled || !selection.directory) {
                 console.log(chalk.yellow('\n⚠ Operation cancelled.'));
                 return;
@@ -50,7 +53,10 @@ export class UpdateWebsiteSubCommand extends CommandRunner {
             console.log(chalk.gray('  • Push updates to the repository'));
 
             const websiteRepo = `${directory.slug}-website`;
-            console.log(chalk.gray('\nTarget repository:'), chalk.white(`${directory.owner}/${websiteRepo}`));
+            console.log(
+                chalk.gray('\nTarget repository:'),
+                chalk.white(`${directory.getRepoOwner()}/${websiteRepo}`),
+            );
 
             const confirmed = await inquirer.prompt([
                 {
@@ -70,8 +76,10 @@ export class UpdateWebsiteSubCommand extends CommandRunner {
             const spinner = ora('Updating website repository...').start();
 
             try {
+                const user = await this.userRepository.createOrGetLocalUser();
+
                 // Call the agent service method directly
-                const result = await this.agentService.updateWebsiteRepository(directory.slug);
+                const result = await this.agentService.updateWebsiteRepository(directory.id, user);
 
                 spinner.succeed('Website repository updated successfully');
 
@@ -98,12 +106,10 @@ export class UpdateWebsiteSubCommand extends CommandRunner {
                     console.log(chalk.red('\n--- Error Details ---'));
                     console.log(chalk.red(result.error_details));
                 }
-
             } catch (error) {
                 spinner.fail('Failed to update website repository');
                 throw error;
             }
-
         } catch (error) {
             this.logger.error('Failed to update website repository:', error);
             console.log(chalk.red('\n✗ Failed to update website repository:'), error.message);

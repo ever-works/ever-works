@@ -1,17 +1,7 @@
+import { Directory } from '@packages/cli-shared';
 import { getHttpClient } from './http-client';
 
 // Types for API responses
-export interface Directory {
-    id: number;
-    name: string;
-    slug: string;
-    website?: string;
-    owner: string;
-    companyName?: string;
-    organization: boolean;
-    description: string;
-    readmeConfig?: MarkdownReadmeConfigDto;
-}
 
 export interface MarkdownReadmeConfigDto {
     header?: string;
@@ -29,7 +19,6 @@ export interface CreateDirectoryDto {
 }
 
 export interface CreateItemsGeneratorDto {
-    slug: string;
     name: string;
     prompt: string;
     company?: {
@@ -62,6 +51,18 @@ export interface UpdateDirectoryDto {
     update_with_pull_request?: boolean;
 }
 
+export interface ApiResponse {
+    status: string;
+    message: string;
+    error_details?: string;
+    repository_url?: string;
+    item?: {
+        name: string;
+        slug: string;
+        category: string;
+    };
+}
+
 export interface SubmitItemDto {
     name: string;
     description: string;
@@ -91,14 +92,6 @@ export interface DeleteDirectoryDto {
     delete_website_repository?: boolean;
 }
 
-// API Response types
-export interface ApiResponse<T = any> {
-    status: string;
-    message?: string;
-    data?: T;
-    [key: string]: any;
-}
-
 export interface DirectoriesResponse {
     status: string;
     directories: Directory[];
@@ -115,12 +108,10 @@ export class ApiService {
 
     // Directory operations
     async getDirectories(options?: {
-        owner?: string;
         limit?: number;
         offset?: number;
     }): Promise<DirectoriesResponse> {
         const queryParams = new URLSearchParams();
-        if (options?.owner) queryParams.append('owner', options.owner);
         if (options?.limit) queryParams.append('limit', options.limit.toString());
         if (options?.offset) queryParams.append('offset', options.offset.toString());
 
@@ -130,53 +121,75 @@ export class ApiService {
         return response.data;
     }
 
-    async createDirectory(
-        data: CreateDirectoryDto,
-    ): Promise<ApiResponse<{ directory: Directory }>> {
-        const response = await this.httpClient.post<ApiResponse<{ directory: Directory }>>(
-            '/directories',
+    async createDirectory(data: CreateDirectoryDto): Promise<{ directory: Directory }> {
+        const response = await this.httpClient.post<{ directory: Directory }>('/directories', data);
+        return response.data;
+    }
+
+    async getDirectory(id: string): Promise<Directory> {
+        const response = await this.httpClient.get<Directory>(`/directories/${id}`);
+        return response.data;
+    }
+
+    async generateContent(
+        directoryId: string,
+        data: CreateItemsGeneratorDto,
+    ): Promise<ApiResponse> {
+        const response = await this.httpClient.post<ApiResponse>(
+            `/directories/${directoryId}/generate`,
             data,
         );
         return response.data;
     }
 
-    async generateContent(data: CreateItemsGeneratorDto): Promise<ApiResponse> {
-        const response = await this.httpClient.post<ApiResponse>('/generate', data);
+    async updateDirectory(directoryId: string, data: UpdateDirectoryDto): Promise<ApiResponse> {
+        const response = await this.httpClient.post<ApiResponse>(
+            `/directories/${directoryId}/update`,
+            data,
+        );
         return response.data;
     }
 
-    async updateDirectory(slug: string, data: UpdateDirectoryDto): Promise<ApiResponse> {
-        const response = await this.httpClient.post<ApiResponse>(`/update/${slug}`, data);
+    async submitItem(directoryId: string, data: SubmitItemDto): Promise<ApiResponse> {
+        const response = await this.httpClient.post<ApiResponse>(
+            `/directories/${directoryId}/submit-item`,
+            data,
+        );
         return response.data;
     }
 
-    async submitItem(slug: string, data: SubmitItemDto): Promise<ApiResponse> {
-        const response = await this.httpClient.post<ApiResponse>(`/submit-item/${slug}`, data);
+    async removeItem(directoryId: string, data: RemoveItemDto): Promise<ApiResponse> {
+        const response = await this.httpClient.post<ApiResponse>(
+            `/directories/${directoryId}/remove-item`,
+            data,
+        );
         return response.data;
     }
 
-    async removeItem(slug: string, data: RemoveItemDto): Promise<ApiResponse> {
-        const response = await this.httpClient.post<ApiResponse>(`/remove-item/${slug}`, data);
+    async regenerateMarkdown(directoryId: string): Promise<ApiResponse> {
+        const response = await this.httpClient.post<ApiResponse>(
+            `/directories/${directoryId}/regenerate-markdown`,
+        );
         return response.data;
     }
 
-    async regenerateMarkdown(slug: string): Promise<ApiResponse> {
-        const response = await this.httpClient.post<ApiResponse>(`/regenerate-markdown/${slug}`);
+    async updateWebsite(directoryId: string): Promise<ApiResponse> {
+        const response = await this.httpClient.post<ApiResponse>(
+            `/directories/${directoryId}/update-website`,
+        );
         return response.data;
     }
 
-    async updateWebsite(slug: string): Promise<ApiResponse> {
-        const response = await this.httpClient.post<ApiResponse>(`/update-website/${slug}`);
+    async deployWebsite(directoryId: string, data?: DeployDto): Promise<ApiResponse> {
+        const response = await this.httpClient.post<ApiResponse>(
+            `/deploy/directories/${directoryId}/vercel`,
+            data,
+        );
         return response.data;
     }
 
-    async deployWebsite(slug: string, data?: DeployDto): Promise<ApiResponse> {
-        const response = await this.httpClient.post<ApiResponse>(`/deploy/${slug}/vercel`, data);
-        return response.data;
-    }
-
-    async deleteDirectory(slug: string, data?: DeleteDirectoryDto): Promise<ApiResponse> {
-        const response = await this.httpClient.post<ApiResponse>(`/delete/${slug}`, data);
+    async deleteDirectory(id: string, data?: DeleteDirectoryDto): Promise<ApiResponse> {
+        const response = await this.httpClient.post<ApiResponse>(`/directories/${id}/delete`, data);
         return response.data;
     }
 }

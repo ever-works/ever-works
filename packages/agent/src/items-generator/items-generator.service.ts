@@ -17,6 +17,7 @@ import {
 import { Category, ItemData, Tag } from './dto';
 import { IDataConfig } from '../data-generator/data-repository';
 import { WebPageData } from './interfaces/items-generator.interfaces';
+import { Directory } from '../entities';
 
 @Injectable()
 export class ItemsGeneratorService {
@@ -45,6 +46,7 @@ export class ItemsGeneratorService {
      * @returns
      */
     async generateItemsGenerator(
+        directory: Directory,
         createItemsGeneratorDto: CreateItemsGeneratorDto,
         existing: {
             existingItems?: ItemData[];
@@ -56,9 +58,11 @@ export class ItemsGeneratorService {
         // Make a copy of the DTO to avoid mutating the original
         createItemsGeneratorDto = { ...createItemsGeneratorDto };
 
-        const { slug, name, source_urls, config, prompt: originalPrompt } = createItemsGeneratorDto;
+        const directorySlug = directory.slug;
 
-        this.logger.log(`Starting generation for slug: ${slug}, name: ${name}`);
+        const { name, source_urls, config, prompt: originalPrompt } = createItemsGeneratorDto;
+
+        this.logger.log(`Starting generation for directory: ${directorySlug}, name: ${name}`);
 
         try {
             let {
@@ -77,11 +81,15 @@ export class ItemsGeneratorService {
 
             // Log the number of existing items, categories, and tags (if any)
             if (existingItems.length || existingCategories.length || existingTags.length) {
-                this.logger.log(`Loaded ${existingItems.length} existing items for slug: ${slug}`);
                 this.logger.log(
-                    `Loaded ${existingCategories.length} existing categories for slug: ${slug}`,
+                    `Loaded ${existingItems.length} existing items for directory: ${directorySlug}`,
                 );
-                this.logger.log(`Loaded ${existingTags.length} existing tags for slug: ${slug}`);
+                this.logger.log(
+                    `Loaded ${existingCategories.length} existing categories for directory: ${directorySlug}`,
+                );
+                this.logger.log(
+                    `Loaded ${existingTags.length} existing tags for directory: ${directorySlug}`,
+                );
             }
 
             // 1.0. Prompt Comparison
@@ -91,9 +99,9 @@ export class ItemsGeneratorService {
                 createItemsGeneratorDto.generation_method === GenerationMethod.CREATE_UPDATE &&
                 existingItems.length > 0
             ) {
-                this.logger.log(`[${slug}] 1.0. Prompt Comparison - Starting`);
+                this.logger.log(`[${directorySlug}] 1.0. Prompt Comparison - Starting`);
                 const comparisonResult = await this.promptComparisonService.comparePrompts(
-                    slug,
+                    directorySlug,
                     $configMetadata.initial_prompt,
                     createItemsGeneratorDto.prompt,
                 );
@@ -106,7 +114,7 @@ export class ItemsGeneratorService {
                     comparisonResult.confidence > confidenceThreshold;
 
                 this.logger.log(
-                    `[${slug}] Prompt comparison: ${comparisonResult.areRelated ? 'RELATED' : 'UNRELATED'} ` +
+                    `[${directorySlug}] Prompt comparison: ${comparisonResult.areRelated ? 'RELATED' : 'UNRELATED'} ` +
                         `(confidence: ${confidence.toFixed(2)})`,
                 );
 
@@ -123,7 +131,7 @@ export class ItemsGeneratorService {
 
             // 1.1. Process Prompt (Extract URLs, Categories, Priorities, and Featured Item Hints)
             this.logger.log(
-                `[${slug}] 1.1. Prompt Processing (URLs, Categories, Priorities, and Featured Hints) - Starting`,
+                `[${directorySlug}] 1.1. Prompt Processing (URLs, Categories, Priorities, and Featured Hints) - Starting`,
             );
             const {
                 extractedUrls: extractedUrlsFromPrompt,
@@ -132,7 +140,7 @@ export class ItemsGeneratorService {
                 featuredItemHints,
                 rewrittenPrompt: prompt,
             } = await this.promptProcessingService.processPrompt(
-                slug,
+                directorySlug,
                 createItemsGeneratorDto.prompt,
             );
 
@@ -152,23 +160,23 @@ export class ItemsGeneratorService {
 
             if (allInitialCategories.length > 0) {
                 this.logger.log(
-                    `[${slug}] Found ${allInitialCategories.length} initial categories: ${allInitialCategories.join(', ')}`,
+                    `[${directorySlug}] Found ${allInitialCategories.length} initial categories: ${allInitialCategories.join(', ')}`,
                 );
             }
 
             if (allPriorityCategories.length > 0) {
                 this.logger.log(
-                    `[${slug}] Found ${allPriorityCategories.length} priority categories: ${allPriorityCategories.join(', ')}`,
+                    `[${directorySlug}] Found ${allPriorityCategories.length} priority categories: ${allPriorityCategories.join(', ')}`,
                 );
             }
 
             if (featuredItemHints.length > 0) {
                 this.logger.log(
-                    `[${slug}] Found ${featuredItemHints.length} featured item hints: ${featuredItemHints.join(', ')}`,
+                    `[${directorySlug}] Found ${featuredItemHints.length} featured item hints: ${featuredItemHints.join(', ')}`,
                 );
             }
 
-            this.logger.log(`[${slug}] Rewritten prompt: "${prompt}"`);
+            this.logger.log(`[${directorySlug}] Rewritten prompt: "${prompt}"`);
 
             // Update the prompt in the DTO
             createItemsGeneratorDto.prompt = prompt;
@@ -195,24 +203,27 @@ export class ItemsGeneratorService {
             let initialAiItems: ItemData[] = [];
 
             if (config.ai_first_generation_enabled) {
-                this.logger.log(`[${slug}] 1.5. AI-First Item Generation - Invoking`);
+                this.logger.log(`[${directorySlug}] 1.5. AI-First Item Generation - Invoking`);
                 initialAiItems = await this.aiItemGenerationService.generateInitialItemsWithAI(
+                    directorySlug,
                     createItemsGeneratorDto,
                     featuredItemHints,
                 );
-                this.logger.log(`[${slug}] AI generated ${initialAiItems.length} initial items.`);
+                this.logger.log(
+                    `[${directorySlug}] AI generated ${initialAiItems.length} initial items.`,
+                );
             }
 
             // 2. AI-Powered Search Query Generation
-            this.logger.log(`[${slug}] 2. AI-Powered Search Query Generation - Starting`);
+            this.logger.log(`[${directorySlug}] 2. AI-Powered Search Query Generation - Starting`);
             const searchQueries =
                 await this.searchQueryGenerationService.generateSearchQueries(
                     createItemsGeneratorDto,
                 );
-            this.logger.log(`[${slug}] Generated ${searchQueries.length} search queries.`);
+            this.logger.log(`[${directorySlug}] Generated ${searchQueries.length} search queries.`);
 
             // 3. Web Search & Content Retrieval
-            this.logger.log(`[${slug}] 3. Web Search & Content Retrieval - Starting`);
+            this.logger.log(`[${directorySlug}] 3. Web Search & Content Retrieval - Starting`);
 
             const processedSourceUrls = new Set<string>();
 
@@ -220,18 +231,18 @@ export class ItemsGeneratorService {
             let initialWebPages: WebPageData[] = [];
             if (extractedUrls.length > 0) {
                 initialWebPages = await this.webPageRetrievalService.retrieveSpecificUrls(
-                    slug,
+                    directorySlug,
                     extractedUrls,
                     processedSourceUrls,
                 );
                 this.logger.log(
-                    `[${slug}] Retrieved ${initialWebPages.length} web pages from extracted URLs`,
+                    `[${directorySlug}] Retrieved ${initialWebPages.length} web pages from extracted URLs`,
                 );
             }
 
             // Then proceed with normal web search
             const searchWebPages = await this.webPageRetrievalService.retrieveWebPages(
-                slug,
+                directorySlug,
                 searchQueries,
                 processedSourceUrls,
                 config,
@@ -241,54 +252,60 @@ export class ItemsGeneratorService {
             let webPages = [...initialWebPages, ...searchWebPages];
             const urlsScannedThisRun = webPages.length;
 
-            this.logger.log(`[${slug}] Retrieved ${webPages.length} web pages for processing.`);
+            this.logger.log(
+                `[${directorySlug}] Retrieved ${webPages.length} web pages for processing.`,
+            );
 
             if (config.content_filtering_enabled) {
                 // 4. Content Pre-filtering & Relevance Assessment
                 webPages = await this.contentFilteringService.filterAndAssessPages(
-                    slug,
+                    directorySlug,
                     webPages,
                     name,
                     prompt,
                     config,
                 );
 
-                this.logger.log(`[${slug}] Filtered down to ${webPages.length} relevant pages.`);
+                this.logger.log(
+                    `[${directorySlug}] Filtered down to ${webPages.length} relevant pages.`,
+                );
             }
 
             // 5. AI-Driven Structured Data Extraction for Items (from Web)
             this.logger.log(
-                `[${slug}] 5. AI-Driven Structured Data Extraction for Items from Web - Starting`,
+                `[${directorySlug}] 5. AI-Driven Structured Data Extraction for Items from Web - Starting`,
             );
             const extractedWebItems: ItemData[] =
                 await this.itemExtractionService.extractItemsFromPages(
+                    directorySlug,
                     createItemsGeneratorDto,
                     webPages,
                     featuredItemHints,
                 );
             this.logger.log(
-                `[${slug}] Extracted ${extractedWebItems.length} potential items from web pages.`,
+                `[${directorySlug}] Extracted ${extractedWebItems.length} potential items from web pages.`,
             );
 
             // Combine AI-generated items and web-extracted items
             const allDiscoveredItems = [...initialAiItems, ...extractedWebItems];
             this.logger.log(
-                `[${slug}] Total discovered items (AI + Web before source validation): ${allDiscoveredItems.length}.`,
+                `[${directorySlug}] Total discovered items (AI + Web before source validation): ${allDiscoveredItems.length}.`,
             );
 
             // 6. Deduplication and Data Aggregation
-            this.logger.log(`[${slug}] 6. Deduplication and Data Aggregation - Starting`);
+            this.logger.log(`[${directorySlug}] 6. Deduplication and Data Aggregation - Starting`);
             const { aggregatedItems, metrics } =
-                await this.dataAggregationService.aggregateAndDeduplicateData(
+                await this.dataAggregationService.aggregateAndDeduplicateData({
+                    directorySlug,
                     createItemsGeneratorDto,
                     existingItems,
-                    allDiscoveredItems,
                     urlsScannedThisRun,
-                    webPages.length,
-                );
+                    newlyExtractedItemsThisRun: allDiscoveredItems,
+                    pagesProcessedThisRun: webPages.length,
+                });
 
             // 7. Category and Tag Generation
-            this.logger.log(`[${slug}] 7. Category and Tag Generation - Starting`);
+            this.logger.log(`[${directorySlug}] 7. Category and Tag Generation - Starting`);
 
             // Create a modified DTO with merged priority categories
             const dtoWithMergedPriorities = {
@@ -299,6 +316,7 @@ export class ItemsGeneratorService {
 
             const { categories, tags, finalItems } =
                 await this.categoryProcessingService.processCategoriesAndTags({
+                    directorySlug,
                     createItemsGeneratorDto: dtoWithMergedPriorities,
                     extractedItems: aggregatedItems,
                     existingCategories: existingCategories || [],
@@ -308,25 +326,27 @@ export class ItemsGeneratorService {
                 });
 
             this.logger.log(
-                `[${slug}] Directory data generation complete. Final metrics: ${JSON.stringify(metrics)}`,
+                `[${directorySlug}] Directory data generation complete. Final metrics: ${JSON.stringify(metrics)}`,
             );
 
             // 8. Filter and Validate Source URLs for all discovered items
-            this.logger.log(`[${slug}] 8. Filter and Validate Source URLs - Starting`);
+            this.logger.log(`[${directorySlug}] 8. Filter and Validate Source URLs - Starting`);
             let validatedItems = await this.sourceValidationService.filterAndValidateSourceItems(
+                directorySlug,
                 finalItems,
-                slug,
             );
 
             // 9. Badge Processing for Repository Items
             if (createItemsGeneratorDto.badge_evaluation_enabled) {
-                this.logger.log(`[${slug}] 9. Badge Processing for Repository Items - Starting`);
+                this.logger.log(
+                    `[${directorySlug}] 9. Badge Processing for Repository Items - Starting`,
+                );
                 validatedItems = await this.badgeProcessingService.processBadges(validatedItems);
 
                 // Log badge statistics
                 const badgeStats = this.badgeProcessingService.getBadgeStatistics(validatedItems);
                 this.logger.log(
-                    `[${slug}] Badge processing completed. Statistics: ${JSON.stringify(badgeStats)}`,
+                    `[${directorySlug}] Badge processing completed. Statistics: ${JSON.stringify(badgeStats)}`,
                 );
             }
 
@@ -340,7 +360,7 @@ export class ItemsGeneratorService {
             };
         } catch (error: any) {
             this.logger.error(
-                `Error generating directory data for slug ${slug}: ${error.message}`,
+                `Error generating directory data for directory ${directorySlug}: ${error.message}`,
                 error.stack,
             );
 
@@ -464,6 +484,7 @@ export class ItemsGeneratorService {
 
             // 3. Extract item details using the existing extraction service
             const extractedItems = await this.itemExtractionService.extractItemsFromPages(
+                'extract-items-from-url',
                 {
                     ...extractionDto,
                     config: {

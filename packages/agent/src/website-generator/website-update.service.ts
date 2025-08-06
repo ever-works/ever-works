@@ -24,13 +24,13 @@ export class WebsiteUpdateService {
 
         // Check if the target repository exists
         const repositoryExists = await this.githubService.repositoryExists(
-            directory.owner,
+            directory.getRepoOwner(),
             websiteRepo,
             token,
         );
         if (!repositoryExists) {
             throw new NotFoundException(
-                `Website repository '${directory.owner}/${websiteRepo}' does not exist`,
+                `Website repository '${directory.getRepoOwner()}/${websiteRepo}' does not exist`,
             );
         }
 
@@ -74,19 +74,22 @@ export class WebsiteUpdateService {
      */
     private async updateFork(directory: Directory, user: User): Promise<boolean> {
         const token = user.getGitToken();
+        const committer = user.asCommitter();
+
         const websiteRepo = directory.getWebsiteRepo();
 
         try {
             // Clone the target repository
-            const targetDir = await this.githubService.cloneOrPull(
-                directory.owner,
-                websiteRepo,
+            const targetDir = await this.githubService.cloneOrPull({
+                owner: directory.getRepoOwner(),
+                repo: websiteRepo,
                 token,
-            );
+                committer,
+            });
 
             // Check if this is actually a fork by looking for upstream remote
             const isActualFork = await this.githubService.hasForkRelationship(
-                directory.owner,
+                directory.getRepoOwner(),
                 websiteRepo,
                 WEBSITE_TEMPLATE_CONFIG.owner,
                 WEBSITE_TEMPLATE_CONFIG.repo,
@@ -125,14 +128,15 @@ export class WebsiteUpdateService {
         const websiteRepo = directory.getWebsiteRepo();
 
         // Clone the original template repository
-        const originalDir = await this.githubService.cloneOrPull(
-            WEBSITE_TEMPLATE_CONFIG.owner,
-            WEBSITE_TEMPLATE_CONFIG.repo,
+        const originalDir = await this.githubService.cloneOrPull({
+            owner: WEBSITE_TEMPLATE_CONFIG.owner,
+            repo: WEBSITE_TEMPLATE_CONFIG.repo,
             token,
-        );
+            committer: user.asCommitter(),
+        });
 
         // Get the target repository URL
-        const targetRepoUrl = this.githubService.getURL(directory.owner, websiteRepo);
+        const targetRepoUrl = this.githubService.getURL(directory.getRepoOwner(), websiteRepo);
 
         // Remove existing origin and add new one
         await this.githubService.remoteRemove(originalDir, 'origin');
@@ -142,7 +146,7 @@ export class WebsiteUpdateService {
         await this.githubService.push(originalDir, token);
 
         this.logger.log(
-            `Successfully updated ${directory.owner}/${websiteRepo} using duplicate method`,
+            `Successfully updated ${directory.getRepoOwner()}/${websiteRepo} using duplicate method`,
         );
     }
 
@@ -151,16 +155,25 @@ export class WebsiteUpdateService {
      */
     private async updateTemplate(directory: Directory, user: User): Promise<void> {
         const token = user.getGitToken();
+        const committer = user.asCommitter();
+
         const websiteRepo = directory.getWebsiteRepo();
 
         // Clone both repositories
         const [originalDir, targetDir] = await Promise.all([
-            this.githubService.cloneOrPull(
-                WEBSITE_TEMPLATE_CONFIG.owner,
-                WEBSITE_TEMPLATE_CONFIG.repo,
+            this.githubService.cloneOrPull({
+                owner: WEBSITE_TEMPLATE_CONFIG.owner,
+                repo: WEBSITE_TEMPLATE_CONFIG.repo,
                 token,
-            ),
-            this.githubService.cloneOrPull(directory.owner, websiteRepo, token),
+                committer,
+            }),
+
+            this.githubService.cloneOrPull({
+                owner: directory.getRepoOwner(),
+                repo: websiteRepo,
+                token,
+                committer,
+            }),
         ]);
 
         // Copy files from original to target (excluding .git directory)
@@ -169,13 +182,12 @@ export class WebsiteUpdateService {
         // Add, commit, and push changes
         await this.githubService.add(targetDir, '.');
 
-        const committer = user.asCommitter();
         await this.githubService.commit(targetDir, 'Update website from template', committer);
 
         await this.githubService.push(targetDir, token);
 
         this.logger.log(
-            `Successfully updated ${directory.owner}/${websiteRepo} using template method`,
+            `Successfully updated ${directory.getRepoOwner()}/${websiteRepo} using template method`,
         );
     }
 

@@ -49,7 +49,7 @@ export class DataGeneratorService {
 
         // Generate items, the items generator will always to generate new items
         const generatedItems = await this.itemsGeneratorService
-            .generateItemsGenerator(createItemsGeneratorDto, existingData)
+            .generateItemsGenerator(directory, createItemsGeneratorDto, existingData)
             .catch((err) => {
                 this.logger.error('Failed to generate items from ItemsGeneratorService.', err);
                 return null;
@@ -57,7 +57,11 @@ export class DataGeneratorService {
 
         // If no items were generated, we don't need to do anything else
         if (!generatedItems || generatedItems.items.length === 0) {
-            const dataDir = this.githubService.getDir(directory.owner, directory.getDataRepo());
+            const dataDir = this.githubService.getDir(
+                directory.getRepoOwner(),
+                directory.getDataRepo(),
+            );
+
             await DataRepository.create(dataDir).then((data) => data.cleanup());
             return;
         }
@@ -72,12 +76,14 @@ export class DataGeneratorService {
         const description = `machine-readable data for ${directory.slug}`;
 
         const token = user.getGitToken();
+        const committer = user.asCommitter();
+
         const repo = directory.getDataRepo();
 
         // Creating GitHub repository
         if (directory.organization) {
             await this.githubService.createEmptyRepoAsOrg(
-                directory.owner,
+                directory.getRepoOwner(),
                 repo,
                 description,
                 token,
@@ -86,11 +92,18 @@ export class DataGeneratorService {
             await this.githubService.createEmptyRepo(repo, description, token);
         }
 
-        this.logger.log(`Successfully created GitHub repository: ${directory.owner}/${repo}`);
+        this.logger.log(
+            `Successfully created GitHub repository: ${directory.getRepoOwner()}/${repo}`,
+        );
 
         // Cloning repository
         const dest = await this.githubService
-            .cloneOrPull(directory.owner, repo, token)
+            .cloneOrPull({
+                owner: directory.getRepoOwner(),
+                repo,
+                token,
+                committer,
+            })
             .catch((err) => {
                 this.logger.error('Failed to clone repository', err);
                 return null;
@@ -231,13 +244,13 @@ export class DataGeneratorService {
 
             // Push changes
             await this.githubService.push(dest, token);
-            this.logger.log(`All processed and pushed to ${directory.owner}/${repo}`);
+            this.logger.log(`All processed and pushed to ${directory.getRepoOwner()}/${repo}`);
 
             // create PR if we are in update mode and branch was created
             if (newBranchName && defaultBranch && createOrUpdate) {
                 await this.githubService.createPR(
                     {
-                        owner: directory.owner,
+                        owner: directory.getRepoOwner(),
                         repo: repo,
                         head: newBranchName,
                         base: defaultBranch,
@@ -276,10 +289,15 @@ export class DataGeneratorService {
 
         try {
             // Delete the GitHub repository
-            await this.githubService.deleteRepository(directory.owner, repo, token);
-            this.logger.log(`Successfully deleted data repository: ${directory.owner}/${repo}`);
+            await this.githubService.deleteRepository(directory.getRepoOwner(), repo, token);
+            this.logger.log(
+                `Successfully deleted data repository: ${directory.getRepoOwner()}/${repo}`,
+            );
         } catch (error) {
-            this.logger.error(`Failed to delete data repository ${directory.owner}/${repo}:`, error);
+            this.logger.error(
+                `Failed to delete data repository ${directory.getRepoOwner()}/${repo}:`,
+                error,
+            );
             throw error;
         }
     }
@@ -289,9 +307,16 @@ export class DataGeneratorService {
      */
     async getLastRequestData(directory: Directory, user: User) {
         const token = user.getGitToken();
+        const committer = user.asCommitter();
+
         const repo = directory.getDataRepo();
 
-        const dest = await this.githubService.cloneOrPull(directory.owner, repo, token);
+        const dest = await this.githubService.cloneOrPull({
+            owner: directory.getRepoOwner(),
+            repo,
+            token,
+            committer,
+        });
         const data = await DataRepository.create(dest);
 
         const config = await data.getConfig();
@@ -305,12 +330,19 @@ export class DataGeneratorService {
         this.logger.debug(`Getting existing data for directory: ${directory.slug}`);
 
         const token = user.getGitToken();
+        const committer = user.asCommitter();
+
         const repo = directory.getDataRepo();
 
         try {
             // Try to clone or pull the repository using persistent directory
-            this.logger.log(`Checking for existing repository ${directory.owner}/${repo}`);
-            const dest = await this.githubService.cloneOrPull(directory.owner, repo, token);
+            this.logger.log(`Checking for existing repository ${directory.getRepoOwner()}/${repo}`);
+            const dest = await this.githubService.cloneOrPull({
+                owner: directory.getRepoOwner(),
+                repo,
+                token,
+                committer,
+            });
             const data = await DataRepository.create(dest);
             this.logger.log(`Found existing repository at ${dest}`);
 
@@ -345,7 +377,7 @@ export class DataGeneratorService {
         } catch (error) {
             // Repository doesn't exist or can't be accessed
             this.logger.debug(
-                `Repository ${directory.owner}/${repo} doesn't exist or can't be accessed: ${error.message}`,
+                `Repository ${directory.getRepoOwner()}/${repo} doesn't exist or can't be accessed: ${error.message}`,
             );
             return {
                 existingItems: [],
@@ -403,7 +435,7 @@ export class DataGeneratorService {
     }
 
     private getDefaultReadme(directory: Directory) {
-        const markdownURL = this.githubService.getURL(directory.owner, directory.slug);
+        const markdownURL = this.githubService.getURL(directory.getRepoOwner(), directory.slug);
         return (
             `# ${directory.getDataRepo()}\n\n` +
             `This repository holds data used to generate [${directory.slug}](${markdownURL})\n\n`

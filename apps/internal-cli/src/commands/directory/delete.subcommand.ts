@@ -3,8 +3,8 @@ import { Logger } from '@nestjs/common';
 import chalk from 'chalk';
 import ora from 'ora';
 import inquirer from 'inquirer';
-import { DirectoryRepository } from '@packages/agent/database';
-import { AgentService } from '@packages/agent/http';
+import { DirectoryRepository, UserRepository } from '@packages/agent/database';
+import { AgentService } from '@packages/agent/services';
 import { DirectoryPromptService } from './directory-prompt.service';
 import { ConfigCheckService } from './config-check.service';
 
@@ -20,6 +20,7 @@ export class DeleteSubCommand extends CommandRunner {
         private readonly directoryPrompt: DirectoryPromptService,
         private readonly configCheck: ConfigCheckService,
         private readonly agentService: AgentService,
+        private readonly userRepository: UserRepository,
     ) {
         super();
     }
@@ -49,17 +50,19 @@ export class DeleteSubCommand extends CommandRunner {
             // Show what will be deleted
             console.log(chalk.cyan('\n--- Deletion Summary ---'));
             console.log(chalk.gray('Directory:'), chalk.white(directory.slug));
-            console.log(chalk.gray('Owner:'), chalk.white(directory.owner));
+            console.log(chalk.gray('Owner:'), chalk.white(directory.getRepoOwner()));
 
             const repositoriesToDelete: string[] = [];
             if (deleteOptions.delete_data_repository) {
-                repositoriesToDelete.push(`${directory.owner}/${directory.getDataRepo()}`);
+                repositoriesToDelete.push(`${directory.getRepoOwner()}/${directory.getDataRepo()}`);
             }
             if (deleteOptions.delete_markdown_repository) {
-                repositoriesToDelete.push(`${directory.owner}/${directory.slug}`);
+                repositoriesToDelete.push(`${directory.getRepoOwner()}/${directory.slug}`);
             }
             if (deleteOptions.delete_website_repository) {
-                repositoriesToDelete.push(`${directory.owner}/${directory.getWebsiteRepo()}`);
+                repositoriesToDelete.push(
+                    `${directory.getRepoOwner()}/${directory.getWebsiteRepo()}`,
+                );
             }
 
             if (repositoriesToDelete.length > 0) {
@@ -119,10 +122,13 @@ export class DeleteSubCommand extends CommandRunner {
             const spinner = ora('Deleting directory and repositories...').start();
 
             try {
+                const user = await this.userRepository.createOrGetLocalUser();
+
                 // Call the agent service method directly
-                const result = await this.agentService.deleteItemsGenerator(
-                    directory.slug,
+                const result = await this.agentService.deleteDirectory(
+                    directory.id,
                     deleteOptions,
+                    user,
                 );
 
                 spinner.succeed('Directory and repositories deleted successfully');

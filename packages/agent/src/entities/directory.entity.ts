@@ -1,48 +1,69 @@
-import { Entity, Column, PrimaryGeneratedColumn, Index } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, Index, ManyToOne } from 'typeorm';
+import { User } from './user.entity';
+import { ClassToObject } from './types';
 
-@Entity()
-@Index(['owner', 'slug'], { unique: true }) // Unique constraint on owner + slug combination
+@Entity({ name: 'directories' })
+@Index(['owner'], { unique: true })
 export class Directory {
-	@PrimaryGeneratedColumn()
-	id: number;
+    @PrimaryGeneratedColumn('uuid')
+    id: string;
 
-	@Column()
-	name: string;
+    @Column()
+    name: string;
 
-	@Column()
-	slug: string;
+    @Column()
+    slug: string;
 
-	@Column({ nullable: true })
-	website: string;
+    @Column()
+    userId: string;
 
-	@Column()
-	owner: string;
+    @ManyToOne(() => User, (user) => user.directories, { onDelete: 'CASCADE', eager: true })
+    user: ClassToObject<User>;
 
-	@Column({ nullable: true })
-	companyName: string;
+    @Column({ nullable: true })
+    owner?: string;
 
-	@Column({ default: false })
-	organization: boolean;
+    @Column({ default: 'github' })
+    repo_provider: string; // 'github', 'gitlab', etc.
 
-	@Column()
-	description: string;
+    @Column({ nullable: true })
+    website: string;
 
-	@Column('simple-json', { nullable: true })
-	readmeConfig: MarkdownReadmeConfig;
+    @Column({ nullable: true })
+    companyName: string;
 
-	getDataRepo() {
-		return `${this.slug}-data`;
-	}
+    @Column({ default: false })
+    organization: boolean;
 
-	getWebsiteRepo() {
-		return `${this.slug}-website`;
-	}
+    @Column()
+    description: string;
+
+    @Column('simple-json', { nullable: true })
+    readmeConfig: MarkdownReadmeConfig;
+
+    getDataRepo() {
+        return `${this.slug}-data`;
+    }
+
+    getWebsiteRepo() {
+        return `${this.slug}-website`;
+    }
+
+    getRepoOwner(): string {
+        const oauthToken = this.user.oauthTokens.find(
+            (token) => token.provider === this.repo_provider,
+        );
+
+        return (
+            this.owner || oauthToken.username || oauthToken.metadata?.login || this.user.username
+        );
+    }
 }
 
 export interface MarkdownReadmeConfig {
-	header?: string;
-	overwrite_default_header?: boolean;
+    header?: string;
+    overwrite_default_header?: boolean;
 
-	footer?: string;
-	overwrite_default_footer?: boolean;
+    footer?: string;
+    overwrite_default_footer?: boolean;
 }

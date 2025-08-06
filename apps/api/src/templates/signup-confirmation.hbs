@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Confirm your Ever Works account</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: #f8fafc;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        .logo-section {
+            padding: 40px 20px 30px;
+            text-align: center;
+        }
+        .logo-title {
+            font-size: 28px;
+            font-weight: 600;
+            color: #1e293b;
+            margin: 0;
+        }
+        .logo-subtitle {
+            font-size: 14px;
+            color: #94a3b8;
+            margin: 5px 0 0;
+        }
+        .main-card {
+            margin: 0 20px 40px;
+            background-color: #ffffff;
+            border-radius: 8px;
+            padding: 40px 30px;
+        }
+        .title {
+            font-size: 24px;
+            color: #1e293b;
+            font-weight: 600;
+            text-align: center;
+            margin: 0 0 10px;
+        }
+        .subtitle {
+            text-align: center;
+            color: #64748b;
+            margin: 0 0 30px;
+            font-size: 16px;
+        }
+        .button {
+            display: inline-block;
+            text-decoration: none;
+            background-color: #1e293b;
+            color: #ffffff;
+            font-size: 16px;
+            font-weight: 500;
+            padding: 12px 48px;
+            border-radius: 6px;
+            text-align: center;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .button-container {
+            text-align: center;
+            margin: 25px 0;
+        }
+        .divider {
+            border: 0;
+            border-top: 1px solid #e2e8f0;
+            margin: 30px 0;
+        }
+        .help-text {
+            text-align: center;
+            font-size: 14px;
+            color: #94a3b8;
+            margin: 0;
+        }
+        .link-text {
+            text-align: center;
+            font-size: 14px;
+            margin: 8px 0 0;
+        }
+        .link-text a {
+            color: #64748b;
+            word-break: break-all;
+        }
+        .footer {
+            padding: 0 20px 40px;
+            text-align: center;
+        }
+        .footer-text {
+            font-size: 14px;
+            color: #94a3b8;
+            margin: 0;
+        }
+        .footer-copyright {
+            font-size: 14px;
+            color: #94a3b8;
+            margin: 20px 0 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Logo Section -->
+        <div class="logo-section">
+            <h1 class="logo-title">Ever Works</h1>
+            <p class="logo-subtitle">by Ever Co.</p>
+        </div>
+
+        <!-- Main Card -->
+        <div class="main-card">
+            <!-- Welcome Message -->
+            <h2 class="title">
+                Welcome to Ever Works{{#if firstName}}, {{firstName}}{{/if}}
+            </h2>
+
+            <p class="subtitle">
+                Please confirm your email address to get started.
+            </p>
+
+            <!-- CTA Button -->
+            <div class="button-container">
+                <a href="{{confirmationUrl}}" class="button">
+                    Confirm Email Address
+                </a>
+            </div>
+
+            <!-- Divider -->
+            <hr class="divider">
+
+            <!-- Alternative Link -->
+            <p class="help-text">
+                Having trouble? Copy and paste this link:
+            </p>
+            <p class="link-text">
+                <a href="{{confirmationUrl}}">
+                    {{confirmationUrl}}
+                </a>
+            </p>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p class="footer-text">
+                If you didn't create an account, you can safely ignore this email.
+            </p>
+            <p class="footer-copyright">
+                © 2024 Ever Co. All rights reserved.
+            </p>
+        </div>
+    </div>
+</body>
+</html>

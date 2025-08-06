@@ -40,8 +40,8 @@ export const regenerateMarkdownCommand = new Command('regenerate-markdown')
                     type: 'confirm',
                     name: 'proceed',
                     message: 'Proceed with markdown regeneration?',
-                    default: true
-                }
+                    default: true,
+                },
             ]);
 
             if (!confirmed.proceed) {
@@ -53,7 +53,7 @@ export const regenerateMarkdownCommand = new Command('regenerate-markdown')
             const spinner = ora('Regenerating markdown...').start();
 
             try {
-                const response = await apiService.regenerateMarkdown(directory.slug);
+                const response = await apiService.regenerateMarkdown(directory.id);
 
                 spinner.succeed('Markdown regenerated successfully');
 
@@ -68,20 +68,23 @@ export const regenerateMarkdownCommand = new Command('regenerate-markdown')
                 console.log(chalk.gray('  • Check your data repository for the updated README.md'));
                 console.log(chalk.gray('  • Review the changes and commit if satisfied'));
                 console.log(chalk.gray('  • Use "directory update-website" to update the website'));
-
             } catch (error) {
                 spinner.fail('Markdown regeneration failed');
                 throw error;
             }
-
         } catch (error) {
-            console.error(chalk.red('\n✗ Failed to regenerate markdown:'), error.response?.data?.message || error.message);
+            console.error(
+                chalk.red('\n✗ Failed to regenerate markdown:'),
+                error.response?.data?.message || error.message,
+            );
 
             if (error.response?.status === 401) {
                 console.log(chalk.yellow('\n⚠ Authentication failed. Please login again.'));
                 console.log(chalk.gray('Run: ever-works auth login'));
             } else if (error.response?.status === 404) {
-                console.log(chalk.yellow('\n⚠ Directory not found. Please check the slug and try again.'));
+                console.log(
+                    chalk.yellow('\n⚠ Directory not found. Please check the slug and try again.'),
+                );
             }
 
             process.exit(1);

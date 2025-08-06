@@ -1,6 +1,6 @@
 import { IsOptional, IsString, IsBoolean } from 'class-validator';
 
-export class DeleteItemsGeneratorDto {
+export class DeleteDirectoryDto {
     @IsOptional()
     @IsString()
     reason?: string;
@@ -22,7 +22,7 @@ export class DeleteItemsGeneratorDto {
     delete_website_repository?: boolean = true;
 }
 
-export interface DeleteItemsGeneratorResponseDto {
+export interface DeleteDirectoryResponseDto {
     status: 'success' | 'error' | 'pending';
     slug: string;
     message: string;

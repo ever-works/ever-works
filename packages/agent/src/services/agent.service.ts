@@ -5,7 +5,6 @@ import { WebsiteGeneratorService } from '../website-generator/website-generator.
 import { WebsiteUpdateService } from '../website-generator/website-update.service';
 import { Directory } from '../entities/directory.entity';
 import { User } from '../entities/user.entity';
-import { GithubService } from '../git/github.service';
 import { DirectoryRepository } from '../database/directory.repository';
 import {
     CreateItemsGeneratorDto,
@@ -20,8 +19,8 @@ import {
     RemoveItemResponseDto,
     ExtractItemDetailsDto,
     ExtractItemDetailsResponseDto,
-    DeleteItemsGeneratorDto,
-    DeleteItemsGeneratorResponseDto,
+    DeleteDirectoryDto,
+    DeleteDirectoryResponseDto,
 } from '../items-generator/dto';
 import { CreateDirectoryDto } from '../dto/create-directory.dto';
 import { UpdateWebsiteRepositoryResponseDto } from '../website-generator/dto/update-website-repository.dto';
@@ -37,32 +36,76 @@ export class AgentService {
         private readonly markdownGenerator: MarkdownGeneratorService,
         private readonly websiteGenerator: WebsiteGeneratorService,
         private readonly websiteUpdateService: WebsiteUpdateService,
-        private readonly githubService: GithubService,
         private readonly itemSubmissionService: ItemSubmissionService,
         private readonly itemsGeneratorService: ItemsGeneratorService,
         private readonly directoryRepository: DirectoryRepository,
     ) {}
 
+    /**
+     * Validates that the current authenticated user owns the directory
+     * @param directoryId - The ID of the directory to validate
+     * @param userId - The ID of the authenticated user
+     * @returns The directory if validation passes
+     * @throws NotFoundException if directory doesn't exist
+     * @throws BadRequestException if user doesn't own the directory
+     */
+    private async validateDirectoryOwnership(
+        directoryId: string,
+        userId: string,
+    ): Promise<Directory> {
+        const directory = await this.directoryRepository.findById(directoryId);
+
+        if (!directory) {
+            throw new NotFoundException(`Directory with id '${directoryId}' not found`);
+        }
+
+        if (directory.userId !== userId) {
+            throw new BadRequestException('You do not have permission to access this directory');
+        }
+
+        return directory;
+    }
+
     async getDirectories(
         options: {
-            owner?: string;
             limit?: number;
             offset?: number;
+            search?: string;
         } = {},
+        user: User,
     ) {
-        const { owner, limit = 20, offset = 0 } = options;
+        const { limit = 20, offset = 0, search } = options;
+
+        // Validate and sanitize search input
+        let sanitizedSearch: string | undefined;
+        if (search) {
+            // Trim and limit search length
+            sanitizedSearch = search.trim().slice(0, 100);
+
+            // If search is empty after trimming, treat as no search
+            if (!sanitizedSearch) {
+                sanitizedSearch = undefined;
+            }
+        }
 
         try {
             const directories = await this.directoryRepository.findAll({
-                owner,
+                userId: user.id,
                 limit,
                 offset,
+                search: sanitizedSearch,
+            });
+
+            // Get the total count of directories for proper pagination
+            const total = await this.directoryRepository.countAll({
+                userId: user.id,
+                search: sanitizedSearch,
             });
 
             return {
                 status: 'success',
                 directories,
-                total: directories.length,
+                total,
                 limit,
                 offset,
             };
@@ -72,22 +115,23 @@ export class AgentService {
         }
     }
 
-    async createDirectory(createDirectoryDto: CreateDirectoryDto) {
-        const { slug, name, description, owner } = createDirectoryDto;
-        const user = await User.sessionMock();
+    async createDirectory(createDirectoryDto: CreateDirectoryDto, user: User) {
+        const { slug, name, description, owner, readme_config, organization, repo_provider } =
+            createDirectoryDto;
 
-        const ghOwner = await this.githubService.getUser(user.getGitToken());
-
-        const directoryData = {
+        const directoryData: Partial<Directory> = {
             slug,
             name,
             description,
-            readmeConfig: createDirectoryDto.readme_config,
-            owner: owner || ghOwner.login,
-            organization: !!owner && owner !== ghOwner.login,
+            userId: user.id,
+            owner: owner,
+            repo_provider: repo_provider,
+            readmeConfig: readme_config,
+            organization: organization,
         };
 
-        const dir = await this.directoryRepository.create(directoryData);
+        const dir = await this.directoryRepository.create(directoryData, user);
+        dir.owner = dir.getRepoOwner();
 
         return {
             status: 'success',
@@ -96,14 +140,12 @@ export class AgentService {
     }
 
     async generateItemsGenerator(
+        directoryId: string,
         createItemsGeneratorDto: CreateItemsGeneratorDto,
+        user: User,
         awaitCompletion = true,
     ): Promise<ItemsGeneratorResponseDto> {
-        const user = await User.sessionMock();
-        const directory = await this.directoryRepository.findBySlug(createItemsGeneratorDto.slug);
-        if (!directory) {
-            throw new NotFoundException('Directory not found');
-        }
+        const directory = await this.validateDirectoryOwnership(directoryId, user.id);
 
         if (awaitCompletion) {
             await this.processGeneration(directory, user, createItemsGeneratorDto);
@@ -113,22 +155,19 @@ export class AgentService {
 
         return {
             status: 'pending',
-            slug: createItemsGeneratorDto.slug,
+            slug: directory.slug,
             parameters: createItemsGeneratorDto,
             message: `Processing request for '${createItemsGeneratorDto.name}'. Check logs or data directory for updates.`,
         };
     }
 
     async updateItemsGenerator(
-        slug: string,
+        directoryId: string,
         updateItemsGeneratorDto: UpdateItemsGeneratorDto,
+        user: User,
         awaitCompletion = true,
     ): Promise<ItemsGeneratorResponseDto> {
-        const user = await User.sessionMock();
-        const directory = await this.directoryRepository.findBySlug(slug);
-        if (!directory) {
-            throw new NotFoundException('Directory not found');
-        }
+        const directory = await this.validateDirectoryOwnership(directoryId, user.id);
 
         let lastRequestData = await this.dataGenerator
             .getLastRequestData(directory, user)
@@ -150,22 +189,21 @@ export class AgentService {
         }
 
         return {
-            slug,
+            slug: directory.slug,
             status: 'pending',
             parameters: lastRequestData,
             message: `Processing update for '${directory.name}'. Check logs or data directory for updates.`,
         };
     }
 
-    async submitItem(slug: string, submitItemDto: SubmitItemDto): Promise<SubmitItemResponseDto> {
+    async submitItem(
+        directoryId: string,
+        submitItemDto: SubmitItemDto,
+        user: User,
+    ): Promise<SubmitItemResponseDto> {
         try {
-            const user = await User.sessionMock();
-
-            // Check if directory exists for the given slug
-            const directory = await this.directoryRepository.findBySlug(slug);
-            if (!directory) {
-                throw new NotFoundException(`Directory with slug '${slug}' not found`);
-            }
+            // Validate directory ownership
+            const directory = await this.validateDirectoryOwnership(directoryId, user.id);
 
             const result = await this.itemSubmissionService.submitItem(
                 directory,
@@ -193,7 +231,7 @@ export class AgentService {
 
             return {
                 status: 'error',
-                slug,
+                slug: directoryId,
                 item_name: submitItemDto.name,
                 message: 'Failed to submit item',
                 error_details: error.message,
@@ -201,15 +239,14 @@ export class AgentService {
         }
     }
 
-    async removeItem(slug: string, removeItemDto: RemoveItemDto): Promise<RemoveItemResponseDto> {
+    async removeItem(
+        directoryId: string,
+        removeItemDto: RemoveItemDto,
+        user: User,
+    ): Promise<RemoveItemResponseDto> {
         try {
-            const user = await User.sessionMock();
-
-            // Check if directory exists for the given slug
-            const directory = await this.directoryRepository.findBySlug(slug);
-            if (!directory) {
-                throw new NotFoundException(`Directory with slug '${slug}' not found`);
-            }
+            // Validate directory ownership
+            const directory = await this.validateDirectoryOwnership(directoryId, user.id);
 
             const result = await this.itemSubmissionService.removeItem(
                 directory,
@@ -236,7 +273,7 @@ export class AgentService {
 
             return {
                 status: 'error',
-                slug,
+                slug: directoryId,
                 item_name: 'Unknown',
                 item_slug: removeItemDto.item_slug,
                 message: 'Failed to remove item',
@@ -285,15 +322,13 @@ export class AgentService {
         }
     }
 
-    async regenerateMarkdown(slug: string): Promise<{ status: string; error_details?: string }> {
+    async regenerateMarkdown(
+        directoryId: string,
+        user: User,
+    ): Promise<{ status: string; error_details?: string }> {
         try {
-            const user = await User.sessionMock();
-
-            // Check if directory exists for the given slug
-            const directory = await this.directoryRepository.findBySlug(slug);
-            if (!directory) {
-                throw new NotFoundException(`Directory with slug '${slug}' not found`);
-            }
+            // Validate directory ownership
+            const directory = await this.validateDirectoryOwnership(directoryId, user.id);
 
             // Regenerate markdown for all items
             await this.markdownGenerator.initialize(directory, user, {
@@ -313,23 +348,21 @@ export class AgentService {
         }
     }
 
-    async updateWebsiteRepository(slug: string): Promise<UpdateWebsiteRepositoryResponseDto> {
+    async updateWebsiteRepository(
+        directoryId: string,
+        user: User,
+    ): Promise<UpdateWebsiteRepositoryResponseDto> {
         try {
-            const user = await User.sessionMock();
-
-            // Check if directory exists for the given slug
-            const directory = await this.directoryRepository.findBySlug(slug);
-            if (!directory) {
-                throw new NotFoundException(`Directory with slug '${slug}' not found`);
-            }
+            // Validate directory ownership
+            const directory = await this.validateDirectoryOwnership(directoryId, user.id);
 
             const result = await this.websiteUpdateService.updateRepository(directory, user);
 
             return {
                 status: 'success',
                 slug: directory.slug,
-                owner: directory.owner,
-                repository: `${directory.owner}/${directory.slug}-website`,
+                owner: directory.getRepoOwner(),
+                repository: `${directory.getRepoOwner()}/${directory.slug}-website`,
                 message: result.message,
                 method_used: result.method,
             };
@@ -338,55 +371,67 @@ export class AgentService {
 
             return {
                 status: 'error',
-                slug,
+                slug: directoryId,
                 owner: '',
-                repository: `/${slug}-website`,
+                repository: `/${directoryId}-website`,
                 message: 'Failed to update website repository',
                 error_details: error.message,
             };
         }
     }
 
-    async deleteItemsGenerator(
-        slug: string,
-        deleteItemsGeneratorDto: DeleteItemsGeneratorDto,
-    ): Promise<DeleteItemsGeneratorResponseDto> {
-        try {
-            const user = await User.sessionMock();
+    async deleteDirectory(
+        id: string,
+        deleteDirectoryDto: DeleteDirectoryDto,
+        user: User,
+    ): Promise<DeleteDirectoryResponseDto> {
+        let directory: Directory | null = null;
 
-            // Check if directory exists for the given slug
-            const directory = await this.directoryRepository.findBySlug(slug);
+        try {
+            // Check if directory exists and belongs to the user
+            directory = await this.directoryRepository.findById(id);
             if (!directory) {
-                throw new NotFoundException(`Directory with slug '${slug}' not found`);
+                throw new NotFoundException(`Directory with id '${id}' not found`);
+            }
+
+            // Verify the directory belongs to the user
+            if (directory.userId !== user.id) {
+                throw new BadRequestException(
+                    'You do not have permission to delete this directory',
+                );
             }
 
             const deletedRepositories: string[] = [];
 
             // Delete data repository if requested
-            if (deleteItemsGeneratorDto.delete_data_repository !== false) {
+            if (deleteDirectoryDto.delete_data_repository !== false) {
                 try {
                     await this.dataGenerator.removeRepository(directory, user);
-                    deletedRepositories.push(`${directory.owner}/${directory.getDataRepo()}`);
+                    deletedRepositories.push(
+                        `${directory.getRepoOwner()}/${directory.getDataRepo()}`,
+                    );
                 } catch (error) {
                     this.logger.error('Failed to delete data repository:', error);
                 }
             }
 
             // Delete markdown repository if requested
-            if (deleteItemsGeneratorDto.delete_markdown_repository !== false) {
+            if (deleteDirectoryDto.delete_markdown_repository !== false) {
                 try {
                     await this.markdownGenerator.removeRepository(directory, user);
-                    deletedRepositories.push(`${directory.owner}/${directory.slug}`);
+                    deletedRepositories.push(`${directory.getRepoOwner()}/${directory.slug}`);
                 } catch (error) {
                     this.logger.error('Failed to delete markdown repository:', error);
                 }
             }
 
             // Delete website repository if requested
-            if (deleteItemsGeneratorDto.delete_website_repository !== false) {
+            if (deleteDirectoryDto.delete_website_repository !== false) {
                 try {
                     await this.websiteGenerator.removeRepository(directory, user);
-                    deletedRepositories.push(`${directory.owner}/${directory.getWebsiteRepo()}`);
+                    deletedRepositories.push(
+                        `${directory.getRepoOwner()}/${directory.getWebsiteRepo()}`,
+                    );
                 } catch (error) {
                     this.logger.error('Failed to delete website repository:', error);
                 }
@@ -406,7 +451,7 @@ export class AgentService {
 
             return {
                 status: 'error',
-                slug,
+                slug: directory?.slug || '',
                 message: 'Failed to delete directory',
                 error_details: error.message,
             };

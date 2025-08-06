@@ -59,7 +59,7 @@ export const updateWebsiteCommand = new Command('update-website')
             const spinner = ora('Updating website repository...').start();
 
             try {
-                const response = await apiService.updateWebsite(directory.slug);
+                const response = await apiService.updateWebsite(directory.id);
 
                 spinner.succeed('Website updated successfully');
 
@@ -70,10 +70,7 @@ export const updateWebsiteCommand = new Command('update-website')
                 }
 
                 if (response.repository_url) {
-                    console.log(
-                        chalk.blue('\nRepository:'),
-                        chalk.white(response.repository_url),
-                    );
+                    console.log(chalk.blue('\nRepository:'), chalk.white(response.repository_url));
                 }
 
                 console.log(chalk.cyan('\nNext Steps:'));

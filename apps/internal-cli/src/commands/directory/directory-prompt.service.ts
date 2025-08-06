@@ -214,7 +214,7 @@ export class DirectoryPromptService extends BasePromptService {
             type Choice = { name: string; value: Directory | null; short: string };
 
             const choices: Choice[] = directories.map((dir) => ({
-                name: `${chalk.cyan(dir.slug)} - ${dir.name} ${chalk.gray(`(${dir.owner})`)}`,
+                name: `${chalk.cyan(dir.slug)} - ${dir.name} ${chalk.gray(`(${dir.getRepoOwner()})`)}`,
                 value: dir,
                 short: dir.slug,
             }));

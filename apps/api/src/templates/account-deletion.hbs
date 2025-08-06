@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Confirm account deletion</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: #f8fafc;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        .logo-section {
+            padding: 40px 20px 30px;
+            text-align: center;
+        }
+        .logo-title {
+            font-size: 28px;
+            font-weight: 600;
+            color: #1e293b;
+            margin: 0;
+        }
+        .logo-subtitle {
+            font-size: 14px;
+            color: #94a3b8;
+            margin: 5px 0 0;
+        }
+        .main-card {
+            margin: 0 20px 40px;
+            background-color: #ffffff;
+            border-radius: 8px;
+            padding: 40px 30px;
+        }
+        .icon {
+            text-align: center;
+            font-size: 40px;
+            margin-bottom: 20px;
+        }
+        .title {
+            font-size: 24px;
+            color: #1e293b;
+            font-weight: 600;
+            text-align: center;
+            margin: 0 0 10px;
+        }
+        .subtitle {
+            text-align: center;
+            color: #64748b;
+            margin: 0 0 20px;
+            font-size: 16px;
+        }
+        .warning-box {
+            background-color: #fef2f2;
+            border: 1px solid #fecaca;
+            border-radius: 6px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .warning-text {
+            font-size: 14px;
+            color: #991b1b;
+            margin: 0;
+        }
+        .warning-list {
+            font-size: 14px;
+            color: #991b1b;
+            margin: 10px 0 0 20px;
+        }
+        .expiry-notice {
+            text-align: center;
+            font-size: 14px;
+            color: #94a3b8;
+            margin: 30px 0 20px;
+        }
+        .button {
+            display: inline-block;
+            text-decoration: none;
+            font-size: 16px;
+            font-weight: 500;
+            padding: 12px 32px;
+            border-radius: 6px;
+            text-align: center;
+            width: 100%;
+            box-sizing: border-box;
+            margin-bottom: 15px;
+        }
+        .button-danger {
+            background-color: #ef4444;
+            color: #ffffff;
+        }
+        .button-primary {
+            background-color: #1e293b;
+            color: #ffffff;
+            padding: 12px 48px;
+        }
+        .button-container {
+            text-align: center;
+        }
+        .footer {
+            padding: 0 20px 40px;
+            text-align: center;
+        }
+        .footer-text {
+            font-size: 14px;
+            color: #94a3b8;
+            margin: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Logo Section -->
+        <div class="logo-section">
+            <h1 class="logo-title">Ever Works</h1>
+            <p class="logo-subtitle">by Ever Co.</p>
+        </div>
+
+        <!-- Main Card -->
+        <div class="main-card">
+            <!-- Icon -->
+            <div class="icon">⚠️</div>
+
+            <!-- Title -->
+            <h2 class="title">Delete Your Account?</h2>
+
+            <p class="subtitle">
+                {{#if firstName}}{{firstName}}, we're{{else}}We're{{/if}}
+                sorry to see you go. Please confirm that you want to permanently delete your
+                Ever Works account.
+            </p>
+
+            <!-- Warning Box -->
+            <div class="warning-box">
+                <p class="warning-text">
+                    <strong>This action cannot be undone!</strong><br><br>
+                    Deleting your account will permanently remove:
+                </p>
+                <div class="warning-list">
+                    • All your projects and data<br>
+                    • Your profile and settings<br>
+                    • Access to Ever Works services
+                </div>
+            </div>
+
+            <!-- Expiry Notice -->
+            <p class="expiry-notice">
+                This deletion request expires in
+                {{expiresIn}}.
+            </p>
+
+            <!-- Actions -->
+            <div class="button-container">
+                <a href="{{deleteUrl}}" class="button button-danger">
+                    Yes, delete my account
+                </a>
+                <a href="{{keepAccountUrl}}" class="button button-primary">
+                    Keep my account
+                </a>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p class="footer-text">
+                If you didn't request this, please ignore this email.<br><br>
+                © 2024 Ever Co. All rights reserved.
+            </p>
+        </div>
+    </div>
+</body>
+</html>

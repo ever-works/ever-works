@@ -2,9 +2,8 @@ import { SubCommand, CommandRunner } from 'nest-commander';
 import { Logger } from '@nestjs/common';
 import chalk from 'chalk';
 import ora from 'ora';
-import { DirectoryRepository } from '@packages/agent/database';
+import { DirectoryRepository, UserRepository } from '@packages/agent/database';
 import { GithubService } from '@packages/agent/git';
-import { User } from '@packages/agent/entities';
 import { DirectoryPromptService } from './directory-prompt.service';
 import { ConfigCheckService } from './config-check.service';
 import { COMMAND } from '../../config';
@@ -21,6 +20,7 @@ export class CreateSubCommand extends CommandRunner {
         private readonly githubService: GithubService,
         private readonly directoryPrompt: DirectoryPromptService,
         private readonly configCheck: ConfigCheckService,
+        private readonly userRepository: UserRepository,
     ) {
         super();
     }
@@ -36,8 +36,13 @@ export class CreateSubCommand extends CommandRunner {
             const loadingSpinner = ora('Loading...').start();
 
             // Get user information
-            const user = await User.sessionMock();
-            const ghOwner = await this.githubService.getUser(user.getGitToken());
+            const user = await this.userRepository.createOrGetLocalUser();
+            const token = user.getGitToken();
+            if (!token) {
+                throw new Error('GitHub token is required');
+            }
+
+            const ghOwner = await this.githubService.getUser(token);
 
             loadingSpinner.stop();
 
@@ -51,7 +56,7 @@ export class CreateSubCommand extends CommandRunner {
             // Check if directory already exists and handle conflicts
             const spinner = ora('Checking if directory exists...').start();
             let finalSlug = directoryData.slug;
-            let slugExists = await this.directoryRepository.existsByOwnerAndSlug(owner, finalSlug);
+            let slugExists = await this.directoryRepository.findByOwnerAndSlug(owner, finalSlug);
 
             if (slugExists) {
                 spinner.stop();
@@ -72,7 +77,7 @@ export class CreateSubCommand extends CommandRunner {
                     finalSlug = suggestedSlug;
                 } else if (resolution.action === 'modify' && resolution.finalSlug) {
                     // Check if the manually entered slug is available
-                    const manualSlugExists = await this.directoryRepository.existsByOwnerAndSlug(
+                    const manualSlugExists = await this.directoryRepository.findByOwnerAndSlug(
                         owner,
                         resolution.finalSlug,
                     );
@@ -105,7 +110,7 @@ export class CreateSubCommand extends CommandRunner {
                 organization,
             };
 
-            const directory = await this.directoryRepository.create(finalDirectoryData);
+            const directory = await this.directoryRepository.create(finalDirectoryData, user);
             createSpinner.succeed('Directory created successfully');
 
             // Display success information
@@ -114,7 +119,7 @@ export class CreateSubCommand extends CommandRunner {
             console.log(chalk.gray(`  Slug: ${directory.slug}`));
             console.log(chalk.gray(`  Name: ${directory.name}`));
             console.log(chalk.gray(`  Description: ${directory.description}`));
-            console.log(chalk.gray(`  Owner: ${directory.owner}`));
+            console.log(chalk.gray(`  Owner: ${directory.getRepoOwner()}`));
             console.log(chalk.gray(`  Organization: ${directory.organization ? 'Yes' : 'No'}`));
 
             if (directory.readmeConfig) {
@@ -149,7 +154,7 @@ export class CreateSubCommand extends CommandRunner {
         let counter = 1;
         let suggestedSlug = `${baseSlug}-${counter}`;
 
-        while (await this.directoryRepository.existsByOwnerAndSlug(owner, suggestedSlug)) {
+        while (await this.directoryRepository.findByOwnerAndSlug(owner, suggestedSlug)) {
             counter++;
             suggestedSlug = `${baseSlug}-${counter}`;
         }

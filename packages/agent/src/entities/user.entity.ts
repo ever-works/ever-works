@@ -1,23 +1,98 @@
-import { randomUUID } from 'node:crypto';
-import { slugifyText } from '../items-generator/utils/text.utils';
+import { Entity, Column, PrimaryGeneratedColumn, OneToMany } from 'typeorm';
+import { OAuthToken } from './oauth-token.entity';
+import { ClassToObject } from './types';
+import { config } from '@src/config';
+import { Directory } from './directory.entity';
 
+@Entity({ name: 'users' })
 export class User {
+    @PrimaryGeneratedColumn('uuid')
     id: string;
+
+    @Column()
     username: string;
+
+    @Column({ unique: true })
     email: string;
 
-    static async sessionMock() {
-        const user = new User();
+    @Column()
+    password: string;
 
-        user.id = slugifyText(process.env.GIT_NAME || randomUUID());
-        user.username = process.env.GIT_NAME;
-        user.email = process.env.GIT_EMAIL;
+    @Column({ default: 'local' })
+    registrationProvider: string; // 'local', 'github', 'google' - how user initially signed up
 
-        return user;
-    }
+    @Column({ nullable: true })
+    avatar: string;
 
-    getGitToken() {
-        return process.env.GITHUB_APIKEY;
+    // Email verification
+    @Column({ default: false })
+    emailVerified: boolean;
+
+    @Column({ nullable: true })
+    emailVerificationToken: string;
+
+    @Column({ nullable: true })
+    emailVerificationExpires: Date;
+
+    // Tokens and API keys
+    @Column({ nullable: true })
+    vercelToken: string;
+
+    // User status
+    @Column({ default: true })
+    isActive: boolean;
+
+    @Column({ nullable: true })
+    lastLoginAt: Date;
+
+    @Column({ nullable: true })
+    lastLoginIp: string;
+
+    // Password reset
+    @Column({ nullable: true })
+    passwordResetToken: string;
+
+    @Column({ nullable: true })
+    passwordResetExpires: Date;
+
+    // Timestamps
+    @Column({ default: () => 'CURRENT_TIMESTAMP' })
+    createdAt: Date;
+
+    @Column({ default: () => 'CURRENT_TIMESTAMP', onUpdate: 'CURRENT_TIMESTAMP' })
+    updatedAt: Date;
+
+    // Relationships
+    @OneToMany(() => OAuthToken, (token) => token.user, { eager: true })
+    oauthTokens: ClassToObject<OAuthToken>[];
+
+    @OneToMany(() => Directory, (directory) => directory.user, { lazy: true })
+    directories: Promise<ClassToObject<Directory>[]>;
+
+    local: boolean = false;
+
+    getGitToken(): string | null {
+        if (this.local) {
+            return config.github.getApiKey() || null;
+        }
+
+        // Check if oauth tokens are loaded
+        if (!this.oauthTokens) {
+            return null;
+        }
+
+        // Find GitHub token
+        const githubToken = this.oauthTokens.find((token) => token.provider === 'github');
+        if (!githubToken) {
+            return null;
+        }
+
+        // Check if token is expired
+        if (githubToken.expiresAt && new Date() > githubToken.expiresAt) {
+            return null;
+        }
+
+        return githubToken.accessToken;
     }
 
     asCommitter() {

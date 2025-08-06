@@ -80,7 +80,7 @@ export const removeItemCommand = new Command('remove-item')
                     reason: answers.reason || undefined,
                 };
 
-                const response = await apiService.removeItem(directory.slug, removeDto);
+                const response = await apiService.removeItem(directory.id, removeDto);
 
                 spinner.succeed('Item removed successfully');
 

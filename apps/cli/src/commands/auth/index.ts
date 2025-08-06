@@ -4,6 +4,7 @@ import inquirer from 'inquirer';
 import * as fs from 'fs-extra';
 import * as path from 'path';
 import * as os from 'os';
+import { API_URL } from '../../utils/constants';
 
 interface Credentials {
     token: string;
@@ -19,7 +20,7 @@ export const authCommand = new Command('auth')
     .addCommand(
         new Command('login')
             .description('Login to Ever Works API')
-            .option('--api-url <url>', 'API URL', process.env.API_URL || 'http://localhost:3100')
+            .option('--api-url <url>', 'API URL', API_URL)
             .action(async (options) => {
                 try {
                     console.log(chalk.cyan.bold('\n🔐 Ever Works Login\n'));
@@ -109,10 +110,9 @@ export async function getCredentials(): Promise<Credentials | null> {
 export async function requireAuth(): Promise<void> {
     const credentials = await getCredentials();
     if (!credentials) {
-        //TODO: Uncomment this when customer authentication is supported by the API.
-        // console.error(
-        //     chalk.red('\n✗ Not authenticated. Please run "ever-works auth login" first.'),
-        // );
-        // process.exit(1);
+        console.error(
+            chalk.red('\n✗ Not authenticated. Please run "ever-works auth login" first.'),
+        );
+        process.exit(1);
     }
 }

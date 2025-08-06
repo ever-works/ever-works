@@ -78,7 +78,10 @@ export class SourceValidationService {
         this.llm = this.aiService.createLlmWithTemperature(0.1); // Low temperature for consistent analysis
     }
 
-    async filterAndValidateSourceItems(items: ItemData[], slug: string): Promise<ItemData[]> {
+    async filterAndValidateSourceItems(
+        directorySlug: string,
+        items: ItemData[],
+    ): Promise<ItemData[]> {
         this.logger.log(`Starting source URL validation and filtering for ${items.length} items.`);
 
         if (!items || items.length === 0) {
@@ -104,7 +107,7 @@ export class SourceValidationService {
 
                 // Process all items in the batch in parallel
                 const validationPromises = batch.map((item) => {
-                    return this.validateAndFetchSourceUrl(slug, item)
+                    return this.validateAndFetchSourceUrl(directorySlug, item)
                         .then((validatedSourceUrl) => {
                             if (validatedSourceUrl) {
                                 return {
@@ -154,7 +157,7 @@ export class SourceValidationService {
     }
 
     private async validateAndFetchSourceUrl(
-        slug: string,
+        directorySlug: string,
         currentItem: ItemData,
     ): Promise<string | undefined> {
         const sourceUrl = currentItem.source_url;
@@ -196,7 +199,7 @@ export class SourceValidationService {
                     timeout: 10000, // 10-second timeout
                     validateStatus: (status) => status >= 200 && status < 400, // Allow 2xx and 3xx (redirects)
                     headers: {
-                        'User-Agent': `ItemsGeneratorBuilder-URL-Validation/${slug}`,
+                        'User-Agent': `ItemsGeneratorBuilder-URL-Validation/${directorySlug}`,
                     },
                 });
 

@@ -3,15 +3,14 @@
     "version": "0.1.0",
     "description": "Ever Works Internal CLI",
     "author": {
-		"name": "Ever Co. LTD",
-		"email": "ever@ever.co",
-		"url": "https://ever.co"
-	},
+        "name": "Ever Co. LTD",
+        "email": "ever@ever.co",
+        "url": "https://ever.co"
+    },
     "private": true,
     "license": "UNLICENSED",
     "scripts": {
-        "start": "nest start",
-        "ever-works": "node dist/main",
+        "cli": "cd dist && node dist/cli.js",
         "build": "nest build",
         "build:deps": "pnpm --filter '@packages/*' build",
         "build:cli": "node build.js",

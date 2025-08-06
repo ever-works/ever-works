@@ -34,10 +34,18 @@ export class ItemSubmissionService {
 
         try {
             const token = user.getGitToken();
+            const committer = user.asCommitter();
+
             const repo = directory.getDataRepo();
 
             // Clone or pull the data repository
-            const dest = await this.githubService.cloneOrPull(directory.owner, repo, token);
+            const dest = await this.githubService.cloneOrPull({
+                owner: directory.getRepoOwner(),
+                repo: repo,
+                token: token,
+                committer: committer,
+            });
+
             const data = await DataRepository.create(dest);
 
             // Get config to check autoapproval settings
@@ -129,7 +137,7 @@ export class ItemSubmissionService {
 
             const pr = await this.githubService.createPR(
                 {
-                    owner: directory.owner,
+                    owner: directory.getRepoOwner(),
                     repo: repo,
                     head: branchName,
                     base: defaultBranch,
@@ -146,7 +154,7 @@ export class ItemSubmissionService {
                 try {
                     await this.githubService.mergePR(
                         {
-                            owner: directory.owner,
+                            owner: directory.getRepoOwner(),
                             repo: repo,
                             pull_number: pr.number,
                             commit_title: `Merge: ${prTitle}`,
@@ -203,10 +211,18 @@ export class ItemSubmissionService {
 
         try {
             const token = user.getGitToken();
+            const committer = user.asCommitter();
+
             const repo = directory.getDataRepo();
 
             // Clone or pull the data repository
-            const dest = await this.githubService.cloneOrPull(directory.owner, repo, token);
+            const dest = await this.githubService.cloneOrPull({
+                owner: directory.getRepoOwner(),
+                repo: repo,
+                token: token,
+                committer: committer,
+            });
+
             const data = await DataRepository.create(dest);
 
             // Check if item exists
@@ -267,7 +283,7 @@ export class ItemSubmissionService {
 
             const pr = await this.githubService.createPR(
                 {
-                    owner: directory.owner,
+                    owner: directory.getRepoOwner(),
                     repo: repo,
                     head: branchName,
                     base: defaultBranch,

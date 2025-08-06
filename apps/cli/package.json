@@ -4,21 +4,19 @@
     "description": "",
     "main": "index.js",
     "scripts": {
-        "build": "node build.js",
-        "build:cli": "node build.js",
-        "dev": "node build.js && node dist/cli.js",
-        "start": "node dist/cli.js",
-        "test": "echo \"Error: no test specified\" && exit 1",
-        "clean": "rm -rf dist",
+        "cli": "cd dist && node dist/cli.js",
+        "build": "tsc --noEmit && node build.js",
+        "build:deps": "pnpm --filter '@packages/*' build",
+        "build:cli": "tsc --noEmit && node build.js",
         "publish:cli": "npm run build:cli && cd dist && npm publish",
         "test:cli": "cd dist && npm install && node cli.js --help"
     },
     "keywords": [],
     "author": {
-		"name": "Ever Co. LTD",
-		"email": "ever@ever.co",
-		"url": "https://ever.co"
-	},
+        "name": "Ever Co. LTD",
+        "email": "ever@ever.co",
+        "url": "https://ever.co"
+    },
     "license": "MIT",
     "packageManager": "pnpm@10.13.1",
     "devDependencies": {

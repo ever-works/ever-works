@@ -56,7 +56,7 @@ export class ListSubCommand extends CommandRunner {
                     dir.id.toString(),
                     this.truncateText(dir.slug, columnWidths[1] - 2),
                     this.truncateText(dir.name, columnWidths[2] - 2),
-                    this.truncateText(dir.owner, columnWidths[3] - 2),
+                    this.truncateText(dir.getRepoOwner(), columnWidths[3] - 2),
                     dir.organization ? 'Yes' : 'No',
                     this.truncateText(dir.description, columnWidths[5] - 2),
                 ];

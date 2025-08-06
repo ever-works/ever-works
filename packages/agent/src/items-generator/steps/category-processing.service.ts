@@ -45,6 +45,16 @@ const categorizeOutputSchema = z.object({
     items: z.array(itemDataWithCategoriesAndTagsSchema),
 });
 
+type CategoryProcessingParams = {
+    directorySlug: string;
+    createItemsGeneratorDto: CreateItemsGeneratorDto;
+    extractedItems: Partial<ItemData>[];
+    initialCategories: string[];
+    existingCategories: Category[];
+    existingTags: Tag[];
+    existingItems: ItemData[];
+};
+
 @Injectable()
 export class CategoryProcessingService {
     private readonly logger = new Logger(CategoryProcessingService.name);
@@ -64,30 +74,25 @@ export class CategoryProcessingService {
      * @param initialCategories Categories provided initially (from DTO or prompt)
      */
     async processCategoriesAndTags({
+        directorySlug,
         createItemsGeneratorDto,
         extractedItems,
         existingCategories,
         existingTags,
         initialCategories = [],
         existingItems,
-    }: {
-        createItemsGeneratorDto: CreateItemsGeneratorDto;
-        extractedItems: Partial<ItemData>[];
-        initialCategories: string[];
-        existingCategories: Category[];
-        existingTags: Tag[];
-        existingItems: ItemData[];
-    }) {
-        const { slug, prompt, priority_categories = [] } = createItemsGeneratorDto;
+    }: CategoryProcessingParams) {
+        const { prompt, priority_categories = [] } = createItemsGeneratorDto;
+
         this.logger.log(
-            `[${slug}] Starting category and tag processing for ${extractedItems.length} items`,
+            `[${directorySlug}] Starting category and tag processing for ${extractedItems.length} items`,
         );
 
         // Track metrics
         const startTime = Date.now();
 
         if (!extractedItems || extractedItems.length === 0) {
-            this.logger.log(`[${slug}] No items to categorize`);
+            this.logger.log(`[${directorySlug}] No items to categorize`);
             return { finalItems: [], categories: [], tags: [] };
         }
 
@@ -126,7 +131,9 @@ export class CategoryProcessingService {
                 initialCategoryMetrics,
             });
 
-            this.logger.log(`[${slug}] Successfully categorized ${categorized.length} items`);
+            this.logger.log(
+                `[${directorySlug}] Successfully categorized ${categorized.length} items`,
+            );
 
             // Extract unique categories and tags
             const categories = this.extractUniqueCategories(categorized, priority_categories);
@@ -138,13 +145,13 @@ export class CategoryProcessingService {
             // Calculate processing time
             const processingTime = (Date.now() - startTime) / 1000;
             this.logger.log(
-                `[${slug}] Category processing complete in ${processingTime.toFixed(2)}s. Found ${categories.length} categories and ${tags.length} tags.`,
+                `[${directorySlug}] Category processing complete in ${processingTime.toFixed(2)}s. Found ${categories.length} categories and ${tags.length} tags.`,
             );
 
             return { finalItems, categories, tags };
         } catch (error) {
             this.logger.error(
-                `[${slug}] Error during category processing: ${error.message}`,
+                `[${directorySlug}] Error during category processing: ${error.message}`,
                 error.stack,
             );
 

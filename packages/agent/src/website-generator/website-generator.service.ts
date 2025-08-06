@@ -12,23 +12,26 @@ export class WebsiteGeneratorService {
 
     private async duplicate(directory: Directory, user: User) {
         const token = user.getGitToken();
+        const committer = user.asCommitter();
 
         if (directory.organization) {
-            return this.githubService.duplicateAsOrg(
-                WEBSITE_TEMPLATE_CONFIG.owner,
-                WEBSITE_TEMPLATE_CONFIG.repo,
-                directory.owner,
-                directory.getWebsiteRepo(),
+            return this.githubService.duplicateAsOrg({
+                owner: WEBSITE_TEMPLATE_CONFIG.owner,
+                repo: WEBSITE_TEMPLATE_CONFIG.repo,
+                org: directory.getRepoOwner(),
+                name: directory.getWebsiteRepo(),
                 token,
-            );
+                committer,
+            });
         }
 
-        return this.githubService.duplicate(
-            WEBSITE_TEMPLATE_CONFIG.owner,
-            WEBSITE_TEMPLATE_CONFIG.repo,
-            directory.getWebsiteRepo(),
+        return this.githubService.duplicate({
+            owner: WEBSITE_TEMPLATE_CONFIG.owner,
+            repo: WEBSITE_TEMPLATE_CONFIG.repo,
+            name: directory.getWebsiteRepo(),
             token,
-        );
+            committer,
+        });
     }
 
     private async fork(directory: Directory, user: User) {
@@ -51,7 +54,7 @@ export class WebsiteGeneratorService {
         return this.githubService.createRepoFromTemplate(
             WEBSITE_TEMPLATE_CONFIG.owner,
             WEBSITE_TEMPLATE_CONFIG.repo,
-            directory.owner,
+            directory.getRepoOwner(),
             directory.getWebsiteRepo(),
             token,
         );
@@ -91,7 +94,7 @@ export class WebsiteGeneratorService {
 
         try {
             // Delete the GitHub repository
-            await this.githubService.deleteRepository(directory.owner, websiteRepo, token);
+            await this.githubService.deleteRepository(directory.getRepoOwner(), websiteRepo, token);
         } catch (error) {
             throw error;
         }

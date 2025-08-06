@@ -3,8 +3,8 @@ import { Logger } from '@nestjs/common';
 import chalk from 'chalk';
 import ora from 'ora';
 import inquirer from 'inquirer';
-import { DirectoryRepository } from '@packages/agent/database';
-import { AgentService } from '@packages/agent/http';
+import { DirectoryRepository, UserRepository } from '@packages/agent/database';
+import { AgentService } from '@packages/agent/services';
 import { DirectoryPromptService } from './directory-prompt.service';
 import { ConfigCheckService } from './config-check.service';
 
@@ -20,6 +20,7 @@ export class UpdateSubCommand extends CommandRunner {
         private readonly directoryPrompt: DirectoryPromptService,
         private readonly configCheck: ConfigCheckService,
         private readonly agentService: AgentService,
+        private readonly userRepository: UserRepository,
     ) {
         super();
     }
@@ -32,7 +33,9 @@ export class UpdateSubCommand extends CommandRunner {
             await this.configCheck.requireConfiguration();
 
             // Select directory
-            const selection = await this.directoryPrompt.promptDirectorySelection(this.directoryRepository);
+            const selection = await this.directoryPrompt.promptDirectorySelection(
+                this.directoryRepository,
+            );
             if (selection.cancelled || !selection.directory) {
                 console.log(chalk.yellow('\n⚠ Operation cancelled.'));
                 return;
@@ -47,8 +50,14 @@ export class UpdateSubCommand extends CommandRunner {
             // Show confirmation
             console.log(chalk.cyan('\n--- Update Summary ---'));
             console.log(chalk.gray('Directory:'), chalk.white(directory.slug));
-            console.log(chalk.gray('Generation Method:'), chalk.white(updateOptions.generation_method));
-            console.log(chalk.gray('Update with PR:'), chalk.white(updateOptions.update_with_pull_request ? 'Yes' : 'No'));
+            console.log(
+                chalk.gray('Generation Method:'),
+                chalk.white(updateOptions.generation_method),
+            );
+            console.log(
+                chalk.gray('Update with PR:'),
+                chalk.white(updateOptions.update_with_pull_request ? 'Yes' : 'No'),
+            );
 
             const confirmed = await inquirer.prompt([
                 {
@@ -68,28 +77,38 @@ export class UpdateSubCommand extends CommandRunner {
             const spinner = ora('Updating directory...').start();
 
             try {
+                const user = await this.userRepository.createOrGetLocalUser();
+
                 // Call the agent service method directly
-                const result = await this.agentService.updateItemsGenerator(directory.slug, updateOptions);
+                const result = await this.agentService.updateItemsGenerator(
+                    directory.id,
+                    updateOptions,
+                    user,
+                );
 
                 spinner.succeed('Directory update initiated successfully');
                 console.log(chalk.green('\n✓ Update initiated successfully!'));
                 console.log(chalk.gray('Status:'), chalk.white(result.status));
                 console.log(chalk.gray('Message:'), chalk.white(result.message));
                 console.log(chalk.gray('Directory:'), chalk.white(directory.slug));
-                console.log(chalk.gray('Generation Method:'), chalk.white(updateOptions.generation_method));
-                console.log(chalk.gray('Update with PR:'), chalk.white(updateOptions.update_with_pull_request ? 'Yes' : 'No'));
+                console.log(
+                    chalk.gray('Generation Method:'),
+                    chalk.white(updateOptions.generation_method),
+                );
+                console.log(
+                    chalk.gray('Update with PR:'),
+                    chalk.white(updateOptions.update_with_pull_request ? 'Yes' : 'No'),
+                );
 
                 if (result.status === 'pending') {
                     console.log(chalk.cyan('\n--- Processing ---'));
                     console.log(chalk.gray('The update is being processed in the background.'));
                     console.log(chalk.gray('Check the logs or data directory for updates.'));
                 }
-
             } catch (error) {
                 spinner.fail('Failed to update directory');
                 throw error;
             }
-
         } catch (error) {
             this.logger.error('Failed to update directory:', error);
             console.log(chalk.red('\n✗ Failed to update directory:'), error.message);

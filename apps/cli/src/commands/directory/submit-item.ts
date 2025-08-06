@@ -116,7 +116,7 @@ export const submitItemCommand = new Command('submit-item')
                     featured: answers.featured || false,
                 };
 
-                const response = await apiService.submitItem(directory.slug, submitDto);
+                const response = await apiService.submitItem(directory.id, submitDto);
 
                 spinner.succeed('Item submitted successfully');
 

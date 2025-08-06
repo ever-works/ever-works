@@ -25,12 +25,13 @@ export class MarkdownGeneratorService {
 
     async initialize(directory: Directory, user: User, options: InitializeOptions = {}) {
         const token = user.getGitToken();
+        const committer = user.asCommitter();
 
         const description = options?.repository_description || directory.description;
 
         if (directory.organization) {
             await this.githubService.createEmptyRepoAsOrg(
-                directory.owner,
+                directory.getRepoOwner(),
                 directory.slug,
                 description,
                 token,
@@ -39,17 +40,19 @@ export class MarkdownGeneratorService {
             await this.githubService.createEmptyRepo(directory.slug, description, token);
         }
 
-        const markdownPath = await this.githubService.cloneOrPull(
-            directory.owner,
-            directory.slug,
+        const markdownPath = await this.githubService.cloneOrPull({
+            owner: directory.getRepoOwner(),
+            repo: directory.slug,
             token,
-        );
+            committer,
+        });
 
-        const dataPath = await this.githubService.cloneOrPull(
-            directory.owner,
-            directory.getDataRepo(),
+        const dataPath = await this.githubService.cloneOrPull({
+            owner: directory.getRepoOwner(),
+            repo: directory.getDataRepo(),
             token,
-        );
+            committer,
+        });
 
         const markdownRepo = new MarkdownRepository(markdownPath);
         const dataRepo = await DataRepository.create(dataPath);
@@ -162,7 +165,7 @@ export class MarkdownGeneratorService {
                 await this.githubService
                     .createPR(
                         {
-                            owner: directory.owner,
+                            owner: directory.getRepoOwner(),
                             repo: directory.slug,
                             base: defaultBranch,
                             head: pr_update.branch,
@@ -187,12 +190,14 @@ export class MarkdownGeneratorService {
 
     async removeItemDetail(directory: Directory, user: User, slug: string, branch?: string) {
         const token = user.getGitToken();
+        const committer = user.asCommitter();
 
-        const markdownPath = await this.githubService.cloneOrPull(
-            directory.owner,
-            directory.slug,
+        const markdownPath = await this.githubService.cloneOrPull({
+            owner: directory.getRepoOwner(),
+            repo: directory.slug,
             token,
-        );
+            committer,
+        });
 
         const markdownRepo = new MarkdownRepository(markdownPath);
 
@@ -213,10 +218,15 @@ export class MarkdownGeneratorService {
 
         try {
             // Delete the GitHub repository
-            await this.githubService.deleteRepository(directory.owner, directory.slug, token);
-            this.logger.log(`Successfully deleted markdown repository: ${directory.owner}/${directory.slug}`);
+            await this.githubService.deleteRepository(directory.getRepoOwner(), directory.slug, token);
+            this.logger.log(
+                `Successfully deleted markdown repository: ${directory.getRepoOwner()}/${directory.slug}`,
+            );
         } catch (error) {
-            this.logger.error(`Failed to delete markdown repository ${directory.owner}/${directory.slug}:`, error);
+            this.logger.error(
+                `Failed to delete markdown repository ${directory.getRepoOwner()}/${directory.slug}:`,
+                error,
+            );
             throw error;
         }
     }
