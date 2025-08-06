@@ -1,3 +1,4 @@
+import 'server-only';
 import { API_URL } from '../constants';
 import { headers } from 'next/headers';
 import { getAuthCookie } from '../auth/cookies';

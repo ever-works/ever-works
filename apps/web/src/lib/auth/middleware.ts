@@ -1,3 +1,4 @@
+import 'server-only';
 import { jwtDecode } from 'jwt-decode';
 import { getAuthCookie } from './cookies';
 

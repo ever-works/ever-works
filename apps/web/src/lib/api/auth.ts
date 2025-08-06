@@ -1,5 +1,5 @@
+import 'server-only';
 import { serverFetch, serverMutation } from './server-api';
-import { getTranslations } from 'next-intl/server';
 
 // DTOs - Auth
 export interface RegisterDto {
