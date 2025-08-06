@@ -14,6 +14,7 @@ export class OAuthToken {
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
+    @Column()
     userId: string;
 
     @ManyToOne(() => User, (user) => user.oauthTokens, { onDelete: 'CASCADE', lazy: true })

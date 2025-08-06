@@ -14,6 +14,7 @@ export class Directory {
     @Column()
     slug: string;
 
+    @Column()
     userId: string;
 
     @ManyToOne(() => User, (user) => user.directories, { onDelete: 'CASCADE', eager: true })
