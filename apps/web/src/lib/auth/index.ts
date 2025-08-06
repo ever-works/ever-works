@@ -7,7 +7,7 @@ export async function getAuthUser() {
         return null;
     }
 
-    return auth.user;
+    return auth.user || null;
 }
 
 export async function getAuthUserFromAPI() {

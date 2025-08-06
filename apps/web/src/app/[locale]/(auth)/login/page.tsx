@@ -76,7 +76,7 @@ export default function LoginPage() {
                     />
                 </div>
 
-                <div className="flex items-center">
+                {/* <div className="flex items-center">
                     <input
                         id="remember"
                         type="checkbox"
@@ -85,7 +85,7 @@ export default function LoginPage() {
                     <label htmlFor="remember" className="ml-2 text-sm text-text-secondary">
                         {t('form.rememberMe')}
                     </label>
-                </div>
+                </div> */}
 
                 <button
                     type="submit"
