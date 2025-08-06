@@ -71,7 +71,7 @@ export class UserRepository {
         }
 
         let user = await this.repository.findOne({
-            where: [{ username: username }, { email: email }],
+            where: [{ email }, { username }],
         });
 
         if (!user) {
