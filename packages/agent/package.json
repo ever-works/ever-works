@@ -55,8 +55,11 @@
         }
     },
     "scripts": {
+        "dev": "concurrently \"npm:build:dev\" \"npm:build:types:dev\"",
         "build": "nest build -b swc && tsc --emitDeclarationOnly --declarationMap true",
-        "build:dev": "nest build -b swc --watch"
+        "build:dev": "nest build -b swc --watch",
+        "build:types": "tsc --emitDeclarationOnly --declarationMap true",
+        "build:types:dev": "tsc --emitDeclarationOnly --declarationMap true --watch"
     },
     "peerDependencies": {
         "@nestjs/common": "*",
@@ -77,6 +80,7 @@
         "@types/jest": "^29.5.14",
         "@types/node": "^22.16.0",
         "@types/supertest": "^6.0.3",
+        "concurrently": "^9.2.0",
         "eslint": "^9.30.1",
         "eslint-config-prettier": "^10.1.5",
         "eslint-plugin-prettier": "^5.5.1",
