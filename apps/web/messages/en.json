@@ -191,7 +191,22 @@
         }
     },
     "dashboard": {
-        "title": "Dashboard"
+        "title": "Dashboard",
+        "toasts": {
+            "newUser": {
+                "title": "Welcome to Ever Works! 🎉",
+                "description": "Your account has been created successfully. Please check your email to verify your account."
+            },
+            "emailVerification": {
+                "title": "Verify your email",
+                "description": "We've sent a verification link to your email address. Please check your inbox and spam folder.",
+                "action": "Resend email"
+            },
+            "verified": {
+                "title": "Email verified successfully! ✅",
+                "description": "Your email address has been verified. You now have full access to all features."
+            }
+        }
     },
     "layout": {
         "auth": {
