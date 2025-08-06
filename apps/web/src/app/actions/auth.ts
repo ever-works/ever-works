@@ -268,11 +268,6 @@ export async function resetPassword(token: string, newPassword: string) {
             token: validation.data.token,
             newPassword: validation.data.password,
         });
-
-        return {
-            success: true,
-            message: 'Password reset successful',
-        };
     } catch (error) {
         console.error(error);
         const errorT = await getTranslations('api.errors');
@@ -282,6 +277,15 @@ export async function resetPassword(token: string, newPassword: string) {
             error: error instanceof Error ? error.message : errorT('resetPasswordFailed'),
         };
     }
+
+    redirect({
+        locale: await getLocale(),
+        href: ROUTES.AUTH_LOGIN + '?reset=true',
+    });
+
+    return {
+        success: true,
+    };
 }
 
 // For oAuth connection check file:

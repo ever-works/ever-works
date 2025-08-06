@@ -132,7 +132,7 @@ function ResetPasswordContent() {
 
                     <div className="text-center">
                         <Link
-                            href={ROUTES.AUTH_LOGIN}
+                            href={ROUTES.AUTH_LOGIN + '?reset=true'}
                             className="inline-block px-6 py-3 bg-primary hover:bg-primary-hover text-white rounded-lg font-medium transition-colors"
                         >
                             {t('success.loginButton')}

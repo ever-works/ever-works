@@ -70,6 +70,10 @@
             },
             "errors": {
                 "invalidCredentials": "Invalid email or password"
+            },
+            "passwordReset": {
+                "success": "Password reset successful!",
+                "canLogin": "You can now sign in with your new password."
             }
         },
         "forgotPassword": {
