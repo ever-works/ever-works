@@ -1,3 +1,4 @@
+import 'server-only';
 import { serverFetch, serverMutation } from './server-api';
 
 // DTOs

@@ -1,3 +1,4 @@
+import 'server-only';
 import { serverMutation } from './server-api';
 
 // Response Types
