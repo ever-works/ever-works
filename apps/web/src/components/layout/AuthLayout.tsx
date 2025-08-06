@@ -17,27 +17,7 @@ export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
             {/* Left side - Form */}
             <div className="flex-1 flex items-center justify-center px-8 py-12">
                 <div className="w-full max-w-md">
-                    <Link
-                        href={ROUTES.HOME}
-                        className="inline-flex items-center gap-2 text-text-secondary hover:text-text mb-8 transition-colors"
-                    >
-                        <svg
-                            className="w-5 h-5"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M10 19l-7-7m0 0l7-7m-7 7h18"
-                            />
-                        </svg>
-                        {t('backToHome')}
-                    </Link>
-
-                    <div className="mb-8">
+                    <div className="mb-8 mt-5">
                         <h1 className="text-3xl font-bold text-text mb-2">{title}</h1>
                         <p className="text-text-secondary">{subtitle}</p>
                     </div>
