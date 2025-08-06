@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto';
 import { Entity, Column, PrimaryGeneratedColumn, OneToMany } from 'typeorm';
 import { OAuthToken } from './oauth-token.entity';
 import { ClassToObject } from './types';
@@ -71,19 +70,6 @@ export class User {
     directories: Promise<ClassToObject<Directory>[]>;
 
     local: boolean = false;
-
-    static async createLocalUser() {
-        const user = new User();
-        user.local = true;
-
-        const username = config.github.getOwner() || config.git.getName();
-
-        user.id = username || randomUUID();
-        user.username = username;
-        user.email = config.git.getEmail();
-
-        return user;
-    }
 
     getGitToken(): string | null {
         if (this.local) {

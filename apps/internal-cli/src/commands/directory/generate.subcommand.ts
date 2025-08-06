@@ -3,7 +3,7 @@ import { Logger } from '@nestjs/common';
 import chalk from 'chalk';
 import ora from 'ora';
 import inquirer from 'inquirer';
-import { DirectoryRepository } from '@packages/agent/database';
+import { DirectoryRepository, UserRepository } from '@packages/agent/database';
 import { AgentService } from '@packages/agent/services';
 import {
     CreateItemsGeneratorDto,
@@ -14,7 +14,6 @@ import {
 } from '@packages/agent/items-generator';
 import { DirectoryPromptService } from './directory-prompt.service';
 import { ConfigCheckService } from './config-check.service';
-import { User } from '@packages/agent/entities';
 
 @SubCommand({
     name: 'generate',
@@ -28,6 +27,7 @@ export class GenerateSubCommand extends CommandRunner {
         private readonly agentService: AgentService,
         private readonly directoryPrompt: DirectoryPromptService,
         private readonly configCheck: ConfigCheckService,
+        private readonly userRepository: UserRepository,
     ) {
         super();
     }
@@ -97,7 +97,7 @@ export class GenerateSubCommand extends CommandRunner {
             const spinner = ora('Starting generation process...').start();
 
             try {
-                const user = await User.createLocalUser();
+                const user = await this.userRepository.createOrGetLocalUser();
 
                 const result = await this.agentService.generateItemsGenerator(
                     directory.id,

@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { FindOneOptions, Repository } from 'typeorm';
 import { User } from '../entities/user.entity';
+import { config } from '../config';
+import { randomUUID } from 'node:crypto';
 
 @Injectable()
 export class UserRepository {
@@ -50,5 +52,39 @@ export class UserRepository {
             where: { id },
             relations: ['oauthTokens'],
         });
+    }
+
+    async createOrGetLocalUser(): Promise<User> {
+        const username = config.github.getOwner() || config.git.getName();
+        const email = config.git.getEmail();
+
+        if (!username.trim()) {
+            throw new Error(
+                'GitHub username or Git name cannot both be empty. Please ensure you have configured these environment variables.',
+            );
+        }
+
+        if (!email.trim()) {
+            throw new Error(
+                'Git email cannot be empty. Please ensure that you have configured this environment variable.',
+            );
+        }
+
+        let user = await this.repository.findOne({
+            where: [{ username: username }, { email: email }],
+        });
+
+        if (!user) {
+            user = await this.create({
+                username,
+                email,
+                password: randomUUID(),
+                emailVerified: true,
+            });
+        }
+
+        user.local = true;
+
+        return user;
     }
 }

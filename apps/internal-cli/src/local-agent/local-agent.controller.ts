@@ -9,10 +9,9 @@ import {
     Post,
     Query,
 } from '@nestjs/common';
-import { DirectoryRepository } from '@packages/agent/database';
+import { DirectoryRepository, UserRepository } from '@packages/agent/database';
 import { DeployVercelDto, VercelService } from '@packages/agent/deploy';
 import { CreateDirectoryDto } from '@packages/agent/dto';
-import { User } from '@packages/agent/entities';
 import {
     CreateItemsGeneratorDto,
     DeleteDirectoryDto,
@@ -35,6 +34,7 @@ export class LocalAgentController {
         private readonly agentService: AgentService,
         private readonly vercelService: VercelService,
         private readonly directoryRepository: DirectoryRepository,
+        private readonly userRepository: UserRepository,
     ) {}
 
     @Get('directories')
@@ -43,7 +43,7 @@ export class LocalAgentController {
         const parsedLimit = limit !== undefined ? Number(limit) : undefined;
         const parsedOffset = offset !== undefined ? Number(offset) : undefined;
 
-        const user = await User.createLocalUser();
+        const user = await this.userRepository.createOrGetLocalUser();
 
         return this.agentService.getDirectories(
             {
@@ -57,7 +57,7 @@ export class LocalAgentController {
     @Post('directories')
     @HttpCode(HttpStatus.OK)
     async createDirectory(@Body() createDirectoryDto: CreateDirectoryDto) {
-        const user = await User.createLocalUser();
+        const user = await this.userRepository.createOrGetLocalUser();
         return this.agentService.createDirectory(createDirectoryDto, user);
     }
 
@@ -67,7 +67,7 @@ export class LocalAgentController {
         @Param('id') id: string,
         @Body() createItemsGeneratorDto: CreateItemsGeneratorDto,
     ): Promise<ItemsGeneratorResponseDto> {
-        const user = await User.createLocalUser();
+        const user = await this.userRepository.createOrGetLocalUser();
         // We don't await completion here, as the request can take a long time
         return this.agentService.generateItemsGenerator(id, createItemsGeneratorDto, user, false);
     }
@@ -78,7 +78,7 @@ export class LocalAgentController {
         @Param('id') id: string,
         @Body() updateItemsGeneratorDto: UpdateItemsGeneratorDto,
     ): Promise<ItemsGeneratorResponseDto> {
-        const user = await User.createLocalUser();
+        const user = await this.userRepository.createOrGetLocalUser();
 
         // We don't await completion here, as the request can take a long time
         return this.agentService.updateItemsGenerator(id, updateItemsGeneratorDto, user, false);
@@ -90,7 +90,7 @@ export class LocalAgentController {
         @Param('id') id: string,
         @Body() submitItemDto: SubmitItemDto,
     ): Promise<SubmitItemResponseDto> {
-        const user = await User.createLocalUser();
+        const user = await this.userRepository.createOrGetLocalUser();
 
         return this.agentService.submitItem(id, submitItemDto, user);
     }
@@ -101,7 +101,7 @@ export class LocalAgentController {
         @Param('id') id: string,
         @Body() removeItemDto: RemoveItemDto,
     ): Promise<RemoveItemResponseDto> {
-        const user = await User.createLocalUser();
+        const user = await this.userRepository.createOrGetLocalUser();
 
         return this.agentService.removeItem(id, removeItemDto, user);
     }
@@ -119,7 +119,7 @@ export class LocalAgentController {
     async regenerateMarkdown(
         @Param('id') id: string,
     ): Promise<{ status: string; error_details?: string }> {
-        const user = await User.createLocalUser();
+        const user = await this.userRepository.createOrGetLocalUser();
 
         return this.agentService.regenerateMarkdown(id, user);
     }
@@ -129,7 +129,7 @@ export class LocalAgentController {
     async updateWebsiteRepository(
         @Param('id') id: string,
     ): Promise<UpdateWebsiteRepositoryResponseDto> {
-        const user = await User.createLocalUser();
+        const user = await this.userRepository.createOrGetLocalUser();
 
         return this.agentService.updateWebsiteRepository(id, user);
     }
@@ -140,7 +140,7 @@ export class LocalAgentController {
         @Param('id') id: string,
         @Body() deleteDirectoryDto: DeleteDirectoryDto,
     ): Promise<DeleteDirectoryResponseDto> {
-        const user = await User.createLocalUser();
+        const user = await this.userRepository.createOrGetLocalUser();
 
         return this.agentService.deleteDirectory(id, deleteDirectoryDto, user);
     }
@@ -149,7 +149,7 @@ export class LocalAgentController {
     async toVercel(@Body() deployVercel: DeployVercelDto, @Param('id') id: string) {
         const { VERCEL_TOKEN: vercelToken, GITHUB_TOKEN: ghToken } = deployVercel;
 
-        const user = await User.createLocalUser();
+        const user = await this.userRepository.createOrGetLocalUser();
 
         // some db query result:
         const directory = await this.directoryRepository.findById(id);

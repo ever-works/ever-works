@@ -3,11 +3,10 @@ import { Logger } from '@nestjs/common';
 import chalk from 'chalk';
 import ora from 'ora';
 import inquirer from 'inquirer';
-import { DirectoryRepository } from '@packages/agent/database';
+import { DirectoryRepository, UserRepository } from '@packages/agent/database';
 import { AgentService } from '@packages/agent/services';
 import { DirectoryPromptService } from './directory-prompt.service';
 import { ConfigCheckService } from './config-check.service';
-import { User } from '@packages/agent/entities';
 
 @SubCommand({
     name: 'update-website',
@@ -21,6 +20,7 @@ export class UpdateWebsiteSubCommand extends CommandRunner {
         private readonly directoryPrompt: DirectoryPromptService,
         private readonly configCheck: ConfigCheckService,
         private readonly agentService: AgentService,
+        private readonly userRepository: UserRepository,
     ) {
         super();
     }
@@ -76,7 +76,7 @@ export class UpdateWebsiteSubCommand extends CommandRunner {
             const spinner = ora('Updating website repository...').start();
 
             try {
-                const user = await User.createLocalUser();
+                const user = await this.userRepository.createOrGetLocalUser();
 
                 // Call the agent service method directly
                 const result = await this.agentService.updateWebsiteRepository(directory.id, user);

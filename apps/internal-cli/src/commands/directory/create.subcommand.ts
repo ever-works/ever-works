@@ -2,9 +2,8 @@ import { SubCommand, CommandRunner } from 'nest-commander';
 import { Logger } from '@nestjs/common';
 import chalk from 'chalk';
 import ora from 'ora';
-import { DirectoryRepository } from '@packages/agent/database';
+import { DirectoryRepository, UserRepository } from '@packages/agent/database';
 import { GithubService } from '@packages/agent/git';
-import { User } from '@packages/agent/entities';
 import { DirectoryPromptService } from './directory-prompt.service';
 import { ConfigCheckService } from './config-check.service';
 import { COMMAND } from '../../config';
@@ -21,6 +20,7 @@ export class CreateSubCommand extends CommandRunner {
         private readonly githubService: GithubService,
         private readonly directoryPrompt: DirectoryPromptService,
         private readonly configCheck: ConfigCheckService,
+        private readonly userRepository: UserRepository,
     ) {
         super();
     }
@@ -36,7 +36,7 @@ export class CreateSubCommand extends CommandRunner {
             const loadingSpinner = ora('Loading...').start();
 
             // Get user information
-            const user = await User.createLocalUser();
+            const user = await this.userRepository.createOrGetLocalUser();
             const token = user.getGitToken();
             if (!token) {
                 throw new Error('GitHub token is required');

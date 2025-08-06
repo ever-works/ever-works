@@ -3,9 +3,8 @@ import { Logger } from '@nestjs/common';
 import chalk from 'chalk';
 import ora from 'ora';
 import inquirer from 'inquirer';
-import { DirectoryRepository } from '@packages/agent/database';
+import { DirectoryRepository, UserRepository } from '@packages/agent/database';
 import { VercelService } from '@packages/agent/deploy';
-import { User } from '@packages/agent/entities';
 import { DirectoryPromptService } from './directory-prompt.service';
 import { ConfigCheckService } from './config-check.service';
 
@@ -21,6 +20,7 @@ export class DeploySubCommand extends CommandRunner {
         private readonly directoryPrompt: DirectoryPromptService,
         private readonly configCheck: ConfigCheckService,
         private readonly vercelService: VercelService,
+        private readonly userRepository: UserRepository,
     ) {
         super();
     }
@@ -79,7 +79,7 @@ export class DeploySubCommand extends CommandRunner {
 
             try {
                 // Get user and call the service method directly
-                const user = await User.createLocalUser();
+                const user = await this.userRepository.createOrGetLocalUser();
 
                 // Call the vercel service
                 await this.vercelService.deploy(
