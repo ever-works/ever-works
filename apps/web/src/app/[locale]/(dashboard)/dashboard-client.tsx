@@ -27,12 +27,12 @@ export default function DashboardClient({ user }: { user: AuthUser }) {
                 <h3 className="text-2xl font-bold text-text mb-4"> {t('title')}</h3>
 
                 <ul>
-                    <li>{user.email}</li>
-                    <li>{user.username}</li>
-                    <li>{user.provider}</li>
-                    <li>{user.emailVerified}</li>
-                    <li>{user.isActive}</li>
-                    <li>{user.avatar}</li>
+                    <li> Email : {user.email}</li>
+                    <li> Username : {user.username}</li>
+                    <li> Provider : {user.provider}</li>
+                    <li> EmailVerified : {JSON.stringify(user.emailVerified)}</li>
+                    <li> isActive : {JSON.stringify(user.isActive)}</li>
+                    <li> Avatar : {user.avatar}</li>
                 </ul>
 
                 <br />

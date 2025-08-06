@@ -16,7 +16,7 @@ export default function DashboardToasts() {
         if (isNewUser) {
             // Show welcome toast for new users
             toast.success(t('newUser.title'), {
-                description: t('newUser.description'),
+                description: <span className="text-white">{t('newUser.description')}</span>,
                 duration: 6000,
                 icon: (
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -32,7 +32,9 @@ export default function DashboardToasts() {
 
             // Show email verification reminder
             toast.info(t('emailVerification.title'), {
-                description: t('emailVerification.description'),
+                description: (
+                    <span className="text-white">{t('emailVerification.description')}</span>
+                ),
                 duration: 8000,
                 action: {
                     label: t('emailVerification.action'),
@@ -47,7 +49,7 @@ export default function DashboardToasts() {
         if (isVerified) {
             // Show email verified success toast
             toast.success(t('verified.title'), {
-                description: t('verified.description'),
+                description: <span className="text-white">{t('verified.description')}</span>,
                 duration: 5000,
                 icon: (
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
