@@ -46,9 +46,14 @@ export async function login(identifier: string, password: string) {
     } catch (error) {
         console.error(error);
 
+        let message = t('invalidCredentials');
+        if (error instanceof Error && error.message.includes('suspended')) {
+            message = t('account.suspended');
+        }
+
         return {
             success: false,
-            error: t('invalidCredentials'),
+            error: message,
         };
     }
 

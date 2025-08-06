@@ -63,6 +63,10 @@ export async function GET(
         }
     } catch (error) {
         href = ROUTES.AUTH_ERROR + '?error=oauth_callback';
+
+        if (error instanceof Error && error.message.includes('suspended')) {
+            href = ROUTES.AUTH_ERROR + '?error=account_locked';
+        }
     }
 
     return redirect({ locale, href });

@@ -260,6 +260,9 @@
     "validation": {
         "auth": {
             "invalidCredentials": "Invalid email or password",
+            "account": {
+                "suspended": "Account is suspended"
+            },
             "email": {
                 "required": "Email cannot be empty",
                 "invalid": "Invalid email",

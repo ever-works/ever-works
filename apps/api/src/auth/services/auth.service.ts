@@ -46,9 +46,7 @@ export class AuthService {
         const isMatch = await bcrypt.compare(password, user.password);
         if (isMatch) {
             // Check if user is active
-            if (!user.isActive) {
-                throw new UnauthorizedException('Account is suspended');
-            }
+            this.ensureUserIsActive(user);
 
             // Check if email is verified (optional - you can make this required)
             if (!user.emailVerified) {
@@ -97,92 +95,6 @@ export class AuthService {
         });
 
         return this.generateTokens(user, userAgent, ipAddress);
-    }
-
-    private async generateTokens(
-        user: Omit<User, 'password' | 'getGitToken' | 'asCommitter'>,
-        userAgent?: string,
-        ipAddress?: string,
-        oldRefreshToken?: string,
-    ): Promise<TokenResponse> {
-        const payload: JwtPayload = {
-            sub: user.id,
-            email: user.email,
-            provider: user.registrationProvider,
-            username: user.username,
-            emailVerified: user.emailVerified,
-            isActive: user.isActive,
-            avatar: user.avatar,
-            iat: Math.floor(Date.now() / 1000),
-            iss: 'ever-works-api',
-            aud: 'ever-works-users',
-        };
-
-        const accessToken = this.jwtService.sign(payload, {
-            expiresIn: jwtConstants.accessTokenExpiration(),
-            secret: jwtConstants.secret(),
-        });
-
-        const refreshToken = await this.generateRefreshToken(
-            user.id,
-            userAgent,
-            ipAddress,
-            oldRefreshToken,
-        );
-
-        return {
-            access_token: accessToken,
-            refresh_token: refreshToken,
-            user: {
-                id: user.id,
-                email: user.email,
-                username: user.username,
-            },
-        };
-    }
-
-    private async generateRefreshToken(
-        userId: string,
-        userAgent?: string,
-        ipAddress?: string,
-        oldRefreshToken?: string,
-    ): Promise<string> {
-        const token = randomBytes(authConstants.refreshTokenLength).toString('hex');
-
-        let expiresAt: Date;
-        const refreshDays = jwtConstants.refreshTokenExpiration();
-
-        if (refreshDays === -1 || jwtConstants.isTokenExpirationDisabled()) {
-            // Set expiration to 100 years in the future (effectively never)
-            expiresAt = new Date();
-            expiresAt.setFullYear(expiresAt.getFullYear() + 100);
-        } else {
-            expiresAt = new Date();
-            expiresAt.setDate(expiresAt.getDate() + refreshDays);
-        }
-
-        let family: string = randomUUID();
-
-        // If rotating from an old token, use the same family
-        if (oldRefreshToken) {
-            const oldToken = await this.refreshTokenRepository.findByToken(oldRefreshToken);
-            if (oldToken) {
-                family = oldToken.family || family;
-                // Revoke the old token
-                await this.refreshTokenRepository.revokeToken(oldRefreshToken, 'Token rotation');
-            }
-        }
-
-        await this.refreshTokenRepository.create({
-            token,
-            userId,
-            expiresAt,
-            family,
-            userAgent,
-            ipAddress,
-        });
-
-        return token;
     }
 
     async refreshToken(refreshToken: string, userAgent?: string, ipAddress?: string) {
@@ -247,11 +159,7 @@ export class AuthService {
         let user = await this.userRepository.findByEmail(email);
 
         if (!user) {
-            const randomPassword = randomBytes(16).toString('hex');
-            const hashedPassword = await bcrypt.hash(
-                randomPassword,
-                authConstants.bcryptSaltRounds,
-            );
+            const hashedPassword = await this.randomHashedPassword();
 
             user = await this.userRepository.create({
                 username: profile.username || profile.displayName,
@@ -263,6 +171,9 @@ export class AuthService {
                 isActive: true,
             });
         } else {
+            // Check if user is active
+            this.ensureUserIsActive(user);
+
             // Update user info if exists
             await this.userRepository.update(user.id, {
                 avatar: profile.photos?.[0]?.value || user.avatar,
@@ -299,11 +210,7 @@ export class AuthService {
         let user = await this.userRepository.findByEmail(email);
 
         if (!user) {
-            const randomPassword = randomBytes(16).toString('hex');
-            const hashedPassword = await bcrypt.hash(
-                randomPassword,
-                authConstants.bcryptSaltRounds,
-            );
+            const hashedPassword = await this.randomHashedPassword();
 
             user = await this.userRepository.create({
                 username: profile.displayName || email.split('@')[0],
@@ -315,6 +222,9 @@ export class AuthService {
                 isActive: true,
             });
         } else {
+            // Check if user is active
+            this.ensureUserIsActive(user);
+
             // Update user info if exists
             await this.userRepository.update(user.id, {
                 avatar: profile.photos?.[0]?.value || user.avatar,
@@ -591,5 +501,104 @@ export class AuthService {
             email: user.email,
             expiresAt: user.passwordResetExpires,
         };
+    }
+
+    private async generateTokens(
+        user: Omit<User, 'password' | 'getGitToken' | 'asCommitter'>,
+        userAgent?: string,
+        ipAddress?: string,
+        oldRefreshToken?: string,
+    ): Promise<TokenResponse> {
+        const payload: JwtPayload = {
+            sub: user.id,
+            email: user.email,
+            provider: user.registrationProvider,
+            username: user.username,
+            emailVerified: user.emailVerified,
+            isActive: user.isActive,
+            avatar: user.avatar,
+            iat: Math.floor(Date.now() / 1000),
+            iss: 'ever-works-api',
+            aud: 'ever-works-users',
+        };
+
+        const accessToken = this.jwtService.sign(payload, {
+            expiresIn: jwtConstants.accessTokenExpiration(),
+            secret: jwtConstants.secret(),
+        });
+
+        const refreshToken = await this.generateRefreshToken(
+            user.id,
+            userAgent,
+            ipAddress,
+            oldRefreshToken,
+        );
+
+        return {
+            access_token: accessToken,
+            refresh_token: refreshToken,
+            user: {
+                id: user.id,
+                email: user.email,
+                username: user.username,
+            },
+        };
+    }
+
+    private async generateRefreshToken(
+        userId: string,
+        userAgent?: string,
+        ipAddress?: string,
+        oldRefreshToken?: string,
+    ): Promise<string> {
+        const token = randomBytes(authConstants.refreshTokenLength).toString('hex');
+
+        let expiresAt: Date;
+        const refreshDays = jwtConstants.refreshTokenExpiration();
+
+        if (refreshDays === -1 || jwtConstants.isTokenExpirationDisabled()) {
+            // Set expiration to 100 years in the future (effectively never)
+            expiresAt = new Date();
+            expiresAt.setFullYear(expiresAt.getFullYear() + 100);
+        } else {
+            expiresAt = new Date();
+            expiresAt.setDate(expiresAt.getDate() + refreshDays);
+        }
+
+        let family: string = randomUUID();
+
+        // If rotating from an old token, use the same family
+        if (oldRefreshToken) {
+            const oldToken = await this.refreshTokenRepository.findByToken(oldRefreshToken);
+            if (oldToken) {
+                family = oldToken.family || family;
+                // Revoke the old token
+                await this.refreshTokenRepository.revokeToken(oldRefreshToken, 'Token rotation');
+            }
+        }
+
+        await this.refreshTokenRepository.create({
+            token,
+            userId,
+            expiresAt,
+            family,
+            userAgent,
+            ipAddress,
+        });
+
+        return token;
+    }
+
+    private async randomHashedPassword() {
+        const randomPassword = randomBytes(16).toString('hex');
+        const hashedPassword = await bcrypt.hash(randomPassword, authConstants.bcryptSaltRounds);
+        return hashedPassword;
+    }
+
+    private ensureUserIsActive(user: User) {
+        // Check if user is active
+        if (!user.isActive) {
+            throw new UnauthorizedException('Account is suspended');
+        }
     }
 }
