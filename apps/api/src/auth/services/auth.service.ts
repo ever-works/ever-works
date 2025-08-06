@@ -90,12 +90,14 @@ export class AuthService {
 
     async login(user: any, userAgent?: string, ipAddress?: string) {
         // Update last login info
-        await this.userRepository.update(user.id, {
+        user = await this.userRepository.update(user.id, {
             lastLoginAt: new Date(),
             lastLoginIp: ipAddress,
+            registrationProvider: AuthProviders.LOCAL,
         });
 
-        return this.generateTokens(user, userAgent, ipAddress);
+        const { password, ...result } = user;
+        return this.generateTokens(result, userAgent, ipAddress);
     }
 
     async refreshToken(refreshToken: string, userAgent?: string, ipAddress?: string) {
