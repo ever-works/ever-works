@@ -20,23 +20,25 @@ export async function GET(
 
     const locale = await getLocale();
 
+    if (!code) {
+        return redirect({
+            locale,
+            href: ROUTES.AUTH_ERROR + '?error=oauth_missing_code',
+        });
+    }
+
+    const storedState = await getOAuthState();
+    if (state !== storedState) {
+        return redirect({
+            locale,
+            href: ROUTES.AUTH_ERROR + '?error=oauth_invalid_state',
+        });
+    }
+
+    let href = ROUTES.HOME;
+
     try {
-        if (!code) {
-            return redirect({
-                locale,
-                href: ROUTES.AUTH_ERROR + '?error=oauth_missing_code',
-            });
-        }
-
-        const storedState = await getOAuthState();
-        if (state !== storedState) {
-            return redirect({
-                locale,
-                href: ROUTES.AUTH_ERROR + '?error=oauth_invalid_state',
-            });
-        }
-
-        let authReponse: AuthResponse;
+        let authReponse: AuthResponse | null = null;
         switch (provider) {
             case 'github': {
                 const response = await authAPI.connectGitHubCallback(code, state || undefined);
@@ -49,25 +51,19 @@ export async function GET(
                 break;
             }
             default:
-                return redirect({
-                    locale,
-                    href: ROUTES.AUTH_ERROR + '?error=oauth_unsupported_provider',
-                });
+                href = ROUTES.AUTH_ERROR + '?error=oauth_unsupported_provider';
+                break;
         }
 
-        await Promise.all([
-            setAuthCookie(authReponse.access_token),
-            setRefreshCookie(authReponse.refresh_token),
-        ]);
-
-        return redirect({
-            locale,
-            href: ROUTES.HOME,
-        });
+        if (authReponse) {
+            await Promise.all([
+                setAuthCookie(authReponse.access_token),
+                setRefreshCookie(authReponse.refresh_token),
+            ]);
+        }
     } catch (error) {
-        return redirect({
-            locale,
-            href: ROUTES.AUTH_ERROR + '?error=oauth_callback',
-        });
+        href = ROUTES.AUTH_ERROR + '?error=oauth_callback';
     }
+
+    return redirect({ locale, href });
 }

@@ -16,6 +16,8 @@ export async function GET(request: NextRequest) {
         });
     }
 
+    let href = ROUTES.HOME + '?verified=true';
+
     try {
         const response = await authAPI.verifyEmail({ token });
 
@@ -23,15 +25,9 @@ export async function GET(request: NextRequest) {
             setAuthCookie(response.access_token),
             setRefreshCookie(response.refresh_token),
         ]);
-
-        return redirect({
-            locale,
-            href: ROUTES.HOME + '?verified=true',
-        });
     } catch (error) {
-        return redirect({
-            locale,
-            href: ROUTES.AUTH_ERROR + '?error=verify_email_invalid_token',
-        });
+        href = ROUTES.AUTH_ERROR + '?error=verify_email_invalid_token';
     }
+
+    return redirect({ locale, href });
 }

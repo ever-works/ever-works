@@ -15,6 +15,8 @@ export async function GET(request: NextRequest) {
         });
     }
 
+    let href = ROUTES.AUTH_RESET_PASSWORD + `?token=${token}`;
+
     try {
         const response = await authAPI.validatePasswordResetToken(token);
 
@@ -24,20 +26,11 @@ export async function GET(request: NextRequest) {
                 ? 'reset_password_expired_token'
                 : 'reset_password_invalid_token';
 
-            return redirect({
-                locale,
-                href: ROUTES.AUTH_ERROR + '?error=' + errorCode,
-            });
+            href = ROUTES.AUTH_ERROR + `?error=${errorCode}`;
         }
     } catch (error) {
-        return redirect({
-            locale,
-            href: ROUTES.AUTH_ERROR + '?error=reset_password_invalid_token',
-        });
+        href = ROUTES.AUTH_ERROR + '?error=reset_password_invalid_token';
     }
 
-    return redirect({
-        locale,
-        href: ROUTES.AUTH_RESET_PASSWORD + `?token=${token}`,
-    });
+    return redirect({ locale, href });
 }

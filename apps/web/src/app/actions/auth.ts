@@ -13,7 +13,6 @@ import { ROUTES, routeWithParams, withAppUrl } from '@/lib/constants';
 import { VALIDATION_RULES } from './validation';
 import { authAPI } from '@/lib/api';
 import { redirect } from '@/i18n/navigation';
-import { redirect as nextRedirect } from 'next/navigation';
 import { getLocale, getTranslations } from 'next-intl/server';
 
 export async function login(identifier: string, password: string) {
@@ -44,16 +43,6 @@ export async function login(identifier: string, password: string) {
             setAuthCookie(response.access_token),
             setRefreshCookie(response.refresh_token),
         ]);
-
-        redirect({
-            locale: await getLocale(),
-            href: ROUTES.HOME,
-        });
-
-        return {
-            success: true,
-            user: response.user,
-        };
     } catch (error) {
         console.error(error);
 
@@ -62,6 +51,15 @@ export async function login(identifier: string, password: string) {
             error: t('invalidCredentials'),
         };
     }
+
+    redirect({
+        locale: await getLocale(),
+        href: ROUTES.HOME,
+    });
+
+    return {
+        success: true,
+    };
 }
 
 export async function register(username: string, email: string, password: string) {
@@ -104,16 +102,6 @@ export async function register(username: string, email: string, password: string
             setAuthCookie(response.access_token),
             setRefreshCookie(response.refresh_token),
         ]);
-
-        redirect({
-            locale: await getLocale(),
-            href: ROUTES.HOME + '?newUser=true',
-        });
-
-        return {
-            success: true,
-            user: response.user,
-        };
     } catch (error) {
         console.error(error);
 
@@ -133,6 +121,15 @@ export async function register(username: string, email: string, password: string
             error: message,
         };
     }
+
+    redirect({
+        locale: await getLocale(),
+        href: ROUTES.HOME + '?newUser=true',
+    });
+
+    return {
+        success: true,
+    };
 }
 
 export async function logout() {
@@ -150,7 +147,7 @@ export async function logout() {
         console.error(error);
     }
 
-    // Redirect to home page
+    // Redirect to login page
     redirect({
         locale: await getLocale(),
         href: ROUTES.AUTH_LOGIN,
