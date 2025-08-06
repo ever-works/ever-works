@@ -56,7 +56,7 @@ export async function GET(
         }
 
         if (authReponse) {
-            setAuthCookies(authReponse.access_token, authReponse.refresh_token);
+            await setAuthCookies(authReponse.access_token, authReponse.refresh_token);
         }
     } catch (error) {
         href = ROUTES.AUTH_ERROR + '?error=oauth_callback';
