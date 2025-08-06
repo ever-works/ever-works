@@ -1,6 +1,7 @@
 import 'server-only';
 import { ResponseCookie } from 'next/dist/compiled/@edge-runtime/cookies';
 import { cookies } from 'next/headers';
+import { encrypt, decrypt } from './crypto';
 
 export const AUTH_COOKIE_NAME = 'everworks_auth_token';
 
@@ -14,17 +15,26 @@ const cookieOptions: Partial<ResponseCookie> = {
     path: '/',
 };
 
-export async function setAuthCookie(token: string) {
+export async function setAuthAccessCookie(token: string) {
     const cookieStore = await cookies();
-    cookieStore.set(AUTH_COOKIE_NAME, token, cookieOptions);
+    const encryptedToken = await encrypt(token);
+    cookieStore.set(AUTH_COOKIE_NAME, encryptedToken, cookieOptions);
 }
 
-export async function getAuthCookie() {
+export async function getAuthAccessCookie() {
     const cookieStore = await cookies();
-    return cookieStore.get(AUTH_COOKIE_NAME)?.value;
+    const encryptedValue = cookieStore.get(AUTH_COOKIE_NAME)?.value;
+    if (!encryptedValue) return undefined;
+
+    try {
+        return await decrypt(encryptedValue);
+    } catch (error) {
+        console.error('Failed to decrypt auth cookie:', error);
+        return undefined;
+    }
 }
 
-export async function removeAuthCookie() {
+export async function removeAuthAccessCookie() {
     const cookieStore = await cookies();
     cookieStore.delete(AUTH_COOKIE_NAME);
 }
@@ -35,12 +45,21 @@ export async function removeAuthCookie() {
 
 export async function setRefreshCookie(token: string) {
     const cookieStore = await cookies();
-    cookieStore.set(REFRESH_COOKIE_NAME, token, cookieOptions);
+    const encryptedToken = await encrypt(token);
+    cookieStore.set(REFRESH_COOKIE_NAME, encryptedToken, cookieOptions);
 }
 
 export async function getRefreshCookie() {
     const cookieStore = await cookies();
-    return cookieStore.get(REFRESH_COOKIE_NAME)?.value;
+    const encryptedValue = cookieStore.get(REFRESH_COOKIE_NAME)?.value;
+    if (!encryptedValue) return undefined;
+
+    try {
+        return await decrypt(encryptedValue);
+    } catch (error) {
+        console.error('Failed to decrypt refresh cookie:', error);
+        return undefined;
+    }
 }
 
 export async function removeRefreshCookie() {
@@ -49,11 +68,15 @@ export async function removeRefreshCookie() {
 }
 
 // =================
-// Remove all cookies
+// All cookies
 // =================
 
-export async function removeAuthCookies() {
-    await Promise.all([removeAuthCookie(), removeRefreshCookie()]);
+export async function setAuthCookies(access_token: string, refresh_token: string) {
+    return Promise.all([setAuthAccessCookie(access_token), setRefreshCookie(refresh_token)]);
+}
+
+export async function removeAuthAccessCookies() {
+    await Promise.all([removeAuthAccessCookie(), removeRefreshCookie()]);
 }
 
 // =================

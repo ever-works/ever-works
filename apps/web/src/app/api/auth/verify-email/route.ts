@@ -1,6 +1,6 @@
 import { redirect } from '@/i18n/navigation';
 import { authAPI } from '@/lib/api';
-import { setAuthCookie, setRefreshCookie } from '@/lib/auth';
+import { setAuthCookies } from '@/lib/auth';
 import { ROUTES } from '@/lib/constants';
 import { getLocale } from 'next-intl/server';
 import { NextRequest } from 'next/server';
@@ -21,10 +21,7 @@ export async function GET(request: NextRequest) {
     try {
         const response = await authAPI.verifyEmail({ token });
 
-        await Promise.all([
-            setAuthCookie(response.access_token),
-            setRefreshCookie(response.refresh_token),
-        ]);
+        await setAuthCookies(response.access_token, response.refresh_token);
     } catch (error) {
         href = ROUTES.AUTH_ERROR + '?error=verify_email_invalid_token';
     }

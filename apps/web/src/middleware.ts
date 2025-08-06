@@ -1,7 +1,7 @@
 import createMiddleware from 'next-intl/middleware';
 import { routing } from './i18n/routing';
 import { NextRequest, NextResponse } from 'next/server';
-import { PROTECTED_ROUTES, PUBLIC_ROUTES, ROUTES } from './lib/constants';
+import { DEFAULT_LOCALE, PUBLIC_ROUTES, ROUTES } from './lib/constants';
 import { getAuthFromRequest } from './lib/auth/middleware';
 import { AUTH_COOKIE_NAME } from './lib/auth/cookies';
 import { match } from 'path-to-regexp';
@@ -10,13 +10,6 @@ const nextIntlMiddleware = createMiddleware(routing);
 
 function isPublicRoute(pathname: string): boolean {
     return PUBLIC_ROUTES.some((route) => {
-        const matcher = match(route);
-        return pathname === route || !!matcher(pathname);
-    });
-}
-
-function isProtectedRoute(pathname: string): boolean {
-    return PROTECTED_ROUTES.some((route) => {
         const matcher = match(route);
         return pathname === route || !!matcher(pathname);
     });
@@ -34,8 +27,10 @@ export default async function middleware(req: NextRequest) {
     const intlResponse = await nextIntlMiddleware(req);
 
     const segments = originalPathname.split('/').filter(Boolean);
-    const maybeLocale = segments[0];
+    let maybeLocale = segments[0];
     const hasLocale = routing.locales.includes(maybeLocale as any);
+
+    maybeLocale = hasLocale ? maybeLocale : DEFAULT_LOCALE;
     const pathname = hasLocale ? `/${segments.slice(1).join('/')}` : originalPathname;
 
     // Allow public routes
@@ -49,9 +44,9 @@ export default async function middleware(req: NextRequest) {
     }
 
     // Check authentication
-    const auth = await getAuthFromRequest();
+    const auth = await getAuthFromRequest().catch(() => null);
 
-    if (!auth.isAuthenticated) {
+    if (!auth || !auth.isAuthenticated) {
         // Not authenticated - redirect to login
         const loginUrl = new URL(ROUTES.AUTH_LOGIN, req.url);
         loginUrl.searchParams.set('from', pathname);

@@ -2,12 +2,11 @@
 
 import { z } from 'zod';
 import {
-    setAuthCookie,
-    setRefreshCookie,
-    removeAuthCookies,
+    removeAuthAccessCookies,
     getRefreshCookie,
     setOAuthState,
-} from '@/lib/auth/cookies';
+    setAuthCookies,
+} from '@/lib/auth';
 import crypto from 'crypto';
 import { ROUTES, routeWithParams, withAppUrl } from '@/lib/constants';
 import { VALIDATION_RULES } from './validation';
@@ -39,10 +38,7 @@ export async function login(identifier: string, password: string) {
             password: validation.data.password,
         });
 
-        await Promise.all([
-            setAuthCookie(response.access_token),
-            setRefreshCookie(response.refresh_token),
-        ]);
+        await setAuthCookies(response.access_token, response.refresh_token);
     } catch (error) {
         console.error(error);
 
@@ -103,10 +99,7 @@ export async function register(username: string, email: string, password: string
             emailverificationcallbackurl: withAppUrl(ROUTES.API_AUTH_VERIFY_EMAIL),
         });
 
-        await Promise.all([
-            setAuthCookie(response.access_token),
-            setRefreshCookie(response.refresh_token),
-        ]);
+        await setAuthCookies(response.access_token, response.refresh_token);
     } catch (error) {
         console.error(error);
 
@@ -138,19 +131,16 @@ export async function register(username: string, email: string, password: string
 }
 
 export async function logout() {
-    const refresh_token = await getRefreshCookie();
-
-    const promises: Promise<any>[] = [removeAuthCookies()];
-
-    if (refresh_token) {
-        promises.push(authAPI.logout({ refreshToken: refresh_token }));
-    }
-
     try {
-        await Promise.all(promises);
+        const refresh_token = await getRefreshCookie();
+        if (refresh_token) {
+            await authAPI.logout({ refreshToken: refresh_token });
+        }
     } catch (error) {
         console.error(error);
     }
+
+    await removeAuthAccessCookies();
 
     // Redirect to login page
     redirect({

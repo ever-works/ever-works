@@ -10,6 +10,9 @@ export const API_URL = apiUrl.endsWith('/api') ? apiUrl : `${apiUrl}/api`;
 // App URL
 export const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
+// AUTH Secret
+export const AUTH_SECRET = process.env.COOKIE_SECRET || process.env.AUTH_SECRET;
+
 // ROUTES
 export const ROUTES = {
     HOME: '/',

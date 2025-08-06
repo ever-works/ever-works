@@ -1,7 +1,7 @@
 import 'server-only';
 import { API_URL } from '../constants';
 import { headers } from 'next/headers';
-import { getAuthCookie } from '../auth/cookies';
+import { getAuthAccessCookie } from '../auth/cookies';
 import { getTranslations } from 'next-intl/server';
 
 export async function handleServerError(error: unknown): Promise<never> {
@@ -33,7 +33,7 @@ export async function getFrontendUrl(): Promise<string> {
 }
 
 export async function serverFetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-    const token = await getAuthCookie();
+    const token = await getAuthAccessCookie();
     const frontendUrl = await getFrontendUrl();
     const t = await getTranslations('api.errors');
 

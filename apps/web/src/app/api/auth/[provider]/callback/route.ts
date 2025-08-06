@@ -1,6 +1,6 @@
 import { redirect } from '@/i18n/navigation';
 import { authAPI, AuthResponse } from '@/lib/api';
-import { getOAuthState, setAuthCookie, setRefreshCookie } from '@/lib/auth';
+import { getOAuthState, setAuthCookies } from '@/lib/auth';
 import { ROUTES } from '@/lib/constants';
 import { getLocale } from 'next-intl/server';
 import { NextRequest } from 'next/server';
@@ -56,10 +56,7 @@ export async function GET(
         }
 
         if (authReponse) {
-            await Promise.all([
-                setAuthCookie(authReponse.access_token),
-                setRefreshCookie(authReponse.refresh_token),
-            ]);
+            setAuthCookies(authReponse.access_token, authReponse.refresh_token);
         }
     } catch (error) {
         href = ROUTES.AUTH_ERROR + '?error=oauth_callback';

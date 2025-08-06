@@ -1,6 +1,6 @@
 import 'server-only';
 import { jwtDecode } from 'jwt-decode';
-import { getAuthCookie } from './cookies';
+import { getAuthAccessCookie } from './cookies';
 
 export type AuthUser = {
     sub: string;
@@ -25,7 +25,7 @@ export async function getAuthFromRequest(): Promise<{
     isExpired: boolean;
 }> {
     try {
-        const token = await getAuthCookie();
+        const token = await getAuthAccessCookie();
 
         if (!token) {
             return { isAuthenticated: false, isExpired: false };
