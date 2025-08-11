@@ -34,13 +34,12 @@ export default function DashboardToasts() {
             toast.info(t('emailVerification.title'), {
                 description: t('emailVerification.description'),
                 duration: 8000,
-                action: {
-                    label: t('emailVerification.action'),
-                    onClick: () => {
-                        // Optional: Navigate to resend verification page
-                        window.location.href = '/resend-verification';
-                    },
-                },
+                // action: {
+                //     label: t('emailVerification.action'),
+                //     onClick: () => {
+                //         window.location.href = '/resend-verification';
+                //     },
+                // },
             });
         }
 

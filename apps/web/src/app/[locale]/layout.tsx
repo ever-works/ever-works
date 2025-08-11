@@ -49,9 +49,15 @@ export default async function RootLayout({
                     {children}
                     <Toaster
                         position="top-right"
+                        theme="system"
                         toastOptions={{
                             className:
-                                'sonner-toast bg-surface dark:bg-surface-dark text-text dark:text-text-dark border border-border dark:border-border-dark',
+                                'sonner-toast !bg-surface dark:!bg-surface-dark !text-text dark:!text-text-dark !border !border-border dark:!border-border-dark',
+                            style: {
+                                background: undefined,
+                                color: undefined,
+                                border: undefined,
+                            },
                         }}
                     />
                 </NextIntlClientProvider>
