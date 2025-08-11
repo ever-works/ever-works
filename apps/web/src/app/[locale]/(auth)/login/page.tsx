@@ -57,10 +57,11 @@ function LoginContent() {
 
     useEffect(() => {
         if (isPasswordReset) {
-            // Hide the success message after 5 seconds
+            // Hide the success message after 10 seconds
             const timer = setTimeout(() => {
                 setShowResetSuccess(false);
-            }, 5000);
+            }, 10 * 1000);
+
             return () => clearTimeout(timer);
         }
     }, [isPasswordReset]);
