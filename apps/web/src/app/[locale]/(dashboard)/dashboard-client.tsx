@@ -24,7 +24,7 @@ export default function DashboardClient({ user }: { user: AuthUser }) {
             </Suspense>
 
             <div className="max-w-md mx-auto">
-                <h3 className="text-2xl font-bold text-text mb-4"> {t('title')}</h3>
+                <h3 className="text-2xl font-bold text-text dark:text-text-dark mb-4"> {t('title')}</h3>
 
                 <ul>
                     <li> Email : {user.email}</li>

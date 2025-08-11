@@ -218,7 +218,7 @@ function AuthErrorContent() {
             <Link
                 key="login"
                 href={ROUTES.AUTH_LOGIN}
-                className="px-6 py-3 bg-surface-secondary hover:bg-surface-tertiary text-text border border-border rounded-lg font-medium transition-colors animate-fade-in"
+                className="px-6 py-3 bg-surface-secondary dark:bg-surface-secondary-dark hover:bg-surface-tertiary dark:hover:bg-surface-tertiary-dark text-text dark:text-text-dark border border-border dark:border-border-dark rounded-lg font-medium transition-colors animate-fade-in"
             >
                 {t('actions.backToLogin')}
             </Link>,
@@ -229,7 +229,7 @@ function AuthErrorContent() {
                 <Link
                     key="register"
                     href={ROUTES.AUTH_REGISTER}
-                    className="px-6 py-3 bg-surface-secondary hover:bg-surface-tertiary text-text border border-border rounded-lg font-medium transition-colors animate-fade-in"
+                    className="px-6 py-3 bg-surface-secondary dark:bg-surface-secondary-dark hover:bg-surface-tertiary dark:hover:bg-surface-tertiary-dark text-text dark:text-text-dark border border-border dark:border-border-dark rounded-lg font-medium transition-colors animate-fade-in"
                 >
                     {t('actions.tryRegister')}
                 </Link>,
@@ -247,10 +247,10 @@ function AuthErrorContent() {
                 </div>
 
                 <div className="bg-danger/10 border border-danger/20 rounded-lg p-6">
-                    <h2 className="text-lg font-semibold text-text mb-2">
+                    <h2 className="text-lg font-semibold text-text dark:text-text-dark mb-2">
                         {errorType ? t('errorOccurred') : t('somethingWentWrong')}
                     </h2>
-                    <p className="text-text-secondary">{getErrorMessage()}</p>
+                    <p className="text-text-secondary dark:text-text-secondary-dark">{getErrorMessage()}</p>
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-3 justify-center pt-4">
@@ -258,8 +258,8 @@ function AuthErrorContent() {
                 </div>
 
                 {/* FOR NOW HIDE */}
-                <div className="pt-8 border-t border-border hidden">
-                    <p className="text-sm text-text-muted mb-4">{t('helpText')}</p>
+                <div className="pt-8 border-t border-border dark:border-border-dark hidden">
+                    <p className="text-sm text-text-muted dark:text-text-muted-dark mb-4">{t('helpText')}</p>
                     <div className="flex justify-center gap-6">
                         <Link
                             href="/help"
@@ -284,9 +284,9 @@ export default function AuthErrorPage() {
     return (
         <Suspense
             fallback={
-                <div className="min-h-screen bg-background flex items-center justify-center">
+                <div className="min-h-screen bg-background dark:bg-background-dark flex items-center justify-center">
                     <div className="animate-pulse">
-                        <div className="w-12 h-12 bg-surface-secondary rounded-full"></div>
+                        <div className="w-12 h-12 bg-surface-secondary dark:bg-surface-secondary-dark rounded-full"></div>
                     </div>
                 </div>
             }

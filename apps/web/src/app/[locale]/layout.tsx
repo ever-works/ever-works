@@ -6,6 +6,7 @@ import { routing } from '@/i18n/routing';
 import { Toaster } from 'sonner';
 
 import './globals.css';
+import { themeInitScript } from '@/lib/theme-init';
 
 const geistSans = Geist({
     variable: '--font-geist-sans',
@@ -38,20 +39,7 @@ export default async function RootLayout({
     return (
         <html lang={locale} suppressHydrationWarning>
             <head>
-                <script
-                    dangerouslySetInnerHTML={{
-                        __html: `
-                            (function() {
-                                const theme = localStorage.getItem('theme');
-                                if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-                                    document.documentElement.classList.add('dark');
-                                } else {
-                                    document.documentElement.classList.remove('dark');
-                                }
-                            })();
-                        `,
-                    }}
-                />
+                <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
             </head>
             <body
                 className={`${geistSans.variable} ${geistMono.variable} antialiased`}
