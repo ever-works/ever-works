@@ -4,8 +4,6 @@ import { hasLocale, NextIntlClientProvider } from 'next-intl';
 import { notFound } from 'next/navigation';
 import { routing } from '@/i18n/routing';
 import { Toaster } from 'sonner';
-import { themeInitScript } from '@/lib/theme-init';
-import Script from 'next/script';
 
 import './globals.css';
 
@@ -40,10 +38,19 @@ export default async function RootLayout({
     return (
         <html lang={locale} suppressHydrationWarning>
             <head>
-                <Script
-                    id="theme-init"
-                    strategy="beforeInteractive"
-                    dangerouslySetInnerHTML={{ __html: themeInitScript }}
+                <script
+                    dangerouslySetInnerHTML={{
+                        __html: `
+                            (function() {
+                                const theme = localStorage.getItem('theme');
+                                if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                                    document.documentElement.classList.add('dark');
+                                } else {
+                                    document.documentElement.classList.remove('dark');
+                                }
+                            })();
+                        `,
+                    }}
                 />
             </head>
             <body
