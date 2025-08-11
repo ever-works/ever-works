@@ -28,7 +28,7 @@ export function SocialLoginButtons() {
                 onClick={() => handleConnectProvider('google')}
                 disabled={isPending}
                 className={cn(
-                    'flex items-center justify-center gap-2 px-4 py-3 bg-surface-secondary hover:bg-surface-tertiary border border-border rounded-lg text-text transition-colors',
+                    'flex items-center justify-center gap-2 px-4 py-3 bg-surface-secondary dark:bg-surface-secondary-dark hover:bg-surface-tertiary dark:hover:bg-surface-tertiary-dark border border-border dark:border-border-dark rounded-lg text-text dark:text-text-dark transition-colors',
                     'disabled:opacity-50 disabled:cursor-not-allowed',
                 )}
             >
@@ -59,7 +59,7 @@ export function SocialLoginButtons() {
                 onClick={() => handleConnectProvider('github')}
                 disabled={isPending}
                 className={cn(
-                    'flex items-center justify-center gap-2 px-4 py-3 bg-surface-secondary hover:bg-surface-tertiary border border-border rounded-lg text-text transition-colors',
+                    'flex items-center justify-center gap-2 px-4 py-3 bg-surface-secondary dark:bg-surface-secondary-dark hover:bg-surface-tertiary dark:hover:bg-surface-tertiary-dark border border-border dark:border-border-dark rounded-lg text-text dark:text-text-dark transition-colors',
                     'disabled:opacity-50 disabled:cursor-not-allowed',
                 )}
             >

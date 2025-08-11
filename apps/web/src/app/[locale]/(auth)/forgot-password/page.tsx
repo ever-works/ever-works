@@ -52,8 +52,8 @@ export default function ForgotPasswordPage() {
                                 </svg>
                             </div>
                             <div>
-                                <h3 className="font-medium text-text mb-1">{t('success.title')}</h3>
-                                <p className="text-sm text-text-secondary">
+                                <h3 className="font-medium text-text dark:text-text-dark mb-1">{t('success.title')}</h3>
+                                <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
                                     {t('success.message', { email })}
                                 </p>
                             </div>
@@ -61,7 +61,7 @@ export default function ForgotPasswordPage() {
                     </div>
 
                     <div className="text-center">
-                        <p className="text-sm text-text-secondary mb-4">{t('success.checkSpam')}</p>
+                        <p className="text-sm text-text-secondary dark:text-text-secondary-dark mb-4">{t('success.checkSpam')}</p>
                         <Link
                             href={ROUTES.AUTH_LOGIN}
                             className="text-primary hover:text-primary-hover font-medium transition-colors"
@@ -110,7 +110,7 @@ export default function ForgotPasswordPage() {
                         {t('backToLogin')}
                     </Link>
 
-                    <p className="text-sm text-text-secondary">
+                    <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
                         {t('noAccount.text')}{' '}
                         <Link
                             href={ROUTES.AUTH_REGISTER}

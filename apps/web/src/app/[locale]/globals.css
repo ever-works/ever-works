@@ -1,33 +1,52 @@
 @import 'tailwindcss';
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
 	--font-sans: var(--font-geist-sans);
 	--font-mono: var(--font-geist-mono);
 
-	/* Extend Tailwind's color palette */
-	--color-background: #0f1419;
-	--color-surface: #0f172a;
-	--color-surface-secondary: #1e293b;
-	--color-surface-tertiary: #334155;
+	/* Light mode colors (default) */
+	--color-background: #ffffff;
+	--color-surface: #f8fafc;
+	--color-surface-secondary: #f1f5f9;
+	--color-surface-tertiary: #e2e8f0;
 
-	--color-card: #1e293b;
-	--color-card-hover: #334155;
-	--color-card-border: #334155;
+	--color-card: #ffffff;
+	--color-card-hover: #f8fafc;
+	--color-card-border: #e2e8f0;
 
 	--color-primary: #3b82f6;
 	--color-primary-hover: #2563eb;
 
-	--color-text: #e2e8f0;
-	--color-text-secondary: #94a3b8;
-	--color-text-muted: #64748b;
+	--color-text: #0f172a;
+	--color-text-secondary: #475569;
+	--color-text-muted: #94a3b8;
 
-	--color-border: #334155;
-	--color-border-secondary: #475569;
+	--color-border: #e2e8f0;
+	--color-border-secondary: #cbd5e1;
 
 	--color-success: #10b981;
 	--color-warning: #f59e0b;
 	--color-danger: #ef4444;
 	--color-info: #3b82f6;
+
+	/* Dark mode colors */
+	--color-background-dark: #0f1419;
+	--color-surface-dark: #0f172a;
+	--color-surface-secondary-dark: #1e293b;
+	--color-surface-tertiary-dark: #334155;
+
+	--color-card-dark: #1e293b;
+	--color-card-hover-dark: #334155;
+	--color-card-border-dark: #334155;
+
+	--color-text-dark: #e2e8f0;
+	--color-text-secondary-dark: #94a3b8;
+	--color-text-muted-dark: #64748b;
+
+	--color-border-dark: #334155;
+	--color-border-secondary-dark: #475569;
 }
 
 html,
@@ -37,7 +56,7 @@ body {
 }
 
 body {
-	@apply bg-background text-text;
+	@apply bg-background text-text dark:bg-background-dark dark:text-text-dark;
 	font-family:
 		var(--font-geist-sans),
 		-apple-system,
@@ -56,15 +75,15 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-	@apply bg-surface-secondary;
+	@apply bg-surface-secondary dark:bg-surface-secondary-dark;
 }
 
 ::-webkit-scrollbar-thumb {
-	@apply bg-border rounded;
+	@apply bg-border dark:bg-border-dark rounded;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-	@apply bg-border-secondary;
+	@apply bg-border-secondary dark:bg-border-secondary-dark;
 }
 
 /* Animations */
@@ -147,16 +166,26 @@ body {
 
 /* Glassmorphism */
 .glass {
-	background: rgba(30, 41, 59, 0.5);
+	background: rgba(255, 255, 255, 0.7);
 	backdrop-filter: blur(10px);
 	-webkit-backdrop-filter: blur(10px);
+	border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.dark .glass {
+	background: rgba(30, 41, 59, 0.5);
 	border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .glass-dark {
-	background: rgba(15, 23, 42, 0.6);
+	background: rgba(248, 250, 252, 0.8);
 	backdrop-filter: blur(12px);
 	-webkit-backdrop-filter: blur(12px);
+	border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.dark .glass-dark {
+	background: rgba(15, 23, 42, 0.6);
 	border: 1px solid rgba(255, 255, 255, 0.05);
 }
 

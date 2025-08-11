@@ -13,13 +13,13 @@ interface AuthLayoutProps {
 export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
     const t = useTranslations('layout.auth');
     return (
-        <div className="min-h-screen bg-background flex">
+        <div className="min-h-screen bg-background dark:bg-background-dark flex">
             {/* Left side - Form */}
             <div className="flex-1 flex items-center justify-center px-8 py-12">
                 <div className="w-full max-w-md">
                     <div className="mb-8 mt-5">
-                        <h1 className="text-3xl font-bold text-text mb-2">{title}</h1>
-                        <p className="text-text-secondary">{subtitle}</p>
+                        <h1 className="text-3xl font-bold text-text dark:text-text-dark mb-2">{title}</h1>
+                        <p className="text-text-secondary dark:text-text-secondary-dark">{subtitle}</p>
                     </div>
 
                     {children}
@@ -27,7 +27,7 @@ export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
             </div>
 
             {/* Right side - Feature showcase */}
-            <div className="hidden lg:flex flex-1 bg-surface items-center justify-center px-8 relative overflow-hidden">
+            <div className="hidden lg:flex flex-1 bg-surface dark:bg-surface-dark items-center justify-center px-8 relative overflow-hidden">
                 <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent" />
 
                 <div className="relative z-10 max-w-lg -mt-24">
@@ -47,8 +47,8 @@ export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
                                 />
                             </svg>
                         </div>
-                        <h2 className="text-2xl font-bold text-text mb-4">{t('feature.title')}</h2>
-                        <p className="text-text-secondary mb-8">{t('feature.subtitle')}</p>
+                        <h2 className="text-2xl font-bold text-text dark:text-text-dark mb-4">{t('feature.title')}</h2>
+                        <p className="text-text-secondary dark:text-text-secondary-dark mb-8">{t('feature.subtitle')}</p>
                     </div>
 
                     <div className="space-y-4">
@@ -69,10 +69,10 @@ export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
                                 </svg>
                             </div>
                             <div>
-                                <h3 className="font-medium text-text mb-1">
+                                <h3 className="font-medium text-text dark:text-text-dark mb-1">
                                     {t('feature.benefits.ai.title')}
                                 </h3>
-                                <p className="text-sm text-text-secondary">
+                                <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
                                     {t('feature.benefits.ai.description')}
                                 </p>
                             </div>
@@ -95,10 +95,10 @@ export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
                                 </svg>
                             </div>
                             <div>
-                                <h3 className="font-medium text-text mb-1">
+                                <h3 className="font-medium text-text dark:text-text-dark mb-1">
                                     {t('feature.benefits.templates.title')}
                                 </h3>
-                                <p className="text-sm text-text-secondary">
+                                <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
                                     {t('feature.benefits.templates.description')}
                                 </p>
                             </div>
@@ -121,10 +121,10 @@ export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
                                 </svg>
                             </div>
                             <div>
-                                <h3 className="font-medium text-text mb-1">
+                                <h3 className="font-medium text-text dark:text-text-dark mb-1">
                                     {t('feature.benefits.management.title')}
                                 </h3>
-                                <p className="text-sm text-text-secondary">
+                                <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
                                     {t('feature.benefits.management.description')}
                                 </p>
                             </div>

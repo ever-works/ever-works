@@ -49,10 +49,10 @@ function ResetPasswordContent() {
                                 </svg>
                             </div>
                             <div>
-                                <h3 className="font-medium text-text mb-1">
+                                <h3 className="font-medium text-text dark:text-text-dark mb-1">
                                     {t('errors.invalidLink')}
                                 </h3>
-                                <p className="text-sm text-text-secondary">
+                                <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
                                     {t('errors.missingTokenMessage')}
                                 </p>
                             </div>
@@ -67,7 +67,7 @@ function ResetPasswordContent() {
                             {t('errors.requestNewLink')}
                         </Link>
 
-                        <p className="text-sm text-text-secondary">
+                        <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
                             <Link
                                 href={ROUTES.AUTH_LOGIN}
                                 className="text-primary hover:text-primary-hover transition-colors"
@@ -122,8 +122,8 @@ function ResetPasswordContent() {
                                 </svg>
                             </div>
                             <div>
-                                <h3 className="font-medium text-text mb-1">{t('success.title')}</h3>
-                                <p className="text-sm text-text-secondary">
+                                <h3 className="font-medium text-text dark:text-text-dark mb-1">{t('success.title')}</h3>
+                                <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
                                     {t('success.message')}
                                 </p>
                             </div>
@@ -208,9 +208,9 @@ export default function ResetPasswordPage() {
     return (
         <Suspense
             fallback={
-                <div className="min-h-screen bg-background flex items-center justify-center">
+                <div className="min-h-screen bg-background dark:bg-background-dark flex items-center justify-center">
                     <div className="animate-pulse">
-                        <div className="w-12 h-12 bg-surface-secondary rounded-full"></div>
+                        <div className="w-12 h-12 bg-surface-secondary dark:bg-surface-secondary-dark rounded-full"></div>
                     </div>
                 </div>
             }
