@@ -2,13 +2,8 @@ import * as fs from 'fs-extra';
 import * as path from 'path';
 import * as os from 'os';
 import chalk from 'chalk';
-import { 
-    decodeJWT, 
-    isJWTExpired, 
-    getJWTExpiration, 
-    getJWTUserInfo,
-    AuthUser 
-} from '../../utils/jwt.utils';
+import { isJWTExpired, getJWTExpiration, getJWTUserInfo, AuthUser } from '../../utils/jwt.utils';
+import { API_URL } from '../../utils/constants';
 
 export interface Credentials {
     token: string;
@@ -47,15 +42,54 @@ export class CredentialsService {
 
             const credentials = await fs.readJson(CREDENTIALS_FILE);
 
-            // Check if JWT token is expired
-            if (credentials.token && isJWTExpired(credentials.token)) {
-                console.log(chalk.yellow('⚠ Token has expired. Please login again.'));
+            // Validate credentials structure
+            if (!credentials || typeof credentials !== 'object') {
+                await this.remove();
                 return null;
+            }
+
+            // Check if token exists
+            if (
+                !credentials.token ||
+                typeof credentials.token !== 'string' ||
+                credentials.token.trim() === ''
+            ) {
+                await this.remove();
+                return null;
+            }
+
+            // Validate token format (basic JWT structure check)
+            const tokenParts = credentials.token.split('.');
+            if (tokenParts.length !== 3) {
+                await this.remove();
+                return null;
+            }
+
+            // Check if JWT token is expired
+            try {
+                if (isJWTExpired(credentials.token)) {
+                    await this.remove();
+                    return null;
+                }
+            } catch (jwtError) {
+                await this.remove();
+                return null;
+            }
+
+            // Ensure apiUrl exists
+            if (!credentials.apiUrl) {
+                credentials.apiUrl = API_URL;
+                await this.save(credentials); // Update with default API URL
             }
 
             return credentials;
         } catch (error) {
-            console.error(chalk.red('Error reading credentials:'), error.message);
+            try {
+                await this.remove();
+            } catch (removeError) {
+                // Ignore removal errors
+            }
+
             return null;
         }
     }
@@ -83,7 +117,7 @@ export class CredentialsService {
         // Extract all user info from JWT token
         const userInfo = getJWTUserInfo(token);
         const expiration = getJWTExpiration(token);
-        
+
         return {
             token,
             apiUrl,
@@ -119,7 +153,7 @@ export class CredentialsService {
     } {
         // Get expiration from JWT token
         const expiresDate = getJWTExpiration(credentials.token);
-        
+
         if (!expiresDate) {
             // Fallback to stored expiresAt if JWT doesn't have exp claim
             if (!credentials.expiresAt) {
@@ -131,12 +165,13 @@ export class CredentialsService {
             const daysLeft = Math.floor(msLeft / (1000 * 60 * 60 * 24));
             const hoursLeft = Math.floor((msLeft % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
             const minutesLeft = Math.floor((msLeft % (1000 * 60 * 60)) / (1000 * 60));
-            
+
             return {
                 isExpired: msLeft <= 0,
                 daysLeft: daysLeft > 0 ? daysLeft : undefined,
                 hoursLeft: daysLeft === 0 && hoursLeft > 0 ? hoursLeft : undefined,
-                minutesLeft: daysLeft === 0 && hoursLeft === 0 && minutesLeft > 0 ? minutesLeft : undefined,
+                minutesLeft:
+                    daysLeft === 0 && hoursLeft === 0 && minutesLeft > 0 ? minutesLeft : undefined,
             };
         }
 
@@ -150,7 +185,8 @@ export class CredentialsService {
             isExpired: msLeft <= 0,
             daysLeft: daysLeft > 0 ? daysLeft : undefined,
             hoursLeft: daysLeft === 0 && hoursLeft > 0 ? hoursLeft : undefined,
-            minutesLeft: daysLeft === 0 && hoursLeft === 0 && minutesLeft > 0 ? minutesLeft : undefined,
+            minutesLeft:
+                daysLeft === 0 && hoursLeft === 0 && minutesLeft > 0 ? minutesLeft : undefined,
         };
     }
 }

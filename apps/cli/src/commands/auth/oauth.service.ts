@@ -20,11 +20,29 @@ export async function getAvailablePort(): Promise<number> {
 // Helper function to start OAuth server
 export async function startOAuthServer(port: number): Promise<string> {
     return new Promise((resolve, reject) => {
+        let resolved = false;
+        const connections = new Set<any>();
+
+        const closeAllConnections = (error: string) => {
+            if (!resolved) {
+                resolved = true;
+                // Force close all connections
+                setTimeout(() => {
+                    connections.forEach((conn) => conn.destroy());
+                    server.close(() => {
+                        reject(new Error(error));
+                    });
+                }, 100);
+            }
+        };
+
         const server = http.createServer((req, res) => {
             const url = new URL(req.url!, `http://localhost:${port}`);
             const sessionToken = url.searchParams.get('sessionToken');
             const error = url.searchParams.get('error');
 
+            // Disable keep-alive to ensure connection closes
+            res.setHeader('Connection', 'close');
             res.writeHead(200, { 'Content-Type': 'text/html' });
 
             if (error) {
@@ -37,19 +55,20 @@ export async function startOAuthServer(port: number): Promise<string> {
                         </body>
                     </html>
                 `);
-                server.close();
-                reject(new Error(error));
+
+                closeAllConnections(error);
             } else if (sessionToken) {
                 res.end(`
                     <html>
                         <body style="font-family: system-ui; padding: 40px; text-align: center;">
                             <h2 style="color: #059669;">Authentication Successful!</h2>
                             <p>You can close this window and return to the terminal.</p>
+                            <script>window.setTimeout(() => window.close(), 3000);</script>
                         </body>
                     </html>
                 `);
-                server.close();
-                resolve(sessionToken);
+
+                closeAllConnections('');
             } else {
                 res.end(`
                     <html>
@@ -61,16 +80,34 @@ export async function startOAuthServer(port: number): Promise<string> {
             }
         });
 
+        // Track connections to force close them
+        server.on('connection', (connection) => {
+            connections.add(connection);
+            connection.on('close', () => {
+                connections.delete(connection);
+            });
+        });
+
         server.listen(port);
 
         // Set a timeout for the OAuth flow
-        setTimeout(
+        const timeoutHandle = setTimeout(
             () => {
-                server.close();
-                reject(new Error('Authentication timeout'));
+                if (!resolved) {
+                    resolved = true;
+                    connections.forEach((conn) => conn.destroy());
+                    server.close(() => {
+                        reject(new Error('Authentication timeout'));
+                    });
+                }
             },
             5 * 60 * 1000,
         ); // 5 minutes timeout
+
+        // Clear timeout if resolved
+        server.on('close', () => {
+            clearTimeout(timeoutHandle);
+        });
     });
 }
 
