@@ -9,7 +9,7 @@ export class HttpClient {
 
     constructor(apiUrl?: string) {
         this.apiUrl = apiUrl || API_URL;
-        this.apiUrl = this.apiUrl.endsWith('/api') ? this.apiUrl : this.apiUrl + '/api';
+        this.apiUrl = this.ensureApiEndpoint(this.apiUrl);
 
         this.client = axios.create({
             baseURL: this.apiUrl,
@@ -27,8 +27,8 @@ export class HttpClient {
                     config.headers.Authorization = `Bearer ${credentials.token}`;
                     // Update base URL if different from stored credentials
                     if (credentials.apiUrl !== this.apiUrl) {
-                        this.apiUrl = credentials.apiUrl;
-                        config.baseURL = credentials.apiUrl;
+                        this.apiUrl = this.ensureApiEndpoint(credentials.apiUrl);
+                        config.baseURL = this.apiUrl;
                     }
                 }
                 return config;
@@ -53,6 +53,14 @@ export class HttpClient {
                 return Promise.reject(error);
             },
         );
+    }
+
+    ensureApiEndpoint(apiUrl: string) {
+        if (!apiUrl.endsWith('/api')) {
+            apiUrl = apiUrl.endsWith('/') ? apiUrl + 'api' : apiUrl + '/api';
+        }
+
+        return apiUrl;
     }
 
     async get<T = any>(url: string, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> {
