@@ -1,0 +1,133 @@
+import * as http from 'http';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+import chalk from 'chalk';
+import { WEB_URL } from '../../utils/constants';
+
+const execAsync = promisify(exec);
+
+// Helper function to find an available port
+export async function getAvailablePort(): Promise<number> {
+    return new Promise((resolve) => {
+        const server = http.createServer();
+        server.listen(0, () => {
+            const port = (server.address() as any).port;
+            server.close(() => resolve(port));
+        });
+    });
+}
+
+// Helper function to start OAuth server
+export async function startOAuthServer(port: number): Promise<string> {
+    return new Promise((resolve, reject) => {
+        const server = http.createServer((req, res) => {
+            const url = new URL(req.url!, `http://localhost:${port}`);
+            const sessionToken = url.searchParams.get('sessionToken');
+            const error = url.searchParams.get('error');
+
+            res.writeHead(200, { 'Content-Type': 'text/html' });
+            
+            if (error) {
+                res.end(`
+                    <html>
+                        <body style="font-family: system-ui; padding: 40px; text-align: center;">
+                            <h2 style="color: #dc2626;">Authentication Failed</h2>
+                            <p>${error}</p>
+                            <p>You can close this window.</p>
+                        </body>
+                    </html>
+                `);
+                server.close();
+                reject(new Error(error));
+            } else if (sessionToken) {
+                res.end(`
+                    <html>
+                        <body style="font-family: system-ui; padding: 40px; text-align: center;">
+                            <h2 style="color: #059669;">Authentication Successful!</h2>
+                            <p>You can close this window and return to the terminal.</p>
+                        </body>
+                    </html>
+                `);
+                server.close();
+                resolve(sessionToken);
+            } else {
+                res.end(`
+                    <html>
+                        <body style="font-family: system-ui; padding: 40px; text-align: center;">
+                            <h2>Waiting for authentication...</h2>
+                        </body>
+                    </html>
+                `);
+            }
+        });
+
+        server.listen(port);
+        
+        // Set a timeout for the OAuth flow
+        setTimeout(() => {
+            server.close();
+            reject(new Error('Authentication timeout'));
+        }, 5 * 60 * 1000); // 5 minutes timeout
+    });
+}
+
+// Helper function to open URL in browser
+export async function openBrowser(url: string): Promise<void> {
+    const platform = process.platform;
+    let command: string;
+    
+    if (platform === 'darwin') {
+        command = `open "${url}"`;
+    } else if (platform === 'win32') {
+        command = `start "${url}"`;
+    } else {
+        command = `xdg-open "${url}"`;
+    }
+    
+    try {
+        await execAsync(command);
+    } catch (error) {
+        console.log(chalk.yellow('\n⚠ Could not open browser automatically.'));
+        console.log(chalk.cyan(`Please open this URL manually: ${url}`));
+    }
+}
+
+// Build OAuth authorization URL
+export function buildAuthUrl(redirectUri: string): string {
+    const authUrl = new URL(`${WEB_URL}/api/auth/authorize`);
+    authUrl.searchParams.append('redirect_uri', redirectUri);
+    authUrl.searchParams.append('response_type', 'token');
+    authUrl.searchParams.append('client_id', 'cli');
+    return authUrl.toString();
+}
+
+// Main OAuth flow
+export async function performOAuthFlow(): Promise<string> {
+    console.log(chalk.cyan('Starting OAuth authentication flow...'));
+    
+    // Get available port for callback server
+    const port = await getAvailablePort();
+    const redirectUri = `http://localhost:${port}`;
+    
+    // Build authorization URL
+    const authUrl = buildAuthUrl(redirectUri);
+    
+    console.log(chalk.gray(`\nStarting local server on port ${port}...`));
+    
+    // Start OAuth callback server
+    const tokenPromise = startOAuthServer(port);
+    
+    // Open browser
+    console.log(chalk.cyan('\nOpening browser for authentication...'));
+    await openBrowser(authUrl);
+    
+    console.log(chalk.gray('\nWaiting for authentication...'));
+    console.log(chalk.gray(`If the browser doesn't open, visit: ${authUrl}`));
+    
+    // Wait for token
+    const sessionToken = await tokenPromise;
+    
+    console.log(chalk.green('\n✓ Authentication successful!'));
+    
+    return sessionToken;
+}

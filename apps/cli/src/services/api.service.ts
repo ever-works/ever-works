@@ -173,6 +173,11 @@ export class ApiService {
         return response.data;
     }
 
+    async getProfile(): Promise<any> {
+        const response = await this.httpClient.get('/auth/profile/fresh');
+        return response.data;
+    }
+
     async updateWebsite(directoryId: string): Promise<ApiResponse> {
         const response = await this.httpClient.post<ApiResponse>(
             `/directories/${directoryId}/update-website`,
