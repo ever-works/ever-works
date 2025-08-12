@@ -10,7 +10,7 @@ export const updateWebsiteCommand = new Command('update-website')
     .description('Update the website repository for a directory')
     .action(async () => {
         try {
-            console.log(chalk.cyan.bold('\n🌐 Update Website\n'));
+            console.log(chalk.cyan.bold('\nUpdate Website\n'));
 
             // Ensure user is authenticated
             await requireAuth();

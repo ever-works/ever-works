@@ -21,7 +21,7 @@ export class ListSubCommand extends CommandRunner {
 
     async run(): Promise<void> {
         try {
-            console.log(chalk.cyan.bold('\n📋 Directory List\n'));
+            console.log(chalk.cyan.bold('\nDirectory List\n'));
 
             // Check configuration first
             await this.configCheck.requireConfiguration();

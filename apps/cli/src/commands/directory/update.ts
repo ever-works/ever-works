@@ -10,7 +10,7 @@ export const updateCommand = new Command('update')
     .description('Update a directory and its GitHub repository')
     .action(async () => {
         try {
-            console.log(chalk.cyan.bold('\n🔄 Update Directory\n'));
+            console.log(chalk.cyan.bold('\nUpdate Directory\n'));
 
             // Ensure user is authenticated
             await requireAuth();

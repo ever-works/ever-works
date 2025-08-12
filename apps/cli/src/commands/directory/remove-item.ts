@@ -10,7 +10,7 @@ export const removeItemCommand = new Command('remove-item')
     .description('Remove an item from a directory')
     .action(async () => {
         try {
-            console.log(chalk.cyan.bold('\n🗑️  Remove Item\n'));
+            console.log(chalk.cyan.bold('\nRemove Item from Directory\n'));
 
             // Ensure user is authenticated
             await requireAuth();

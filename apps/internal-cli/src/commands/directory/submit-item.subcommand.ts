@@ -27,7 +27,7 @@ export class SubmitItemSubCommand extends CommandRunner {
 
     async run(): Promise<void> {
         try {
-            console.log(chalk.cyan.bold('\n📝 Submit Item to Directory\n'));
+            console.log(chalk.cyan.bold('\nSubmit Item to Directory\n'));
 
             // Check configuration first
             await this.configCheck.requireConfiguration();

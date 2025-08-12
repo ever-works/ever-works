@@ -27,7 +27,7 @@ export class UpdateSubCommand extends CommandRunner {
 
     async run(): Promise<void> {
         try {
-            console.log(chalk.cyan.bold('\n🔄 Update Directory\n'));
+            console.log(chalk.cyan.bold('\nUpdate Directory\n'));
 
             // Check configuration first
             await this.configCheck.requireConfiguration();

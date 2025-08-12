@@ -10,7 +10,7 @@ export const listCommand = new Command('list')
     .option('--limit <limit>', 'Limit number of results', '20')
     .action(async (options) => {
         try {
-            console.log(chalk.cyan.bold('\n📋 Directory List\n'));
+            console.log(chalk.cyan.bold('\nDirectory List\n'));
 
             // Ensure user is authenticated
             await requireAuth();

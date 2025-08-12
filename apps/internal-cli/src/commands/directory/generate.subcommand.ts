@@ -34,7 +34,7 @@ export class GenerateSubCommand extends CommandRunner {
 
     async run(): Promise<void> {
         try {
-            console.log(chalk.cyan.bold('\n🚀 Generate Directory Content\n'));
+            console.log(chalk.cyan.bold('\nGenerate Directory Content\n'));
             console.log(
                 chalk.gray(
                     'This process may take a while. Please be patient and do not interrupt.',

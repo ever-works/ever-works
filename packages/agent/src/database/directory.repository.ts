@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, Raw, ILike } from 'typeorm';
 import { Directory } from '../entities/directory.entity';
 import { User } from '../entities';
 import { prepareLikeSearchTerm } from './utils';
@@ -51,41 +51,59 @@ export class DirectoryRepository {
     }): Promise<Directory[]> {
         const { userId, limit, offset, search } = options || {};
 
-        const queryBuilder = this.repository.createQueryBuilder('directory');
-
-        if (userId) {
-            queryBuilder.where('userId = :userId', { userId });
-        }
+        let whereConditions: any = [];
 
         if (search) {
             const sanitizedSearch = prepareLikeSearchTerm(search);
 
             if (sanitizedSearch) {
-                // Use LOWER() for case-insensitive search - works across all databases
-                queryBuilder.andWhere(
-                    '(LOWER(directory.name) LIKE LOWER(:search) OR LOWER(directory.description) LIKE LOWER(:search) OR LOWER(directory.slug) LIKE LOWER(:search))',
-                    { search: `%${sanitizedSearch}%` },
-                );
+                // Create OR conditions for search
+                const searchConditions = [
+                    { name: ILike(`%${sanitizedSearch}%`) },
+                    { description: ILike(`%${sanitizedSearch}%`) },
+                    { slug: ILike(`%${sanitizedSearch}%`) },
+                ];
+
+                // If userId is specified, add it to each search condition
+                if (userId) {
+                    whereConditions = searchConditions.map((cond) => ({ ...cond, userId }));
+                } else {
+                    whereConditions = searchConditions;
+                }
+            } else if (userId) {
+                whereConditions = { userId };
             }
+        } else if (userId) {
+            whereConditions = { userId };
+        }
+
+        const findOptions: any = {
+            order: { id: 'DESC' },
+            relations: ['user', 'user.oauthTokens'],
+        };
+
+        if (
+            whereConditions &&
+            (Array.isArray(whereConditions)
+                ? whereConditions.length > 0
+                : Object.keys(whereConditions).length > 0)
+        ) {
+            findOptions.where = whereConditions;
         }
 
         if (limit) {
-            queryBuilder.limit(limit);
+            findOptions.take = limit;
         }
 
         if (offset) {
-            queryBuilder.offset(offset);
+            findOptions.skip = offset;
         }
 
-        queryBuilder.orderBy('directory.id', 'DESC');
-
-        const directories = await queryBuilder.getMany();
+        const directories = await this.repository.find(findOptions);
 
         return directories.map((dir) => {
-            return {
-                ...dir,
-                owner: dir.getRepoOwner(),
-            } as Directory;
+            dir.owner = dir.getRepoOwner();
+            return dir;
         });
     }
 

@@ -27,7 +27,7 @@ export class RemoveItemSubCommand extends CommandRunner {
 
     async run(): Promise<void> {
         try {
-            console.log(chalk.cyan.bold('\n🗑️  Remove Item from Directory\n'));
+            console.log(chalk.cyan.bold('\nRemove Item from Directory\n'));
 
             // Check configuration first
             await this.configCheck.requireConfiguration();

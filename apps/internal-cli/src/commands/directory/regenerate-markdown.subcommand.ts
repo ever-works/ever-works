@@ -27,7 +27,7 @@ export class RegenerateMarkdownSubCommand extends CommandRunner {
 
     async run(): Promise<void> {
         try {
-            console.log(chalk.cyan.bold('\n📄 Regenerate Markdown Files\n'));
+            console.log(chalk.cyan.bold('\nRegenerate Markdown Files\n'));
 
             // Check configuration first
             await this.configCheck.requireConfiguration();

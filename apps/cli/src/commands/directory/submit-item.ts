@@ -10,7 +10,7 @@ export const submitItemCommand = new Command('submit-item')
     .description('Submit an item to a directory')
     .action(async () => {
         try {
-            console.log(chalk.cyan.bold('\n📤 Submit Item\n'));
+            console.log(chalk.cyan.bold('\nSubmit Item to Directory\n'));
 
             // Ensure user is authenticated
             await requireAuth();

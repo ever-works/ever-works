@@ -10,7 +10,7 @@ export const regenerateMarkdownCommand = new Command('regenerate-markdown')
     .description('Regenerate readme markdown file for a directory')
     .action(async () => {
         try {
-            console.log(chalk.cyan.bold('\n📝 Regenerate Markdown\n'));
+            console.log(chalk.cyan.bold('\nRegenerate Markdown Files\n'));
 
             // Ensure user is authenticated
             await requireAuth();

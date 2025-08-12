@@ -11,7 +11,7 @@ export const generateCommand = new Command('generate')
     .description('Generate data and create a GitHub repository for a directory')
     .action(async () => {
         try {
-            console.log(chalk.cyan.bold('\n🚀 Generate Directory Content\n'));
+            console.log(chalk.cyan.bold('\nGenerate Directory Content\n'));
 
             // Ensure user is authenticated
             await requireAuth();
@@ -110,7 +110,10 @@ export const generateCommand = new Command('generate')
             const spinner = ora('Starting generation process...').start();
 
             try {
-                const response = await apiService.generateContent(directory.id, createItemsGeneratorDto);
+                const response = await apiService.generateContent(
+                    directory.id,
+                    createItemsGeneratorDto,
+                );
 
                 spinner.succeed('Generation started successfully');
 
