@@ -6,15 +6,17 @@ import {
     getRefreshCookie,
     setOAuthState,
     setAuthCookies,
+    getRedirectCookie,
+    removeRedirectCookie,
 } from '@/lib/auth';
-import crypto from 'crypto';
 import { ROUTES, routeWithParams, withAppUrl } from '@/lib/constants';
 import { VALIDATION_RULES } from './validation';
-import { authAPI } from '@/lib/api';
+import { authAPI, AuthResponse } from '@/lib/api';
 import { redirect } from '@/i18n/navigation';
 import { getLocale, getTranslations } from 'next-intl/server';
+import { addSessionTokenToUrl, isValidRedirectUrl } from '@/lib/utils';
 
-export async function login(identifier: string, password: string) {
+export async function login(identifier: string, password: string, redirectUrl: string | null) {
     const t = await getTranslations('validation.auth');
 
     // Validation schemas
@@ -32,13 +34,16 @@ export async function login(identifier: string, password: string) {
         };
     }
 
+    let authReponse: AuthResponse | null = null;
+    let href: string = ROUTES.HOME;
+
     try {
-        const response = await authAPI.login({
+        authReponse = await authAPI.login({
             email: validation.data.email,
             password: validation.data.password,
         });
 
-        await setAuthCookies(response.access_token, response.refresh_token);
+        await setAuthCookies(authReponse.access_token, authReponse.refresh_token);
     } catch (error) {
         console.error(error);
 
@@ -53,10 +58,19 @@ export async function login(identifier: string, password: string) {
         };
     }
 
-    redirect({
-        locale: await getLocale(),
-        href: ROUTES.HOME,
-    });
+    if (redirectUrl && isValidRedirectUrl(redirectUrl)) {
+        href = redirectUrl;
+    } else if (authReponse) {
+        // Check if we have a redirect URL
+        const redirectUrl = await getRedirectCookie();
+
+        if (redirectUrl && isValidRedirectUrl(redirectUrl)) {
+            await removeRedirectCookie();
+            href = addSessionTokenToUrl(redirectUrl, authReponse.access_token);
+        }
+    }
+
+    redirect({ locale: await getLocale(), href });
 
     return {
         success: true,
@@ -157,9 +171,18 @@ export async function logout() {
 // OAuth
 // =================
 
-export async function connectProvider(provider: string) {
+const crypto = globalThis.crypto || require('crypto').webcrypto;
+
+function generateHexToken(length = 16) {
+    const bytes = crypto.getRandomValues(new Uint8Array(Math.ceil(length / 2)));
+    return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0'))
+        .join('')
+        .substring(0, length);
+}
+
+export async function connectProvider(provider: 'github' | 'google') {
     try {
-        const state = crypto.randomBytes(16).toString('hex');
+        const state = generateHexToken(16);
         await setOAuthState(state);
 
         const callbackUrl = routeWithParams(ROUTES.API_AUTH_CALLBACK, { provider });

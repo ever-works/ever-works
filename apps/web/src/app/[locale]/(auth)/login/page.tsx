@@ -33,7 +33,9 @@ function PasswordResetSuccessMessage() {
                     </svg>
                 </div>
                 <div className="flex-1">
-                    <p className="text-sm font-medium text-text dark:text-text-dark">{t('passwordReset.success')}</p>
+                    <p className="text-sm font-medium text-text dark:text-text-dark">
+                        {t('passwordReset.success')}
+                    </p>
                     <p className="text-xs text-text-secondary dark:text-text-secondary-dark mt-1">
                         {t('passwordReset.canLogin')}
                     </p>
@@ -48,6 +50,7 @@ function LoginContent() {
     const t = useTranslations('auth.login');
     const searchParams = useSearchParams();
     const isPasswordReset = searchParams.get('reset') === 'true';
+    const redirectUrl = searchParams.get('redirect');
 
     const [formData, setFormData] = useState({
         email: '',
@@ -74,7 +77,7 @@ function LoginContent() {
         setShowResetSuccess(false);
 
         startTransition(async () => {
-            const response = await loginAction(formData.email, formData.password);
+            const response = await loginAction(formData.email, formData.password, redirectUrl);
             if (!response.success) {
                 setError(response.error || t('errors.invalidCredentials'));
                 return;

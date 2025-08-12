@@ -1,7 +1,8 @@
 import { redirect } from '@/i18n/navigation';
 import { authAPI, AuthResponse } from '@/lib/api';
-import { getOAuthState, setAuthCookies } from '@/lib/auth';
+import { getOAuthState, getRedirectCookie, removeRedirectCookie, setAuthCookies } from '@/lib/auth';
 import { ROUTES } from '@/lib/constants';
+import { addSessionTokenToUrl, isValidRedirectUrl } from '@/lib/utils';
 import { getLocale } from 'next-intl/server';
 import { NextRequest } from 'next/server';
 
@@ -35,10 +36,10 @@ export async function GET(
         });
     }
 
-    let href = ROUTES.HOME;
+    let href: string = ROUTES.HOME;
+    let authReponse: AuthResponse | null = null;
 
     try {
-        let authReponse: AuthResponse | null = null;
         switch (provider) {
             case 'github': {
                 const response = await authAPI.connectGitHubCallback(code, state || undefined);
@@ -63,6 +64,16 @@ export async function GET(
 
         if (error instanceof Error && error.message.includes('suspended')) {
             href = ROUTES.AUTH_ERROR + '?error=account_locked';
+        }
+    }
+
+    if (authReponse) {
+        // Check if we have a redirect URL
+        const redirectUrl = await getRedirectCookie();
+
+        if (redirectUrl && isValidRedirectUrl(redirectUrl)) {
+            await removeRedirectCookie();
+            href = addSessionTokenToUrl(redirectUrl, authReponse.access_token);
         }
     }
 

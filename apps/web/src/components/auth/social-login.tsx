@@ -9,7 +9,7 @@ export function SocialLoginButtons() {
     const t = useTranslations('auth.login');
     const [isPending, startTransition] = useTransition();
 
-    const handleConnectProvider = async (provider: string) => {
+    const handleConnectProvider = async (provider: 'github' | 'google') => {
         startTransition(async () => {
             const response = await connectProvider(provider);
             if (!response.success || !response.url) {

@@ -7,6 +7,11 @@ export const DEFAULT_LOCALE = 'en';
 const apiUrl = process.env.API_URL || 'http://localhost:3100';
 export const API_URL = apiUrl.endsWith('/api') ? apiUrl : `${apiUrl}/api`;
 
+// Allowed redirect hosts
+export const ALLOWED_REDIRECT_URLS = (process.env.ALLOWED_REDIRECT_URLS || 'localhost,127.0.0.1')
+    .split(',')
+    .map((url) => url.trim());
+
 // App URL
 export const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
