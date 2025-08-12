@@ -24,30 +24,12 @@ export const statusCommand = new Command('status')
             if (credentials.username) {
                 console.log(chalk.gray(`  Username: ${credentials.username}`));
             }
-            if (credentials.provider) {
-                console.log(chalk.gray(`  Provider: ${credentials.provider}`));
-            }
             if (credentials.emailVerified !== undefined) {
                 console.log(
                     chalk.gray(`  Email Verified: ${credentials.emailVerified ? '✓' : '✗'}`),
                 );
             }
-            if (credentials.isActive !== undefined) {
-                console.log(chalk.gray(`  Active: ${credentials.isActive ? '✓' : '✗'}`));
-            }
             console.log(chalk.gray(`  API URL: ${credentials.apiUrl}`));
-
-            // Check token expiry
-            const expiryInfo = CredentialsService.getTokenExpiryInfo(credentials);
-            if (expiryInfo.isExpired) {
-                console.log(chalk.red(`  Token expired`));
-            } else if (expiryInfo.daysLeft !== undefined && expiryInfo.daysLeft > 0) {
-                console.log(chalk.gray(`  Token expires in: ${expiryInfo.daysLeft} days`));
-            } else if (expiryInfo.hoursLeft !== undefined && expiryInfo.hoursLeft > 0) {
-                console.log(chalk.yellow(`  Token expires in: ${expiryInfo.hoursLeft} hours`));
-            } else if (expiryInfo.minutesLeft !== undefined && expiryInfo.minutesLeft > 0) {
-                console.log(chalk.yellow(`  Token expires in: ${expiryInfo.minutesLeft} minutes`));
-            }
 
             // Try to verify with API
             console.log(chalk.gray('\nVerifying with API...'));
