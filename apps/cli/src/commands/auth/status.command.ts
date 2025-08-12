@@ -31,6 +31,18 @@ export const statusCommand = new Command('status')
             }
             console.log(chalk.gray(`  API URL: ${credentials.apiUrl}`));
 
+            // Check token expiry
+            const expiryInfo = CredentialsService.getTokenExpiryInfo(credentials);
+            if (expiryInfo.isExpired) {
+                console.log(chalk.red(`  Token expired`));
+            } else if (expiryInfo.daysLeft !== undefined && expiryInfo.daysLeft > 0) {
+                console.log(chalk.gray(`  Token expires in: ${expiryInfo.daysLeft} days`));
+            } else if (expiryInfo.hoursLeft !== undefined && expiryInfo.hoursLeft > 0) {
+                console.log(chalk.yellow(`  Token expires in: ${expiryInfo.hoursLeft} hours`));
+            } else if (expiryInfo.minutesLeft !== undefined && expiryInfo.minutesLeft > 0) {
+                console.log(chalk.yellow(`  Token expires in: ${expiryInfo.minutesLeft} minutes`));
+            }
+
             // Try to verify with API
             console.log(chalk.gray('\nVerifying with API...'));
             try {
