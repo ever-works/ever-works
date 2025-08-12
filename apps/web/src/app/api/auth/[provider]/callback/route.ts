@@ -1,7 +1,7 @@
 import { redirect } from '@/i18n/navigation';
 import { authAPI, AuthResponse } from '@/lib/api';
 import { getOAuthState, setAuthCookies } from '@/lib/auth';
-import { authRedirect } from '@/lib/auth/redirect';
+import { getRedirectUrl } from '@/lib/auth/redirect';
 import { ROUTES } from '@/lib/constants';
 import { getLocale } from 'next-intl/server';
 import { NextRequest } from 'next/server';
@@ -67,7 +67,7 @@ export async function GET(
         }
     }
 
-    href = await authRedirect(authReponse, href);
+    href = await getRedirectUrl(authReponse, href);
 
     return redirect({ locale, href });
 }

@@ -1,7 +1,7 @@
 import { redirect } from '@/i18n/navigation';
 import { authAPI, AuthResponse } from '@/lib/api';
 import { setAuthCookies } from '@/lib/auth';
-import { authRedirect } from '@/lib/auth/redirect';
+import { getRedirectUrl } from '@/lib/auth/redirect';
 import { ROUTES } from '@/lib/constants';
 import { getLocale } from 'next-intl/server';
 import { NextRequest } from 'next/server';
@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
         href = ROUTES.AUTH_ERROR + '?error=verify_email_invalid_token';
     }
 
-    href = await authRedirect(authReponse, href);
+    href = await getRedirectUrl(authReponse, href);
 
     return redirect({ locale, href });
 }

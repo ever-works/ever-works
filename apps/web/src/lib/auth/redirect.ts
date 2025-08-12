@@ -2,7 +2,7 @@ import { AuthResponse } from '../api';
 import { addSessionTokenToUrl, isValidRedirectUrl } from '../utils';
 import { getRedirectCookie, removeRedirectCookie } from './cookies';
 
-export async function authRedirect(authReponse: AuthResponse | null, initialHref: string) {
+export async function getRedirectUrl(authReponse: AuthResponse | null, initialHref: string) {
     if (!authReponse) {
         return initialHref;
     }

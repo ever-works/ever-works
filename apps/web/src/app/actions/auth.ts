@@ -13,7 +13,7 @@ import { authAPI, AuthResponse } from '@/lib/api';
 import { redirect } from '@/i18n/navigation';
 import { getLocale, getTranslations } from 'next-intl/server';
 import { isValidRedirectUrl } from '@/lib/utils';
-import { authRedirect } from '@/lib/auth/redirect';
+import { getRedirectUrl } from '@/lib/auth/redirect';
 
 export async function login(identifier: string, password: string, redirectUrl: string | null) {
     const t = await getTranslations('validation.auth');
@@ -61,7 +61,7 @@ export async function login(identifier: string, password: string, redirectUrl: s
         href = redirectUrl;
     } else if (authReponse) {
         // Check if we have a redirect URL in a cookie
-        href = await authRedirect(authReponse, href);
+        href = await getRedirectUrl(authReponse, href);
     }
 
     redirect({ locale: await getLocale(), href });
