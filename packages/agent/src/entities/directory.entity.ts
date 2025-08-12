@@ -50,12 +50,12 @@ export class Directory {
     }
 
     getRepoOwner(): string {
-        const oauthToken = this.user.oauthTokens.find(
+        const oauthToken = (this.user.oauthTokens || []).find(
             (token) => token.provider === this.repo_provider,
         );
 
         return (
-            this.owner || oauthToken.username || oauthToken.metadata?.login || this.user.username
+            this.owner || oauthToken?.username || oauthToken?.metadata?.login || this.user.username
         );
     }
 }
