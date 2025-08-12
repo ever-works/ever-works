@@ -19,7 +19,7 @@ export const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000
 export const AUTH_SECRET = process.env.COOKIE_SECRET || process.env.AUTH_SECRET;
 
 // Redirect search param key
-export const REDIRECT_SEARCH_PARAM = 'redirect';
+export const REDIRECT_SEARCH_PARAM = 'redirect_uri';
 
 // ROUTES
 export const ROUTES = {

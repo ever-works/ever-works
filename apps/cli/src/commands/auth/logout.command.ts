@@ -10,13 +10,12 @@ export const logoutCommand = new Command('logout')
 
             const credentials = await CredentialsService.get();
             const removed = await CredentialsService.remove();
-            
+
             if (removed) {
-                if (credentials?.email) {
-                    console.log(chalk.green(`✓ Successfully logged out from ${chalk.bold(credentials.email)}!`));
-                } else {
-                    console.log(chalk.green('✓ Successfully logged out!'));
-                }
+                const displayName = credentials?.email || credentials?.username || 'User';
+                console.log(
+                    chalk.green(`✓ Successfully logged out from ${chalk.bold(displayName)}!`),
+                );
             } else {
                 console.log(chalk.yellow('⚠ No active session found.'));
             }

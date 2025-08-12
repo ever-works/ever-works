@@ -2,11 +2,23 @@ import * as fs from 'fs-extra';
 import * as path from 'path';
 import * as os from 'os';
 import chalk from 'chalk';
+import { 
+    decodeJWT, 
+    isJWTExpired, 
+    getJWTExpiration, 
+    getJWTUserInfo,
+    AuthUser 
+} from '../../utils/jwt.utils';
 
 export interface Credentials {
     token: string;
     apiUrl: string;
     email?: string;
+    username?: string;
+    provider?: string;
+    emailVerified?: boolean;
+    isActive?: boolean;
+    avatar?: string | null;
     expiresAt?: string;
 }
 
@@ -35,8 +47,8 @@ export class CredentialsService {
 
             const credentials = await fs.readJson(CREDENTIALS_FILE);
 
-            // Check if token is expired
-            if (credentials.expiresAt && new Date(credentials.expiresAt) < new Date()) {
+            // Check if JWT token is expired
+            if (credentials.token && isJWTExpired(credentials.token)) {
                 console.log(chalk.yellow('⚠ Token has expired. Please login again.'));
                 return null;
             }
@@ -67,13 +79,26 @@ export class CredentialsService {
         }
     }
 
-    static createWithExpiry(token: string, apiUrl: string, email?: string): Credentials {
+    static createWithExpiry(token: string, apiUrl: string, overrideEmail?: string): Credentials {
+        // Extract all user info from JWT token
+        const userInfo = getJWTUserInfo(token);
+        const expiration = getJWTExpiration(token);
+        
         return {
             token,
             apiUrl,
-            email,
-            expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days
+            email: overrideEmail || userInfo?.email,
+            username: userInfo?.username,
+            provider: userInfo?.provider,
+            emailVerified: userInfo?.emailVerified,
+            isActive: userInfo?.isActive,
+            avatar: userInfo?.avatar,
+            expiresAt: expiration ? expiration.toISOString() : undefined,
         };
+    }
+
+    static extractUserFromToken(token: string): Partial<AuthUser> | null {
+        return getJWTUserInfo(token);
     }
 
     static async requireAuth(): Promise<void> {
@@ -89,18 +114,43 @@ export class CredentialsService {
     static getTokenExpiryInfo(credentials: Credentials): {
         isExpired: boolean;
         daysLeft?: number;
+        hoursLeft?: number;
+        minutesLeft?: number;
     } {
-        if (!credentials.expiresAt) {
-            return { isExpired: false };
+        // Get expiration from JWT token
+        const expiresDate = getJWTExpiration(credentials.token);
+        
+        if (!expiresDate) {
+            // Fallback to stored expiresAt if JWT doesn't have exp claim
+            if (!credentials.expiresAt) {
+                return { isExpired: false };
+            }
+            const storedExpiry = new Date(credentials.expiresAt);
+            const now = new Date();
+            const msLeft = storedExpiry.getTime() - now.getTime();
+            const daysLeft = Math.floor(msLeft / (1000 * 60 * 60 * 24));
+            const hoursLeft = Math.floor((msLeft % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            const minutesLeft = Math.floor((msLeft % (1000 * 60 * 60)) / (1000 * 60));
+            
+            return {
+                isExpired: msLeft <= 0,
+                daysLeft: daysLeft > 0 ? daysLeft : undefined,
+                hoursLeft: daysLeft === 0 && hoursLeft > 0 ? hoursLeft : undefined,
+                minutesLeft: daysLeft === 0 && hoursLeft === 0 && minutesLeft > 0 ? minutesLeft : undefined,
+            };
         }
 
-        const expiresDate = new Date(credentials.expiresAt);
         const now = new Date();
-        const daysLeft = Math.ceil((expiresDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+        const msLeft = expiresDate.getTime() - now.getTime();
+        const daysLeft = Math.floor(msLeft / (1000 * 60 * 60 * 24));
+        const hoursLeft = Math.floor((msLeft % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        const minutesLeft = Math.floor((msLeft % (1000 * 60 * 60)) / (1000 * 60));
 
         return {
-            isExpired: daysLeft <= 0,
+            isExpired: msLeft <= 0,
             daysLeft: daysLeft > 0 ? daysLeft : undefined,
+            hoursLeft: daysLeft === 0 && hoursLeft > 0 ? hoursLeft : undefined,
+            minutesLeft: daysLeft === 0 && hoursLeft === 0 && minutesLeft > 0 ? minutesLeft : undefined,
         };
     }
 }

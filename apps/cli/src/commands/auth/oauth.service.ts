@@ -26,7 +26,7 @@ export async function startOAuthServer(port: number): Promise<string> {
             const error = url.searchParams.get('error');
 
             res.writeHead(200, { 'Content-Type': 'text/html' });
-            
+
             if (error) {
                 res.end(`
                     <html>
@@ -62,12 +62,15 @@ export async function startOAuthServer(port: number): Promise<string> {
         });
 
         server.listen(port);
-        
+
         // Set a timeout for the OAuth flow
-        setTimeout(() => {
-            server.close();
-            reject(new Error('Authentication timeout'));
-        }, 5 * 60 * 1000); // 5 minutes timeout
+        setTimeout(
+            () => {
+                server.close();
+                reject(new Error('Authentication timeout'));
+            },
+            5 * 60 * 1000,
+        ); // 5 minutes timeout
     });
 }
 
@@ -75,7 +78,7 @@ export async function startOAuthServer(port: number): Promise<string> {
 export async function openBrowser(url: string): Promise<void> {
     const platform = process.platform;
     let command: string;
-    
+
     if (platform === 'darwin') {
         command = `open "${url}"`;
     } else if (platform === 'win32') {
@@ -83,7 +86,7 @@ export async function openBrowser(url: string): Promise<void> {
     } else {
         command = `xdg-open "${url}"`;
     }
-    
+
     try {
         await execAsync(command);
     } catch (error) {
@@ -104,30 +107,30 @@ export function buildAuthUrl(redirectUri: string): string {
 // Main OAuth flow
 export async function performOAuthFlow(): Promise<string> {
     console.log(chalk.cyan('Starting OAuth authentication flow...'));
-    
+
     // Get available port for callback server
     const port = await getAvailablePort();
     const redirectUri = `http://localhost:${port}`;
-    
+
     // Build authorization URL
     const authUrl = buildAuthUrl(redirectUri);
-    
+
     console.log(chalk.gray(`\nStarting local server on port ${port}...`));
-    
+
     // Start OAuth callback server
     const tokenPromise = startOAuthServer(port);
-    
+
     // Open browser
     console.log(chalk.cyan('\nOpening browser for authentication...'));
     await openBrowser(authUrl);
-    
+
     console.log(chalk.gray('\nWaiting for authentication...'));
     console.log(chalk.gray(`If the browser doesn't open, visit: ${authUrl}`));
-    
+
     // Wait for token
     const sessionToken = await tokenPromise;
-    
+
     console.log(chalk.green('\n✓ Authentication successful!'));
-    
+
     return sessionToken;
 }

@@ -8,9 +8,10 @@ import { performOAuthFlow } from './oauth.service';
 
 async function checkExistingLogin(): Promise<boolean> {
     const existingCredentials = await CredentialsService.get();
-    if (existingCredentials && existingCredentials.email) {
-        console.log(chalk.yellow(`⚠ You are already logged in as ${chalk.bold(existingCredentials.email)}`));
-        
+    if (existingCredentials) {
+        const displayName = existingCredentials.email || existingCredentials.username || 'User';
+        console.log(chalk.yellow(`⚠ You are already logged in as ${chalk.bold(displayName)}`));
+
         const { proceed } = await inquirer.prompt([
             {
                 type: 'confirm',
@@ -19,7 +20,7 @@ async function checkExistingLogin(): Promise<boolean> {
                 default: false,
             },
         ]);
-        
+
         if (!proceed) {
             console.log(chalk.gray('Login cancelled.'));
             return false;
@@ -53,10 +54,7 @@ async function manualLogin(apiUrl: string): Promise<void> {
     ]);
 
     // Save credentials
-    const credentials = CredentialsService.createWithExpiry(
-        answers.token,
-        answers.apiUrl
-    );
+    const credentials = CredentialsService.createWithExpiry(answers.token, answers.apiUrl);
 
     await CredentialsService.save(credentials);
 
@@ -67,38 +65,45 @@ async function manualLogin(apiUrl: string): Promise<void> {
 async function oauthLogin(apiUrl: string): Promise<void> {
     // Perform OAuth flow
     const sessionToken = await performOAuthFlow();
-    
+
     // Verify token by fetching profile
     console.log(chalk.gray('Verifying credentials...'));
-    
+
     // Save credentials temporarily to test
     const tempCredentials = CredentialsService.createWithExpiry(sessionToken, apiUrl);
     await CredentialsService.save(tempCredentials);
-    
+
     // Get profile to verify and get email
     try {
         const apiService = getApiService();
         const profile = await apiService.getProfile();
-        
+
         // Update credentials with user info
         const credentials = CredentialsService.createWithExpiry(
             sessionToken,
             apiUrl,
-            profile.email || profile.username || 'User'
+            profile.email || profile.username || 'User',
         );
-        
+
         await CredentialsService.save(credentials);
-        
-        console.log(chalk.green(`\n✓ Successfully logged in as ${chalk.bold(credentials.email)}!`));
+
+        const displayName = credentials.email || credentials.username || 'User';
+        console.log(chalk.green(`\n✓ Successfully logged in as ${chalk.bold(displayName)}!`));
+
+        if (credentials.provider) {
+            console.log(chalk.gray(`  Provider: ${credentials.provider}`));
+        }
         console.log(chalk.gray(`Credentials saved to: ${CredentialsService.credentialsPath}`));
     } catch (error) {
         // If profile fetch fails, still save the token but without email
         const credentials = CredentialsService.createWithExpiry(sessionToken, apiUrl);
-        
+
         await CredentialsService.save(credentials);
-        
+
         console.log(chalk.green('\n✓ Successfully logged in!'));
-        console.log(chalk.yellow('⚠ Could not fetch user profile, but authentication was successful.'));
+        console.log(
+            chalk.yellow('⚠ Could not fetch user profile, but authentication was successful.'),
+        );
         console.log(chalk.gray(`Credentials saved to: ${CredentialsService.credentialsPath}`));
     }
 }
@@ -123,7 +128,6 @@ export const loginCommand = new Command('login')
             } else {
                 await oauthLogin(options.apiUrl);
             }
-            
         } catch (error) {
             console.error(chalk.red('\n✗ Login failed:'), error.message);
             process.exit(1);
