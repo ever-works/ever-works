@@ -23,14 +23,18 @@ export async function startOAuthServer(port: number): Promise<string> {
         let resolved = false;
         const connections = new Set<any>();
 
-        const closeAllConnections = (error: string) => {
+        const closeAllConnections = (error?: string, sessionToken?: string) => {
             if (!resolved) {
                 resolved = true;
                 // Force close all connections
                 setTimeout(() => {
                     connections.forEach((conn) => conn.destroy());
                     server.close(() => {
-                        reject(new Error(error));
+                        if (error) {
+                            reject(new Error(error));
+                        } else if (sessionToken) {
+                            resolve(sessionToken);
+                        }
                     });
                 }, 100);
             }
@@ -68,7 +72,7 @@ export async function startOAuthServer(port: number): Promise<string> {
                     </html>
                 `);
 
-                closeAllConnections('');
+                closeAllConnections(undefined, sessionToken);
             } else {
                 res.end(`
                     <html>

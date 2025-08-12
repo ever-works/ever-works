@@ -59,7 +59,6 @@ async function manualLogin(apiUrl: string): Promise<void> {
     await CredentialsService.save(credentials);
 
     console.log(chalk.green('\n✓ Successfully logged in!'));
-    console.log(chalk.gray(`Credentials saved to: ${CredentialsService.credentialsPath}`));
 }
 
 async function oauthLogin(apiUrl: string): Promise<void> {
@@ -89,11 +88,6 @@ async function oauthLogin(apiUrl: string): Promise<void> {
 
         const displayName = credentials.email || credentials.username || 'User';
         console.log(chalk.green(`\n✓ Successfully logged in as ${chalk.bold(displayName)}!`));
-
-        if (credentials.provider) {
-            console.log(chalk.gray(`  Provider: ${credentials.provider}`));
-        }
-        console.log(chalk.gray(`Credentials saved to: ${CredentialsService.credentialsPath}`));
     } catch (error) {
         // If profile fetch fails, still save the token but without email
         const credentials = CredentialsService.createWithExpiry(sessionToken, apiUrl);
@@ -104,7 +98,6 @@ async function oauthLogin(apiUrl: string): Promise<void> {
         console.log(
             chalk.yellow('⚠ Could not fetch user profile, but authentication was successful.'),
         );
-        console.log(chalk.gray(`Credentials saved to: ${CredentialsService.credentialsPath}`));
     }
 }
 
@@ -129,6 +122,7 @@ export const loginCommand = new Command('login')
                 await oauthLogin(options.apiUrl);
             }
         } catch (error) {
+            console.log(error);
             console.error(chalk.red('\n✗ Login failed:'), error.message);
             process.exit(1);
         }
