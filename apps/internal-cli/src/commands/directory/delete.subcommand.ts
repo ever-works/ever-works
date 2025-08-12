@@ -27,7 +27,7 @@ export class DeleteSubCommand extends CommandRunner {
 
     async run(): Promise<void> {
         try {
-            console.log(chalk.cyan.bold('\n🗑️  Delete Directory\n'));
+            console.log(chalk.cyan.bold('\nDelete Directory\n'));
 
             // Check configuration first
             await this.configCheck.requireConfiguration();

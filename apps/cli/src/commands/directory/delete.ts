@@ -10,7 +10,7 @@ export const deleteCommand = new Command('delete')
     .description('Delete a directory')
     .action(async () => {
         try {
-            console.log(chalk.red.bold('\n🗑️  Delete Directory\n'));
+            console.log(chalk.red.bold('\nDelete Directory\n'));
 
             // Ensure user is authenticated
             await requireAuth();

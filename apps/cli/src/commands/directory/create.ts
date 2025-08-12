@@ -9,7 +9,7 @@ export const createCommand = new Command('create')
     .description('Create a new directory')
     .action(async () => {
         try {
-            console.log(chalk.cyan.bold('\n📁 Create New Directory\n'));
+            console.log(chalk.cyan.bold('\nCreate New Directory\n'));
 
             // Ensure user is authenticated
             const auth = await requireAuth();

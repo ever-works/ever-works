@@ -27,7 +27,7 @@ export class CreateSubCommand extends CommandRunner {
 
     async run(): Promise<void> {
         try {
-            console.log(chalk.cyan.bold('\n📁 Create New Directory\n'));
+            console.log(chalk.cyan.bold('\nCreate New Directory\n'));
 
             // Check configuration first
             await this.configCheck.requireConfiguration();
