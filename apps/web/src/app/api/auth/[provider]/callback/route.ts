@@ -1,8 +1,8 @@
 import { redirect } from '@/i18n/navigation';
 import { authAPI, AuthResponse } from '@/lib/api';
-import { getOAuthState, getRedirectCookie, removeRedirectCookie, setAuthCookies } from '@/lib/auth';
+import { getOAuthState, setAuthCookies } from '@/lib/auth';
+import { authRedirect } from '@/lib/auth/redirect';
 import { ROUTES } from '@/lib/constants';
-import { addSessionTokenToUrl, isValidRedirectUrl } from '@/lib/utils';
 import { getLocale } from 'next-intl/server';
 import { NextRequest } from 'next/server';
 
@@ -67,15 +67,7 @@ export async function GET(
         }
     }
 
-    if (authReponse) {
-        // Check if we have a redirect URL
-        const redirectUrl = await getRedirectCookie();
-
-        if (redirectUrl && isValidRedirectUrl(redirectUrl)) {
-            await removeRedirectCookie();
-            href = addSessionTokenToUrl(redirectUrl, authReponse.access_token);
-        }
-    }
+    href = await authRedirect(authReponse, href);
 
     return redirect({ locale, href });
 }

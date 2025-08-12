@@ -48,6 +48,8 @@ function AuthErrorContent() {
                 return t('verifyEmail.expiredToken');
             case 'verify_email_failed':
                 return t('verifyEmail.failed');
+            case 'authorize_invalid_redirect_url':
+                return t('authorize.invalidRedirectUrl');
             default:
                 return t('generic');
         }
@@ -141,6 +143,22 @@ function AuthErrorContent() {
                             strokeLinejoin="round"
                             strokeWidth={2}
                             d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                        />
+                    </svg>
+                );
+            case 'authorize_invalid_redirect_url':
+                return (
+                    <svg
+                        className="w-12 h-12 text-warning"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                    >
+                        <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M13 10V3L4 14h7v7l9-11h-7z"
                         />
                     </svg>
                 );
@@ -250,7 +268,9 @@ function AuthErrorContent() {
                     <h2 className="text-lg font-semibold text-text dark:text-text-dark mb-2">
                         {errorType ? t('errorOccurred') : t('somethingWentWrong')}
                     </h2>
-                    <p className="text-text-secondary dark:text-text-secondary-dark">{getErrorMessage()}</p>
+                    <p className="text-text-secondary dark:text-text-secondary-dark">
+                        {getErrorMessage()}
+                    </p>
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-3 justify-center pt-4">
@@ -259,7 +279,9 @@ function AuthErrorContent() {
 
                 {/* FOR NOW HIDE */}
                 <div className="pt-8 border-t border-border dark:border-border-dark hidden">
-                    <p className="text-sm text-text-muted dark:text-text-muted-dark mb-4">{t('helpText')}</p>
+                    <p className="text-sm text-text-muted dark:text-text-muted-dark mb-4">
+                        {t('helpText')}
+                    </p>
                     <div className="flex justify-center gap-6">
                         <Link
                             href="/help"

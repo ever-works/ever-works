@@ -29,6 +29,9 @@
                 "expiredToken": "Email verification link has expired. Please request a new one.",
                 "failed": "Failed to verify email. Please try again or request a new verification link."
             },
+            "authorize": {
+                "invalidRedirectUrl": "The redirect URL is invalid or not allowed. Please contact support if you believe this is an error."
+            },
             "actions": {
                 "backToLogin": "Back to Login",
                 "tryRegister": "Try Registering",

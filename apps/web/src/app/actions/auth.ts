@@ -6,15 +6,14 @@ import {
     getRefreshCookie,
     setOAuthState,
     setAuthCookies,
-    getRedirectCookie,
-    removeRedirectCookie,
 } from '@/lib/auth';
 import { ROUTES, routeWithParams, withAppUrl } from '@/lib/constants';
 import { VALIDATION_RULES } from './validation';
 import { authAPI, AuthResponse } from '@/lib/api';
 import { redirect } from '@/i18n/navigation';
 import { getLocale, getTranslations } from 'next-intl/server';
-import { addSessionTokenToUrl, isValidRedirectUrl } from '@/lib/utils';
+import { isValidRedirectUrl } from '@/lib/utils';
+import { authRedirect } from '@/lib/auth/redirect';
 
 export async function login(identifier: string, password: string, redirectUrl: string | null) {
     const t = await getTranslations('validation.auth');
@@ -61,13 +60,8 @@ export async function login(identifier: string, password: string, redirectUrl: s
     if (redirectUrl && isValidRedirectUrl(redirectUrl)) {
         href = redirectUrl;
     } else if (authReponse) {
-        // Check if we have a redirect URL
-        const redirectUrl = await getRedirectCookie();
-
-        if (redirectUrl && isValidRedirectUrl(redirectUrl)) {
-            await removeRedirectCookie();
-            href = addSessionTokenToUrl(redirectUrl, authReponse.access_token);
-        }
+        // Check if we have a redirect URL in a cookie
+        href = await authRedirect(authReponse, href);
     }
 
     redirect({ locale: await getLocale(), href });

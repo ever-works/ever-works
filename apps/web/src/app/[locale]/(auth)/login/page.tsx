@@ -8,7 +8,7 @@ import { useTranslations } from 'next-intl';
 import { login as loginAction } from '@/app/actions/auth';
 import { SocialLoginButtons } from '@/components/auth/social-login';
 import { Input } from '@/components/ui/input';
-import { ROUTES } from '@/lib/constants';
+import { REDIRECT_SEARCH_PARAM, ROUTES } from '@/lib/constants';
 import { ThemeToggle } from '@/components/theme-toggle';
 
 function PasswordResetSuccessMessage() {
@@ -46,11 +46,12 @@ function PasswordResetSuccessMessage() {
 }
 
 function LoginContent() {
-    const [isPending, startTransition] = useTransition();
-    const t = useTranslations('auth.login');
     const searchParams = useSearchParams();
+    const t = useTranslations('auth.login');
+    const [isPending, startTransition] = useTransition();
+
     const isPasswordReset = searchParams.get('reset') === 'true';
-    const redirectUrl = searchParams.get('redirect');
+    const redirectUrl = searchParams.get(REDIRECT_SEARCH_PARAM);
 
     const [formData, setFormData] = useState({
         email: '',
