@@ -135,7 +135,7 @@ export class CredentialsService {
         return getJWTUserInfo(token);
     }
 
-    static async requireAuth(): Promise<void> {
+    static async requireAuth(): Promise<Credentials> {
         const credentials = await this.get();
         if (!credentials) {
             console.error(
@@ -143,6 +143,8 @@ export class CredentialsService {
             );
             process.exit(1);
         }
+
+        return credentials;
     }
 
     static getTokenExpiryInfo(credentials: Credentials): {
@@ -192,5 +194,8 @@ export class CredentialsService {
 }
 
 // Export for backward compatibility
-export const getCredentials = CredentialsService.get.bind(CredentialsService);
-export const requireAuth = CredentialsService.requireAuth.bind(CredentialsService);
+export const getCredentials: typeof CredentialsService.get =
+    CredentialsService.get.bind(CredentialsService);
+
+export const requireAuth: typeof CredentialsService.requireAuth =
+    CredentialsService.requireAuth.bind(CredentialsService);

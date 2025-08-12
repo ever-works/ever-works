@@ -12,7 +12,7 @@ export const createCommand = new Command('create')
             console.log(chalk.cyan.bold('\n📁 Create New Directory\n'));
 
             // Ensure user is authenticated
-            await requireAuth();
+            const auth = await requireAuth();
 
             const apiService = getApiService();
             const directoryPrompt = new DirectoryPromptService();
@@ -36,6 +36,8 @@ export const createCommand = new Command('create')
                         description: directoryData.description,
                         owner: directoryData.owner,
                         readme_config: directoryData.readme_config,
+                        organization:
+                            !!directoryData.owner && directoryData.owner !== auth.username,
                     };
 
                     const response = await apiService.createDirectory(createDirectoryDto);

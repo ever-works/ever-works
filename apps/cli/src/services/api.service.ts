@@ -16,6 +16,7 @@ export interface CreateDirectoryDto {
     description: string;
     owner?: string;
     readme_config?: MarkdownReadmeConfigDto;
+    organization: boolean;
 }
 
 export interface CreateItemsGeneratorDto {
