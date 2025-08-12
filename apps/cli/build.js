@@ -13,6 +13,7 @@ if (envExists) {
 
 // Get API_URL from environment with default fallback
 const API_URL = process.env.API_URL || 'http://localhost:3100';
+const WEB_URL = process.env.WEB_URL || 'http://localhost:3000';
 
 const AUTHOR = 'Ever Co. LTD <ever@ever.co>';
 
@@ -20,13 +21,15 @@ const AUTHOR = 'Ever Co. LTD <ever@ever.co>';
 const envPlugin = {
     name: 'env',
     setup(build) {
-        // Replace process.env.API_URL with the actual value
+        // Replace process.env.API_URL and process.env.WEB_URL with actual values
         build.onLoad({ filter: /\.(ts|js)$/ }, async (args) => {
             let contents = await fs.readFile(args.path, 'utf8');
 
             // Replace process.env.API_URL with the actual value
-            // This handles cases like: process.env.API_URL || 'default'
             contents = contents.replace(/process\.env\.API_URL/g, JSON.stringify(API_URL));
+
+            // Replace process.env.WEB_URL with the actual value
+            contents = contents.replace(/process\.env\.WEB_URL/g, JSON.stringify(WEB_URL));
 
             return {
                 contents,
@@ -59,6 +62,7 @@ async function buildCLI() {
 
     console.log('Bundling with esbuild...');
     console.log(`Using API_URL: ${API_URL}`);
+    console.log(`Using WEB_URL: ${WEB_URL}`);
 
     // Bundle the compiled JavaScript
     await esbuild.build({
