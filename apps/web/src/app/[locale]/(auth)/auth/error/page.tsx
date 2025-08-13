@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Suspense } from 'react';
 import { ROUTES } from '@/lib/constants';
+import { cn } from '@/lib/utils';
 
 function AuthErrorContent() {
     const t = useTranslations('auth.error');
@@ -236,7 +237,10 @@ function AuthErrorContent() {
             <Link
                 key="login"
                 href={ROUTES.AUTH_LOGIN}
-                className="px-6 py-3 bg-surface-secondary dark:bg-surface-secondary-dark hover:bg-surface-tertiary dark:hover:bg-surface-tertiary-dark text-text dark:text-text-dark border border-border dark:border-border-dark rounded-lg font-medium transition-colors animate-fade-in"
+                className={cn(
+                    'px-6 py-3 bg-surface-secondary dark:bg-surface-secondary-dark hover:bg-surface-tertiary dark:hover:bg-surface-tertiary-dark',
+                    'text-text dark:text-text-dark border border-border dark:border-border-dark rounded-lg font-medium transition-colors animate-fade-in',
+                )}
             >
                 {t('actions.backToLogin')}
             </Link>,
@@ -247,7 +251,10 @@ function AuthErrorContent() {
                 <Link
                     key="register"
                     href={ROUTES.AUTH_REGISTER}
-                    className="px-6 py-3 bg-surface-secondary dark:bg-surface-secondary-dark hover:bg-surface-tertiary dark:hover:bg-surface-tertiary-dark text-text dark:text-text-dark border border-border dark:border-border-dark rounded-lg font-medium transition-colors animate-fade-in"
+                    className={cn(
+                        'px-6 py-3 bg-surface-secondary dark:bg-surface-secondary-dark hover:bg-surface-tertiary dark:hover:bg-surface-tertiary-dark',
+                        'text-text dark:text-text-dark border border-border dark:border-border-dark rounded-lg font-medium transition-colors animate-fade-in',
+                    )}
                 >
                     {t('actions.tryRegister')}
                 </Link>,
