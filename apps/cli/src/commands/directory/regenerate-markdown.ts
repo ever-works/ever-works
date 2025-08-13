@@ -5,6 +5,7 @@ import inquirer from 'inquirer';
 import { requireAuth } from '../auth';
 import { getApiService } from '../../services/api.service';
 import { DirectoryPromptService } from './directory-prompt.service';
+import { handleCliError } from '../../utils/error';
 
 export const regenerateMarkdownCommand = new Command('regenerate-markdown')
     .description('Regenerate readme markdown file for a directory')
@@ -87,19 +88,7 @@ export const regenerateMarkdownCommand = new Command('regenerate-markdown')
                 throw error;
             }
         } catch (error) {
-            console.error(
-                chalk.red('\n✗ Failed to regenerate markdown:'),
-                error.response?.data?.message || error.message,
-            );
-
-            if (error.response?.status === 401) {
-                console.log(chalk.yellow('\n⚠ Authentication failed. Please login again.'));
-                console.log(chalk.gray('Run: ever-works auth login'));
-            } else if (error.response?.status === 404) {
-                console.log(
-                    chalk.yellow('\n⚠ Directory not found. Please check the slug and try again.'),
-                );
-            }
+            handleCliError(error);
 
             process.exit(1);
         }

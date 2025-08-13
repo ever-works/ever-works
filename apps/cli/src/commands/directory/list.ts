@@ -4,6 +4,7 @@ import ora from 'ora';
 import { requireAuth } from '../auth';
 import { getApiService } from '../../services/api.service';
 import { Directory } from '@packages/cli-shared';
+import { handleCliError } from '../../utils/error';
 
 export const listCommand = new Command('list')
     .description('List all directories')
@@ -59,15 +60,7 @@ export const listCommand = new Command('list')
                 throw error;
             }
         } catch (error) {
-            console.error(
-                chalk.red('\n✗ Failed to list directories:'),
-                error.response?.data?.message || error.message,
-            );
-
-            if (error.response?.status === 401) {
-                console.log(chalk.yellow('\n⚠ Authentication failed. Please login again.'));
-                console.log(chalk.gray('Run: ever-works auth login'));
-            }
+            handleCliError(error);
 
             process.exit(1);
         }
