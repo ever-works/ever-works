@@ -54,7 +54,7 @@ export async function startOAuthServer(port: number): Promise<string> {
                     <html>
                         <body style="font-family: system-ui; padding: 40px; text-align: center;">
                             <h2 style="color: #dc2626;">Authentication Failed</h2>
-                            <p>${error}</p>
+                            <p>${error.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>
                             <p>You can close this window.</p>
                         </body>
                     </html>

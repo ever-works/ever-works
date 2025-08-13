@@ -71,7 +71,7 @@ function isRedirectAllowedWithSession(redirectUrl: string) {
             return cleanHostname === cleanAllowed;
         });
     } catch (e) {
-        return true;
+        return false;
     }
 }
 

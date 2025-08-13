@@ -18,17 +18,17 @@ export async function GET(request: NextRequest) {
     }
 
     let href = ROUTES.HOME + '?verified=true';
-    let authReponse: AuthResponse | null = null;
+    let authResponse: AuthResponse | null = null;
 
     try {
-        authReponse = await authAPI.verifyEmail({ token });
+        authResponse = await authAPI.verifyEmail({ token });
 
-        await setAuthCookies(authReponse.access_token, authReponse.refresh_token);
+        await setAuthCookies(authResponse.access_token, authResponse.refresh_token);
     } catch (error) {
         href = ROUTES.AUTH_ERROR + '?error=verify_email_invalid_token';
     }
 
-    href = await getRedirectUrl(authReponse, href);
+    href = await getRedirectUrl(authResponse, href);
 
     return redirect({ locale, href });
 }

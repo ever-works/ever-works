@@ -33,16 +33,16 @@ export async function login(identifier: string, password: string, redirectUrl: s
         };
     }
 
-    let authReponse: AuthResponse | null = null;
+    let authResponse: AuthResponse | null = null;
     let href: string = ROUTES.HOME;
 
     try {
-        authReponse = await authAPI.login({
+        authResponse = await authAPI.login({
             email: validation.data.email,
             password: validation.data.password,
         });
 
-        await setAuthCookies(authReponse.access_token, authReponse.refresh_token);
+        await setAuthCookies(authResponse.access_token, authResponse.refresh_token);
     } catch (error) {
         console.error(error);
 
@@ -59,9 +59,9 @@ export async function login(identifier: string, password: string, redirectUrl: s
 
     if (redirectUrl && isValidRedirectUrl(redirectUrl)) {
         href = redirectUrl;
-    } else if (authReponse) {
+    } else if (authResponse) {
         // Check if we have a redirect URL in a cookie
-        href = await getRedirectUrl(authReponse, href);
+        href = await getRedirectUrl(authResponse, href);
     }
 
     redirect({ locale: await getLocale(), href });

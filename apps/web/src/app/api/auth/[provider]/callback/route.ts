@@ -37,18 +37,18 @@ export async function GET(
     }
 
     let href: string = ROUTES.HOME;
-    let authReponse: AuthResponse | null = null;
+    let authResponse: AuthResponse | null = null;
 
     try {
         switch (provider) {
             case 'github': {
                 const response = await authAPI.connectGitHubCallback(code, state || undefined);
-                authReponse = response;
+                authResponse = response;
                 break;
             }
             case 'google': {
                 const response = await authAPI.connectGoogleCallback(code, state || undefined);
-                authReponse = response;
+                authResponse = response;
                 break;
             }
             default:
@@ -56,8 +56,8 @@ export async function GET(
                 break;
         }
 
-        if (authReponse) {
-            await setAuthCookies(authReponse.access_token, authReponse.refresh_token);
+        if (authResponse) {
+            await setAuthCookies(authResponse.access_token, authResponse.refresh_token);
         }
     } catch (error) {
         href = ROUTES.AUTH_ERROR + '?error=oauth_callback';
@@ -67,7 +67,7 @@ export async function GET(
         }
     }
 
-    href = await getRedirectUrl(authReponse, href);
+    href = await getRedirectUrl(authResponse, href);
 
     return redirect({ locale, href });
 }

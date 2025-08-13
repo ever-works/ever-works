@@ -55,7 +55,7 @@ export class HttpClient {
         );
     }
 
-    ensureApiEndpoint(apiUrl: string) {
+    private ensureApiEndpoint(apiUrl: string) {
         if (!apiUrl.endsWith('/api')) {
             apiUrl = apiUrl.endsWith('/') ? apiUrl + 'api' : apiUrl + '/api';
         }
