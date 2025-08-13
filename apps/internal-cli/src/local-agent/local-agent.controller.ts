@@ -116,9 +116,7 @@ export class LocalAgentController {
 
     @Post('directories/:id/regenerate-markdown')
     @HttpCode(HttpStatus.OK)
-    async regenerateMarkdown(
-        @Param('id') id: string,
-    ): Promise<{ status: string; error_details?: string }> {
+    async regenerateMarkdown(@Param('id') id: string) {
         const user = await this.userRepository.createOrGetLocalUser();
 
         return this.agentService.regenerateMarkdown(id, user);

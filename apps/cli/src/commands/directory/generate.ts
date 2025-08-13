@@ -119,7 +119,7 @@ export const generateCommand = new Command('generate')
                 spinner.stop();
 
                 if (response.status === 'error') {
-                    console.log(chalk.red('\n✗ Generation failed'), response.error_details);
+                    console.log(chalk.red('\n✗ Generation failed'));
                 } else {
                     console.log(chalk.green('\n✓ Generation process started!'));
                 }

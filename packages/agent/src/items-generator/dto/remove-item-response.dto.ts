@@ -9,5 +9,4 @@ export interface RemoveItemResponseDto {
     pr_title?: string;
     pr_body?: string;
     pr_branch_name?: string;
-    error_details?: string;
 }

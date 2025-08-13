@@ -134,13 +134,15 @@ export class DeleteSubCommand extends CommandRunner {
                 spinner.stop();
 
                 if (result.status === 'error') {
-                    console.log(chalk.red('\n✗ Directory deletion failed'), result.error_details);
+                    console.log(chalk.red('\n✗ Directory deletion failed'));
                 } else {
                     console.log(chalk.green('\n✓ Directory deleted successfully!'));
                 }
 
                 console.log(chalk.gray('Status:'), chalk.white(result.status));
-                console.log(chalk.gray('Message:'), chalk.white(result.message));
+                if (result.message) {
+                    console.log(chalk.gray('Message:'), chalk.white(result.message));
+                }
 
                 if (result.deleted_repositories && result.deleted_repositories.length > 0) {
                     console.log(chalk.gray('\nDeleted repositories:'));

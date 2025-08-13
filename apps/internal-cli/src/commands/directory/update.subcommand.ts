@@ -89,14 +89,17 @@ export class UpdateSubCommand extends CommandRunner {
                 spinner.stop();
 
                 if (result.status === 'error') {
-                    console.log(chalk.red('\n✗ Failed to update directory:'), result.error_details);
+                    console.log(chalk.red('\n✗ Failed to update directory'));
                 } else {
                     console.log(chalk.green('\n✓ Update initiated successfully!'));
                 }
 
                 console.log(chalk.gray('Status:'), chalk.white(result.status));
-                console.log(chalk.gray('Message:'), chalk.white(result.message));
                 console.log(chalk.gray('Directory:'), chalk.white(directory.slug));
+                if (result.message) {
+                    console.log(chalk.gray('Message:'), chalk.white(result.message));
+                }
+
                 console.log(
                     chalk.gray('Generation Method:'),
                     chalk.white(updateOptions.generation_method),

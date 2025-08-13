@@ -55,7 +55,6 @@ export interface UpdateDirectoryDto {
 export interface ApiResponse {
     status: 'success' | 'error' | 'pending';
     message: string;
-    error_details?: string;
     repository_url?: string;
     item?: {
         name: string;

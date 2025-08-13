@@ -85,10 +85,10 @@ export class RegenerateMarkdownSubCommand extends CommandRunner {
                     console.log(chalk.gray('  • Check your repository for updated files'));
                     console.log(chalk.gray('  • Review the generated markdown content'));
                     console.log(chalk.gray('  • The changes have been committed automatically'));
-                } else if (result.error_details) {
+                } else if (result.status === 'error' && result.message) {
                     spinner.fail();
                     console.log(chalk.red('\n--- Error Details ---'));
-                    console.log(chalk.red(result.error_details));
+                    console.log(result.message);
                 }
             } catch (error) {
                 spinner.fail('Failed to regenerate markdown files');

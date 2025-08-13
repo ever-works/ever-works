@@ -17,5 +17,4 @@ export interface DeployWebsiteResponseDto {
     repository: string;
     message: string;
     deployment_url?: string;
-    error_details?: string;
 }

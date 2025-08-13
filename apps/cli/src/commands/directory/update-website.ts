@@ -64,7 +64,7 @@ export const updateWebsiteCommand = new Command('update-website')
 
                 spinner.stop();
                 if (response.status === 'error') {
-                    console.log(chalk.red('\n✗ Website update failed'), response.error_details);
+                    console.log(chalk.red('\n✗ Website update failed'));
                 } else {
                     console.log(chalk.green('\n✓ Website updated successfully!'));
                 }

@@ -27,5 +27,4 @@ export interface DeleteDirectoryResponseDto {
     slug: string;
     message: string;
     deleted_repositories?: string[];
-    error_details?: string;
 }

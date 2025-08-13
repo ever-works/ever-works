@@ -107,9 +107,9 @@ export class UpdateWebsiteSubCommand extends CommandRunner {
                             chalk.cyan('directory deploy') +
                             chalk.gray(' to deploy the website'),
                     );
-                } else if (result.error_details) {
+                } else if (result.status === 'error' && result.message) {
                     console.log(chalk.red('\n--- Error Details ---'));
-                    console.log(chalk.red(result.error_details));
+                    console.log(chalk.red(result.message));
                 }
             } catch (error) {
                 spinner.fail('Failed to update website repository');

@@ -88,12 +88,15 @@ export class SubmitItemSubCommand extends CommandRunner {
                 spinner.stop();
 
                 if (result.status === 'error') {
-                    console.log(chalk.red('\n✗ Item submission failed:'), result.error_details);
+                    console.log(chalk.red('\n✗ Item submission failed'));
                 } else {
                     console.log(chalk.green('\n✓ Item submitted successfully!'));
                 }
+
                 console.log(chalk.gray('Status:'), chalk.white(result.status));
-                console.log(chalk.gray('Message:'), chalk.white(result.message));
+                if (result.message) {
+                    console.log(chalk.gray('Message:'), chalk.white(result.message));
+                }
 
                 if (result.pr_url) {
                     console.log(chalk.cyan('\n--- Pull Request Created ---'));

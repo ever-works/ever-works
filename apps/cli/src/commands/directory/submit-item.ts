@@ -122,7 +122,7 @@ export const submitItemCommand = new Command('submit-item')
                 spinner.stop();
 
                 if (response.status === 'error') {
-                    console.log(chalk.red('\n✗ Item submission failed:'), response.error_details);
+                    console.log(chalk.red('\n✗ Item submission failed:'));
                 } else {
                     console.log(chalk.green('\n✓ Item submitted successfully!'));
                 }

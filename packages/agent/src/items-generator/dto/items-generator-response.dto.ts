@@ -16,5 +16,4 @@ export interface ItemsGeneratorResponseDto {
     message: string;
     metrics?: ItemsGeneratorMetrics;
     parameters?: CreateItemsGeneratorDto;
-    error_details?: string; // For use when status is 'error'
 }

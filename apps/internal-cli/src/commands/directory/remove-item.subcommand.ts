@@ -86,7 +86,7 @@ export class RemoveItemSubCommand extends CommandRunner {
 
                 if (result.status === 'error') {
                     spinner.fail('Failed to remove item');
-                    console.log(chalk.red('\n✗ Failed to remove item:'), result.error_details);
+                    console.log(chalk.red('\n✗ Failed to remove item:'));
                     return;
                 }
 
@@ -94,7 +94,10 @@ export class RemoveItemSubCommand extends CommandRunner {
 
                 console.log(chalk.green('\n✓ Item removed successfully!'));
                 console.log(chalk.gray('Status:'), chalk.white(result.status));
-                console.log(chalk.gray('Message:'), chalk.white(result.message));
+
+                if (result.message) {
+                    console.log(chalk.gray('Message:'), chalk.white(result.message));
+                }
 
                 if (result.pr_url) {
                     console.log(chalk.cyan('\n--- Pull Request Created ---'));

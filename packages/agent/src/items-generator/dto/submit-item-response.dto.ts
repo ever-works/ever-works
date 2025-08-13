@@ -9,5 +9,4 @@ export interface SubmitItemResponseDto {
     pr_body?: string;
     pr_branch_name?: string;
     auto_merged?: boolean;
-    error_details?: string;
 }

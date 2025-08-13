@@ -1,4 +1,10 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+    BadRequestException,
+    HttpException,
+    Injectable,
+    Logger,
+    NotFoundException,
+} from '@nestjs/common';
 import { DataGeneratorService } from '../data-generator/data-generator.service';
 import { MarkdownGeneratorService } from '../markdown-generator/markdown-generator.service';
 import { WebsiteGeneratorService } from '../website-generator/website-generator.service';
@@ -85,12 +91,15 @@ export class AgentService {
                 offset,
             };
         } catch (error) {
+            if (error instanceof HttpException) {
+                throw error;
+            }
+
             this.logger.error('Failed to get directories:', error);
 
             throw new BadRequestException({
                 status: 'error',
-                message: 'Failed to get directories',
-                error_details: this.clearMessageError(error),
+                message: this.clearMessageError(error),
             });
         }
     }
@@ -131,11 +140,14 @@ export class AgentService {
             try {
                 await this.processGeneration(directory, user, createItemsGeneratorDto);
             } catch (error) {
+                if (error instanceof HttpException) {
+                    throw error;
+                }
+
                 throw new BadRequestException({
                     status: 'error',
                     slug: directory.slug,
-                    message: 'Failed to generate directory',
-                    error_details: this.clearMessageError(error),
+                    message: this.clearMessageError(error),
                 });
             }
         } else {
@@ -167,7 +179,6 @@ export class AgentService {
                 status: 'error',
                 slug: directory.slug,
                 message: 'No previous request data found',
-                error_details: 'No previous request data found',
             });
         }
 
@@ -180,11 +191,14 @@ export class AgentService {
             try {
                 await this.processGeneration(directory, user, lastRequestData);
             } catch (error) {
+                if (error instanceof HttpException) {
+                    throw error;
+                }
+
                 throw new BadRequestException({
                     status: 'error',
-                    message: 'Failed to update directory',
                     slug: directory.slug,
-                    error_details: this.clearMessageError(error),
+                    message: this.clearMessageError(error),
                 });
             }
         } else {
@@ -229,20 +243,23 @@ export class AgentService {
             }
 
             if (result.status === 'error') {
-                result.error_details = this.clearMessageError(result.error_details);
+                result.message = this.clearMessageError(result.message);
                 throw new BadRequestException(result);
             }
 
             return result;
         } catch (error) {
+            if (error instanceof HttpException) {
+                throw error;
+            }
+
             this.logger.error('Error submitting item:', error);
 
             throw new BadRequestException({
                 status: 'error',
                 slug: directoryId,
-                message: 'Failed to submit item',
                 item_name: submitItemDto.name,
-                error_details: this.clearMessageError(error),
+                message: this.clearMessageError(error),
             });
         }
     }
@@ -276,20 +293,23 @@ export class AgentService {
             }
 
             if (result.status === 'error') {
-                result.error_details = this.clearMessageError(result.error_details);
+                result.message = this.clearMessageError(result.message);
                 throw new BadRequestException(result);
             }
 
             return result;
         } catch (error) {
+            if (error instanceof HttpException) {
+                throw error;
+            }
+
             console.error('Error removing item:', error);
             throw new BadRequestException({
                 status: 'error',
                 slug: directoryId,
                 item_name: 'Unknown',
                 item_slug: removeItemDto.item_slug,
-                message: 'Failed to remove item',
-                error_details: this.clearMessageError(error),
+                message: this.clearMessageError(error),
             });
         }
     }
@@ -311,8 +331,7 @@ export class AgentService {
                 throw new BadRequestException({
                     status: 'error',
                     source_url: extractItemDetailsDto.source_url,
-                    message: 'Failed to extract item details from the provided URL',
-                    error_details: 'No item data could be extracted from the URL content',
+                    message: 'No item data could be extracted from the URL content',
                 });
             }
 
@@ -323,13 +342,16 @@ export class AgentService {
                 message: `Successfully extracted item details: "${item.name}"`,
             };
         } catch (error) {
+            if (error instanceof HttpException) {
+                throw error;
+            }
+
             console.error('Error extracting item details:', error);
 
             throw new BadRequestException({
                 status: 'error',
-                message: 'Failed to extract item details',
                 source_url: extractItemDetailsDto.source_url,
-                error_details: this.clearMessageError(error),
+                message: this.clearMessageError(error),
             });
         }
     }
@@ -337,7 +359,7 @@ export class AgentService {
     async regenerateMarkdown(
         directoryId: string,
         user: User,
-    ): Promise<{ status: string; error_details?: string }> {
+    ): Promise<{ status: string; message?: string }> {
         try {
             // Validate directory ownership
             const directory = await this.validateDirectoryOwnership(directoryId, user.id);
@@ -351,13 +373,16 @@ export class AgentService {
                 status: 'success',
             };
         } catch (error) {
+            if (error instanceof HttpException) {
+                throw error;
+            }
+
             console.error('Error regenerating markdown:', error);
 
             throw new BadRequestException({
                 status: 'error',
                 id: directoryId,
-                message: 'Failed to regenerate markdown',
-                error_details: this.clearMessageError(error),
+                message: this.clearMessageError(error),
             });
         }
     }
@@ -381,13 +406,16 @@ export class AgentService {
                 method_used: result.method,
             };
         } catch (error) {
+            if (error instanceof HttpException) {
+                throw error;
+            }
+
             console.error('Error updating website repository:', error);
 
             throw new BadRequestException({
                 status: 'error',
                 directoryId,
-                message: 'Failed to update website repository',
-                error_details: this.clearMessageError(error),
+                message: this.clearMessageError(error),
             });
         }
     }
@@ -407,7 +435,6 @@ export class AgentService {
                     status: 'error',
                     id,
                     message: 'Directory not found',
-                    error_details: 'Directory not found',
                 });
             }
 
@@ -417,7 +444,6 @@ export class AgentService {
                     status: 'error',
                     id,
                     message: 'You do not have permission to delete this directory',
-                    error_details: 'You do not have permission to delete this directory',
                 });
             }
 
@@ -431,6 +457,10 @@ export class AgentService {
                         `${directory.getRepoOwner()}/${directory.getDataRepo()}`,
                     );
                 } catch (error) {
+                    if (error instanceof HttpException) {
+                        throw error;
+                    }
+
                     this.logger.error('Failed to delete data repository:', error);
                 }
             }
@@ -441,6 +471,10 @@ export class AgentService {
                     await this.markdownGenerator.removeRepository(directory, user);
                     deletedRepositories.push(`${directory.getRepoOwner()}/${directory.slug}`);
                 } catch (error) {
+                    if (error instanceof HttpException) {
+                        throw error;
+                    }
+
                     this.logger.error('Failed to delete markdown repository:', error);
                 }
             }
@@ -453,6 +487,10 @@ export class AgentService {
                         `${directory.getRepoOwner()}/${directory.getWebsiteRepo()}`,
                     );
                 } catch (error) {
+                    if (error instanceof HttpException) {
+                        throw error;
+                    }
+
                     this.logger.error('Failed to delete website repository:', error);
                 }
             }
@@ -467,13 +505,16 @@ export class AgentService {
                 deleted_repositories: deletedRepositories,
             };
         } catch (error) {
+            if (error instanceof HttpException) {
+                throw error;
+            }
+
             this.logger.error('Error deleting directory:', error);
 
             throw new BadRequestException({
                 status: 'error',
-                message: 'Failed to delete directory',
                 slug: directory?.slug || '',
-                error_details: this.clearMessageError(error),
+                message: this.clearMessageError(error),
             });
         }
     }
@@ -590,6 +631,10 @@ export class AgentService {
                 ]);
             }
         } catch (error) {
+            if (error instanceof HttpException) {
+                throw error;
+            }
+
             console.error('Error during generation:', error);
         }
 
@@ -616,14 +661,14 @@ export class AgentService {
         if (!directory) {
             throw new NotFoundException({
                 status: 'error',
-                error_details: `Directory with id '${directoryId}' not found`,
+                message: `Directory with id '${directoryId}' not found`,
             });
         }
 
         if (directory.userId !== userId) {
             throw new BadRequestException({
                 status: 'error',
-                error_details: 'You do not have permission to access this directory',
+                message: 'You do not have permission to access this directory',
             });
         }
 

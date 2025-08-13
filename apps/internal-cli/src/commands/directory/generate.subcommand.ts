@@ -112,13 +112,16 @@ export class GenerateSubCommand extends CommandRunner {
                     console.log(chalk.red('\n✗ Generation failed'));
                     console.log(chalk.gray(`  Status: ${result.status}`));
                     console.log(chalk.gray(`  Directory: ${result.slug}`));
-                    console.log(chalk.gray(`  Message: ${result.error_details || result.message}`));
+                    console.log(chalk.gray(`  Message: ${result.message}`));
                 } else {
                     console.log(chalk.green('\n✓ Generation process finished!'));
                     console.log(chalk.gray('\nGeneration Details:'));
                     console.log(chalk.gray(`  Status: ${result.status}`));
                     console.log(chalk.gray(`  Directory: ${result.slug}`));
-                    console.log(chalk.gray(`  Message: ${result.message}`));
+
+                    if (result.message) {
+                        console.log(chalk.gray(`  Message: ${result.message}`));
+                    }
 
                     console.log(
                         chalk.gray('  • Use ') +

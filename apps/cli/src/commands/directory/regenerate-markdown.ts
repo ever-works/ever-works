@@ -59,18 +59,15 @@ export const regenerateMarkdownCommand = new Command('regenerate-markdown')
                 spinner.stop();
 
                 if (response.status === 'error') {
-                    console.log(
-                        chalk.red('\n✗ Markdown regeneration failed'),
-                        response.error_details,
-                    );
+                    console.log(chalk.red('\n✗ Markdown regeneration failed'));
                 } else {
                     console.log(chalk.green('\n✓ Markdown regeneration completed successfully!'));
                 }
 
                 console.log(chalk.gray('Status:'), chalk.white(response.status));
 
-                if (response.error_details) {
-                    console.log(chalk.yellow('\n⚠ Warning:'), chalk.white(response.error_details));
+                if (response.message) {
+                    console.log(chalk.yellow('\n⚠ Warning:'), chalk.white(response.message));
                 }
 
                 if (response.status !== 'error') {
