@@ -131,9 +131,14 @@ export class DeleteSubCommand extends CommandRunner {
                     user,
                 );
 
-                spinner.succeed('Directory and repositories deleted successfully');
+                spinner.stop();
 
-                console.log(chalk.green('\n✓ Directory deleted successfully!'));
+                if (result.status === 'error') {
+                    console.log(chalk.red('\n✗ Directory deletion failed'));
+                } else {
+                    console.log(chalk.green('\n✓ Directory deleted successfully!'));
+                }
+
                 console.log(chalk.gray('Status:'), chalk.white(result.status));
                 console.log(chalk.gray('Message:'), chalk.white(result.message));
 

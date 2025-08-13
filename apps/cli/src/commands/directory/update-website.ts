@@ -61,9 +61,13 @@ export const updateWebsiteCommand = new Command('update-website')
             try {
                 const response = await apiService.updateWebsite(directory.id);
 
-                spinner.succeed('Website updated successfully');
+                spinner.stop();
+                if (response.status === 'error') {
+                    console.log(chalk.red('\n✗ Website update failed'));
+                } else {
+                    console.log(chalk.green('\n✓ Website updated successfully!'));
+                }
 
-                console.log(chalk.green('\n✓ Website updated successfully!'));
                 console.log(chalk.gray('Status:'), chalk.white(response.status));
                 if (response.message) {
                     console.log(chalk.gray('Message:'), chalk.white(response.message));

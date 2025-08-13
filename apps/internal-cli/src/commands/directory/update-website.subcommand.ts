@@ -81,9 +81,14 @@ export class UpdateWebsiteSubCommand extends CommandRunner {
                 // Call the agent service method directly
                 const result = await this.agentService.updateWebsiteRepository(directory.id, user);
 
-                spinner.succeed('Website repository updated successfully');
+                spinner.stop();
 
-                console.log(chalk.green('\n✓ Website repository updated successfully!'));
+                if (result.status === 'error') {
+                    console.log(chalk.red('\n✗ Failed to update website repository'));
+                } else {
+                    console.log(chalk.green('\n✓ Website repository updated successfully!'));
+                }
+
                 console.log(chalk.gray('Status:'), chalk.white(result.status));
                 console.log(chalk.gray('Repository:'), chalk.white(result.repository));
                 console.log(chalk.gray('Message:'), chalk.white(result.message));

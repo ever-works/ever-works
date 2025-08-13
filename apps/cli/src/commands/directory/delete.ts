@@ -137,9 +137,14 @@ export const deleteCommand = new Command('delete')
 
                 const response = await apiService.deleteDirectory(directory.id, deleteDto);
 
-                spinner.succeed('Directory deleted successfully');
+                spinner.stop();
 
-                console.log(chalk.green('\n✓ Directory deleted successfully!'));
+                if (response.status === 'error') {
+                    console.log(chalk.red('\n✗ Directory deletion failed'));
+                } else {
+                    console.log(chalk.green('\n✓ Directory deleted successfully!'));
+                }
+
                 console.log(chalk.gray('Status:'), chalk.white(response.status));
                 if (response.message) {
                     console.log(chalk.gray('Message:'), chalk.white(response.message));

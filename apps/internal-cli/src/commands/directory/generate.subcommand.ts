@@ -105,24 +105,27 @@ export class GenerateSubCommand extends CommandRunner {
                     user,
                     true,
                 );
-                spinner.succeed('Generation started successfully');
 
-                console.log(chalk.green('\n✓ Generation process started!'));
-                console.log(chalk.gray('\nGeneration Details:'));
-                console.log(chalk.gray(`  Status: ${result.status}`));
-                console.log(chalk.gray(`  Directory: ${result.slug}`));
-                console.log(chalk.gray(`  Message: ${result.message}`));
+                spinner.stop();
 
-                console.log(chalk.cyan('\nNext Steps:'));
-                console.log(chalk.gray('  • The generation process is running in the background'));
-                console.log(
-                    chalk.gray('  • Check the logs or data directory for progress updates'),
-                );
-                console.log(
-                    chalk.gray('  • Use ') +
-                        chalk.cyan('directory list') +
-                        chalk.gray(' to see your directories'),
-                );
+                if (result.status === 'error') {
+                    console.log(chalk.red('\n✗ Generation failed'));
+                    console.log(chalk.gray(`  Status: ${result.status}`));
+                    console.log(chalk.gray(`  Directory: ${result.slug}`));
+                    console.log(chalk.gray(`  Message: ${result.message}`));
+                } else {
+                    console.log(chalk.green('\n✓ Generation process finished!'));
+                    console.log(chalk.gray('\nGeneration Details:'));
+                    console.log(chalk.gray(`  Status: ${result.status}`));
+                    console.log(chalk.gray(`  Directory: ${result.slug}`));
+                    console.log(chalk.gray(`  Message: ${result.message}`));
+
+                    console.log(
+                        chalk.gray('  • Use ') +
+                            chalk.cyan('directory list') +
+                            chalk.gray(' to see your directories'),
+                    );
+                }
             } catch (error) {
                 spinner.fail('Generation failed');
                 throw error;

@@ -55,9 +55,14 @@ export const regenerateMarkdownCommand = new Command('regenerate-markdown')
             try {
                 const response = await apiService.regenerateMarkdown(directory.id);
 
-                spinner.succeed('Markdown regenerated successfully');
+                spinner.stop();
 
-                console.log(chalk.green('\n✓ Markdown regenerated successfully!'));
+                if (response.status === 'error') {
+                    console.log(chalk.red('\n✗ Markdown regeneration failed'));
+                } else {
+                    console.log(chalk.green('\n✓ Markdown regeneration completed successfully!'));
+                }
+
                 console.log(chalk.gray('Status:'), chalk.white(response.status));
 
                 if (response.error_details) {

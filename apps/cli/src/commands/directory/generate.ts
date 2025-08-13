@@ -115,9 +115,14 @@ export const generateCommand = new Command('generate')
                     createItemsGeneratorDto,
                 );
 
-                spinner.succeed('Generation started successfully');
+                spinner.stop();
 
-                console.log(chalk.green('\n✓ Generation process started!'));
+                if (response.status === 'error') {
+                    console.log(chalk.red('\n✗ Generation failed'));
+                } else {
+                    console.log(chalk.green('\n✓ Generation process started!'));
+                }
+
                 console.log(chalk.gray('Status:'), chalk.white(response.status));
                 if (response.message) {
                     console.log(chalk.gray('Message:'), chalk.white(response.message));

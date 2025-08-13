@@ -82,9 +82,14 @@ export const removeItemCommand = new Command('remove-item')
 
                 const response = await apiService.removeItem(directory.id, removeDto);
 
-                spinner.succeed('Item removed successfully');
+                spinner.stop();
 
-                console.log(chalk.green('\n✓ Item removed successfully!'));
+                if (response.status === 'error') {
+                    console.log(chalk.red('\n✗ Item removal failed'));
+                } else {
+                    console.log(chalk.green('\n✓ Item removed successfully!'));
+                }
+
                 console.log(chalk.gray('Status:'), chalk.white(response.status));
                 if (response.message) {
                     console.log(chalk.gray('Message:'), chalk.white(response.message));

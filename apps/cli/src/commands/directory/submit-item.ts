@@ -118,9 +118,14 @@ export const submitItemCommand = new Command('submit-item')
 
                 const response = await apiService.submitItem(directory.id, submitDto);
 
-                spinner.succeed('Item submitted successfully');
+                spinner.stop();
 
-                console.log(chalk.green('\n✓ Item submitted successfully!'));
+                if (response.status === 'error') {
+                    console.log(chalk.red('\n✗ Item submission failed:'));
+                } else {
+                    console.log(chalk.green('\n✓ Item submitted successfully!'));
+                }
+
                 console.log(chalk.gray('Status:'), chalk.white(response.status));
                 if (response.message) {
                     console.log(chalk.gray('Message:'), chalk.white(response.message));

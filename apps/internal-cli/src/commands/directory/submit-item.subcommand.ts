@@ -85,9 +85,13 @@ export class SubmitItemSubCommand extends CommandRunner {
                 // Call the agent service method directly
                 const result = await this.agentService.submitItem(directory.id, itemData, user);
 
-                spinner.succeed('Item submitted successfully');
+                spinner.stop();
 
-                console.log(chalk.green('\n✓ Item submitted successfully!'));
+                if (result.status === 'error') {
+                    console.log(chalk.red('\n✗ Item submission failed:'));
+                } else {
+                    console.log(chalk.green('\n✓ Item submitted successfully!'));
+                }
                 console.log(chalk.gray('Status:'), chalk.white(result.status));
                 console.log(chalk.gray('Message:'), chalk.white(result.message));
 

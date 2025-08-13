@@ -82,9 +82,14 @@ export const updateCommand = new Command('update')
 
                 const response = await apiService.updateDirectory(directory.id, updateDto);
 
-                spinner.succeed('Update started successfully');
+                spinner.stop();
 
-                console.log(chalk.green('\n✓ Update process started!'));
+                if (response.status === 'error') {
+                    console.log(chalk.red('\n✗ Update failed'));
+                } else {
+                    console.log(chalk.green('\n✓ Update process started!'));
+                }
+
                 console.log(chalk.gray('Status:'), chalk.white(response.status));
                 if (response.message) {
                     console.log(chalk.gray('Message:'), chalk.white(response.message));
