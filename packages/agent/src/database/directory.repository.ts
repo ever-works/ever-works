@@ -115,8 +115,10 @@ export class DirectoryRepository {
         const directories = await this.repository.find(findOptions);
 
         return directories.map((dir) => {
-            dir.owner = dir.getRepoOwner();
-            return dir;
+            return {
+                ...dir,
+                owner: dir.getRepoOwner(),
+            } as Directory;
         });
     }
 
