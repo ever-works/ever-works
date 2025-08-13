@@ -67,7 +67,7 @@ export async function startOAuthServer(port: number): Promise<string> {
                         <body style="font-family: system-ui; padding: 40px; text-align: center;">
                             <h2 style="color: #059669;">Authentication Successful!</h2>
                             <p>You can close this window and return to the terminal.</p>
-                            <script>window.setTimeout(() => window.close(), 3000);</script>
+                            <script>window.setTimeout(() => window.close(), 10000);</script>
                         </body>
                     </html>
                 `);
@@ -169,7 +169,10 @@ export async function performOAuthFlow(): Promise<string> {
     console.log(chalk.gray(`If the browser doesn't open, visit: ${authUrl}`));
 
     // Wait for token
-    const sessionToken = await tokenPromise;
+    const sessionToken = await tokenPromise.catch((err) => {
+        console.log(chalk.red('\n✗ Authentication failed:'), err.message);
+        process.exit(1);
+    });
 
     console.log(chalk.green('\n✓ Authentication successful!'));
 

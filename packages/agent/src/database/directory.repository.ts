@@ -43,13 +43,8 @@ export class DirectoryRepository {
         return await this.repository.findOne({ where: { id } });
     }
 
-    async findAll(options?: {
-        userId?: string;
-        limit?: number;
-        offset?: number;
-        search?: string;
-    }): Promise<Directory[]> {
-        const { userId, limit, offset, search } = options || {};
+    private buildWhereConditions(options?: { userId?: string; search?: string }): any {
+        const { userId, search } = options || {};
 
         let whereConditions: any = [];
 
@@ -77,17 +72,35 @@ export class DirectoryRepository {
             whereConditions = { userId };
         }
 
+        let hasWhereCondition = false;
+
+        if (whereConditions) {
+            if (Array.isArray(whereConditions)) {
+                hasWhereCondition = whereConditions.length > 0;
+            } else {
+                hasWhereCondition = Object.keys(whereConditions).length > 0;
+            }
+        }
+
+        return { whereConditions, hasWhereCondition };
+    }
+
+    async findAll(options?: {
+        userId?: string;
+        limit?: number;
+        offset?: number;
+        search?: string;
+    }): Promise<Directory[]> {
+        const { limit, offset } = options || {};
+
+        const { whereConditions, hasWhereCondition } = this.buildWhereConditions(options);
+
         const findOptions: any = {
             order: { id: 'DESC' },
             relations: ['user', 'user.oauthTokens'],
         };
 
-        if (
-            whereConditions &&
-            (Array.isArray(whereConditions)
-                ? whereConditions.length > 0
-                : Object.keys(whereConditions).length > 0)
-        ) {
+        if (hasWhereCondition) {
             findOptions.where = whereConditions;
         }
 
@@ -108,27 +121,15 @@ export class DirectoryRepository {
     }
 
     async countAll(options?: { userId?: string; search?: string }): Promise<number> {
-        const { userId, search } = options || {};
+        const { whereConditions, hasWhereCondition } = this.buildWhereConditions(options);
 
-        const queryBuilder = this.repository.createQueryBuilder('directory');
+        const countOptions: any = {};
 
-        if (userId) {
-            queryBuilder.where('userId = :userId', { userId });
+        if (hasWhereCondition) {
+            countOptions.where = whereConditions;
         }
 
-        if (search) {
-            const sanitizedSearch = prepareLikeSearchTerm(search);
-
-            if (sanitizedSearch) {
-                // Use LOWER() for case-insensitive search - works across all databases
-                queryBuilder.andWhere(
-                    '(LOWER(directory.name) LIKE LOWER(:search) OR LOWER(directory.description) LIKE LOWER(:search) OR LOWER(directory.slug) LIKE LOWER(:search))',
-                    { search: `%${sanitizedSearch}%` },
-                );
-            }
-        }
-
-        return await queryBuilder.getCount();
+        return await this.repository.count(countOptions);
     }
 
     async update(id: string, updateData: Partial<Directory>): Promise<Directory | null> {
