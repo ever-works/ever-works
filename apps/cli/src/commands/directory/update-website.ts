@@ -63,7 +63,7 @@ export const updateWebsiteCommand = new Command('update-website')
 
                 spinner.stop();
                 if (response.status === 'error') {
-                    console.log(chalk.red('\n✗ Website update failed'));
+                    console.log(chalk.red('\n✗ Website update failed'), response.error_details);
                 } else {
                     console.log(chalk.green('\n✓ Website updated successfully!'));
                 }
@@ -77,10 +77,12 @@ export const updateWebsiteCommand = new Command('update-website')
                     console.log(chalk.blue('\nRepository:'), chalk.white(response.repository_url));
                 }
 
-                console.log(chalk.cyan('\nNext Steps:'));
-                console.log(chalk.gray('  • Check the website repository for updates'));
-                console.log(chalk.gray('  • Use "directory deploy" to deploy the website'));
-                console.log(chalk.gray('  • Review the changes before deployment'));
+                if (response.status !== 'error') {
+                    console.log(chalk.cyan('\nNext Steps:'));
+                    console.log(chalk.gray('  • Check the website repository for updates'));
+                    console.log(chalk.gray('  • Use "directory deploy" to deploy the website'));
+                    console.log(chalk.gray('  • Review the changes before deployment'));
+                }
             } catch (error) {
                 spinner.fail('Website update failed');
                 throw error;

@@ -85,7 +85,7 @@ export const removeItemCommand = new Command('remove-item')
                 spinner.stop();
 
                 if (response.status === 'error') {
-                    console.log(chalk.red('\n✗ Item removal failed'));
+                    console.log(chalk.red('\n✗ Item removal failed'), response.error_details);
                 } else {
                     console.log(chalk.green('\n✓ Item removed successfully!'));
                 }

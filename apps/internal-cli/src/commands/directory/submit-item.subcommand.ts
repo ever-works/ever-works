@@ -88,7 +88,7 @@ export class SubmitItemSubCommand extends CommandRunner {
                 spinner.stop();
 
                 if (result.status === 'error') {
-                    console.log(chalk.red('\n✗ Item submission failed:'));
+                    console.log(chalk.red('\n✗ Item submission failed:'), result.error_details);
                 } else {
                     console.log(chalk.green('\n✓ Item submitted successfully!'));
                 }

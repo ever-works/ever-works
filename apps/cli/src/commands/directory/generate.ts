@@ -118,7 +118,7 @@ export const generateCommand = new Command('generate')
                 spinner.stop();
 
                 if (response.status === 'error') {
-                    console.log(chalk.red('\n✗ Generation failed'));
+                    console.log(chalk.red('\n✗ Generation failed'), response.error_details);
                 } else {
                     console.log(chalk.green('\n✓ Generation process started!'));
                 }
@@ -128,12 +128,14 @@ export const generateCommand = new Command('generate')
                     console.log(chalk.gray('Message:'), chalk.white(response.message));
                 }
 
-                console.log(chalk.cyan('\nNext Steps:'));
-                console.log(chalk.gray('  • Monitor the generation progress in your logs'));
-                console.log(chalk.gray('  • Check your GitHub repositories for updates'));
-                console.log(
-                    chalk.gray('  • Use other directory commands once generation is complete'),
-                );
+                if (response.status !== 'error') {
+                    console.log(chalk.cyan('\nNext Steps:'));
+                    console.log(chalk.gray('  • Monitor the generation progress in your logs'));
+                    console.log(chalk.gray('  • Check your GitHub repositories for updates'));
+                    console.log(
+                        chalk.gray('  • Use other directory commands once generation is complete'),
+                    );
+                }
             } catch (error) {
                 spinner.fail('Generation failed');
                 throw error;

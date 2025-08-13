@@ -140,7 +140,7 @@ export const deleteCommand = new Command('delete')
                 spinner.stop();
 
                 if (response.status === 'error') {
-                    console.log(chalk.red('\n✗ Directory deletion failed'));
+                    console.log(chalk.red('\n✗ Directory deletion failed'), response.error_details);
                 } else {
                     console.log(chalk.green('\n✓ Directory deleted successfully!'));
                 }

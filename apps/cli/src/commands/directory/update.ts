@@ -85,7 +85,7 @@ export const updateCommand = new Command('update')
                 spinner.stop();
 
                 if (response.status === 'error') {
-                    console.log(chalk.red('\n✗ Update failed'));
+                    console.log(chalk.red('\n✗ Update failed'), response.error_details);
                 } else {
                     console.log(chalk.green('\n✓ Update process started!'));
                 }

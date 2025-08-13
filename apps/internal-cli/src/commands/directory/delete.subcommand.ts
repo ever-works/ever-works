@@ -134,7 +134,7 @@ export class DeleteSubCommand extends CommandRunner {
                 spinner.stop();
 
                 if (result.status === 'error') {
-                    console.log(chalk.red('\n✗ Directory deletion failed'));
+                    console.log(chalk.red('\n✗ Directory deletion failed'), result.error_details);
                 } else {
                     console.log(chalk.green('\n✓ Directory deleted successfully!'));
                 }

@@ -58,7 +58,10 @@ export const regenerateMarkdownCommand = new Command('regenerate-markdown')
                 spinner.stop();
 
                 if (response.status === 'error') {
-                    console.log(chalk.red('\n✗ Markdown regeneration failed'));
+                    console.log(
+                        chalk.red('\n✗ Markdown regeneration failed'),
+                        response.error_details,
+                    );
                 } else {
                     console.log(chalk.green('\n✓ Markdown regeneration completed successfully!'));
                 }
@@ -69,10 +72,16 @@ export const regenerateMarkdownCommand = new Command('regenerate-markdown')
                     console.log(chalk.yellow('\n⚠ Warning:'), chalk.white(response.error_details));
                 }
 
-                console.log(chalk.cyan('\nNext Steps:'));
-                console.log(chalk.gray('  • Check your data repository for the updated README.md'));
-                console.log(chalk.gray('  • Review the changes and commit if satisfied'));
-                console.log(chalk.gray('  • Use "directory update-website" to update the website'));
+                if (response.status !== 'error') {
+                    console.log(chalk.cyan('\nNext Steps:'));
+                    console.log(
+                        chalk.gray('  • Check your data repository for the updated README.md'),
+                    );
+                    console.log(chalk.gray('  • Review the changes and commit if satisfied'));
+                    console.log(
+                        chalk.gray('  • Use "directory update-website" to update the website'),
+                    );
+                }
             } catch (error) {
                 spinner.fail('Markdown regeneration failed');
                 throw error;
