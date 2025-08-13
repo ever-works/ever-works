@@ -177,10 +177,7 @@ export async function performOAuthFlow(): Promise<string> {
     console.log(chalk.gray(`If the browser doesn't open, visit: ${authUrl}`));
 
     // Wait for token
-    const sessionToken = await tokenPromise.catch((err) => {
-        console.log(chalk.red('\n✗ Authentication failed:'), err.message);
-        process.exit(1);
-    });
+    const sessionToken = await tokenPromise;
 
     console.log(chalk.green('\n✓ Authentication successful!'));
 

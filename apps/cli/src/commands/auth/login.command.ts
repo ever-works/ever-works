@@ -122,8 +122,7 @@ export const loginCommand = new Command('login')
                 await oauthLogin(options.apiUrl);
             }
         } catch (error) {
-            console.log(error);
-            console.error(chalk.red('\n✗ Login failed:'), error.message);
+            console.log(chalk.red('\n✗ Login failed:'), error?.message || error);
             process.exit(1);
         }
     });
