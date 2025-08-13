@@ -93,6 +93,13 @@ export interface DeleteDirectoryDto {
     delete_website_repository?: boolean;
 }
 
+export interface UserProfile {
+    id: string;
+    username: string;
+    email: string;
+    avatar?: string;
+}
+
 export interface DirectoriesResponse {
     status: string;
     directories: Directory[];
@@ -174,8 +181,8 @@ export class ApiService {
         return response.data;
     }
 
-    async getProfile(): Promise<any> {
-        const response = await this.httpClient.get('/auth/profile/fresh');
+    async getProfile(): Promise<UserProfile> {
+        const response = await this.httpClient.get<UserProfile>('/auth/profile/fresh');
         return response.data;
     }
 
