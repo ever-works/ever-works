@@ -6,12 +6,20 @@ import { WEB_URL } from '../../utils/constants';
 
 const execAsync = promisify(exec);
 
+const DEFAULT_PORT = 44663;
+
 // Helper function to find an available port
 export async function getAvailablePort(): Promise<number> {
     return new Promise((resolve) => {
         const server = http.createServer();
         server.listen(0, () => {
-            const port = (server.address() as any).port;
+            let port = DEFAULT_PORT;
+            const address = server.address();
+
+            if (address && typeof address === 'object') {
+                port = address.port;
+            }
+
             server.close(() => resolve(port));
         });
     });
@@ -21,7 +29,7 @@ export async function getAvailablePort(): Promise<number> {
 export async function startOAuthServer(port: number): Promise<string> {
     return new Promise((resolve, reject) => {
         let resolved = false;
-        const connections = new Set<any>();
+        const connections = new Set<import('net').Socket>();
 
         const closeAllConnections = (error?: string, sessionToken?: string) => {
             if (!resolved) {
