@@ -87,7 +87,11 @@ export class AgentService {
         } catch (error) {
             this.logger.error('Failed to get directories:', error);
 
-            throw new BadRequestException(error?.message || error);
+            throw new BadRequestException({
+                status: 'error',
+                message: 'Failed to get directories',
+                error_details: this.clearMessageError(error),
+            });
         }
     }
 
@@ -127,12 +131,12 @@ export class AgentService {
             try {
                 await this.processGeneration(directory, user, createItemsGeneratorDto);
             } catch (error) {
-                return {
+                throw new BadRequestException({
                     status: 'error',
                     slug: directory.slug,
                     message: 'Failed to generate directory',
                     error_details: this.clearMessageError(error),
-                };
+                });
             }
         } else {
             void this.processGeneration(directory, user, createItemsGeneratorDto);
@@ -159,7 +163,12 @@ export class AgentService {
             .catch(() => null);
 
         if (!lastRequestData) {
-            throw new BadRequestException('No last request data found');
+            throw new BadRequestException({
+                status: 'error',
+                slug: directory.slug,
+                message: 'No previous request data found',
+                error_details: 'No previous request data found',
+            });
         }
 
         lastRequestData = {
@@ -171,12 +180,12 @@ export class AgentService {
             try {
                 await this.processGeneration(directory, user, lastRequestData);
             } catch (error) {
-                return {
+                throw new BadRequestException({
                     status: 'error',
-                    slug: directory.slug,
                     message: 'Failed to update directory',
+                    slug: directory.slug,
                     error_details: this.clearMessageError(error),
-                };
+                });
             }
         } else {
             void this.processGeneration(directory, user, lastRequestData);
@@ -221,19 +230,20 @@ export class AgentService {
 
             if (result.status === 'error') {
                 result.error_details = this.clearMessageError(result.error_details);
+                throw new BadRequestException(result);
             }
 
             return result;
         } catch (error) {
             this.logger.error('Error submitting item:', error);
 
-            return {
+            throw new BadRequestException({
                 status: 'error',
                 slug: directoryId,
                 message: 'Failed to submit item',
                 item_name: submitItemDto.name,
                 error_details: this.clearMessageError(error),
-            };
+            });
         }
     }
 
@@ -265,18 +275,22 @@ export class AgentService {
                 });
             }
 
+            if (result.status === 'error') {
+                result.error_details = this.clearMessageError(result.error_details);
+                throw new BadRequestException(result);
+            }
+
             return result;
         } catch (error) {
             console.error('Error removing item:', error);
-
-            return {
+            throw new BadRequestException({
                 status: 'error',
                 slug: directoryId,
                 item_name: 'Unknown',
                 item_slug: removeItemDto.item_slug,
                 message: 'Failed to remove item',
                 error_details: this.clearMessageError(error),
-            };
+            });
         }
     }
 
@@ -294,29 +308,29 @@ export class AgentService {
             );
 
             if (!item) {
-                return {
+                throw new BadRequestException({
                     status: 'error',
                     source_url: extractItemDetailsDto.source_url,
                     message: 'Failed to extract item details from the provided URL',
                     error_details: 'No item data could be extracted from the URL content',
-                };
+                });
             }
 
             return {
                 status: 'success',
-                source_url: extractItemDetailsDto.source_url,
                 item,
+                source_url: extractItemDetailsDto.source_url,
                 message: `Successfully extracted item details: "${item.name}"`,
             };
         } catch (error) {
             console.error('Error extracting item details:', error);
 
-            return {
+            throw new BadRequestException({
                 status: 'error',
-                source_url: extractItemDetailsDto.source_url,
                 message: 'Failed to extract item details',
+                source_url: extractItemDetailsDto.source_url,
                 error_details: this.clearMessageError(error),
-            };
+            });
         }
     }
 
@@ -339,10 +353,12 @@ export class AgentService {
         } catch (error) {
             console.error('Error regenerating markdown:', error);
 
-            return {
+            throw new BadRequestException({
                 status: 'error',
+                id: directoryId,
+                message: 'Failed to regenerate markdown',
                 error_details: this.clearMessageError(error),
-            };
+            });
         }
     }
 
@@ -367,14 +383,12 @@ export class AgentService {
         } catch (error) {
             console.error('Error updating website repository:', error);
 
-            return {
+            throw new BadRequestException({
                 status: 'error',
-                slug: directoryId,
-                owner: '',
-                repository: `/${directoryId}-website`,
+                directoryId,
                 message: 'Failed to update website repository',
                 error_details: this.clearMessageError(error),
-            };
+            });
         }
     }
 
@@ -389,14 +403,22 @@ export class AgentService {
             // Check if directory exists and belongs to the user
             directory = await this.directoryRepository.findById(id);
             if (!directory) {
-                throw new NotFoundException(`Directory with id '${id}' not found`);
+                throw new NotFoundException({
+                    status: 'error',
+                    id,
+                    message: 'Directory not found',
+                    error_details: 'Directory not found',
+                });
             }
 
             // Verify the directory belongs to the user
             if (directory.userId !== user.id) {
-                throw new BadRequestException(
-                    'You do not have permission to delete this directory',
-                );
+                throw new BadRequestException({
+                    status: 'error',
+                    id,
+                    message: 'You do not have permission to delete this directory',
+                    error_details: 'You do not have permission to delete this directory',
+                });
             }
 
             const deletedRepositories: string[] = [];
@@ -447,12 +469,12 @@ export class AgentService {
         } catch (error) {
             this.logger.error('Error deleting directory:', error);
 
-            return {
+            throw new BadRequestException({
                 status: 'error',
-                slug: directory?.slug || '',
                 message: 'Failed to delete directory',
+                slug: directory?.slug || '',
                 error_details: this.clearMessageError(error),
-            };
+            });
         }
     }
 
@@ -592,11 +614,17 @@ export class AgentService {
         const directory = await this.directoryRepository.findById(directoryId);
 
         if (!directory) {
-            throw new NotFoundException(`Directory with id '${directoryId}' not found`);
+            throw new NotFoundException({
+                status: 'error',
+                error_details: `Directory with id '${directoryId}' not found`,
+            });
         }
 
         if (directory.userId !== userId) {
-            throw new BadRequestException('You do not have permission to access this directory');
+            throw new BadRequestException({
+                status: 'error',
+                error_details: 'You do not have permission to access this directory',
+            });
         }
 
         return directory;
