@@ -70,11 +70,16 @@ export class AgentService {
         }
 
         try {
-            const directories = await this.directoryRepository.findAll({
+            let directories = await this.directoryRepository.findAll({
                 userId: user.id,
                 limit,
                 offset,
                 search: sanitizedSearch,
+            });
+
+            directories = directories.map((dir) => {
+                dir.owner = dir.getRepoOwner();
+                return dir;
             });
 
             // Get the total count of directories for proper pagination

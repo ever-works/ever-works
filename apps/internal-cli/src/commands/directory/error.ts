@@ -17,7 +17,7 @@ export function handleCliError(error: any, messageHeader: string = 'An error occ
     const message = data?.message || error.message || error;
 
     if (process.env.DEBUG_CLI === 'true') {
-        console.log(error);
+        console.error(error);
     }
     console.error(chalk.red(`\n✗ ${messageHeader}:`), String(message));
 

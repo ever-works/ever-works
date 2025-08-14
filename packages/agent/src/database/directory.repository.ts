@@ -33,21 +33,21 @@ export class DirectoryRepository {
     }
 
     private async findByUserAndSlug(userId: string, slug: string): Promise<Directory | null> {
-        return await this.repository.findOne({
+        return this.repository.findOne({
             where: { userId, slug },
             relations: ['user', 'user.oauthTokens'],
         });
     }
 
     async findByOwnerAndSlug(owner: string, slug: string): Promise<Directory | null> {
-        return await this.repository.findOne({
+        return this.repository.findOne({
             where: { owner, slug },
             relations: ['user', 'user.oauthTokens'],
         });
     }
 
     async findById(id: string): Promise<Directory | null> {
-        return await this.repository.findOne({
+        return this.repository.findOne({
             where: { id },
             relations: ['user', 'user.oauthTokens'],
         });
@@ -122,14 +122,7 @@ export class DirectoryRepository {
             findOptions.skip = offset;
         }
 
-        const directories = await this.repository.find(findOptions);
-
-        return directories.map((dir) => {
-            return {
-                ...dir,
-                owner: dir.getRepoOwner(),
-            } as Directory;
-        });
+        return this.repository.find(findOptions);
     }
 
     async countAll(options?: { userId?: string; search?: string }): Promise<number> {

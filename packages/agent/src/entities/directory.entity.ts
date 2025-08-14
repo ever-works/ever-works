@@ -3,7 +3,6 @@ import { User } from './user.entity';
 import { ClassToObject } from './types';
 
 @Entity({ name: 'directories' })
-@Index(['owner'], { unique: true })
 export class Directory {
     @PrimaryGeneratedColumn('uuid')
     id: string;
