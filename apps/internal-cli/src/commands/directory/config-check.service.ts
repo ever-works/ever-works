@@ -27,9 +27,6 @@ export class ConfigCheckService implements ConfigChecker {
                 return false;
             }
 
-            // Load config into environment for use
-            await this.configService.loadConfigIntoEnv();
-
             return true;
         } catch (error) {
             displayConfigurationError('Failed to load configuration', [error.message]);

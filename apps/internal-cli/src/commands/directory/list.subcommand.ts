@@ -4,6 +4,7 @@ import chalk from 'chalk';
 import ora from 'ora';
 import { DirectoryRepository } from '@packages/agent/database';
 import { ConfigCheckService } from './config-check.service';
+import { handleCliError } from './error';
 
 @SubCommand({
     name: 'list',
@@ -21,14 +22,12 @@ export class ListSubCommand extends CommandRunner {
 
     async run(): Promise<void> {
         try {
-            console.log(chalk.cyan.bold('\n📋 Directory List\n'));
+            console.log(chalk.cyan.bold('\nDirectory List\n'));
 
             // Check configuration first
             await this.configCheck.requireConfiguration();
 
-            const spinner = ora('Loading directories...').start();
             const directories = await this.directoryRepository.findAll();
-            spinner.succeed(`Found ${directories.length} directories`);
 
             if (directories.length === 0) {
                 console.log(chalk.yellow('\n⚠ No directories found.'));
@@ -70,8 +69,8 @@ export class ListSubCommand extends CommandRunner {
                     chalk.gray(' to create a new directory.'),
             );
         } catch (error) {
-            this.logger.error('Failed to list directories:', error);
-            console.log(chalk.red('\n✗ Failed to list directories:'), error.message);
+            handleCliError(error, 'Failed to list directories');
+            process.exit(1);
         }
     }
 

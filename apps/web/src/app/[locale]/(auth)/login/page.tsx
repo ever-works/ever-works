@@ -8,7 +8,8 @@ import { useTranslations } from 'next-intl';
 import { login as loginAction } from '@/app/actions/auth';
 import { SocialLoginButtons } from '@/components/auth/social-login';
 import { Input } from '@/components/ui/input';
-import { ROUTES } from '@/lib/constants';
+import { REDIRECT_SEARCH_PARAM, ROUTES } from '@/lib/constants';
+import { ThemeToggle } from '@/components/theme-toggle';
 
 function PasswordResetSuccessMessage() {
     const t = useTranslations('auth.login');
@@ -32,8 +33,10 @@ function PasswordResetSuccessMessage() {
                     </svg>
                 </div>
                 <div className="flex-1">
-                    <p className="text-sm font-medium text-text">{t('passwordReset.success')}</p>
-                    <p className="text-xs text-text-secondary mt-1">
+                    <p className="text-sm font-medium text-text dark:text-text-dark">
+                        {t('passwordReset.success')}
+                    </p>
+                    <p className="text-xs text-text-secondary dark:text-text-secondary-dark mt-1">
                         {t('passwordReset.canLogin')}
                     </p>
                 </div>
@@ -43,10 +46,12 @@ function PasswordResetSuccessMessage() {
 }
 
 function LoginContent() {
-    const [isPending, startTransition] = useTransition();
-    const t = useTranslations('auth.login');
     const searchParams = useSearchParams();
+    const t = useTranslations('auth.login');
+    const [isPending, startTransition] = useTransition();
+
     const isPasswordReset = searchParams.get('reset') === 'true';
+    const redirectUrl = searchParams.get(REDIRECT_SEARCH_PARAM);
 
     const [formData, setFormData] = useState({
         email: '',
@@ -57,10 +62,11 @@ function LoginContent() {
 
     useEffect(() => {
         if (isPasswordReset) {
-            // Hide the success message after 5 seconds
+            // Hide the success message after 10 seconds
             const timer = setTimeout(() => {
                 setShowResetSuccess(false);
-            }, 5000);
+            }, 10 * 1000);
+
             return () => clearTimeout(timer);
         }
     }, [isPasswordReset]);
@@ -72,7 +78,7 @@ function LoginContent() {
         setShowResetSuccess(false);
 
         startTransition(async () => {
-            const response = await loginAction(formData.email, formData.password);
+            const response = await loginAction(formData.email, formData.password, redirectUrl);
             if (!response.success) {
                 setError(response.error || t('errors.invalidCredentials'));
                 return;
@@ -82,6 +88,7 @@ function LoginContent() {
 
     return (
         <AuthLayout title={t('title')} subtitle={t('subtitle')}>
+            <ThemeToggle />
             <form onSubmit={handleSubmit} className="space-y-6">
                 {showResetSuccess && <PasswordResetSuccessMessage />}
 
@@ -104,7 +111,7 @@ function LoginContent() {
 
                 <div>
                     <div className="flex items-center justify-between mb-2">
-                        <label className="block text-sm font-medium text-text">
+                        <label className="block text-sm font-medium text-text dark:text-text-dark">
                             {t('form.password.label')}
                         </label>
                         <Link
@@ -146,10 +153,10 @@ function LoginContent() {
 
                 <div className="relative">
                     <div className="absolute inset-0 flex items-center">
-                        <div className="w-full border-t border-border" />
+                        <div className="w-full border-t border-border dark:border-border-dark" />
                     </div>
                     <div className="relative flex justify-center text-sm">
-                        <span className="bg-background px-2 text-text-muted">
+                        <span className="bg-background dark:bg-background-dark px-2 text-text-muted dark:text-text-muted-dark">
                             {t('socialLogin.divider')}
                         </span>
                     </div>
@@ -157,7 +164,7 @@ function LoginContent() {
 
                 <SocialLoginButtons />
 
-                <p className="text-center text-sm text-text-secondary">
+                <p className="text-center text-sm text-text-secondary dark:text-text-secondary-dark">
                     {t('signUp.text')}{' '}
                     <Link
                         href={ROUTES.AUTH_REGISTER}
@@ -175,9 +182,9 @@ export default function LoginPage() {
     return (
         <Suspense
             fallback={
-                <div className="min-h-screen bg-background flex items-center justify-center">
+                <div className="min-h-screen bg-background dark:bg-background-dark flex items-center justify-center">
                     <div className="animate-pulse">
-                        <div className="w-12 h-12 bg-surface-secondary rounded-full"></div>
+                        <div className="w-12 h-12 bg-surface-secondary dark:bg-surface-secondary-dark rounded-full"></div>
                     </div>
                 </div>
             }

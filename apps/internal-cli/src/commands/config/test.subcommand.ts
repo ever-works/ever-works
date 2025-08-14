@@ -34,9 +34,6 @@ export class TestSubCommand extends CommandRunner {
                 return;
             }
 
-            // Load config into environment for testing
-            await this.configService.loadConfigIntoEnv();
-
             let allTestsPassed = true;
 
             // Test AI providers

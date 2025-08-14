@@ -100,3 +100,25 @@ export async function removeOAuthState() {
     const cookieStore = await cookies();
     cookieStore.delete('oauth_state');
 }
+
+// =================
+// Redirects
+// =================
+
+export async function setRedirectCookie(url: string) {
+    const cookieStore = await cookies();
+    cookieStore.set('redirect_url', url, {
+        ...cookieOptions,
+        maxAge: 60 * 10, // 10 minute expiry
+    });
+}
+
+export async function getRedirectCookie() {
+    const cookieStore = await cookies();
+    return cookieStore.get('redirect_url')?.value;
+}
+
+export async function removeRedirectCookie() {
+    const cookieStore = await cookies();
+    cookieStore.delete('redirect_url');
+}

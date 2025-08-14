@@ -7,6 +7,7 @@ import { DirectoryRepository, UserRepository } from '@packages/agent/database';
 import { AgentService } from '@packages/agent/services';
 import { DirectoryPromptService } from './directory-prompt.service';
 import { ConfigCheckService } from './config-check.service';
+import { handleCliError } from './error';
 
 @SubCommand({
     name: 'submit-item',
@@ -27,7 +28,7 @@ export class SubmitItemSubCommand extends CommandRunner {
 
     async run(): Promise<void> {
         try {
-            console.log(chalk.cyan.bold('\n📝 Submit Item to Directory\n'));
+            console.log(chalk.cyan.bold('\nSubmit Item to Directory\n'));
 
             // Check configuration first
             await this.configCheck.requireConfiguration();
@@ -85,11 +86,18 @@ export class SubmitItemSubCommand extends CommandRunner {
                 // Call the agent service method directly
                 const result = await this.agentService.submitItem(directory.id, itemData, user);
 
-                spinner.succeed('Item submitted successfully');
+                spinner.stop();
 
-                console.log(chalk.green('\n✓ Item submitted successfully!'));
+                if (result.status === 'error') {
+                    console.log(chalk.red('\n✗ Item submission failed'));
+                } else {
+                    console.log(chalk.green('\n✓ Item submitted successfully!'));
+                }
+
                 console.log(chalk.gray('Status:'), chalk.white(result.status));
-                console.log(chalk.gray('Message:'), chalk.white(result.message));
+                if (result.message) {
+                    console.log(chalk.gray('Message:'), chalk.white(result.message));
+                }
 
                 if (result.pr_url) {
                     console.log(chalk.cyan('\n--- Pull Request Created ---'));
@@ -98,12 +106,12 @@ export class SubmitItemSubCommand extends CommandRunner {
                     console.log(chalk.gray('Branch:'), chalk.white(result.pr_branch_name));
                 }
             } catch (error) {
-                spinner.fail('Failed to submit item');
+                spinner.stop();
                 throw error;
             }
         } catch (error) {
-            this.logger.error('Failed to submit item:', error);
-            console.log(chalk.red('\n✗ Failed to submit item:'), error.message);
+            handleCliError(error, 'Failed to submit item');
+            process.exit(1);
         }
     }
 

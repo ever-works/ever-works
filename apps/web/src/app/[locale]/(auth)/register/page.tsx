@@ -106,10 +106,10 @@ export default function RegisterPage() {
                         id="terms"
                         type="checkbox"
                         required
-                        className="w-4 h-4 mt-0.5 bg-surface-secondary border-border rounded text-primary focus:ring-primary"
+                        className="w-4 h-4 mt-0.5 bg-surface-secondary dark:bg-surface-secondary-dark border-border dark:border-border-dark rounded text-primary focus:ring-primary"
                     />
 
-                    <label htmlFor="terms" className="ml-2 text-sm text-text-secondary">
+                    <label htmlFor="terms" className="ml-2 text-sm text-text-secondary dark:text-text-secondary-dark">
                         {t('form.terms.text')}{' '}
                         <Link href="/terms" className="text-primary hover:text-primary-hover">
                             {t('form.terms.termsLink')}
@@ -131,11 +131,11 @@ export default function RegisterPage() {
 
                 <div className="relative">
                     <div className="absolute inset-0 flex items-center">
-                        <div className="w-full border-t border-border" />
+                        <div className="w-full border-t border-border dark:border-border-dark" />
                     </div>
 
                     <div className="relative flex justify-center text-sm">
-                        <span className="bg-background px-2 text-text-muted">
+                        <span className="bg-background dark:bg-background-dark px-2 text-text-muted dark:text-text-muted-dark">
                             {t('socialSignUp.divider')}
                         </span>
                     </div>
@@ -143,7 +143,7 @@ export default function RegisterPage() {
 
                 <SocialLoginButtons />
 
-                <p className="text-center text-sm text-text-secondary">
+                <p className="text-center text-sm text-text-secondary dark:text-text-secondary-dark">
                     {t('signIn.text')}{' '}
                     <Link
                         href={ROUTES.AUTH_LOGIN}

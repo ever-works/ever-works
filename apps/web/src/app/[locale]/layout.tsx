@@ -6,6 +6,7 @@ import { routing } from '@/i18n/routing';
 import { Toaster } from 'sonner';
 
 import './globals.css';
+import { themeInitScript } from '@/lib/theme-init';
 
 const geistSans = Geist({
     variable: '--font-geist-sans',
@@ -36,7 +37,10 @@ export default async function RootLayout({
     }
 
     return (
-        <html lang={locale}>
+        <html lang={locale} suppressHydrationWarning>
+            <head>
+                <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+            </head>
             <body
                 className={`${geistSans.variable} ${geistMono.variable} antialiased`}
                 suppressHydrationWarning
@@ -45,13 +49,15 @@ export default async function RootLayout({
                     {children}
                     <Toaster
                         position="top-right"
+                        theme="system"
                         toastOptions={{
+                            className:
+                                'sonner-toast !bg-surface dark:!bg-surface-dark !text-text dark:!text-text-dark !border !border-border dark:!border-border-dark',
                             style: {
-                                background: 'var(--color-surface)',
-                                color: 'var(--color-text)',
-                                border: '1px solid var(--color-border)',
+                                background: undefined,
+                                color: undefined,
+                                border: undefined,
                             },
-                            className: 'sonner-toast',
                         }}
                     />
                 </NextIntlClientProvider>

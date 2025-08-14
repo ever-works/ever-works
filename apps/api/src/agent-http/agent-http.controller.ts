@@ -129,10 +129,7 @@ export class AgentHttpController {
 
     @Post('directories/:id/regenerate-markdown')
     @HttpCode(HttpStatus.OK)
-    async regenerateMarkdown(
-        @CurrentUser() auth: AuthenticatedUser,
-        @Param('id') id: string,
-    ): Promise<{ status: string; error_details?: string }> {
+    async regenerateMarkdown(@CurrentUser() auth: AuthenticatedUser, @Param('id') id: string) {
         const user = await this.authService.getUser(auth.userId);
 
         return this.agentService.regenerateMarkdown(id, user);

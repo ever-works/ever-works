@@ -23,6 +23,7 @@ export async function getAuthFromRequest(): Promise<{
     isAuthenticated: boolean;
     user?: JwtPayload;
     isExpired: boolean;
+    token?: string;
 }> {
     try {
         const token = await getAuthAccessCookie();
@@ -38,6 +39,7 @@ export async function getAuthFromRequest(): Promise<{
             isAuthenticated: true,
             user: decoded,
             isExpired: decoded.exp < now,
+            token,
         };
     } catch (error) {
         return { isAuthenticated: false, isExpired: false };

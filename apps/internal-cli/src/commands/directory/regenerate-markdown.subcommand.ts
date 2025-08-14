@@ -7,6 +7,7 @@ import { DirectoryRepository, UserRepository } from '@packages/agent/database';
 import { AgentService } from '@packages/agent/services';
 import { DirectoryPromptService } from './directory-prompt.service';
 import { ConfigCheckService } from './config-check.service';
+import { handleCliError } from './error';
 
 @SubCommand({
     name: 'regenerate-markdown',
@@ -27,7 +28,7 @@ export class RegenerateMarkdownSubCommand extends CommandRunner {
 
     async run(): Promise<void> {
         try {
-            console.log(chalk.cyan.bold('\n📄 Regenerate Markdown Files\n'));
+            console.log(chalk.cyan.bold('\nRegenerate Markdown Files\n'));
 
             // Check configuration first
             await this.configCheck.requireConfiguration();
@@ -76,8 +77,7 @@ export class RegenerateMarkdownSubCommand extends CommandRunner {
                 const result = await this.agentService.regenerateMarkdown(directory.id, user);
 
                 if (result.status === 'success') {
-                    spinner.succeed('Markdown files regenerated successfully');
-
+                    spinner.stop();
                     console.log(chalk.green('\n✓ Markdown regeneration completed successfully!'));
                     console.log(chalk.gray('Status:'), chalk.white(result.status));
 
@@ -85,18 +85,18 @@ export class RegenerateMarkdownSubCommand extends CommandRunner {
                     console.log(chalk.gray('  • Check your repository for updated files'));
                     console.log(chalk.gray('  • Review the generated markdown content'));
                     console.log(chalk.gray('  • The changes have been committed automatically'));
-                } else if (result.error_details) {
+                } else if (result.status === 'error' && result.message) {
                     spinner.fail();
                     console.log(chalk.red('\n--- Error Details ---'));
-                    console.log(chalk.red(result.error_details));
+                    console.log(result.message);
                 }
             } catch (error) {
-                spinner.fail('Failed to regenerate markdown files');
+                spinner.stop();
                 throw error;
             }
         } catch (error) {
-            this.logger.error('Failed to regenerate markdown:', error);
-            console.log(chalk.red('\n✗ Failed to regenerate markdown:'), error.message);
+            handleCliError(error, 'Failed to regenerate markdown');
+            process.exit(1);
         }
     }
 }

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, ILike } from 'typeorm';
 import { Directory } from '../entities/directory.entity';
 import { User } from '../entities';
 import { prepareLikeSearchTerm } from './utils';
@@ -28,19 +28,71 @@ export class DirectoryRepository {
             directory = this.repository.create(directoryData);
         }
 
-        return await this.repository.save(directory);
+        directory = await this.repository.save(directory);
+        return this.findById(directory.id);
     }
 
     private async findByUserAndSlug(userId: string, slug: string): Promise<Directory | null> {
-        return await this.repository.findOne({ where: { userId, slug } });
+        return this.repository.findOne({
+            where: { userId, slug },
+            relations: ['user', 'user.oauthTokens'],
+        });
     }
 
     async findByOwnerAndSlug(owner: string, slug: string): Promise<Directory | null> {
-        return await this.repository.findOne({ where: { owner, slug } });
+        return this.repository.findOne({
+            where: { owner, slug },
+            relations: ['user', 'user.oauthTokens'],
+        });
     }
 
     async findById(id: string): Promise<Directory | null> {
-        return await this.repository.findOne({ where: { id } });
+        return this.repository.findOne({
+            where: { id },
+            relations: ['user', 'user.oauthTokens'],
+        });
+    }
+
+    private buildWhereConditions(options?: { userId?: string; search?: string }): any {
+        const { userId, search } = options || {};
+
+        let whereConditions: any = [];
+
+        if (search) {
+            const sanitizedSearch = prepareLikeSearchTerm(search);
+
+            if (sanitizedSearch) {
+                // Create OR conditions for search
+                const searchConditions = [
+                    { name: ILike(`%${sanitizedSearch}%`) },
+                    { description: ILike(`%${sanitizedSearch}%`) },
+                    { slug: ILike(`%${sanitizedSearch}%`) },
+                ];
+
+                // If userId is specified, add it to each search condition
+                if (userId) {
+                    whereConditions = searchConditions.map((cond) => ({ ...cond, userId }));
+                } else {
+                    whereConditions = searchConditions;
+                }
+            } else if (userId) {
+                whereConditions = { userId };
+            }
+        } else if (userId) {
+            whereConditions = { userId };
+        }
+
+        let hasWhereCondition = false;
+
+        if (whereConditions) {
+            if (Array.isArray(whereConditions)) {
+                hasWhereCondition = whereConditions.length > 0;
+            } else {
+                hasWhereCondition = Object.keys(whereConditions).length > 0;
+            }
+        }
+
+        return { whereConditions, hasWhereCondition };
     }
 
     async findAll(options?: {
@@ -49,68 +101,40 @@ export class DirectoryRepository {
         offset?: number;
         search?: string;
     }): Promise<Directory[]> {
-        const { userId, limit, offset, search } = options || {};
+        const { limit, offset } = options || {};
 
-        const queryBuilder = this.repository.createQueryBuilder('directory');
+        const { whereConditions, hasWhereCondition } = this.buildWhereConditions(options);
 
-        if (userId) {
-            queryBuilder.where('userId = :userId', { userId });
-        }
+        const findOptions: any = {
+            order: { id: 'DESC' },
+            relations: ['user', 'user.oauthTokens'],
+        };
 
-        if (search) {
-            const sanitizedSearch = prepareLikeSearchTerm(search);
-
-            if (sanitizedSearch) {
-                // Use LOWER() for case-insensitive search - works across all databases
-                queryBuilder.andWhere(
-                    '(LOWER(directory.name) LIKE LOWER(:search) OR LOWER(directory.description) LIKE LOWER(:search) OR LOWER(directory.slug) LIKE LOWER(:search))',
-                    { search: `%${sanitizedSearch}%` },
-                );
-            }
+        if (hasWhereCondition) {
+            findOptions.where = whereConditions;
         }
 
         if (limit) {
-            queryBuilder.limit(limit);
+            findOptions.take = limit;
         }
 
         if (offset) {
-            queryBuilder.offset(offset);
+            findOptions.skip = offset;
         }
 
-        queryBuilder.orderBy('directory.id', 'DESC');
-
-        const directories = await queryBuilder.getMany();
-
-        return directories.map((dir) => {
-            return {
-                ...dir,
-                owner: dir.getRepoOwner(),
-            } as Directory;
-        });
+        return this.repository.find(findOptions);
     }
 
     async countAll(options?: { userId?: string; search?: string }): Promise<number> {
-        const { userId, search } = options || {};
+        const { whereConditions, hasWhereCondition } = this.buildWhereConditions(options);
 
-        const queryBuilder = this.repository.createQueryBuilder('directory');
+        const countOptions: any = {};
 
-        if (userId) {
-            queryBuilder.where('userId = :userId', { userId });
+        if (hasWhereCondition) {
+            countOptions.where = whereConditions;
         }
 
-        if (search) {
-            const sanitizedSearch = prepareLikeSearchTerm(search);
-
-            if (sanitizedSearch) {
-                // Use LOWER() for case-insensitive search - works across all databases
-                queryBuilder.andWhere(
-                    '(LOWER(directory.name) LIKE LOWER(:search) OR LOWER(directory.description) LIKE LOWER(:search) OR LOWER(directory.slug) LIKE LOWER(:search))',
-                    { search: `%${sanitizedSearch}%` },
-                );
-            }
-        }
-
-        return await queryBuilder.getCount();
+        return await this.repository.count(countOptions);
     }
 
     async update(id: string, updateData: Partial<Directory>): Promise<Directory | null> {

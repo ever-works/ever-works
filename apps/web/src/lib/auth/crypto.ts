@@ -2,14 +2,14 @@ import 'server-only';
 import { sealData, unsealData } from 'iron-session';
 import { AUTH_SECRET } from '../constants';
 
-const secret = AUTH_SECRET!;
-if (!AUTH_SECRET) {
-    throw new Error(
-        'COOKIE_SECRET or AUTH_SECRET environment variable is required for cookie encryption',
-    );
-}
-
 function getPassword(): string {
+    const secret = AUTH_SECRET;
+    if (!secret) {
+        throw new Error(
+            'COOKIE_SECRET or AUTH_SECRET environment variable is required for cookie encryption',
+        );
+    }
+
     // Iron session requires at least 32 characters
     if (secret.length < 32) {
         // Pad the secret to meet minimum requirements

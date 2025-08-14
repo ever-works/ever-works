@@ -6,7 +6,9 @@ import { DirectoryRepository, UserRepository } from '@packages/agent/database';
 import { GithubService } from '@packages/agent/git';
 import { DirectoryPromptService } from './directory-prompt.service';
 import { ConfigCheckService } from './config-check.service';
-import { COMMAND } from '../../config';
+import { handleCliError } from './error';
+import { AgentService } from '@packages/agent/services';
+import { RepoProvider } from '@packages/agent/dto';
 
 @SubCommand({
     name: 'create',
@@ -16,6 +18,7 @@ export class CreateSubCommand extends CommandRunner {
     private readonly logger = new Logger(CreateSubCommand.name);
 
     constructor(
+        private readonly agentService: AgentService,
         private readonly directoryRepository: DirectoryRepository,
         private readonly githubService: GithubService,
         private readonly directoryPrompt: DirectoryPromptService,
@@ -27,7 +30,7 @@ export class CreateSubCommand extends CommandRunner {
 
     async run(): Promise<void> {
         try {
-            console.log(chalk.cyan.bold('\n📁 Create New Directory\n'));
+            console.log(chalk.cyan.bold('\nCreate New Directory\n'));
 
             // Check configuration first
             await this.configCheck.requireConfiguration();
@@ -54,48 +57,9 @@ export class CreateSubCommand extends CommandRunner {
             const organization = !!directoryData.owner && directoryData.owner !== ghOwner.login;
 
             // Check if directory already exists and handle conflicts
-            const spinner = ora('Checking if directory exists...').start();
-            let finalSlug = directoryData.slug;
-            let slugExists = await this.directoryRepository.findByOwnerAndSlug(owner, finalSlug);
-
-            if (slugExists) {
-                spinner.stop();
-
-                // Generate a suggested alternative slug
-                const suggestedSlug = await this.generateAvailableSlug(owner, directoryData.slug);
-
-                // Prompt user for conflict resolution
-                const resolution = await this.directoryPrompt.promptSlugConflictResolution(
-                    directoryData.slug,
-                    suggestedSlug,
-                );
-
-                if (resolution.action === 'cancel') {
-                    console.log(chalk.blue('\nℹ Directory creation cancelled.'));
-                    return;
-                } else if (resolution.action === 'use_suggested') {
-                    finalSlug = suggestedSlug;
-                } else if (resolution.action === 'modify' && resolution.finalSlug) {
-                    // Check if the manually entered slug is available
-                    const manualSlugExists = await this.directoryRepository.findByOwnerAndSlug(
-                        owner,
-                        resolution.finalSlug,
-                    );
-                    if (manualSlugExists) {
-                        console.log(
-                            chalk.red(`\n✗ The slug "${resolution.finalSlug}" is also taken.`),
-                        );
-                        console.log(
-                            chalk.blue('Please run the command again with a different name.'),
-                        );
-                        return;
-                    }
-                    finalSlug = resolution.finalSlug;
-                }
-
-                console.log(chalk.green(`✓ Using slug: "${finalSlug}"`));
-            } else {
-                spinner.succeed('Directory slug is available');
+            const finalSlug = await this.getFinalSlug(owner, directoryData.slug);
+            if (!finalSlug) {
+                return;
             }
 
             // Create directory
@@ -108,10 +72,12 @@ export class CreateSubCommand extends CommandRunner {
                 readmeConfig: directoryData.readme_config,
                 owner,
                 organization,
+                repo_provider: RepoProvider.GITHUB,
             };
 
-            const directory = await this.directoryRepository.create(finalDirectoryData, user);
-            createSpinner.succeed('Directory created successfully');
+            const { directory } = await this.agentService.createDirectory(finalDirectoryData, user);
+
+            createSpinner.stop();
 
             // Display success information
             console.log(chalk.green('\n✓ Directory created successfully!'));
@@ -134,20 +100,48 @@ export class CreateSubCommand extends CommandRunner {
             );
             console.log(chalk.gray('  • Start adding content to your new directory'));
         } catch (error) {
-            this.logger.error('Failed to create directory:', error);
-            console.log(chalk.red('\n✗ Failed to create directory:'), error.message);
-
-            if (error.message?.includes('Owner is required')) {
-                console.log(
-                    chalk.yellow('\n⚠ Make sure your GitHub configuration is set up correctly.'),
-                );
-                console.log(
-                    chalk.gray('Run ') +
-                        chalk.cyan(`${COMMAND} config setup`) +
-                        chalk.gray(' to configure GitHub settings.'),
-                );
-            }
+            handleCliError(error, 'Failed to create directory');
+            process.exit(1);
         }
+    }
+
+    private async getFinalSlug(owner: string, slug: string): Promise<string | null> {
+        let slugExists = await this.directoryRepository.findByOwnerAndSlug(owner, slug);
+
+        if (slugExists) {
+            // Generate a suggested alternative slug
+            const suggestedSlug = await this.generateAvailableSlug(owner, slug);
+
+            // Prompt user for conflict resolution
+            const resolution = await this.directoryPrompt.promptSlugConflictResolution(
+                slug,
+                suggestedSlug,
+            );
+
+            if (resolution.action === 'cancel') {
+                console.log(chalk.blue('\nℹ Directory creation cancelled.'));
+                return null;
+            } else if (resolution.action === 'use_suggested') {
+                slug = suggestedSlug;
+            } else if (resolution.action === 'modify' && resolution.finalSlug) {
+                // Check if the manually entered slug is available
+                const manualSlugExists = await this.directoryRepository.findByOwnerAndSlug(
+                    owner,
+                    resolution.finalSlug,
+                );
+                if (manualSlugExists) {
+                    console.log(chalk.red(`\n✗ The slug "${resolution.finalSlug}" is also taken.`));
+                    console.log(chalk.blue('Please run the command again with a different name.'));
+                    return null;
+                }
+
+                slug = resolution.finalSlug;
+            }
+
+            console.log(chalk.green(`✓ Using slug: "${slug}"`));
+        }
+
+        return slug;
     }
 
     private async generateAvailableSlug(owner: string, baseSlug: string): Promise<string> {

@@ -7,6 +7,7 @@ import { DirectoryRepository, UserRepository } from '@packages/agent/database';
 import { AgentService } from '@packages/agent/services';
 import { DirectoryPromptService } from './directory-prompt.service';
 import { ConfigCheckService } from './config-check.service';
+import { handleCliError } from './error';
 
 @SubCommand({
     name: 'remove-item',
@@ -27,7 +28,7 @@ export class RemoveItemSubCommand extends CommandRunner {
 
     async run(): Promise<void> {
         try {
-            console.log(chalk.cyan.bold('\n🗑️  Remove Item from Directory\n'));
+            console.log(chalk.cyan.bold('\nRemove Item from Directory\n'));
 
             // Check configuration first
             await this.configCheck.requireConfiguration();
@@ -86,15 +87,18 @@ export class RemoveItemSubCommand extends CommandRunner {
 
                 if (result.status === 'error') {
                     spinner.fail('Failed to remove item');
-                    console.log(chalk.red('\n✗ Failed to remove item:'), result.error_details);
+                    console.log(chalk.red('\n✗ Failed to remove item:'));
                     return;
                 }
 
-                spinner.succeed('Item removed successfully');
+                spinner.stop();
 
                 console.log(chalk.green('\n✓ Item removed successfully!'));
                 console.log(chalk.gray('Status:'), chalk.white(result.status));
-                console.log(chalk.gray('Message:'), chalk.white(result.message));
+
+                if (result.message) {
+                    console.log(chalk.gray('Message:'), chalk.white(result.message));
+                }
 
                 if (result.pr_url) {
                     console.log(chalk.cyan('\n--- Pull Request Created ---'));
@@ -103,12 +107,12 @@ export class RemoveItemSubCommand extends CommandRunner {
                     console.log(chalk.gray('Branch:'), chalk.white(result.pr_branch_name));
                 }
             } catch (error) {
-                spinner.fail('Failed to remove item');
+                spinner.stop();
                 throw error;
             }
         } catch (error) {
-            this.logger.error('Failed to remove item:', error);
-            console.log(chalk.red('\n✗ Failed to remove item:'), error.message);
+            handleCliError(error, 'Failed to remove item');
+            process.exit(1);
         }
     }
 

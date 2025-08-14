@@ -14,6 +14,7 @@ import {
 } from '@packages/agent/items-generator';
 import { DirectoryPromptService } from './directory-prompt.service';
 import { ConfigCheckService } from './config-check.service';
+import { handleCliError } from './error';
 
 @SubCommand({
     name: 'generate',
@@ -34,7 +35,7 @@ export class GenerateSubCommand extends CommandRunner {
 
     async run(): Promise<void> {
         try {
-            console.log(chalk.cyan.bold('\n🚀 Generate Directory Content\n'));
+            console.log(chalk.cyan.bold('\nGenerate Directory Content\n'));
             console.log(
                 chalk.gray(
                     'This process may take a while. Please be patient and do not interrupt.',
@@ -105,31 +106,37 @@ export class GenerateSubCommand extends CommandRunner {
                     user,
                     true,
                 );
-                spinner.succeed('Generation started successfully');
 
-                console.log(chalk.green('\n✓ Generation process started!'));
-                console.log(chalk.gray('\nGeneration Details:'));
-                console.log(chalk.gray(`  Status: ${result.status}`));
-                console.log(chalk.gray(`  Directory: ${result.slug}`));
-                console.log(chalk.gray(`  Message: ${result.message}`));
+                spinner.stop();
 
-                console.log(chalk.cyan('\nNext Steps:'));
-                console.log(chalk.gray('  • The generation process is running in the background'));
-                console.log(
-                    chalk.gray('  • Check the logs or data directory for progress updates'),
-                );
-                console.log(
-                    chalk.gray('  • Use ') +
-                        chalk.cyan('directory list') +
-                        chalk.gray(' to see your directories'),
-                );
+                if (result.status === 'error') {
+                    console.log(chalk.red('\n✗ Generation failed'));
+                    console.log(chalk.gray(`  Status: ${result.status}`));
+                    console.log(chalk.gray(`  Directory: ${result.slug}`));
+                    console.log(chalk.gray(`  Message: ${result.message}`));
+                } else {
+                    console.log(chalk.green('\n✓ Generation process finished!'));
+                    console.log(chalk.gray('\nGeneration Details:'));
+                    console.log(chalk.gray(`  Status: ${result.status}`));
+                    console.log(chalk.gray(`  Directory: ${result.slug}`));
+
+                    if (result.message) {
+                        console.log(chalk.gray(`  Message: ${result.message}`));
+                    }
+
+                    console.log(
+                        chalk.gray('  • Use ') +
+                            chalk.cyan('directory list') +
+                            chalk.gray(' to see your directories'),
+                    );
+                }
             } catch (error) {
-                spinner.fail('Generation failed');
+                spinner.stop();
                 throw error;
             }
         } catch (error) {
-            this.logger.error('Failed to generate directory content:', error);
-            console.log(chalk.red('\n✗ Failed to generate directory content:'), error.message);
+            handleCliError(error, 'Failed to generate directory content');
+            process.exit(1);
         }
     }
 

@@ -7,6 +7,7 @@ import { DirectoryRepository, UserRepository } from '@packages/agent/database';
 import { AgentService } from '@packages/agent/services';
 import { DirectoryPromptService } from './directory-prompt.service';
 import { ConfigCheckService } from './config-check.service';
+import { handleCliError } from './error';
 
 @SubCommand({
     name: 'delete',
@@ -27,7 +28,7 @@ export class DeleteSubCommand extends CommandRunner {
 
     async run(): Promise<void> {
         try {
-            console.log(chalk.cyan.bold('\n🗑️  Delete Directory\n'));
+            console.log(chalk.cyan.bold('\nDelete Directory\n'));
 
             // Check configuration first
             await this.configCheck.requireConfiguration();
@@ -131,11 +132,18 @@ export class DeleteSubCommand extends CommandRunner {
                     user,
                 );
 
-                spinner.succeed('Directory and repositories deleted successfully');
+                spinner.stop();
 
-                console.log(chalk.green('\n✓ Directory deleted successfully!'));
+                if (result.status === 'error') {
+                    console.log(chalk.red('\n✗ Directory deletion failed'));
+                } else {
+                    console.log(chalk.green('\n✓ Directory deleted successfully!'));
+                }
+
                 console.log(chalk.gray('Status:'), chalk.white(result.status));
-                console.log(chalk.gray('Message:'), chalk.white(result.message));
+                if (result.message) {
+                    console.log(chalk.gray('Message:'), chalk.white(result.message));
+                }
 
                 if (result.deleted_repositories && result.deleted_repositories.length > 0) {
                     console.log(chalk.gray('\nDeleted repositories:'));
@@ -144,12 +152,12 @@ export class DeleteSubCommand extends CommandRunner {
                     });
                 }
             } catch (error) {
-                spinner.fail('Failed to delete directory');
+                spinner.stop();
                 throw error;
             }
         } catch (error) {
-            this.logger.error('Failed to delete directory:', error);
-            console.log(chalk.red('\n✗ Failed to delete directory:'), error.message);
+            handleCliError(error, 'Failed to delete directory');
+            process.exit(1);
         }
     }
 

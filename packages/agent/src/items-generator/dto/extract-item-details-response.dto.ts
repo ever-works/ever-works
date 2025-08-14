@@ -5,5 +5,4 @@ export interface ExtractItemDetailsResponseDto {
     source_url: string;
     item?: ItemData;
     message: string;
-    error_details?: string;
 }

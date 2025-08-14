@@ -5,12 +5,13 @@ import inquirer from 'inquirer';
 import { requireAuth } from '../auth';
 import { getApiService } from '../../services/api.service';
 import { DirectoryPromptService } from './directory-prompt.service';
+import { handleCliError } from '../../utils/error';
 
 export const deleteCommand = new Command('delete')
     .description('Delete a directory')
     .action(async () => {
         try {
-            console.log(chalk.red.bold('\n🗑️  Delete Directory\n'));
+            console.log(chalk.red.bold('\nDelete Directory\n'));
 
             // Ensure user is authenticated
             await requireAuth();
@@ -137,9 +138,14 @@ export const deleteCommand = new Command('delete')
 
                 const response = await apiService.deleteDirectory(directory.id, deleteDto);
 
-                spinner.succeed('Directory deleted successfully');
+                spinner.stop();
 
-                console.log(chalk.green('\n✓ Directory deleted successfully!'));
+                if (response.status === 'error') {
+                    console.log(chalk.red('\n✗ Directory deletion failed'));
+                } else {
+                    console.log(chalk.green('\n✓ Directory deleted successfully!'));
+                }
+
                 console.log(chalk.gray('Status:'), chalk.white(response.status));
                 if (response.message) {
                     console.log(chalk.gray('Message:'), chalk.white(response.message));
@@ -169,25 +175,7 @@ export const deleteCommand = new Command('delete')
                 throw error;
             }
         } catch (error) {
-            console.error(
-                chalk.red('\n✗ Failed to delete directory:'),
-                error.response?.data?.message || error.message,
-            );
-
-            if (error.response?.status === 401) {
-                console.log(chalk.yellow('\n⚠ Authentication failed. Please login again.'));
-                console.log(chalk.gray('Run: ever-works auth login'));
-            } else if (error.response?.status === 404) {
-                console.log(
-                    chalk.yellow('\n⚠ Directory not found. It may have already been deleted.'),
-                );
-            } else if (error.response?.status === 403) {
-                console.log(
-                    chalk.yellow(
-                        '\n⚠ Permission denied. You may not have permission to delete this directory.',
-                    ),
-                );
-            }
+            handleCliError(error);
 
             process.exit(1);
         }

@@ -194,8 +194,7 @@ export class ItemSubmissionService {
                 status: 'error',
                 slug: directory.slug,
                 item_name: submitItemDto.name,
-                message: 'Failed to submit item',
-                error_details: error.message,
+                message: error.message,
             };
         }
     }
@@ -234,7 +233,6 @@ export class ItemSubmissionService {
                     item_name: 'Unknown',
                     item_slug: removeItemDto.item_slug,
                     message: `Item with slug '${removeItemDto.item_slug}' not found`,
-                    error_details: 'Item does not exist in the repository',
                 };
             }
 
@@ -257,7 +255,6 @@ export class ItemSubmissionService {
                     item_name: itemData.name,
                     item_slug: removeItemDto.item_slug,
                     message: `Failed to remove item '${removeItemDto.item_slug}'`,
-                    error_details: 'Item removal operation failed',
                 };
             }
 
@@ -312,8 +309,7 @@ export class ItemSubmissionService {
                 slug: directory.slug,
                 item_name: 'Unknown',
                 item_slug: removeItemDto.item_slug,
-                message: 'Failed to remove item',
-                error_details: error.message,
+                message: error.message,
             };
         }
     }

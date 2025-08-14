@@ -5,5 +5,4 @@ export interface UpdateWebsiteRepositoryResponseDto {
     repository: string;
     message: string;
     method_used?: string;
-    error_details?: string;
 }

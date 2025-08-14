@@ -4,15 +4,16 @@ import ora from 'ora';
 import { requireAuth } from '../auth';
 import { getApiService, CreateDirectoryDto } from '../../services/api.service';
 import { DirectoryPromptService } from './directory-prompt.service';
+import { handleCliError } from '../../utils/error';
 
 export const createCommand = new Command('create')
     .description('Create a new directory')
     .action(async () => {
         try {
-            console.log(chalk.cyan.bold('\n📁 Create New Directory\n'));
+            console.log(chalk.cyan.bold('\nCreate New Directory\n'));
 
             // Ensure user is authenticated
-            await requireAuth();
+            const auth = await requireAuth();
 
             const apiService = getApiService();
             const directoryPrompt = new DirectoryPromptService();
@@ -36,6 +37,8 @@ export const createCommand = new Command('create')
                         description: directoryData.description,
                         owner: directoryData.owner,
                         readme_config: directoryData.readme_config,
+                        organization:
+                            !!directoryData.owner && directoryData.owner !== auth.username,
                     };
 
                     const response = await apiService.createDirectory(createDirectoryDto);
@@ -94,17 +97,13 @@ export const createCommand = new Command('create')
                 }
             }
         } catch (error) {
-            console.error(
-                chalk.red('\n✗ Failed to create directory:'),
-                error.response?.data?.message || error.message,
-            );
+            handleCliError(error);
 
-            if (error.response?.status === 401) {
-                console.log(chalk.yellow('\n⚠ Authentication failed. Please login again.'));
-                console.log(chalk.gray('Run: ever-works auth login'));
-            } else if (error.response?.status === 400) {
+            if (error.response?.status === 400) {
                 console.log(
-                    chalk.yellow('\n⚠ Invalid input. Please check your data and try again.'),
+                    chalk.yellow(
+                        '\n⚠ Invalid input. Please ensure all required fields are correctly filled.',
+                    ),
                 );
             }
 

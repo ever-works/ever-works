@@ -7,6 +7,7 @@ import { DirectoryRepository, UserRepository } from '@packages/agent/database';
 import { AgentService } from '@packages/agent/services';
 import { DirectoryPromptService } from './directory-prompt.service';
 import { ConfigCheckService } from './config-check.service';
+import { handleCliError } from './error';
 
 @SubCommand({
     name: 'update-website',
@@ -27,7 +28,7 @@ export class UpdateWebsiteSubCommand extends CommandRunner {
 
     async run(): Promise<void> {
         try {
-            console.log(chalk.cyan.bold('\n🌐 Update Website Repository\n'));
+            console.log(chalk.cyan.bold('\nUpdate Website Repository\n'));
 
             // Check configuration first
             await this.configCheck.requireConfiguration();
@@ -81,9 +82,14 @@ export class UpdateWebsiteSubCommand extends CommandRunner {
                 // Call the agent service method directly
                 const result = await this.agentService.updateWebsiteRepository(directory.id, user);
 
-                spinner.succeed('Website repository updated successfully');
+                spinner.stop();
 
-                console.log(chalk.green('\n✓ Website repository updated successfully!'));
+                if (result.status === 'error') {
+                    console.log(chalk.red('\n✗ Failed to update website repository'));
+                } else {
+                    console.log(chalk.green('\n✓ Website repository updated successfully!'));
+                }
+
                 console.log(chalk.gray('Status:'), chalk.white(result.status));
                 console.log(chalk.gray('Repository:'), chalk.white(result.repository));
                 console.log(chalk.gray('Message:'), chalk.white(result.message));
@@ -102,17 +108,17 @@ export class UpdateWebsiteSubCommand extends CommandRunner {
                             chalk.cyan('directory deploy') +
                             chalk.gray(' to deploy the website'),
                     );
-                } else if (result.error_details) {
+                } else if (result.status === 'error' && result.message) {
                     console.log(chalk.red('\n--- Error Details ---'));
-                    console.log(chalk.red(result.error_details));
+                    console.log(chalk.red(result.message));
                 }
             } catch (error) {
-                spinner.fail('Failed to update website repository');
+                spinner.stop();
                 throw error;
             }
         } catch (error) {
-            this.logger.error('Failed to update website repository:', error);
-            console.log(chalk.red('\n✗ Failed to update website repository:'), error.message);
+            handleCliError(error, 'Failed to update website repository');
+            process.exit(1);
         }
     }
 }

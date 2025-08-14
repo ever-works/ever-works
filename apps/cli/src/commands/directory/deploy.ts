@@ -5,6 +5,7 @@ import inquirer from 'inquirer';
 import { requireAuth } from '../auth';
 import { getApiService } from '../../services/api.service';
 import { DirectoryPromptService } from './directory-prompt.service';
+import { handleCliError } from '../../utils/error';
 
 interface DeployDto {
     VERCEL_TOKEN?: string;
@@ -114,19 +115,9 @@ export const deployCommand = new Command('deploy')
                 throw error;
             }
         } catch (error) {
-            console.error(
-                chalk.red('\n✗ Failed to deploy website:'),
-                error.response?.data?.message || error.message,
-            );
+            handleCliError(error);
 
-            if (error.response?.status === 401) {
-                console.log(chalk.yellow('\n⚠ Authentication failed. Please login again.'));
-                console.log(chalk.gray('Run: ever-works auth login'));
-            } else if (error.response?.status === 404) {
-                console.log(
-                    chalk.yellow('\n⚠ Directory not found. Please check the slug and try again.'),
-                );
-            } else if (error.response?.status === 400) {
+            if (error.response?.status === 400) {
                 console.log(
                     chalk.yellow(
                         '\n⚠ Invalid deployment configuration. Please check your tokens and try again.',

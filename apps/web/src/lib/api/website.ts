@@ -9,7 +9,6 @@ export interface UpdateWebsiteRepositoryResponse {
     repository: string;
     message: string;
     method_used?: string;
-    error_details?: string;
 }
 
 export const websiteAPI = {

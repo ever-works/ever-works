@@ -105,7 +105,7 @@ export interface ExtractItemDetailsResponse {
 
 export interface RegenerateMarkdownResponse {
     status: string;
-    error_details?: string;
+    message?: string;
 }
 
 export const itemsGeneratorAPI = {

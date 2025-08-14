@@ -1,4 +1,10 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+    BadRequestException,
+    HttpException,
+    Injectable,
+    Logger,
+    NotFoundException,
+} from '@nestjs/common';
 import { DataGeneratorService } from '../data-generator/data-generator.service';
 import { MarkdownGeneratorService } from '../markdown-generator/markdown-generator.service';
 import { WebsiteGeneratorService } from '../website-generator/website-generator.service';
@@ -41,31 +47,6 @@ export class AgentService {
         private readonly directoryRepository: DirectoryRepository,
     ) {}
 
-    /**
-     * Validates that the current authenticated user owns the directory
-     * @param directoryId - The ID of the directory to validate
-     * @param userId - The ID of the authenticated user
-     * @returns The directory if validation passes
-     * @throws NotFoundException if directory doesn't exist
-     * @throws BadRequestException if user doesn't own the directory
-     */
-    private async validateDirectoryOwnership(
-        directoryId: string,
-        userId: string,
-    ): Promise<Directory> {
-        const directory = await this.directoryRepository.findById(directoryId);
-
-        if (!directory) {
-            throw new NotFoundException(`Directory with id '${directoryId}' not found`);
-        }
-
-        if (directory.userId !== userId) {
-            throw new BadRequestException('You do not have permission to access this directory');
-        }
-
-        return directory;
-    }
-
     async getDirectories(
         options: {
             limit?: number;
@@ -89,11 +70,16 @@ export class AgentService {
         }
 
         try {
-            const directories = await this.directoryRepository.findAll({
+            let directories = await this.directoryRepository.findAll({
                 userId: user.id,
                 limit,
                 offset,
                 search: sanitizedSearch,
+            });
+
+            directories = directories.map((dir) => {
+                dir.owner = dir.getRepoOwner();
+                return dir;
             });
 
             // Get the total count of directories for proper pagination
@@ -110,8 +96,16 @@ export class AgentService {
                 offset,
             };
         } catch (error) {
+            if (error instanceof HttpException) {
+                throw error;
+            }
+
             this.logger.error('Failed to get directories:', error);
-            throw error;
+
+            throw new BadRequestException({
+                status: 'error',
+                message: this.clearMessageError(error),
+            });
         }
     }
 
@@ -148,7 +142,19 @@ export class AgentService {
         const directory = await this.validateDirectoryOwnership(directoryId, user.id);
 
         if (awaitCompletion) {
-            await this.processGeneration(directory, user, createItemsGeneratorDto);
+            try {
+                await this.processGeneration(directory, user, createItemsGeneratorDto);
+            } catch (error) {
+                if (error instanceof HttpException) {
+                    throw error;
+                }
+
+                throw new BadRequestException({
+                    status: 'error',
+                    slug: directory.slug,
+                    message: this.clearMessageError(error),
+                });
+            }
         } else {
             void this.processGeneration(directory, user, createItemsGeneratorDto);
         }
@@ -174,7 +180,11 @@ export class AgentService {
             .catch(() => null);
 
         if (!lastRequestData) {
-            throw new BadRequestException('No last request data found');
+            throw new BadRequestException({
+                status: 'error',
+                slug: directory.slug,
+                message: 'No previous request data found',
+            });
         }
 
         lastRequestData = {
@@ -183,7 +193,19 @@ export class AgentService {
         };
 
         if (awaitCompletion) {
-            await this.processGeneration(directory, user, lastRequestData);
+            try {
+                await this.processGeneration(directory, user, lastRequestData);
+            } catch (error) {
+                if (error instanceof HttpException) {
+                    throw error;
+                }
+
+                throw new BadRequestException({
+                    status: 'error',
+                    slug: directory.slug,
+                    message: this.clearMessageError(error),
+                });
+            }
         } else {
             void this.processGeneration(directory, user, lastRequestData);
         }
@@ -225,17 +247,25 @@ export class AgentService {
                 });
             }
 
+            if (result.status === 'error') {
+                result.message = this.clearMessageError(result.message);
+                throw new BadRequestException(result);
+            }
+
             return result;
         } catch (error) {
+            if (error instanceof HttpException) {
+                throw error;
+            }
+
             this.logger.error('Error submitting item:', error);
 
-            return {
+            throw new BadRequestException({
                 status: 'error',
                 slug: directoryId,
                 item_name: submitItemDto.name,
-                message: 'Failed to submit item',
-                error_details: error.message,
-            };
+                message: this.clearMessageError(error),
+            });
         }
     }
 
@@ -267,18 +297,25 @@ export class AgentService {
                 });
             }
 
+            if (result.status === 'error') {
+                result.message = this.clearMessageError(result.message);
+                throw new BadRequestException(result);
+            }
+
             return result;
         } catch (error) {
-            console.error('Error removing item:', error);
+            if (error instanceof HttpException) {
+                throw error;
+            }
 
-            return {
+            console.error('Error removing item:', error);
+            throw new BadRequestException({
                 status: 'error',
                 slug: directoryId,
                 item_name: 'Unknown',
                 item_slug: removeItemDto.item_slug,
-                message: 'Failed to remove item',
-                error_details: error.message,
-            };
+                message: this.clearMessageError(error),
+            });
         }
     }
 
@@ -296,36 +333,38 @@ export class AgentService {
             );
 
             if (!item) {
-                return {
+                throw new BadRequestException({
                     status: 'error',
                     source_url: extractItemDetailsDto.source_url,
-                    message: 'Failed to extract item details from the provided URL',
-                    error_details: 'No item data could be extracted from the URL content',
-                };
+                    message: 'No item data could be extracted from the URL content',
+                });
             }
 
             return {
                 status: 'success',
-                source_url: extractItemDetailsDto.source_url,
                 item,
+                source_url: extractItemDetailsDto.source_url,
                 message: `Successfully extracted item details: "${item.name}"`,
             };
         } catch (error) {
+            if (error instanceof HttpException) {
+                throw error;
+            }
+
             console.error('Error extracting item details:', error);
 
-            return {
+            throw new BadRequestException({
                 status: 'error',
                 source_url: extractItemDetailsDto.source_url,
-                message: 'Failed to extract item details',
-                error_details: error.message,
-            };
+                message: this.clearMessageError(error),
+            });
         }
     }
 
     async regenerateMarkdown(
         directoryId: string,
         user: User,
-    ): Promise<{ status: string; error_details?: string }> {
+    ): Promise<{ status: string; message?: string }> {
         try {
             // Validate directory ownership
             const directory = await this.validateDirectoryOwnership(directoryId, user.id);
@@ -339,12 +378,17 @@ export class AgentService {
                 status: 'success',
             };
         } catch (error) {
+            if (error instanceof HttpException) {
+                throw error;
+            }
+
             console.error('Error regenerating markdown:', error);
 
-            return {
+            throw new BadRequestException({
                 status: 'error',
-                error_details: error.message,
-            };
+                id: directoryId,
+                message: this.clearMessageError(error),
+            });
         }
     }
 
@@ -367,16 +411,17 @@ export class AgentService {
                 method_used: result.method,
             };
         } catch (error) {
+            if (error instanceof HttpException) {
+                throw error;
+            }
+
             console.error('Error updating website repository:', error);
 
-            return {
+            throw new BadRequestException({
                 status: 'error',
-                slug: directoryId,
-                owner: '',
-                repository: `/${directoryId}-website`,
-                message: 'Failed to update website repository',
-                error_details: error.message,
-            };
+                directoryId,
+                message: this.clearMessageError(error),
+            });
         }
     }
 
@@ -391,14 +436,20 @@ export class AgentService {
             // Check if directory exists and belongs to the user
             directory = await this.directoryRepository.findById(id);
             if (!directory) {
-                throw new NotFoundException(`Directory with id '${id}' not found`);
+                throw new NotFoundException({
+                    status: 'error',
+                    id,
+                    message: 'Directory not found',
+                });
             }
 
             // Verify the directory belongs to the user
             if (directory.userId !== user.id) {
-                throw new BadRequestException(
-                    'You do not have permission to delete this directory',
-                );
+                throw new BadRequestException({
+                    status: 'error',
+                    id,
+                    message: 'You do not have permission to delete this directory',
+                });
             }
 
             const deletedRepositories: string[] = [];
@@ -411,6 +462,10 @@ export class AgentService {
                         `${directory.getRepoOwner()}/${directory.getDataRepo()}`,
                     );
                 } catch (error) {
+                    if (error instanceof HttpException) {
+                        throw error;
+                    }
+
                     this.logger.error('Failed to delete data repository:', error);
                 }
             }
@@ -421,6 +476,10 @@ export class AgentService {
                     await this.markdownGenerator.removeRepository(directory, user);
                     deletedRepositories.push(`${directory.getRepoOwner()}/${directory.slug}`);
                 } catch (error) {
+                    if (error instanceof HttpException) {
+                        throw error;
+                    }
+
                     this.logger.error('Failed to delete markdown repository:', error);
                 }
             }
@@ -433,6 +492,10 @@ export class AgentService {
                         `${directory.getRepoOwner()}/${directory.getWebsiteRepo()}`,
                     );
                 } catch (error) {
+                    if (error instanceof HttpException) {
+                        throw error;
+                    }
+
                     this.logger.error('Failed to delete website repository:', error);
                 }
             }
@@ -447,15 +510,106 @@ export class AgentService {
                 deleted_repositories: deletedRepositories,
             };
         } catch (error) {
+            if (error instanceof HttpException) {
+                throw error;
+            }
+
             this.logger.error('Error deleting directory:', error);
 
-            return {
+            throw new BadRequestException({
                 status: 'error',
                 slug: directory?.slug || '',
-                message: 'Failed to delete directory',
-                error_details: error.message,
-            };
+                message: this.clearMessageError(error),
+            });
         }
+    }
+
+    private clearMessageError(error: any): string {
+        if (!error) {
+            return 'Unknown error';
+        }
+
+        let message: string = String(error);
+
+        if (typeof error === 'object') {
+            message = error.message || error.error || error;
+        }
+
+        const lowerMessage = message.toLowerCase();
+
+        // Repository not found
+        if (lowerMessage.includes('404') || lowerMessage.includes('not found')) {
+            return 'Repository not found. Please verify the repository exists and try again.';
+        }
+
+        // Authentication errors
+        if (lowerMessage.includes('401') || lowerMessage.includes('unauthorized')) {
+            return 'Authentication expired. Please reconnect your account.';
+        }
+
+        if (lowerMessage.includes('403') || lowerMessage.includes('forbidden')) {
+            return "You don't have access to this repository. Please check permissions.";
+        }
+
+        // Network errors
+        if (lowerMessage.includes('enotfound') || lowerMessage.includes('getaddrinfo')) {
+            return 'Connection failed. Please check your network and try again.';
+        }
+
+        if (lowerMessage.includes('timeout') || lowerMessage.includes('timedout')) {
+            return 'Request timed out. Please try again.';
+        }
+
+        // OAuth/Auth specific
+        if (
+            lowerMessage.includes('could not read username') ||
+            lowerMessage.includes('could not read password')
+        ) {
+            return 'Please reconnect your Git account to continue.';
+        }
+
+        if (lowerMessage.includes('token') || lowerMessage.includes('oauth')) {
+            return 'Access token invalid. Please reconnect your account.';
+        }
+
+        // Git operation errors
+        if (lowerMessage.includes('merge conflict') || lowerMessage.includes('conflict')) {
+            return 'Sync conflict detected. Please resolve conflicts to continue.';
+        }
+
+        if (lowerMessage.includes('already exists') && lowerMessage.includes('empty')) {
+            return 'Workspace already initialized. Please refresh the page.';
+        }
+
+        if (lowerMessage.includes('no such ref') || lowerMessage.includes("couldn't find ref")) {
+            return 'Branch not found. Please select a valid branch.';
+        }
+
+        if (lowerMessage.includes('shallow') && lowerMessage.includes('unrelated')) {
+            return 'Cannot sync unrelated repositories.';
+        }
+
+        if (lowerMessage.includes('lock') || lowerMessage.includes('locked')) {
+            return 'Another operation in progress. Please wait and try again.';
+        }
+
+        // Certificate/SSL errors
+        if (lowerMessage.includes('certificate') || lowerMessage.includes('ssl')) {
+            return 'Secure connection failed. Please contact support.';
+        }
+
+        // Rate limiting
+        if (lowerMessage.includes('rate limit') || lowerMessage.includes('429')) {
+            return 'Too many requests. Please wait a moment and try again.';
+        }
+
+        // Empty repository
+        if (lowerMessage.includes('empty repository') || lowerMessage.includes('no commits')) {
+            return 'Repository is empty. Please add content first.';
+        }
+
+        // Return original message if no pattern matches
+        return message;
     }
 
     private async processGeneration(
@@ -482,6 +636,10 @@ export class AgentService {
                 ]);
             }
         } catch (error) {
+            if (error instanceof HttpException) {
+                throw error;
+            }
+
             console.error('Error during generation:', error);
         }
 
@@ -489,5 +647,36 @@ export class AgentService {
         console.log(`Generation finished at: ${endTime.toISOString()}`);
         const duration = (endTime.getTime() - startTime.getTime()) / 1000;
         console.log(`Total time taken: ${duration} seconds`);
+    }
+
+    /**
+     * Validates that the current authenticated user owns the directory
+     * @param directoryId - The ID of the directory to validate
+     * @param userId - The ID of the authenticated user
+     * @returns The directory if validation passes
+     * @throws NotFoundException if directory doesn't exist
+     * @throws BadRequestException if user doesn't own the directory
+     */
+    private async validateDirectoryOwnership(
+        directoryId: string,
+        userId: string,
+    ): Promise<Directory> {
+        const directory = await this.directoryRepository.findById(directoryId);
+
+        if (!directory) {
+            throw new NotFoundException({
+                status: 'error',
+                message: `Directory with id '${directoryId}' not found`,
+            });
+        }
+
+        if (directory.userId !== userId) {
+            throw new BadRequestException({
+                status: 'error',
+                message: 'You do not have permission to access this directory',
+            });
+        }
+
+        return directory;
     }
 }

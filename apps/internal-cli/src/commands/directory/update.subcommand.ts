@@ -7,6 +7,7 @@ import { DirectoryRepository, UserRepository } from '@packages/agent/database';
 import { AgentService } from '@packages/agent/services';
 import { DirectoryPromptService } from './directory-prompt.service';
 import { ConfigCheckService } from './config-check.service';
+import { handleCliError } from './error';
 
 @SubCommand({
     name: 'update',
@@ -27,7 +28,7 @@ export class UpdateSubCommand extends CommandRunner {
 
     async run(): Promise<void> {
         try {
-            console.log(chalk.cyan.bold('\n🔄 Update Directory\n'));
+            console.log(chalk.cyan.bold('\nUpdate Directory\n'));
 
             // Check configuration first
             await this.configCheck.requireConfiguration();
@@ -84,13 +85,23 @@ export class UpdateSubCommand extends CommandRunner {
                     directory.id,
                     updateOptions,
                     user,
+                    true,
                 );
 
-                spinner.succeed('Directory update initiated successfully');
-                console.log(chalk.green('\n✓ Update initiated successfully!'));
+                spinner.stop();
+
+                if (result.status === 'error') {
+                    console.log(chalk.red('\n✗ Failed to update directory'));
+                } else {
+                    console.log(chalk.green('\n✓ Update initiated successfully!'));
+                }
+
                 console.log(chalk.gray('Status:'), chalk.white(result.status));
-                console.log(chalk.gray('Message:'), chalk.white(result.message));
                 console.log(chalk.gray('Directory:'), chalk.white(directory.slug));
+                if (result.message) {
+                    console.log(chalk.gray('Message:'), chalk.white(result.message));
+                }
+
                 console.log(
                     chalk.gray('Generation Method:'),
                     chalk.white(updateOptions.generation_method),
@@ -106,12 +117,12 @@ export class UpdateSubCommand extends CommandRunner {
                     console.log(chalk.gray('Check the logs or data directory for updates.'));
                 }
             } catch (error) {
-                spinner.fail('Failed to update directory');
+                spinner.stop();
                 throw error;
             }
         } catch (error) {
-            this.logger.error('Failed to update directory:', error);
-            console.log(chalk.red('\n✗ Failed to update directory:'), error.message);
+            handleCliError(error, 'Failed to update directory content');
+            process.exit(1);
         }
     }
 

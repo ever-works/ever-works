@@ -1,6 +1,7 @@
 import { redirect } from '@/i18n/navigation';
-import { authAPI } from '@/lib/api';
+import { authAPI, AuthResponse } from '@/lib/api';
 import { setAuthCookies } from '@/lib/auth';
+import { getRedirectUrl } from '@/lib/auth/redirect';
 import { ROUTES } from '@/lib/constants';
 import { getLocale } from 'next-intl/server';
 import { NextRequest } from 'next/server';
@@ -17,14 +18,17 @@ export async function GET(request: NextRequest) {
     }
 
     let href = ROUTES.HOME + '?verified=true';
+    let authResponse: AuthResponse | null = null;
 
     try {
-        const response = await authAPI.verifyEmail({ token });
+        authResponse = await authAPI.verifyEmail({ token });
 
-        await setAuthCookies(response.access_token, response.refresh_token);
+        await setAuthCookies(authResponse.access_token, authResponse.refresh_token);
     } catch (error) {
         href = ROUTES.AUTH_ERROR + '?error=verify_email_invalid_token';
     }
+
+    href = await getRedirectUrl(authResponse, href);
 
     return redirect({ locale, href });
 }

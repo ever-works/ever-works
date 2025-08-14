@@ -1,6 +1,7 @@
 import { redirect } from '@/i18n/navigation';
 import { authAPI, AuthResponse } from '@/lib/api';
 import { getOAuthState, setAuthCookies } from '@/lib/auth';
+import { getRedirectUrl } from '@/lib/auth/redirect';
 import { ROUTES } from '@/lib/constants';
 import { getLocale } from 'next-intl/server';
 import { NextRequest } from 'next/server';
@@ -35,19 +36,19 @@ export async function GET(
         });
     }
 
-    let href = ROUTES.HOME;
+    let href: string = ROUTES.HOME;
+    let authResponse: AuthResponse | null = null;
 
     try {
-        let authReponse: AuthResponse | null = null;
         switch (provider) {
             case 'github': {
                 const response = await authAPI.connectGitHubCallback(code, state || undefined);
-                authReponse = response;
+                authResponse = response;
                 break;
             }
             case 'google': {
                 const response = await authAPI.connectGoogleCallback(code, state || undefined);
-                authReponse = response;
+                authResponse = response;
                 break;
             }
             default:
@@ -55,8 +56,8 @@ export async function GET(
                 break;
         }
 
-        if (authReponse) {
-            await setAuthCookies(authReponse.access_token, authReponse.refresh_token);
+        if (authResponse) {
+            await setAuthCookies(authResponse.access_token, authResponse.refresh_token);
         }
     } catch (error) {
         href = ROUTES.AUTH_ERROR + '?error=oauth_callback';
@@ -65,6 +66,8 @@ export async function GET(
             href = ROUTES.AUTH_ERROR + '?error=account_locked';
         }
     }
+
+    href = await getRedirectUrl(authResponse, href);
 
     return redirect({ locale, href });
 }

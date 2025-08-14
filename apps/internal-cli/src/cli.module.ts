@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { DatabaseConfigurations } from '@packages/agent/database';
+import { DatabaseConfigurations, DatabaseInitService } from '@packages/agent/database';
 import { AiModule } from '@packages/agent/ai';
 import { AgentModule } from '@packages/agent/services';
 import { GitModule } from '@packages/agent/git';
@@ -31,6 +31,7 @@ import { ServeCommands } from './commands/serve';
         AgentModule,
     ],
     providers: [
+        DatabaseInitService,
         // Commands
         ...ConfigCommands,
         ...DirectoryCommands,

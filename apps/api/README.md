@@ -368,7 +368,6 @@ POST /api/directories/{id}/submit-item
 | `pr_url`        | string  | _(Success only)_ GitHub PR URL if created                       |
 | `branch_name`   | string  | _(Success only)_ Git branch name if created                     |
 | `auto_merged`   | boolean | _(Success only)_ Whether the PR was automatically merged        |
-| `error_details` | string  | _(Error only)_ Additional details about the error that occurred |
 
 **Auto-Merge Behavior:**
 
@@ -469,7 +468,6 @@ POST /api/directories/{id}/remove-item
 | `pr_number`     | number | _(Success only)_ GitHub PR number if created                    |
 | `pr_url`        | string | _(Success only)_ GitHub PR URL if created                       |
 | `branch_name`   | string | _(Success only)_ Git branch name if created                     |
-| `error_details` | string | _(Error only)_ Additional details about the error that occurred |
 
 **Example with Immediate Publishing:**
 
@@ -556,7 +554,6 @@ POST /api/extract-item-details
 | `source_url`    | string   | The URL that was processed                                      |
 | `item`          | ItemData | _(Success only)_ Complete item data with all extracted details  |
 | `message`       | string   | Status message                                                  |
-| `error_details` | string   | _(Error only)_ Additional details about the error that occurred |
 
 **ItemData Fields:**
 
@@ -643,7 +640,6 @@ POST /api/directories/{id}/update-website
 | `repository`    | string | Full repository name in `owner/repo-name` format                          |
 | `message`       | string | Descriptive message about the update operation                            |
 | `method_used`   | string | The update method that was successfully used (see Update Methods below)   |
-| `error_details` | string | _(Error responses only)_ Additional details about the error that occurred |
 
 **Update Methods:**
 
@@ -663,8 +659,7 @@ The service automatically tries different update strategies in order of preferen
     "slug": "awesome-time-tracking",
     "owner": "",
     "repository": "/awesome-time-tracking-website",
-    "message": "Failed to update website repository",
-    "error_details": "Directory with slug 'awesome-time-tracking' not found"
+    "message": "Failed to update website repository"
 }
 ```
 

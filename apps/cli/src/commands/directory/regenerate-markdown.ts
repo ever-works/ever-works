@@ -5,12 +5,13 @@ import inquirer from 'inquirer';
 import { requireAuth } from '../auth';
 import { getApiService } from '../../services/api.service';
 import { DirectoryPromptService } from './directory-prompt.service';
+import { handleCliError } from '../../utils/error';
 
 export const regenerateMarkdownCommand = new Command('regenerate-markdown')
     .description('Regenerate readme markdown file for a directory')
     .action(async () => {
         try {
-            console.log(chalk.cyan.bold('\n📝 Regenerate Markdown\n'));
+            console.log(chalk.cyan.bold('\nRegenerate Markdown Files\n'));
 
             // Ensure user is authenticated
             await requireAuth();
@@ -55,37 +56,36 @@ export const regenerateMarkdownCommand = new Command('regenerate-markdown')
             try {
                 const response = await apiService.regenerateMarkdown(directory.id);
 
-                spinner.succeed('Markdown regenerated successfully');
+                spinner.stop();
 
-                console.log(chalk.green('\n✓ Markdown regenerated successfully!'));
-                console.log(chalk.gray('Status:'), chalk.white(response.status));
-
-                if (response.error_details) {
-                    console.log(chalk.yellow('\n⚠ Warning:'), chalk.white(response.error_details));
+                if (response.status === 'error') {
+                    console.log(chalk.red('\n✗ Markdown regeneration failed'));
+                } else {
+                    console.log(chalk.green('\n✓ Markdown regeneration completed successfully!'));
                 }
 
-                console.log(chalk.cyan('\nNext Steps:'));
-                console.log(chalk.gray('  • Check your data repository for the updated README.md'));
-                console.log(chalk.gray('  • Review the changes and commit if satisfied'));
-                console.log(chalk.gray('  • Use "directory update-website" to update the website'));
+                console.log(chalk.gray('Status:'), chalk.white(response.status));
+
+                if (response.message) {
+                    console.log(chalk.yellow('\n⚠ Warning:'), chalk.white(response.message));
+                }
+
+                if (response.status !== 'error') {
+                    console.log(chalk.cyan('\nNext Steps:'));
+                    console.log(
+                        chalk.gray('  • Check your data repository for the updated README.md'),
+                    );
+                    console.log(chalk.gray('  • Review the changes and commit if satisfied'));
+                    console.log(
+                        chalk.gray('  • Use "directory update-website" to update the website'),
+                    );
+                }
             } catch (error) {
                 spinner.fail('Markdown regeneration failed');
                 throw error;
             }
         } catch (error) {
-            console.error(
-                chalk.red('\n✗ Failed to regenerate markdown:'),
-                error.response?.data?.message || error.message,
-            );
-
-            if (error.response?.status === 401) {
-                console.log(chalk.yellow('\n⚠ Authentication failed. Please login again.'));
-                console.log(chalk.gray('Run: ever-works auth login'));
-            } else if (error.response?.status === 404) {
-                console.log(
-                    chalk.yellow('\n⚠ Directory not found. Please check the slug and try again.'),
-                );
-            }
+            handleCliError(error);
 
             process.exit(1);
         }

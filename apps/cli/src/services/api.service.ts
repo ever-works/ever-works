@@ -16,6 +16,7 @@ export interface CreateDirectoryDto {
     description: string;
     owner?: string;
     readme_config?: MarkdownReadmeConfigDto;
+    organization: boolean;
 }
 
 export interface CreateItemsGeneratorDto {
@@ -52,9 +53,8 @@ export interface UpdateDirectoryDto {
 }
 
 export interface ApiResponse {
-    status: string;
+    status: 'success' | 'error' | 'pending';
     message: string;
-    error_details?: string;
     repository_url?: string;
     item?: {
         name: string;
@@ -90,6 +90,13 @@ export interface DeleteDirectoryDto {
     delete_data_repository?: boolean;
     delete_markdown_repository?: boolean;
     delete_website_repository?: boolean;
+}
+
+export interface UserProfile {
+    id: string;
+    username: string;
+    email: string;
+    avatar?: string;
 }
 
 export interface DirectoriesResponse {
@@ -170,6 +177,11 @@ export class ApiService {
         const response = await this.httpClient.post<ApiResponse>(
             `/directories/${directoryId}/regenerate-markdown`,
         );
+        return response.data;
+    }
+
+    async getProfile(): Promise<UserProfile> {
+        const response = await this.httpClient.get<UserProfile>('/auth/profile/fresh');
         return response.data;
     }
 
