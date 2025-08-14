@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import Link from 'next/link';
+import { Link } from '@/i18n/navigation';
 import { AuthLayout } from '@/components/layout/AuthLayout';
 import { useTranslations } from 'next-intl';
 import { SocialLoginButtons } from '@/components/auth/social-login';

@@ -2,7 +2,7 @@
 
 import { ButtonHTMLAttributes, forwardRef } from 'react';
 import { cn } from '@/lib/utils';
-import Link from 'next/link';
+import { Link } from '@/i18n/navigation';
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
     variant?: 'primary' | 'secondary' | 'ghost' | 'danger';

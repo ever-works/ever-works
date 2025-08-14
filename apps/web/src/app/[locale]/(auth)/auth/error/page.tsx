@@ -3,10 +3,10 @@
 import { useTranslations } from 'next-intl';
 import { AuthLayout } from '@/components/layout/AuthLayout';
 import { useSearchParams } from 'next/navigation';
-import Link from 'next/link';
 import { Suspense } from 'react';
 import { Button } from '@/components/ui/button';
 import { ROUTES } from '@/lib/constants';
+import { Link } from '@/i18n/navigation';
 
 function AuthErrorContent() {
     const t = useTranslations('auth.error');

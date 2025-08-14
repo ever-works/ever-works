@@ -2,7 +2,7 @@
 
 import { useState, useTransition, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import Link from 'next/link';
+import { Link } from '@/i18n/navigation';
 import { AuthLayout } from '@/components/layout/AuthLayout';
 import { useTranslations } from 'next-intl';
 import { Input } from '@/components/ui/input';
