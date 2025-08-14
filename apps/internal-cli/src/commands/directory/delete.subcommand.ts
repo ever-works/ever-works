@@ -7,6 +7,7 @@ import { DirectoryRepository, UserRepository } from '@packages/agent/database';
 import { AgentService } from '@packages/agent/services';
 import { DirectoryPromptService } from './directory-prompt.service';
 import { ConfigCheckService } from './config-check.service';
+import { handleCliError } from './error';
 
 @SubCommand({
     name: 'delete',
@@ -151,12 +152,12 @@ export class DeleteSubCommand extends CommandRunner {
                     });
                 }
             } catch (error) {
-                spinner.fail('Failed to delete directory');
+                spinner.stop();
                 throw error;
             }
         } catch (error) {
-            this.logger.error('Failed to delete directory:', error);
-            console.log(chalk.red('\n✗ Failed to delete directory:'), error.message);
+            handleCliError(error, 'Failed to delete directory');
+            process.exit(1);
         }
     }
 

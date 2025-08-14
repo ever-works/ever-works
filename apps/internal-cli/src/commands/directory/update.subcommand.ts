@@ -7,6 +7,7 @@ import { DirectoryRepository, UserRepository } from '@packages/agent/database';
 import { AgentService } from '@packages/agent/services';
 import { DirectoryPromptService } from './directory-prompt.service';
 import { ConfigCheckService } from './config-check.service';
+import { handleCliError } from './error';
 
 @SubCommand({
     name: 'update',
@@ -84,6 +85,7 @@ export class UpdateSubCommand extends CommandRunner {
                     directory.id,
                     updateOptions,
                     user,
+                    true,
                 );
 
                 spinner.stop();
@@ -115,12 +117,12 @@ export class UpdateSubCommand extends CommandRunner {
                     console.log(chalk.gray('Check the logs or data directory for updates.'));
                 }
             } catch (error) {
-                spinner.fail('Failed to update directory');
+                spinner.stop();
                 throw error;
             }
         } catch (error) {
-            this.logger.error('Failed to update directory:', error);
-            console.log(chalk.red('\n✗ Failed to update directory:'), error.message);
+            handleCliError(error, 'Failed to update directory content');
+            process.exit(1);
         }
     }
 

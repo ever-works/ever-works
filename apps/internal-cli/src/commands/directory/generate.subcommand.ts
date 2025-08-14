@@ -14,6 +14,7 @@ import {
 } from '@packages/agent/items-generator';
 import { DirectoryPromptService } from './directory-prompt.service';
 import { ConfigCheckService } from './config-check.service';
+import { handleCliError } from './error';
 
 @SubCommand({
     name: 'generate',
@@ -130,12 +131,12 @@ export class GenerateSubCommand extends CommandRunner {
                     );
                 }
             } catch (error) {
-                spinner.fail('Generation failed');
+                spinner.stop();
                 throw error;
             }
         } catch (error) {
-            this.logger.error('Failed to generate directory content:', error);
-            console.log(chalk.red('\n✗ Failed to generate directory content:'), error.message);
+            handleCliError(error, 'Failed to generate directory content');
+            process.exit(1);
         }
     }
 

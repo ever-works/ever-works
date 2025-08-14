@@ -7,6 +7,7 @@ import { DirectoryRepository, UserRepository } from '@packages/agent/database';
 import { VercelService } from '@packages/agent/deploy';
 import { DirectoryPromptService } from './directory-prompt.service';
 import { ConfigCheckService } from './config-check.service';
+import { handleCliError } from './error';
 
 @SubCommand({
     name: 'deploy',
@@ -96,7 +97,7 @@ export class DeploySubCommand extends CommandRunner {
                     user,
                 );
 
-                spinner.succeed('Website deployed successfully');
+                spinner.stop();
 
                 console.log(chalk.green('\n✓ Website deployment initiated successfully!'));
                 console.log(
@@ -111,12 +112,12 @@ export class DeploySubCommand extends CommandRunner {
                     chalk.gray('  • The website will be available once deployment completes'),
                 );
             } catch (error) {
-                spinner.fail('Failed to deploy website');
+                spinner.stop();
                 throw error;
             }
         } catch (error) {
-            this.logger.error('Failed to deploy website:', error);
-            console.log(chalk.red('\n✗ Failed to deploy website:'), error.message);
+            handleCliError(error, 'Failed to deploy website');
+            process.exit(1);
         }
     }
 

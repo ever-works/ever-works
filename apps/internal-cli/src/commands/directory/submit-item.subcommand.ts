@@ -7,6 +7,7 @@ import { DirectoryRepository, UserRepository } from '@packages/agent/database';
 import { AgentService } from '@packages/agent/services';
 import { DirectoryPromptService } from './directory-prompt.service';
 import { ConfigCheckService } from './config-check.service';
+import { handleCliError } from './error';
 
 @SubCommand({
     name: 'submit-item',
@@ -105,12 +106,12 @@ export class SubmitItemSubCommand extends CommandRunner {
                     console.log(chalk.gray('Branch:'), chalk.white(result.pr_branch_name));
                 }
             } catch (error) {
-                spinner.fail('Failed to submit item');
+                spinner.stop();
                 throw error;
             }
         } catch (error) {
-            this.logger.error('Failed to submit item:', error);
-            console.log(chalk.red('\n✗ Failed to submit item:'), error.message);
+            handleCliError(error, 'Failed to submit item');
+            process.exit(1);
         }
     }
 

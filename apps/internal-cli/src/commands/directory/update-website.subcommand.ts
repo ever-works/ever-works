@@ -7,6 +7,7 @@ import { DirectoryRepository, UserRepository } from '@packages/agent/database';
 import { AgentService } from '@packages/agent/services';
 import { DirectoryPromptService } from './directory-prompt.service';
 import { ConfigCheckService } from './config-check.service';
+import { handleCliError } from './error';
 
 @SubCommand({
     name: 'update-website',
@@ -112,12 +113,12 @@ export class UpdateWebsiteSubCommand extends CommandRunner {
                     console.log(chalk.red(result.message));
                 }
             } catch (error) {
-                spinner.fail('Failed to update website repository');
+                spinner.stop();
                 throw error;
             }
         } catch (error) {
-            this.logger.error('Failed to update website repository:', error);
-            console.log(chalk.red('\n✗ Failed to update website repository:'), error.message);
+            handleCliError(error, 'Failed to update website repository');
+            process.exit(1);
         }
     }
 }
