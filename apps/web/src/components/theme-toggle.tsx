@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { Button } from '@/components/ui/button';
 
 export function ThemeToggle() {
     const [isDark, setIsDark] = useState(false);
@@ -28,19 +29,23 @@ export function ThemeToggle() {
     // Prevent hydration mismatch by not rendering until mounted
     if (!mounted) {
         return (
-            <button
-                className="fixed top-4 right-4 z-50 p-2 rounded-lg bg-surface dark:bg-surface-dark border border-border dark:border-border-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark transition-colors"
+            <Button
+                variant="ghost"
+                size="icon"
+                className="fixed top-4 right-4 z-50 bg-surface dark:bg-surface-dark border border-border dark:border-border-dark"
                 aria-label="Toggle theme"
             >
                 <div className="w-5 h-5" />
-            </button>
+            </Button>
         );
     }
 
     return (
-        <button
+        <Button
             onClick={toggleTheme}
-            className="fixed top-4 right-4 z-50 p-2 rounded-lg bg-surface dark:bg-surface-dark border border-border dark:border-border-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark transition-colors"
+            variant="ghost"
+            size="icon"
+            className="fixed top-4 right-4 z-50 bg-surface dark:bg-surface-dark border border-border dark:border-border-dark"
             aria-label="Toggle theme"
         >
             {isDark ? (
@@ -72,6 +77,6 @@ export function ThemeToggle() {
                     />
                 </svg>
             )}
-        </button>
+        </Button>
     );
 }

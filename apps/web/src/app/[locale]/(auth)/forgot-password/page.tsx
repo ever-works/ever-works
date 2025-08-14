@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { AuthLayout } from '@/components/layout/AuthLayout';
 import { useTranslations } from 'next-intl';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { ROUTES } from '@/lib/constants';
 import { forgotPassword as forgotPasswordAction } from '@/app/actions/auth';
 
@@ -52,7 +53,9 @@ export default function ForgotPasswordPage() {
                                 </svg>
                             </div>
                             <div>
-                                <h3 className="font-medium text-text dark:text-text-dark mb-1">{t('success.title')}</h3>
+                                <h3 className="font-medium text-text dark:text-text-dark mb-1">
+                                    {t('success.title')}
+                                </h3>
                                 <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
                                     {t('success.message', { email })}
                                 </p>
@@ -61,7 +64,9 @@ export default function ForgotPasswordPage() {
                     </div>
 
                     <div className="text-center">
-                        <p className="text-sm text-text-secondary dark:text-text-secondary-dark mb-4">{t('success.checkSpam')}</p>
+                        <p className="text-sm text-text-secondary dark:text-text-secondary-dark mb-4">
+                            {t('success.checkSpam')}
+                        </p>
                         <Link
                             href={ROUTES.AUTH_LOGIN}
                             className="text-primary hover:text-primary-hover font-medium transition-colors"
@@ -94,13 +99,9 @@ export default function ForgotPasswordPage() {
                     disabled={isPending}
                 />
 
-                <button
-                    type="submit"
-                    disabled={isPending || !email}
-                    className="w-full py-3 bg-primary hover:bg-primary-hover text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
+                <Button type="submit" disabled={isPending || !email} loading={isPending} fullWidth>
                     {isPending ? t('form.submitting') : t('form.submit')}
-                </button>
+                </Button>
 
                 <div className="text-center space-y-4">
                     <Link

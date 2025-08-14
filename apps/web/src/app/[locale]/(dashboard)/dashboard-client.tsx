@@ -2,7 +2,7 @@
 
 import { logout } from '@/app/actions/auth';
 import { AuthUser } from '@/lib/auth';
-import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 import { useTranslations } from 'next-intl';
 import { Suspense, useTransition } from 'react';
 import DashboardToasts from './dashboard-toasts';
@@ -24,7 +24,9 @@ export default function DashboardClient({ user }: { user: AuthUser }) {
             </Suspense>
 
             <div className="max-w-md mx-auto">
-                <h3 className="text-2xl font-bold text-text dark:text-text-dark mb-4"> {t('title')}</h3>
+                <h3 className="text-2xl font-bold text-text dark:text-text-dark mb-4">
+                    {t('title')}
+                </h3>
 
                 <ul>
                     <li> Email : {user.email}</li>
@@ -37,16 +39,9 @@ export default function DashboardClient({ user }: { user: AuthUser }) {
 
                 <br />
 
-                <button
-                    onClick={handleLogout}
-                    disabled={isPending}
-                    className={cn(
-                        'px-6 py-3 bg-primary hover:bg-primary-hover text-white rounded-lg font-medium transition-colors',
-                        'disabled:opacity-50 disabled:cursor-not-allowed',
-                    )}
-                >
+                <Button onClick={handleLogout} disabled={isPending} loading={isPending} size="lg">
                     Logout
-                </button>
+                </Button>
             </div>
         </>
     );
