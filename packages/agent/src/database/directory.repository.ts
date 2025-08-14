@@ -28,19 +28,29 @@ export class DirectoryRepository {
             directory = this.repository.create(directoryData);
         }
 
-        return await this.repository.save(directory);
+        directory = await this.repository.save(directory);
+        return this.findById(directory.id);
     }
 
     private async findByUserAndSlug(userId: string, slug: string): Promise<Directory | null> {
-        return await this.repository.findOne({ where: { userId, slug } });
+        return await this.repository.findOne({
+            where: { userId, slug },
+            relations: ['user', 'user.oauthTokens'],
+        });
     }
 
     async findByOwnerAndSlug(owner: string, slug: string): Promise<Directory | null> {
-        return await this.repository.findOne({ where: { owner, slug } });
+        return await this.repository.findOne({
+            where: { owner, slug },
+            relations: ['user', 'user.oauthTokens'],
+        });
     }
 
     async findById(id: string): Promise<Directory | null> {
-        return await this.repository.findOne({ where: { id } });
+        return await this.repository.findOne({
+            where: { id },
+            relations: ['user', 'user.oauthTokens'],
+        });
     }
 
     private buildWhereConditions(options?: { userId?: string; search?: string }): any {
