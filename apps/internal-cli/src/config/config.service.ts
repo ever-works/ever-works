@@ -10,7 +10,6 @@ import {
 
 @Injectable()
 export class ConfigService {
-    private readonly logger = new Logger(ConfigService.name);
     private readonly configDir = path.join(os.homedir(), '.ever-works');
     private readonly configPath = path.join(this.configDir, 'config.json');
 
@@ -21,7 +20,6 @@ export class ConfigService {
         try {
             await fs.ensureDir(this.configDir);
         } catch (error) {
-            this.logger.error(`Failed to create config directory: ${error.message}`);
             throw new Error(`Failed to create config directory: ${error.message}`);
         }
     }
@@ -32,15 +30,12 @@ export class ConfigService {
     async loadConfig(): Promise<EverWorksConfig | null> {
         try {
             if (!(await fs.pathExists(this.configPath))) {
-                this.logger.debug('Configuration file does not exist');
                 return null;
             }
 
             const configData = await fs.readJson(this.configPath);
-            this.logger.debug('Configuration loaded successfully');
             return configData as EverWorksConfig;
         } catch (error) {
-            this.logger.error(`Failed to load configuration: ${error.message}`);
             throw new Error(`Failed to load configuration: ${error.message}`);
         }
     }
@@ -56,9 +51,7 @@ export class ConfigService {
             const cleanConfig = this.removeUndefinedValues(config);
 
             await fs.writeJson(this.configPath, cleanConfig, { spaces: 2 });
-            this.logger.log('Configuration saved successfully');
         } catch (error) {
-            this.logger.error(`Failed to save configuration: ${error.message}`);
             throw new Error(`Failed to save configuration: ${error.message}`);
         }
     }
@@ -70,7 +63,6 @@ export class ConfigService {
         try {
             return await fs.pathExists(this.configPath);
         } catch (error) {
-            this.logger.error(`Failed to check config existence: ${error.message}`);
             return false;
         }
     }
@@ -95,7 +87,6 @@ export class ConfigService {
     async loadConfigIntoEnv(): Promise<void> {
         const config = await this.loadConfig();
         if (!config) {
-            this.logger.warn('No configuration found to load into environment');
             return;
         }
 
@@ -105,8 +96,6 @@ export class ConfigService {
                 process.env[key] = String(value);
             }
         });
-
-        this.logger.log('Configuration loaded into environment variables');
     }
 
     /**

@@ -16,6 +16,7 @@ export function handleCliError(error: any, messageHeader: string = 'An error occ
     const status = error.response?.status;
     const message = data?.message || error.message || error;
 
+    console.log(error);
     console.error(chalk.red(`\n✗ ${messageHeader}:`), String(message));
 
     if (error.message?.includes('Owner is required')) {
