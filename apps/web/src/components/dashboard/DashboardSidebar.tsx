@@ -35,13 +35,15 @@ export function DashboardSidebar({ user, isOpen, onToggle }: DashboardSidebarPro
 
     return (
         <aside className={cn(
-            "flex flex-col h-full transition-all duration-300",
+            "fixed lg:relative top-0 h-full z-50",
+            "transition-all duration-300 ease-in-out",
             "bg-surface-secondary dark:bg-surface-secondary-dark",
             "border-r border-border dark:border-border-dark",
-            "lg:relative fixed top-0 left-0 z-50",
-            isOpen ? "w-80 min-w-[20rem]" : "w-0 min-w-0",
-            !isOpen && "overflow-hidden"
+            "w-80 flex-shrink-0",
+            isOpen ? "left-0" : "-left-80 lg:ml-[-20rem]",
+            "xl:!left-0 xl:!ml-0" // Always visible on XL screens
         )}>
+            <div className="flex flex-col h-full">
             <div className={cn(
                 "h-16 flex items-center px-6",
                 "border-b border-border dark:border-border-dark"
@@ -51,7 +53,7 @@ export function DashboardSidebar({ user, isOpen, onToggle }: DashboardSidebarPro
                     <button 
                         onClick={onToggle}
                         className={cn(
-                            "p-2 rounded-md transition-colors",
+                            "p-2 rounded-md transition-colors xl:hidden",
                             "text-text-muted dark:text-text-muted-dark",
                             "hover:text-text dark:hover:text-text-dark",
                             "hover:bg-surface dark:hover:bg-surface-dark"
@@ -177,6 +179,7 @@ export function DashboardSidebar({ user, isOpen, onToggle }: DashboardSidebarPro
                     </svg>
                     <span className="text-sm">{isPending ? 'Signing out...' : 'Sign Out'}</span>
                 </button>
+            </div>
             </div>
         </aside>
     );

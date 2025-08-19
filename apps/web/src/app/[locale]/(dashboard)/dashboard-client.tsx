@@ -9,9 +9,10 @@ import { DirectoryList } from '@/components/directories/DirectoryList';
 import { StatsOverview } from '@/components/dashboard/StatsOverview';
 import { RecentActivity } from '@/components/dashboard/RecentActivity';
 import { EmptyState } from '@/components/common/EmptyState';
+import { cn } from '@/lib/utils/cn';
 
 export default function DashboardClient({ user }: { user: AuthUser }) {
-    const [sidebarOpen, setSidebarOpen] = useState(typeof window !== 'undefined' ? window.innerWidth >= 1024 : true);
+    const [sidebarOpen, setSidebarOpen] = useState(true); // Always start with sidebar open
     const [hasDirectories, setHasDirectories] = useState(false);
 
     return (
@@ -21,7 +22,7 @@ export default function DashboardClient({ user }: { user: AuthUser }) {
             </Suspense>
 
             <div className="flex h-screen bg-background dark:bg-background-dark overflow-hidden">
-                {/* Mobile overlay */}
+                {/* Mobile overlay - only on small screens */}
                 {sidebarOpen && (
                     <div 
                         className="fixed inset-0 bg-black/50 z-40 lg:hidden"
@@ -35,7 +36,7 @@ export default function DashboardClient({ user }: { user: AuthUser }) {
                     onToggle={() => setSidebarOpen(!sidebarOpen)}
                 />
 
-                <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+                <div className="flex-1 flex flex-col overflow-hidden">
                     <DashboardHeader 
                         user={user}
                         onMenuClick={() => setSidebarOpen(!sidebarOpen)}

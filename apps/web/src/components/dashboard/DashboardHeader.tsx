@@ -36,7 +36,7 @@ export function DashboardHeader({ onMenuClick, isSidebarOpen = true }: Dashboard
                             <button
                                 onClick={onMenuClick}
                                 className={cn(
-                                    "p-2 rounded-md",
+                                    "p-2 rounded-md xl:hidden",
                                     "text-text-secondary dark:text-text-secondary-dark",
                                     "hover:text-text dark:hover:text-text-dark",
                                     "hover:bg-surface dark:hover:bg-surface-secondary-dark"
@@ -49,7 +49,7 @@ export function DashboardHeader({ onMenuClick, isSidebarOpen = true }: Dashboard
                         )}
                         <h2 className={cn(
                             "text-xl font-semibold text-text dark:text-text-dark",
-                            !isSidebarOpen ? "ml-4" : ""
+                            !isSidebarOpen ? "ml-4 xl:ml-0" : ""
                         )}>
                             {getPageTitle()}
                         </h2>
