@@ -5,9 +5,10 @@ import { AuthUser } from '@/lib/auth';
 import { cn } from '@/lib/utils/cn';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { CreateDirectoryDto, RepoProvider } from '@/lib/api/directory';
+import type { CreateDirectoryDto } from '@/lib/api/directory';
 import { createDirectory } from '@/app/actions/dashboard';
 import { ROUTES } from '@/lib/constants';
+import { RepoProvider } from '@/lib/api/enums';
 
 interface DirectoryManualFormProps {
     user: AuthUser;
@@ -31,12 +32,12 @@ export function DirectoryManualForm({ user }: DirectoryManualFormProps) {
             overwrite_default_header: false,
             footer: '',
             overwrite_default_footer: false,
-        }
+        },
     });
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        
+
         // Basic validation
         if (!formData.name.trim()) {
             toast.error('Directory name is required');
@@ -53,7 +54,7 @@ export function DirectoryManualForm({ user }: DirectoryManualFormProps) {
 
         startTransition(async () => {
             const result = await createDirectory(formData);
-            
+
             if (result.success) {
                 toast.success(result.message || 'Directory created successfully!');
                 router.push(ROUTES.DASHBOARD_DIRECTORIES);
@@ -86,11 +87,13 @@ export function DirectoryManualForm({ user }: DirectoryManualFormProps) {
 
             <form onSubmit={handleSubmit} className="space-y-6">
                 {/* Basic Fields */}
-                <div className={cn(
-                    "p-6 rounded-lg",
-                    "bg-card dark:bg-card-dark",
-                    "border border-card-border dark:border-card-border-dark"
-                )}>
+                <div
+                    className={cn(
+                        'p-6 rounded-lg',
+                        'bg-card dark:bg-card-dark',
+                        'border border-card-border dark:border-card-border-dark',
+                    )}
+                >
                     <h2 className="text-lg font-semibold text-text dark:text-text-dark mb-4">
                         Basic Information
                     </h2>
@@ -105,20 +108,20 @@ export function DirectoryManualForm({ user }: DirectoryManualFormProps) {
                                 type="text"
                                 value={formData.name}
                                 onChange={(e) => {
-                                    setFormData({ 
-                                        ...formData, 
+                                    setFormData({
+                                        ...formData,
                                         name: e.target.value,
-                                        slug: generateSlug(e.target.value)
+                                        slug: generateSlug(e.target.value),
                                     });
                                 }}
                                 placeholder="e.g., Awesome AI Tools"
                                 className={cn(
-                                    "w-full px-4 py-2 rounded-lg",
-                                    "bg-surface dark:bg-surface-dark",
-                                    "border border-border dark:border-border-dark",
-                                    "text-text dark:text-text-dark",
-                                    "placeholder-text-muted dark:placeholder-text-muted-dark",
-                                    "focus:outline-none focus:border-primary"
+                                    'w-full px-4 py-2 rounded-lg',
+                                    'bg-surface dark:bg-surface-dark',
+                                    'border border-border dark:border-border-dark',
+                                    'text-text dark:text-text-dark',
+                                    'placeholder-text-muted dark:placeholder-text-muted-dark',
+                                    'focus:outline-none focus:border-primary',
                                 )}
                                 required
                             />
@@ -136,17 +139,18 @@ export function DirectoryManualForm({ user }: DirectoryManualFormProps) {
                                 placeholder="awesome-ai-tools"
                                 pattern="[a-z0-9-]+"
                                 className={cn(
-                                    "w-full px-4 py-2 rounded-lg",
-                                    "bg-surface dark:bg-surface-dark",
-                                    "border border-border dark:border-border-dark",
-                                    "text-text dark:text-text-dark",
-                                    "placeholder-text-muted dark:placeholder-text-muted-dark",
-                                    "focus:outline-none focus:border-primary"
+                                    'w-full px-4 py-2 rounded-lg',
+                                    'bg-surface dark:bg-surface-dark',
+                                    'border border-border dark:border-border-dark',
+                                    'text-text dark:text-text-dark',
+                                    'placeholder-text-muted dark:placeholder-text-muted-dark',
+                                    'focus:outline-none focus:border-primary',
                                 )}
                                 required
                             />
                             <p className="text-xs text-text-muted dark:text-text-muted-dark mt-1">
-                                URL-friendly identifier (lowercase letters, numbers, and hyphens only)
+                                URL-friendly identifier (lowercase letters, numbers, and hyphens
+                                only)
                             </p>
                         </div>
 
@@ -157,16 +161,18 @@ export function DirectoryManualForm({ user }: DirectoryManualFormProps) {
                             </label>
                             <textarea
                                 value={formData.description}
-                                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                                onChange={(e) =>
+                                    setFormData({ ...formData, description: e.target.value })
+                                }
                                 placeholder="A curated list of the best AI tools and resources for developers"
                                 rows={3}
                                 className={cn(
-                                    "w-full px-4 py-2 rounded-lg resize-none",
-                                    "bg-surface dark:bg-surface-dark",
-                                    "border border-border dark:border-border-dark",
-                                    "text-text dark:text-text-dark",
-                                    "placeholder-text-muted dark:placeholder-text-muted-dark",
-                                    "focus:outline-none focus:border-primary"
+                                    'w-full px-4 py-2 rounded-lg resize-none',
+                                    'bg-surface dark:bg-surface-dark',
+                                    'border border-border dark:border-border-dark',
+                                    'text-text dark:text-text-dark',
+                                    'placeholder-text-muted dark:placeholder-text-muted-dark',
+                                    'focus:outline-none focus:border-primary',
                                 )}
                                 required
                             />
@@ -179,11 +185,11 @@ export function DirectoryManualForm({ user }: DirectoryManualFormProps) {
                     type="button"
                     onClick={() => setShowAdvanced(!showAdvanced)}
                     className={cn(
-                        "w-full p-4 rounded-lg text-left",
-                        "bg-surface dark:bg-surface-dark",
-                        "border border-border dark:border-border-dark",
-                        "hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark",
-                        "transition-colors"
+                        'w-full p-4 rounded-lg text-left',
+                        'bg-surface dark:bg-surface-dark',
+                        'border border-border dark:border-border-dark',
+                        'hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark',
+                        'transition-colors',
                     )}
                 >
                     <div className="flex items-center justify-between">
@@ -195,34 +201,43 @@ export function DirectoryManualForm({ user }: DirectoryManualFormProps) {
                                 Organization, custom headers, and more
                             </p>
                         </div>
-                        <svg 
+                        <svg
                             className={cn(
-                                "w-5 h-5 text-text-secondary dark:text-text-secondary-dark transition-transform",
-                                showAdvanced && "rotate-180"
-                            )} 
-                            fill="none" 
-                            stroke="currentColor" 
+                                'w-5 h-5 text-text-secondary dark:text-text-secondary-dark transition-transform',
+                                showAdvanced && 'rotate-180',
+                            )}
+                            fill="none"
+                            stroke="currentColor"
                             viewBox="0 0 24 24"
                         >
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M19 9l-7 7-7-7"
+                            />
                         </svg>
                     </div>
                 </button>
 
                 {/* Advanced Fields */}
                 {showAdvanced && (
-                    <div className={cn(
-                        "p-6 rounded-lg space-y-4",
-                        "bg-card dark:bg-card-dark",
-                        "border border-card-border dark:border-card-border-dark"
-                    )}>
+                    <div
+                        className={cn(
+                            'p-6 rounded-lg space-y-4',
+                            'bg-card dark:bg-card-dark',
+                            'border border-card-border dark:border-card-border-dark',
+                        )}
+                    >
                         {/* Organization */}
                         <div>
                             <label className="flex items-center gap-3">
                                 <input
                                     type="checkbox"
                                     checked={formData.organization}
-                                    onChange={(e) => setFormData({ ...formData, organization: e.target.checked })}
+                                    onChange={(e) =>
+                                        setFormData({ ...formData, organization: e.target.checked })
+                                    }
                                     className="w-4 h-4 rounded border-border dark:border-border-dark text-primary focus:ring-primary"
                                 />
                                 <div>
@@ -230,7 +245,8 @@ export function DirectoryManualForm({ user }: DirectoryManualFormProps) {
                                         Create under organization
                                     </span>
                                     <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                                        Create this directory under a GitHub organization instead of your personal account
+                                        Create this directory under a GitHub organization instead of
+                                        your personal account
                                     </p>
                                 </div>
                             </label>
@@ -245,15 +261,17 @@ export function DirectoryManualForm({ user }: DirectoryManualFormProps) {
                                 <input
                                     type="text"
                                     value={formData.owner || ''}
-                                    onChange={(e) => setFormData({ ...formData, owner: e.target.value })}
+                                    onChange={(e) =>
+                                        setFormData({ ...formData, owner: e.target.value })
+                                    }
                                     placeholder="my-organization"
                                     className={cn(
-                                        "w-full px-4 py-2 rounded-lg",
-                                        "bg-surface dark:bg-surface-dark",
-                                        "border border-border dark:border-border-dark",
-                                        "text-text dark:text-text-dark",
-                                        "placeholder-text-muted dark:placeholder-text-muted-dark",
-                                        "focus:outline-none focus:border-primary"
+                                        'w-full px-4 py-2 rounded-lg',
+                                        'bg-surface dark:bg-surface-dark',
+                                        'border border-border dark:border-border-dark',
+                                        'text-text dark:text-text-dark',
+                                        'placeholder-text-muted dark:placeholder-text-muted-dark',
+                                        'focus:outline-none focus:border-primary',
                                     )}
                                 />
                             </div>
@@ -266,35 +284,41 @@ export function DirectoryManualForm({ user }: DirectoryManualFormProps) {
                             </label>
                             <textarea
                                 value={formData.readme_config?.header || ''}
-                                onChange={(e) => setFormData({ 
-                                    ...formData, 
-                                    readme_config: { 
-                                        ...formData.readme_config, 
-                                        header: e.target.value 
-                                    }
-                                })}
+                                onChange={(e) =>
+                                    setFormData({
+                                        ...formData,
+                                        readme_config: {
+                                            ...formData.readme_config,
+                                            header: e.target.value,
+                                        },
+                                    })
+                                }
                                 placeholder="Add custom content to the top of your README file"
                                 rows={3}
                                 className={cn(
-                                    "w-full px-4 py-2 rounded-lg resize-none",
-                                    "bg-surface dark:bg-surface-dark",
-                                    "border border-border dark:border-border-dark",
-                                    "text-text dark:text-text-dark",
-                                    "placeholder-text-muted dark:placeholder-text-muted-dark",
-                                    "focus:outline-none focus:border-primary"
+                                    'w-full px-4 py-2 rounded-lg resize-none',
+                                    'bg-surface dark:bg-surface-dark',
+                                    'border border-border dark:border-border-dark',
+                                    'text-text dark:text-text-dark',
+                                    'placeholder-text-muted dark:placeholder-text-muted-dark',
+                                    'focus:outline-none focus:border-primary',
                                 )}
                             />
                             <label className="flex items-center gap-2 mt-2">
                                 <input
                                     type="checkbox"
-                                    checked={formData.readme_config?.overwrite_default_header || false}
-                                    onChange={(e) => setFormData({ 
-                                        ...formData, 
-                                        readme_config: { 
-                                            ...formData.readme_config, 
-                                            overwrite_default_header: e.target.checked 
-                                        }
-                                    })}
+                                    checked={
+                                        formData.readme_config?.overwrite_default_header || false
+                                    }
+                                    onChange={(e) =>
+                                        setFormData({
+                                            ...formData,
+                                            readme_config: {
+                                                ...formData.readme_config,
+                                                overwrite_default_header: e.target.checked,
+                                            },
+                                        })
+                                    }
                                     className="w-4 h-4 rounded border-border dark:border-border-dark text-primary focus:ring-primary"
                                 />
                                 <span className="text-sm text-text-secondary dark:text-text-secondary-dark">
@@ -310,35 +334,41 @@ export function DirectoryManualForm({ user }: DirectoryManualFormProps) {
                             </label>
                             <textarea
                                 value={formData.readme_config?.footer || ''}
-                                onChange={(e) => setFormData({ 
-                                    ...formData, 
-                                    readme_config: { 
-                                        ...formData.readme_config, 
-                                        footer: e.target.value 
-                                    }
-                                })}
+                                onChange={(e) =>
+                                    setFormData({
+                                        ...formData,
+                                        readme_config: {
+                                            ...formData.readme_config,
+                                            footer: e.target.value,
+                                        },
+                                    })
+                                }
                                 placeholder="Add custom content to the bottom of your README file"
                                 rows={3}
                                 className={cn(
-                                    "w-full px-4 py-2 rounded-lg resize-none",
-                                    "bg-surface dark:bg-surface-dark",
-                                    "border border-border dark:border-border-dark",
-                                    "text-text dark:text-text-dark",
-                                    "placeholder-text-muted dark:placeholder-text-muted-dark",
-                                    "focus:outline-none focus:border-primary"
+                                    'w-full px-4 py-2 rounded-lg resize-none',
+                                    'bg-surface dark:bg-surface-dark',
+                                    'border border-border dark:border-border-dark',
+                                    'text-text dark:text-text-dark',
+                                    'placeholder-text-muted dark:placeholder-text-muted-dark',
+                                    'focus:outline-none focus:border-primary',
                                 )}
                             />
                             <label className="flex items-center gap-2 mt-2">
                                 <input
                                     type="checkbox"
-                                    checked={formData.readme_config?.overwrite_default_footer || false}
-                                    onChange={(e) => setFormData({ 
-                                        ...formData, 
-                                        readme_config: { 
-                                            ...formData.readme_config, 
-                                            overwrite_default_footer: e.target.checked 
-                                        }
-                                    })}
+                                    checked={
+                                        formData.readme_config?.overwrite_default_footer || false
+                                    }
+                                    onChange={(e) =>
+                                        setFormData({
+                                            ...formData,
+                                            readme_config: {
+                                                ...formData.readme_config,
+                                                overwrite_default_footer: e.target.checked,
+                                            },
+                                        })
+                                    }
                                     className="w-4 h-4 rounded border-border dark:border-border-dark text-primary focus:ring-primary"
                                 />
                                 <span className="text-sm text-text-secondary dark:text-text-secondary-dark">
@@ -355,10 +385,10 @@ export function DirectoryManualForm({ user }: DirectoryManualFormProps) {
                         type="submit"
                         disabled={isPending}
                         className={cn(
-                            "flex-1 py-3 rounded-lg font-medium transition-colors",
-                            "bg-primary hover:bg-primary-hover text-white",
-                            "disabled:opacity-50 disabled:cursor-not-allowed",
-                            "flex items-center justify-center gap-2"
+                            'flex-1 py-3 rounded-lg font-medium transition-colors',
+                            'bg-primary hover:bg-primary-hover text-white',
+                            'disabled:opacity-50 disabled:cursor-not-allowed',
+                            'flex items-center justify-center gap-2',
                         )}
                     >
                         {isPending ? (
@@ -368,8 +398,18 @@ export function DirectoryManualForm({ user }: DirectoryManualFormProps) {
                             </>
                         ) : (
                             <>
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                <svg
+                                    className="w-5 h-5"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M12 4v16m8-8H4"
+                                    />
                                 </svg>
                                 Create Directory
                             </>
@@ -380,12 +420,12 @@ export function DirectoryManualForm({ user }: DirectoryManualFormProps) {
                         onClick={() => router.back()}
                         disabled={isPending}
                         className={cn(
-                            "px-6 py-3 rounded-lg font-medium transition-colors",
-                            "bg-surface dark:bg-surface-dark",
-                            "border border-border dark:border-border-dark",
-                            "text-text dark:text-text-dark",
-                            "hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark",
-                            "disabled:opacity-50 disabled:cursor-not-allowed"
+                            'px-6 py-3 rounded-lg font-medium transition-colors',
+                            'bg-surface dark:bg-surface-dark',
+                            'border border-border dark:border-border-dark',
+                            'text-text dark:text-text-dark',
+                            'hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark',
+                            'disabled:opacity-50 disabled:cursor-not-allowed',
                         )}
                     >
                         Cancel

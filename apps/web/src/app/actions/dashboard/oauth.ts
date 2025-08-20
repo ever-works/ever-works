@@ -3,6 +3,7 @@
 import { authAPI } from '@/lib/api';
 import { setOAuthStateCookie } from '@/lib/auth';
 import { withAppUrl } from '@/lib/constants';
+import { generateHexToken } from '@/lib/utils/random';
 
 export async function checkGitHubConnection() {
     try {
@@ -25,10 +26,7 @@ export async function checkGitHubConnection() {
 export async function connectGitHub(returnPath?: string) {
     try {
         // Generate state for OAuth
-        const crypto = globalThis.crypto || require('crypto').webcrypto;
-        const bytes = crypto.getRandomValues(new Uint8Array(8));
-        const state = Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
-
+        const state = generateHexToken(16);
         await setOAuthStateCookie(state);
 
         // Set callback URL with return path

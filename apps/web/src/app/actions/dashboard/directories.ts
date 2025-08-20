@@ -1,10 +1,9 @@
 'use server';
 
 import { z } from 'zod';
-import { directoryAPI, CreateDirectoryDto, RepoProvider } from '@/lib/api';
-import { getAuthUser } from '@/lib/auth';
+import { directoryAPI, CreateDirectoryDto } from '@/lib/api';
 import { checkGitHubConnection } from './oauth';
-import { getTranslations } from 'next-intl/server';
+import { RepoProvider } from '@/lib/api/enums';
 
 // Validation schemas
 const readmeConfigSchema = z.object({

@@ -1,10 +1,6 @@
 import 'server-only';
 import { serverFetch, serverMutation } from './server-api';
-
-// DTOs
-export enum RepoProvider {
-    GITHUB = 'github',
-}
+import { RepoProvider } from './enums';
 
 export interface MarkdownReadmeConfig {
     header?: string;

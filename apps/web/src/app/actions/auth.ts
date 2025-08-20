@@ -4,7 +4,7 @@ import { z } from 'zod';
 import {
     removeAuthAccessCookies,
     getRefreshCookie,
-    setOAuthState,
+    setOAuthStateCookie,
     setAuthCookies,
 } from '@/lib/auth';
 import { ROUTES, routeWithParams, withAppUrl } from '@/lib/constants';
@@ -14,6 +14,7 @@ import { redirect } from '@/i18n/navigation';
 import { getLocale, getTranslations } from 'next-intl/server';
 import { isValidRedirectUrl } from '@/lib/utils';
 import { getRedirectUrl } from '@/lib/auth/redirect';
+import { generateHexToken } from '@/lib/utils/random';
 
 export async function login(identifier: string, password: string, redirectUrl: string | null) {
     const t = await getTranslations('validation.auth');
@@ -166,13 +167,6 @@ export async function logout() {
 // =================
 
 const crypto = globalThis.crypto || require('crypto').webcrypto;
-
-function generateHexToken(length = 16) {
-    const bytes = crypto.getRandomValues(new Uint8Array(Math.ceil(length / 2)));
-    return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0'))
-        .join('')
-        .substring(0, length);
-}
 
 export async function connectProvider(provider: 'github' | 'google') {
     try {
