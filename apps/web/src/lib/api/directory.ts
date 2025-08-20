@@ -24,7 +24,7 @@ export interface DeleteDirectoryDto {
 }
 
 // Response Types
-export interface DirectoryResponse {
+export interface Directory {
     id: string;
     slug: string;
     name: string;
@@ -38,7 +38,7 @@ export interface DirectoryResponse {
 }
 
 export interface DirectoriesResponse {
-    directories: DirectoryResponse[];
+    directories: Directory[];
     total: number;
     limit?: number;
     offset?: number;
@@ -63,7 +63,7 @@ export const directoryAPI = {
 
     // Create a new directory
     create: async (data: CreateDirectoryDto) => {
-        return serverMutation<DirectoryResponse>({
+        return serverMutation<Directory>({
             endpoint: '/directories',
             data,
             method: 'POST',

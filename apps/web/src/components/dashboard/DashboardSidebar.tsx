@@ -29,7 +29,7 @@ export function DashboardSidebar({ user, isOpen, onToggle }: DashboardSidebarPro
     const navigation = [
         { name: 'Dashboard', href: ROUTES.DASHBOARD, icon: HomeIcon },
         { name: 'Directories', href: ROUTES.DASHBOARD_DIRECTORIES, icon: FolderIcon },
-        { name: 'Analytics', href: ROUTES.DASHBOARD_ANALYTICS, icon: ChartIcon },
+        // { name: 'Analytics', href: ROUTES.DASHBOARD_ANALYTICS, icon: ChartIcon },
         { name: 'Settings', href: ROUTES.DASHBOARD_SETTINGS, icon: SettingsIcon },
     ];
 
@@ -79,14 +79,14 @@ export function DashboardSidebar({ user, isOpen, onToggle }: DashboardSidebarPro
                 </div>
 
                 <div className="px-6 py-3">
-                    <div className="flex bg-surface dark:bg-surface-dark rounded-lg p-1">
+                    <div className="flex bg-surface-tertiary/50 dark:bg-surface-dark rounded-lg p-1">
                         <button
                             onClick={() => setActiveMode('menu')}
                             className={cn(
-                                'flex-1 py-2 text-center text-sm font-medium transition-colors rounded-md',
+                                'flex-1 py-2 text-center text-sm font-medium transition-all rounded-md',
                                 activeMode === 'menu'
-                                    ? 'bg-surface-tertiary dark:bg-surface-tertiary-dark text-text dark:text-text-dark'
-                                    : 'text-text-muted dark:text-text-muted-dark hover:text-text dark:hover:text-text-dark',
+                                    ? 'bg-white dark:bg-surface-tertiary-dark text-text dark:text-text-dark shadow-sm'
+                                    : 'text-text-secondary dark:text-text-muted-dark hover:text-text dark:hover:text-text-dark',
                             )}
                         >
                             Menu
@@ -94,10 +94,10 @@ export function DashboardSidebar({ user, isOpen, onToggle }: DashboardSidebarPro
                         <button
                             onClick={() => setActiveMode('chat')}
                             className={cn(
-                                'flex-1 py-2 text-center text-sm font-medium transition-colors rounded-md',
+                                'flex-1 py-2 text-center text-sm font-medium transition-all rounded-md',
                                 activeMode === 'chat'
-                                    ? 'bg-surface-tertiary dark:bg-surface-tertiary-dark text-text dark:text-text-dark'
-                                    : 'text-text-muted dark:text-text-muted-dark hover:text-text dark:hover:text-text-dark',
+                                    ? 'bg-white dark:bg-surface-tertiary-dark text-text dark:text-text-dark shadow-sm'
+                                    : 'text-text-secondary dark:text-text-muted-dark hover:text-text dark:hover:text-text-dark',
                             )}
                         >
                             AI Chat

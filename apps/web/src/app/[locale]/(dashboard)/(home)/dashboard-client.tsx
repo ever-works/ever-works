@@ -10,7 +10,7 @@ import { ROUTES } from '@/lib/constants';
 import { useRouter } from '@/i18n/navigation';
 
 export default function DashboardClient({ user }: { user: AuthUser }) {
-    const [hasDirectories, setHasDirectories] = useState(false);
+    const [hasDirectories, setHasDirectories] = useState(true);
     const router = useRouter();
 
     return (
