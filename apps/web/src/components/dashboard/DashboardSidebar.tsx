@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import Image from 'next/image';
 import { AuthUser } from '@/lib/auth';
 import { logout } from '@/app/actions/auth';
 import { cn } from '@/lib/utils/cn';
@@ -18,6 +19,7 @@ export function DashboardSidebar({ user, isOpen, onToggle }: DashboardSidebarPro
     const pathname = usePathname();
     const [activeMode, setActiveMode] = useState<'menu' | 'chat'>('menu');
     const [isPending, startTransition] = useTransition();
+    const [avatarError, setAvatarError] = useState(false);
 
     const handleLogout = async () => {
         startTransition(async () => {
@@ -170,15 +172,18 @@ export function DashboardSidebar({ user, isOpen, onToggle }: DashboardSidebarPro
                             <div className="flex items-center gap-3 mb-4">
                                 <div
                                     className={cn(
-                                        'w-10 h-10 rounded-full flex items-center justify-center',
+                                        'relative w-10 h-10 rounded-full flex items-center justify-center overflow-hidden',
                                         'bg-surface-tertiary dark:bg-surface-tertiary-dark',
                                     )}
                                 >
-                                    {user.avatar ? (
-                                        <img
+                                    {user.avatar && !avatarError ? (
+                                        <Image
                                             src={user.avatar}
                                             alt={user.username}
-                                            className="w-full h-full rounded-full"
+                                            fill
+                                            className="object-cover"
+                                            onError={() => setAvatarError(true)}
+                                            sizes="40px"
                                         />
                                     ) : (
                                         <span className="text-sm font-medium text-text dark:text-text-dark">
@@ -251,32 +256,6 @@ function FolderIcon({ className }: { className?: string }) {
                 strokeLinejoin="round"
                 strokeWidth={2}
                 d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
-            />
-        </svg>
-    );
-}
-
-function ChartIcon({ className }: { className?: string }) {
-    return (
-        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-            />
-        </svg>
-    );
-}
-
-function KeyIcon({ className }: { className?: string }) {
-    return (
-        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"
             />
         </svg>
     );
