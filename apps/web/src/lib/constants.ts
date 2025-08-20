@@ -1,3 +1,5 @@
+export const APP_NAME = 'Ever Works';
+
 // i18n
 export const LOCALES = ['en', 'de'] as const;
 

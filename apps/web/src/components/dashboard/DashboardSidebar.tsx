@@ -4,10 +4,10 @@ import { useState, useTransition } from 'react';
 import { AuthUser } from '@/lib/auth';
 import { logout } from '@/app/actions/auth';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils/cn';
 import { ChatInterface } from '@/components/ai/ChatInterface';
-import { ROUTES } from '@/lib/constants';
+import { APP_NAME, ROUTES } from '@/lib/constants';
+import { usePathname } from '@/i18n/navigation';
 
 interface DashboardSidebarProps {
     user: AuthUser;
@@ -46,16 +46,12 @@ export function DashboardSidebar({ user, isOpen, onToggle }: DashboardSidebarPro
             )}
         >
             <div className="flex flex-col h-full">
-                <div
-                    className={cn(
-                        'h-16 flex items-center px-6',
-                        'border-b border-border dark:border-border-dark',
-                    )}
-                >
+                <div className={cn('h-16 flex items-center px-6')}>
                     <div className="flex items-center justify-between w-full">
                         <h1 className="text-xl font-semibold text-text dark:text-text-dark">
-                            Ever Works
+                            {APP_NAME}
                         </h1>
+
                         <button
                             onClick={onToggle}
                             className={cn(

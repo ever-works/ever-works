@@ -6,8 +6,8 @@ import { DirectoryList } from '@/components/directories/DirectoryList';
 import { StatsOverview } from '@/components/dashboard/StatsOverview';
 import { RecentActivity } from '@/components/dashboard/RecentActivity';
 import { EmptyState } from '@/components/common/EmptyState';
-import { useRouter } from 'next/navigation';
 import { ROUTES } from '@/lib/constants';
+import { useRouter } from '@/i18n/navigation';
 
 export default function DashboardClient({ user }: { user: AuthUser }) {
     const [hasDirectories, setHasDirectories] = useState(false);
@@ -29,16 +29,18 @@ export default function DashboardClient({ user }: { user: AuthUser }) {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8">
                 <div className="lg:col-span-2">
                     {hasDirectories ? (
-                        <DirectoryList onUpdate={(directories) => setHasDirectories(directories.length > 0)} />
+                        <DirectoryList
+                            onUpdate={(directories) => setHasDirectories(directories.length > 0)}
+                        />
                     ) : (
                         <EmptyState
                             title="No directories yet"
                             description="Create your first AI-powered directory to start organizing and showcasing your content."
                             action={{
-                                label: "Create Your First Directory",
+                                label: 'Create Your First Directory',
                                 onClick: () => {
                                     router.push(ROUTES.DASHBOARD_DIRECTORIES_NEW);
-                                }
+                                },
                             }}
                         />
                     )}

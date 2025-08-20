@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { AuthUser } from '@/lib/auth';
-import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils/cn';
 import { DirectoryAICreator } from '@/components/directories/DirectoryAICreator';
 import { DirectoryManualForm } from '@/components/directories/DirectoryManualForm';
@@ -20,11 +19,10 @@ export default function NewDirectoryClient({
 }: NewDirectoryClientProps) {
     const [creationMode, setCreationMode] = useState<'ai' | 'manual' | null>(null);
     const [githubConnected] = useState(initialGithubConnected);
-    const router = useRouter();
 
     if (creationMode === null) {
         return (
-            <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
                 {/* GitHub Connection Alert */}
                 <GitHubConnectionAlert githubConnected={githubConnected} />
 

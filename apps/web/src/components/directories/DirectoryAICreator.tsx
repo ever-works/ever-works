@@ -3,10 +3,10 @@
 import { useState, useTransition } from 'react';
 import { AuthUser } from '@/lib/auth';
 import { cn } from '@/lib/utils/cn';
-import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { createDirectoryWithAI } from '@/app/actions/dashboard';
 import { ROUTES } from '@/lib/constants';
+import { useRouter } from '@/i18n/navigation';
 
 interface DirectoryAICreatorProps {
     user: AuthUser;
