@@ -3,11 +3,10 @@
 import { useState, useTransition } from 'react';
 import { AuthUser } from '@/lib/auth';
 import { logout } from '@/app/actions/auth';
-import Link from 'next/link';
 import { cn } from '@/lib/utils/cn';
 import { ChatInterface } from '@/components/ai/ChatInterface';
 import { APP_NAME, ROUTES } from '@/lib/constants';
-import { usePathname } from '@/i18n/navigation';
+import { Link, usePathname } from '@/i18n/navigation';
 
 interface DashboardSidebarProps {
     user: AuthUser;

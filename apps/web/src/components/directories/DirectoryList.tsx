@@ -1,50 +1,41 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { Directory } from '@/lib/api/directory';
+import type { Directory } from '@/lib/api/directory';
 import { cn } from '@/lib/utils/cn';
+import { getDirectories } from '@/app/actions/dashboard/directories';
+import { Link } from '@/i18n/navigation';
+import { ROUTES } from '@/lib/constants';
 
 interface DirectoryListProps {
+    initialDirectories?: Directory[];
+    showLimit?: number;
     onUpdate?: (directories: Directory[]) => void;
 }
 
-export function DirectoryList({ onUpdate }: DirectoryListProps) {
-    const [directories, setDirectories] = useState<Directory[]>([]);
-    const [loading, setLoading] = useState(true);
+export function DirectoryList({
+    initialDirectories = [],
+    showLimit,
+    onUpdate,
+}: DirectoryListProps) {
+    const [directories, setDirectories] = useState<Directory[]>(initialDirectories);
+    const [loading, setLoading] = useState(false);
 
     useEffect(() => {
-        fetchDirectories();
+        // If no initial directories provided, fetch them
+        if (initialDirectories.length === 0 && !loading) {
+            fetchDirectories();
+        }
     }, []);
 
     const fetchDirectories = async () => {
+        setLoading(true);
         try {
-            // TODO: Replace with actual API call using directoryAPI.getAll()
-            // For now, using mock data
-            const mockDirectories: Directory[] = [
-                {
-                    id: '1',
-                    slug: 'awesome-ai-tools',
-                    name: 'Awesome AI Tools',
-                    description: 'A curated list of the best AI tools and resources',
-                    organization: false,
-                    repo_provider: 'github' as any,
-                    created_at: new Date().toISOString(),
-                    updated_at: new Date().toISOString(),
-                },
-                {
-                    id: '2',
-                    slug: 'tech-startups',
-                    name: 'Tech Startups Directory',
-                    description: 'Directory of innovative tech startups worldwide',
-                    organization: false,
-                    repo_provider: 'github' as any,
-                    created_at: new Date(Date.now() - 86400000).toISOString(),
-                    updated_at: new Date(Date.now() - 86400000).toISOString(),
-                },
-            ];
-            setDirectories(mockDirectories);
-            onUpdate?.(mockDirectories);
+            const response = await getDirectories({ limit: showLimit || 10 });
+            if (response.success) {
+                setDirectories(response.directories);
+                onUpdate?.(response.directories);
+            }
         } catch (error) {
             console.error('Failed to fetch directories:', error);
         } finally {
@@ -52,29 +43,34 @@ export function DirectoryList({ onUpdate }: DirectoryListProps) {
         }
     };
 
-    if (loading) {
+    if (loading && directories.length === 0) {
         return <DirectoryListSkeleton />;
     }
 
+    const displayDirectories = showLimit ? directories.slice(0, showLimit) : directories;
+
     return (
         <div>
-            <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-semibold text-text dark:text-text-dark">
-                    Your Directories
-                </h2>
-                <Link
-                    href="/dashboard/directories/new"
-                    className={cn(
-                        'px-4 py-2 rounded-lg font-medium transition-colors',
-                        'bg-primary hover:bg-primary-hover text-white',
-                    )}
-                >
-                    Create Directory
-                </Link>
-            </div>
+            {!showLimit && (
+                <div className="flex justify-between items-center mb-6">
+                    <h2 className="text-xl font-semibold text-text dark:text-text-dark">
+                        Your Directories
+                    </h2>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {directories.map((directory) => (
+                    <Link
+                        href={ROUTES.DASHBOARD_DIRECTORIES_NEW}
+                        className={cn(
+                            'px-4 py-2 rounded-lg font-medium transition-colors',
+                            'bg-primary hover:bg-primary-hover text-white',
+                        )}
+                    >
+                        Create Directory
+                    </Link>
+                </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {displayDirectories.map((directory) => (
                     <DirectoryCard key={directory.id} directory={directory} />
                 ))}
             </div>
@@ -195,8 +191,9 @@ function DirectoryCard({ directory }: { directory: Directory }) {
                         1.2k views
                     </span>
                 </div>
+
                 <Link
-                    href={`/dashboard/directories/${directory.id}`}
+                    href={ROUTES.DASHBOARD_DIRECTORY(directory.id)}
                     className={cn('text-sm font-medium', 'text-primary hover:text-primary-hover')}
                 >
                     View Details →

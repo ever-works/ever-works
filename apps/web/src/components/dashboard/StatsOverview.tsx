@@ -10,23 +10,27 @@ interface Stats {
     activeWebsites: number;
 }
 
-export function StatsOverview() {
+interface StatsOverviewProps {
+    totalDirectories?: number;
+}
+
+export function StatsOverview({ totalDirectories = 0 }: StatsOverviewProps) {
     const [stats, setStats] = useState<Stats>({
-        totalDirectories: 0,
+        totalDirectories: totalDirectories,
         totalItems: 0,
         apiCalls: 0,
         activeWebsites: 0,
     });
 
     useEffect(() => {
-        // TODO: Fetch actual stats from API
+        // TODO: Fetch other stats from API
         setStats({
-            totalDirectories: 3,
-            totalItems: 156,
-            apiCalls: 1247,
-            activeWebsites: 2,
+            totalDirectories: totalDirectories,
+            totalItems: 0,
+            apiCalls: 0,
+            activeWebsites: 0,
         });
-    }, []);
+    }, [totalDirectories]);
 
     const statCards: Array<{
         title: string;

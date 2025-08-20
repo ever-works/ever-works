@@ -1,17 +1,27 @@
 'use client';
 
 import { AuthUser } from '@/lib/auth';
-import { useState } from 'react';
 import { DirectoryList } from '@/components/directories/DirectoryList';
 import { StatsOverview } from '@/components/dashboard/StatsOverview';
 import { RecentActivity } from '@/components/dashboard/RecentActivity';
 import { EmptyState } from '@/components/common/EmptyState';
 import { ROUTES } from '@/lib/constants';
-import { useRouter } from '@/i18n/navigation';
+import { Link, useRouter } from '@/i18n/navigation';
+import type { Directory } from '@/lib/api';
 
-export default function DashboardClient({ user }: { user: AuthUser }) {
-    const [hasDirectories, setHasDirectories] = useState(true);
+interface DashboardClientProps {
+    user: AuthUser;
+    initialDirectories: Directory[];
+    totalDirectories: number;
+}
+
+export default function DashboardClient({
+    user,
+    initialDirectories,
+    totalDirectories,
+}: DashboardClientProps) {
     const router = useRouter();
+    const hasDirectories = initialDirectories.length > 0;
 
     return (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
@@ -24,14 +34,27 @@ export default function DashboardClient({ user }: { user: AuthUser }) {
                 </p>
             </div>
 
-            <StatsOverview />
+            <StatsOverview totalDirectories={totalDirectories} />
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8">
                 <div className="lg:col-span-2">
                     {hasDirectories ? (
-                        <DirectoryList
-                            onUpdate={(directories) => setHasDirectories(directories.length > 0)}
-                        />
+                        <>
+                            <div className="flex justify-between items-center mb-4">
+                                <h2 className="text-xl font-semibold text-text dark:text-text-dark">
+                                    Recent Directories
+                                </h2>
+                                {totalDirectories > 5 && (
+                                    <Link
+                                        href={ROUTES.DASHBOARD_DIRECTORIES}
+                                        className="text-sm text-primary hover:text-primary-hover transition-colors"
+                                    >
+                                        View all ({totalDirectories})
+                                    </Link>
+                                )}
+                            </div>
+                            <DirectoryList initialDirectories={initialDirectories} showLimit={5} />
+                        </>
                     ) : (
                         <EmptyState
                             title="No directories yet"
