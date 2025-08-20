@@ -4,7 +4,7 @@ import NewDirectoryClient from './new-directory-client';
 
 export default async function NewDirectoryPage() {
     const user = await getAuthUser();
-    
+
     // Check GitHub connection on the server
     let githubConnected = false;
     try {

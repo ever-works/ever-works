@@ -1,7 +1,7 @@
 'use server';
 
 import { authAPI } from '@/lib/api';
-import { setOAuthState } from '@/lib/auth';
+import { setOAuthStateCookie } from '@/lib/auth';
 import { withAppUrl } from '@/lib/constants';
 
 export async function checkGitHubConnection() {
@@ -28,16 +28,20 @@ export async function connectGitHub(returnPath?: string) {
         const crypto = globalThis.crypto || require('crypto').webcrypto;
         const bytes = crypto.getRandomValues(new Uint8Array(8));
         const state = Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
-        
-        await setOAuthState(state);
+
+        await setOAuthStateCookie(state);
 
         // Set callback URL with return path
         const callbackUrl = withAppUrl(
-            `/auth/github/callback${returnPath ? `?returnPath=${encodeURIComponent(returnPath)}` : ''}`
+            `/auth/github/callback${returnPath ? `?returnPath=${encodeURIComponent(returnPath)}` : ''}`,
         );
 
-        const response = await authAPI.oauth_connections.getConnectUrl('github', callbackUrl, state);
-        
+        const response = await authAPI.oauth_connections.getConnectUrl(
+            'github',
+            callbackUrl,
+            state,
+        );
+
         return {
             success: true,
             url: response.url,

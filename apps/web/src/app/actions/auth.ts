@@ -177,7 +177,7 @@ function generateHexToken(length = 16) {
 export async function connectProvider(provider: 'github' | 'google') {
     try {
         const state = generateHexToken(16);
-        await setOAuthState(state);
+        await setOAuthStateCookie(state);
 
         const callbackUrl = routeWithParams(ROUTES.API_AUTH_CALLBACK, { provider });
 

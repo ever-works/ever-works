@@ -1,8 +1,7 @@
 'use server';
 
 import { z } from 'zod';
-import { directoryAPI } from '@/lib/api';
-import { CreateDirectoryDto, RepoProvider } from '@/lib/api/directory';
+import { directoryAPI, CreateDirectoryDto, RepoProvider } from '@/lib/api';
 import { getAuthUser } from '@/lib/auth';
 import { checkGitHubConnection } from './oauth';
 import { getTranslations } from 'next-intl/server';
@@ -44,15 +43,6 @@ export async function createDirectory(data: CreateDirectoryDto) {
             return {
                 success: false,
                 error: validation.error.errors[0].message,
-            };
-        }
-
-        // Check if user is authenticated
-        const user = await getAuthUser();
-        if (!user) {
-            return {
-                success: false,
-                error: 'You must be logged in to create a directory',
             };
         }
 
@@ -106,15 +96,6 @@ export async function createDirectoryWithAI(prompt: string, name?: string) {
             return {
                 success: false,
                 error: validation.error.errors[0].message,
-            };
-        }
-
-        // Check if user is authenticated
-        const user = await getAuthUser();
-        if (!user) {
-            return {
-                success: false,
-                error: 'You must be logged in to create a directory',
             };
         }
 
@@ -190,15 +171,6 @@ export async function deleteDirectory(id: string) {
             };
         }
 
-        // Check if user is authenticated
-        const user = await getAuthUser();
-        if (!user) {
-            return {
-                success: false,
-                error: 'You must be logged in to delete a directory',
-            };
-        }
-
         const result = await directoryAPI.delete(validation.data.id, { confirmation: true });
 
         return {
@@ -235,17 +207,6 @@ export async function getDirectories(options?: {
                 directories: [],
                 total: 0,
                 error: validation.error.errors[0].message,
-            };
-        }
-
-        // Check if user is authenticated
-        const user = await getAuthUser();
-        if (!user) {
-            return {
-                success: false,
-                directories: [],
-                total: 0,
-                error: 'You must be logged in to view directories',
             };
         }
 

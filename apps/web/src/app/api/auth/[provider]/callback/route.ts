@@ -1,6 +1,6 @@
 import { redirect } from '@/i18n/navigation';
 import { authAPI, AuthResponse } from '@/lib/api';
-import { getOAuthState, setAuthCookies } from '@/lib/auth';
+import { getOAuthStateCookie, setAuthCookies } from '@/lib/auth';
 import { getRedirectUrl } from '@/lib/auth/redirect';
 import { ROUTES } from '@/lib/constants';
 import { getLocale } from 'next-intl/server';
@@ -28,7 +28,7 @@ export async function GET(
         });
     }
 
-    const storedState = await getOAuthState();
+    const storedState = await getOAuthStateCookie();
     if (state !== storedState) {
         return redirect({
             locale,
