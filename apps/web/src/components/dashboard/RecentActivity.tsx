@@ -11,62 +11,57 @@ interface Activity {
     timestamp: Date;
 }
 
+const activities: Activity[] = [
+    {
+        id: '1',
+        type: 'directory_created',
+        title: 'New Directory Created',
+        description: 'Created "Awesome AI Tools" directory',
+        timestamp: new Date(Date.now() - 1000 * 60 * 30),
+    },
+    {
+        id: '2',
+        type: 'item_added',
+        title: 'Item Added',
+        description: 'Added 5 new items to "Tech Startups"',
+        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2),
+    },
+    {
+        id: '3',
+        type: 'website_deployed',
+        title: 'Website Deployed',
+        description: 'Deployed "awesome-tools.vercel.app"',
+        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 5),
+    },
+];
+
+const getActivityIcon = (type: Activity['type']) => {
+    switch (type) {
+        case 'directory_created':
+            return <FolderPlusIcon className="w-5 h-5 text-primary" />;
+        case 'item_added':
+            return <PlusCircleIcon className="w-5 h-5 text-success" />;
+        case 'website_deployed':
+            return <GlobeIcon className="w-5 h-5 text-info" />;
+        case 'api_key_created':
+            return <KeyIcon className="w-5 h-5 text-warning" />;
+    }
+};
+
+const formatTime = (date: Date) => {
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+
+    if (days > 0) return `${days} day${days > 1 ? 's' : ''} ago`;
+    if (hours > 0) return `${hours} hour${hours > 1 ? 's' : ''} ago`;
+    if (minutes > 0) return `${minutes} minute${minutes > 1 ? 's' : ''} ago`;
+    return 'Just now';
+};
+
 export function RecentActivity() {
-    const [activities, setActivities] = useState<Activity[]>([]);
-
-    useEffect(() => {
-        // TODO: Fetch actual activities from API
-        setActivities([
-            {
-                id: '1',
-                type: 'directory_created',
-                title: 'New Directory Created',
-                description: 'Created "Awesome AI Tools" directory',
-                timestamp: new Date(Date.now() - 1000 * 60 * 30),
-            },
-            {
-                id: '2',
-                type: 'item_added',
-                title: 'Item Added',
-                description: 'Added 5 new items to "Tech Startups"',
-                timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2),
-            },
-            {
-                id: '3',
-                type: 'website_deployed',
-                title: 'Website Deployed',
-                description: 'Deployed "awesome-tools.vercel.app"',
-                timestamp: new Date(Date.now() - 1000 * 60 * 60 * 5),
-            },
-        ]);
-    }, []);
-
-    const getActivityIcon = (type: Activity['type']) => {
-        switch (type) {
-            case 'directory_created':
-                return <FolderPlusIcon className="w-5 h-5 text-primary" />;
-            case 'item_added':
-                return <PlusCircleIcon className="w-5 h-5 text-success" />;
-            case 'website_deployed':
-                return <GlobeIcon className="w-5 h-5 text-info" />;
-            case 'api_key_created':
-                return <KeyIcon className="w-5 h-5 text-warning" />;
-        }
-    };
-
-    const formatTime = (date: Date) => {
-        const now = new Date();
-        const diff = now.getTime() - date.getTime();
-        const minutes = Math.floor(diff / 60000);
-        const hours = Math.floor(minutes / 60);
-        const days = Math.floor(hours / 24);
-
-        if (days > 0) return `${days} day${days > 1 ? 's' : ''} ago`;
-        if (hours > 0) return `${hours} hour${hours > 1 ? 's' : ''} ago`;
-        if (minutes > 0) return `${minutes} minute${minutes > 1 ? 's' : ''} ago`;
-        return 'Just now';
-    };
-
     return (
         <div
             className={cn(
