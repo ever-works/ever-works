@@ -34,7 +34,7 @@ export async function login(identifier: string, password: string, redirectUrl: s
     }
 
     let authResponse: AuthResponse | null = null;
-    let href: string = ROUTES.HOME;
+    let href: string = ROUTES.DASHBOARD;
 
     try {
         authResponse = await authAPI.login({
@@ -130,7 +130,7 @@ export async function register(username: string, email: string, password: string
 
     redirect({
         locale: await getLocale(),
-        href: ROUTES.HOME + '?newUser=true',
+        href: ROUTES.DASHBOARD + '?newUser=true',
     });
 
     return {

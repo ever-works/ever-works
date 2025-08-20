@@ -36,7 +36,7 @@ export async function GET(
         });
     }
 
-    let href: string = ROUTES.HOME;
+    let href: string = ROUTES.DASHBOARD;
     let authResponse: AuthResponse | null = null;
 
     try {

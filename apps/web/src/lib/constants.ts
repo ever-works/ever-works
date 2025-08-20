@@ -23,17 +23,25 @@ export const REDIRECT_SEARCH_PARAM = 'redirect_uri';
 
 // ROUTES
 export const ROUTES = {
-    HOME: '/',
-    DIRECTORIES: '/directories',
-    DIRECTORY: (slug: string) => `/directories/${slug}`,
+    // Dashboard routes (these are under (dashboard) route group)
+    DASHBOARD: '/',
+    DASHBOARD_DIRECTORIES: '/directories',
+    DASHBOARD_DIRECTORIES_NEW: '/directories/new',
+    DASHBOARD_DIRECTORY: (id: string) => `/directories/${id}`,
+    DASHBOARD_SETTINGS: '/settings',
+    DASHBOARD_PROFILE: '/profile',
+    DASHBOARD_ANALYTICS: '/analytics',
+    DASHBOARD_NOTIFICATIONS: '/notifications',
 
+    // Auth routes (these are under (auth) route group)
     AUTH_LOGIN: '/login',
     AUTH_REGISTER: '/register',
     AUTH_ERROR: '/auth/error',
     AUTH_EMAIL_CONFIRMATION: '/email-confirmation',
     AUTH_RESET_PASSWORD: '/reset-password',
     AUTH_FORGOT_PASSWORD: '/forgot-password',
-    // NEXTJS API ROUTES
+
+    // API routes
     API_AUTH_CALLBACK: '/api/auth/:provider/callback',
     API_AUTH_VERIFY_EMAIL: '/api/auth/verify-email',
     API_AUTH_RESET_PASSWORD: '/api/auth/reset-password',
@@ -63,5 +71,3 @@ export const PUBLIC_ROUTES = [
     '/terms',
     '/help',
 ] as const;
-
-export const PROTECTED_ROUTES = [ROUTES.HOME, ROUTES.DIRECTORIES] as const;

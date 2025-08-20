@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
         });
     }
 
-    let href = ROUTES.HOME + '?verified=true';
+    let href = ROUTES.DASHBOARD + '?verified=true';
     let authResponse: AuthResponse | null = null;
 
     try {
