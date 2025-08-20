@@ -4,9 +4,10 @@ import { useState } from 'react';
 import { AuthUser } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils/cn';
-import { GitHubConnectCard } from '@/components/directories/GitHubConnectCard';
 import { DirectoryAICreator } from '@/components/directories/DirectoryAICreator';
 import { DirectoryManualForm } from '@/components/directories/DirectoryManualForm';
+import { GitHubConnectionAlert } from './github-connection-alert';
+import { GitHubStatusSidebar } from './github-status-sidebar';
 
 interface NewDirectoryClientProps {
     user: AuthUser;
@@ -18,20 +19,15 @@ export default function NewDirectoryClient({
     githubConnected: initialGithubConnected,
 }: NewDirectoryClientProps) {
     const [creationMode, setCreationMode] = useState<'ai' | 'manual' | null>(null);
-    const [githubConnected, setGithubConnected] = useState(initialGithubConnected);
+    const [githubConnected] = useState(initialGithubConnected);
     const router = useRouter();
-
-    if (!githubConnected) {
-        return (
-            <div className="max-w-4xl mx-auto px-4 py-8">
-                <GitHubConnectCard />
-            </div>
-        );
-    }
 
     if (creationMode === null) {
         return (
-            <div className="max-w-4xl mx-auto px-4 py-8">
+            <div className="max-w-5xl mx-auto px-4 py-8">
+                {/* GitHub Connection Alert */}
+                <GitHubConnectionAlert githubConnected={githubConnected} />
+
                 <div className="mb-8">
                     <button
                         onClick={() => router.back()}
@@ -181,29 +177,40 @@ export default function NewDirectoryClient({
     }
 
     return (
-        <div className="max-w-4xl mx-auto px-4 py-8">
-            <div className="mb-8">
-                <button
-                    onClick={() => setCreationMode(null)}
-                    className="flex items-center gap-2 text-text-secondary dark:text-text-secondary-dark hover:text-text dark:hover:text-text-dark transition-colors mb-4"
-                >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M10 19l-7-7m0 0l7-7m-7 7h18"
-                        />
-                    </svg>
-                    Back to options
-                </button>
+        <div className="flex gap-6 max-w-7xl mx-auto px-4 py-8">
+            {/* Main Content */}
+            <div className="flex-1">
+                <div className="mb-8">
+                    <button
+                        onClick={() => setCreationMode(null)}
+                        className="flex items-center gap-2 text-text-secondary dark:text-text-secondary-dark hover:text-text dark:hover:text-text-dark transition-colors mb-4"
+                    >
+                        <svg
+                            className="w-5 h-5"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M10 19l-7-7m0 0l7-7m-7 7h18"
+                            />
+                        </svg>
+                        Back to options
+                    </button>
+                </div>
+
+                {creationMode === 'ai' ? (
+                    <DirectoryAICreator user={user} />
+                ) : (
+                    <DirectoryManualForm user={user} />
+                )}
             </div>
 
-            {creationMode === 'ai' ? (
-                <DirectoryAICreator user={user} />
-            ) : (
-                <DirectoryManualForm user={user} />
-            )}
+            {/* GitHub Status Sidebar */}
+            <GitHubStatusSidebar user={user} githubConnected={githubConnected} />
         </div>
     );
 }
