@@ -94,9 +94,9 @@ export function DirectoryCard({ directory }: DirectoryCardProps) {
 
             {/* Footer */}
             <div className="flex items-center justify-between pt-4 border-t border-border dark:border-border-dark">
-                {directory.updated_at && (
+                {directory.updatedAt && (
                     <span className="text-xs text-text-muted dark:text-text-muted-dark">
-                        Updated {formatDate(directory.updated_at)}
+                        Updated {formatDate(directory.updatedAt)}
                     </span>
                 )}
 

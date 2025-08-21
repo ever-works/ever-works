@@ -4,9 +4,9 @@ import { RepoProvider } from './enums';
 
 export interface MarkdownReadmeConfig {
     header?: string;
-    overwrite_default_header?: boolean;
+    overwriteDefaultHeader?: boolean;
     footer?: string;
-    overwrite_default_footer?: boolean;
+    overwriteDefaultFooter?: boolean;
 }
 
 export interface CreateDirectoryDto {
@@ -15,8 +15,8 @@ export interface CreateDirectoryDto {
     description: string;
     owner?: string;
     organization: boolean;
-    repo_provider?: RepoProvider;
-    readme_config?: MarkdownReadmeConfig;
+    repoProvider?: RepoProvider;
+    readmeConfig?: MarkdownReadmeConfig;
 }
 
 export interface DeleteDirectoryDto {
@@ -31,10 +31,10 @@ export interface Directory {
     description: string;
     owner?: string;
     organization: boolean;
-    repo_provider: RepoProvider;
-    readme_config?: MarkdownReadmeConfig;
-    created_at: string;
-    updated_at: string;
+    repoProvider: RepoProvider;
+    readmeConfig?: MarkdownReadmeConfig;
+    createdAt: string;
+    updatedAt: string;
 }
 
 export interface DirectoriesResponse {

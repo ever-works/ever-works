@@ -25,13 +25,13 @@ export function DirectoryManualForm({ user }: DirectoryManualFormProps) {
         name: '',
         description: '',
         organization: false,
-        repo_provider: RepoProvider.GITHUB,
+        repoProvider: RepoProvider.GITHUB,
         owner: '',
-        readme_config: {
+        readmeConfig: {
             header: '',
-            overwrite_default_header: false,
+            overwriteDefaultHeader: false,
             footer: '',
-            overwrite_default_footer: false,
+            overwriteDefaultFooter: false,
         },
     });
 
@@ -283,12 +283,12 @@ export function DirectoryManualForm({ user }: DirectoryManualFormProps) {
                                 Custom README Header
                             </label>
                             <textarea
-                                value={formData.readme_config?.header || ''}
+                                value={formData.readmeConfig?.header || ''}
                                 onChange={(e) =>
                                     setFormData({
                                         ...formData,
-                                        readme_config: {
-                                            ...formData.readme_config,
+                                        readmeConfig: {
+                                            ...formData.readmeConfig,
                                             header: e.target.value,
                                         },
                                     })
@@ -308,14 +308,14 @@ export function DirectoryManualForm({ user }: DirectoryManualFormProps) {
                                 <input
                                     type="checkbox"
                                     checked={
-                                        formData.readme_config?.overwrite_default_header || false
+                                        formData.readmeConfig?.overwriteDefaultHeader || false
                                     }
                                     onChange={(e) =>
                                         setFormData({
                                             ...formData,
-                                            readme_config: {
-                                                ...formData.readme_config,
-                                                overwrite_default_header: e.target.checked,
+                                            readmeConfig: {
+                                                ...formData.readmeConfig,
+                                                overwriteDefaultHeader: e.target.checked,
                                             },
                                         })
                                     }
@@ -333,12 +333,12 @@ export function DirectoryManualForm({ user }: DirectoryManualFormProps) {
                                 Custom README Footer
                             </label>
                             <textarea
-                                value={formData.readme_config?.footer || ''}
+                                value={formData.readmeConfig?.footer || ''}
                                 onChange={(e) =>
                                     setFormData({
                                         ...formData,
-                                        readme_config: {
-                                            ...formData.readme_config,
+                                        readmeConfig: {
+                                            ...formData.readmeConfig,
                                             footer: e.target.value,
                                         },
                                     })
@@ -358,14 +358,14 @@ export function DirectoryManualForm({ user }: DirectoryManualFormProps) {
                                 <input
                                     type="checkbox"
                                     checked={
-                                        formData.readme_config?.overwrite_default_footer || false
+                                        formData.readmeConfig?.overwriteDefaultFooter || false
                                     }
                                     onChange={(e) =>
                                         setFormData({
                                             ...formData,
-                                            readme_config: {
-                                                ...formData.readme_config,
-                                                overwrite_default_footer: e.target.checked,
+                                            readmeConfig: {
+                                                ...formData.readmeConfig,
+                                                overwriteDefaultFooter: e.target.checked,
                                             },
                                         })
                                     }

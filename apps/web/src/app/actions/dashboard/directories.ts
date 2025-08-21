@@ -8,9 +8,9 @@ import { RepoProvider } from '@/lib/api/enums';
 // Validation schemas
 const readmeConfigSchema = z.object({
     header: z.string().optional(),
-    overwrite_default_header: z.boolean().optional(),
+    overwriteDefaultHeader: z.boolean().optional(),
     footer: z.string().optional(),
-    overwrite_default_footer: z.boolean().optional(),
+    overwriteDefaultFooter: z.boolean().optional(),
 });
 
 const createDirectorySchema = z.object({
@@ -28,8 +28,8 @@ const createDirectorySchema = z.object({
         .max(500, 'Description must be less than 500 characters'),
     owner: z.string().optional(),
     organization: z.boolean(),
-    repo_provider: z.nativeEnum(RepoProvider).optional().default(RepoProvider.GITHUB),
-    readme_config: readmeConfigSchema.optional(),
+    repoProvider: z.nativeEnum(RepoProvider).optional().default(RepoProvider.GITHUB),
+    readmeConfig: readmeConfigSchema.optional(),
 });
 
 export async function createDirectory(data: CreateDirectoryDto) {
@@ -122,7 +122,7 @@ export async function createDirectoryWithAI(prompt: string, name?: string) {
             slug,
             description: `Directory created from prompt: ${validation.data.prompt.substring(0, 200)}...`,
             organization: false,
-            repo_provider: RepoProvider.GITHUB,
+            repoProvider: RepoProvider.GITHUB,
         };
 
         // Validate the generated directory data

@@ -5,9 +5,9 @@ import { getHttpClient } from './http-client';
 
 export interface MarkdownReadmeConfigDto {
     header?: string;
-    overwrite_default_header?: boolean;
+    overwriteDefaultHeader?: boolean;
     footer?: string;
-    overwrite_default_footer?: boolean;
+    overwriteDefaultFooter?: boolean;
 }
 
 export interface CreateDirectoryDto {
@@ -15,7 +15,7 @@ export interface CreateDirectoryDto {
     name: string;
     description: string;
     owner?: string;
-    readme_config?: MarkdownReadmeConfigDto;
+    readmeConfig?: MarkdownReadmeConfigDto;
     organization: boolean;
 }
 

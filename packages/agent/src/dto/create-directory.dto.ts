@@ -20,7 +20,7 @@ export class MarkdownReadmeConfigDto implements MarkdownReadmeConfig {
 
     @IsOptional()
     @IsBoolean()
-    overwrite_default_header?: boolean;
+    overwriteDefaultHeader?: boolean;
 
     @IsOptional()
     @IsString()
@@ -28,7 +28,7 @@ export class MarkdownReadmeConfigDto implements MarkdownReadmeConfig {
 
     @IsOptional()
     @IsBoolean()
-    overwrite_default_footer?: boolean;
+    overwriteDefaultFooter?: boolean;
 }
 
 export class CreateDirectoryDto {
@@ -53,10 +53,10 @@ export class CreateDirectoryDto {
 
     @IsEnum(RepoProvider)
     @IsOptional()
-    repo_provider: RepoProvider = RepoProvider.GITHUB;
+    repoProvider: RepoProvider = RepoProvider.GITHUB;
 
     @IsOptional()
     @ValidateNested()
     @Type(() => MarkdownReadmeConfigDto)
-    readme_config?: MarkdownReadmeConfigDto;
+    readmeConfig?: MarkdownReadmeConfigDto;
 }

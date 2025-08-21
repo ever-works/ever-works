@@ -69,10 +69,10 @@ export class CreateSubCommand extends CommandRunner {
                 slug: finalSlug,
                 name: directoryData.name,
                 description: directoryData.description,
-                readmeConfig: directoryData.readme_config,
+                readmeConfig: directoryData.readmeConfig,
                 owner,
                 organization,
-                repo_provider: RepoProvider.GITHUB,
+                repoProvider: RepoProvider.GITHUB,
             };
 
             const { directory } = await this.agentService.createDirectory(finalDirectoryData, user);

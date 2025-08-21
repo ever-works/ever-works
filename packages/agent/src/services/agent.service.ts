@@ -110,7 +110,7 @@ export class AgentService {
     }
 
     async createDirectory(createDirectoryDto: CreateDirectoryDto, user: User) {
-        const { slug, name, description, owner, readme_config, organization, repo_provider } =
+        const { slug, name, description, owner, readmeConfig, organization, repoProvider } =
             createDirectoryDto;
 
         const directoryData: Partial<Directory> = {
@@ -119,8 +119,8 @@ export class AgentService {
             description,
             userId: user.id,
             owner: owner,
-            repo_provider: repo_provider,
-            readmeConfig: readme_config,
+            repoProvider: repoProvider,
+            readmeConfig: readmeConfig,
             organization: organization,
         };
 

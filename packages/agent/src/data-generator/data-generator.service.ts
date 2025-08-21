@@ -444,7 +444,7 @@ export class DataGeneratorService {
 
     private getHeader(directory: Directory) {
         const readmeConfig = directory.readmeConfig;
-        if (readmeConfig?.header && readmeConfig.overwrite_default_header) {
+        if (readmeConfig?.header && readmeConfig.overwriteDefaultHeader) {
             return readmeConfig.header;
         }
 
@@ -458,7 +458,7 @@ export class DataGeneratorService {
 
     private getFooter(directory: Directory) {
         const readmeConfig = directory.readmeConfig;
-        if (readmeConfig?.footer && readmeConfig.overwrite_default_footer) {
+        if (readmeConfig?.footer && readmeConfig.overwriteDefaultFooter) {
             return readmeConfig.footer;
         }
 
