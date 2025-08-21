@@ -160,6 +160,7 @@ export class OAuthConnectionService {
     }
 
     private async handleGitHubCallback(userId: string, code: string): Promise<ConnectionInfo> {
+        console.log('handleGitHubCallback');
         // Exchange code for token
         const tokenResponse = await firstValueFrom(
             this.httpService.post(
@@ -382,6 +383,13 @@ export class OAuthConnectionService {
             missingScopes,
             hasAgentScopes: agentCheck.hasAll,
         };
+    }
+
+    storeState(state: string, userId: string) {
+        const expires = new Date();
+        expires.setMinutes(expires.getMinutes() + 10); // 10 minute expiry
+
+        this.stateStore.set(state, { userId, expires });
     }
 
     /**

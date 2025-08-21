@@ -6,6 +6,7 @@ import { connectGitHub } from '@/app/actions/dashboard';
 import { toast } from 'sonner';
 import { ROUTES } from '@/lib/constants';
 import { AuthUser } from '@/lib/auth';
+import Image from 'next/image';
 
 interface GitHubStatusSidebarProps {
     user: AuthUser;
@@ -71,11 +72,15 @@ export function GitHubStatusSidebar({ user, githubConnected }: GitHubStatusSideb
                             </p>
                             <div className="flex items-center gap-2">
                                 {user.avatar && (
-                                    <img
-                                        src={user.avatar}
-                                        alt={user.username}
-                                        className="w-6 h-6 rounded-full"
-                                    />
+                                    <div className="relative w-6 h-6">
+                                        <Image
+                                            src={user.avatar}
+                                            alt={user.username}
+                                            fill
+                                            className="w-6 h-6 rounded-full"
+                                            sizes="40px"
+                                        />
+                                    </div>
                                 )}
                                 <span className="text-sm text-text dark:text-text-dark">
                                     {user.username}

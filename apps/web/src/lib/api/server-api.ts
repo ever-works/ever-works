@@ -65,6 +65,8 @@ export async function serverFetch<T>(endpoint: string, options: RequestInit = {}
         try {
             const errorData = await response.json();
 
+            console.error('API Error:', errorData);
+
             if (errorData?.message) {
                 errorMessage = Array.isArray(errorData.message)
                     ? errorData.message.join(', ')
