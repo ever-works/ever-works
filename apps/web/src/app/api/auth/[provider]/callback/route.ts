@@ -49,7 +49,7 @@ export async function GET(
     return;
 }
 
-export async function connectOauth(
+async function connectOauth(
     provider: string,
     returnPath: string | null,
     code: string,
