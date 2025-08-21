@@ -75,9 +75,10 @@ export function DirectoryList({
             <div
                 className={cn(
                     'grid gap-6',
-                    showLimit
-                        ? 'grid-cols-1 md:grid-cols-2'
-                        : 'grid-cols-1 lg:grid-cols-2 xl:grid-cols-3',
+                    // showLimit
+                    //     ? 'grid-cols-1 md:grid-cols-2'
+                    //     : 'grid-cols-1 lg:grid-cols-2 xl:grid-cols-3',
+                    'grid-cols-1 lg:grid-cols-2 xl:grid-cols-3',
                 )}
             >
                 {displayDirectories.map((directory) => (
