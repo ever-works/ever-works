@@ -3,7 +3,6 @@
 import { AuthUser } from '@/lib/auth';
 import { DirectoryList } from '@/components/directories/DirectoryList';
 import { StatsOverview } from '@/components/dashboard/StatsOverview';
-import { RecentActivity } from '@/components/dashboard/RecentActivity';
 import { EmptyState } from '@/components/common/EmptyState';
 import { ROUTES } from '@/lib/constants';
 import { Link, useRouter } from '@/i18n/navigation';

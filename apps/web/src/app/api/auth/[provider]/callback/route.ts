@@ -75,7 +75,7 @@ export async function connectOauth(
         href = ROUTES.AUTH_ERROR + '?error=oauth_callback';
     }
 
-    return redirect({ locale, href });
+    return redirect({ locale, href: href + '?oauth_connected=true' });
 }
 
 async function loginOauth(provider: string, code: string, state: string, locale: string) {

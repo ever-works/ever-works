@@ -56,8 +56,7 @@ export const config = {
         },
         connectCallbackUrl: () => {
             return (
-                process.env.GOOGLE_CONNECT_CALLBACK_URL ||
-                'http://localhost:3100/api/auth/connections/google/callback'
+                process.env.GOOGLE_CALLBACK_URL || 'http://localhost:3100/api/auth/google/callback'
             );
         },
     },
@@ -71,8 +70,7 @@ export const config = {
         },
         connectCallbackUrl: () => {
             return (
-                process.env.GITHUB_CONNECT_CALLBACK_URL ||
-                'http://localhost:3100/api/auth/connections/github/callback'
+                process.env.GITHUB_CALLBACK_URL || 'http://localhost:3100/api/auth/github/callback'
             );
         },
     },
