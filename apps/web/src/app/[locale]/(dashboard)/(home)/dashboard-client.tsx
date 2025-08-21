@@ -68,7 +68,7 @@ export default function DashboardClient({
                         />
                     )}
                 </div>
-                <div className="lg:col-span-1">
+                <div className="lg:col-span-1 hidden">
                     <RecentActivity />
                 </div>
             </div>

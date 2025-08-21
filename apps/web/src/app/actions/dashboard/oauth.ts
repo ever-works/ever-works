@@ -2,7 +2,7 @@
 
 import { authAPI } from '@/lib/api';
 import { setOAuthStateCookie } from '@/lib/auth';
-import { withAppUrl } from '@/lib/constants';
+import { ROUTES, routeWithParams, withAppUrl } from '@/lib/constants';
 import { generateHexToken } from '@/lib/utils/random';
 
 export async function checkGitHubConnection() {
@@ -29,14 +29,17 @@ export async function connectGitHub(returnPath?: string) {
         const state = generateHexToken(16);
         await setOAuthStateCookie(state);
 
+        const params = new URLSearchParams({ process: 'connect' });
+        if (returnPath) {
+            params.append('returnPath', returnPath);
+        }
+
         // Set callback URL with return path
-        const callbackUrl = withAppUrl(
-            `/auth/github/callback${returnPath ? `?returnPath=${encodeURIComponent(returnPath)}` : ''}`,
-        );
+        const callbackPath = routeWithParams(ROUTES.API_AUTH_CALLBACK, { provider: 'github' });
 
         const response = await authAPI.oauth_connections.getConnectUrl(
             'github',
-            callbackUrl,
+            withAppUrl(callbackPath) + `?${params.toString()}`,
             state,
         );
 
