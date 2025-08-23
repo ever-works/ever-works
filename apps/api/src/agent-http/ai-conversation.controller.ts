@@ -8,6 +8,7 @@ import {
     BadRequestException,
     Res,
     Header,
+    Get,
 } from '@nestjs/common';
 import { AiConversationService } from '@packages/agent/ai';
 import { CurrentUser, JwtAuthGuard } from '../auth';
@@ -15,7 +16,7 @@ import { Observable } from 'rxjs';
 import { AuthenticatedUser } from '../auth/types/jwt.types';
 import { StartConversationDto } from './dto/conversation.dto';
 import { SendMessageDto } from './dto/send-message.dto';
-import { Response } from 'express';
+import type { Response } from 'express';
 
 const LIMIT_MESSAGE = 20;
 
@@ -46,6 +47,23 @@ export class AiConversationController {
             sessionId,
             message: 'Conversation started successfully',
         };
+    }
+
+    /**
+     * Get conversation history
+     */
+    @Get(':sessionId/history')
+    async getConversationHistory(
+        @Param('sessionId') sessionId: string,
+        @CurrentUser() auth: AuthenticatedUser,
+    ) {
+        const history = await this.conversationService.getConversationHistory(
+            sessionId,
+            auth.userId,
+            LIMIT_MESSAGE * 2,
+        );
+
+        return history;
     }
 
     /**

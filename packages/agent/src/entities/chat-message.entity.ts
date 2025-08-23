@@ -7,6 +7,7 @@ import {
     Index,
 } from 'typeorm';
 import { ChatHistory } from './chat-history.entity';
+import { ClassToObject } from './types';
 
 export type MessageRole = 'user' | 'assistant' | 'system' | 'function' | 'tool';
 
@@ -20,7 +21,7 @@ export class ChatMessage {
     chatHistoryId: string;
 
     @Column()
-    role: MessageRole;
+    role: string;
 
     @Column({ type: 'text' })
     content: string;
@@ -60,5 +61,5 @@ export class ChatMessage {
     @ManyToOne(() => ChatHistory, (history) => history.messages, {
         onDelete: 'CASCADE',
     })
-    chatHistory: ChatHistory;
+    chatHistory: ClassToObject<ChatHistory>;
 }
