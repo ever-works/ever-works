@@ -10,6 +10,7 @@ import {
 } from 'typeorm';
 import { User } from './user.entity';
 import { ChatMessage } from './chat-message.entity';
+import { ClassToObject } from './types';
 
 @Entity({ name: 'chat_histories' })
 @Index(['sessionId', 'userId'])
@@ -40,11 +41,11 @@ export class ChatHistory {
 
     // Relationships
     @ManyToOne(() => User, { nullable: true, onDelete: 'CASCADE' })
-    user: User;
+    user: ClassToObject<User>;
 
     @OneToMany(() => ChatMessage, (message) => message.chatHistory, {
         cascade: true,
         eager: false,
     })
-    messages: ChatMessage[];
+    messages: ClassToObject<ChatMessage>[];
 }

@@ -112,14 +112,17 @@ export async function serverMutation<T>({
     data,
     method = 'POST',
     wrapInData = false,
+    headers,
 }: {
     endpoint: string;
     data: any;
     method: 'POST' | 'PUT' | 'PATCH' | 'DELETE';
     wrapInData: boolean;
+    headers?: Record<string, string>;
 }): Promise<T> {
     return serverFetch<T>(endpoint, {
         method,
+        headers,
         body: JSON.stringify(wrapInData ? { data } : data),
     });
 }
