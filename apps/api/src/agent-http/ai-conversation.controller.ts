@@ -6,7 +6,7 @@ import { AuthenticatedUser } from '../auth/types/jwt.types';
 import { StartConversationDto } from './dto/conversation.dto';
 import { SendMessageDto } from './dto/send-message.dto';
 
-const LIMIT_MESSAGE = 50;
+const LIMIT_MESSAGE = 20;
 
 @Controller('api/ai-conversations')
 @UseGuards(JwtAuthGuard)
