@@ -83,26 +83,6 @@ export class SendMessageWithLimitDto extends SendMessageDto {
     messageLimit?: number;
 }
 
-export class StreamMessageQueryDto {
-    @IsString()
-    @MinLength(1)
-    @MaxLength(10000)
-    message: string;
-
-    @IsOptional()
-    @IsString()
-    messageLimit?: string;
-
-    @IsOptional()
-    @IsString()
-    temperature?: string;
-
-    @IsOptional()
-    @IsString()
-    @MaxLength(100)
-    role?: string;
-}
-
 export enum ExpertiseType {
     CLOUD_ARCHITECTURE = 'Cloud Architecture',
     DEVOPS = 'DevOps',

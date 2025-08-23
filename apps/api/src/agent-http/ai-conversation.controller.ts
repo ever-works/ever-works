@@ -91,4 +91,43 @@ export class AiConversationController {
             })();
         });
     }
+
+    /**
+     * Ask a question without starting a conversation (or history)
+     */
+    @Post('ask')
+    async askQuestion(@Body() dto: SendMessageDto) {
+        const result = await this.conversationService.ask(dto.message, dto.options);
+
+        if (!result.success) {
+            throw new BadRequestException(result.error);
+        }
+
+        return result;
+    }
+
+    /**
+     * Stream a response to a question without starting a conversation (or history)
+     */
+    @Sse('ask/stream')
+    async streamAsk(@Body() dto: SendMessageDto): Promise<Observable<MessageEvent>> {
+        const stream = this.conversationService.streamAsk(dto.message, dto.options);
+
+        // Convert async generator to Observable for SSE
+        return new Observable((subscriber) => {
+            (async () => {
+                try {
+                    for await (const chunk of stream) {
+                        subscriber.next({
+                            data: JSON.stringify(chunk),
+                        } as MessageEvent);
+                    }
+
+                    subscriber.complete();
+                } catch (error) {
+                    subscriber.error(error);
+                }
+            })();
+        });
+    }
 }

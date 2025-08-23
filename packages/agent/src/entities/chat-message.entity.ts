@@ -19,10 +19,7 @@ export class ChatMessage {
     @Column()
     chatHistoryId: string;
 
-    @Column({
-        type: 'enum',
-        enum: ['user', 'assistant', 'system', 'function', 'tool'],
-    })
+    @Column()
     role: MessageRole;
 
     @Column({ type: 'text' })

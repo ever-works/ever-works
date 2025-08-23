@@ -66,6 +66,92 @@ Core principles:
     }
 
     /**
+     * Ask a question without starting a conversation (or history)
+     */
+    async ask(message: string, options: ConversationOptions = {}): Promise<ConversationResponse> {
+        const messages: BaseMessage[] = [];
+
+        // Add system message
+        const systemContent = this.buildSystemMessage(options);
+        if (systemContent) {
+            messages.push(new SystemMessage(systemContent));
+        }
+
+        // Add user message
+        messages.push(new HumanMessage(message));
+
+        // Get LLM instance
+        const llm = this.getLlmInstance(options);
+
+        if (options.maxTokens) {
+            llm.maxTokens = options.maxTokens;
+        }
+
+        try {
+            const response = await llm.invoke(messages);
+            return {
+                response: response.content as string,
+                success: true,
+            };
+        } catch (error) {
+            this.logger.error(`Error asking question:`, error);
+            return {
+                response: '',
+                success: false,
+                error: error.message || 'Failed to ask question',
+            };
+        }
+    }
+
+    /**
+     * Stream a response to a question without starting a conversation (or history)
+     */
+    async *streamAsk(
+        message: string,
+        options: ConversationOptions = {},
+    ): AsyncGenerator<StreamChunk, void, unknown> {
+        const messages: BaseMessage[] = [];
+
+        // Add system message
+        const systemContent = this.buildSystemMessage(options);
+        if (systemContent) {
+            messages.push(new SystemMessage(systemContent));
+        }
+
+        // Add user message
+        messages.push(new HumanMessage(message));
+
+        // Get LLM instance with streaming enabled
+        const llm = this.getLlmInstance(options);
+        llm.streaming = true;
+
+        if (options.maxTokens) {
+            llm.maxTokens = options.maxTokens;
+        }
+
+        try {
+            const stream = await llm.pipe(new StringOutputParser()).stream(messages);
+            for await (const chunk of stream) {
+                yield {
+                    content: chunk,
+                    done: false,
+                };
+            }
+            yield {
+                content: '',
+                done: true,
+            };
+        } catch (error) {
+            this.logger.error(`Error asking question:`, error);
+            yield {
+                content: '',
+                done: true,
+                metadata: { error: error.message },
+            };
+        }
+    }
+
+    /**
      * Send a message in a conversation with history
      */
     async sendMessage(
@@ -92,10 +178,7 @@ Core principles:
             const messages = await this.buildMessages(chatHistory, message, options);
 
             // Get LLM instance
-            const llm =
-                options.temperature !== undefined
-                    ? this.aiService.createLlmWithTemperature(options.temperature)
-                    : this.aiService.getLlm();
+            const llm = this.getLlmInstance(options);
 
             if (options.maxTokens) {
                 llm.maxTokens = options.maxTokens;
@@ -163,10 +246,8 @@ Core principles:
             const messages = await this.buildMessages(chatHistory, message, options);
 
             // Get LLM instance with streaming enabled
-            const llm =
-                options.temperature !== undefined
-                    ? this.aiService.createLlmWithTemperature(options.temperature)
-                    : this.aiService.getLlm();
+            const llm = this.getLlmInstance(options);
+            llm.streaming = true;
 
             if (options.maxTokens) {
                 llm.maxTokens = options.maxTokens;
@@ -207,6 +288,17 @@ Core principles:
                 metadata: { error: error.message },
             };
         }
+    }
+
+    /**
+     * Get LLM instance with proper configuration
+     */
+    private getLlmInstance(options: ConversationOptions) {
+        if (options.temperature !== undefined) {
+            return this.aiService.createLlmWithTemperature(options.temperature);
+        }
+
+        return this.aiService.getLlm();
     }
 
     /**
