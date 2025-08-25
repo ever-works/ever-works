@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { BaseListChatMessageHistory } from '@langchain/core/chat_history';
 import {
     type BaseMessage,
+    type MessageType,
     mapChatMessagesToStoredMessages,
     HumanMessage,
     AIMessage,
@@ -202,7 +203,7 @@ export class TypeORMChatMessageHistory extends BaseListChatMessageHistory {
     /**
      * Infer message type using instanceof checks as fallback
      */
-    private inferMessageType(message: BaseMessage): string {
+    private inferMessageType(message: BaseMessage): MessageType {
         if (message instanceof HumanMessage) return 'human';
         if (message instanceof AIMessage) return 'ai';
         if (message instanceof SystemMessage) return 'system';
