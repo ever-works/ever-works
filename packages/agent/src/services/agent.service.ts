@@ -109,6 +109,29 @@ export class AgentService {
         }
     }
 
+    async getDirectory(id: string, user: User) {
+        try {
+            const directory = await this.validateDirectoryOwnership(id, user.id);
+            directory.owner = directory.getRepoOwner();
+
+            return {
+                status: 'success',
+                directory,
+            };
+        } catch (error) {
+            if (error instanceof HttpException) {
+                throw error;
+            }
+
+            this.logger.error('Failed to get directory:', error);
+
+            throw new BadRequestException({
+                status: 'error',
+                message: this.clearMessageError(error),
+            });
+        }
+    }
+
     async createDirectory(createDirectoryDto: CreateDirectoryDto, user: User) {
         const { slug, name, description, owner, readmeConfig, organization, repoProvider } =
             createDirectoryDto;

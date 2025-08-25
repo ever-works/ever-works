@@ -49,6 +49,10 @@ export interface DeleteDirectoryResponse {
     message: string;
 }
 
+export type APIResponse<T> = {
+    status: 'success' | 'error';
+} & T;
+
 export const directoryAPI = {
     // Get all directories with pagination and search
     getAll: async (options?: { limit?: number; offset?: number; search?: string }) => {
@@ -59,6 +63,11 @@ export const directoryAPI = {
         const query = params.toString() ? `?${params.toString()}` : '';
 
         return serverFetch<DirectoriesResponse>(`/directories${query}`);
+    },
+
+    // Get a directory by ID
+    get: async (id: string) => {
+        return serverFetch<APIResponse<{ directory: Directory }>>(`/directories/${id}`);
     },
 
     // Create a new directory

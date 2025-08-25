@@ -69,6 +69,13 @@ export class AgentHttpController {
         return this.agentService.createDirectory(createDirectoryDto, user);
     }
 
+    @Get('directories/:id')
+    @HttpCode(HttpStatus.OK)
+    async getDirectory(@CurrentUser() auth: AuthenticatedUser, @Param('id') id: string) {
+        const user = await this.authService.getUser(auth.userId);
+        return this.agentService.getDirectory(id, user);
+    }
+
     @Post('directories/:id/generate')
     @HttpCode(HttpStatus.ACCEPTED)
     async generateItemsGenerator(
