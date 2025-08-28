@@ -44,7 +44,6 @@ export function OAuthConnections({ githubConnected, githubScopes }: OAuthConnect
 
             if (result.success) {
                 toast.success('GitHub account disconnected');
-                window.location.reload();
             } else {
                 toast.error(result.error || 'Failed to disconnect GitHub');
             }
