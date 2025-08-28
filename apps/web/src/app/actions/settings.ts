@@ -13,13 +13,14 @@ const updateProfileSchema = z.object({
         .string()
         .min(1, 'Username is required')
         .max(50, 'Username must be less than 50 characters')
-        .regex(/^[a-zA-Z0-9_-]+$/, 'Username can only contain letters, numbers, dashes and underscores'),
+        .regex(
+            /^[a-zA-Z0-9_-]+$/,
+            'Username can only contain letters, numbers, dashes and underscores',
+        ),
 });
 
 const updatePasswordSchema = z.object({
-    currentPassword: z
-        .string()
-        .min(1, 'Current password is required'),
+    currentPassword: z.string().min(1, 'Current password is required'),
     newPassword: z
         .string()
         .min(8, 'Password must be at least 8 characters')
@@ -67,12 +68,12 @@ export async function updateProfile(data: { username: string }) {
 
         const result = await authAPI.updateProfile(validation.data);
         revalidatePath(ROUTES.DASHBOARD_SETTINGS);
-        
+
         return { success: true, data: result };
     } catch (error: any) {
-        return { 
-            success: false, 
-            error: error?.message || 'Failed to update profile' 
+        return {
+            success: false,
+            error: error?.message || 'Failed to update profile',
         };
     }
 }
@@ -95,12 +96,12 @@ export async function updatePassword(data: { currentPassword: string; newPasswor
         }
 
         await authAPI.updatePassword(validation.data);
-        
+
         return { success: true, message: 'Password updated successfully' };
     } catch (error: any) {
-        return { 
-            success: false, 
-            error: error?.message || 'Failed to update password' 
+        return {
+            success: false,
+            error: error?.message || 'Failed to update password',
         };
     }
 }
@@ -124,12 +125,12 @@ export async function updateVercelToken(token: string) {
 
         await settingsAPI.updateVercelToken(validation.data.token);
         revalidatePath(ROUTES.DASHBOARD_SETTINGS);
-        
+
         return { success: true, message: 'Vercel token saved successfully' };
     } catch (error: any) {
-        return { 
-            success: false, 
-            error: error?.message || 'Failed to save Vercel token' 
+        return {
+            success: false,
+            error: error?.message || 'Failed to save Vercel token',
         };
     }
 }
@@ -143,12 +144,12 @@ export async function removeVercelToken() {
 
         await settingsAPI.removeVercelToken();
         revalidatePath(ROUTES.DASHBOARD_SETTINGS);
-        
+
         return { success: true, message: 'Vercel token removed successfully' };
     } catch (error: any) {
-        return { 
-            success: false, 
-            error: error?.message || 'Failed to remove Vercel token' 
+        return {
+            success: false,
+            error: error?.message || 'Failed to remove Vercel token',
         };
     }
 }
@@ -163,12 +164,12 @@ export async function disconnectGitHub() {
 
         await authAPI.oauth_connections.disconnect('github');
         revalidatePath(ROUTES.DASHBOARD_SETTINGS);
-        
+
         return { success: true, message: 'GitHub account disconnected successfully' };
     } catch (error: any) {
-        return { 
-            success: false, 
-            error: error?.message || 'Failed to disconnect GitHub' 
+        return {
+            success: false,
+            error: error?.message || 'Failed to disconnect GitHub',
         };
     }
 }
@@ -205,13 +206,13 @@ export async function updateNotificationPreferences(preferences: {
 
         // This would normally call an API endpoint
         // For now, just simulate success
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
+        await new Promise((resolve) => setTimeout(resolve, 500));
+
         return { success: true, message: 'Notification preferences updated successfully' };
     } catch (error: any) {
-        return { 
-            success: false, 
-            error: error?.message || 'Failed to update preferences' 
+        return {
+            success: false,
+            error: error?.message || 'Failed to update preferences',
         };
     }
 }
@@ -226,13 +227,13 @@ export async function deleteAccount() {
 
         // This would normally call an API endpoint to delete the account
         // await authAPI.deleteAccount();
-        
+
         // For safety, not implementing actual deletion in demo
         return { success: false, error: 'Account deletion is disabled in demo' };
     } catch (error: any) {
-        return { 
-            success: false, 
-            error: error?.message || 'Failed to delete account' 
+        return {
+            success: false,
+            error: error?.message || 'Failed to delete account',
         };
     }
 }

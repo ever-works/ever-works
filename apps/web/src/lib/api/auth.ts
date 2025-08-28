@@ -287,6 +287,10 @@ export const authAPI = {
             return serverFetch<any[]>('/auth/connections/github/repositories');
         },
 
+        getGitHubOrgs: async () => {
+            return serverFetch<any[]>('/auth/connections/github/orgs');
+        },
+
         checkGitHubScopes: async (requiredScopes: string[]) => {
             const params = new URLSearchParams({ required: requiredScopes.join(',') });
             return serverFetch<{ hasScopes: boolean; missingScopes?: string[] }>(

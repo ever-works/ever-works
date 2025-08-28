@@ -8,6 +8,7 @@ import { ApiTokenSettings } from '@/components/settings/ApiTokenSettings';
 import { OAuthConnections } from '@/components/settings/OAuthConnections';
 import { NotificationSettings } from '@/components/settings/NotificationSettings';
 import { DangerZone } from '@/components/settings/DangerZone';
+import { User, Lock, Key, Link2, Bell, AlertTriangle } from 'lucide-react';
 
 interface SettingsClientProps {
     user: {
@@ -20,12 +21,12 @@ interface SettingsClientProps {
 }
 
 const tabs = [
-    { id: 'profile', label: 'Profile', icon: '👤' },
-    { id: 'security', label: 'Security', icon: '🔒' },
-    { id: 'api-tokens', label: 'API & Tokens', icon: '🔑' },
-    { id: 'oauth', label: 'Connected Accounts', icon: '🔗' },
-    { id: 'notifications', label: 'Notifications', icon: '🔔' },
-    { id: 'danger', label: 'Danger Zone', icon: '⚠️' },
+    { id: 'profile', label: 'Profile', icon: User },
+    { id: 'security', label: 'Security', icon: Lock },
+    { id: 'api-tokens', label: 'API & Tokens', icon: Key },
+    { id: 'oauth', label: 'Connected Accounts', icon: Link2 },
+    { id: 'notifications', label: 'Notifications', icon: Bell },
+    { id: 'danger', label: 'Danger Zone', icon: AlertTriangle },
 ];
 
 export function SettingsClient({
@@ -48,21 +49,24 @@ export function SettingsClient({
                 {/* Sidebar Navigation */}
                 <div className="lg:w-64">
                     <nav className="space-y-1">
-                        {tabs.map((tab) => (
-                            <button
-                                key={tab.id}
-                                onClick={() => setActiveTab(tab.id)}
-                                className={cn(
-                                    'w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors',
-                                    activeTab === tab.id
-                                        ? 'bg-surface-secondary dark:bg-surface-secondary-dark text-text dark:text-text-dark font-medium'
-                                        : 'text-text-muted dark:text-text-muted-dark hover:bg-surface dark:hover:bg-surface-dark hover:text-text dark:hover:text-text-dark',
-                                )}
-                            >
-                                <span className="text-xl">{tab.icon}</span>
-                                <span>{tab.label}</span>
-                            </button>
-                        ))}
+                        {tabs.map((tab) => {
+                            const Icon = tab.icon;
+                            return (
+                                <button
+                                    key={tab.id}
+                                    onClick={() => setActiveTab(tab.id)}
+                                    className={cn(
+                                        'w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors',
+                                        activeTab === tab.id
+                                            ? 'bg-surface-secondary dark:bg-surface-secondary-dark text-text dark:text-text-dark font-medium'
+                                            : 'text-text-muted dark:text-text-muted-dark hover:bg-surface dark:hover:bg-surface-dark hover:text-text dark:hover:text-text-dark',
+                                    )}
+                                >
+                                    <Icon className="w-5 h-5" />
+                                    <span>{tab.label}</span>
+                                </button>
+                            );
+                        })}
                     </nav>
                 </div>
 

@@ -114,9 +114,9 @@ export async function serverFetch<T>(
     }
 
     try {
-        return response.json();
+        return await response.json();
     } catch (error) {
-        return response.text() as T;
+        return (await response.text()) as T;
     }
 }
 

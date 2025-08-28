@@ -150,6 +150,11 @@ export class OAuthConnectionsController {
         return this.oauthConnectionService.getGitHubRepositories(req.user.userId);
     }
 
+    @Get('github/orgs')
+    async getGitHubOrgs(@Request() req): Promise<any> {
+        return this.oauthConnectionService.getGitHubOrgs(req.user.userId);
+    }
+
     /**
      * Check if user has required GitHub scopes
      */

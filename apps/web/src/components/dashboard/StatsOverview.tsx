@@ -86,7 +86,7 @@ export function StatsOverview({ totalDirectories = 0 }: StatsOverviewProps) {
                             <stat.icon className="w-6 h-6 text-primary" />
                         </div>
                     </div>
-                    <div className="mt-4 flex items-center">
+                    <div className="mt-4  items-center hidden">
                         <span
                             className={cn(
                                 'text-sm font-medium',
