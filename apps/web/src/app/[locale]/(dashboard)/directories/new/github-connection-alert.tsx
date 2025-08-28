@@ -2,7 +2,7 @@
 
 import { useTransition } from 'react';
 import { cn } from '@/lib/utils/cn';
-import { connectGitHub } from '@/app/actions/dashboard';
+import { connectGitHub } from '@/app/actions/dashboard/oauth';
 import { toast } from 'sonner';
 import { ROUTES } from '@/lib/constants';
 

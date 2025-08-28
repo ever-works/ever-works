@@ -1,5 +1,6 @@
 import 'server-only';
 import { serverFetch, serverMutation } from './server-api';
+import { MessageResponse } from './types';
 
 // DTOs
 export interface StartConversationDto {
@@ -33,13 +34,6 @@ export interface ConversationHistoryResponse {
         content: string;
         timestamp: string;
     }[];
-}
-
-interface MessageResponse {
-    success: boolean;
-    response?: string;
-    error?: string;
-    metadata?: Record<string, any>;
 }
 
 export interface StreamChunk {

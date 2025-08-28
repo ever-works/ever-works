@@ -1,5 +1,6 @@
 import 'server-only';
 import { serverFetch, serverMutation } from './server-api';
+import { MessageResponse } from './types';
 
 // DTOs - Auth
 export interface RegisterDto {
@@ -65,10 +66,6 @@ export interface OAuthConnectionResponse {
     providerId: string;
     scopes: string[];
     createdAt: string;
-}
-
-export interface MessageResponse {
-    message: string;
 }
 
 export interface TokenValidationResponse {
