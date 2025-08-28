@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils/cn';
+import { useTranslations } from 'next-intl';
 
 interface Stats {
     totalDirectories: number;
@@ -15,6 +16,7 @@ interface StatsOverviewProps {
 }
 
 export function StatsOverview({ totalDirectories = 0 }: StatsOverviewProps) {
+    const t = useTranslations('dashboard.stats');
     const [stats, setStats] = useState<Stats>({
         totalDirectories: totalDirectories,
         totalItems: 0,
@@ -40,21 +42,21 @@ export function StatsOverview({ totalDirectories = 0 }: StatsOverviewProps) {
         changeType: 'positive' | 'negative' | 'neutral';
     }> = [
         {
-            title: 'Total Directories',
+            title: t('totalDirectories'),
             value: stats.totalDirectories,
             icon: FolderIcon,
             change: '+12%',
             changeType: 'positive',
         },
         {
-            title: 'Total Items',
+            title: t('totalItems'),
             value: stats.totalItems,
             icon: ItemsIcon,
             change: '+23%',
             changeType: 'positive',
         },
         {
-            title: 'Active Websites',
+            title: t('activeWebsites'),
             value: stats.activeWebsites,
             icon: WebsiteIcon,
             change: '0%',
@@ -99,7 +101,7 @@ export function StatsOverview({ totalDirectories = 0 }: StatsOverviewProps) {
                             {stat.change}
                         </span>
                         <span className="text-sm text-text-muted dark:text-text-muted-dark ml-2">
-                            from last month
+                            {t('fromLastMonth')}
                         </span>
                     </div>
                 </div>

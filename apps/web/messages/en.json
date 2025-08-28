@@ -251,7 +251,92 @@
                 "oauth": "Connected Accounts",
                 "notifications": "Notifications",
                 "dangerZone": "Danger Zone"
+            },
+            "profile": {
+                "title": "Profile Settings",
+                "subtitle": "Update your profile information and avatar",
+                "fields": {
+                    "username": "Username",
+                    "email": "Email",
+                    "emailHelperText": "Email cannot be changed"
+                },
+                "placeholders": {
+                    "username": "Enter your username"
+                },
+                "actions": {
+                    "save": "Save Changes"
+                },
+                "messages": {
+                    "success": "Profile updated successfully",
+                    "usernameRequired": "Username is required",
+                    "error": "Failed to update profile",
+                    "unexpectedError": "An unexpected error occurred"
+                }
+            },
+            "security": {
+                "title": "Security Settings",
+                "subtitle": "Manage your account security and authentication",
+                "changePassword": {
+                    "title": "Change Password",
+                    "currentPassword": "Current Password",
+                    "newPassword": "New Password",
+                    "confirmPassword": "Confirm New Password",
+                    "showPasswords": "Show passwords",
+                    "placeholders": {
+                        "current": "Enter current password",
+                        "new": "Enter new password (min 8 characters)",
+                        "confirm": "Confirm new password"
+                    },
+                    "actions": {
+                        "update": "Update Password"
+                    },
+                    "messages": {
+                        "success": "Password updated successfully",
+                        "fillAllFields": "Please fill in all password fields",
+                        "minLength": "New password must be at least 8 characters",
+                        "mismatch": "New passwords do not match",
+                        "sameAsCurrent": "New password must be different from current password",
+                        "error": "Failed to update password",
+                        "unexpectedError": "An unexpected error occurred"
+                    }
+                },
+                "twoFactor": {
+                    "title": "Two-Factor Authentication",
+                    "subtitle": "Add an extra layer of security to your account",
+                    "action": "Coming Soon"
+                },
+                "sessions": {
+                    "title": "Active Sessions",
+                    "subtitle": "Manage your active sessions across devices",
+                    "action": "View Sessions (Coming Soon)"
+                }
+            },
+            "oauth": {
+                "title": "Connected Accounts",
+                "subtitle": "Connect your external accounts for enhanced functionality",
+                "github": {
+                    "name": "GitHub",
+                    "connected": "Create and manage directories with GitHub repositories",
+                    "disconnected": "Connect to create directories from repositories",
+                    "scopes": "Scopes",
+                    "actions": {
+                        "connect": "Connect",
+                        "disconnect": "Disconnect",
+                        "confirmDisconnect": "Are you sure you want to disconnect your GitHub account?"
+                    },
+                    "messages": {
+                        "disconnected": "GitHub account disconnected",
+                        "connectError": "Failed to connect GitHub",
+                        "disconnectError": "Failed to disconnect GitHub"
+                    }
+                }
             }
+        },
+        "stats": {
+            "totalDirectories": "Total Directories",
+            "totalItems": "Total Items",
+            "activeWebsites": "Active Websites",
+            "fromLastMonth": "from last month"
         }
     },
     "layout": {
@@ -301,6 +386,44 @@
             "providerConnectFailed": "Failed to connect provider",
             "forgotPasswordFailed": "Failed to send password reset email",
             "resetPasswordFailed": "Failed to reset password"
+        }
+    },
+    "actions": {
+        "settings": {
+            "profile": {
+                "usernameRequired": "Username is required",
+                "usernameMaxLength": "Username must be less than 50 characters",
+                "usernameFormat": "Username can only contain letters, numbers, dashes and underscores",
+                "updateFailed": "Failed to update profile",
+                "notAuthenticated": "Not authenticated"
+            },
+            "password": {
+                "currentRequired": "Current password is required",
+                "newMinLength": "Password must be at least 8 characters",
+                "newMaxLength": "Password must be less than 100 characters",
+                "updateFailed": "Failed to update password",
+                "updateSuccess": "Password updated successfully"
+            },
+            "vercel": {
+                "tokenRequired": "Token is required",
+                "invalidFormat": "Invalid Vercel token format",
+                "saveFailed": "Failed to save Vercel token",
+                "saveSuccess": "Vercel token saved successfully",
+                "removeFailed": "Failed to remove Vercel token",
+                "removeSuccess": "Vercel token removed successfully"
+            },
+            "github": {
+                "disconnectFailed": "Failed to disconnect GitHub",
+                "disconnectSuccess": "GitHub account disconnected successfully"
+            },
+            "notifications": {
+                "updateFailed": "Failed to update preferences",
+                "updateSuccess": "Notification preferences updated successfully"
+            },
+            "danger": {
+                "deleteFailed": "Failed to delete account",
+                "deleteDisabled": "Account deletion is disabled in demo"
+            }
         }
     },
     "validation": {

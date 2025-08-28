@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { updateProfile } from '@/app/actions/settings';
 import { toast } from 'sonner';
+import { useTranslations } from 'next-intl';
 
 interface ProfileSettingsProps {
     user: {
@@ -17,10 +18,11 @@ interface ProfileSettingsProps {
 export function ProfileSettings({ user }: ProfileSettingsProps) {
     const [isPending, startTransition] = useTransition();
     const [username, setUsername] = useState(user.username);
+    const t = useTranslations('dashboard.settings.profile');
 
     const handleSaveProfile = () => {
         if (!username.trim()) {
-            toast.error('Username is required');
+            toast.error(t('messages.usernameRequired'));
             return;
         }
 
@@ -31,12 +33,12 @@ export function ProfileSettings({ user }: ProfileSettingsProps) {
                 });
 
                 if (result.success) {
-                    toast.success('Profile updated successfully');
+                    toast.success(t('messages.success'));
                 } else {
-                    toast.error(result.error || 'Failed to update profile');
+                    toast.error(result.error || t('messages.error'));
                 }
             } catch (error) {
-                toast.error('An unexpected error occurred');
+                toast.error(t('messages.unexpectedError'));
             }
         });
     };
@@ -45,30 +47,30 @@ export function ProfileSettings({ user }: ProfileSettingsProps) {
         <div className="space-y-6">
             <div>
                 <h2 className="text-xl font-semibold text-text dark:text-text-dark mb-4">
-                    Profile Settings
+                    {t('title')}
                 </h2>
                 <p className="text-text-muted dark:text-text-muted-dark text-sm">
-                    Update your profile information and avatar
+                    {t('subtitle')}
                 </p>
             </div>
 
             <div className="space-y-4">
                 {/* Username Field */}
                 <Input
-                    label="Username"
+                    label={t('fields.username')}
                     type="text"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
-                    placeholder="Enter your username"
+                    placeholder={t('placeholders.username')}
                 />
 
                 {/* Email Field (Read-only) */}
                 <Input
-                    label="Email"
+                    label={t('fields.email')}
                     type="email"
                     value={user.email}
                     disabled
-                    helperText="Email cannot be changed"
+                    helperText={t('fields.emailHelperText')}
                 />
 
                 {/* Save Button */}
@@ -77,7 +79,7 @@ export function ProfileSettings({ user }: ProfileSettingsProps) {
                         onClick={handleSaveProfile}
                         loading={isPending}
                     >
-                        Save Changes
+                        {t('actions.save')}
                     </Button>
                 </div>
             </div>

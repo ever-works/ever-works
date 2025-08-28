@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { updatePassword } from '@/app/actions/settings';
 import { toast } from 'sonner';
+import { useTranslations } from 'next-intl';
 
 interface SecuritySettingsProps {
     user: {
@@ -19,26 +20,27 @@ export function SecuritySettings({ user }: SecuritySettingsProps) {
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [showPasswords, setShowPasswords] = useState(false);
+    const t = useTranslations('dashboard.settings.security');
 
     const handleUpdatePassword = () => {
         // Validation
         if (!currentPassword || !newPassword || !confirmPassword) {
-            toast.error('Please fill in all password fields');
+            toast.error(t('changePassword.messages.fillAllFields'));
             return;
         }
 
         if (newPassword.length < 8) {
-            toast.error('New password must be at least 8 characters');
+            toast.error(t('changePassword.messages.minLength'));
             return;
         }
 
         if (newPassword !== confirmPassword) {
-            toast.error('New passwords do not match');
+            toast.error(t('changePassword.messages.mismatch'));
             return;
         }
 
         if (currentPassword === newPassword) {
-            toast.error('New password must be different from current password');
+            toast.error(t('changePassword.messages.sameAsCurrent'));
             return;
         }
 
@@ -50,16 +52,16 @@ export function SecuritySettings({ user }: SecuritySettingsProps) {
                 });
 
                 if (result.success) {
-                    toast.success('Password updated successfully');
+                    toast.success(t('changePassword.messages.success'));
                     // Clear form
                     setCurrentPassword('');
                     setNewPassword('');
                     setConfirmPassword('');
                 } else {
-                    toast.error(result.error || 'Failed to update password');
+                    toast.error(result.error || t('changePassword.messages.error'));
                 }
             } catch (error) {
-                toast.error('An unexpected error occurred');
+                toast.error(t('changePassword.messages.unexpectedError'));
             }
         });
     };
@@ -68,41 +70,41 @@ export function SecuritySettings({ user }: SecuritySettingsProps) {
         <div className="space-y-6">
             <div>
                 <h2 className="text-xl font-semibold text-text dark:text-text-dark mb-4">
-                    Security Settings
+                    {t('title')}
                 </h2>
                 <p className="text-text-muted dark:text-text-muted-dark text-sm">
-                    Manage your account security and authentication
+                    {t('subtitle')}
                 </p>
             </div>
 
             {/* Password Change Section */}
             <div className="space-y-4">
                 <h3 className="text-lg font-medium text-text dark:text-text-dark">
-                    Change Password
+                    {t('changePassword.title')}
                 </h3>
 
                 <Input
-                    label="Current Password"
+                    label={t('changePassword.currentPassword')}
                     type={showPasswords ? 'text' : 'password'}
                     value={currentPassword}
                     onChange={(e) => setCurrentPassword(e.target.value)}
-                    placeholder="Enter current password"
+                    placeholder={t('changePassword.placeholders.current')}
                 />
 
                 <Input
-                    label="New Password"
+                    label={t('changePassword.newPassword')}
                     type={showPasswords ? 'text' : 'password'}
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="Enter new password (min 8 characters)"
+                    placeholder={t('changePassword.placeholders.new')}
                 />
 
                 <Input
-                    label="Confirm New Password"
+                    label={t('changePassword.confirmPassword')}
                     type={showPasswords ? 'text' : 'password'}
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="Confirm new password"
+                    placeholder={t('changePassword.placeholders.confirm')}
                 />
 
                 <div className="flex items-center gap-2">
@@ -117,7 +119,7 @@ export function SecuritySettings({ user }: SecuritySettingsProps) {
                         htmlFor="show-passwords"
                         className="text-sm text-text-muted dark:text-text-muted-dark"
                     >
-                        Show passwords
+                        {t('changePassword.showPasswords')}
                     </label>
                 </div>
 
@@ -126,7 +128,7 @@ export function SecuritySettings({ user }: SecuritySettingsProps) {
                         onClick={handleUpdatePassword}
                         loading={isPending}
                     >
-                        Update Password
+                        {t('changePassword.actions.update')}
                     </Button>
                 </div>
             </div>
@@ -134,32 +136,32 @@ export function SecuritySettings({ user }: SecuritySettingsProps) {
             {/* Two-Factor Authentication */}
             <div className="pt-6 border-t border-border dark:border-border-dark">
                 <h3 className="text-lg font-medium text-text dark:text-text-dark mb-2">
-                    Two-Factor Authentication
+                    {t('twoFactor.title')}
                 </h3>
                 <p className="text-sm text-text-muted dark:text-text-muted-dark mb-4">
-                    Add an extra layer of security to your account
+                    {t('twoFactor.subtitle')}
                 </p>
                 <Button
                     variant="secondary"
                     disabled
                 >
-                    Coming Soon
+                    {t('twoFactor.action')}
                 </Button>
             </div>
 
             {/* Active Sessions */}
             <div className="pt-6 border-t border-border dark:border-border-dark">
                 <h3 className="text-lg font-medium text-text dark:text-text-dark mb-2">
-                    Active Sessions
+                    {t('sessions.title')}
                 </h3>
                 <p className="text-sm text-text-muted dark:text-text-muted-dark mb-4">
-                    Manage your active sessions across devices
+                    {t('sessions.subtitle')}
                 </p>
                 <Button
                     variant="secondary"
                     disabled
                 >
-                    View Sessions (Coming Soon)
+                    {t('sessions.action')}
                 </Button>
             </div>
         </div>

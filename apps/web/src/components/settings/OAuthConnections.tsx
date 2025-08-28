@@ -7,6 +7,7 @@ import { disconnectGitHub } from '@/app/actions/settings';
 import { toast } from 'sonner';
 import { ROUTES } from '@/lib/constants';
 import { GitHubIcon } from '@/components/icons/GitHubIcon';
+import { useTranslations } from 'next-intl';
 
 interface OAuthConnectionsProps {
     user: {
@@ -21,6 +22,7 @@ interface OAuthConnectionsProps {
 
 export function OAuthConnections({ githubConnected, githubScopes }: OAuthConnectionsProps) {
     const [isPending, startTransition] = useTransition();
+    const t = useTranslations('dashboard.settings.oauth');
 
     const handleGitHubConnect = () => {
         startTransition(async () => {
@@ -29,13 +31,13 @@ export function OAuthConnections({ githubConnected, githubScopes }: OAuthConnect
             if (result.success && result.url) {
                 window.location.href = result.url;
             } else {
-                toast.error(result.error || 'Failed to connect GitHub');
+                toast.error(result.error || t('github.messages.connectError'));
             }
         });
     };
 
     const handleGitHubDisconnect = () => {
-        if (!confirm('Are you sure you want to disconnect your GitHub account?')) {
+        if (!confirm(t('github.actions.confirmDisconnect'))) {
             return;
         }
 
@@ -43,9 +45,9 @@ export function OAuthConnections({ githubConnected, githubScopes }: OAuthConnect
             const result = await disconnectGitHub();
 
             if (result.success) {
-                toast.success('GitHub account disconnected');
+                toast.success(t('github.messages.disconnected'));
             } else {
-                toast.error(result.error || 'Failed to disconnect GitHub');
+                toast.error(result.error || t('github.messages.disconnectError'));
             }
         });
     };
@@ -54,10 +56,10 @@ export function OAuthConnections({ githubConnected, githubScopes }: OAuthConnect
         <div className="space-y-6">
             <div>
                 <h2 className="text-xl font-semibold text-text dark:text-text-dark mb-4">
-                    Connected Accounts
+                    {t('title')}
                 </h2>
                 <p className="text-text-muted dark:text-text-muted-dark text-sm">
-                    Connect your external accounts for enhanced functionality
+                    {t('subtitle')}
                 </p>
             </div>
 
@@ -70,16 +72,16 @@ export function OAuthConnections({ githubConnected, githubScopes }: OAuthConnect
                         </div>
 
                         <div>
-                            <h3 className="font-medium text-text dark:text-text-dark">GitHub</h3>
+                            <h3 className="font-medium text-text dark:text-text-dark">{t('github.name')}</h3>
                             <p className="text-sm text-text-muted dark:text-text-muted-dark">
                                 {githubConnected
-                                    ? 'Create and manage directories with GitHub repositories'
-                                    : 'Connect to create directories from repositories'}
+                                    ? t('github.connected')
+                                    : t('github.disconnected')}
                             </p>
                             {githubConnected && githubScopes.length > 0 && (
                                 <div className="mt-2">
                                     <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                                        Scopes: {githubScopes.join(', ')}
+                                        {t('github.scopes')}: {githubScopes.join(', ')}
                                     </p>
                                 </div>
                             )}
@@ -93,7 +95,7 @@ export function OAuthConnections({ githubConnected, githubScopes }: OAuthConnect
                                 size="sm"
                                 loading={isPending}
                             >
-                                Disconnect
+                                {t('github.actions.disconnect')}
                             </Button>
                         ) : (
                             <Button
@@ -102,7 +104,7 @@ export function OAuthConnections({ githubConnected, githubScopes }: OAuthConnect
                                 size="sm"
                                 loading={isPending}
                             >
-                                Connect
+                                {t('github.actions.connect')}
                             </Button>
                         )}
                     </div>
