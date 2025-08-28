@@ -9,6 +9,7 @@ import { OAuthConnections } from '@/components/settings/OAuthConnections';
 import { NotificationSettings } from '@/components/settings/NotificationSettings';
 import { DangerZone } from '@/components/settings/DangerZone';
 import { User, Lock, Key, Link2, Bell, AlertTriangle } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 
 interface SettingsClientProps {
     user: {
@@ -20,14 +21,6 @@ interface SettingsClientProps {
     githubScopes: string[];
 }
 
-const tabs = [
-    { id: 'profile', label: 'Profile', icon: User },
-    { id: 'security', label: 'Security', icon: Lock },
-    { id: 'api-tokens', label: 'API & Tokens', icon: Key },
-    { id: 'oauth', label: 'Connected Accounts', icon: Link2 },
-    { id: 'notifications', label: 'Notifications', icon: Bell },
-    { id: 'danger', label: 'Danger Zone', icon: AlertTriangle },
-];
 
 export function SettingsClient({
     user,
@@ -35,13 +28,23 @@ export function SettingsClient({
     githubScopes,
 }: SettingsClientProps) {
     const [activeTab, setActiveTab] = useState('profile');
+    const t = useTranslations('dashboard.settings');
+
+    const tabs = [
+        { id: 'profile', label: t('tabs.profile'), icon: User },
+        { id: 'security', label: t('tabs.security'), icon: Lock },
+        { id: 'api-tokens', label: t('tabs.apiTokens'), icon: Key },
+        { id: 'oauth', label: t('tabs.oauth'), icon: Link2 },
+        { id: 'notifications', label: t('tabs.notifications'), icon: Bell },
+        { id: 'danger', label: t('tabs.dangerZone'), icon: AlertTriangle },
+    ];
 
     return (
         <div className="max-w-7xl mx-auto px-4 py-8">
             <div className="mb-8">
-                <h1 className="text-3xl font-bold text-text dark:text-text-dark">Settings</h1>
+                <h1 className="text-3xl font-bold text-text dark:text-text-dark">{t('title')}</h1>
                 <p className="text-text-muted dark:text-text-muted-dark mt-2">
-                    Manage your account settings and preferences
+                    {t('subtitle')}
                 </p>
             </div>
 

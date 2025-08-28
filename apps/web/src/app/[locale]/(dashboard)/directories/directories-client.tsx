@@ -8,6 +8,7 @@ import { ROUTES } from '@/lib/constants';
 import { Link, useRouter } from '@/i18n/navigation';
 import { getDirectories } from '@/app/actions/dashboard/directories';
 import { cn } from '@/lib/utils/cn';
+import { useTranslations } from 'next-intl';
 
 interface DirectoriesClientProps {
     initialDirectories: Directory[];
@@ -19,6 +20,7 @@ export default function DirectoriesClient({
     totalDirectories,
 }: DirectoriesClientProps) {
     const router = useRouter();
+    const t = useTranslations('dashboard.directories');
     const [directories, setDirectories] = useState<Directory[]>(initialDirectories);
     const [total, setTotal] = useState(totalDirectories);
     const [loading, setLoading] = useState(false);
@@ -71,9 +73,9 @@ export default function DirectoriesClient({
     return (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
             <div className="mb-8">
-                <h1 className="text-3xl font-bold text-text dark:text-text-dark">Directories</h1>
+                <h1 className="text-3xl font-bold text-text dark:text-text-dark">{t('title')}</h1>
                 <p className="mt-2 text-text-secondary dark:text-text-secondary-dark">
-                    Manage and organize your AI-powered directories
+                    {t('subtitle')}
                 </p>
             </div>
 
@@ -83,7 +85,7 @@ export default function DirectoriesClient({
                     <div className="relative">
                         <input
                             type="text"
-                            placeholder="Search directories..."
+                            placeholder={t('search')}
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
@@ -127,14 +129,14 @@ export default function DirectoriesClient({
                             d="M12 4v16m8-8H4"
                         />
                     </svg>
-                    Create Directory
+                    {t('create')}
                 </Link>
             </div>
 
             {/* Directory Count */}
             {total > 0 && (
                 <div className="mb-4 text-sm text-text-secondary dark:text-text-secondary-dark">
-                    Showing {directories.length} of {total} directories
+                    {t('showing', { current: directories.length, total })}
                 </div>
             )}
 
@@ -165,7 +167,7 @@ export default function DirectoriesClient({
                                             : 'text-text dark:text-text-dark hover:bg-surface dark:hover:bg-surface-dark',
                                     )}
                                 >
-                                    Previous
+                                    {t('pagination.previous')}
                                 </button>
 
                                 {/* Page Numbers */}
@@ -210,7 +212,7 @@ export default function DirectoriesClient({
                                             : 'text-text dark:text-text-dark hover:bg-surface dark:hover:bg-surface-dark',
                                     )}
                                 >
-                                    Next
+                                    {t('pagination.next')}
                                 </button>
                             </nav>
                         </div>
@@ -218,14 +220,14 @@ export default function DirectoriesClient({
                 </>
             ) : (
                 <EmptyState
-                    title="No directories found"
+                    title={t('empty.notFound.title')}
                     description={
                         searchQuery
-                            ? 'Try adjusting your search terms'
-                            : 'Create your first AI-powered directory to get started'
+                            ? t('empty.notFound.withSearch')
+                            : t('empty.notFound.withoutSearch')
                     }
                     action={{
-                        label: 'Create Your First Directory',
+                        label: t('empty.action'),
                         onClick: () => {
                             router.push(ROUTES.DASHBOARD_DIRECTORIES_NEW);
                         },

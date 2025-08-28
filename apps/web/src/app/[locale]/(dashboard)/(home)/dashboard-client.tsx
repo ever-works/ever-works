@@ -6,6 +6,7 @@ import { StatsOverview } from '@/components/dashboard/StatsOverview';
 import { EmptyState } from '@/components/common/EmptyState';
 import { ROUTES } from '@/lib/constants';
 import { Link, useRouter } from '@/i18n/navigation';
+import { useTranslations } from 'next-intl';
 import type { Directory } from '@/lib/api';
 
 interface DashboardClientProps {
@@ -20,16 +21,17 @@ export default function DashboardClient({
     totalDirectories,
 }: DashboardClientProps) {
     const router = useRouter();
+    const t = useTranslations('dashboard');
     const hasDirectories = initialDirectories.length > 0;
 
     return (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
             <div className="mb-8">
                 <h1 className="text-3xl font-bold text-text dark:text-text-dark">
-                    Welcome back, {user.username}!
+                    {t('header.welcome', { username: user.username })}
                 </h1>
                 <p className="mt-2 text-text-secondary dark:text-text-secondary-dark">
-                    Manage your AI-powered directories and track their performance
+                    {t('header.subtitle')}
                 </p>
             </div>
 
@@ -41,14 +43,14 @@ export default function DashboardClient({
                         <>
                             <div className="flex justify-between items-center mb-4">
                                 <h2 className="text-xl font-semibold text-text dark:text-text-dark">
-                                    Recent Directories
+                                    {t('directories.recent')}
                                 </h2>
                                 {totalDirectories > 5 && (
                                     <Link
                                         href={ROUTES.DASHBOARD_DIRECTORIES}
                                         className="text-sm text-primary hover:text-primary-hover transition-colors"
                                     >
-                                        View all ({totalDirectories})
+                                        {t('directories.viewAll', { count: totalDirectories })}
                                     </Link>
                                 )}
                             </div>
@@ -56,10 +58,10 @@ export default function DashboardClient({
                         </>
                     ) : (
                         <EmptyState
-                            title="No directories yet"
-                            description="Create your first AI-powered directory to start organizing and showcasing your content."
+                            title={t('directories.empty.title')}
+                            description={t('directories.empty.description')}
                             action={{
-                                label: 'Create Your First Directory',
+                                label: t('directories.empty.action'),
                                 onClick: () => {
                                     router.push(ROUTES.DASHBOARD_DIRECTORIES_NEW);
                                 },

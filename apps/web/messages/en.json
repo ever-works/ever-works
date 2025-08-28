@@ -208,6 +208,49 @@
             "verified": {
                 "title": "Email verified successfully! ✅",
                 "description": "Your email address has been verified. You now have full access to all features."
+            },
+            "oauthConnected": {
+                "title": "Account connected to GitHub",
+                "description": "Your account has been successfully connected to GitHub."
+            }
+        },
+        "header": {
+            "welcome": "Welcome back, {username}!",
+            "subtitle": "Manage your AI-powered directories and track their performance"
+        },
+        "directories": {
+            "title": "Directories",
+            "subtitle": "Manage and organize your AI-powered directories",
+            "recent": "Recent Directories",
+            "viewAll": "View all ({count})",
+            "search": "Search directories...",
+            "create": "Create Directory",
+            "showing": "Showing {current} of {total} directories",
+            "pagination": {
+                "previous": "Previous",
+                "next": "Next"
+            },
+            "empty": {
+                "title": "No directories yet",
+                "description": "Create your first AI-powered directory to start organizing and showcasing your content.",
+                "action": "Create Your First Directory",
+                "notFound": {
+                    "title": "No directories found",
+                    "withSearch": "Try adjusting your search terms",
+                    "withoutSearch": "Create your first AI-powered directory to get started"
+                }
+            }
+        },
+        "settings": {
+            "title": "Settings",
+            "subtitle": "Manage your account settings and preferences",
+            "tabs": {
+                "profile": "Profile",
+                "security": "Security",
+                "apiTokens": "API & Tokens",
+                "oauth": "Connected Accounts",
+                "notifications": "Notifications",
+                "dangerZone": "Danger Zone"
             }
         }
     },
