@@ -30,7 +30,7 @@ import { AuthenticatedUser } from '@src/auth/types/jwt.types';
 
 @Controller('api')
 @UseGuards(JwtAuthGuard)
-export class AgentHttpController {
+export class DirectoriesController {
     constructor(
         private readonly agentService: AgentService,
         private readonly authService: AuthService,
