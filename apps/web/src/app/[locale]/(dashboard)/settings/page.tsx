@@ -12,9 +12,6 @@ export default async function SettingsPage() {
         redirect(ROUTES.AUTH_LOGIN);
     }
 
-    // const repos = await authAPI.oauth_connections.getGitHubOrgs();
-    // console.log('repos', repos);
-
     // Get fresh profile and OAuth connections
     const [profile, connections] = await Promise.all([
         authAPI.getFreshProfile(),

@@ -7,7 +7,7 @@ import {
     UpdateDateColumn,
 } from 'typeorm';
 import { User } from './user.entity';
-import { ClassToObject } from './types';
+import { ClassToObject, GenerateStatus } from './types';
 
 @Entity({ name: 'directories' })
 export class Directory {
@@ -47,8 +47,8 @@ export class Directory {
     @Column('simple-json', { nullable: true })
     readmeConfig: MarkdownReadmeConfig;
 
-    @Column({ nullable: true })
-    generateStatus: 'active' | 'generating' | 'generated' | 'error';
+    @Column('simple-json', { nullable: true })
+    generateStatus?: GenerateStatus;
 
     @CreateDateColumn()
     createdAt: Date;

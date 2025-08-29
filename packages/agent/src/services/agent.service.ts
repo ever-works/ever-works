@@ -32,6 +32,7 @@ import { CreateDirectoryDto } from '../dto/create-directory.dto';
 import { UpdateWebsiteRepositoryResponseDto } from '../website-generator/dto/update-website-repository.dto';
 import { ItemSubmissionService } from '../items-generator/item-submission.service';
 import { ItemsGeneratorService } from '../items-generator/items-generator.service';
+import { GenerateStatus, GenerateStatusType } from '../entities/types';
 
 @Injectable()
 export class AgentService {
@@ -643,6 +644,10 @@ export class AgentService {
         const startTime = new Date();
         console.log(`Generation started at: ${startTime.toISOString()}`);
 
+        await this.directoryRepository.updateGenerateStatus(directory.id, {
+            status: GenerateStatusType.GENERATING,
+        });
+
         try {
             const generated = await this.dataGenerator.initialize(directory, user, dto);
 
@@ -658,7 +663,16 @@ export class AgentService {
                     ),
                 ]);
             }
+
+            await this.directoryRepository.updateGenerateStatus(directory.id, {
+                status: GenerateStatusType.GENERATED,
+            });
         } catch (error) {
+            await this.directoryRepository.updateGenerateStatus(directory.id, {
+                status: GenerateStatusType.ERROR,
+                error: this.clearMessageError(error),
+            });
+
             if (error instanceof HttpException) {
                 throw error;
             }

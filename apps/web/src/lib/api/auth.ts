@@ -61,11 +61,11 @@ export interface OAuthUrlResponse {
 }
 
 export interface OAuthConnectionResponse {
-    id: string;
     provider: string;
-    providerId: string;
+    connected: boolean;
     scopes: string[];
-    createdAt: string;
+    metadata: Record<string, any>;
+    connectedAt: string;
 }
 
 export interface TokenValidationResponse {

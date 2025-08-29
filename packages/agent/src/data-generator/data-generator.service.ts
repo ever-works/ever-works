@@ -13,6 +13,8 @@ import {
     CompanyDto,
 } from '../items-generator/dto';
 import { format } from 'date-fns';
+import { DirectoryRepository } from '../database';
+import { GenerateStatusType } from '../entities/types';
 
 @Injectable()
 export class DataGeneratorService {
@@ -21,6 +23,7 @@ export class DataGeneratorService {
     constructor(
         private readonly githubService: GithubService,
         private readonly itemsGeneratorService: ItemsGeneratorService,
+        private readonly directoryRepository: DirectoryRepository,
     ) {}
 
     async initialize(
@@ -49,7 +52,9 @@ export class DataGeneratorService {
 
         // Generate items, the items generator will always to generate new items
         const generatedItems = await this.itemsGeneratorService
-            .generateItemsGenerator(directory, createItemsGeneratorDto, existingData)
+            .generateItemsGenerator(directory, createItemsGeneratorDto, existingData, (step) => {
+                this.onGenerationProgress(step, directory);
+            })
             .catch((err) => {
                 this.logger.error('Failed to generate items from ItemsGeneratorService.', err);
                 return null;
@@ -216,11 +221,7 @@ export class DataGeneratorService {
             await Promise.all(promises);
 
             // Commit changes
-            if (createItemsGeneratorDto.generation_method === GenerationMethod.RECREATE) {
-                await this.githubService.addAll(data.dir);
-            } else {
-                await this.githubService.add(data.dir, '.');
-            }
+            await this.githubService.addAll(data.dir);
 
             await this.githubService.commit(
                 data.dir,
@@ -232,6 +233,8 @@ export class DataGeneratorService {
 
             // Process items (with markdown generation, writing to disk and committing)
             this.logger.log(`Processing ${newItems.length} items...`);
+            this.onGenerationProgress('Processing Items', directory);
+
             const itemsWithMarkdown =
                 await this.itemsGeneratorService.generateMarkdownForItems(newItems);
 
@@ -321,6 +324,16 @@ export class DataGeneratorService {
 
         const config = await data.getConfig();
         return config.metadata?.last_request_data;
+    }
+
+    /**
+     * Callback for generation progress
+     */
+    private async onGenerationProgress(step: string, directory: Directory) {
+        await this.directoryRepository.updateGenerateStatus(directory.id, {
+            status: GenerateStatusType.GENERATING,
+            step,
+        });
     }
 
     /**
