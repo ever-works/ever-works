@@ -216,7 +216,11 @@
         },
         "header": {
             "welcome": "Welcome back, {username}!",
-            "subtitle": "Manage your AI-powered directories and track their performance"
+            "subtitle": "Manage your AI-powered directories and track their performance",
+            "notifications": {
+                "title": "Notifications",
+                "empty": "No new notifications"
+            }
         },
         "directories": {
             "title": "Directories",
@@ -438,12 +442,6 @@
                 "unexpectedError": "An unexpected error occurred"
             }
         },
-        "header": {
-            "notifications": {
-                "title": "Notifications",
-                "empty": "No new notifications"
-            }
-        },
         "sidebar": {
             "menu": "Menu",
             "aiChat": "AI Chat",
@@ -580,9 +578,11 @@
                 "newMinLength": "Password must be at least 8 characters",
                 "newMaxLength": "Password must be less than 100 characters",
                 "updateFailed": "Failed to update password",
-                "updateSuccess": "Password updated successfully"
+                "updateSuccess": "Password updated successfully",
+                "notAuthenticated": "Not authenticated"
             },
             "vercel": {
+                "notAuthenticated": "Not authenticated",
                 "tokenRequired": "Token is required",
                 "invalidFormat": "Invalid Vercel token format",
                 "saveFailed": "Failed to save Vercel token",
@@ -591,14 +591,17 @@
                 "removeSuccess": "Vercel token removed successfully"
             },
             "github": {
+                "notAuthenticated": "Not authenticated",
                 "disconnectFailed": "Failed to disconnect GitHub",
                 "disconnectSuccess": "GitHub account disconnected successfully"
             },
             "notifications": {
+                "notAuthenticated": "Not authenticated",
                 "updateFailed": "Failed to update preferences",
                 "updateSuccess": "Notification preferences updated successfully"
             },
             "danger": {
+                "notAuthenticated": "Not authenticated",
                 "deleteFailed": "Failed to delete account",
                 "deleteDisabled": "Account deletion is disabled in demo"
             }

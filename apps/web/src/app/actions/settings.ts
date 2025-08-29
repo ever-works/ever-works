@@ -29,8 +29,7 @@ export async function updateProfile(data: { username: string }) {
     try {
         const user = await getAuthFromCookie();
         if (!user) {
-            const errorT = await getTranslations('api.errors');
-            return { success: false, error: errorT('notAuthenticated') };
+            return { success: false, error: t('notAuthenticated') };
         }
 
         // Validate input
@@ -70,8 +69,7 @@ export async function updatePassword(data: { currentPassword: string; newPasswor
     try {
         const user = await getAuthFromCookie();
         if (!user) {
-            const errorT = await getTranslations('api.errors');
-            return { success: false, error: errorT('notAuthenticated') };
+            return { success: false, error: t('notAuthenticated') };
         }
 
         // Validate input
@@ -109,8 +107,7 @@ export async function updateVercelToken(token: string) {
     try {
         const user = await getAuthFromCookie();
         if (!user) {
-            const errorT = await getTranslations('api.errors');
-            return { success: false, error: errorT('notAuthenticated') };
+            return { success: false, error: t('notAuthenticated') };
         }
 
         // Validate input
@@ -140,8 +137,7 @@ export async function removeVercelToken() {
     try {
         const user = await getAuthFromCookie();
         if (!user) {
-            const errorT = await getTranslations('api.errors');
-            return { success: false, error: errorT('notAuthenticated') };
+            return { success: false, error: t('notAuthenticated') };
         }
 
         await settingsAPI.removeVercelToken();
@@ -163,8 +159,7 @@ export async function disconnectGitHub() {
     try {
         const user = await getAuthFromCookie();
         if (!user) {
-            const errorT = await getTranslations('api.errors');
-            return { success: false, error: errorT('notAuthenticated') };
+            return { success: false, error: t('notAuthenticated') };
         }
 
         await authAPI.oauth_connections.disconnect('github');
@@ -215,8 +210,7 @@ export async function updateNotificationPreferences(preferences: {
     try {
         const user = await getAuthFromCookie();
         if (!user) {
-            const errorT = await getTranslations('api.errors');
-            return { success: false, error: errorT('notAuthenticated') };
+            return { success: false, error: t('notAuthenticated') };
         }
 
         // Validate input
@@ -248,8 +242,7 @@ export async function deleteAccount() {
     try {
         const user = await getAuthFromCookie();
         if (!user) {
-            const errorT = await getTranslations('api.errors');
-            return { success: false, error: errorT('notAuthenticated') };
+            return { success: false, error: t('notAuthenticated') };
         }
 
         // This would normally call an API endpoint to delete the account

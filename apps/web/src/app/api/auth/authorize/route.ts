@@ -3,7 +3,7 @@ import { getAuthFromRequest, setRedirectCookie } from '@/lib/auth';
 import { REDIRECT_SEARCH_PARAM, ROUTES } from '@/lib/constants';
 import { addSessionTokenToUrl, isValidRedirectUrl } from '@/lib/utils';
 import { getLocale } from 'next-intl/server';
-import { NextRequest } from 'next/server';
+import type { NextRequest } from 'next/server';
 
 export async function GET(request: NextRequest) {
     const redirectUrl = request.nextUrl.searchParams.get(REDIRECT_SEARCH_PARAM);
