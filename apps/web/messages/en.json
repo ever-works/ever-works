@@ -337,6 +337,139 @@
             "totalItems": "Total Items",
             "activeWebsites": "Active Websites",
             "fromLastMonth": "from last month"
+        },
+        "directoryCard": {
+            "status": {
+                "active": "Active"
+            },
+            "noDescription": "No description provided",
+            "items": "{count} items",
+            "views": "{count} views",
+            "updated": "Updated {date}",
+            "viewAction": "View →"
+        },
+        "apiTokens": {
+            "title": "API & Tokens",
+            "subtitle": "Manage your API keys and third-party integrations",
+            "vercel": {
+                "title": "Vercel Integration",
+                "subtitle": "Connect your Vercel account to deploy directories as websites",
+                "connected": "Connected",
+                "notConnected": "Not Connected",
+                "connectedMessage": "Your Vercel account is connected. You can now deploy directories to Vercel.",
+                "disconnect": "Disconnect Vercel",
+                "disconnecting": "Removing...",
+                "apiTokenLabel": "Vercel API Token",
+                "placeholder": "vc_...",
+                "showToken": "Show",
+                "hideToken": "Hide",
+                "getTokenHelp": "You can get your API token from",
+                "vercelDashboard": "Vercel Dashboard",
+                "save": "Save Token",
+                "saving": "Saving...",
+                "messages": {
+                    "tokenRequired": "Please enter a valid Vercel token",
+                    "saveSuccess": "Vercel token saved successfully",
+                    "saveFailed": "Failed to save Vercel token",
+                    "removeSuccess": "Vercel token removed successfully",
+                    "removeFailed": "Failed to remove Vercel token",
+                    "unexpectedError": "An unexpected error occurred"
+                }
+            },
+            "apiKeys": {
+                "title": "API Keys",
+                "subtitle": "Generate and manage API keys for programmatic access",
+                "generate": "Generate API Key (Coming Soon)"
+            },
+            "webhooks": {
+                "title": "Webhooks",
+                "subtitle": "Configure webhooks to receive real-time updates",
+                "configure": "Configure Webhooks (Coming Soon)"
+            }
+        },
+        "notifications": {
+            "title": "Notification Preferences",
+            "subtitle": "Choose how you want to be notified about important updates",
+            "email": {
+                "title": "Email Notifications",
+                "directoryUpdates": {
+                    "label": "Directory Updates",
+                    "description": "Get notified about important updates to your directories"
+                },
+                "newItems": {
+                    "label": "New Items",
+                    "description": "Get notified when new items are added to your directories"
+                },
+                "weeklyDigest": {
+                    "label": "Weekly Digest",
+                    "description": "Receive a weekly summary of your directory activity"
+                },
+                "marketing": {
+                    "label": "Marketing & Promotions",
+                    "description": "Receive updates about new features and offers"
+                }
+            },
+            "app": {
+                "title": "In-App Notifications",
+                "newItems": {
+                    "label": "New Items",
+                    "description": "Show notifications for new directory items"
+                },
+                "comments": {
+                    "label": "Comments",
+                    "description": "Get notified about comments on your directories"
+                },
+                "mentions": {
+                    "label": "Mentions",
+                    "description": "Get notified when someone mentions you"
+                },
+                "systemUpdates": {
+                    "label": "System Updates",
+                    "description": "Important system notifications and maintenance alerts"
+                }
+            },
+            "actions": {
+                "save": "Save Preferences",
+                "saving": "Saving..."
+            },
+            "messages": {
+                "success": "Notification preferences updated",
+                "error": "Failed to update preferences",
+                "unexpectedError": "An unexpected error occurred"
+            }
+        },
+        "dangerZone": {
+            "title": "Danger Zone",
+            "subtitle": "Irreversible and destructive actions",
+            "export": {
+                "title": "Export Your Data",
+                "subtitle": "Download all your directories, items, and settings",
+                "action": "Export Data (Coming Soon)"
+            },
+            "delete": {
+                "title": "Delete Account",
+                "subtitle": "Permanently delete your account and all associated data. This action cannot be undone.",
+                "button": "Delete My Account",
+                "confirmTitle": "⚠️ This will permanently delete:",
+                "confirmItems": [
+                    "Your account and profile",
+                    "All your directories",
+                    "All directory items and data",
+                    "API keys and integrations",
+                    "All associated websites"
+                ],
+                "confirmLabel": "Type your email {email} to confirm",
+                "confirmPlaceholder": "Enter your email",
+                "confirmButton": "Yes, Delete My Account",
+                "deleting": "Deleting...",
+                "cancel": "Cancel"
+            },
+            "messages": {
+                "confirmEmail": "Please enter your email correctly to confirm",
+                "deleteSuccess": "Account deleted successfully",
+                "deleteFailed": "Failed to delete account",
+                "unexpectedError": "An unexpected error occurred"
+            }
         }
     },
     "layout": {

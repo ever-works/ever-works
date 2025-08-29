@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react';
 import { cn } from '@/lib/utils/cn';
 import { updateVercelToken, removeVercelToken } from '@/app/actions/settings';
 import { toast } from 'sonner';
+import { useTranslations } from 'next-intl';
 
 interface ApiTokenSettingsProps {
     user: {
@@ -17,10 +18,11 @@ export function ApiTokenSettings({ user }: ApiTokenSettingsProps) {
     const [vercelToken, setVercelToken] = useState('');
     const [hasVercelToken, setHasVercelToken] = useState(false);
     const [showToken, setShowToken] = useState(false);
+    const t = useTranslations('dashboard.apiTokens');
 
     const handleSaveVercelToken = () => {
         if (!vercelToken.trim()) {
-            toast.error('Please enter a valid Vercel token');
+            toast.error(t('vercel.messages.tokenRequired'));
             return;
         }
 
@@ -29,15 +31,15 @@ export function ApiTokenSettings({ user }: ApiTokenSettingsProps) {
                 const result = await updateVercelToken(vercelToken.trim());
 
                 if (result.success) {
-                    toast.success('Vercel token saved successfully');
+                    toast.success(t('vercel.messages.saveSuccess'));
                     setHasVercelToken(true);
                     setVercelToken('');
                     setShowToken(false);
                 } else {
-                    toast.error(result.error || 'Failed to save Vercel token');
+                    toast.error(result.error || t('vercel.messages.saveFailed'));
                 }
             } catch (error) {
-                toast.error('An unexpected error occurred');
+                toast.error(t('vercel.messages.unexpectedError'));
             }
         });
     };
@@ -48,13 +50,13 @@ export function ApiTokenSettings({ user }: ApiTokenSettingsProps) {
                 const result = await removeVercelToken();
 
                 if (result.success) {
-                    toast.success('Vercel token removed successfully');
+                    toast.success(t('vercel.messages.removeSuccess'));
                     setHasVercelToken(false);
                 } else {
-                    toast.error(result.error || 'Failed to remove Vercel token');
+                    toast.error(result.error || t('vercel.messages.removeFailed'));
                 }
             } catch (error) {
-                toast.error('An unexpected error occurred');
+                toast.error(t('vercel.messages.unexpectedError'));
             }
         });
     };
@@ -63,10 +65,10 @@ export function ApiTokenSettings({ user }: ApiTokenSettingsProps) {
         <div className="space-y-6">
             <div>
                 <h2 className="text-xl font-semibold text-text dark:text-text-dark mb-4">
-                    API & Tokens
+                    {t('title')}
                 </h2>
                 <p className="text-text-muted dark:text-text-muted-dark text-sm">
-                    Manage your API keys and third-party integrations
+                    {t('subtitle')}
                 </p>
             </div>
 
@@ -75,10 +77,10 @@ export function ApiTokenSettings({ user }: ApiTokenSettingsProps) {
                 <div className="flex items-center justify-between">
                     <div>
                         <h3 className="text-lg font-medium text-text dark:text-text-dark">
-                            Vercel Integration
+                            {t('vercel.title')}
                         </h3>
                         <p className="text-sm text-text-muted dark:text-text-muted-dark mt-1">
-                            Connect your Vercel account to deploy directories as websites
+                            {t('vercel.subtitle')}
                         </p>
                     </div>
                     <div className="flex items-center gap-2">
@@ -90,7 +92,7 @@ export function ApiTokenSettings({ user }: ApiTokenSettingsProps) {
                                     : 'bg-surface-secondary dark:bg-surface-secondary-dark text-text-muted dark:text-text-muted-dark',
                             )}
                         >
-                            {hasVercelToken ? 'Connected' : 'Not Connected'}
+                            {hasVercelToken ? t('vercel.connected') : t('vercel.notConnected')}
                         </span>
                     </div>
                 </div>
@@ -98,7 +100,7 @@ export function ApiTokenSettings({ user }: ApiTokenSettingsProps) {
                 {hasVercelToken ? (
                     <div className="p-4 rounded-lg bg-surface-secondary dark:bg-surface-secondary-dark">
                         <p className="text-sm text-text dark:text-text-dark mb-3">
-                            Your Vercel account is connected. You can now deploy directories to Vercel.
+                            {t('vercel.connectedMessage')}
                         </p>
                         <button
                             onClick={handleRemoveVercelToken}
@@ -109,14 +111,14 @@ export function ApiTokenSettings({ user }: ApiTokenSettingsProps) {
                                 'disabled:opacity-50 disabled:cursor-not-allowed',
                             )}
                         >
-                            {isPending ? 'Removing...' : 'Disconnect Vercel'}
+                            {isPending ? t('vercel.disconnecting') : t('vercel.disconnect')}
                         </button>
                     </div>
                 ) : (
                     <div className="space-y-4">
                         <div>
                             <label className="block text-sm font-medium text-text dark:text-text-dark mb-2">
-                                Vercel API Token
+                                {t('vercel.apiTokenLabel')}
                             </label>
                             <div className="relative">
                                 <input
@@ -132,25 +134,25 @@ export function ApiTokenSettings({ user }: ApiTokenSettingsProps) {
                                         'placeholder:text-text-muted dark:placeholder:text-text-muted-dark',
                                         'font-mono',
                                     )}
-                                    placeholder="vc_..."
+                                    placeholder={t('vercel.placeholder')}
                                 />
                                 <button
                                     type="button"
                                     onClick={() => setShowToken(!showToken)}
                                     className="absolute right-2 top-1/2 -translate-y-1/2 px-2 py-1 text-xs text-text-muted dark:text-text-muted-dark hover:text-text dark:hover:text-text-dark"
                                 >
-                                    {showToken ? 'Hide' : 'Show'}
+                                    {showToken ? t('vercel.hideToken') : t('vercel.showToken')}
                                 </button>
                             </div>
                             <p className="text-xs text-text-muted dark:text-text-muted-dark mt-2">
-                                You can get your API token from{' '}
+                                {t('vercel.getTokenHelp')}{' '}
                                 <a
                                     href="https://vercel.com/account/tokens"
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="text-primary dark:text-primary-dark hover:underline"
                                 >
-                                    Vercel Dashboard
+                                    {t('vercel.vercelDashboard')}
                                 </a>
                             </p>
                         </div>
@@ -166,7 +168,7 @@ export function ApiTokenSettings({ user }: ApiTokenSettingsProps) {
                                     'disabled:opacity-50 disabled:cursor-not-allowed',
                                 )}
                             >
-                                {isPending ? 'Saving...' : 'Save Token'}
+                                {isPending ? t('vercel.saving') : t('vercel.save')}
                             </button>
                         </div>
                     </div>
@@ -176,10 +178,10 @@ export function ApiTokenSettings({ user }: ApiTokenSettingsProps) {
             {/* API Keys Section */}
             <div className="pt-6 border-t border-border dark:border-border-dark">
                 <h3 className="text-lg font-medium text-text dark:text-text-dark mb-2">
-                    API Keys
+                    {t('apiKeys.title')}
                 </h3>
                 <p className="text-sm text-text-muted dark:text-text-muted-dark mb-4">
-                    Generate and manage API keys for programmatic access
+                    {t('apiKeys.subtitle')}
                 </p>
                 <button
                     disabled
@@ -190,17 +192,17 @@ export function ApiTokenSettings({ user }: ApiTokenSettingsProps) {
                         'cursor-not-allowed opacity-50',
                     )}
                 >
-                    Generate API Key (Coming Soon)
+                    {t('apiKeys.generate')}
                 </button>
             </div>
 
             {/* Webhooks */}
             <div className="pt-6 border-t border-border dark:border-border-dark">
                 <h3 className="text-lg font-medium text-text dark:text-text-dark mb-2">
-                    Webhooks
+                    {t('webhooks.title')}
                 </h3>
                 <p className="text-sm text-text-muted dark:text-text-muted-dark mb-4">
-                    Configure webhooks to receive real-time updates
+                    {t('webhooks.subtitle')}
                 </p>
                 <button
                     disabled
@@ -211,7 +213,7 @@ export function ApiTokenSettings({ user }: ApiTokenSettingsProps) {
                         'cursor-not-allowed opacity-50',
                     )}
                 >
-                    Configure Webhooks (Coming Soon)
+                    {t('webhooks.configure')}
                 </button>
             </div>
         </div>

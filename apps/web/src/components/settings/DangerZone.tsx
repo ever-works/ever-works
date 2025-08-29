@@ -6,6 +6,7 @@ import { deleteAccount } from '@/app/actions/settings';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { ROUTES } from '@/lib/constants';
+import { useTranslations } from 'next-intl';
 
 interface DangerZoneProps {
     user: {
@@ -19,10 +20,11 @@ export function DangerZone({ user }: DangerZoneProps) {
     const [isPending, startTransition] = useTransition();
     const [confirmEmail, setConfirmEmail] = useState('');
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const t = useTranslations('dashboard.dangerZone');
 
     const handleDeleteAccount = () => {
         if (confirmEmail !== user.email) {
-            toast.error('Please enter your email correctly to confirm');
+            toast.error(t('messages.confirmEmail'));
             return;
         }
 
@@ -31,13 +33,13 @@ export function DangerZone({ user }: DangerZoneProps) {
                 const result = await deleteAccount();
 
                 if (result.success) {
-                    toast.success('Account deleted successfully');
+                    toast.success(t('messages.deleteSuccess'));
                     router.push(ROUTES.AUTH_REGISTER);
                 } else {
-                    toast.error(result.error || 'Failed to delete account');
+                    toast.error(result.error || t('messages.deleteFailed'));
                 }
             } catch (error) {
-                toast.error('An unexpected error occurred');
+                toast.error(t('messages.unexpectedError'));
             }
         });
     };
@@ -45,19 +47,19 @@ export function DangerZone({ user }: DangerZoneProps) {
     return (
         <div className="space-y-6">
             <div>
-                <h2 className="text-xl font-semibold text-danger mb-4">Danger Zone</h2>
+                <h2 className="text-xl font-semibold text-danger mb-4">{t('title')}</h2>
                 <p className="text-text-muted dark:text-text-muted-dark text-sm">
-                    Irreversible and destructive actions
+                    {t('subtitle')}
                 </p>
             </div>
 
             {/* Export Data */}
             <div className="p-4 rounded-lg border border-danger/20 bg-danger/5">
                 <h3 className="text-lg font-medium text-text dark:text-text-dark mb-2">
-                    Export Your Data
+                    {t('export.title')}
                 </h3>
                 <p className="text-sm text-text-muted dark:text-text-muted-dark mb-4">
-                    Download all your directories, items, and settings
+                    {t('export.subtitle')}
                 </p>
                 <button
                     disabled
@@ -68,16 +70,15 @@ export function DangerZone({ user }: DangerZoneProps) {
                         'cursor-not-allowed opacity-50',
                     )}
                 >
-                    Export Data (Coming Soon)
+                    {t('export.action')}
                 </button>
             </div>
 
             {/* Delete Account */}
             <div className="p-4 rounded-lg border border-danger/20 bg-danger/5">
-                <h3 className="text-lg font-medium text-danger mb-2">Delete Account</h3>
+                <h3 className="text-lg font-medium text-danger mb-2">{t('delete.title')}</h3>
                 <p className="text-sm text-text-muted dark:text-text-muted-dark mb-4">
-                    Permanently delete your account and all associated data. This action cannot be
-                    undone.
+                    {t('delete.subtitle')}
                 </p>
 
                 {!showDeleteConfirm ? (
@@ -88,27 +89,26 @@ export function DangerZone({ user }: DangerZoneProps) {
                             'bg-danger text-white hover:bg-danger/90',
                         )}
                     >
-                        Delete My Account
+                        {t('delete.button')}
                     </button>
                 ) : (
                     <div className="space-y-4">
                         <div className="p-3 rounded bg-danger/10 border border-danger/30">
                             <p className="text-sm text-danger font-medium mb-2">
-                                ⚠️ This will permanently delete:
+                                {t('delete.confirmTitle')}
                             </p>
                             <ul className="text-sm text-text-muted dark:text-text-muted-dark space-y-1 ml-5 list-disc">
-                                <li>Your account and profile</li>
-                                <li>All your directories</li>
-                                <li>All directory items and data</li>
-                                <li>API keys and integrations</li>
-                                <li>All associated websites</li>
+                                <li>{t('delete.confirmItems.0')}</li>
+                                <li>{t('delete.confirmItems.1')}</li>
+                                <li>{t('delete.confirmItems.2')}</li>
+                                <li>{t('delete.confirmItems.3')}</li>
+                                <li>{t('delete.confirmItems.4')}</li>
                             </ul>
                         </div>
 
                         <div>
                             <label className="block text-sm font-medium text-text dark:text-text-dark mb-2">
-                                Type your email <span className="font-mono">{user.email}</span> to
-                                confirm
+                                {t('delete.confirmLabel', { email: user.email })}
                             </label>
                             <input
                                 type="email"
@@ -122,7 +122,7 @@ export function DangerZone({ user }: DangerZoneProps) {
                                     'focus:outline-none focus:ring-2 focus:ring-danger',
                                     'placeholder:text-text-muted dark:placeholder:text-text-muted-dark',
                                 )}
-                                placeholder="Enter your email"
+                                placeholder={t('delete.confirmPlaceholder')}
                             />
                         </div>
 
@@ -138,7 +138,7 @@ export function DangerZone({ user }: DangerZoneProps) {
                                         : 'opacity-50 cursor-not-allowed',
                                 )}
                             >
-                                {isPending ? 'Deleting...' : 'Yes, Delete My Account'}
+                                {isPending ? t('delete.deleting') : t('delete.confirmButton')}
                             </button>
                             <button
                                 onClick={() => {
@@ -154,7 +154,7 @@ export function DangerZone({ user }: DangerZoneProps) {
                                     'disabled:opacity-50 disabled:cursor-not-allowed',
                                 )}
                             >
-                                Cancel
+                                {t('delete.cancel')}
                             </button>
                         </div>
                     </div>

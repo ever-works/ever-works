@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react';
 import { cn } from '@/lib/utils/cn';
 import { updateNotificationPreferences } from '@/app/actions/settings';
 import { toast } from 'sonner';
+import { useTranslations } from 'next-intl';
 
 interface NotificationSettingsProps {
     user: {
@@ -14,6 +15,7 @@ interface NotificationSettingsProps {
 
 export function NotificationSettings({ user }: NotificationSettingsProps) {
     const [isPending, startTransition] = useTransition();
+    const t = useTranslations('dashboard.notifications');
     
     // Email notifications
     const [emailUpdates, setEmailUpdates] = useState(true);
@@ -46,12 +48,12 @@ export function NotificationSettings({ user }: NotificationSettingsProps) {
                 });
 
                 if (result.success) {
-                    toast.success('Notification preferences updated');
+                    toast.success(t('messages.success'));
                 } else {
-                    toast.error(result.error || 'Failed to update preferences');
+                    toast.error(result.error || t('messages.error'));
                 }
             } catch (error) {
-                toast.error('An unexpected error occurred');
+                toast.error(t('messages.unexpectedError'));
             }
         });
     };
@@ -60,27 +62,27 @@ export function NotificationSettings({ user }: NotificationSettingsProps) {
         <div className="space-y-6">
             <div>
                 <h2 className="text-xl font-semibold text-text dark:text-text-dark mb-4">
-                    Notification Preferences
+                    {t('title')}
                 </h2>
                 <p className="text-text-muted dark:text-text-muted-dark text-sm">
-                    Choose how you want to be notified about important updates
+                    {t('subtitle')}
                 </p>
             </div>
 
             {/* Email Notifications */}
             <div className="space-y-4">
                 <h3 className="text-lg font-medium text-text dark:text-text-dark">
-                    Email Notifications
+                    {t('email.title')}
                 </h3>
                 
                 <div className="space-y-3">
                     <label className="flex items-center justify-between cursor-pointer">
                         <div>
                             <p className="text-sm font-medium text-text dark:text-text-dark">
-                                Directory Updates
+                                {t('email.directoryUpdates.label')}
                             </p>
                             <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                                Get notified about important updates to your directories
+                                {t('email.directoryUpdates.description')}
                             </p>
                         </div>
                         <input
@@ -94,10 +96,10 @@ export function NotificationSettings({ user }: NotificationSettingsProps) {
                     <label className="flex items-center justify-between cursor-pointer">
                         <div>
                             <p className="text-sm font-medium text-text dark:text-text-dark">
-                                New Items
+                                {t('email.newItems.label')}
                             </p>
                             <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                                Get notified when new items are added to your directories
+                                {t('email.newItems.description')}
                             </p>
                         </div>
                         <input
@@ -111,10 +113,10 @@ export function NotificationSettings({ user }: NotificationSettingsProps) {
                     <label className="flex items-center justify-between cursor-pointer">
                         <div>
                             <p className="text-sm font-medium text-text dark:text-text-dark">
-                                Weekly Digest
+                                {t('email.weeklyDigest.label')}
                             </p>
                             <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                                Receive a weekly summary of your directory activity
+                                {t('email.weeklyDigest.description')}
                             </p>
                         </div>
                         <input
@@ -128,10 +130,10 @@ export function NotificationSettings({ user }: NotificationSettingsProps) {
                     <label className="flex items-center justify-between cursor-pointer">
                         <div>
                             <p className="text-sm font-medium text-text dark:text-text-dark">
-                                Marketing & Promotions
+                                {t('email.marketing.label')}
                             </p>
                             <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                                Receive updates about new features and offers
+                                {t('email.marketing.description')}
                             </p>
                         </div>
                         <input
@@ -147,17 +149,17 @@ export function NotificationSettings({ user }: NotificationSettingsProps) {
             {/* In-App Notifications */}
             <div className="space-y-4 pt-6 border-t border-border dark:border-border-dark">
                 <h3 className="text-lg font-medium text-text dark:text-text-dark">
-                    In-App Notifications
+                    {t('app.title')}
                 </h3>
                 
                 <div className="space-y-3">
                     <label className="flex items-center justify-between cursor-pointer">
                         <div>
                             <p className="text-sm font-medium text-text dark:text-text-dark">
-                                New Items
+                                {t('app.newItems.label')}
                             </p>
                             <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                                Show notifications for new directory items
+                                {t('app.newItems.description')}
                             </p>
                         </div>
                         <input
@@ -171,10 +173,10 @@ export function NotificationSettings({ user }: NotificationSettingsProps) {
                     <label className="flex items-center justify-between cursor-pointer">
                         <div>
                             <p className="text-sm font-medium text-text dark:text-text-dark">
-                                Comments
+                                {t('app.comments.label')}
                             </p>
                             <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                                Get notified about comments on your directories
+                                {t('app.comments.description')}
                             </p>
                         </div>
                         <input
@@ -188,10 +190,10 @@ export function NotificationSettings({ user }: NotificationSettingsProps) {
                     <label className="flex items-center justify-between cursor-pointer">
                         <div>
                             <p className="text-sm font-medium text-text dark:text-text-dark">
-                                Mentions
+                                {t('app.mentions.label')}
                             </p>
                             <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                                Get notified when someone mentions you
+                                {t('app.mentions.description')}
                             </p>
                         </div>
                         <input
@@ -205,10 +207,10 @@ export function NotificationSettings({ user }: NotificationSettingsProps) {
                     <label className="flex items-center justify-between cursor-pointer">
                         <div>
                             <p className="text-sm font-medium text-text dark:text-text-dark">
-                                System Updates
+                                {t('app.systemUpdates.label')}
                             </p>
                             <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                                Important system notifications and maintenance alerts
+                                {t('app.systemUpdates.description')}
                             </p>
                         </div>
                         <input
@@ -233,7 +235,7 @@ export function NotificationSettings({ user }: NotificationSettingsProps) {
                         'disabled:opacity-50 disabled:cursor-not-allowed',
                     )}
                 >
-                    {isPending ? 'Saving...' : 'Save Preferences'}
+                    {isPending ? t('actions.saving') : t('actions.save')}
                 </button>
             </div>
         </div>
