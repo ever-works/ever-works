@@ -28,6 +28,18 @@ export interface DirectorySelection {
 	cancelled: boolean;
 }
 
+export enum GenerateStatusType {
+	GENERATING = 'generating',
+	GENERATED = 'generated',
+	ERROR = 'error'
+}
+
+type GenerateStatus = {
+	status: GenerateStatusType;
+	step?: string;
+	error?: string;
+};
+
 export interface Directory {
 	id: string;
 	name: string;
@@ -38,6 +50,7 @@ export interface Directory {
 	organization: boolean;
 	description: string;
 	readmeConfig?: MarkdownReadmeConfigDto;
+	generateStatus?: GenerateStatus;
 }
 
 export class DirectoryPromptService extends BasePromptService {
@@ -170,10 +183,7 @@ export class DirectoryPromptService extends BasePromptService {
 
 		if (wantsCustomHeader) {
 			config.header = await this.promptMultilineText('Enter custom header content:');
-			config.overwriteDefaultHeader = await this.promptConfirm(
-				'Overwrite the default header completely?',
-				false
-			);
+			config.overwriteDefaultHeader = await this.promptConfirm('Overwrite the default header completely?', false);
 		}
 
 		// Footer configuration
@@ -181,10 +191,7 @@ export class DirectoryPromptService extends BasePromptService {
 
 		if (wantsCustomFooter) {
 			config.footer = await this.promptMultilineText('Enter custom footer content:');
-			config.overwriteDefaultFooter = await this.promptConfirm(
-				'Overwrite the default footer completely?',
-				false
-			);
+			config.overwriteDefaultFooter = await this.promptConfirm('Overwrite the default footer completely?', false);
 		}
 
 		return config;

@@ -59,6 +59,18 @@ export class GenerateSubCommand extends CommandRunner {
                 chalk.green(`\n✓ Selected directory: ${directory.name} (${directory.slug})`),
             );
 
+            if (directory.generateStatus?.status === 'generating') {
+                console.log(chalk.yellow('\n⚠ Generation already in progress.'));
+                if (directory.generateStatus.step) {
+                    console.log(
+                        chalk.gray('Current step:'),
+                        chalk.white(directory.generateStatus.step),
+                    );
+                }
+                console.log(chalk.gray('Please wait for the current generation to complete.'));
+                return;
+            }
+
             // Collect required fields
             const requiredData = await this.promptRequiredFields();
 
