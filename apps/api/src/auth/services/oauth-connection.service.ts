@@ -160,7 +160,6 @@ export class OAuthConnectionService {
     }
 
     private async handleGitHubCallback(userId: string, code: string): Promise<ConnectionInfo> {
-        console.log('handleGitHubCallback');
         // Exchange code for token
         const tokenResponse = await firstValueFrom(
             this.httpService.post(
