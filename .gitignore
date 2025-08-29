@@ -43,3 +43,6 @@ Thumbs.db
 
 # Turborepo
 .turbo
+
+# claude
+.claude

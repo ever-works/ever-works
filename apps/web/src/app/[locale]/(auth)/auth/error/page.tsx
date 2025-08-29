@@ -3,10 +3,10 @@
 import { useTranslations } from 'next-intl';
 import { AuthLayout } from '@/components/layout/AuthLayout';
 import { useSearchParams } from 'next/navigation';
-import Link from 'next/link';
 import { Suspense } from 'react';
+import { Button } from '@/components/ui/button';
 import { ROUTES } from '@/lib/constants';
-import { cn } from '@/lib/utils';
+import { Link } from '@/i18n/navigation';
 
 function AuthErrorContent() {
     const t = useTranslations('auth.error');
@@ -187,77 +187,64 @@ function AuthErrorContent() {
 
         if (errorType === 'email_not_verified') {
             buttons.push(
-                <Link
-                    key="resend"
-                    href="/"
-                    className="px-6 py-3 bg-primary hover:bg-primary-hover text-white rounded-lg font-medium transition-colors animate-fade-in"
-                >
+                <Button key="resend" href="/" size="lg" className="animate-fade-in">
                     {t('actions.resendVerification')}
-                </Link>,
+                </Button>,
             );
         }
 
         if (errorType === 'account_locked') {
             buttons.push(
-                <Link
-                    key="support"
-                    href="/support"
-                    className="px-6 py-3 bg-primary hover:bg-primary-hover text-white rounded-lg font-medium transition-colors animate-fade-in"
-                >
+                <Button key="support" href="/support" size="lg" className="animate-fade-in">
                     {t('actions.contactSupport')}
-                </Link>,
+                </Button>,
             );
         }
 
         if (errorType?.startsWith('reset_password_')) {
             buttons.push(
-                <Link
+                <Button
                     key="forgot"
                     href={ROUTES.AUTH_FORGOT_PASSWORD}
-                    className="px-6 py-3 bg-primary hover:bg-primary-hover text-white rounded-lg font-medium transition-colors animate-fade-in"
+                    size="lg"
+                    className="animate-fade-in"
                 >
                     {t('actions.requestNewReset')}
-                </Link>,
+                </Button>,
             );
         }
 
         if (errorType?.startsWith('verify_email_')) {
             buttons.push(
-                <Link
-                    key="resend-verification"
-                    href="/"
-                    className="px-6 py-3 bg-primary hover:bg-primary-hover text-white rounded-lg font-medium transition-colors animate-fade-in"
-                >
+                <Button key="resend-verification" href="/" size="lg" className="animate-fade-in">
                     {t('actions.resendVerification')}
-                </Link>,
+                </Button>,
             );
         }
 
         buttons.push(
-            <Link
+            <Button
                 key="login"
                 href={ROUTES.AUTH_LOGIN}
-                className={cn(
-                    'px-6 py-3 bg-surface-secondary dark:bg-surface-secondary-dark hover:bg-surface-tertiary dark:hover:bg-surface-tertiary-dark',
-                    'text-text dark:text-text-dark border border-border dark:border-border-dark rounded-lg font-medium transition-colors animate-fade-in',
-                )}
+                variant="secondary"
+                size="lg"
+                className="animate-fade-in"
             >
                 {t('actions.backToLogin')}
-            </Link>,
+            </Button>,
         );
 
         if (errorType?.startsWith('oauth_')) {
             buttons.push(
-                <Link
+                <Button
                     key="register"
                     href={ROUTES.AUTH_REGISTER}
-                    className={cn(
-                        'px-6 py-3 bg-surface-secondary dark:bg-surface-secondary-dark hover:bg-surface-tertiary dark:hover:bg-surface-tertiary-dark',
-                        'text-text dark:text-text-dark border border-border dark:border-border-dark rounded-lg font-medium transition-colors animate-fade-in',
-                    )}
+                    variant="secondary"
+                    size="lg"
+                    className="animate-fade-in"
                 >
                     {t('actions.tryRegister')}
-                </Link>,
+                </Button>,
             );
         }
 

@@ -11,6 +11,7 @@ export default function DashboardToasts() {
 
     const isNewUser = searchParams.get('newUser') === 'true';
     const isVerified = searchParams.get('verified') === 'true';
+    const isOAuthConnected = searchParams.get('oauth_connected') === 'true';
 
     useEffect(() => {
         if (isNewUser) {
@@ -73,7 +74,24 @@ export default function DashboardToasts() {
 
             return () => clearTimeout(timer);
         }
-    }, [isNewUser, isVerified, t]);
+
+        if (isOAuthConnected) {
+            toast.success(t('oauthConnected.title'), {
+                description: t('oauthConnected.description'),
+                duration: 5000,
+                icon: (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                        />
+                    </svg>
+                ),
+            });
+        }
+    }, [isNewUser, isVerified, isOAuthConnected, t]);
 
     return null; // This component doesn't render anything
 }

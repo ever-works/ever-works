@@ -2,10 +2,11 @@ import { Module } from '@nestjs/common';
 import { DataGeneratorService } from './data-generator.service';
 import { GitModule } from '../git/git.module';
 import { ItemsGeneratorModule } from 'src/items-generator/items-generator.module';
+import { DatabaseModule } from '@src/database';
 
 @Module({
-  imports: [GitModule, ItemsGeneratorModule],
-  providers: [DataGeneratorService],
-  exports: [DataGeneratorService],
+    imports: [GitModule, ItemsGeneratorModule, DatabaseModule],
+    providers: [DataGeneratorService],
+    exports: [DataGeneratorService],
 })
 export class DataGeneratorModule {}

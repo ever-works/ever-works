@@ -7,6 +7,7 @@ import { getApiService, CreateItemsGeneratorDto } from '../../services/api.servi
 import { DirectoryPromptService } from './directory-prompt.service';
 import { GeneratePromptService } from './generate-prompt.service';
 import { handleCliError } from '../../utils/error';
+import { GenerateStatusType } from '@packages/cli-shared';
 
 export const generateCommand = new Command('generate')
     .description('Generate data and create a GitHub repository for a directory')
@@ -30,6 +31,18 @@ export const generateCommand = new Command('generate')
 
             const directory = selection.directory;
             console.log(chalk.green(`\n✓ Selected directory: ${directory.slug}`));
+
+            if (directory.generateStatus?.status === GenerateStatusType.GENERATING) {
+                console.log(chalk.yellow('\n⚠ Generation already in progress.'));
+                if (directory.generateStatus.step) {
+                    console.log(
+                        chalk.gray('Current step:'),
+                        chalk.white(directory.generateStatus.step),
+                    );
+                }
+                console.log(chalk.gray('Please wait for the current generation to complete.'));
+                return;
+            }
 
             // Collect generation parameters
             console.log(chalk.cyan('\n📝 Generation Configuration'));

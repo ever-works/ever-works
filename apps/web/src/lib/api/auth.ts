@@ -1,5 +1,6 @@
 import 'server-only';
 import { serverFetch, serverMutation } from './server-api';
+import { MessageResponse } from './types';
 
 // DTOs - Auth
 export interface RegisterDto {
@@ -60,15 +61,11 @@ export interface OAuthUrlResponse {
 }
 
 export interface OAuthConnectionResponse {
-    id: string;
     provider: string;
-    providerId: string;
+    connected: boolean;
     scopes: string[];
-    createdAt: string;
-}
-
-export interface MessageResponse {
-    message: string;
+    metadata: Record<string, any>;
+    connectedAt: string;
 }
 
 export interface TokenValidationResponse {
@@ -288,6 +285,10 @@ export const authAPI = {
         // GitHub specific
         getGitHubRepositories: async () => {
             return serverFetch<any[]>('/auth/connections/github/repositories');
+        },
+
+        getGitHubOrgs: async () => {
+            return serverFetch<any[]>('/auth/connections/github/orgs');
         },
 
         checkGitHubScopes: async (requiredScopes: string[]) => {

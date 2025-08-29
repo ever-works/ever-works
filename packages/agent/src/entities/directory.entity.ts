@@ -1,6 +1,13 @@
-import { Entity, Column, PrimaryGeneratedColumn, Index, ManyToOne } from 'typeorm';
+import {
+    Entity,
+    Column,
+    PrimaryGeneratedColumn,
+    ManyToOne,
+    CreateDateColumn,
+    UpdateDateColumn,
+} from 'typeorm';
 import { User } from './user.entity';
-import { ClassToObject } from './types';
+import { ClassToObject, GenerateStatus } from './types';
 
 @Entity({ name: 'directories' })
 export class Directory {
@@ -23,7 +30,7 @@ export class Directory {
     owner?: string;
 
     @Column({ default: 'github' })
-    repo_provider: string; // 'github', 'gitlab', etc.
+    repoProvider: string; // 'github', 'gitlab', etc.
 
     @Column({ nullable: true })
     website: string;
@@ -40,6 +47,15 @@ export class Directory {
     @Column('simple-json', { nullable: true })
     readmeConfig: MarkdownReadmeConfig;
 
+    @Column('simple-json', { nullable: true })
+    generateStatus?: GenerateStatus;
+
+    @CreateDateColumn()
+    createdAt: Date;
+
+    @UpdateDateColumn()
+    updatedAt: Date;
+
     getDataRepo() {
         return `${this.slug}-data`;
     }
@@ -50,7 +66,7 @@ export class Directory {
 
     getRepoOwner(): string {
         const oauthToken = (this.user?.oauthTokens || []).find(
-            (token) => token.provider === this.repo_provider,
+            (token) => token.provider === this.repoProvider,
         );
 
         return (
@@ -61,8 +77,8 @@ export class Directory {
 
 export interface MarkdownReadmeConfig {
     header?: string;
-    overwrite_default_header?: boolean;
+    overwriteDefaultHeader?: boolean;
 
     footer?: string;
-    overwrite_default_footer?: boolean;
+    overwriteDefaultFooter?: boolean;
 }

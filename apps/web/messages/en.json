@@ -208,6 +208,267 @@
             "verified": {
                 "title": "Email verified successfully! ✅",
                 "description": "Your email address has been verified. You now have full access to all features."
+            },
+            "oauthConnected": {
+                "title": "Account connected to GitHub",
+                "description": "Your account has been successfully connected to GitHub."
+            }
+        },
+        "header": {
+            "welcome": "Welcome back, {username}!",
+            "subtitle": "Manage your AI-powered directories and track their performance"
+        },
+        "directories": {
+            "title": "Directories",
+            "subtitle": "Manage and organize your AI-powered directories",
+            "recent": "Recent Directories",
+            "viewAll": "View all ({count})",
+            "search": "Search directories...",
+            "create": "Create Directory",
+            "showing": "Showing {current} of {total} directories",
+            "pagination": {
+                "previous": "Previous",
+                "next": "Next"
+            },
+            "empty": {
+                "title": "No directories yet",
+                "description": "Create your first AI-powered directory to start organizing and showcasing your content.",
+                "action": "Create Your First Directory",
+                "notFound": {
+                    "title": "No directories found",
+                    "withSearch": "Try adjusting your search terms",
+                    "withoutSearch": "Create your first AI-powered directory to get started"
+                }
+            }
+        },
+        "settings": {
+            "title": "Settings",
+            "subtitle": "Manage your account settings and preferences",
+            "tabs": {
+                "profile": "Profile",
+                "security": "Security",
+                "apiTokens": "API & Tokens",
+                "oauth": "Connected Accounts",
+                "notifications": "Notifications",
+                "dangerZone": "Danger Zone"
+            },
+            "profile": {
+                "title": "Profile Settings",
+                "subtitle": "Update your profile information and avatar",
+                "fields": {
+                    "username": "Username",
+                    "email": "Email",
+                    "emailHelperText": "Email cannot be changed"
+                },
+                "placeholders": {
+                    "username": "Enter your username"
+                },
+                "actions": {
+                    "save": "Save Changes"
+                },
+                "messages": {
+                    "success": "Profile updated successfully",
+                    "usernameRequired": "Username is required",
+                    "error": "Failed to update profile",
+                    "unexpectedError": "An unexpected error occurred"
+                }
+            },
+            "security": {
+                "title": "Security Settings",
+                "subtitle": "Manage your account security and authentication",
+                "changePassword": {
+                    "title": "Change Password",
+                    "currentPassword": "Current Password",
+                    "newPassword": "New Password",
+                    "confirmPassword": "Confirm New Password",
+                    "showPasswords": "Show passwords",
+                    "placeholders": {
+                        "current": "Enter current password",
+                        "new": "Enter new password (min 8 characters)",
+                        "confirm": "Confirm new password"
+                    },
+                    "actions": {
+                        "update": "Update Password"
+                    },
+                    "messages": {
+                        "success": "Password updated successfully",
+                        "fillAllFields": "Please fill in all password fields",
+                        "minLength": "New password must be at least 8 characters",
+                        "mismatch": "New passwords do not match",
+                        "sameAsCurrent": "New password must be different from current password",
+                        "error": "Failed to update password",
+                        "unexpectedError": "An unexpected error occurred"
+                    }
+                },
+                "twoFactor": {
+                    "title": "Two-Factor Authentication",
+                    "subtitle": "Add an extra layer of security to your account",
+                    "action": "Coming Soon"
+                },
+                "sessions": {
+                    "title": "Active Sessions",
+                    "subtitle": "Manage your active sessions across devices",
+                    "action": "View Sessions (Coming Soon)"
+                }
+            },
+            "oauth": {
+                "title": "Connected Accounts",
+                "subtitle": "Connect your external accounts for enhanced functionality",
+                "github": {
+                    "name": "GitHub",
+                    "connected": "Create and manage directories with GitHub repositories",
+                    "disconnected": "Connect to create directories from repositories",
+                    "scopes": "Scopes",
+                    "actions": {
+                        "connect": "Connect",
+                        "disconnect": "Disconnect",
+                        "confirmDisconnect": "Are you sure you want to disconnect your GitHub account?"
+                    },
+                    "messages": {
+                        "disconnected": "GitHub account disconnected",
+                        "connectError": "Failed to connect GitHub",
+                        "disconnectError": "Failed to disconnect GitHub"
+                    }
+                }
+            }
+        },
+        "stats": {
+            "totalDirectories": "Total Directories",
+            "totalItems": "Total Items",
+            "activeWebsites": "Active Websites",
+            "fromLastMonth": "from last month"
+        },
+        "directoryCard": {
+            "status": {
+                "active": "Active"
+            },
+            "noDescription": "No description provided",
+            "items": "{count} items",
+            "views": "{count} views",
+            "updated": "Updated {date}",
+            "viewAction": "View →"
+        },
+        "apiTokens": {
+            "title": "API & Tokens",
+            "subtitle": "Manage your API keys and third-party integrations",
+            "vercel": {
+                "title": "Vercel Integration",
+                "subtitle": "Connect your Vercel account to deploy directories as websites",
+                "connected": "Connected",
+                "notConnected": "Not Connected",
+                "connectedMessage": "Your Vercel account is connected. You can now deploy directories to Vercel.",
+                "disconnect": "Disconnect Vercel",
+                "disconnecting": "Removing...",
+                "apiTokenLabel": "Vercel API Token",
+                "placeholder": "vc_...",
+                "showToken": "Show",
+                "hideToken": "Hide",
+                "getTokenHelp": "You can get your API token from",
+                "vercelDashboard": "Vercel Dashboard",
+                "save": "Save Token",
+                "saving": "Saving...",
+                "messages": {
+                    "tokenRequired": "Please enter a valid Vercel token",
+                    "saveSuccess": "Vercel token saved successfully",
+                    "saveFailed": "Failed to save Vercel token",
+                    "removeSuccess": "Vercel token removed successfully",
+                    "removeFailed": "Failed to remove Vercel token",
+                    "unexpectedError": "An unexpected error occurred"
+                }
+            },
+            "apiKeys": {
+                "title": "API Keys",
+                "subtitle": "Generate and manage API keys for programmatic access",
+                "generate": "Generate API Key (Coming Soon)"
+            },
+            "webhooks": {
+                "title": "Webhooks",
+                "subtitle": "Configure webhooks to receive real-time updates",
+                "configure": "Configure Webhooks (Coming Soon)"
+            }
+        },
+        "notifications": {
+            "title": "Notification Preferences",
+            "subtitle": "Choose how you want to be notified about important updates",
+            "email": {
+                "title": "Email Notifications",
+                "directoryUpdates": {
+                    "label": "Directory Updates",
+                    "description": "Get notified about important updates to your directories"
+                },
+                "newItems": {
+                    "label": "New Items",
+                    "description": "Get notified when new items are added to your directories"
+                },
+                "weeklyDigest": {
+                    "label": "Weekly Digest",
+                    "description": "Receive a weekly summary of your directory activity"
+                },
+                "marketing": {
+                    "label": "Marketing & Promotions",
+                    "description": "Receive updates about new features and offers"
+                }
+            },
+            "app": {
+                "title": "In-App Notifications",
+                "newItems": {
+                    "label": "New Items",
+                    "description": "Show notifications for new directory items"
+                },
+                "comments": {
+                    "label": "Comments",
+                    "description": "Get notified about comments on your directories"
+                },
+                "mentions": {
+                    "label": "Mentions",
+                    "description": "Get notified when someone mentions you"
+                },
+                "systemUpdates": {
+                    "label": "System Updates",
+                    "description": "Important system notifications and maintenance alerts"
+                }
+            },
+            "actions": {
+                "save": "Save Preferences",
+                "saving": "Saving..."
+            },
+            "messages": {
+                "success": "Notification preferences updated",
+                "error": "Failed to update preferences",
+                "unexpectedError": "An unexpected error occurred"
+            }
+        },
+        "dangerZone": {
+            "title": "Danger Zone",
+            "subtitle": "Irreversible and destructive actions",
+            "export": {
+                "title": "Export Your Data",
+                "subtitle": "Download all your directories, items, and settings",
+                "action": "Export Data (Coming Soon)"
+            },
+            "delete": {
+                "title": "Delete Account",
+                "subtitle": "Permanently delete your account and all associated data. This action cannot be undone.",
+                "button": "Delete My Account",
+                "confirmTitle": "⚠️ This will permanently delete:",
+                "confirmItems": [
+                    "Your account and profile",
+                    "All your directories",
+                    "All directory items and data",
+                    "API keys and integrations",
+                    "All associated websites"
+                ],
+                "confirmLabel": "Type your email {email} to confirm",
+                "confirmPlaceholder": "Enter your email",
+                "confirmButton": "Yes, Delete My Account",
+                "deleting": "Deleting...",
+                "cancel": "Cancel"
+            },
+            "messages": {
+                "confirmEmail": "Please enter your email correctly to confirm",
+                "deleteSuccess": "Account deleted successfully",
+                "deleteFailed": "Failed to delete account",
+                "unexpectedError": "An unexpected error occurred"
             }
         }
     },
@@ -258,6 +519,44 @@
             "providerConnectFailed": "Failed to connect provider",
             "forgotPasswordFailed": "Failed to send password reset email",
             "resetPasswordFailed": "Failed to reset password"
+        }
+    },
+    "actions": {
+        "settings": {
+            "profile": {
+                "usernameRequired": "Username is required",
+                "usernameMaxLength": "Username must be less than 50 characters",
+                "usernameFormat": "Username can only contain letters, numbers, dashes and underscores",
+                "updateFailed": "Failed to update profile",
+                "notAuthenticated": "Not authenticated"
+            },
+            "password": {
+                "currentRequired": "Current password is required",
+                "newMinLength": "Password must be at least 8 characters",
+                "newMaxLength": "Password must be less than 100 characters",
+                "updateFailed": "Failed to update password",
+                "updateSuccess": "Password updated successfully"
+            },
+            "vercel": {
+                "tokenRequired": "Token is required",
+                "invalidFormat": "Invalid Vercel token format",
+                "saveFailed": "Failed to save Vercel token",
+                "saveSuccess": "Vercel token saved successfully",
+                "removeFailed": "Failed to remove Vercel token",
+                "removeSuccess": "Vercel token removed successfully"
+            },
+            "github": {
+                "disconnectFailed": "Failed to disconnect GitHub",
+                "disconnectSuccess": "GitHub account disconnected successfully"
+            },
+            "notifications": {
+                "updateFailed": "Failed to update preferences",
+                "updateSuccess": "Notification preferences updated successfully"
+            },
+            "danger": {
+                "deleteFailed": "Failed to delete account",
+                "deleteDisabled": "Account deletion is disabled in demo"
+            }
         }
     },
     "validation": {

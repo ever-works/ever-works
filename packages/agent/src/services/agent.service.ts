@@ -32,6 +32,7 @@ import { CreateDirectoryDto } from '../dto/create-directory.dto';
 import { UpdateWebsiteRepositoryResponseDto } from '../website-generator/dto/update-website-repository.dto';
 import { ItemSubmissionService } from '../items-generator/item-submission.service';
 import { ItemsGeneratorService } from '../items-generator/items-generator.service';
+import { GenerateStatus, GenerateStatusType } from '../entities/types';
 
 @Injectable()
 export class AgentService {
@@ -109,8 +110,31 @@ export class AgentService {
         }
     }
 
+    async getDirectory(id: string, user: User) {
+        try {
+            const directory = await this.validateDirectoryOwnership(id, user.id);
+            directory.owner = directory.getRepoOwner();
+
+            return {
+                status: 'success',
+                directory,
+            };
+        } catch (error) {
+            if (error instanceof HttpException) {
+                throw error;
+            }
+
+            this.logger.error('Failed to get directory:', error);
+
+            throw new BadRequestException({
+                status: 'error',
+                message: this.clearMessageError(error),
+            });
+        }
+    }
+
     async createDirectory(createDirectoryDto: CreateDirectoryDto, user: User) {
-        const { slug, name, description, owner, readme_config, organization, repo_provider } =
+        const { slug, name, description, owner, readmeConfig, organization, repoProvider } =
             createDirectoryDto;
 
         const directoryData: Partial<Directory> = {
@@ -119,8 +143,8 @@ export class AgentService {
             description,
             userId: user.id,
             owner: owner,
-            repo_provider: repo_provider,
-            readmeConfig: readme_config,
+            repoProvider: repoProvider,
+            readmeConfig: readmeConfig,
             organization: organization,
         };
 
@@ -620,6 +644,10 @@ export class AgentService {
         const startTime = new Date();
         console.log(`Generation started at: ${startTime.toISOString()}`);
 
+        await this.directoryRepository.updateGenerateStatus(directory.id, {
+            status: GenerateStatusType.GENERATING,
+        });
+
         try {
             const generated = await this.dataGenerator.initialize(directory, user, dto);
 
@@ -635,7 +663,16 @@ export class AgentService {
                     ),
                 ]);
             }
+
+            await this.directoryRepository.updateGenerateStatus(directory.id, {
+                status: GenerateStatusType.GENERATED,
+            });
         } catch (error) {
+            await this.directoryRepository.updateGenerateStatus(directory.id, {
+                status: GenerateStatusType.ERROR,
+                error: this.clearMessageError(error),
+            });
+
             if (error instanceof HttpException) {
                 throw error;
             }

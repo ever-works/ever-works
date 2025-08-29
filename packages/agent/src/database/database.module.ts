@@ -7,6 +7,7 @@ import { OAuthTokenRepository } from './oauth-token.repository';
 import { databaseConfig, ENTITIES } from './database.config';
 import { UserRepository } from './user.repository';
 import { UserGitHubService } from './user-github.service';
+import { ChatHistoryRepository } from './chat-history.repository';
 
 @Module({
     imports: [
@@ -25,18 +26,20 @@ import { UserGitHubService } from './user-github.service';
     ],
     providers: [
         DirectoryRepository,
+        UserGitHubService,
         RefreshTokenRepository,
         UserRepository,
         OAuthTokenRepository,
-        UserGitHubService,
+        ChatHistoryRepository,
     ],
     exports: [
         TypeOrmModule,
+        UserGitHubService,
         DirectoryRepository,
         UserRepository,
         RefreshTokenRepository,
         OAuthTokenRepository,
-        UserGitHubService,
+        ChatHistoryRepository,
     ],
 })
 export class DatabaseModule {}

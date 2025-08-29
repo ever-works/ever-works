@@ -338,6 +338,33 @@ export class OAuthConnectionService {
     }
 
     /**
+     * Get GitHub organizations with current permissions
+     */
+    async getGitHubOrgs(userId: string): Promise<any> {
+        const token = await this.oauthTokenService.getGitHubToken(userId);
+
+        if (!token) {
+            throw new BadRequestException('GitHub is not connected');
+        }
+
+        try {
+            const response = await firstValueFrom(
+                this.httpService.get('https://api.github.com/user/orgs', {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        Accept: 'application/vnd.github+json',
+                    },
+                }),
+            );
+
+            return response.data;
+        } catch (error) {
+            this.logger.error('Failed to fetch GitHub organizations', error);
+            throw new BadRequestException('Failed to fetch organizations');
+        }
+    }
+
+    /**
      * Check if user has required GitHub scopes
      */
     async checkGitHubScopes(
@@ -382,6 +409,13 @@ export class OAuthConnectionService {
             missingScopes,
             hasAgentScopes: agentCheck.hasAll,
         };
+    }
+
+    storeState(state: string, userId: string) {
+        const expires = new Date();
+        expires.setMinutes(expires.getMinutes() + 10); // 10 minute expiry
+
+        this.stateStore.set(state, { userId, expires });
     }
 
     /**

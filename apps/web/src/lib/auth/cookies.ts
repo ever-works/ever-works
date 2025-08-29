@@ -83,7 +83,7 @@ export async function removeAuthAccessCookies() {
 // OAuth
 // =================
 
-export async function setOAuthState(state: string) {
+export async function setOAuthStateCookie(state: string) {
     const cookieStore = await cookies();
     cookieStore.set('oauth_state', state, {
         ...cookieOptions,
@@ -91,12 +91,12 @@ export async function setOAuthState(state: string) {
     });
 }
 
-export async function getOAuthState() {
+export async function getOAuthStateCookie() {
     const cookieStore = await cookies();
     return cookieStore.get('oauth_state')?.value;
 }
 
-export async function removeOAuthState() {
+export async function removeOAuthStateCookie() {
     const cookieStore = await cookies();
     cookieStore.delete('oauth_state');
 }

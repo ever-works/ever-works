@@ -9,5 +9,6 @@
         "OPENROUTER",
         "Tavily",
         "VERCEL"
-    ]
+    ],
+    "biome.enabled": false
 }

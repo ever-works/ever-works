@@ -72,18 +72,18 @@ To create a new directory object, send a POST request to `http://localhost:3100/
     "slug": "awesome-time-tracking",
     "name": "Awesome Time Tracking",
     "description": "Time Tracking - Software, Methodologies and Practices.",
-    "readme_config": {
+    "readmeConfig": {
         "header": "This text will be used as additional header in the README.md file",
-        "overwrite_default_header": false,
+        "overwriteDefaultHeader": false,
 
         "footer": "This text will be used as additional footer in the README.md file",
-        "overwrite_default_footer": false
+        "overwriteDefaultFooter": false
     }
 }
 ```
 
 **Overwrite default header and footer**
-If you want to overwrite the default header and footer in the README.md file, set `overwrite_default_header` and `overwrite_default_footer` to `true`. This will replace the default content with your custom text.
+If you want to overwrite the default header and footer in the README.md file, set `overwriteDefaultHeader` and `overwriteDefaultFooter` to `true`. This will replace the default content with your custom text.
 
 **Request Parameters:**
 By default, the directory will be created with the currently authenticated GitHub user as the owner.

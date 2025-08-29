@@ -1,12 +1,13 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import Link from 'next/link';
+import { Link } from '@/i18n/navigation';
 import { AuthLayout } from '@/components/layout/AuthLayout';
 import { useTranslations } from 'next-intl';
 import { SocialLoginButtons } from '@/components/auth/social-login';
 import { register as registerAction } from '@/app/actions/auth';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { ROUTES } from '@/lib/constants';
 
 export default function RegisterPage() {
@@ -121,13 +122,14 @@ export default function RegisterPage() {
                     </label>
                 </div>
 
-                <button
+                <Button
                     type="submit"
                     disabled={isPending}
-                    className="w-full py-3 bg-primary hover:bg-primary-hover text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    loading={isPending}
+                    fullWidth
                 >
                     {isPending ? t('form.submitting') : t('form.submit')}
-                </button>
+                </Button>
 
                 <div className="relative">
                     <div className="absolute inset-0 flex items-center">

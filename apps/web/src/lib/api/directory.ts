@@ -1,16 +1,12 @@
 import 'server-only';
 import { serverFetch, serverMutation } from './server-api';
-
-// DTOs
-export enum RepoProvider {
-    GITHUB = 'github',
-}
+import { RepoProvider } from './enums';
 
 export interface MarkdownReadmeConfig {
     header?: string;
-    overwrite_default_header?: boolean;
+    overwriteDefaultHeader?: boolean;
     footer?: string;
-    overwrite_default_footer?: boolean;
+    overwriteDefaultFooter?: boolean;
 }
 
 export interface CreateDirectoryDto {
@@ -19,8 +15,8 @@ export interface CreateDirectoryDto {
     description: string;
     owner?: string;
     organization: boolean;
-    repo_provider?: RepoProvider;
-    readme_config?: MarkdownReadmeConfig;
+    repoProvider?: RepoProvider;
+    readmeConfig?: MarkdownReadmeConfig;
 }
 
 export interface DeleteDirectoryDto {
@@ -28,21 +24,21 @@ export interface DeleteDirectoryDto {
 }
 
 // Response Types
-export interface DirectoryResponse {
+export interface Directory {
     id: string;
     slug: string;
     name: string;
     description: string;
     owner?: string;
     organization: boolean;
-    repo_provider: RepoProvider;
-    readme_config?: MarkdownReadmeConfig;
-    created_at: string;
-    updated_at: string;
+    repoProvider: RepoProvider;
+    readmeConfig?: MarkdownReadmeConfig;
+    createdAt: string;
+    updatedAt: string;
 }
 
 export interface DirectoriesResponse {
-    directories: DirectoryResponse[];
+    directories: Directory[];
     total: number;
     limit?: number;
     offset?: number;
@@ -52,6 +48,10 @@ export interface DeleteDirectoryResponse {
     success: boolean;
     message: string;
 }
+
+export type APIResponse<T> = {
+    status: 'success' | 'error';
+} & T;
 
 export const directoryAPI = {
     // Get all directories with pagination and search
@@ -65,9 +65,14 @@ export const directoryAPI = {
         return serverFetch<DirectoriesResponse>(`/directories${query}`);
     },
 
+    // Get a directory by ID
+    get: async (id: string) => {
+        return serverFetch<APIResponse<{ directory: Directory }>>(`/directories/${id}`);
+    },
+
     // Create a new directory
     create: async (data: CreateDirectoryDto) => {
-        return serverMutation<DirectoryResponse>({
+        return serverMutation<Directory>({
             endpoint: '/directories',
             data,
             method: 'POST',

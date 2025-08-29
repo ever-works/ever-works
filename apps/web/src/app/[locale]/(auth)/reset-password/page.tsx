@@ -2,10 +2,11 @@
 
 import { useState, useTransition, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import Link from 'next/link';
+import { Link } from '@/i18n/navigation';
 import { AuthLayout } from '@/components/layout/AuthLayout';
 import { useTranslations } from 'next-intl';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { ROUTES } from '@/lib/constants';
 import { resetPassword as resetPasswordAction } from '@/app/actions/auth';
 
@@ -24,7 +25,7 @@ function ResetPasswordContent() {
         confirmPassword?: string;
         general?: string;
     }>({});
-    const [success, setSuccess] = useState(false);
+    const [success] = useState(false);
 
     // If no token, show error message instead of redirecting
     if (!token) {
@@ -60,12 +61,9 @@ function ResetPasswordContent() {
                     </div>
 
                     <div className="text-center space-y-4">
-                        <Link
-                            href={ROUTES.AUTH_FORGOT_PASSWORD}
-                            className="inline-block px-6 py-3 bg-primary hover:bg-primary-hover text-white rounded-lg font-medium transition-colors"
-                        >
+                        <Button href={ROUTES.AUTH_FORGOT_PASSWORD} size="lg">
                             {t('errors.requestNewLink')}
-                        </Link>
+                        </Button>
 
                         <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
                             <Link
@@ -122,7 +120,9 @@ function ResetPasswordContent() {
                                 </svg>
                             </div>
                             <div>
-                                <h3 className="font-medium text-text dark:text-text-dark mb-1">{t('success.title')}</h3>
+                                <h3 className="font-medium text-text dark:text-text-dark mb-1">
+                                    {t('success.title')}
+                                </h3>
                                 <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
                                     {t('success.message')}
                                 </p>
@@ -131,12 +131,9 @@ function ResetPasswordContent() {
                     </div>
 
                     <div className="text-center">
-                        <Link
-                            href={ROUTES.AUTH_LOGIN + '?reset=true'}
-                            className="inline-block px-6 py-3 bg-primary hover:bg-primary-hover text-white rounded-lg font-medium transition-colors"
-                        >
+                        <Button href={ROUTES.AUTH_LOGIN + '?reset=true'} size="lg">
                             {t('success.loginButton')}
-                        </Link>
+                        </Button>
                     </div>
                 </div>
             </AuthLayout>
@@ -183,13 +180,14 @@ function ResetPasswordContent() {
                     disabled={isPending}
                 />
 
-                <button
+                <Button
                     type="submit"
                     disabled={isPending || !formData.password || !formData.confirmPassword}
-                    className="w-full py-3 bg-primary hover:bg-primary-hover text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    loading={isPending}
+                    fullWidth
                 >
                     {isPending ? t('form.submitting') : t('form.submit')}
-                </button>
+                </Button>
 
                 <div className="text-center">
                     <Link

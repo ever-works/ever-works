@@ -165,4 +165,11 @@ export class DirectoryRepository {
     async findByUser(userId: string): Promise<Directory[]> {
         return await this.repository.find({ where: { userId } });
     }
+
+    async updateGenerateStatus(
+        id: string,
+        generateStatus: Directory['generateStatus'],
+    ): Promise<void> {
+        await this.repository.update(id, { generateStatus });
+    }
 }

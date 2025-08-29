@@ -54,6 +54,7 @@ export class OAuthConnectionsController {
     ) {
         // Generate state if not provided for CSRF protection
         const finalState = state || this.oauthConnectionService.generateState(req.user.userId);
+        this.oauthConnectionService.storeState(finalState, req.user.userId);
 
         let url: string;
         switch (provider.toLowerCase() as AuthProviders) {
@@ -147,6 +148,11 @@ export class OAuthConnectionsController {
     @Get('github/repositories')
     async getGitHubRepositories(@Request() req): Promise<any> {
         return this.oauthConnectionService.getGitHubRepositories(req.user.userId);
+    }
+
+    @Get('github/orgs')
+    async getGitHubOrgs(@Request() req): Promise<any> {
+        return this.oauthConnectionService.getGitHubOrgs(req.user.userId);
     }
 
     /**

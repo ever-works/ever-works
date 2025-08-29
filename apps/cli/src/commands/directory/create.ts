@@ -36,7 +36,7 @@ export const createCommand = new Command('create')
                         name: directoryData.name,
                         description: directoryData.description,
                         owner: directoryData.owner,
-                        readme_config: directoryData.readme_config,
+                        readmeConfig: directoryData.readmeConfig,
                         organization:
                             !!directoryData.owner && directoryData.owner !== auth.username,
                     };

@@ -1,6 +1,6 @@
 import { redirect } from '@/i18n/navigation';
-import { authAPI, AuthResponse } from '@/lib/api';
-import { getOAuthState, setAuthCookies } from '@/lib/auth';
+import { authAPI, AuthResponse, OAuthConnectionResponse } from '@/lib/api';
+import { getOAuthStateCookie, setAuthCookies } from '@/lib/auth';
 import { getRedirectUrl } from '@/lib/auth/redirect';
 import { ROUTES } from '@/lib/constants';
 import { getLocale } from 'next-intl/server';
@@ -18,6 +18,8 @@ export async function GET(
     const queryParams = request.nextUrl.searchParams;
     const code = queryParams.get('code');
     const state = queryParams.get('state');
+    const returnPath = queryParams.get('returnPath');
+    const process = queryParams.get('process') as 'login' | 'connect' | undefined;
 
     const locale = await getLocale();
 
@@ -28,7 +30,7 @@ export async function GET(
         });
     }
 
-    const storedState = await getOAuthState();
+    const storedState = await getOAuthStateCookie();
     if (state !== storedState) {
         return redirect({
             locale,
@@ -36,7 +38,48 @@ export async function GET(
         });
     }
 
-    let href: string = ROUTES.HOME;
+    // Login process
+    if (process === 'login' || !process) {
+        await loginOauth(provider, code, state || '', locale);
+        return;
+    }
+
+    // Connection process
+    await connectOauth(provider, returnPath, code, state || '', locale);
+    return;
+}
+
+async function connectOauth(
+    provider: string,
+    returnPath: string | null,
+    code: string,
+    state: string,
+    locale: string,
+) {
+    let href: string = returnPath || ROUTES.DASHBOARD;
+    let connectionResponse: OAuthConnectionResponse | null = null;
+
+    try {
+        switch (provider) {
+            case 'github': {
+                const response = await authAPI.oauth_connections.connectCallback(
+                    'github',
+                    code,
+                    state || undefined,
+                );
+                connectionResponse = response;
+                break;
+            }
+        }
+    } catch (error) {
+        href = ROUTES.AUTH_ERROR + '?error=oauth_callback';
+    }
+
+    return redirect({ locale, href: href + '?oauth_connected=true' });
+}
+
+async function loginOauth(provider: string, code: string, state: string, locale: string) {
+    let href: string = ROUTES.DASHBOARD;
     let authResponse: AuthResponse | null = null;
 
     try {

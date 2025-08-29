@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { AgentHttpController } from './agent-http.controller';
+import { DirectoriesController } from './directories.controller';
 import { AgentModule } from '@packages/agent/services';
 import { DeployController } from './deploy.controller';
 import { DeployModule } from '@packages/agent/deploy';
@@ -8,6 +8,6 @@ import { AuthModule } from '@src/auth';
 
 @Module({
     imports: [AgentModule, DeployModule, DatabaseModule, AuthModule],
-    controllers: [AgentHttpController, DeployController],
+    controllers: [DirectoriesController, DeployController],
 })
-export class AgentHttpModule {}
+export class DirectoriesModule {}

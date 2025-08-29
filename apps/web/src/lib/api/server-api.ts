@@ -32,15 +32,24 @@ export async function getFrontendUrl(): Promise<string> {
     return process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 }
 
-export async function serverFetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+interface ServerFetchOptions extends RequestInit {
+    rawResponse?: boolean;
+}
+
+export async function serverFetch<T>(
+    endpoint: string,
+    options: ServerFetchOptions = {},
+): Promise<T> {
     const token = await getAuthAccessCookie();
     const frontendUrl = await getFrontendUrl();
     const t = await getTranslations('api.errors');
 
+    const { rawResponse, ...fetchOptions } = options;
+
     const headers: Record<string, string> = {
         'Content-Type': 'application/json',
         'X-Frontend-URL': frontendUrl,
-        ...((options.headers as Record<string, string>) || {}),
+        ...((fetchOptions.headers as Record<string, string>) || {}),
     };
 
     // Add authentication header if token exists
@@ -49,21 +58,28 @@ export async function serverFetch<T>(endpoint: string, options: RequestInit = {}
     }
 
     const response = await fetch(`${API_URL}${endpoint}`, {
-        ...options,
+        ...fetchOptions,
         headers,
         // Enable caching for GET requests by default
         // next: {
-        //     revalidate: options.method === "GET" ? 3600 : 0, // Cache for 1 hour
+        //     revalidate: fetchOptions.method === "GET" ? 3600 : 0, // Cache for 1 hour
         //     tags: [endpoint.split("/")[1] || "api"], // Tag based on resource type
         // },
         cache: 'no-store',
         next: { revalidate: 0 },
     });
 
+    // Return raw response for streaming
+    if (rawResponse) {
+        return response as T;
+    }
+
     if (!response.ok) {
         let errorMessage: string | null = null;
         try {
             const errorData = await response.json();
+
+            console.error('API Error:', errorData);
 
             if (errorData?.message) {
                 errorMessage = Array.isArray(errorData.message)
@@ -98,9 +114,9 @@ export async function serverFetch<T>(endpoint: string, options: RequestInit = {}
     }
 
     try {
-        return response.json();
+        return await response.json();
     } catch (error) {
-        return response.text() as T;
+        return (await response.text()) as T;
     }
 }
 
@@ -110,14 +126,17 @@ export async function serverMutation<T>({
     data,
     method = 'POST',
     wrapInData = false,
+    headers,
 }: {
     endpoint: string;
     data: any;
     method: 'POST' | 'PUT' | 'PATCH' | 'DELETE';
     wrapInData: boolean;
+    headers?: Record<string, string>;
 }): Promise<T> {
     return serverFetch<T>(endpoint, {
         method,
+        headers,
         body: JSON.stringify(wrapInData ? { data } : data),
     });
 }

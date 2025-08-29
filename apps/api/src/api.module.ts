@@ -4,7 +4,7 @@ import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { AuthModule } from './auth/auth.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { throttlerConfig } from './config/throttler.config';
-import { AgentHttpModule } from './agent-http/agent-http.module';
+import { DirectoriesModule } from './directories/directories.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { MailModule } from './mail/mail.module';
 import { LoggingInterceptor } from './logging.interceptor';
@@ -14,7 +14,7 @@ import { LoggingInterceptor } from './logging.interceptor';
         ThrottlerModule.forRoot(throttlerConfig),
         EventEmitterModule.forRoot(),
         AuthModule,
-        AgentHttpModule,
+        DirectoriesModule,
         MailModule,
     ],
     providers: [

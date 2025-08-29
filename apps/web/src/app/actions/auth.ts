@@ -4,7 +4,7 @@ import { z } from 'zod';
 import {
     removeAuthAccessCookies,
     getRefreshCookie,
-    setOAuthState,
+    setOAuthStateCookie,
     setAuthCookies,
 } from '@/lib/auth';
 import { ROUTES, routeWithParams, withAppUrl } from '@/lib/constants';
@@ -14,6 +14,7 @@ import { redirect } from '@/i18n/navigation';
 import { getLocale, getTranslations } from 'next-intl/server';
 import { isValidRedirectUrl } from '@/lib/utils';
 import { getRedirectUrl } from '@/lib/auth/redirect';
+import { generateHexToken } from '@/lib/utils/random';
 
 export async function login(identifier: string, password: string, redirectUrl: string | null) {
     const t = await getTranslations('validation.auth');
@@ -34,7 +35,7 @@ export async function login(identifier: string, password: string, redirectUrl: s
     }
 
     let authResponse: AuthResponse | null = null;
-    let href: string = ROUTES.HOME;
+    let href: string = ROUTES.DASHBOARD;
 
     try {
         authResponse = await authAPI.login({
@@ -130,7 +131,7 @@ export async function register(username: string, email: string, password: string
 
     redirect({
         locale: await getLocale(),
-        href: ROUTES.HOME + '?newUser=true',
+        href: ROUTES.DASHBOARD + '?newUser=true',
     });
 
     return {
@@ -167,17 +168,10 @@ export async function logout() {
 
 const crypto = globalThis.crypto || require('crypto').webcrypto;
 
-function generateHexToken(length = 16) {
-    const bytes = crypto.getRandomValues(new Uint8Array(Math.ceil(length / 2)));
-    return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0'))
-        .join('')
-        .substring(0, length);
-}
-
 export async function connectProvider(provider: 'github' | 'google') {
     try {
         const state = generateHexToken(16);
-        await setOAuthState(state);
+        await setOAuthStateCookie(state);
 
         const callbackUrl = routeWithParams(ROUTES.API_AUTH_CALLBACK, { provider });
 

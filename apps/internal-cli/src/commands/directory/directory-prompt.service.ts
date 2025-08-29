@@ -11,7 +11,7 @@ export interface DirectoryInputData {
     name: string;
     description: string;
     owner?: string;
-    readme_config?: MarkdownReadmeConfigDto;
+    readmeConfig?: MarkdownReadmeConfigDto;
 }
 
 export interface SlugConflictResolution {
@@ -55,7 +55,7 @@ export class DirectoryPromptService extends BasePromptService {
         );
 
         let owner: string | undefined;
-        let readme_config: MarkdownReadmeConfigDto | undefined;
+        let readmeConfig: MarkdownReadmeConfigDto | undefined;
 
         if (wantsOptionalFields) {
             owner = await this.promptOptionalText(
@@ -69,7 +69,7 @@ export class DirectoryPromptService extends BasePromptService {
             );
 
             if (wantsReadmeConfig) {
-                readme_config = await this.promptReadmeConfig();
+                readmeConfig = await this.promptReadmeConfig();
             }
         }
 
@@ -78,7 +78,7 @@ export class DirectoryPromptService extends BasePromptService {
             name,
             description,
             owner,
-            readme_config,
+            readmeConfig,
         };
     }
 
@@ -120,7 +120,7 @@ export class DirectoryPromptService extends BasePromptService {
                 'Enter the header markdown content (press Enter twice to finish):',
             );
 
-            config.overwrite_default_header = await this.promptConfirm(
+            config.overwriteDefaultHeader = await this.promptConfirm(
                 'Overwrite the default header completely?',
                 false,
             );
@@ -133,7 +133,7 @@ export class DirectoryPromptService extends BasePromptService {
                 'Enter the footer markdown content (press Enter twice to finish):',
             );
 
-            config.overwrite_default_footer = await this.promptConfirm(
+            config.overwriteDefaultFooter = await this.promptConfirm(
                 'Overwrite the default footer completely?',
                 false,
             );

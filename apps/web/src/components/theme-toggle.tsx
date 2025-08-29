@@ -1,8 +1,15 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils/cn';
 
-export function ThemeToggle() {
+interface ThemeToggleProps {
+    className?: string;
+    variant?: 'fixed' | 'inline';
+}
+
+export function ThemeToggle({ className, variant = 'fixed' }: ThemeToggleProps = {}) {
     const [isDark, setIsDark] = useState(false);
     const [mounted, setMounted] = useState(false);
 
@@ -25,23 +32,32 @@ export function ThemeToggle() {
         }
     };
 
+    const buttonClasses = variant === 'fixed' 
+        ? "fixed top-4 right-4 z-50 bg-surface dark:bg-surface-dark border border-border dark:border-border-dark"
+        : "";
+
     // Prevent hydration mismatch by not rendering until mounted
     if (!mounted) {
         return (
-            <button
-                className="fixed top-4 right-4 z-50 p-2 rounded-lg bg-surface dark:bg-surface-dark border border-border dark:border-border-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark transition-colors"
+            <Button
+                variant="ghost"
+                size="icon"
+                className={cn(buttonClasses, className)}
                 aria-label="Toggle theme"
             >
                 <div className="w-5 h-5" />
-            </button>
+            </Button>
         );
     }
 
     return (
-        <button
+        <Button
             onClick={toggleTheme}
-            className="fixed top-4 right-4 z-50 p-2 rounded-lg bg-surface dark:bg-surface-dark border border-border dark:border-border-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark transition-colors"
+            variant="ghost"
+            size="icon"
+            className={cn(buttonClasses, className)}
             aria-label="Toggle theme"
+            title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
         >
             {isDark ? (
                 <svg
@@ -72,6 +88,6 @@ export function ThemeToggle() {
                     />
                 </svg>
             )}
-        </button>
+        </Button>
     );
 }

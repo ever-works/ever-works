@@ -1,13 +1,14 @@
 'use client';
 
 import { useState, useTransition, Suspense, useEffect } from 'react';
-import Link from 'next/link';
+import { Link } from '@/i18n/navigation';
 import { useSearchParams } from 'next/navigation';
 import { AuthLayout } from '@/components/layout/AuthLayout';
 import { useTranslations } from 'next-intl';
 import { login as loginAction } from '@/app/actions/auth';
 import { SocialLoginButtons } from '@/components/auth/social-login';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { REDIRECT_SEARCH_PARAM, ROUTES } from '@/lib/constants';
 import { ThemeToggle } from '@/components/theme-toggle';
 
@@ -143,13 +144,14 @@ function LoginContent() {
                     </label>
                 </div> */}
 
-                <button
+                <Button
                     type="submit"
                     disabled={isPending}
-                    className="w-full py-3 bg-primary hover:bg-primary-hover text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    loading={isPending}
+                    fullWidth
                 >
                     {isPending ? t('form.submitting') : t('form.submit')}
-                </button>
+                </Button>
 
                 <div className="relative">
                     <div className="absolute inset-0 flex items-center">
