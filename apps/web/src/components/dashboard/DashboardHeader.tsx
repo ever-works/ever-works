@@ -4,6 +4,7 @@ import { AuthUser } from '@/lib/auth';
 import { useState } from 'react';
 import { cn } from '@/lib/utils/cn';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { useTranslations } from 'next-intl';
 
 interface DashboardHeaderProps {
     user: AuthUser;
@@ -13,6 +14,7 @@ interface DashboardHeaderProps {
 
 export function DashboardHeader({ onMenuClick, isSidebarOpen = true }: DashboardHeaderProps) {
     const [notificationsOpen, setNotificationsOpen] = useState(false);
+    const t = useTranslations('dashboard.header');
 
     return (
         <header
@@ -113,12 +115,12 @@ export function DashboardHeader({ onMenuClick, isSidebarOpen = true }: Dashboard
                                 >
                                     <div className="p-4 border-b border-border dark:border-border-dark">
                                         <h3 className="text-sm font-semibold text-text dark:text-text-dark">
-                                            Notifications
+                                            {t('notifications.title')}
                                         </h3>
                                     </div>
                                     <div className="p-4">
                                         <p className="text-sm text-text-muted dark:text-text-muted-dark">
-                                            No new notifications
+                                            {t('notifications.empty')}
                                         </p>
                                     </div>
                                 </div>

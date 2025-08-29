@@ -64,7 +64,7 @@ export class AuthService {
     }
 
     async register(registerDto: RegisterDto) {
-        const { username, email, password, emailverificationcallbackurl } = registerDto;
+        const { username, email, password, emailVerificationCallbackUrl } = registerDto;
 
         const existingUser = await this.userRepository.findByEmail(email);
         if (existingUser) {
@@ -82,7 +82,7 @@ export class AuthService {
             isActive: true,
         });
 
-        this.sendVerificationEmail(user.id, emailverificationcallbackurl);
+        this.sendVerificationEmail(user.id, emailVerificationCallbackUrl);
 
         const { password: _, ...userWithoutPassword } = user;
         return this.generateTokens(userWithoutPassword);

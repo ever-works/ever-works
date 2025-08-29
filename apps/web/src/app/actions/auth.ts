@@ -105,7 +105,7 @@ export async function register(username: string, email: string, password: string
             username: validation.data.username,
             email: validation.data.email,
             password: validation.data.password,
-            emailverificationcallbackurl: withAppUrl(ROUTES.API_AUTH_VERIFY_EMAIL),
+            emailVerificationCallbackUrl: withAppUrl(ROUTES.API_AUTH_VERIFY_EMAIL),
         });
 
         await setAuthCookies(response.access_token, response.refresh_token);
@@ -166,8 +166,6 @@ export async function logout() {
 // OAuth
 // =================
 
-const crypto = globalThis.crypto || require('crypto').webcrypto;
-
 export async function connectProvider(provider: 'github' | 'google') {
     try {
         const state = generateHexToken(16);
@@ -190,12 +188,13 @@ export async function connectProvider(provider: 'github' | 'google') {
                     url,
                 };
             }
-            default:
+            default: {
                 const t = await getTranslations('api.errors');
                 return {
                     success: false,
                     error: t('unsupportedProvider'),
                 };
+            }
         }
     } catch (error) {
         console.error(error);

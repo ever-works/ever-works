@@ -438,6 +438,24 @@
                 "unexpectedError": "An unexpected error occurred"
             }
         },
+        "header": {
+            "notifications": {
+                "title": "Notifications",
+                "empty": "No new notifications"
+            }
+        },
+        "sidebar": {
+            "menu": "Menu",
+            "aiChat": "AI Chat",
+            "newDirectory": "New Directory",
+            "navigation": {
+                "dashboard": "Dashboard",
+                "directories": "Directories",
+                "settings": "Settings"
+            },
+            "signOut": "Sign Out",
+            "signingOut": "Signing out..."
+        },
         "dangerZone": {
             "title": "Danger Zone",
             "subtitle": "Irreversible and destructive actions",
@@ -522,6 +540,33 @@
         }
     },
     "actions": {
+        "directories": {
+            "slug": {
+                "required": "Slug is required",
+                "format": "Slug must be lowercase letters, numbers, and hyphens only"
+            },
+            "name": {
+                "required": "Name is required",
+                "maxLength": "Name must be less than 100 characters"
+            },
+            "description": {
+                "required": "Description is required",
+                "maxLength": "Description must be less than 500 characters"
+            },
+            "prompt": {
+                "minLength": "Prompt must be at least 10 characters",
+                "maxLength": "Prompt must be less than 1000 characters"
+            },
+            "githubRequired": "GitHub connection required. Please connect your GitHub account first.",
+            "createSuccess": "Directory created successfully!",
+            "createFailed": "Failed to create directory",
+            "invalidGeneratedData": "Failed to generate valid directory data",
+            "aiGenerationStarted": "Directory creation started! AI is generating content...",
+            "invalidId": "Invalid directory ID",
+            "deleteSuccess": "Directory deleted successfully",
+            "deleteFailed": "Failed to delete directory",
+            "fetchFailed": "Failed to fetch directories"
+        },
         "settings": {
             "profile": {
                 "usernameRequired": "Username is required",

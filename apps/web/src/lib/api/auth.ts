@@ -7,7 +7,7 @@ export interface RegisterDto {
     username: string;
     email: string;
     password: string;
-    emailverificationcallbackurl?: string;
+    emailVerificationCallbackUrl?: string;
 }
 
 export interface LoginDto {
