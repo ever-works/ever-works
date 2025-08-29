@@ -1,4 +1,4 @@
-import { getAuthUser } from '@/lib/auth';
+import { getAuthFromCookie } from '@/lib/auth';
 import { authAPI } from '@/lib/api/auth';
 import { SettingsClient } from './settings-client';
 import { redirect } from 'next/navigation';
@@ -6,7 +6,7 @@ import { ROUTES } from '@/lib/constants';
 import { RepoProvider } from '@/lib/api/enums';
 
 export default async function SettingsPage() {
-    const user = await getAuthUser();
+    const user = await getAuthFromCookie();
 
     if (!user) {
         redirect(ROUTES.AUTH_LOGIN);

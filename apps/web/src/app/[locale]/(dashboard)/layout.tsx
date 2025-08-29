@@ -1,8 +1,8 @@
-import { getAuthUser } from '@/lib/auth';
+import { getAuthFromCookie } from '@/lib/auth';
 import { DashboardLayoutClient } from './layout-client';
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
-    const user = await getAuthUser();
+    const user = await getAuthFromCookie();
 
     if (!user) {
         // This shouldn't happen as middleware should redirect

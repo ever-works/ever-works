@@ -3,7 +3,7 @@
 import { z } from 'zod';
 import { authAPI } from '@/lib/api/auth';
 import { settingsAPI } from '@/lib/api/settings';
-import { getAuthUser } from '@/lib/auth';
+import { getAuthFromCookie } from '@/lib/auth';
 import { revalidatePath } from 'next/cache';
 import { ROUTES } from '@/lib/constants';
 
@@ -52,7 +52,7 @@ const notificationPreferencesSchema = z.object({
 // Profile Actions
 export async function updateProfile(data: { username: string }) {
     try {
-        const user = await getAuthUser();
+        const user = await getAuthFromCookie();
         if (!user) {
             return { success: false, error: 'Not authenticated' };
         }
@@ -81,7 +81,7 @@ export async function updateProfile(data: { username: string }) {
 // Security Actions
 export async function updatePassword(data: { currentPassword: string; newPassword: string }) {
     try {
-        const user = await getAuthUser();
+        const user = await getAuthFromCookie();
         if (!user) {
             return { success: false, error: 'Not authenticated' };
         }
@@ -109,7 +109,7 @@ export async function updatePassword(data: { currentPassword: string; newPasswor
 // API Token Actions
 export async function updateVercelToken(token: string) {
     try {
-        const user = await getAuthUser();
+        const user = await getAuthFromCookie();
         if (!user) {
             return { success: false, error: 'Not authenticated' };
         }
@@ -137,7 +137,7 @@ export async function updateVercelToken(token: string) {
 
 export async function removeVercelToken() {
     try {
-        const user = await getAuthUser();
+        const user = await getAuthFromCookie();
         if (!user) {
             return { success: false, error: 'Not authenticated' };
         }
@@ -157,7 +157,7 @@ export async function removeVercelToken() {
 // OAuth Actions
 export async function disconnectGitHub() {
     try {
-        const user = await getAuthUser();
+        const user = await getAuthFromCookie();
         if (!user) {
             return { success: false, error: 'Not authenticated' };
         }
@@ -190,7 +190,7 @@ export async function updateNotificationPreferences(preferences: {
     };
 }) {
     try {
-        const user = await getAuthUser();
+        const user = await getAuthFromCookie();
         if (!user) {
             return { success: false, error: 'Not authenticated' };
         }
@@ -220,7 +220,7 @@ export async function updateNotificationPreferences(preferences: {
 // Danger Zone Actions
 export async function deleteAccount() {
     try {
-        const user = await getAuthUser();
+        const user = await getAuthFromCookie();
         if (!user) {
             return { success: false, error: 'Not authenticated' };
         }
