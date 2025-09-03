@@ -65,6 +65,8 @@ COPY --from=installer --chown=node:node /app/packages /app/packages
 RUN pnpm install --prod
 RUN pnpm store prune
 
+WORKDIR /app/apps/api
+
 ENV PORT=3010
 
 EXPOSE 3010
