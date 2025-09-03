@@ -19,7 +19,7 @@
 	"scripts": {
 		"dev": "turbo dev",
 		"dev:api": "turbo dev --filter=ever-works-api",
-		"dev:web": "turbo dev --filter=ever-works-webapp",
+		"dev:web": "turbo dev --filter=ever-works-web",
 		"build": "turbo build",
 		"prepare:husky": "npx husky install .husky",
 		"prepare": "husky",

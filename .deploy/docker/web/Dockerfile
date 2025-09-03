@@ -14,7 +14,7 @@ WORKDIR /app
 
 COPY . .
 
-RUN turbo prune --scope=ever-works-webapp --docker
+RUN turbo prune --scope=ever-works-web --docker
 
 #--
 # Add lockfile and package.json's of isolated subworkspace
@@ -39,8 +39,9 @@ RUN cd apps/web && pnpm install --frozen-lockfile
 # Build the project
 COPY --from=builder /app/out/full/ .
 # Build the apps
-RUN pnpm build --filter=ever-works-webapp...
+RUN pnpm build --filter=ever-works-web...
 # Prune dev deps
+RUN sed -i '/"prepare.*husky/d' package.json
 RUN cd apps/web && (echo "Y" | pnpm prune --prod)
 
 #--

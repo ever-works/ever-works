@@ -15,7 +15,7 @@ export const ALLOWED_REDIRECT_URLS = (process.env.ALLOWED_REDIRECT_URLS || 'loca
     .map((url) => url.trim());
 
 // App URL
-export const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+export const APP_URL = process.env.NEXT_PUBLIC_WEB_URL || 'http://localhost:3000';
 
 // AUTH Secret
 export const AUTH_SECRET = process.env.COOKIE_SECRET || process.env.AUTH_SECRET;

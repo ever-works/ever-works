@@ -29,7 +29,7 @@ export async function getFrontendUrl(): Promise<string> {
     }
 
     // Fallback to environment variable or localhost
-    return process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    return process.env.NEXT_PUBLIC_WEB_URL || 'http://localhost:3000';
 }
 
 interface ServerFetchOptions extends RequestInit {
