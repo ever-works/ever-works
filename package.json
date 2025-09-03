@@ -22,11 +22,11 @@
 		"dev:web": "turbo dev --filter=ever-works-webapp",
 		"build": "turbo build",
 		"prepare:husky": "npx husky install .husky",
+		"prepare": "husky",
 		"lint": "turbo lint",
 		"type-check": "turbo type-check",
 		"clean": "turbo clean",
-		"format": "prettier --write \"**/*.{ts,tsx,md}\"",
-		"prepare": "husky"
+		"format": "prettier --write \"**/*.{ts,tsx,md}\""
 	},
 	"keywords": [],
 	"devDependencies": {

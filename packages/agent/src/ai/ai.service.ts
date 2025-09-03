@@ -315,11 +315,7 @@ export class AiService {
         const config = this.config.providers[targetProvider];
 
         if (!config || !config.enabled) {
-            if (this.isCLI) {
-                return this.createDefaultProvider();
-            }
-
-            throw new Error(`Provider ${targetProvider} is not configured or enabled`);
+            return this.createDefaultProvider();
         }
 
         const tempConfig = { ...config, temperature };
