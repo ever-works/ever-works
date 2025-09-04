@@ -67,8 +67,8 @@ RUN pnpm store prune
 
 WORKDIR /app/apps/api
 
-ENV PORT=3010
+ENV PORT=3100
 
-EXPOSE 3010
+EXPOSE 3100
 
 CMD ["node", "/app/apps/api/dist/main"]

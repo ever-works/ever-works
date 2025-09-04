@@ -1,0 +1,167 @@
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: ever-works-web-dev
+spec:
+  selector:
+    app: ever-works-web-dev
+  ports:
+    - name: web
+      protocol: TCP
+      port: 3100
+      targetPort: 3100
+
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: ever-works-api-dev
+spec:
+  selector:
+    app: ever-works-api-dev
+  ports:
+    - name: web
+      protocol: TCP
+      port: 3000
+      targetPort: 3000
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ever-works-api-dev
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ever-works-api-dev
+  template:
+    metadata:
+      labels:
+        app: ever-works-api-dev
+    spec:
+      containers:
+        - name: ever-works-api-dev
+          image: ghcr.io/ever-co/ever-works-api:latest
+          env:
+            - name: API_HOST
+              value: 0.0.0.0
+            - name: FIREBASE_API_KEY
+              value: "$FIREBASE_API_KEY"
+            - name: FIREBASE_AUTH_DOMAIN
+              value: "$FIREBASE_AUTH_DOMAIN"
+            - name: FIREBASE_DATABASE_URL
+              value: "$FIREBASE_DATABASE_URL"
+            - name: FIREBASE_PROJECT_ID
+              value: "$FIREBASE_PROJECT_ID"
+            - name: FIREBASE_STORAGE_BUCKET
+              value: "$FIREBASE_STORAGE_BUCKET"
+            - name: FIREBASE_MESSAGING_SENDER_ID
+              value: "$FIREBASE_MESSAGING_SENDER_ID"
+            - name: FIREBASE_APP_ID
+              value: "$FIREBASE_APP_ID"
+            - name: FIREBASE_MEASUREMENT_ID
+              value: "$FIREBASE_MEASUREMENT_ID"
+            - name: FIREBASE_ADMIN_PRIVATE_KEY
+              value: "$FIREBASE_ADMIN_PRIVATE_KEY"
+            - name: FIREBASE_ADMIN_CLIENT_EMAIL
+              value: "$FIREBASE_ADMIN_CLIENT_EMAIL"
+
+          ports:
+            - containerPort: 3100
+              protocol: TCP
+
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ever-works-web-dev
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ever-works-web-dev
+  template:
+    metadata:
+      labels:
+        app: ever-works-web-dev
+    spec:
+      containers:
+        - name: ever-works-web-dev
+          image: ghcr.io/ever-co/ever-works-web:latest
+          env:
+            - name: AUTH_SECRET
+              value: "$AUTH_SECRET"
+            - name: API_URL
+              value: "http://ever-works-api-dev:3100"
+            - name: NEXT_PUBLIC_WEB_URL
+              value: "https://appdev.ever.works"
+
+          ports:
+            - containerPort: 3100
+              protocol: TCP
+
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ever-works-web-dev-ing
+  namespace: default
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: appdev.ever.works
+      http:
+        paths:
+          - backend:
+              service:
+                name: ever-works-web-dev
+                port:
+                  number: 3100
+            path: /
+            pathType: Prefix
+  tls:
+    - hosts:
+        - appdev.ever.works
+      secretName: appdev.ever.works-tls
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ever-works-api-dev-ing
+  namespace: default
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: apidev.ever.works
+      http:
+        paths:
+          - backend:
+              service:
+                name: ever-works-api-dev
+                port:
+                  number: 3000
+            path: /
+            pathType: Prefix
+  tls:
+    - hosts:
+        - apidev.ever.works
+      secretName: apidev.ever.works-tls
