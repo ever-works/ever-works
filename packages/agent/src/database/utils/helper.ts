@@ -12,7 +12,7 @@ export const getTlsOptions = (
     }
 
     if (!caCertBase64) {
-        console.error('DB_CA_CERT is not defined. TLS options cannot be configured.');
+        console.error('DATABASE_CA_CERT is not defined. TLS options cannot be configured.');
         return undefined;
     }
 
@@ -25,7 +25,7 @@ export const getTlsOptions = (
             ca: sslCert,
         };
     } catch (error) {
-        console.error('Error decoding DB_CA_CERT:', error.message);
+        console.error('Error decoding DATABASE_CA_CERT:', error.message);
         return undefined;
     }
 };
