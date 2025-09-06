@@ -45,28 +45,102 @@ spec:
         - name: ever-works-api-dev
           image: ghcr.io/ever-co/ever-works-api:latest
           env:
-            - name: API_HOST
-              value: 0.0.0.0
-            - name: FIREBASE_API_KEY
-              value: "$FIREBASE_API_KEY"
-            - name: FIREBASE_AUTH_DOMAIN
-              value: "$FIREBASE_AUTH_DOMAIN"
-            - name: FIREBASE_DATABASE_URL
-              value: "$FIREBASE_DATABASE_URL"
-            - name: FIREBASE_PROJECT_ID
-              value: "$FIREBASE_PROJECT_ID"
-            - name: FIREBASE_STORAGE_BUCKET
-              value: "$FIREBASE_STORAGE_BUCKET"
-            - name: FIREBASE_MESSAGING_SENDER_ID
-              value: "$FIREBASE_MESSAGING_SENDER_ID"
-            - name: FIREBASE_APP_ID
-              value: "$FIREBASE_APP_ID"
-            - name: FIREBASE_MEASUREMENT_ID
-              value: "$FIREBASE_MEASUREMENT_ID"
-            - name: FIREBASE_ADMIN_PRIVATE_KEY
-              value: "$FIREBASE_ADMIN_PRIVATE_KEY"
-            - name: FIREBASE_ADMIN_CLIENT_EMAIL
-              value: "$FIREBASE_ADMIN_CLIENT_EMAIL"
+            - name: WEB_APP_URL
+              value: https://appdev.ever.works
+            - name: API_URL
+              value: https://apidev.ever.works
+            - name: ALLOWED_ORIGINS
+              value: https://appdev.ever.works,https://apidev.ever.works
+            - name: JWT_SECRET
+              value: $JWT_SECRET
+
+            # Github
+            - name: GITHUB_APIKEY
+              value: $GITHUB_APIKEY
+            - name: GITHUB_OWNER
+              value: $GITHUB_OWNER
+
+            # Git
+            - name: GIT_NAME
+              value: $GIT_NAME
+            - name: GIT_EMAIL
+              value: $GIT_EMAIL
+
+            # Vercel
+            - name: VERCEL_TOKEN
+              value: $VERCEL_TOKEN
+
+            # GitHub Auth
+            - name: GITHUB_CLIENT_ID
+              value: $GITHUB_CLIENT_ID
+            - name: GITHUB_CLIENT_SECRET
+              value: $GITHUB_CLIENT_SECRET
+            - name: GITHUB_CALLBACK_URL
+              value: https://appdev.ever.works/api/auth/github/callback
+
+            # Google Auth
+            - name: GOOGLE_CLIENT_ID
+              value: $GOOGLE_CLIENT_ID
+            - name: GOOGLE_CLIENT_SECRET
+              value: $GOOGLE_CLIENT_SECRET
+            - name: GOOGLE_CALLBACK_URL
+              value: https://appdev.ever.works/api/auth/google/callback
+
+            # AI Configuration
+            - name: AI_DEFAULT_PROVIDER
+              value: $AI_DEFAULT_PROVIDER
+
+            # OpenAI
+            - name: OPENAI_MODEL
+              value: $OPENAI_MODEL
+            - name: OPENAI_API_KEY
+              value: $OPENAI_API_KEY
+
+            # OpenRouter
+            - name: OPENROUTER_MODEL
+              value: $OPENROUTER_MODEL
+            - name: OPENROUTER_API_KEY
+              value: $OPENROUTER_API_KEY
+
+            # Tavily
+            - name: TAVILY_API_KEY
+              value: $TAVILY_API_KEY
+
+            # SEARCH SERVICES
+            - name: EXTRACT_CONTENT_SERVICE
+              value: $EXTRACT_CONTENT_SERVICE
+            - name: WEB_SEARCH_SERVICE
+              value: $WEB_SEARCH_SERVICE
+
+            # Database
+            - name: DATABASE_TYPE
+              value: $DATABASE_TYPE
+            - name: DATABASE_HOST
+              value: $DATABASE_HOST
+            - name: DATABASE_PORT
+              value: $DATABASE_PORT
+            - name: DATABASE_USERNAME
+              value: $DATABASE_USERNAME
+            - name: DATABASE_PASSWORD
+              value: $DATABASE_PASSWORD
+            - name: DATABASE_NAME
+              value: $DATABASE_NAME
+
+            # Mail
+            - name: SMTP_HOST
+              value: $SMTP_HOST
+            - name: SMTP_PORT
+              value: $SMTP_PORT
+            - name: SMTP_SECURE
+              value: $SMTP_SECURE
+            - name: SMTP_IGNORE_TLS
+              value: $SMTP_IGNORE_TLS
+            - name: SMTP_USER
+              value: $SMTP_USER
+            - name: SMTP_PASSWORD
+              value: $SMTP_PASSWORD
+            - name: MAIL_FROM
+              value: $MAIL_FROM
 
           ports:
             - containerPort: 3100

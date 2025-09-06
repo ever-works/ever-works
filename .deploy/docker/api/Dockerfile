@@ -55,6 +55,7 @@ USER node
 WORKDIR /app
 
 ENV NODE_ENV=production
+ENV APP_TYPE=api
 
 COPY --from=installer --chown=node:node /app/package.json ./
 COPY --from=installer --chown=node:node /app/pnpm-lock.yaml ./
