@@ -9,6 +9,7 @@ import { ChatMessage } from '../entities/chat-message.entity';
 import * as path from 'path';
 import * as os from 'os';
 import { config } from '@src/config';
+import { getTlsOptions } from './utils';
 
 export type DatabaseType = 'better-sqlite3' | 'postgres' | 'mysql' | 'mariadb';
 
@@ -25,6 +26,7 @@ export interface DatabaseConfig extends Omit<TypeOrmModuleOptions, 'type'> {
     entities: any[];
     synchronize: boolean;
     logging: boolean;
+    ssl?: any;
 }
 
 export const ENTITIES = [Directory, User, RefreshToken, OAuthToken, ChatHistory, ChatMessage];
@@ -34,11 +36,15 @@ export const databaseConfig = registerAs('database', (): DatabaseConfig => {
     const appType = config.getAppType() || 'api';
     let dbType = config.database.getType() || 'better-sqlite3';
 
-    const baseConfig = {
+    const baseConfig: any = {
         entities: ENTITIES,
         synchronize: environment !== 'production',
         logging: config.database.loggingEnabled(),
     };
+
+    if (config.database.sslMode()) {
+        baseConfig.ssl = getTlsOptions(true, config.database.databaseCaCert());
+    }
 
     // @ts-ignore
     if (dbType === 'sqlite' || dbType === 'sqlite3') {

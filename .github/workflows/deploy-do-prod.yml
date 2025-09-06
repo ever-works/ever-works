@@ -30,6 +30,12 @@ jobs:
       - name: Save DigitalOcean kubeconfig with short-lived credentials
         run: doctl kubernetes cluster kubeconfig save --expiry-seconds 600 k8s-ever-works
 
+      - name: Write PostgreSQL Certificate file
+        run: |
+          echo "$DB_CA_CERT" | base64 --decode > ${HOME}/ca-certificate.crt
+        env:
+          DB_CA_CERT: '${{ secrets.DATABASE_CA_CERT }}'
+
       - name: Generate TLS Secrets
         run: |
           rm -f ${HOME}/ingress.api.crt ${HOME}/ingress.api.key ${HOME}/ingress.webapp.crt ${HOME}/ingress.webapp.key
@@ -88,6 +94,9 @@ jobs:
           DATABASE_USERNAME: ${{ secrets.DATABASE_USERNAME }}
           DATABASE_PASSWORD: ${{ secrets.DATABASE_PASSWORD }}
           DATABASE_NAME: ${{ secrets.DATABASE_NAME }}
+          # Enable SSL/TLS for database connections (true/false)
+          DATABASE_SSL_MODE: ${{ secrets.DATABASE_SSL_MODE }}
+          DATABASE_CA_CERT: ${{ secrets.DATABASE_CA_CERT }}
           # Mail
           MAILER_PROVIDER: ${{ secrets.MAILER_PROVIDER }}
           SMTP_HOST: ${{ secrets.SMTP_HOST }}
