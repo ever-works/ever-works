@@ -1,4 +1,4 @@
-name: Deploy to CoreWeave Prod
+name: Deploy to DO Prod
 
 on:
   workflow_run:
@@ -43,15 +43,14 @@ jobs:
           echo ${{ secrets.INGRESS_API_CERT_KEY }} | base64 --decode > ${HOME}/ingress.api.key
           echo ${{ secrets.INGRESS_WEBAPP_CERT }} | base64 --decode > ${HOME}/ingress.webapp.crt
           echo ${{ secrets.INGRESS_WEBAPP_CERT_KEY }} | base64 --decode > ${HOME}/ingress.webapp.key
-          kubectl create secret tls api.ever.works-tls --save-config --dry-run=client --cert=${HOME}/ingress.api.crt --key=${HOME}/ingress.api.key -o yaml | kubectl --context coreweave apply -f -
-          kubectl create secret tls app.ever.works-tls --save-config --dry-run=client --cert=${HOME}/ingress.webapp.crt --key=${HOME}/ingress.webapp.key -o yaml | kubectl --context coreweave apply -f -
+          kubectl create secret tls api.ever.works-tls --save-config --dry-run=client --cert=${HOME}/ingress.api.crt --key=${HOME}/ingress.api.key -o yaml | kubectl --context do-sfo2-k8s-gauzy apply -f -
+          kubectl create secret tls app.ever.works-tls --save-config --dry-run=client --cert=${HOME}/ingress.webapp.crt --key=${HOME}/ingress.webapp.key -o yaml | kubectl --context do-sfo2-k8s-gauzy apply -f -
 
       - name: Apply k8s manifests changes in DigitalOcean k8s cluster (if any)
         run: |
           envsubst < $GITHUB_WORKSPACE/.deploy/k8s/k8s-manifest.prod.yaml | kubectl --context do-sfo2-k8s-gauzy apply -f -
         env:
           # WEB ENV
-          API_URL: https://api.ever.works
           AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
 
           # API ENV
