@@ -2,9 +2,9 @@ import createMiddleware from 'next-intl/middleware';
 import { routing } from './i18n/routing';
 import { NextRequest, NextResponse } from 'next/server';
 import { DEFAULT_LOCALE, PUBLIC_ROUTES, ROUTES } from './lib/constants';
-import { getAuthFromRequest } from './lib/auth/middleware';
 import { AUTH_COOKIE_NAME } from './lib/auth/cookies';
 import { match } from 'path-to-regexp';
+import { getAuthFromCookie } from './lib/auth';
 
 const nextIntlMiddleware = createMiddleware(routing);
 
@@ -44,24 +44,9 @@ export default async function middleware(req: NextRequest) {
     }
 
     // Check authentication
-    const auth = await getAuthFromRequest().catch(() => null);
-
-    if (!auth || !auth.isAuthenticated) {
+    const auth = await getAuthFromCookie().catch(() => null);
+    if (!auth) {
         // Not authenticated - redirect to login
-        const loginUrl = new URL(ROUTES.AUTH_LOGIN, req.url);
-        loginUrl.searchParams.set('from', pathname);
-
-        // Remove invalid cookie if it exists
-        if (req.cookies.has(AUTH_COOKIE_NAME)) {
-            req.cookies.delete(AUTH_COOKIE_NAME);
-        }
-
-        return redirect(maybeLocale, ROUTES.AUTH_LOGIN, req);
-    }
-
-    if (auth.isExpired) {
-        // TODO: We may want to handle this better by refresh the token
-        // For now we will just log out
         const loginUrl = new URL(ROUTES.AUTH_LOGIN, req.url);
         loginUrl.searchParams.set('from', pathname);
 

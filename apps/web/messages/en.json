@@ -216,7 +216,11 @@
         },
         "header": {
             "welcome": "Welcome back, {username}!",
-            "subtitle": "Manage your AI-powered directories and track their performance"
+            "subtitle": "Manage your AI-powered directories and track their performance",
+            "notifications": {
+                "title": "Notifications",
+                "empty": "No new notifications"
+            }
         },
         "directories": {
             "title": "Directories",
@@ -438,6 +442,18 @@
                 "unexpectedError": "An unexpected error occurred"
             }
         },
+        "sidebar": {
+            "menu": "Menu",
+            "aiChat": "AI Chat",
+            "newDirectory": "New Directory",
+            "navigation": {
+                "dashboard": "Dashboard",
+                "directories": "Directories",
+                "settings": "Settings"
+            },
+            "signOut": "Sign Out",
+            "signingOut": "Signing out..."
+        },
         "dangerZone": {
             "title": "Danger Zone",
             "subtitle": "Irreversible and destructive actions",
@@ -522,6 +538,33 @@
         }
     },
     "actions": {
+        "directories": {
+            "slug": {
+                "required": "Slug is required",
+                "format": "Slug must be lowercase letters, numbers, and hyphens only"
+            },
+            "name": {
+                "required": "Name is required",
+                "maxLength": "Name must be less than 100 characters"
+            },
+            "description": {
+                "required": "Description is required",
+                "maxLength": "Description must be less than 500 characters"
+            },
+            "prompt": {
+                "minLength": "Prompt must be at least 10 characters",
+                "maxLength": "Prompt must be less than 1000 characters"
+            },
+            "githubRequired": "GitHub connection required. Please connect your GitHub account first.",
+            "createSuccess": "Directory created successfully!",
+            "createFailed": "Failed to create directory",
+            "invalidGeneratedData": "Failed to generate valid directory data",
+            "aiGenerationStarted": "Directory creation started! AI is generating content...",
+            "invalidId": "Invalid directory ID",
+            "deleteSuccess": "Directory deleted successfully",
+            "deleteFailed": "Failed to delete directory",
+            "fetchFailed": "Failed to fetch directories"
+        },
         "settings": {
             "profile": {
                 "usernameRequired": "Username is required",
@@ -535,9 +578,11 @@
                 "newMinLength": "Password must be at least 8 characters",
                 "newMaxLength": "Password must be less than 100 characters",
                 "updateFailed": "Failed to update password",
-                "updateSuccess": "Password updated successfully"
+                "updateSuccess": "Password updated successfully",
+                "notAuthenticated": "Not authenticated"
             },
             "vercel": {
+                "notAuthenticated": "Not authenticated",
                 "tokenRequired": "Token is required",
                 "invalidFormat": "Invalid Vercel token format",
                 "saveFailed": "Failed to save Vercel token",
@@ -546,14 +591,17 @@
                 "removeSuccess": "Vercel token removed successfully"
             },
             "github": {
+                "notAuthenticated": "Not authenticated",
                 "disconnectFailed": "Failed to disconnect GitHub",
                 "disconnectSuccess": "GitHub account disconnected successfully"
             },
             "notifications": {
+                "notAuthenticated": "Not authenticated",
                 "updateFailed": "Failed to update preferences",
                 "updateSuccess": "Notification preferences updated successfully"
             },
             "danger": {
+                "notAuthenticated": "Not authenticated",
                 "deleteFailed": "Failed to delete account",
                 "deleteDisabled": "Account deletion is disabled in demo"
             }

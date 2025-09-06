@@ -26,6 +26,12 @@ export const config = {
         loggingEnabled() {
             return process.env.DATABASE_LOGGING === 'true';
         },
+        sslMode() {
+            return process.env.DATABASE_SSL_MODE === 'true';
+        },
+        databaseCaCert() {
+            return process.env.DATABASE_CA_CERT;
+        },
         getPath() {
             return process.env.DATABASE_PATH;
         },

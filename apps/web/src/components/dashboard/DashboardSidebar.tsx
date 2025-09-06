@@ -9,6 +9,7 @@ import { ChatInterface } from '@/components/ai/ChatInterface';
 import { APP_NAME, ROUTES } from '@/lib/constants';
 import { Link, usePathname } from '@/i18n/navigation';
 import { Home, Folder, Settings, LogOut, Plus, X } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 
 interface DashboardSidebarProps {
     user: AuthUser;
@@ -21,6 +22,7 @@ export function DashboardSidebar({ user, isOpen, onToggle }: DashboardSidebarPro
     const [activeMode, setActiveMode] = useState<'menu' | 'chat'>('menu');
     const [isPending, startTransition] = useTransition();
     const [avatarError, setAvatarError] = useState(false);
+    const t = useTranslations('dashboard.sidebar');
 
     const handleLogout = async () => {
         startTransition(async () => {
@@ -29,10 +31,10 @@ export function DashboardSidebar({ user, isOpen, onToggle }: DashboardSidebarPro
     };
 
     const navigation = [
-        { name: 'Dashboard', href: ROUTES.DASHBOARD, icon: Home },
-        { name: 'Directories', href: ROUTES.DASHBOARD_DIRECTORIES, icon: Folder },
+        { name: t('navigation.dashboard'), href: ROUTES.DASHBOARD, icon: Home },
+        { name: t('navigation.directories'), href: ROUTES.DASHBOARD_DIRECTORIES, icon: Folder },
         // { name: 'Analytics', href: ROUTES.DASHBOARD_ANALYTICS, icon: ChartIcon },
-        { name: 'Settings', href: ROUTES.DASHBOARD_SETTINGS, icon: Settings },
+        { name: t('navigation.settings'), href: ROUTES.DASHBOARD_SETTINGS, icon: Settings },
     ];
 
     return (
@@ -79,7 +81,7 @@ export function DashboardSidebar({ user, isOpen, onToggle }: DashboardSidebarPro
                                     : 'text-text-secondary dark:text-text-muted-dark hover:text-text dark:hover:text-text-dark',
                             )}
                         >
-                            Menu
+                            {t('menu')}
                         </button>
                         <button
                             onClick={() => setActiveMode('chat')}
@@ -90,7 +92,7 @@ export function DashboardSidebar({ user, isOpen, onToggle }: DashboardSidebarPro
                                     : 'text-text-secondary dark:text-text-muted-dark hover:text-text dark:hover:text-text-dark',
                             )}
                         >
-                            AI Chat
+                            {t('aiChat')}
                         </button>
                     </div>
                 </div>
@@ -110,7 +112,7 @@ export function DashboardSidebar({ user, isOpen, onToggle }: DashboardSidebarPro
                                 )}
                             >
                                 <Plus className="w-5 h-5" />
-                                <span className="font-medium">New Directory</span>
+                                <span className="font-medium">{t('newDirectory')}</span>
                             </Link>
                         </div>
 
@@ -192,7 +194,7 @@ export function DashboardSidebar({ user, isOpen, onToggle }: DashboardSidebarPro
                         )}
                     >
                         <LogOut className="w-5 h-5" />
-                        <span className="text-sm">{isPending ? 'Signing out...' : 'Sign Out'}</span>
+                        <span className="text-sm">{isPending ? t('signingOut') : t('signOut')}</span>
                     </button>
                 </div>
             </div>

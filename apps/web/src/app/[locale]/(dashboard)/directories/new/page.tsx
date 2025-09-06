@@ -1,9 +1,9 @@
-import { getAuthUser } from '@/lib/auth';
+import { getAuthFromCookie } from '@/lib/auth';
 import { authAPI } from '@/lib/api/auth';
 import NewDirectoryClient from './new-directory-client';
 
 export default async function NewDirectoryPage() {
-    const user = await getAuthUser();
+    const user = await getAuthFromCookie();
 
     // Check GitHub connection on the server
     let githubConnected = false;

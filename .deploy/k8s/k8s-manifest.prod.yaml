@@ -1,0 +1,239 @@
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: ever-works-web
+spec:
+  selector:
+    app: ever-works-web
+  ports:
+    - name: web
+      protocol: TCP
+      port: 3000
+      targetPort: 3000
+
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: ever-works-api
+spec:
+  selector:
+    app: ever-works-api
+  ports:
+    - name: web
+      protocol: TCP
+      port: 3100
+      targetPort: 3100
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ever-works-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ever-works-api
+  template:
+    metadata:
+      labels:
+        app: ever-works-api
+    spec:
+      containers:
+        - name: ever-works-api
+          image: ghcr.io/ever-co/ever-works-api:latest
+          env:
+            - name: WEB_APP_URL
+              value: https://app.ever.works
+            - name: API_URL
+              value: https://api.ever.works
+            - name: ALLOWED_ORIGINS
+              value: https://app.ever.works,https://api.ever.works
+            - name: JWT_SECRET
+              value: $JWT_SECRET
+
+            # Github
+            - name: GITHUB_APIKEY
+              value: $GITHUB_APIKEY
+            - name: GITHUB_OWNER
+              value: $GITHUB_OWNER
+
+            # Git
+            - name: GIT_NAME
+              value: $GIT_NAME
+            - name: GIT_EMAIL
+              value: $GIT_EMAIL
+
+            # Vercel
+            - name: VERCEL_TOKEN
+              value: $VERCEL_TOKEN
+
+            # GitHub Auth
+            - name: GITHUB_CLIENT_ID
+              value: $GITHUB_CLIENT_ID
+            - name: GITHUB_CLIENT_SECRET
+              value: $GITHUB_CLIENT_SECRET
+            - name: GITHUB_CALLBACK_URL
+              value: https://app.ever.works/api/auth/github/callback
+
+            # Google Auth
+            - name: GOOGLE_CLIENT_ID
+              value: $GOOGLE_CLIENT_ID
+            - name: GOOGLE_CLIENT_SECRET
+              value: $GOOGLE_CLIENT_SECRET
+            - name: GOOGLE_CALLBACK_URL
+              value: https://app.ever.works/api/auth/google/callback
+
+            # AI Configuration
+            - name: AI_DEFAULT_PROVIDER
+              value: $AI_DEFAULT_PROVIDER
+
+            # OpenAI
+            - name: OPENAI_MODEL
+              value: $OPENAI_MODEL
+            - name: OPENAI_API_KEY
+              value: $OPENAI_API_KEY
+
+            # OpenRouter
+            - name: OPENROUTER_MODEL
+              value: $OPENROUTER_MODEL
+            - name: OPENROUTER_API_KEY
+              value: $OPENROUTER_API_KEY
+
+            # Tavily
+            - name: TAVILY_API_KEY
+              value: $TAVILY_API_KEY
+
+            # SEARCH SERVICES
+            - name: EXTRACT_CONTENT_SERVICE
+              value: $EXTRACT_CONTENT_SERVICE
+            - name: WEB_SEARCH_SERVICE
+              value: $WEB_SEARCH_SERVICE
+
+            # Database
+            - name: DATABASE_TYPE
+              value: $DATABASE_TYPE
+            - name: DATABASE_HOST
+              value: $DATABASE_HOST
+            - name: DATABASE_PORT
+              value: $DATABASE_PORT
+            - name: DATABASE_USERNAME
+              value: $DATABASE_USERNAME
+            - name: DATABASE_PASSWORD
+              value: $DATABASE_PASSWORD
+            - name: DATABASE_NAME
+              value: $DATABASE_NAME
+
+            # Mail
+            - name: SMTP_HOST
+              value: $SMTP_HOST
+            - name: SMTP_PORT
+              value: $SMTP_PORT
+            - name: SMTP_SECURE
+              value: $SMTP_SECURE
+            - name: SMTP_IGNORE_TLS
+              value: $SMTP_IGNORE_TLS
+            - name: SMTP_USER
+              value: $SMTP_USER
+            - name: SMTP_PASSWORD
+              value: $SMTP_PASSWORD
+            - name: MAIL_FROM
+              value: $MAIL_FROM
+
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
+
+          ports:
+            - containerPort: 3100
+              protocol: TCP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ever-works-web
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ever-works-web
+  template:
+    metadata:
+      labels:
+        app: ever-works-web
+    spec:
+      containers:
+        - name: ever-works-web
+          image: ghcr.io/ever-co/ever-works-web:latest
+          env:
+            - name: AUTH_SECRET
+              value: "$AUTH_SECRET"
+            - name: API_URL
+              value: "http://ever-works-api:3100"
+            - name: NEXT_PUBLIC_WEB_URL
+              value: "https://app.ever.works"
+          ports:
+            - containerPort: 3000
+              protocol: TCP
+
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ever-works-web-ing
+  namespace: default
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: app.ever.works
+      http:
+        paths:
+          - backend:
+              service:
+                name: ever-works-web
+                port:
+                  number: 3000
+            path: /
+            pathType: Prefix
+  tls:
+    - hosts:
+        - app.ever.works
+      secretName: app.ever.works-tls
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ever-works-api-ing
+  namespace: default
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: api.ever.works
+      http:
+        paths:
+          - backend:
+              service:
+                name: ever-works-api
+                port:
+                  number: 3100
+            path: /
+            pathType: Prefix
+  tls:
+    - hosts:
+        - api.ever.works
+      secretName: api.ever.works-tls

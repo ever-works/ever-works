@@ -21,7 +21,7 @@ export class RegisterDto {
 
     @IsString()
     @IsOptional()
-    emailverificationcallbackurl?: string;
+    emailVerificationCallbackUrl?: string;
 }
 
 export class LoginDto {

@@ -4,6 +4,7 @@
 dist
 tmp
 /out-tsc
+/out
 
 # dependencies
 node_modules
@@ -46,3 +47,6 @@ Thumbs.db
 
 # claude
 .claude
+
+# API
+apps/api/data

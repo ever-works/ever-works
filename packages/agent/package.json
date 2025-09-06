@@ -66,7 +66,21 @@
         "@nestjs/core": "*",
         "@nestjs/platform-express": "*",
         "reflect-metadata": "*",
-        "rxjs": "*"
+        "rxjs": "*",
+        "better-sqlite3": "^12.2",
+        "pg": "^8.16",
+        "mysql2": "^3.14"
+    },
+    "peerDependenciesMeta": {
+        "better-sqlite3": {
+            "optional": true
+        },
+        "pg": {
+            "optional": true
+        },
+        "mysql2": {
+            "optional": true
+        }
     },
     "devDependencies": {
         "@eslint/eslintrc": "^3.3.1",
@@ -114,7 +128,6 @@
         "@types/fs-extra": "^11.0.4",
         "@types/string-similarity": "^4.0.2",
         "axios": "^1.11.0",
-        "better-sqlite3": "^11.10.0",
         "bullmq": "^5.56.1",
         "cheerio": "^1.1.0",
         "class-transformer": "^0.5.1",

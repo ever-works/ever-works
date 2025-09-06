@@ -19,14 +19,14 @@
 	"scripts": {
 		"dev": "turbo dev",
 		"dev:api": "turbo dev --filter=ever-works-api",
-		"dev:web": "turbo dev --filter=ever-works-webapp",
+		"dev:web": "turbo dev --filter=ever-works-web",
 		"build": "turbo build",
 		"prepare:husky": "npx husky install .husky",
+		"prepare": "husky",
 		"lint": "turbo lint",
 		"type-check": "turbo type-check",
 		"clean": "turbo clean",
-		"format": "prettier --write \"**/*.{ts,tsx,md}\"",
-		"prepare": "husky"
+		"format": "prettier --write \"**/*.{ts,tsx,jsx,json,css,md}\""
 	},
 	"keywords": [],
 	"devDependencies": {

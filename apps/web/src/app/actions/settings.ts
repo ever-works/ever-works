@@ -3,58 +3,33 @@
 import { z } from 'zod';
 import { authAPI } from '@/lib/api/auth';
 import { settingsAPI } from '@/lib/api/settings';
-import { getAuthUser } from '@/lib/auth';
+import { getAuthFromCookie } from '@/lib/auth';
 import { revalidatePath } from 'next/cache';
 import { ROUTES } from '@/lib/constants';
+import { getTranslations } from 'next-intl/server';
 
-// Validation schemas
-const updateProfileSchema = z.object({
-    username: z
-        .string()
-        .min(1, 'Username is required')
-        .max(50, 'Username must be less than 50 characters')
-        .regex(
-            /^[a-zA-Z0-9_-]+$/,
-            'Username can only contain letters, numbers, dashes and underscores',
-        ),
-});
-
-const updatePasswordSchema = z.object({
-    currentPassword: z.string().min(1, 'Current password is required'),
-    newPassword: z
-        .string()
-        .min(8, 'Password must be at least 8 characters')
-        .max(100, 'Password must be less than 100 characters'),
-});
-
-const vercelTokenSchema = z.object({
-    token: z
-        .string()
-        .min(1, 'Token is required')
-        .regex(/^vc_[A-Za-z0-9]+$/, 'Invalid Vercel token format'),
-});
-
-const notificationPreferencesSchema = z.object({
-    email: z.object({
-        updates: z.boolean(),
-        newItems: z.boolean(),
-        weeklyDigest: z.boolean(),
-        marketing: z.boolean(),
-    }),
-    app: z.object({
-        newItems: z.boolean(),
-        comments: z.boolean(),
-        mentions: z.boolean(),
-        systemUpdates: z.boolean(),
-    }),
-});
+// Note: Validation schemas are now created inside each function with translations
 
 // Profile Actions
 export async function updateProfile(data: { username: string }) {
+    const t = await getTranslations('actions.settings.profile');
+    
+    // Validation schema with translations
+    const updateProfileSchema = z.object({
+        username: z
+            .string()
+            .min(1, t('usernameRequired'))
+            .max(50, t('usernameMaxLength'))
+            .regex(
+                /^[a-zA-Z0-9_-]+$/,
+                t('usernameFormat'),
+            ),
+    });
+    
     try {
-        const user = await getAuthUser();
+        const user = await getAuthFromCookie();
         if (!user) {
-            return { success: false, error: 'Not authenticated' };
+            return { success: false, error: t('notAuthenticated') };
         }
 
         // Validate input
@@ -73,17 +48,28 @@ export async function updateProfile(data: { username: string }) {
     } catch (error: any) {
         return {
             success: false,
-            error: error?.message || 'Failed to update profile',
+            error: error?.message || t('updateFailed'),
         };
     }
 }
 
 // Security Actions
 export async function updatePassword(data: { currentPassword: string; newPassword: string }) {
+    const t = await getTranslations('actions.settings.password');
+    
+    // Validation schema with translations
+    const updatePasswordSchema = z.object({
+        currentPassword: z.string().min(1, t('currentRequired')),
+        newPassword: z
+            .string()
+            .min(8, t('newMinLength'))
+            .max(100, t('newMaxLength')),
+    });
+    
     try {
-        const user = await getAuthUser();
+        const user = await getAuthFromCookie();
         if (!user) {
-            return { success: false, error: 'Not authenticated' };
+            return { success: false, error: t('notAuthenticated') };
         }
 
         // Validate input
@@ -97,21 +83,31 @@ export async function updatePassword(data: { currentPassword: string; newPasswor
 
         await authAPI.updatePassword(validation.data);
 
-        return { success: true, message: 'Password updated successfully' };
+        return { success: true, message: t('updateSuccess') };
     } catch (error: any) {
         return {
             success: false,
-            error: error?.message || 'Failed to update password',
+            error: error?.message || t('updateFailed'),
         };
     }
 }
 
 // API Token Actions
 export async function updateVercelToken(token: string) {
+    const t = await getTranslations('actions.settings.vercel');
+    
+    // Validation schema with translations
+    const vercelTokenSchema = z.object({
+        token: z
+            .string()
+            .min(1, t('tokenRequired'))
+            .regex(/^vc_[A-Za-z0-9]+$/, t('invalidFormat')),
+    });
+    
     try {
-        const user = await getAuthUser();
+        const user = await getAuthFromCookie();
         if (!user) {
-            return { success: false, error: 'Not authenticated' };
+            return { success: false, error: t('notAuthenticated') };
         }
 
         // Validate input
@@ -126,50 +122,54 @@ export async function updateVercelToken(token: string) {
         await settingsAPI.updateVercelToken(validation.data.token);
         revalidatePath(ROUTES.DASHBOARD_SETTINGS);
 
-        return { success: true, message: 'Vercel token saved successfully' };
+        return { success: true, message: t('saveSuccess') };
     } catch (error: any) {
         return {
             success: false,
-            error: error?.message || 'Failed to save Vercel token',
+            error: error?.message || t('saveFailed'),
         };
     }
 }
 
 export async function removeVercelToken() {
+    const t = await getTranslations('actions.settings.vercel');
+    
     try {
-        const user = await getAuthUser();
+        const user = await getAuthFromCookie();
         if (!user) {
-            return { success: false, error: 'Not authenticated' };
+            return { success: false, error: t('notAuthenticated') };
         }
 
         await settingsAPI.removeVercelToken();
         revalidatePath(ROUTES.DASHBOARD_SETTINGS);
 
-        return { success: true, message: 'Vercel token removed successfully' };
+        return { success: true, message: t('removeSuccess') };
     } catch (error: any) {
         return {
             success: false,
-            error: error?.message || 'Failed to remove Vercel token',
+            error: error?.message || t('removeFailed'),
         };
     }
 }
 
 // OAuth Actions
 export async function disconnectGitHub() {
+    const t = await getTranslations('actions.settings.github');
+    
     try {
-        const user = await getAuthUser();
+        const user = await getAuthFromCookie();
         if (!user) {
-            return { success: false, error: 'Not authenticated' };
+            return { success: false, error: t('notAuthenticated') };
         }
 
         await authAPI.oauth_connections.disconnect('github');
         revalidatePath(ROUTES.DASHBOARD_SETTINGS);
 
-        return { success: true, message: 'GitHub account disconnected successfully' };
+        return { success: true, message: t('disconnectSuccess') };
     } catch (error: any) {
         return {
             success: false,
-            error: error?.message || 'Failed to disconnect GitHub',
+            error: error?.message || t('disconnectFailed'),
         };
     }
 }
@@ -189,10 +189,28 @@ export async function updateNotificationPreferences(preferences: {
         systemUpdates: boolean;
     };
 }) {
+    const t = await getTranslations('actions.settings.notifications');
+    
+    // Validation schema
+    const notificationPreferencesSchema = z.object({
+        email: z.object({
+            updates: z.boolean(),
+            newItems: z.boolean(),
+            weeklyDigest: z.boolean(),
+            marketing: z.boolean(),
+        }),
+        app: z.object({
+            newItems: z.boolean(),
+            comments: z.boolean(),
+            mentions: z.boolean(),
+            systemUpdates: z.boolean(),
+        }),
+    });
+    
     try {
-        const user = await getAuthUser();
+        const user = await getAuthFromCookie();
         if (!user) {
-            return { success: false, error: 'Not authenticated' };
+            return { success: false, error: t('notAuthenticated') };
         }
 
         // Validate input
@@ -208,32 +226,34 @@ export async function updateNotificationPreferences(preferences: {
         // For now, just simulate success
         await new Promise((resolve) => setTimeout(resolve, 500));
 
-        return { success: true, message: 'Notification preferences updated successfully' };
+        return { success: true, message: t('updateSuccess') };
     } catch (error: any) {
         return {
             success: false,
-            error: error?.message || 'Failed to update preferences',
+            error: error?.message || t('updateFailed'),
         };
     }
 }
 
 // Danger Zone Actions
 export async function deleteAccount() {
+    const t = await getTranslations('actions.settings.danger');
+    
     try {
-        const user = await getAuthUser();
+        const user = await getAuthFromCookie();
         if (!user) {
-            return { success: false, error: 'Not authenticated' };
+            return { success: false, error: t('notAuthenticated') };
         }
 
         // This would normally call an API endpoint to delete the account
         // await authAPI.deleteAccount();
 
         // For safety, not implementing actual deletion in demo
-        return { success: false, error: 'Account deletion is disabled in demo' };
+        return { success: false, error: t('deleteDisabled') };
     } catch (error: any) {
         return {
             success: false,
-            error: error?.message || 'Failed to delete account',
+            error: error?.message || t('deleteFailed'),
         };
     }
 }

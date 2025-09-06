@@ -4,36 +4,34 @@ import { z } from 'zod';
 import { directoryAPI, CreateDirectoryDto } from '@/lib/api';
 import { checkGitHubConnection } from './oauth';
 import { RepoProvider } from '@/lib/api/enums';
-
-// Validation schemas
-const readmeConfigSchema = z.object({
-    header: z.string().optional(),
-    overwriteDefaultHeader: z.boolean().optional(),
-    footer: z.string().optional(),
-    overwriteDefaultFooter: z.boolean().optional(),
-});
-
-const createDirectorySchema = z.object({
-    slug: z
-        .string()
-        .min(1, 'Slug is required')
-        .regex(
-            /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
-            'Slug must be lowercase letters, numbers, and hyphens only',
-        ),
-    name: z.string().min(1, 'Name is required').max(100, 'Name must be less than 100 characters'),
-    description: z
-        .string()
-        .min(1, 'Description is required')
-        .max(500, 'Description must be less than 500 characters'),
-    owner: z.string().optional(),
-    organization: z.boolean(),
-    repoProvider: z.nativeEnum(RepoProvider).optional().default(RepoProvider.GITHUB),
-    readmeConfig: readmeConfigSchema.optional(),
-});
+import { getTranslations } from 'next-intl/server';
 
 export async function createDirectory(data: CreateDirectoryDto) {
-    // const t = await getTranslations('validation.directory');
+    const t = await getTranslations('actions.directories');
+
+    // Validation schemas with translations
+    const readmeConfigSchema = z.object({
+        header: z.string().optional(),
+        overwriteDefaultHeader: z.boolean().optional(),
+        footer: z.string().optional(),
+        overwriteDefaultFooter: z.boolean().optional(),
+    });
+
+    const createDirectorySchema = z.object({
+        slug: z
+            .string()
+            .min(1, t('slug.required'))
+            .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, t('slug.format')),
+        name: z.string().min(1, t('name.required')).max(100, t('name.maxLength')),
+        description: z
+            .string()
+            .min(1, t('description.required'))
+            .max(500, t('description.maxLength')),
+        owner: z.string().optional(),
+        organization: z.boolean(),
+        repoProvider: z.nativeEnum(RepoProvider).optional().default(RepoProvider.GITHUB),
+        readmeConfig: readmeConfigSchema.optional(),
+    });
 
     try {
         // Validate input data
@@ -50,7 +48,7 @@ export async function createDirectory(data: CreateDirectoryDto) {
         if (!githubCheck.connected) {
             return {
                 success: false,
-                error: 'GitHub connection required. Please connect your GitHub account first.',
+                error: t('githubRequired'),
                 requiresGitHub: true,
             };
         }
@@ -61,32 +59,49 @@ export async function createDirectory(data: CreateDirectoryDto) {
         return {
             success: true,
             directory,
-            message: 'Directory created successfully!',
+            message: t('createSuccess'),
         };
     } catch (error) {
         console.error('Failed to create directory:', error);
         return {
             success: false,
-            error: error instanceof Error ? error.message : 'Failed to create directory',
+            error: error instanceof Error ? error.message : t('createFailed'),
         };
     }
 }
 
-// AI prompt validation schema
-const aiPromptSchema = z.object({
-    prompt: z
-        .string()
-        .min(10, 'Prompt must be at least 10 characters')
-        .max(1000, 'Prompt must be less than 1000 characters'),
-    name: z
-        .string()
-        .min(1, 'Name is required')
-        .max(100, 'Name must be less than 100 characters')
-        .optional(),
-});
-
 export async function createDirectoryWithAI(prompt: string, name?: string) {
-    // const t = await getTranslations('validation.directory');
+    const t = await getTranslations('actions.directories');
+
+    // AI prompt validation schema
+    const aiPromptSchema = z.object({
+        prompt: z.string().min(10, t('prompt.minLength')).max(1000, t('prompt.maxLength')),
+        name: z.string().min(1, t('name.required')).max(100, t('name.maxLength')).optional(),
+    });
+
+    // Validation schemas for generated directory
+    const readmeConfigSchema = z.object({
+        header: z.string().optional(),
+        overwriteDefaultHeader: z.boolean().optional(),
+        footer: z.string().optional(),
+        overwriteDefaultFooter: z.boolean().optional(),
+    });
+
+    const createDirectorySchema = z.object({
+        slug: z
+            .string()
+            .min(1, t('slug.required'))
+            .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, t('slug.format')),
+        name: z.string().min(1, t('name.required')).max(100, t('name.maxLength')),
+        description: z
+            .string()
+            .min(1, t('description.required'))
+            .max(500, t('description.maxLength')),
+        owner: z.string().optional(),
+        organization: z.boolean(),
+        repoProvider: z.nativeEnum(RepoProvider).optional().default(RepoProvider.GITHUB),
+        readmeConfig: readmeConfigSchema.optional(),
+    });
 
     try {
         // Validate input
@@ -103,7 +118,7 @@ export async function createDirectoryWithAI(prompt: string, name?: string) {
         if (!githubCheck.connected) {
             return {
                 success: false,
-                error: 'GitHub connection required. Please connect your GitHub account first.',
+                error: t('githubRequired'),
                 requiresGitHub: true,
             };
         }
@@ -130,7 +145,7 @@ export async function createDirectoryWithAI(prompt: string, name?: string) {
         if (!directoryValidation.success) {
             return {
                 success: false,
-                error: 'Failed to generate valid directory data',
+                error: t('invalidGeneratedData'),
             };
         }
 
@@ -142,27 +157,29 @@ export async function createDirectoryWithAI(prompt: string, name?: string) {
         return {
             success: true,
             directory,
-            message: 'Directory creation started! AI is generating content...',
+            message: t('aiGenerationStarted'),
             isGenerating: true,
         };
     } catch (error) {
         console.error('Failed to create directory with AI:', error);
         return {
             success: false,
-            error: error instanceof Error ? error.message : 'Failed to create directory',
+            error: error instanceof Error ? error.message : t('createFailed'),
         };
     }
 }
 
-// Delete directory validation schema
-const deleteDirectorySchema = z.object({
-    id: z.string().uuid('Invalid directory ID'),
-});
+export async function deleteDirectory(directoryId: string) {
+    const t = await getTranslations('actions.directories');
 
-export async function deleteDirectory(id: string) {
+    // Delete directory validation schema
+    const deleteDirectorySchema = z.object({
+        id: z.string().uuid(t('invalidId')),
+    });
+
     try {
-        // Validate input
-        const validation = deleteDirectorySchema.safeParse({ id });
+        // Validate the directory ID
+        const validation = deleteDirectorySchema.safeParse({ id: directoryId });
         if (!validation.success) {
             return {
                 success: false,
@@ -170,53 +187,43 @@ export async function deleteDirectory(id: string) {
             };
         }
 
-        const result = await directoryAPI.delete(validation.data.id, { confirmation: true });
+        await directoryAPI.delete(validation.data.id, {
+            confirmation: true,
+        });
 
         return {
-            success: result.success,
-            message: result.message,
+            success: true,
+            message: t('deleteSuccess'),
         };
     } catch (error) {
         console.error('Failed to delete directory:', error);
         return {
             success: false,
-            error: error instanceof Error ? error.message : 'Failed to delete directory',
+            error: error instanceof Error ? error.message : t('deleteFailed'),
         };
     }
 }
 
-// Get directories validation schema
-const getDirectoriesSchema = z.object({
-    limit: z.number().min(1).max(100).optional(),
-    offset: z.number().min(0).optional(),
-    search: z.string().max(100).optional(),
-});
-
-export async function getDirectories(options?: {
+interface GetDirectoriesParams {
+    search?: string;
     limit?: number;
     offset?: number;
-    search?: string;
-}) {
-    try {
-        // Validate input
-        const validation = getDirectoriesSchema.safeParse(options || {});
-        if (!validation.success) {
-            return {
-                success: false,
-                directories: [],
-                total: 0,
-                error: validation.error.errors[0].message,
-            };
-        }
+}
 
-        const response = await directoryAPI.getAll(validation.data);
+export async function getDirectories(params: GetDirectoriesParams = {}) {
+    const t = await getTranslations('actions.directories');
+
+    try {
+        const { directories, total } = await directoryAPI.getAll({
+            search: params.search,
+            limit: params.limit || 20,
+            offset: params.offset || 0,
+        });
 
         return {
             success: true,
-            directories: response.directories,
-            total: response.total,
-            limit: response.limit,
-            offset: response.offset,
+            directories,
+            total,
         };
     } catch (error) {
         console.error('Failed to fetch directories:', error);
@@ -224,7 +231,7 @@ export async function getDirectories(options?: {
             success: false,
             directories: [],
             total: 0,
-            error: error instanceof Error ? error.message : 'Failed to fetch directories',
+            error: error instanceof Error ? error.message : t('fetchFailed'),
         };
     }
 }

@@ -1,0 +1,34 @@
+services:
+    ever-works-api:
+        image: ghcr.io/ever-works/ever-works-api:latest
+        container_name: ever-works-api
+        ports:
+            - '3100:3100'
+        networks:
+            - ever-works-network
+        environment:
+            - DATABASE_TYPE=sqlite
+            - DATABASE_PATH=/app/apps/api/data/database.db
+        volumes:
+            - api_data:/app/apps/api/data
+        env_file: .env.compose
+
+    ever-works-web:
+        image: ghcr.io/ever-works/ever-works-web:latest
+        container_name: ever-works-web
+        ports:
+            - '3000:3000'
+        depends_on:
+            - ever-works-api
+        environment:
+            - API_URL=http://ever-works-api:3100
+        networks:
+            - ever-works-network
+        env_file: .env.compose
+
+networks:
+    ever-works-network:
+        driver: bridge
+
+volumes:
+    api_data:
