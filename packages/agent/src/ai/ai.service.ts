@@ -297,6 +297,9 @@ export class AiService {
             }
 
             if (this.isCLI) {
+                this.logger.warn(
+                    `No AI providers available. Provider ${providerType} not found and no fallbacks configured. Using default provider.`,
+                );
                 return this.createDefaultProvider();
             }
 
@@ -315,6 +318,9 @@ export class AiService {
         const config = this.config.providers[targetProvider];
 
         if (!config || !config.enabled) {
+            this.logger.warn(
+                `Provider ${targetProvider} not available, using default provider for temperature override.`,
+            );
             return this.createDefaultProvider();
         }
 
@@ -323,6 +329,9 @@ export class AiService {
 
         if (!provider) {
             if (this.isCLI) {
+                this.logger.warn(
+                    `Failed to create temporary provider for ${targetProvider}, using default provider.`,
+                );
                 return this.createDefaultProvider();
             }
 

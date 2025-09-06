@@ -63,10 +63,12 @@ export function LoginClient() {
 
     useEffect(() => {
         if (isPasswordReset) {
+            const TIMEOUT = 10 * 1000;
+
             // Hide the success message after 10 seconds
             const timer = setTimeout(() => {
                 setShowResetSuccess(false);
-            }, 10 * 1000);
+            }, TIMEOUT);
 
             return () => clearTimeout(timer);
         }
