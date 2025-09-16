@@ -90,7 +90,7 @@ export class DeploySubCommand extends CommandRunner {
                         provider: 'vercel',
                         data: {
                             vercelToken: deployOptions.VERCEL_TOKEN || process.env.VERCEL_TOKEN,
-                            ghToken: deployOptions.GITHUB_TOKEN || process.env.GITHUB_APIKEY,
+                            ghToken: deployOptions.GITHUB_TOKEN || process.env.GH_APIKEY,
                         },
                     },
                     directory,

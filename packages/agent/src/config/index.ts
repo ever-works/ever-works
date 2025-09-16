@@ -212,10 +212,10 @@ export const config = {
     // GitHub configuration
     github: {
         getApiKey() {
-            return process.env.GITHUB_APIKEY;
+            return process.env.GH_APIKEY;
         },
         getOwner() {
-            return process.env.GITHUB_OWNER;
+            return process.env.GH_OWNER;
         },
     },
 

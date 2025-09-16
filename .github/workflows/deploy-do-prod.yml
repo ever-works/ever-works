@@ -3,7 +3,7 @@ name: Deploy to DO Prod
 on:
   workflow_run:
     workflows: ['Build and Publish Docker Images Prod']
-    branches: [main]
+    branches: [main, develop]
     types:
       - completed
 
@@ -58,17 +58,17 @@ jobs:
           ALLOWED_ORIGINS: https://app.ever.works,https://api.ever.works
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           # Github
-          GITHUB_APIKEY: ${{ secrets.GITHUB_APIKEY }}
-          GITHUB_OWNER: ${{ secrets.GITHUB_OWNER }}
+          GH_APIKEY: ${{ secrets.GH_APIKEY }}
+          GH_OWNER: ${{ secrets.GH_OWNER }}
           # Git
           GIT_NAME: ${{ secrets.GIT_NAME }}
           GIT_EMAIL: ${{ secrets.GIT_EMAIL }}
           # Vercel
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           # GitHub Auth
-          GITHUB_CLIENT_ID: ${{ secrets.GITHUB_CLIENT_ID }}
-          GITHUB_CLIENT_SECRET: ${{ secrets.GITHUB_CLIENT_SECRET }}
-          GITHUB_CALLBACK_URL: https://app.ever.works/api/auth/github/callback
+          GH_CLIENT_ID: ${{ secrets.GH_CLIENT_ID }}
+          GH_CLIENT_SECRET: ${{ secrets.GH_CLIENT_SECRET }}
+          GH_CALLBACK_URL: https://app.ever.works/api/auth/github/callback
           # Google Auth
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}

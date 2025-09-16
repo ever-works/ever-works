@@ -211,8 +211,8 @@ export class UnsetSubCommand extends CommandRunner {
     private isCriticalKey(key: string): boolean {
         const criticalKeys = [
             'AI_DEFAULT_PROVIDER',
-            'GITHUB_APIKEY',
-            'GITHUB_OWNER',
+            'GH_APIKEY',
+            'GH_OWNER',
             'GIT_NAME',
             'GIT_EMAIL',
         ];
@@ -222,8 +222,8 @@ export class UnsetSubCommand extends CommandRunner {
     private getCriticalKeyWarning(key: string): string {
         const warnings: Record<string, string> = {
             AI_DEFAULT_PROVIDER: 'Removing this will disable AI functionality',
-            GITHUB_APIKEY: 'Removing this will disable GitHub API access',
-            GITHUB_OWNER: 'Removing this will break repository operations',
+            GH_APIKEY: 'Removing this will disable GitHub API access',
+            GH_OWNER: 'Removing this will break repository operations',
             GIT_NAME: 'Removing this will break Git commit operations',
             GIT_EMAIL: 'Removing this will break Git commit operations',
         };

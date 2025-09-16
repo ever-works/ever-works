@@ -55,10 +55,10 @@ spec:
               value: $JWT_SECRET
 
             # Github
-            - name: GITHUB_APIKEY
-              value: $GITHUB_APIKEY
-            - name: GITHUB_OWNER
-              value: $GITHUB_OWNER
+            - name: GH_APIKEY
+              value: $GH_APIKEY
+            - name: GH_OWNER
+              value: $GH_OWNER
 
             # Git
             - name: GIT_NAME
@@ -71,11 +71,11 @@ spec:
               value: $VERCEL_TOKEN
 
             # GitHub Auth
-            - name: GITHUB_CLIENT_ID
-              value: $GITHUB_CLIENT_ID
-            - name: GITHUB_CLIENT_SECRET
-              value: $GITHUB_CLIENT_SECRET
-            - name: GITHUB_CALLBACK_URL
+            - name: GH_CLIENT_ID
+              value: $GH_CLIENT_ID
+            - name: GH_CLIENT_SECRET
+              value: $GH_CLIENT_SECRET
+            - name: GH_CALLBACK_URL
               value: https://app.ever.works/api/auth/github/callback
 
             # Google Auth
