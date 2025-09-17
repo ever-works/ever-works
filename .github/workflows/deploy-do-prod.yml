@@ -88,6 +88,7 @@ jobs:
           WEB_SEARCH_SERVICE: ${{ secrets.WEB_SEARCH_SERVICE }}
           # Database
           DATABASE_TYPE: ${{ secrets.DATABASE_TYPE }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DATABASE_HOST: ${{ secrets.DATABASE_HOST }}
           DATABASE_PORT: ${{ secrets.DATABASE_PORT }}
           DATABASE_USERNAME: ${{ secrets.DATABASE_USERNAME }}
