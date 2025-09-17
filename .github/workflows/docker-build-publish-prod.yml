@@ -27,7 +27,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./.deploy/api/Dockerfile
+          file: .deploy/docker/api/Dockerfile
           load: true
           platforms: linux/amd64
           tags: |
@@ -110,7 +110,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./.deploy/web/Dockerfile
+          file: .deploy/docker/web/Dockerfile
           load: true
           platforms: linux/amd64
           tags: |
