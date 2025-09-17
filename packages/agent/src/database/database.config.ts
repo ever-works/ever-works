@@ -8,6 +8,7 @@ import { ChatHistory } from '../entities/chat-history.entity';
 import { ChatMessage } from '../entities/chat-message.entity';
 import * as path from 'path';
 import * as os from 'os';
+import * as fs from 'fs';
 import { config } from '@src/config';
 import { getTlsOptions } from './utils';
 
@@ -17,7 +18,7 @@ export interface DatabaseConfig extends Omit<TypeOrmModuleOptions, 'type'> {
     type: DatabaseType;
     // SQLite specific
     database?: string;
-    // PostgreSQL/MySQL/MariaDB specific
+    // PostgreSQL/MySQL|MariaDB specific
     host?: string;
     port?: number;
     username?: string;
@@ -71,7 +72,6 @@ export const databaseConfig = registerAs('database', (): DatabaseConfig => {
 
         // Ensure directory exists for file-based SQLite databases (SQLite-specific logic)
         if (database !== ':memory:' && !database.startsWith(':')) {
-            const fs = require('fs');
             const dbDir = path.dirname(database);
             if (!fs.existsSync(dbDir)) {
                 fs.mkdirSync(dbDir, { recursive: true });
@@ -82,6 +82,15 @@ export const databaseConfig = registerAs('database', (): DatabaseConfig => {
             ...baseConfig,
             type: 'better-sqlite3',
             database,
+        };
+    }
+
+    // Handle Database URL if provided
+    if (config.database.getUrl()) {
+        return {
+            ...baseConfig,
+            type: dbType,
+            url: config.database.getUrl(),
         };
     }
 
@@ -99,23 +108,10 @@ export const databaseConfig = registerAs('database', (): DatabaseConfig => {
     }
 
     // MySQL configuration
-    if (dbType === 'mysql') {
+    if (['mysql', 'mariadb'].includes(dbType)) {
         return {
             ...baseConfig,
             type: 'mysql',
-            host: config.database.getHost() || 'localhost',
-            port: parseInt(config.database.getPort() || '3306'),
-            username: config.database.getUsername() || 'root',
-            password: config.database.getPassword() || '',
-            database: config.database.getDatabaseName() || 'ever_works',
-        };
-    }
-
-    // MariaDB configuration
-    if (dbType === 'mariadb') {
-        return {
-            ...baseConfig,
-            type: 'mariadb',
             host: config.database.getHost() || 'localhost',
             port: parseInt(config.database.getPort() || '3306'),
             username: config.database.getUsername() || 'root',

@@ -106,8 +106,8 @@ export class ConfigService {
         const warnings: string[] = [];
 
         // Required fields
-        if (!config.GITHUB_APIKEY) errors.push('GITHUB_APIKEY is required');
-        if (!config.GITHUB_OWNER) errors.push('GITHUB_OWNER is required');
+        if (!config.GH_APIKEY) errors.push('GH_APIKEY is required');
+        if (!config.GH_OWNER) errors.push('GH_OWNER is required');
         if (!config.GIT_NAME) errors.push('GIT_NAME is required');
         if (!config.GIT_EMAIL) errors.push('GIT_EMAIL is required');
         if (!config.AI_DEFAULT_PROVIDER) errors.push('AI_DEFAULT_PROVIDER is required');

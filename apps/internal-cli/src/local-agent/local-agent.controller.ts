@@ -167,7 +167,7 @@ export class LocalAgentController {
                 provider: 'vercel',
                 data: {
                     vercelToken: vercel,
-                    ghToken: ghToken || process.env.GITHUB_APIKEY,
+                    ghToken: ghToken || process.env.GH_APIKEY,
                 },
             },
             directory,

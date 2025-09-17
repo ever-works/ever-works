@@ -39,8 +39,8 @@ export class ShowSubCommand extends CommandRunner {
             });
 
             this.displaySection('GitHub & Git', {
-                'GitHub Owner': config.GITHUB_OWNER,
-                'GitHub API Key': maskSecret(config.GITHUB_APIKEY),
+                'GitHub Owner': config.GH_OWNER,
+                'GitHub API Key': maskSecret(config.GH_APIKEY),
                 'Git Name': config.GIT_NAME,
                 'Git Email': config.GIT_EMAIL,
             });

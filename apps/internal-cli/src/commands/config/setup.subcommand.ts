@@ -94,8 +94,8 @@ export class SetupSubCommand extends CommandRunner {
             // 1. GitHub & Git Configuration
             const githubGitConfig =
                 await this.githubGitPrompt.promptGitHubGitConfig(existingConfig);
-            config.GITHUB_APIKEY = githubGitConfig.githubApiKey;
-            config.GITHUB_OWNER = githubGitConfig.githubOwner;
+            config.GH_APIKEY = githubGitConfig.githubApiKey;
+            config.GH_OWNER = githubGitConfig.githubOwner;
             config.GIT_NAME = githubGitConfig.gitName;
             config.GIT_EMAIL = githubGitConfig.gitEmail;
 

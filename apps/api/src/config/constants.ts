@@ -61,16 +61,16 @@ export const config = {
         },
     },
     github: {
-        clientId: () => process.env.GITHUB_CLIENT_ID,
-        clientSecret: () => process.env.GITHUB_CLIENT_SECRET,
+        clientId: () => process.env.GH_CLIENT_ID,
+        clientSecret: () => process.env.GH_CLIENT_SECRET,
         callbackUrl: () => {
             return (
-                process.env.GITHUB_CALLBACK_URL || 'http://localhost:3100/api/auth/github/callback'
+                process.env.GH_CALLBACK_URL || 'http://localhost:3100/api/auth/github/callback'
             );
         },
         connectCallbackUrl: () => {
             return (
-                process.env.GITHUB_CALLBACK_URL || 'http://localhost:3100/api/auth/github/callback'
+                process.env.GH_CALLBACK_URL || 'http://localhost:3100/api/auth/github/callback'
             );
         },
     },

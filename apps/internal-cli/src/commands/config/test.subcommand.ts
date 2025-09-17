@@ -120,8 +120,8 @@ export class TestSubCommand extends CommandRunner {
         let allPassed = true;
 
         // Test GitHub API
-        if (config.GITHUB_APIKEY) {
-            const githubResult = await this.testGitHubApi(config.GITHUB_APIKEY);
+        if (config.GH_APIKEY) {
+            const githubResult = await this.testGitHubApi(config.GH_APIKEY);
             if (!githubResult) {
                 allPassed = false;
             }

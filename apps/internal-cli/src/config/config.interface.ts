@@ -7,8 +7,8 @@ export interface EverWorksConfig {
     APP_TYPE: 'cli' | 'api' | 'test';
 
     // GitHub Configuration
-    GITHUB_APIKEY: string;
-    GITHUB_OWNER: string;
+    GH_APIKEY: string;
+    GH_OWNER: string;
 
     // Git Configuration
     GIT_NAME: string;
