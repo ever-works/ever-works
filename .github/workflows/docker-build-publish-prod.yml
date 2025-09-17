@@ -34,7 +34,6 @@ jobs:
             ghcr.io/ever-works/ever-works-api:latest
             everco/ever-works-api:latest
             registry.digitalocean.com/ever/ever-works-api:latest
-            ${{ secrets.CW_DOCKER_REGISTRY }}/ever-co/ever-works-api:latest
           cache-from: type=registry,ref=ghcr.io/ever-works/ever-works-api:latest
           cache-to: type=inline
           build-args: |
@@ -118,7 +117,6 @@ jobs:
             ghcr.io/ever-works/ever-works-web:latest
             everco/ever-works-web:latest
             registry.digitalocean.com/ever/ever-works-web:latest
-            ${{ secrets.CW_DOCKER_REGISTRY }}/ever-co/ever-works-web:latest
           cache-from: type=registry,ref=ghcr.io/ever-works/ever-works-web:latest
           cache-to: type=inline
           build-args: |
