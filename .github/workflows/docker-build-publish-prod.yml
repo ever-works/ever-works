@@ -2,7 +2,7 @@ name: Build and Publish Docker Images Prod
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main, develop, rename-variables]
 
 concurrency:
   group: ${{ github.ref }}-${{ github.workflow }}
