@@ -44,6 +44,7 @@ spec:
       containers:
         - name: ever-works-api-dev
           image: ghcr.io/ever-co/ever-works-api:latest
+          imagePullPolicy: Always
           env:
             - name: WEB_APP_URL
               value: https://appdev.ever.works
@@ -172,6 +173,7 @@ spec:
       containers:
         - name: ever-works-web-dev
           image: ghcr.io/ever-co/ever-works-web:latest
+          imagePullPolicy: Always
           env:
             - name: AUTH_SECRET
               value: "$AUTH_SECRET"

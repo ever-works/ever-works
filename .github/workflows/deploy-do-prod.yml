@@ -1,12 +1,11 @@
 name: Deploy to DO Prod
 
 on:
-  # workflow_run:
-  #   workflows: ['Build and Publish Docker Images Prod']
-  #   branches: [main, develop]
-  #   types:
-  #     - completed
-  workflow_dispatch:
+  workflow_run:
+    workflows: ['Build and Publish Docker Images Prod']
+    branches: [main, develop]
+    types:
+      - completed
 
 jobs:
   deploy-prod:
