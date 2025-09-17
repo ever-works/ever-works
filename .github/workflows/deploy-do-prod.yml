@@ -3,7 +3,7 @@ name: Deploy to DO Prod
 on:
   workflow_run:
     workflows: ['Build and Publish Docker Images Prod']
-    branches: [main, develop]
+    branches: [main, develop, rename-variables]
     types:
       - completed
 
