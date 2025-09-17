@@ -1,6 +1,6 @@
 # Database Configuration
 
-This package provides TypeORM configuration with support for multiple database types (SQLite, PostgreSQL, MySQL, MariaDB) and different environments and app types.
+This package provides TypeORM configuration with support for multiple database types (SQLite, PostgreSQL, MySQL) and different environments and app types.
 
 ## Usage
 
@@ -13,8 +13,8 @@ import { Module } from '@nestjs/common';
 import { DatabaseModule } from '@packages/agent';
 
 @Module({
-  imports: [DatabaseModule],
-  // ... other configuration
+    imports: [DatabaseModule],
+    // ... other configuration
 })
 export class AppModule {}
 ```
@@ -26,16 +26,19 @@ The database configuration automatically adapts based on environment variables:
 #### Environment Variables
 
 **Common Variables:**
+
 - `APP_TYPE`: `'cli' | 'api'` - Determines the default database behavior
-- `DATABASE_TYPE`: `'sqlite' | 'postgres' | 'mysql' | 'mariadb'` - Database type (default: sqlite)
+- `DATABASE_TYPE`: `'sqlite' | 'postgres' | 'mysql'` - Database type (default: sqlite)
 - `DATABASE_LOGGING`: `'true' | 'false'` - Enable/disable SQL logging
 - `NODE_ENV`: `'development' | 'production' | 'test'` - Environment mode
 
 **SQLite Specific:**
+
 - `DATABASE_PATH`: Explicit path to SQLite database file
 - `DATABASE_IN_MEMORY`: `'true' | 'false'` - Force in-memory or file-based database
 
 **PostgreSQL/MySQL/MariaDB Specific:**
+
 - `DATABASE_HOST`: Database host (default: localhost)
 - `DATABASE_PORT`: Database port (default: 5432 for PostgreSQL, 3306 for MySQL/MariaDB)
 - `DATABASE_USERNAME`: Database username
@@ -44,12 +47,12 @@ The database configuration automatically adapts based on environment variables:
 
 #### Default Behavior
 
-| App Type | Environment | Default Database | Location |
-|----------|-------------|------------------|----------|
-| CLI | Any | File | `~/.ever-works/ever-works.db` |
-| API | Development | In-memory | `:memory:` |
-| API | Production | File | `/tmp/ever-works-api.db` |
-| Any | Test | In-memory | `:memory:` |
+| App Type | Environment | Default Database | Location                      |
+| -------- | ----------- | ---------------- | ----------------------------- |
+| CLI      | Any         | File             | `~/.ever-works/ever-works.db` |
+| API      | Development | In-memory        | `:memory:`                    |
+| API      | Production  | File             | `/tmp/ever-works-api.db`      |
+| Any      | Test        | In-memory        | `:memory:`                    |
 
 ### Using the Configuration Factory (Recommended)
 
@@ -60,32 +63,32 @@ import { Module } from '@nestjs/common';
 import { DatabaseConfigurations } from '@packages/agent';
 
 @Module({
-  imports: [
-    // Use predefined configurations (RECOMMENDED)
-    DatabaseConfigurations.cli(),
-    DatabaseConfigurations.apiDevelopment(),
-    DatabaseConfigurations.apiProduction('/path/to/database.db'),
-    DatabaseConfigurations.test(),
+    imports: [
+        // Use predefined configurations (RECOMMENDED)
+        DatabaseConfigurations.cli(),
+        DatabaseConfigurations.apiDevelopment(),
+        DatabaseConfigurations.apiProduction('/path/to/database.db'),
+        DatabaseConfigurations.test(),
 
-    // PostgreSQL production
-    DatabaseConfigurations.postgres({
-      host: 'localhost',
-      port: 5432,
-      username: 'postgres',
-      password: 'password',
-      databaseName: 'ever_works_prod'
-    }),
+        // PostgreSQL production
+        DatabaseConfigurations.postgres({
+            host: 'localhost',
+            port: 5432,
+            username: 'postgres',
+            password: 'password',
+            databaseName: 'ever_works_prod',
+        }),
 
-    // MySQL production
-    DatabaseConfigurations.mysql({
-      host: 'mysql.example.com',
-      username: 'app_user',
-      password: 'secure_password',
-      databaseName: 'ever_works'
-    }),
+        // MySQL production
+        DatabaseConfigurations.mysql({
+            host: 'mysql.example.com',
+            username: 'app_user',
+            password: 'secure_password',
+            databaseName: 'ever_works',
+        }),
 
-    TypeOrmModule.forFeature([Directory, User]),
-  ],
+        TypeOrmModule.forFeature([Directory, User]),
+    ],
 })
 export class AppModule {}
 ```
@@ -102,15 +105,15 @@ import { DirectoryRepository } from '@packages/agent';
 
 @Injectable()
 export class MyService {
-  constructor(private readonly directoryRepository: DirectoryRepository) {}
+    constructor(private readonly directoryRepository: DirectoryRepository) {}
 
-  async createDirectory(data: Partial<Directory>) {
-    return await this.directoryRepository.create(data);
-  }
+    async createDirectory(data: Partial<Directory>) {
+        return await this.directoryRepository.create(data);
+    }
 
-  async findDirectory(slug: string) {
-    return await this.directoryRepository.findBySlug(slug);
-  }
+    async findDirectory(slug: string) {
+        return await this.directoryRepository.findBySlug(slug);
+    }
 }
 ```
 
@@ -138,6 +141,7 @@ The database will be automatically created with the following tables:
 ### Directory Table Constraints
 
 The `directory` table has a unique constraint on the combination of `owner` and `slug`, meaning:
+
 - The same slug can be used by different owners
 - Each owner can only have one directory with a specific slug
 - This allows for proper multi-tenant directory management

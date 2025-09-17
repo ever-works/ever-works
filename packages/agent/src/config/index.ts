@@ -1,12 +1,14 @@
 import { AiProviderType } from '@src/ai';
 import { DatabaseType } from '@src/database';
 
+type AppType = 'cli' | 'api';
+
 export const config = {
     getEnvironment() {
         return process.env.NODE_ENV;
     },
-    getAppType(): 'cli' | 'api' | undefined {
-        return process.env.APP_TYPE as any;
+    getAppType(): AppType {
+        return (process.env.APP_TYPE as AppType) || 'api';
     },
     isCli() {
         return this.getAppType() === 'cli';
@@ -16,6 +18,9 @@ export const config = {
     database: {
         getType() {
             return (process.env.DATABASE_TYPE as DatabaseType) || undefined;
+        },
+        getUrl() {
+            return process.env.DATABASE_URL;
         },
         getHost() {
             return process.env.DATABASE_HOST;
