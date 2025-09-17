@@ -6,6 +6,7 @@ on:
     branches: [main, develop]
     types:
       - completed
+  workflow_dispatch:
 
 jobs:
   deploy-prod:
