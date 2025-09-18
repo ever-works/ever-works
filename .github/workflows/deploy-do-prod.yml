@@ -9,7 +9,7 @@ on:
 
 jobs:
   deploy-prod:
-    runs-on: buildjet-4vcpu-ubuntu-2204
+    runs-on: ubuntu-latest
 
     environment:
       name: production

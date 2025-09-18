@@ -67,7 +67,7 @@ export function DirectoryManualForm({ user }: DirectoryManualFormProps) {
                     router.push(ROUTES.DASHBOARD_DIRECTORIES);
                 }
             } else if (result.requiresGitHub) {
-                toast.error('Please connect your GitHub account first');
+                toast.error(result.error || 'Please connect your GitHub account first');
                 router.push(ROUTES.DASHBOARD_DIRECTORIES_NEW);
             } else {
                 toast.error(result.error || 'Failed to create directory');
