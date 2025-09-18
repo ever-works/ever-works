@@ -34,7 +34,12 @@ export function DirectoryAICreator({ user }: DirectoryAICreatorProps) {
                 if (result.isGenerating) {
                     toast.info(t('success.generating'));
                 }
-                router.push(ROUTES.DASHBOARD_DIRECTORIES);
+
+                if (result.directory) {
+                    router.push(ROUTES.DASHBOARD_DIRECTORY(result.directory.id));
+                } else {
+                    router.push(ROUTES.DASHBOARD_DIRECTORIES);
+                }
             } else if (result.requiresGitHub) {
                 toast.error('Please connect your GitHub account first');
                 router.push(ROUTES.DASHBOARD_DIRECTORIES_NEW);
@@ -89,9 +94,9 @@ export function DirectoryAICreator({ user }: DirectoryAICreatorProps) {
                                 'focus:outline-none focus:border-primary',
                             )}
                         />
-                        <p className="text-xs text-text-muted dark:text-text-muted-dark mt-1">
+                        {/* <p className="text-xs text-text-muted dark:text-text-muted-dark mt-1">
                             {t('directoryNameHelp')}
-                        </p>
+                        </p> */}
                     </div>
 
                     {/* AI Prompt */}

@@ -59,7 +59,12 @@ export function DirectoryManualForm({ user }: DirectoryManualFormProps) {
 
             if (result.success) {
                 toast.success(result.message || t('success.created'));
-                router.push(ROUTES.DASHBOARD_DIRECTORIES);
+
+                if (result.directory) {
+                    router.push(ROUTES.DASHBOARD_DIRECTORY(result.directory.id));
+                } else {
+                    router.push(ROUTES.DASHBOARD_DIRECTORIES);
+                }
             } else if (result.requiresGitHub) {
                 toast.error('Please connect your GitHub account first');
                 router.push(ROUTES.DASHBOARD_DIRECTORIES_NEW);
