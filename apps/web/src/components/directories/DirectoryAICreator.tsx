@@ -9,6 +9,8 @@ import { ROUTES } from '@/lib/constants';
 import { useRouter } from '@/i18n/navigation';
 import { useTranslations } from 'next-intl';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
 
 interface DirectoryAICreatorProps {
     user: AuthUser;
@@ -99,25 +101,14 @@ export function DirectoryAICreator({ user }: DirectoryAICreatorProps) {
                     />
 
                     {/* AI Prompt */}
-                    <div>
-                        <label className="block text-sm font-medium text-text dark:text-text-dark mb-2">
-                            {t('promptLabel')} *
-                        </label>
-                        <textarea
-                            value={prompt}
-                            onChange={(e) => setPrompt(e.target.value)}
-                            placeholder={t('promptPlaceholder')}
-                            rows={6}
-                            className={cn(
-                                'w-full px-4 py-3 rounded-lg resize-none',
-                                'bg-surface dark:bg-surface-dark',
-                                'border border-border dark:border-border-dark',
-                                'text-text dark:text-text-dark',
-                                'placeholder-text-muted dark:placeholder-text-muted-dark',
-                                'focus:outline-none focus:border-primary',
-                            )}
-                        />
-                    </div>
+                    <Textarea
+                        label={`${t('promptLabel')} *`}
+                        value={prompt}
+                        onChange={(e) => setPrompt(e.target.value)}
+                        placeholder={t('promptPlaceholder')}
+                        rows={6}
+                        variant="form"
+                    />
 
                     {/* Example Prompts */}
                     <div>
@@ -126,23 +117,24 @@ export function DirectoryAICreator({ user }: DirectoryAICreatorProps) {
                         </p>
                         <div className="flex flex-wrap gap-2">
                             {examplePrompts.map((example, index) => (
-                                <button
+                                <Button
                                     key={index}
                                     onClick={() => {
                                         setPrompt(example.prompt);
                                         setDirectoryName(example.name);
                                     }}
+                                    variant="ghost"
+                                    size="sm"
                                     className={cn(
-                                        'px-3 py-1.5 rounded-full text-sm',
+                                        'rounded-full',
                                         'bg-surface dark:bg-surface-dark',
                                         'border border-border dark:border-border-dark',
                                         'text-text-secondary dark:text-text-secondary-dark',
                                         'hover:border-primary hover:text-primary',
-                                        'transition-colors',
                                     )}
                                 >
                                     {example.name}
-                                </button>
+                                </Button>
                             ))}
                         </div>
                     </div>
@@ -222,21 +214,16 @@ export function DirectoryAICreator({ user }: DirectoryAICreatorProps) {
 
                     {/* Action Buttons */}
                     <div className="flex gap-3">
-                        <button
+                        <Button
                             onClick={handleGenerate}
                             disabled={isPending || !prompt.trim()}
-                            className={cn(
-                                'flex-1 py-3 rounded-lg font-medium transition-colors',
-                                'bg-primary hover:bg-primary-hover text-white',
-                                'disabled:opacity-50 disabled:cursor-not-allowed',
-                                'flex items-center justify-center gap-2',
-                            )}
+                            loading={isPending}
+                            variant="primary"
+                            size="lg"
+                            fullWidth
                         >
                             {isPending ? (
-                                <>
-                                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                    {t('generatingButton')}
-                                </>
+                                t('generatingButton')
                             ) : (
                                 <>
                                     <svg
@@ -255,21 +242,16 @@ export function DirectoryAICreator({ user }: DirectoryAICreatorProps) {
                                     {t('generateButton')}
                                 </>
                             )}
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                             onClick={() => router.back()}
                             disabled={isPending}
-                            className={cn(
-                                'px-6 py-3 rounded-lg font-medium transition-colors',
-                                'bg-surface dark:bg-surface-dark',
-                                'border border-border dark:border-border-dark',
-                                'text-text dark:text-text-dark',
-                                'hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark',
-                                'disabled:opacity-50 disabled:cursor-not-allowed',
-                            )}
+                            variant="secondary"
+                            size="lg"
+                            className="px-6"
                         >
                             {t('cancelButton')}
-                        </button>
+                        </Button>
                     </div>
                 </div>
             </div>

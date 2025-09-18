@@ -11,6 +11,9 @@ import { RepoProvider } from '@/lib/api/enums';
 import { useRouter } from '@/i18n/navigation';
 import { useTranslations } from 'next-intl';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface DirectoryManualFormProps {
     user: AuthUser;
@@ -138,70 +141,58 @@ export function DirectoryManualForm({ user }: DirectoryManualFormProps) {
                         />
 
                         {/* Description */}
-                        <div>
-                            <label className="block text-sm font-medium text-text dark:text-text-dark mb-2">
-                                {t('descriptionLabel')}
-                            </label>
-                            <textarea
-                                value={formData.description}
-                                onChange={(e) =>
-                                    setFormData({ ...formData, description: e.target.value })
-                                }
-                                placeholder={t('descriptionPlaceholder')}
-                                rows={3}
-                                className={cn(
-                                    'w-full px-4 py-2 rounded-lg resize-none',
-                                    'bg-surface dark:bg-surface-dark',
-                                    'border border-border dark:border-border-dark',
-                                    'text-text dark:text-text-dark',
-                                    'placeholder-text-muted dark:placeholder-text-muted-dark',
-                                    'focus:outline-none focus:border-primary',
-                                )}
-                                required
-                            />
-                        </div>
+                        <Textarea
+                            label={t('descriptionLabel')}
+                            value={formData.description}
+                            onChange={(e) =>
+                                setFormData({ ...formData, description: e.target.value })
+                            }
+                            placeholder={t('descriptionPlaceholder')}
+                            rows={3}
+                            variant="form"
+                            required
+                        />
                     </div>
                 </div>
 
                 {/* Advanced Fields Toggle */}
-                <button
+                <Button
                     type="button"
+                    variant="ghost"
                     onClick={() => setShowAdvanced(!showAdvanced)}
+                    fullWidth
                     className={cn(
-                        'w-full p-4 rounded-lg text-left',
+                        'p-4 text-left justify-between',
                         'bg-surface dark:bg-surface-dark',
                         'border border-border dark:border-border-dark',
                         'hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark',
-                        'transition-colors',
                     )}
                 >
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <h3 className="font-medium text-text dark:text-text-dark">
-                                {t('advancedSettings')}
-                            </h3>
-                            <p className="text-sm text-text-muted dark:text-text-muted-dark">
-                                {t('advancedSubtitle')}
-                            </p>
-                        </div>
-                        <svg
-                            className={cn(
-                                'w-5 h-5 text-text-secondary dark:text-text-secondary-dark transition-transform',
-                                showAdvanced && 'rotate-180',
-                            )}
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M19 9l-7 7-7-7"
-                            />
-                        </svg>
+                    <div>
+                        <h3 className="font-medium text-text dark:text-text-dark">
+                            {t('advancedSettings')}
+                        </h3>
+                        <p className="text-sm text-text-muted dark:text-text-muted-dark">
+                            {t('advancedSubtitle')}
+                        </p>
                     </div>
-                </button>
+                    <svg
+                        className={cn(
+                            'w-5 h-5 text-text-secondary dark:text-text-secondary-dark transition-transform',
+                            showAdvanced && 'rotate-180',
+                        )}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                    >
+                        <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M19 9l-7 7-7-7"
+                        />
+                    </svg>
+                </Button>
 
                 {/* Advanced Fields */}
                 {showAdvanced && (
@@ -213,26 +204,15 @@ export function DirectoryManualForm({ user }: DirectoryManualFormProps) {
                         )}
                     >
                         {/* Organization */}
-                        <div>
-                            <label className="flex items-center gap-3">
-                                <input
-                                    type="checkbox"
-                                    checked={formData.organization}
-                                    onChange={(e) =>
-                                        setFormData({ ...formData, organization: e.target.checked })
-                                    }
-                                    className="w-4 h-4 rounded border-border dark:border-border-dark text-primary focus:ring-primary"
-                                />
-                                <div>
-                                    <span className="text-sm font-medium text-text dark:text-text-dark">
-                                        {t('organizationLabel')}
-                                    </span>
-                                    <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                                        {t('organizationHelp')}
-                                    </p>
-                                </div>
-                            </label>
-                        </div>
+                        <Checkbox
+                            checked={formData.organization}
+                            onChange={(e) =>
+                                setFormData({ ...formData, organization: e.target.checked })
+                            }
+                            label={t('organizationLabel')}
+                            description={t('organizationHelp')}
+                            variant="form"
+                        />
 
                         {/* Owner */}
                         {formData.organization && (
@@ -249,11 +229,9 @@ export function DirectoryManualForm({ user }: DirectoryManualFormProps) {
                         )}
 
                         {/* README Header */}
-                        <div>
-                            <label className="block text-sm font-medium text-text dark:text-text-dark mb-2">
-                                {t('headerLabel')}
-                            </label>
-                            <textarea
+                        <div className="space-y-3">
+                            <Textarea
+                                label={t('headerLabel')}
                                 value={formData.readmeConfig?.header || ''}
                                 onChange={(e) =>
                                     setFormData({
@@ -266,42 +244,28 @@ export function DirectoryManualForm({ user }: DirectoryManualFormProps) {
                                 }
                                 placeholder={t('headerPlaceholder')}
                                 rows={3}
-                                className={cn(
-                                    'w-full px-4 py-2 rounded-lg resize-none',
-                                    'bg-surface dark:bg-surface-dark',
-                                    'border border-border dark:border-border-dark',
-                                    'text-text dark:text-text-dark',
-                                    'placeholder-text-muted dark:placeholder-text-muted-dark',
-                                    'focus:outline-none focus:border-primary',
-                                )}
+                                variant="form"
                             />
-                            <label className="flex items-center gap-2 mt-2">
-                                <input
-                                    type="checkbox"
-                                    checked={formData.readmeConfig?.overwriteDefaultHeader || false}
-                                    onChange={(e) =>
-                                        setFormData({
-                                            ...formData,
-                                            readmeConfig: {
-                                                ...formData.readmeConfig,
-                                                overwriteDefaultHeader: e.target.checked,
-                                            },
-                                        })
-                                    }
-                                    className="w-4 h-4 rounded border-border dark:border-border-dark text-primary focus:ring-primary"
-                                />
-                                <span className="text-sm text-text-secondary dark:text-text-secondary-dark">
-                                    {t('headerOverwrite')}
-                                </span>
-                            </label>
+                            <Checkbox
+                                checked={formData.readmeConfig?.overwriteDefaultHeader || false}
+                                onChange={(e) =>
+                                    setFormData({
+                                        ...formData,
+                                        readmeConfig: {
+                                            ...formData.readmeConfig,
+                                            overwriteDefaultHeader: e.target.checked,
+                                        },
+                                    })
+                                }
+                                label={t('headerOverwrite')}
+                                variant="form"
+                            />
                         </div>
 
                         {/* README Footer */}
-                        <div>
-                            <label className="block text-sm font-medium text-text dark:text-text-dark mb-2">
-                                Custom README Footer
-                            </label>
-                            <textarea
+                        <div className="space-y-3">
+                            <Textarea
+                                label="Custom README Footer"
                                 value={formData.readmeConfig?.footer || ''}
                                 onChange={(e) =>
                                     setFormData({
@@ -314,55 +278,38 @@ export function DirectoryManualForm({ user }: DirectoryManualFormProps) {
                                 }
                                 placeholder="Add custom content to the bottom of your README file"
                                 rows={3}
-                                className={cn(
-                                    'w-full px-4 py-2 rounded-lg resize-none',
-                                    'bg-surface dark:bg-surface-dark',
-                                    'border border-border dark:border-border-dark',
-                                    'text-text dark:text-text-dark',
-                                    'placeholder-text-muted dark:placeholder-text-muted-dark',
-                                    'focus:outline-none focus:border-primary',
-                                )}
+                                variant="form"
                             />
-                            <label className="flex items-center gap-2 mt-2">
-                                <input
-                                    type="checkbox"
-                                    checked={formData.readmeConfig?.overwriteDefaultFooter || false}
-                                    onChange={(e) =>
-                                        setFormData({
-                                            ...formData,
-                                            readmeConfig: {
-                                                ...formData.readmeConfig,
-                                                overwriteDefaultFooter: e.target.checked,
-                                            },
-                                        })
-                                    }
-                                    className="w-4 h-4 rounded border-border dark:border-border-dark text-primary focus:ring-primary"
-                                />
-                                <span className="text-sm text-text-secondary dark:text-text-secondary-dark">
-                                    Replace default footer entirely
-                                </span>
-                            </label>
+                            <Checkbox
+                                checked={formData.readmeConfig?.overwriteDefaultFooter || false}
+                                onChange={(e) =>
+                                    setFormData({
+                                        ...formData,
+                                        readmeConfig: {
+                                            ...formData.readmeConfig,
+                                            overwriteDefaultFooter: e.target.checked,
+                                        },
+                                    })
+                                }
+                                label="Replace default footer entirely"
+                                variant="form"
+                            />
                         </div>
                     </div>
                 )}
 
                 {/* Action Buttons */}
                 <div className="flex gap-3">
-                    <button
+                    <Button
                         type="submit"
                         disabled={isPending}
-                        className={cn(
-                            'flex-1 py-3 rounded-lg font-medium transition-colors',
-                            'bg-primary hover:bg-primary-hover text-white',
-                            'disabled:opacity-50 disabled:cursor-not-allowed',
-                            'flex items-center justify-center gap-2',
-                        )}
+                        loading={isPending}
+                        variant="primary"
+                        size="lg"
+                        fullWidth
                     >
                         {isPending ? (
-                            <>
-                                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                {t('creatingButton')}
-                            </>
+                            t('creatingButton')
                         ) : (
                             <>
                                 <svg
@@ -381,22 +328,17 @@ export function DirectoryManualForm({ user }: DirectoryManualFormProps) {
                                 {t('createButton')}
                             </>
                         )}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                         type="button"
                         onClick={() => router.back()}
                         disabled={isPending}
-                        className={cn(
-                            'px-6 py-3 rounded-lg font-medium transition-colors',
-                            'bg-surface dark:bg-surface-dark',
-                            'border border-border dark:border-border-dark',
-                            'text-text dark:text-text-dark',
-                            'hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark',
-                            'disabled:opacity-50 disabled:cursor-not-allowed',
-                        )}
+                        variant="secondary"
+                        size="lg"
+                        className="px-6"
                     >
                         {t('cancelButton')}
-                    </button>
+                    </Button>
                 </div>
             </form>
         </div>
