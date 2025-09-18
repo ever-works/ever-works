@@ -10,6 +10,7 @@ import { ROUTES } from '@/lib/constants';
 import { RepoProvider } from '@/lib/api/enums';
 import { useRouter } from '@/i18n/navigation';
 import { useTranslations } from 'next-intl';
+import { Input } from '@/components/ui/input';
 
 interface DirectoryManualFormProps {
     user: AuthUser;
@@ -107,58 +108,34 @@ export function DirectoryManualForm({ user }: DirectoryManualFormProps) {
 
                     <div className="space-y-4">
                         {/* Name */}
-                        <div>
-                            <label className="block text-sm font-medium text-text dark:text-text-dark mb-2">
-                                {t('nameLabel')}
-                            </label>
-                            <input
-                                type="text"
-                                value={formData.name}
-                                onChange={(e) => {
-                                    setFormData({
-                                        ...formData,
-                                        name: e.target.value,
-                                        slug: generateSlug(e.target.value),
-                                    });
-                                }}
-                                placeholder={t('namePlaceholder')}
-                                className={cn(
-                                    'w-full px-4 py-2 rounded-lg',
-                                    'bg-surface dark:bg-surface-dark',
-                                    'border border-border dark:border-border-dark',
-                                    'text-text dark:text-text-dark',
-                                    'placeholder-text-muted dark:placeholder-text-muted-dark',
-                                    'focus:outline-none focus:border-primary',
-                                )}
-                                required
-                            />
-                        </div>
+                        <Input
+                            label={t('nameLabel')}
+                            type="text"
+                            value={formData.name}
+                            onChange={(e) => {
+                                setFormData({
+                                    ...formData,
+                                    name: e.target.value,
+                                    slug: generateSlug(e.target.value),
+                                });
+                            }}
+                            placeholder={t('namePlaceholder')}
+                            variant="form"
+                            required
+                        />
 
                         {/* Slug */}
-                        <div>
-                            <label className="block text-sm font-medium text-text dark:text-text-dark mb-2">
-                                {t('slugLabel')}
-                            </label>
-                            <input
-                                type="text"
-                                value={formData.slug}
-                                onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
-                                placeholder={t('slugPlaceholder')}
-                                pattern="[a-z0-9-]+"
-                                className={cn(
-                                    'w-full px-4 py-2 rounded-lg',
-                                    'bg-surface dark:bg-surface-dark',
-                                    'border border-border dark:border-border-dark',
-                                    'text-text dark:text-text-dark',
-                                    'placeholder-text-muted dark:placeholder-text-muted-dark',
-                                    'focus:outline-none focus:border-primary',
-                                )}
-                                required
-                            />
-                            <p className="text-xs text-text-muted dark:text-text-muted-dark mt-1">
-                                {t('slugHelp')}
-                            </p>
-                        </div>
+                        <Input
+                            label={t('slugLabel')}
+                            type="text"
+                            value={formData.slug}
+                            onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
+                            placeholder={t('slugPlaceholder')}
+                            pattern="[a-z0-9-]+"
+                            helperText={t('slugHelp')}
+                            variant="form"
+                            required
+                        />
 
                         {/* Description */}
                         <div>
@@ -259,27 +236,16 @@ export function DirectoryManualForm({ user }: DirectoryManualFormProps) {
 
                         {/* Owner */}
                         {formData.organization && (
-                            <div>
-                                <label className="block text-sm font-medium text-text dark:text-text-dark mb-2">
-                                    {t('organizationNameLabel')}
-                                </label>
-                                <input
-                                    type="text"
-                                    value={formData.owner || ''}
-                                    onChange={(e) =>
-                                        setFormData({ ...formData, owner: e.target.value })
-                                    }
-                                    placeholder={t('organizationNamePlaceholder')}
-                                    className={cn(
-                                        'w-full px-4 py-2 rounded-lg',
-                                        'bg-surface dark:bg-surface-dark',
-                                        'border border-border dark:border-border-dark',
-                                        'text-text dark:text-text-dark',
-                                        'placeholder-text-muted dark:placeholder-text-muted-dark',
-                                        'focus:outline-none focus:border-primary',
-                                    )}
-                                />
-                            </div>
+                            <Input
+                                label={t('organizationNameLabel')}
+                                type="text"
+                                value={formData.owner || ''}
+                                onChange={(e) =>
+                                    setFormData({ ...formData, owner: e.target.value })
+                                }
+                                placeholder={t('organizationNamePlaceholder')}
+                                variant="form"
+                            />
                         )}
 
                         {/* README Header */}

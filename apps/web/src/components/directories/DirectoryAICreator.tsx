@@ -8,6 +8,7 @@ import { createDirectoryWithAI } from '@/app/actions/dashboard';
 import { ROUTES } from '@/lib/constants';
 import { useRouter } from '@/i18n/navigation';
 import { useTranslations } from 'next-intl';
+import { Input } from '@/components/ui/input';
 
 interface DirectoryAICreatorProps {
     user: AuthUser;
@@ -50,10 +51,22 @@ export function DirectoryAICreator({ user }: DirectoryAICreatorProps) {
     };
 
     const examplePrompts = [
-        t('examplePrompts.0'),
-        t('examplePrompts.1'),
-        t('examplePrompts.2'),
-        t('examplePrompts.3'),
+        {
+            name: t('examplePrompts.0.name'),
+            prompt: t('examplePrompts.0.prompt'),
+        },
+        {
+            name: t('examplePrompts.1.name'),
+            prompt: t('examplePrompts.1.prompt'),
+        },
+        {
+            name: t('examplePrompts.2.name'),
+            prompt: t('examplePrompts.2.prompt'),
+        },
+        {
+            name: t('examplePrompts.3.name'),
+            prompt: t('examplePrompts.3.prompt'),
+        },
     ];
 
     return (
@@ -76,33 +89,19 @@ export function DirectoryAICreator({ user }: DirectoryAICreatorProps) {
             >
                 <div className="space-y-6">
                     {/* Directory Name */}
-                    <div>
-                        <label className="block text-sm font-medium text-text dark:text-text-dark mb-2">
-                            {t('directoryNameLabel')}
-                        </label>
-                        <input
-                            type="text"
-                            value={directoryName}
-                            onChange={(e) => setDirectoryName(e.target.value)}
-                            placeholder={t('directoryNamePlaceholder')}
-                            className={cn(
-                                'w-full px-4 py-2 rounded-lg',
-                                'bg-surface dark:bg-surface-dark',
-                                'border border-border dark:border-border-dark',
-                                'text-text dark:text-text-dark',
-                                'placeholder-text-muted dark:placeholder-text-muted-dark',
-                                'focus:outline-none focus:border-primary',
-                            )}
-                        />
-                        {/* <p className="text-xs text-text-muted dark:text-text-muted-dark mt-1">
-                            {t('directoryNameHelp')}
-                        </p> */}
-                    </div>
+                    <Input
+                        label={`${t('directoryNameLabel')} *`}
+                        type="text"
+                        value={directoryName}
+                        onChange={(e) => setDirectoryName(e.target.value)}
+                        placeholder={t('directoryNamePlaceholder')}
+                        variant="form"
+                    />
 
                     {/* AI Prompt */}
                     <div>
                         <label className="block text-sm font-medium text-text dark:text-text-dark mb-2">
-                            {t('promptLabel')}
+                            {t('promptLabel')} *
                         </label>
                         <textarea
                             value={prompt}
@@ -129,7 +128,10 @@ export function DirectoryAICreator({ user }: DirectoryAICreatorProps) {
                             {examplePrompts.map((example, index) => (
                                 <button
                                     key={index}
-                                    onClick={() => setPrompt(example)}
+                                    onClick={() => {
+                                        setPrompt(example.prompt);
+                                        setDirectoryName(example.name);
+                                    }}
                                     className={cn(
                                         'px-3 py-1.5 rounded-full text-sm',
                                         'bg-surface dark:bg-surface-dark',
@@ -139,7 +141,7 @@ export function DirectoryAICreator({ user }: DirectoryAICreatorProps) {
                                         'transition-colors',
                                     )}
                                 >
-                                    {example}
+                                    {example.name}
                                 </button>
                             ))}
                         </div>

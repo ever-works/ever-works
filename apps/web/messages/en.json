@@ -369,14 +369,26 @@
                 "directoryNameLabel": "Directory Name",
                 "directoryNamePlaceholder": "e.g., Awesome AI Tools",
                 "directoryNameHelp": "AI will suggest a name if you leave this empty",
-                "promptLabel": "Describe Your Directory *",
+                "promptLabel": "Describe Your Directory",
                 "promptPlaceholder": "Describe what kind of directory you want to create, what items it should contain, and any specific requirements...",
                 "inspirationText": "Need inspiration? Try one of these:",
                 "examplePrompts": {
-                    "0": "Create a directory of the best AI tools for developers",
-                    "1": "Build a curated list of open-source React components",
-                    "2": "Generate a directory of productivity apps for remote teams",
-                    "3": "Make a collection of sustainable fashion brands"
+                    "0": {
+                        "name": "AI Developer Tools",
+                        "prompt": "Create a directory of the best AI tools for developers"
+                    },
+                    "1": {
+                        "name": "React Components Hub",
+                        "prompt": "Build a curated list of open-source React components"
+                    },
+                    "2": {
+                        "name": "Remote Team Tools",
+                        "prompt": "Generate a directory of productivity apps for remote teams"
+                    },
+                    "3": {
+                        "name": "Sustainable Fashion",
+                        "prompt": "Make a collection of sustainable fashion brands"
+                    }
                 },
                 "featuresTitle": "What AI will do for you:",
                 "features": {
