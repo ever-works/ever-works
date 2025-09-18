@@ -6,10 +6,9 @@ import { checkGitHubConnection } from './oauth';
 import { RepoProvider } from '@/lib/api/enums';
 import { getTranslations } from 'next-intl/server';
 
-export async function createDirectory(data: CreateDirectoryDto) {
+const getCreateDirectorySchema = async () => {
     const t = await getTranslations('actions.directories');
 
-    // Validation schemas with translations
     const readmeConfigSchema = z.object({
         header: z.string().optional(),
         overwriteDefaultHeader: z.boolean().optional(),
@@ -32,6 +31,14 @@ export async function createDirectory(data: CreateDirectoryDto) {
         repoProvider: z.nativeEnum(RepoProvider).optional().default(RepoProvider.GITHUB),
         readmeConfig: readmeConfigSchema.optional(),
     });
+
+    return createDirectorySchema;
+};
+
+export async function createDirectory(data: CreateDirectoryDto) {
+    const t = await getTranslations('actions.directories');
+
+    const createDirectorySchema = await getCreateDirectorySchema();
 
     try {
         // Validate input data
@@ -70,7 +77,7 @@ export async function createDirectory(data: CreateDirectoryDto) {
     }
 }
 
-export async function createDirectoryWithAI(prompt: string, name?: string) {
+export async function createDirectoryWithAI(prompt: string, name: string) {
     const t = await getTranslations('actions.directories');
 
     // AI prompt validation schema
@@ -79,29 +86,7 @@ export async function createDirectoryWithAI(prompt: string, name?: string) {
         name: z.string().min(1, t('name.required')).max(100, t('name.maxLength')),
     });
 
-    // Validation schemas for generated directory
-    const readmeConfigSchema = z.object({
-        header: z.string().optional(),
-        overwriteDefaultHeader: z.boolean().optional(),
-        footer: z.string().optional(),
-        overwriteDefaultFooter: z.boolean().optional(),
-    });
-
-    const createDirectorySchema = z.object({
-        slug: z
-            .string()
-            .min(1, t('slug.required'))
-            .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, t('slug.format')),
-        name: z.string().min(1, t('name.required')).max(100, t('name.maxLength')),
-        description: z
-            .string()
-            .min(1, t('description.required'))
-            .max(500, t('description.maxLength')),
-        owner: z.string().optional(),
-        organization: z.boolean(),
-        repoProvider: z.nativeEnum(RepoProvider).optional().default(RepoProvider.GITHUB),
-        readmeConfig: readmeConfigSchema.optional(),
-    });
+    const createDirectorySchema = await getCreateDirectorySchema();
 
     try {
         // Validate input

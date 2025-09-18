@@ -12,7 +12,12 @@ export class DirectoryRepository {
         private readonly repository: Repository<Directory>,
     ) {}
 
-    async create(directoryData: Partial<Directory>, user: User): Promise<Directory> {
+    async create(directoryData: Partial<Directory>): Promise<Directory> {
+        const directory = this.repository.create(directoryData);
+        return await this.repository.save(directory);
+    }
+
+    async createOrUpdate(directoryData: Partial<Directory>, user: User): Promise<Directory> {
         let exists: Directory | null = null;
         if (directoryData.owner) {
             exists = await this.findByOwnerAndSlug(directoryData.owner, directoryData.slug);

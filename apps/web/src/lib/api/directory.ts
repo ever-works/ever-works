@@ -19,6 +19,12 @@ export interface CreateDirectoryDto {
     readmeConfig?: MarkdownReadmeConfig;
 }
 
+export interface UpdateDirectoryDto {
+    name?: string;
+    description?: string;
+    readmeConfig?: MarkdownReadmeConfig;
+}
+
 export interface DeleteDirectoryDto {
     confirmation: boolean;
 }
@@ -76,6 +82,16 @@ export const directoryAPI = {
             endpoint: '/directories',
             data,
             method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    // Update a directory by ID
+    update: async (id: string, data: UpdateDirectoryDto) => {
+        return serverMutation<Directory>({
+            endpoint: `/directories/${id}`,
+            data,
+            method: 'PUT',
             wrapInData: false,
         });
     },

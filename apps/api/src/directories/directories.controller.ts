@@ -6,10 +6,11 @@ import {
     HttpStatus,
     Param,
     Post,
+    Put,
     Query,
     UseGuards,
 } from '@nestjs/common';
-import { CreateDirectoryDto } from '@packages/agent/dto';
+import { CreateDirectoryDto, UpdateDirectoryDto } from '@packages/agent/dto';
 import {
     CreateItemsGeneratorDto,
     DeleteDirectoryDto,
@@ -74,6 +75,17 @@ export class DirectoriesController {
     async getDirectory(@CurrentUser() auth: AuthenticatedUser, @Param('id') id: string) {
         const user = await this.authService.getUser(auth.userId);
         return this.agentService.getDirectory(id, user);
+    }
+
+    @Put('directories/:id')
+    @HttpCode(HttpStatus.OK)
+    async updateDirectory(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') id: string,
+        @Body() updateDirectoryDto: UpdateDirectoryDto,
+    ) {
+        const user = await this.authService.getUser(auth.userId);
+        return this.agentService.updateDirectory(id, updateDirectoryDto, user);
     }
 
     @Post('directories/:id/generate')

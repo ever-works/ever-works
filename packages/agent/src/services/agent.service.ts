@@ -32,7 +32,8 @@ import { CreateDirectoryDto } from '../dto/create-directory.dto';
 import { UpdateWebsiteRepositoryResponseDto } from '../website-generator/dto/update-website-repository.dto';
 import { ItemSubmissionService } from '../items-generator/item-submission.service';
 import { ItemsGeneratorService } from '../items-generator/items-generator.service';
-import { GenerateStatus, GenerateStatusType } from '../entities/types';
+import { GenerateStatusType } from '../entities/types';
+import { UpdateDirectoryDto } from '../dto';
 
 @Injectable()
 export class AgentService {
@@ -148,13 +149,57 @@ export class AgentService {
             organization: organization,
         };
 
-        const dir = await this.directoryRepository.create(directoryData, user);
+        if (await this.directoryExists(slug, user)) {
+            throw new BadRequestException({
+                status: 'error',
+                message: 'Directory with this slug already exists',
+            });
+        }
+
+        const dir = await this.directoryRepository.create(directoryData);
         dir.owner = dir.getRepoOwner();
 
         return {
             status: 'success',
             directory: dir,
         };
+    }
+
+    async updateDirectory(id: string, updateDto: UpdateDirectoryDto, user: User) {
+        try {
+            const directory = await this.validateDirectoryOwnership(id, user.id);
+
+            const updatedDirectory = await this.directoryRepository.update(id, {
+                name: updateDto.name || directory.name,
+                description: updateDto.description || directory.description,
+                readmeConfig: {
+                    ...directory.readmeConfig,
+                    ...updateDto.readmeConfig,
+                },
+            });
+
+            updatedDirectory.owner = updatedDirectory.getRepoOwner();
+
+            return {
+                status: 'success',
+                directory: updatedDirectory,
+            };
+        } catch (error) {
+            if (error instanceof HttpException) {
+                throw error;
+            }
+
+            this.logger.error('Failed to update directory:', error);
+
+            throw new BadRequestException({
+                status: 'error',
+                message: this.clearMessageError(error),
+            });
+        }
+    }
+
+    async directoryExists(slug: string, user: User) {
+        return this.directoryRepository.existsByUserAndSlug(user.id, slug);
     }
 
     async generateItemsGenerator(

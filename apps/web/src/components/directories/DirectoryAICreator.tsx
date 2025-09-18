@@ -27,7 +27,7 @@ export function DirectoryAICreator({ user }: DirectoryAICreatorProps) {
         }
 
         startTransition(async () => {
-            const result = await createDirectoryWithAI(prompt, directoryName || undefined);
+            const result = await createDirectoryWithAI(prompt, directoryName);
 
             if (result.success) {
                 toast.success(result.message || t('success.started'));

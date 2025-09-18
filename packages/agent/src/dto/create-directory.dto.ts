@@ -6,6 +6,7 @@ import {
     IsOptional,
     IsString,
     ValidateNested,
+    Matches,
 } from 'class-validator';
 import { MarkdownReadmeConfig } from '../entities/directory.entity';
 
@@ -34,6 +35,9 @@ export class MarkdownReadmeConfigDto implements MarkdownReadmeConfig {
 export class CreateDirectoryDto {
     @IsString()
     @IsNotEmpty()
+    @Matches(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, {
+        message: 'Slug can only contain lowercase letters, numbers, and hyphens',
+    })
     slug: string;
 
     @IsString()
