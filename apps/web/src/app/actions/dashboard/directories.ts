@@ -76,7 +76,7 @@ export async function createDirectoryWithAI(prompt: string, name?: string) {
     // AI prompt validation schema
     const aiPromptSchema = z.object({
         prompt: z.string().min(10, t('prompt.minLength')).max(1000, t('prompt.maxLength')),
-        name: z.string().min(1, t('name.required')).max(100, t('name.maxLength')).optional(),
+        name: z.string().min(1, t('name.required')).max(100, t('name.maxLength')),
     });
 
     // Validation schemas for generated directory

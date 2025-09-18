@@ -7,6 +7,7 @@ import { getDirectories } from '@/app/actions/dashboard/directories';
 import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { DirectoryCard } from './DirectoryCard';
+import { useTranslations } from 'next-intl';
 
 interface DirectoryListProps {
     initialDirectories?: Directory[];
@@ -23,6 +24,7 @@ export function DirectoryList({
 }: DirectoryListProps) {
     const [directories, setDirectories] = useState<Directory[]>(initialDirectories);
     const [loading, setLoading] = useState(false);
+    const t = useTranslations('dashboard.directoryList');
 
     useEffect(() => {
         // If no initial directories provided, fetch them
@@ -57,7 +59,7 @@ export function DirectoryList({
             {showHeader && (
                 <div className="flex justify-between items-center mb-6">
                     <h2 className="text-xl font-semibold text-text dark:text-text-dark">
-                        Your Directories
+                        {t('title')}
                     </h2>
 
                     <Link
@@ -67,7 +69,7 @@ export function DirectoryList({
                             'bg-primary hover:bg-primary-hover text-white',
                         )}
                     >
-                        Create Directory
+                        {t('createButton')}
                     </Link>
                 </div>
             )}

@@ -7,6 +7,7 @@ import { DirectoryAICreator } from '@/components/directories/DirectoryAICreator'
 import { DirectoryManualForm } from '@/components/directories/DirectoryManualForm';
 import { GitHubConnectionAlert } from './github-connection-alert';
 import { GitHubStatusSidebar } from './github-status-sidebar';
+import { useTranslations } from 'next-intl';
 
 interface NewDirectoryClientProps {
     user: AuthUser;
@@ -19,6 +20,7 @@ export default function NewDirectoryClient({
 }: NewDirectoryClientProps) {
     const [creationMode, setCreationMode] = useState<'ai' | 'manual' | null>(null);
     const [githubConnected] = useState(initialGithubConnected);
+    const t = useTranslations('dashboard.directoryCreation');
 
     if (creationMode === null) {
         return (
@@ -28,10 +30,10 @@ export default function NewDirectoryClient({
 
                 <div className="mb-8">
                     <h1 className="text-3xl font-bold text-text dark:text-text-dark">
-                        Create New Directory
+                        {t('title')}
                     </h1>
                     <p className="text-text-secondary dark:text-text-secondary-dark mt-2">
-                        Choose how you'd like to create your directory
+                        {t('subtitle')}
                     </p>
                 </div>
 
@@ -70,14 +72,13 @@ export default function NewDirectoryClient({
                             </div>
                         </div>
                         <h3 className="text-xl font-semibold text-text dark:text-text-dark mb-2">
-                            Create with AI
+                            {t('ai.title')}
                         </h3>
                         <p className="text-text-secondary dark:text-text-secondary-dark mb-4">
-                            Describe your directory idea in natural language and let AI handle the
-                            setup
+                            {t('ai.subtitle')}
                         </p>
                         <div className="flex items-center gap-2 text-primary font-medium">
-                            <span>Get started</span>
+                            <span>{t('ai.getStarted')}</span>
                             <svg
                                 className="w-4 h-4 group-hover:translate-x-1 transition-transform"
                                 fill="none"
@@ -128,13 +129,13 @@ export default function NewDirectoryClient({
                             </div>
                         </div>
                         <h3 className="text-xl font-semibold text-text dark:text-text-dark mb-2">
-                            Create Manually
+                            {t('manual.title')}
                         </h3>
                         <p className="text-text-secondary dark:text-text-secondary-dark mb-4">
-                            Configure your directory with full control over every setting and option
+                            {t('manual.subtitle')}
                         </p>
                         <div className="flex items-center gap-2 text-success font-medium">
-                            <span>Configure now</span>
+                            <span>{t('manual.configureNow')}</span>
                             <svg
                                 className="w-4 h-4 group-hover:translate-x-1 transition-transform"
                                 fill="none"
@@ -177,7 +178,7 @@ export default function NewDirectoryClient({
                                 d="M10 19l-7-7m0 0l7-7m-7 7h18"
                             />
                         </svg>
-                        Back to options
+                        {t('backToOptions')}
                     </button>
                 </div>
 

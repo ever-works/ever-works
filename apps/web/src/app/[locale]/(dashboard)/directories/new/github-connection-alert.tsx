@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils/cn';
 import { connectGitHub } from '@/app/actions/dashboard/oauth';
 import { toast } from 'sonner';
 import { ROUTES } from '@/lib/constants';
+import { useTranslations } from 'next-intl';
 
 interface GitHubConnectionAlertProps {
     githubConnected: boolean;
@@ -12,6 +13,7 @@ interface GitHubConnectionAlertProps {
 
 export function GitHubConnectionAlert({ githubConnected }: GitHubConnectionAlertProps) {
     const [isPending, startTransition] = useTransition();
+    const t = useTranslations('dashboard.github.connection.alert');
 
     const handleGitHubConnect = () => {
         startTransition(async () => {
@@ -52,10 +54,10 @@ export function GitHubConnectionAlert({ githubConnected }: GitHubConnectionAlert
                 </svg>
                 <div>
                     <p className="text-sm font-medium text-text dark:text-text-dark">
-                        GitHub not connected
+                        {t('title')}
                     </p>
                     <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                        Connect your GitHub account to create and manage directories
+                        {t('subtitle')}
                     </p>
                 </div>
             </div>
@@ -69,7 +71,7 @@ export function GitHubConnectionAlert({ githubConnected }: GitHubConnectionAlert
                     'disabled:opacity-50 disabled:cursor-not-allowed',
                 )}
             >
-                {isPending ? 'Connecting...' : 'Connect GitHub'}
+                {isPending ? t('connectingButton') : t('connectButton')}
             </button>
         </div>
     );

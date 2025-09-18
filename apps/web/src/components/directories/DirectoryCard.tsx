@@ -3,15 +3,15 @@
 import { cn } from '@/lib/utils/cn';
 import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
-import { useTranslations } from 'next-intl';
+import { useTranslations, useLocale } from 'next-intl';
 import type { Directory } from '@/lib/api/directory';
 
 interface DirectoryCardProps {
     directory: Directory;
 }
 
-const formatDate = (date: string) => {
-    return new Date(date).toLocaleDateString('en-US', {
+const formatDate = (date: string, locale: string) => {
+    return new Date(date).toLocaleDateString(locale, {
         month: 'short',
         day: 'numeric',
         year: 'numeric',
@@ -20,6 +20,7 @@ const formatDate = (date: string) => {
 
 export function DirectoryCard({ directory }: DirectoryCardProps) {
     const t = useTranslations('dashboard.directoryCard');
+    const locale = useLocale();
     return (
         <Link
             href={ROUTES.DASHBOARD_DIRECTORY(directory.id)}
@@ -98,7 +99,7 @@ export function DirectoryCard({ directory }: DirectoryCardProps) {
             <div className="flex items-center justify-between pt-4 border-t border-border dark:border-border-dark">
                 {directory.updatedAt && (
                     <span className="text-xs text-text-muted dark:text-text-muted-dark">
-                        {t('updated', { date: formatDate(directory.updatedAt) })}
+                        {t('updated', { date: formatDate(directory.updatedAt, locale) })}
                     </span>
                 )}
 

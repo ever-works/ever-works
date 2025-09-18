@@ -9,6 +9,7 @@ import { createDirectory } from '@/app/actions/dashboard';
 import { ROUTES } from '@/lib/constants';
 import { RepoProvider } from '@/lib/api/enums';
 import { useRouter } from '@/i18n/navigation';
+import { useTranslations } from 'next-intl';
 
 interface DirectoryManualFormProps {
     user: AuthUser;
@@ -18,6 +19,7 @@ export function DirectoryManualForm({ user }: DirectoryManualFormProps) {
     const [showAdvanced, setShowAdvanced] = useState(false);
     const [isPending, startTransition] = useTransition();
     const router = useRouter();
+    const t = useTranslations('dashboard.directoryCreation.manual');
 
     // Form state
     const [formData, setFormData] = useState<CreateDirectoryDto>({
@@ -40,15 +42,15 @@ export function DirectoryManualForm({ user }: DirectoryManualFormProps) {
 
         // Basic validation
         if (!formData.name.trim()) {
-            toast.error('Directory name is required');
+            toast.error(t('nameRequired'));
             return;
         }
         if (!formData.slug.trim()) {
-            toast.error('Directory slug is required');
+            toast.error(t('slugRequired'));
             return;
         }
         if (!formData.description.trim()) {
-            toast.error('Directory description is required');
+            toast.error(t('descriptionRequired'));
             return;
         }
 
@@ -56,7 +58,7 @@ export function DirectoryManualForm({ user }: DirectoryManualFormProps) {
             const result = await createDirectory(formData);
 
             if (result.success) {
-                toast.success(result.message || 'Directory created successfully!');
+                toast.success(result.message || t('success.created'));
                 router.push(ROUTES.DASHBOARD_DIRECTORIES);
             } else if (result.requiresGitHub) {
                 toast.error('Please connect your GitHub account first');
@@ -78,10 +80,10 @@ export function DirectoryManualForm({ user }: DirectoryManualFormProps) {
         <div className="space-y-6">
             <div>
                 <h1 className="text-3xl font-bold text-text dark:text-text-dark mb-2">
-                    Create Directory Manually
+                    {t('formTitle')}
                 </h1>
                 <p className="text-text-secondary dark:text-text-secondary-dark">
-                    Configure your directory with full control over every setting
+                    {t('formSubtitle')}
                 </p>
             </div>
 
@@ -95,14 +97,14 @@ export function DirectoryManualForm({ user }: DirectoryManualFormProps) {
                     )}
                 >
                     <h2 className="text-lg font-semibold text-text dark:text-text-dark mb-4">
-                        Basic Information
+                        {t('basicInfo')}
                     </h2>
 
                     <div className="space-y-4">
                         {/* Name */}
                         <div>
                             <label className="block text-sm font-medium text-text dark:text-text-dark mb-2">
-                                Directory Name *
+                                {t('nameLabel')}
                             </label>
                             <input
                                 type="text"
@@ -114,7 +116,7 @@ export function DirectoryManualForm({ user }: DirectoryManualFormProps) {
                                         slug: generateSlug(e.target.value),
                                     });
                                 }}
-                                placeholder="e.g., Awesome AI Tools"
+                                placeholder={t('namePlaceholder')}
                                 className={cn(
                                     'w-full px-4 py-2 rounded-lg',
                                     'bg-surface dark:bg-surface-dark',
@@ -130,13 +132,13 @@ export function DirectoryManualForm({ user }: DirectoryManualFormProps) {
                         {/* Slug */}
                         <div>
                             <label className="block text-sm font-medium text-text dark:text-text-dark mb-2">
-                                Directory Slug *
+                                {t('slugLabel')}
                             </label>
                             <input
                                 type="text"
                                 value={formData.slug}
                                 onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
-                                placeholder="awesome-ai-tools"
+                                placeholder={t('slugPlaceholder')}
                                 pattern="[a-z0-9-]+"
                                 className={cn(
                                     'w-full px-4 py-2 rounded-lg',
@@ -149,22 +151,21 @@ export function DirectoryManualForm({ user }: DirectoryManualFormProps) {
                                 required
                             />
                             <p className="text-xs text-text-muted dark:text-text-muted-dark mt-1">
-                                URL-friendly identifier (lowercase letters, numbers, and hyphens
-                                only)
+                                {t('slugHelp')}
                             </p>
                         </div>
 
                         {/* Description */}
                         <div>
                             <label className="block text-sm font-medium text-text dark:text-text-dark mb-2">
-                                Description *
+                                {t('descriptionLabel')}
                             </label>
                             <textarea
                                 value={formData.description}
                                 onChange={(e) =>
                                     setFormData({ ...formData, description: e.target.value })
                                 }
-                                placeholder="A curated list of the best AI tools and resources for developers"
+                                placeholder={t('descriptionPlaceholder')}
                                 rows={3}
                                 className={cn(
                                     'w-full px-4 py-2 rounded-lg resize-none',
@@ -195,10 +196,10 @@ export function DirectoryManualForm({ user }: DirectoryManualFormProps) {
                     <div className="flex items-center justify-between">
                         <div>
                             <h3 className="font-medium text-text dark:text-text-dark">
-                                Advanced Settings
+                                {t('advancedSettings')}
                             </h3>
                             <p className="text-sm text-text-muted dark:text-text-muted-dark">
-                                Organization, custom headers, and more
+                                {t('advancedSubtitle')}
                             </p>
                         </div>
                         <svg
@@ -242,11 +243,10 @@ export function DirectoryManualForm({ user }: DirectoryManualFormProps) {
                                 />
                                 <div>
                                     <span className="text-sm font-medium text-text dark:text-text-dark">
-                                        Create under organization
+                                        {t('organizationLabel')}
                                     </span>
                                     <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                                        Create this directory under a GitHub organization instead of
-                                        your personal account
+                                        {t('organizationHelp')}
                                     </p>
                                 </div>
                             </label>
@@ -256,7 +256,7 @@ export function DirectoryManualForm({ user }: DirectoryManualFormProps) {
                         {formData.organization && (
                             <div>
                                 <label className="block text-sm font-medium text-text dark:text-text-dark mb-2">
-                                    Organization Name
+                                    {t('organizationNameLabel')}
                                 </label>
                                 <input
                                     type="text"
@@ -264,7 +264,7 @@ export function DirectoryManualForm({ user }: DirectoryManualFormProps) {
                                     onChange={(e) =>
                                         setFormData({ ...formData, owner: e.target.value })
                                     }
-                                    placeholder="my-organization"
+                                    placeholder={t('organizationNamePlaceholder')}
                                     className={cn(
                                         'w-full px-4 py-2 rounded-lg',
                                         'bg-surface dark:bg-surface-dark',
@@ -280,7 +280,7 @@ export function DirectoryManualForm({ user }: DirectoryManualFormProps) {
                         {/* README Header */}
                         <div>
                             <label className="block text-sm font-medium text-text dark:text-text-dark mb-2">
-                                Custom README Header
+                                {t('headerLabel')}
                             </label>
                             <textarea
                                 value={formData.readmeConfig?.header || ''}
@@ -293,7 +293,7 @@ export function DirectoryManualForm({ user }: DirectoryManualFormProps) {
                                         },
                                     })
                                 }
-                                placeholder="Add custom content to the top of your README file"
+                                placeholder={t('headerPlaceholder')}
                                 rows={3}
                                 className={cn(
                                     'w-full px-4 py-2 rounded-lg resize-none',
@@ -307,9 +307,7 @@ export function DirectoryManualForm({ user }: DirectoryManualFormProps) {
                             <label className="flex items-center gap-2 mt-2">
                                 <input
                                     type="checkbox"
-                                    checked={
-                                        formData.readmeConfig?.overwriteDefaultHeader || false
-                                    }
+                                    checked={formData.readmeConfig?.overwriteDefaultHeader || false}
                                     onChange={(e) =>
                                         setFormData({
                                             ...formData,
@@ -322,7 +320,7 @@ export function DirectoryManualForm({ user }: DirectoryManualFormProps) {
                                     className="w-4 h-4 rounded border-border dark:border-border-dark text-primary focus:ring-primary"
                                 />
                                 <span className="text-sm text-text-secondary dark:text-text-secondary-dark">
-                                    Replace default header entirely
+                                    {t('headerOverwrite')}
                                 </span>
                             </label>
                         </div>
@@ -357,9 +355,7 @@ export function DirectoryManualForm({ user }: DirectoryManualFormProps) {
                             <label className="flex items-center gap-2 mt-2">
                                 <input
                                     type="checkbox"
-                                    checked={
-                                        formData.readmeConfig?.overwriteDefaultFooter || false
-                                    }
+                                    checked={formData.readmeConfig?.overwriteDefaultFooter || false}
                                     onChange={(e) =>
                                         setFormData({
                                             ...formData,
@@ -394,7 +390,7 @@ export function DirectoryManualForm({ user }: DirectoryManualFormProps) {
                         {isPending ? (
                             <>
                                 <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                Creating Directory...
+                                {t('creatingButton')}
                             </>
                         ) : (
                             <>
@@ -411,7 +407,7 @@ export function DirectoryManualForm({ user }: DirectoryManualFormProps) {
                                         d="M12 4v16m8-8H4"
                                     />
                                 </svg>
-                                Create Directory
+                                {t('createButton')}
                             </>
                         )}
                     </button>
@@ -428,7 +424,7 @@ export function DirectoryManualForm({ user }: DirectoryManualFormProps) {
                             'disabled:opacity-50 disabled:cursor-not-allowed',
                         )}
                     >
-                        Cancel
+                        {t('cancelButton')}
                     </button>
                 </div>
             </form>
