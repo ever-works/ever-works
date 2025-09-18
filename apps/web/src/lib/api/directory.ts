@@ -29,6 +29,18 @@ export interface DeleteDirectoryDto {
     confirmation: boolean;
 }
 
+enum GenerateStatusType {
+    GENERATING = 'generating',
+    GENERATED = 'generated',
+    ERROR = 'error',
+}
+
+type GenerateStatus = {
+    status: GenerateStatusType;
+    step?: string;
+    error?: string;
+};
+
 // Response Types
 export interface Directory {
     id: string;
@@ -39,6 +51,7 @@ export interface Directory {
     organization: boolean;
     repoProvider: RepoProvider;
     readmeConfig?: MarkdownReadmeConfig;
+    generateStatus?: GenerateStatus;
     createdAt: string;
     updatedAt: string;
 }
