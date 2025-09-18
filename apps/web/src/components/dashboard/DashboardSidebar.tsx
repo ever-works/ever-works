@@ -74,7 +74,7 @@ export function DashboardSidebar({ user, isOpen, onToggle }: DashboardSidebarPro
                 </div>
 
                 <div className="px-6 py-3">
-                    <div className="flex bg-surface-tertiary/50 dark:bg-surface-dark rounded-lg p-1">
+                    <div className="flex bg-surface-tertiary/50 dark:bg-surface-dark rounded-lg p-1 gap-1">
                         <Button
                             onClick={() => setActiveMode('menu')}
                             variant="ghost"
