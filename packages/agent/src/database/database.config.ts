@@ -10,7 +10,7 @@ import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs';
 import { config } from '@src/config';
-import { getTlsOptions } from './utils';
+import { getTlsOptions, parseDatabaseUrl } from './utils';
 
 export type DatabaseType = 'better-sqlite3' | 'postgres' | 'mysql' | 'mariadb';
 
@@ -135,22 +135,3 @@ export const getDatabaseConfig = (): TypeOrmModuleOptions => {
     const config = databaseConfig();
     return config as TypeOrmModuleOptions;
 };
-
-function parseDatabaseUrl(databaseUrl: string) {
-    try {
-        const url = new URL(databaseUrl);
-
-        const config = {
-            protocol: url.protocol.slice(0, -1),
-            username: url.username,
-            password: url.password,
-            host: url.hostname,
-            port: url.port ? parseInt(url.port, 10) : undefined,
-            database: url.pathname.slice(1),
-            searchParams: Object.fromEntries(url.searchParams.entries()),
-        };
-        return config;
-    } catch (error) {
-        return null;
-    }
-}

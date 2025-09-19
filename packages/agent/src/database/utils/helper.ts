@@ -29,3 +29,22 @@ export const getTlsOptions = (
         return undefined;
     }
 };
+
+export function parseDatabaseUrl(databaseUrl: string) {
+    try {
+        const url = new URL(databaseUrl);
+
+        const config = {
+            protocol: url.protocol.slice(0, -1),
+            username: url.username,
+            password: url.password,
+            host: url.hostname,
+            port: url.port ? parseInt(url.port, 10) : undefined,
+            database: url.pathname.slice(1),
+            searchParams: Object.fromEntries(url.searchParams.entries()),
+        };
+        return config;
+    } catch (error) {
+        return null;
+    }
+}
