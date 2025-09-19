@@ -87,10 +87,13 @@ export const databaseConfig = registerAs('database', (): DatabaseConfig => {
 
     // Handle Database URL if provided
     if (config.database.getUrl()) {
+        const parsedUrl = parseDatabaseUrl(config.database.getUrl());
+
         return {
             ...baseConfig,
             type: dbType,
             url: config.database.getUrl(),
+            database: parsedUrl?.database,
         };
     }
 
@@ -132,3 +135,22 @@ export const getDatabaseConfig = (): TypeOrmModuleOptions => {
     const config = databaseConfig();
     return config as TypeOrmModuleOptions;
 };
+
+function parseDatabaseUrl(databaseUrl: string) {
+    try {
+        const url = new URL(databaseUrl);
+
+        const config = {
+            protocol: url.protocol.slice(0, -1),
+            username: url.username,
+            password: url.password,
+            host: url.hostname,
+            port: url.port ? parseInt(url.port, 10) : undefined,
+            database: url.pathname.slice(1),
+            searchParams: Object.fromEntries(url.searchParams.entries()),
+        };
+        return config;
+    } catch (error) {
+        return null;
+    }
+}
