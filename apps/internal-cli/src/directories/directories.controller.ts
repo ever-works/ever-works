@@ -29,7 +29,7 @@ import { AgentService } from '@packages/agent/services';
 import { UpdateWebsiteRepositoryResponseDto } from '@packages/agent/website-generator';
 
 @Controller('api')
-export class LocalAgentController {
+export class DirectoriesController {
     constructor(
         private readonly agentService: AgentService,
         private readonly vercelService: VercelService,

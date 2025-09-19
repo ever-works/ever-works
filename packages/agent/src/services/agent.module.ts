@@ -6,7 +6,9 @@ import { MarkdownGeneratorModule } from '../markdown-generator/markdown-generato
 import { WebsiteGeneratorModule } from '../website-generator/website-generator.module';
 import { DeployModule } from '../deploy/deploy.module';
 import { DatabaseModule } from '../database/database.module';
+import { AiModule } from '../ai/ai.module';
 import { AgentService } from './agent.service';
+import { DirectoryDetailService } from './directory-detail.service';
 
 @Module({
     imports: [
@@ -17,8 +19,9 @@ import { AgentService } from './agent.service';
         MarkdownGeneratorModule,
         WebsiteGeneratorModule,
         DeployModule,
+        AiModule,
     ],
-    providers: [AgentService],
-    exports: [AgentService],
+    providers: [AgentService, DirectoryDetailService],
+    exports: [AgentService, DirectoryDetailService],
 })
 export class AgentModule {}

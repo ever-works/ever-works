@@ -180,11 +180,6 @@ export class ApiService {
         return response.data;
     }
 
-    async getProfile(): Promise<UserProfile> {
-        const response = await this.httpClient.get<UserProfile>('/auth/profile/fresh');
-        return response.data;
-    }
-
     async updateWebsite(directoryId: string): Promise<ApiResponse> {
         const response = await this.httpClient.post<ApiResponse>(
             `/directories/${directoryId}/update-website`,
@@ -202,6 +197,18 @@ export class ApiService {
 
     async deleteDirectory(id: string, data?: DeleteDirectoryDto): Promise<ApiResponse> {
         const response = await this.httpClient.post<ApiResponse>(`/directories/${id}/delete`, data);
+        return response.data;
+    }
+
+    // OAuth operations
+
+    async getProfile(): Promise<UserProfile> {
+        const response = await this.httpClient.get<UserProfile>('/auth/profile/fresh');
+        return response.data;
+    }
+
+    async checkConnection(provider: string): Promise<{ connected: boolean; scopes?: string[] }> {
+        const response = await this.httpClient.get<any>(`/auth/connections/${provider}`);
         return response.data;
     }
 }

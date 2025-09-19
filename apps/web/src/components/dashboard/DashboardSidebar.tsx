@@ -10,6 +10,7 @@ import { APP_NAME, ROUTES } from '@/lib/constants';
 import { Link, usePathname } from '@/i18n/navigation';
 import { Home, Folder, Settings, LogOut, Plus, X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import { Button } from '@/components/ui/button';
 
 interface DashboardSidebarProps {
     user: AuthUser;
@@ -56,44 +57,50 @@ export function DashboardSidebar({ user, isOpen, onToggle }: DashboardSidebarPro
                             {APP_NAME}
                         </h1>
 
-                        <button
+                        <Button
                             onClick={onToggle}
+                            variant="ghost"
+                            size="icon"
                             className={cn(
-                                'p-2 rounded-md transition-colors xl:hidden',
+                                'xl:hidden',
                                 'text-text-muted dark:text-text-muted-dark',
                                 'hover:text-text dark:hover:text-text-dark',
                                 'hover:bg-surface dark:hover:bg-surface-dark',
                             )}
                         >
                             <X className="w-5 h-5" />
-                        </button>
+                        </Button>
                     </div>
                 </div>
 
                 <div className="px-6 py-3">
-                    <div className="flex bg-surface-tertiary/50 dark:bg-surface-dark rounded-lg p-1">
-                        <button
+                    <div className="flex bg-surface-tertiary/50 dark:bg-surface-dark rounded-lg p-1 gap-1">
+                        <Button
                             onClick={() => setActiveMode('menu')}
+                            variant="ghost"
+                            size="sm"
                             className={cn(
-                                'flex-1 py-2 text-center text-sm font-medium transition-all rounded-md',
+                                'flex-1 text-sm font-medium transition-all rounded-md',
                                 activeMode === 'menu'
                                     ? 'bg-white dark:bg-surface-tertiary-dark text-text dark:text-text-dark shadow-sm'
                                     : 'text-text-secondary dark:text-text-muted-dark hover:text-text dark:hover:text-text-dark',
                             )}
                         >
                             {t('menu')}
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                             onClick={() => setActiveMode('chat')}
+                            variant="ghost"
+                            size="sm"
                             className={cn(
-                                'flex-1 py-2 text-center text-sm font-medium transition-all rounded-md',
+                                'flex-1 text-sm font-medium transition-all rounded-md',
                                 activeMode === 'chat'
                                     ? 'bg-white dark:bg-surface-tertiary-dark text-text dark:text-text-dark shadow-sm'
                                     : 'text-text-secondary dark:text-text-muted-dark hover:text-text dark:hover:text-text-dark',
                             )}
                         >
                             {t('aiChat')}
-                        </button>
+                        </Button>
                     </div>
                 </div>
 
@@ -104,16 +111,15 @@ export function DashboardSidebar({ user, isOpen, onToggle }: DashboardSidebarPro
                 ) : (
                     <>
                         <div className="px-6 pb-4">
-                            <Link
+                            <Button
                                 href={ROUTES.DASHBOARD_DIRECTORIES_NEW}
-                                className={cn(
-                                    'w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors',
-                                    'bg-primary hover:bg-primary-hover text-white',
-                                )}
+                                variant="primary"
+                                size="lg"
+                                fullWidth
                             >
                                 <Plus className="w-5 h-5" />
                                 <span className="font-medium">{t('newDirectory')}</span>
-                            </Link>
+                            </Button>
                         </div>
 
                         <nav className="flex-1 px-6 overflow-y-auto min-h-0">
@@ -184,18 +190,23 @@ export function DashboardSidebar({ user, isOpen, onToggle }: DashboardSidebarPro
                 )}
 
                 <div className="px-6 pb-6 mt-auto">
-                    <button
+                    <Button
                         onClick={handleLogout}
                         disabled={isPending}
+                        loading={isPending}
+                        variant="ghost"
+                        fullWidth
                         className={cn(
-                            'w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors',
-                            'text-danger hover:bg-surface-tertiary dark:hover:bg-surface-tertiary-dark',
-                            isPending && 'opacity-50 cursor-not-allowed',
+                            'justify-start items-center gap-3 px-4 py-3',
+                            'text-danger dark:text-danger hover:bg-surface-tertiary dark:hover:bg-surface-tertiary-dark',
+                            'hover:text-danger',
                         )}
                     >
                         <LogOut className="w-5 h-5" />
-                        <span className="text-sm">{isPending ? t('signingOut') : t('signOut')}</span>
-                    </button>
+                        <span className="text-sm">
+                            {isPending ? t('signingOut') : t('signOut')}
+                        </span>
+                    </Button>
                 </div>
             </div>
         </aside>

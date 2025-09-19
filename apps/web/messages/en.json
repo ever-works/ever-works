@@ -352,6 +352,128 @@
             "updated": "Updated {date}",
             "viewAction": "View →"
         },
+        "directoryList": {
+            "title": "Your Directories",
+            "createButton": "Create Directory"
+        },
+        "directoryCreation": {
+            "title": "Create New Directory",
+            "subtitle": "Choose how you'd like to create your directory",
+            "backToOptions": "Back to options",
+            "ai": {
+                "title": "Create with AI",
+                "subtitle": "Describe your directory idea in natural language and let AI handle the setup",
+                "getStarted": "Get started",
+                "formTitle": "Create Directory with AI",
+                "formSubtitle": "Describe your directory idea and let AI handle the setup and initial content generation",
+                "directoryNameLabel": "Directory Name",
+                "directoryNamePlaceholder": "e.g., Awesome AI Tools",
+                "directoryNameHelp": "AI will suggest a name if you leave this empty",
+                "promptLabel": "Describe Your Directory",
+                "githubRequired": "Please connect your GitHub account first.",
+                "promptPlaceholder": "Describe what kind of directory you want to create, what items it should contain, and any specific requirements...",
+                "inspirationText": "Need inspiration? Try one of these:",
+                "examplePrompts": {
+                    "0": {
+                        "name": "AI Developer Tools",
+                        "prompt": "Create a directory of the best AI tools for developers"
+                    },
+                    "1": {
+                        "name": "React Components Hub",
+                        "prompt": "Build a curated list of open-source React components"
+                    },
+                    "2": {
+                        "name": "Remote Team Tools",
+                        "prompt": "Generate a directory of productivity apps for remote teams"
+                    },
+                    "3": {
+                        "name": "Sustainable Fashion",
+                        "prompt": "Make a collection of sustainable fashion brands"
+                    }
+                },
+                "featuresTitle": "What AI will do for you:",
+                "features": {
+                    "0": "Generate an appropriate name and description",
+                    "1": "Create initial categories and structure",
+                    "2": "Find and add relevant items automatically",
+                    "3": "Set up GitHub repository with proper documentation"
+                },
+                "generateButton": "Generate with AI",
+                "generatingButton": "Generating Directory...",
+                "cancelButton": "Cancel",
+                "noteTitle": "Note:",
+                "noteText": "AI generation typically takes 2-5 minutes depending on the complexity of your request. You'll be notified when your directory is ready.",
+                "errors": {
+                    "promptRequired": "Please describe what kind of directory you want to create",
+                    "nameRequired": "Directory name is required",
+                    "slugRequired": "Directory slug is required",
+                    "descriptionRequired": "Directory description is required"
+                },
+                "success": {
+                    "started": "Directory creation started!",
+                    "generating": "AI is generating content. This may take a few minutes...",
+                    "created": "Directory created successfully!"
+                }
+            },
+            "manual": {
+                "title": "Create Manually",
+                "subtitle": "Configure your directory with full control over every setting and option",
+                "configureNow": "Configure now",
+                "formTitle": "Create Directory Manually",
+                "formSubtitle": "Configure your directory with full control over every setting",
+                "basicInfo": "Basic Information",
+                "nameLabel": "Directory Name *",
+                "namePlaceholder": "e.g., Awesome AI Tools",
+                "slugLabel": "Directory Slug *",
+                "slugPlaceholder": "awesome-ai-tools",
+                "githubRequired": "Please connect your GitHub account first.",
+                "slugHelp": "URL-friendly identifier (lowercase letters, numbers, and hyphens only)",
+                "descriptionLabel": "Description *",
+                "descriptionPlaceholder": "A curated list of the best AI tools and resources for developers",
+                "advancedSettings": "Advanced Settings",
+                "advancedSubtitle": "Organization, custom headers, and more",
+                "organizationLabel": "Create under organization",
+                "organizationHelp": "Create this directory under a GitHub organization instead of your personal account",
+                "organizationNameLabel": "Organization Name",
+                "organizationNamePlaceholder": "my-organization",
+                "headerLabel": "Custom README Header",
+                "headerPlaceholder": "Add custom content to the top of your README file",
+                "headerOverwrite": "Replace default header entirely",
+                "footerLabel": "Custom README Footer",
+                "footerPlaceholder": "Add custom content to the bottom of your README file",
+                "footerOverwrite": "Replace default footer entirely",
+                "createButton": "Create Directory",
+                "creatingButton": "Creating Directory...",
+                "cancelButton": "Cancel",
+                "nameRequired": "Directory name is required",
+                "slugRequired": "Directory slug is required",
+                "descriptionRequired": "Directory description is required",
+                "success": {
+                    "created": "Directory created successfully!"
+                }
+            }
+        },
+        "github": {
+            "connection": {
+                "alert": {
+                    "title": "GitHub not connected",
+                    "subtitle": "Connect your GitHub account to create and manage directories",
+                    "connectButton": "Connect GitHub",
+                    "connectingButton": "Connecting..."
+                },
+                "status": {
+                    "title": "GitHub Status",
+                    "connected": "Connected",
+                    "notConnected": "Not connected",
+                    "connectedDescription": "Your directories will be stored as GitHub repositories in your account.",
+                    "notConnectedDescription": "Connect your GitHub account to create and manage directories.",
+                    "connectedAccount": "Connected account:",
+                    "requiredNote": "Required to create directories",
+                    "connectButton": "Connect GitHub",
+                    "connectingButton": "Connecting..."
+                }
+            }
+        },
         "apiTokens": {
             "title": "API & Tokens",
             "subtitle": "Manage your API keys and third-party integrations",

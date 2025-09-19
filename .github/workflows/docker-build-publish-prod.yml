@@ -16,7 +16,7 @@ permissions:
 
 jobs:
   ever-works-api:
-    runs-on: buildjet-4vcpu-ubuntu-2204
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -101,7 +101,7 @@ jobs:
     #      docker push ${{ secrets.CW_DOCKER_REGISTRY }}/ever-co/ever-works-api:latest
 
   ever-works-web:
-    runs-on: buildjet-4vcpu-ubuntu-2204
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4

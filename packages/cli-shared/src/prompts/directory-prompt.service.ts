@@ -18,6 +18,10 @@ export interface MarkdownReadmeConfigDto {
 	overwriteDefaultFooter?: boolean;
 }
 
+export enum RepoProvider {
+	GITHUB = 'github'
+}
+
 export interface SlugConflictResolution {
 	action: 'use_suggested' | 'modify' | 'cancel';
 	finalSlug?: string;

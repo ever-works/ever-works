@@ -7,7 +7,8 @@ import { getApiService, CreateItemsGeneratorDto } from '../../services/api.servi
 import { DirectoryPromptService } from './directory-prompt.service';
 import { GeneratePromptService } from './generate-prompt.service';
 import { handleCliError } from '../../utils/error';
-import { GenerateStatusType } from '@packages/cli-shared';
+import { GenerateStatusType, RepoProvider } from '@packages/cli-shared';
+import { WEB_URL } from '../../utils/constants';
 
 export const generateCommand = new Command('generate')
     .description('Generate data and create a GitHub repository for a directory')
@@ -34,13 +35,36 @@ export const generateCommand = new Command('generate')
 
             if (directory.generateStatus?.status === GenerateStatusType.GENERATING) {
                 console.log(chalk.yellow('\n⚠ Generation already in progress.'));
+
                 if (directory.generateStatus.step) {
                     console.log(
                         chalk.gray('Current step:'),
                         chalk.white(directory.generateStatus.step),
                     );
                 }
-                console.log(chalk.gray('Please wait for the current generation to complete.'));
+
+                console.log(
+                    chalk.gray('To check the status, use ') +
+                        chalk.cyan('ever-works directory status') +
+                        chalk.gray(' command.'),
+                );
+                return;
+            }
+
+            // Check if github is connected
+            const githubConnected = await apiService.checkConnection(RepoProvider.GITHUB);
+            if (!githubConnected.connected) {
+                console.log(
+                    chalk.yellow(
+                        '\n⚠ GitHub is not connected. Please connect your GitHub account.',
+                    ),
+                );
+                // User should go to the web app to connect their GitHub account
+                console.log(
+                    chalk.gray('  • Go to ') +
+                        chalk.cyan(WEB_URL) +
+                        chalk.gray(' to connect your GitHub account'),
+                );
                 return;
             }
 
@@ -129,27 +153,20 @@ export const generateCommand = new Command('generate')
                     createItemsGeneratorDto,
                 );
 
-                spinner.stop();
-
                 if (response.status === 'error') {
-                    console.log(chalk.red('\n✗ Generation failed'));
+                    spinner.fail('\n✗ Generation failed');
+                    return;
                 } else {
-                    console.log(chalk.green('\n✓ Generation process started!'));
+                    spinner.succeed('\n✓ Generation process started!');
                 }
 
-                console.log(chalk.gray('Status:'), chalk.white(response.status));
-                if (response.message) {
-                    console.log(chalk.gray('Message:'), chalk.white(response.message));
-                }
-
-                if (response.status !== 'error') {
-                    console.log(chalk.cyan('\nNext Steps:'));
-                    console.log(chalk.gray('  • Monitor the generation progress in your logs'));
-                    console.log(chalk.gray('  • Check your GitHub repositories for updates'));
-                    console.log(
-                        chalk.gray('  • Use other directory commands once generation is complete'),
-                    );
-                }
+                // Tell user to use ever-works status to check status
+                console.log(chalk.cyan('\n--- Next Steps ---'));
+                console.log(
+                    chalk.gray('  • Use ') +
+                        chalk.cyan('ever-works directory status') +
+                        chalk.gray(' to check the status of your generation'),
+                );
             } catch (error) {
                 spinner.fail('Generation failed');
                 throw error;

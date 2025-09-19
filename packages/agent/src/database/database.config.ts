@@ -10,7 +10,7 @@ import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs';
 import { config } from '@src/config';
-import { getTlsOptions } from './utils';
+import { getTlsOptions, parseDatabaseUrl } from './utils';
 
 export type DatabaseType = 'better-sqlite3' | 'postgres' | 'mysql' | 'mariadb';
 
@@ -87,10 +87,13 @@ export const databaseConfig = registerAs('database', (): DatabaseConfig => {
 
     // Handle Database URL if provided
     if (config.database.getUrl()) {
+        const parsedUrl = parseDatabaseUrl(config.database.getUrl());
+
         return {
             ...baseConfig,
             type: dbType,
             url: config.database.getUrl(),
+            database: parsedUrl?.database,
         };
     }
 

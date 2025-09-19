@@ -1,6 +1,7 @@
 import 'server-only';
 import { serverFetch, serverMutation } from './server-api';
 import { RepoProvider } from './enums';
+import { ItemData } from './types';
 
 export interface MarkdownReadmeConfig {
     header?: string;
@@ -19,9 +20,32 @@ export interface CreateDirectoryDto {
     readmeConfig?: MarkdownReadmeConfig;
 }
 
+export interface UpdateDirectoryDto {
+    name?: string;
+    description?: string;
+    readmeConfig?: MarkdownReadmeConfig;
+}
+
 export interface DeleteDirectoryDto {
     confirmation: boolean;
 }
+
+export interface GenerateDirectoryDetailDto {
+    directory_name: string;
+    prompt: string;
+}
+
+export enum GenerateStatusType {
+    GENERATING = 'generating',
+    GENERATED = 'generated',
+    ERROR = 'error',
+}
+
+export type GenerateStatus = {
+    status: GenerateStatusType;
+    step?: string;
+    error?: string;
+};
 
 // Response Types
 export interface Directory {
@@ -33,6 +57,7 @@ export interface Directory {
     organization: boolean;
     repoProvider: RepoProvider;
     readmeConfig?: MarkdownReadmeConfig;
+    generateStatus?: GenerateStatus;
     createdAt: string;
     updatedAt: string;
 }
@@ -52,6 +77,14 @@ export interface DeleteDirectoryResponse {
 export type APIResponse<T> = {
     status: 'success' | 'error';
 } & T;
+
+export interface DirectoryDetails {
+    name: string;
+    slug: string;
+    description: string;
+    keywords: string[];
+    categories: string[];
+}
 
 export const directoryAPI = {
     // Get all directories with pagination and search
@@ -80,10 +113,35 @@ export const directoryAPI = {
         });
     },
 
+    // Update a directory by ID
+    update: async (id: string, data: UpdateDirectoryDto) => {
+        return serverMutation<Directory>({
+            endpoint: `/directories/${id}`,
+            data,
+            method: 'PUT',
+            wrapInData: false,
+        });
+    },
+
     // Delete a directory by ID
     delete: async (id: string, data: DeleteDirectoryDto) => {
         return serverMutation<DeleteDirectoryResponse>({
             endpoint: `/directories/${id}/delete`,
+            data,
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    // Get directory items
+    getItems: async (id: string) => {
+        return serverFetch<APIResponse<{ items: ItemData[] }>>(`/directories/${id}/items`);
+    },
+
+    // Generate directory details from name and prompt
+    generateDetails: async (data: GenerateDirectoryDetailDto) => {
+        return serverMutation<DirectoryDetails>({
+            endpoint: '/directories/generate-details',
             data,
             method: 'POST',
             wrapInData: false,
