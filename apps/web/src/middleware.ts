@@ -1,7 +1,7 @@
 import createMiddleware from 'next-intl/middleware';
 import { routing } from './i18n/routing';
 import { NextRequest, NextResponse } from 'next/server';
-import { DEFAULT_LOCALE, PUBLIC_ROUTES, ROUTES } from './lib/constants';
+import { DEFAULT_LOCALE, PUBLIC_ROUTES, REDIRECT_SEARCH_PARAM, ROUTES } from './lib/constants';
 import { AUTH_COOKIE_NAME } from './lib/auth/cookies';
 import { match } from 'path-to-regexp';
 import { getAuthFromCookie } from './lib/auth';
@@ -48,7 +48,7 @@ export default async function middleware(req: NextRequest) {
     if (!auth) {
         // Not authenticated - redirect to login
         const loginUrl = new URL(ROUTES.AUTH_LOGIN, req.url);
-        loginUrl.searchParams.set('from', pathname);
+        loginUrl.searchParams.set(REDIRECT_SEARCH_PARAM, pathname);
 
         // Remove invalid cookie if it exists
         if (req.cookies.has(AUTH_COOKIE_NAME)) {
