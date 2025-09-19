@@ -1,6 +1,7 @@
 import 'server-only';
 import { serverFetch, serverMutation } from './server-api';
 import { RepoProvider } from './enums';
+import { ItemData } from './types';
 
 export interface MarkdownReadmeConfig {
     header?: string;
@@ -27,6 +28,11 @@ export interface UpdateDirectoryDto {
 
 export interface DeleteDirectoryDto {
     confirmation: boolean;
+}
+
+export interface GenerateDirectoryDetailDto {
+    directory_name: string;
+    prompt: string;
 }
 
 enum GenerateStatusType {
@@ -72,6 +78,14 @@ export type APIResponse<T> = {
     status: 'success' | 'error';
 } & T;
 
+export interface DirectoryDetails {
+    name: string;
+    slug: string;
+    description: string;
+    keywords: string[];
+    categories: string[];
+}
+
 export const directoryAPI = {
     // Get all directories with pagination and search
     getAll: async (options?: { limit?: number; offset?: number; search?: string }) => {
@@ -113,6 +127,21 @@ export const directoryAPI = {
     delete: async (id: string, data: DeleteDirectoryDto) => {
         return serverMutation<DeleteDirectoryResponse>({
             endpoint: `/directories/${id}/delete`,
+            data,
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    // Get directory items
+    getItems: async (id: string) => {
+        return serverFetch<APIResponse<{ items: ItemData[] }>>(`/directories/${id}/items`);
+    },
+
+    // Generate directory details from name and prompt
+    generateDetails: async (data: GenerateDirectoryDetailDto) => {
+        return serverMutation<DirectoryDetails>({
+            endpoint: '/directories/generate-details',
             data,
             method: 'POST',
             wrapInData: false,

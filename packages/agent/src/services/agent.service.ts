@@ -202,6 +202,29 @@ export class AgentService {
         return this.directoryRepository.existsByUserAndSlug(user.id, slug);
     }
 
+    async directoryItems(directoryId: string, user: User) {
+        const directory = await this.validateDirectoryOwnership(directoryId, user.id);
+
+        try {
+            const items = await this.dataGenerator.getItems(directory, user);
+            return {
+                status: 'success',
+                items,
+            };
+        } catch (error) {
+            if (error instanceof HttpException) {
+                throw error;
+            }
+
+            this.logger.error('Failed to get directory items:', error);
+
+            throw new BadRequestException({
+                status: 'error',
+                message: this.clearMessageError(error),
+            });
+        }
+    }
+
     async generateItemsGenerator(
         directoryId: string,
         createItemsGeneratorDto: CreateItemsGeneratorDto,

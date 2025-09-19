@@ -24,10 +24,11 @@ import {
     SubmitItemResponseDto,
     UpdateItemsGeneratorDto,
 } from '@packages/agent/items-generator';
-import { AgentService } from '@packages/agent/services';
+import { AgentService, DirectoryDetailService } from '@packages/agent/services';
 import { UpdateWebsiteRepositoryResponseDto } from '@packages/agent/website-generator';
 import { AuthService, CurrentUser, JwtAuthGuard } from '../auth';
 import { AuthenticatedUser } from '@src/auth/types/jwt.types';
+import { GenerateDirectoryDetailDto } from './dto/generate-detail.dto';
 
 @Controller('api')
 @UseGuards(JwtAuthGuard)
@@ -35,6 +36,7 @@ export class DirectoriesController {
     constructor(
         private readonly agentService: AgentService,
         private readonly authService: AuthService,
+        private readonly directoryDetailService: DirectoryDetailService,
     ) {}
 
     @Get('directories')
@@ -86,6 +88,27 @@ export class DirectoriesController {
     ) {
         const user = await this.authService.getUser(auth.userId);
         return this.agentService.updateDirectory(id, updateDirectoryDto, user);
+    }
+
+    @Get('directories/:id/items')
+    @HttpCode(HttpStatus.OK)
+    async getDirectoryItems(@CurrentUser() auth: AuthenticatedUser, @Param('id') id: string) {
+        const user = await this.authService.getUser(auth.userId);
+        return this.agentService.directoryItems(id, user);
+    }
+
+    @Post('directories/generate-details')
+    @HttpCode(HttpStatus.OK)
+    async generateDirectoryDetails(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Body() generateDirectoryDetailDto: GenerateDirectoryDetailDto,
+    ) {
+        const user = await this.authService.getUser(auth.userId);
+        return this.directoryDetailService.generateDirectoryDetails(
+            generateDirectoryDetailDto.directory_name,
+            generateDirectoryDetailDto.prompt,
+            user,
+        );
     }
 
     @Post('directories/:id/generate')

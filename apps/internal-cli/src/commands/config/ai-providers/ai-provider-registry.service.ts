@@ -21,7 +21,7 @@ export class AiProviderRegistryService {
                 maxTokens: 8192,
             },
             requiresApiKey: true,
-            models: ['gpt-4.1', 'gpt-4.1-mini', 'gpt-4o', 'gpt-4o-mini'],
+            models: ['gpt-5', 'gpt-5-mini', 'gpt-4.1', 'gpt-4.1-mini', 'gpt-4o', 'gpt-4o-mini'],
             websiteUrl: 'https://openai.com',
             docsUrl: 'https://platform.openai.com/docs',
         });
@@ -75,6 +75,8 @@ export class AiProviderRegistryService {
             },
             requiresApiKey: true,
             models: [
+                'openai/gpt-5',
+                'openai/gpt-5-mini',
                 'openai/gpt-4.1',
                 'openai/gpt-4o',
                 'anthropic/claude-3-5-sonnet',

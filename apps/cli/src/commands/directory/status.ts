@@ -56,7 +56,7 @@ export const statusCommand = new Command('status')
                     spinner.text = `Generating...`;
                 }
 
-                setTimeout(watchStatus, 3000);
+                setTimeout(watchStatus, 5000);
             };
 
             watchStatus();

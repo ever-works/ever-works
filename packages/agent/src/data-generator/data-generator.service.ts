@@ -328,6 +328,14 @@ export class DataGeneratorService {
     }
 
     /**
+     * Get existing items from the repository
+     */
+
+    async getItems(directory: Directory, user: User) {
+        return (await this.getExistingData(directory, user)).existingItems;
+    }
+
+    /**
      * Callback for generation progress
      */
     private async onGenerationProgress(step: string, directory: Directory) {

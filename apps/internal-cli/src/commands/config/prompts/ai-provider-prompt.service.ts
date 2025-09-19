@@ -432,12 +432,12 @@ export class AiProviderPromptService extends BasePromptService {
      */
     private getCustomModelExamples(providerName: string): string {
         const examples: Record<string, string> = {
-            openai: 'Examples: gpt-4.1, gpt-4o, gpt-4o-mini, gpt-3.5-turbo-16k',
+            openai: 'Examples: gpt-5, gpt-5-mini, gpt-4.1, gpt-4o, gpt-4o-mini, gpt-3.5-turbo-16k',
             google: 'Examples: gemini-2.5-flash, gemini-1.5-pro, gemini-1.5-flash-8b',
             anthropic:
                 'Examples: claude-3-5-sonnet-20241022, claude-3-opus-20240229, claude-3-haiku-20240307',
             openrouter:
-                'Examples: openai/gpt-4.1, anthropic/claude-3-5-sonnet, google/gemini-2.5-flash',
+                'Examples: openai/gpt-5, openai/gpt-5-mini, openai/gpt-4.1, anthropic/claude-3-5-sonnet, google/gemini-2.5-flash',
             ollama: 'Examples: llama3.1, codellama, mistral, qwen2.5, deepseek-coder',
             mistral: 'Examples: mistral-large-latest, mistral-small-latest, codestral-latest',
             deepseek: 'Examples: deepseek-chat, deepseek-coder, deepseek-reasoner',
