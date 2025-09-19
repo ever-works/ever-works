@@ -25,7 +25,7 @@ jobs:
           token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
 
       - name: Save DigitalOcean kubeconfig with short-lived credentials
-        run: doctl kubernetes cluster kubeconfig save --expiry-seconds 600 k8s-ever-works
+        run: doctl kubernetes cluster kubeconfig save --expiry-seconds 600 k8s-gauzy
 
       - name: Write PostgreSQL Certificate file
         run: |
