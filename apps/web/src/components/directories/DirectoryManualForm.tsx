@@ -206,9 +206,15 @@ export function DirectoryManualForm({ user }: DirectoryManualFormProps) {
                         {/* Organization */}
                         <Checkbox
                             checked={formData.organization}
-                            onChange={(e) =>
-                                setFormData({ ...formData, organization: e.target.checked })
-                            }
+                            onChange={(e) => {
+                                const isOrganization = e.target.checked;
+                                setFormData({
+                                    ...formData,
+                                    organization: isOrganization,
+                                    // Clear owner if organization is unchecked
+                                    owner: isOrganization ? formData.owner : '',
+                                });
+                            }}
                             label={t('organizationLabel')}
                             description={t('organizationHelp')}
                             variant="form"
@@ -220,9 +226,16 @@ export function DirectoryManualForm({ user }: DirectoryManualFormProps) {
                                 label={t('organizationNameLabel')}
                                 type="text"
                                 value={formData.owner || ''}
-                                onChange={(e) =>
-                                    setFormData({ ...formData, owner: e.target.value })
-                                }
+                                onChange={(e) => {
+                                    const ownerValue = e.target.value;
+                                    setFormData({
+                                        ...formData,
+                                        owner: ownerValue,
+                                        // Automatically set organization to true if owner is provided
+                                        organization:
+                                            ownerValue.trim() !== '' ? true : formData.organization,
+                                    });
+                                }}
                                 placeholder={t('organizationNamePlaceholder')}
                                 variant="form"
                             />

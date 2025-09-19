@@ -413,7 +413,13 @@
                     "started": "Directory creation started!",
                     "generating": "AI is generating content. This may take a few minutes...",
                     "created": "Directory created successfully!"
-                }
+                },
+                "advancedSettings": "Advanced Settings",
+                "advancedSubtitle": "Configure organization and repository settings",
+                "organizationLabel": "Organization Repository",
+                "organizationHelp": "Create repositories under an organization instead of your personal account",
+                "organizationNameLabel": "Organization Name",
+                "organizationNamePlaceholder": "Enter organization name"
             },
             "manual": {
                 "title": "Create Manually",
@@ -685,7 +691,10 @@
             "invalidId": "Invalid directory ID",
             "deleteSuccess": "Directory deleted successfully",
             "deleteFailed": "Failed to delete directory",
-            "fetchFailed": "Failed to fetch directories"
+            "fetchFailed": "Failed to fetch directories",
+            "organization": {
+                "requiredWhenOwnerProvided": "Organization must be enabled when owner is provided"
+            }
         },
         "settings": {
             "profile": {

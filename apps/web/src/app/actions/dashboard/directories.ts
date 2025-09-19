@@ -1,7 +1,7 @@
 'use server';
 
 import { z } from 'zod';
-import { directoryAPI, CreateDirectoryDto } from '@/lib/api';
+import { directoryAPI, CreateDirectoryDto, itemsGeneratorAPI } from '@/lib/api';
 import { checkGitHubConnection } from './oauth';
 import { RepoProvider } from '@/lib/api/enums';
 import { getTranslations } from 'next-intl/server';
@@ -16,21 +16,35 @@ const getCreateDirectorySchema = async () => {
         overwriteDefaultFooter: z.boolean().optional(),
     });
 
-    const createDirectorySchema = z.object({
-        slug: z
-            .string()
-            .min(1, t('slug.required'))
-            .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, t('slug.format')),
-        name: z.string().min(1, t('name.required')).max(100, t('name.maxLength')),
-        description: z
-            .string()
-            .min(1, t('description.required'))
-            .max(500, t('description.maxLength')),
-        owner: z.string().optional(),
-        organization: z.boolean(),
-        repoProvider: z.nativeEnum(RepoProvider).optional().default(RepoProvider.GITHUB),
-        readmeConfig: readmeConfigSchema.optional(),
-    });
+    const createDirectorySchema = z
+        .object({
+            slug: z
+                .string()
+                .min(1, t('slug.required'))
+                .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, t('slug.format')),
+            name: z.string().min(1, t('name.required')).max(100, t('name.maxLength')),
+            description: z
+                .string()
+                .min(1, t('description.required'))
+                .max(500, t('description.maxLength')),
+            owner: z.string().optional(),
+            organization: z.boolean(),
+            repoProvider: z.nativeEnum(RepoProvider).optional().default(RepoProvider.GITHUB),
+            readmeConfig: readmeConfigSchema.optional(),
+        })
+        .refine(
+            (data) => {
+                // If owner is provided and not empty, organization should be true
+                if (data.owner && data.owner.trim() !== '' && !data.organization) {
+                    return false;
+                }
+                return true;
+            },
+            {
+                message: t('organization.requiredWhenOwnerProvided'),
+                path: ['organization'],
+            },
+        );
 
     return createDirectorySchema;
 };
@@ -77,7 +91,19 @@ export async function createDirectory(data: CreateDirectoryDto) {
     }
 }
 
-export async function createDirectoryWithAI(prompt: string, name: string) {
+interface AIDirectoryOptions {
+    name: string;
+    prompt: string;
+    organization?: boolean;
+    owner?: string;
+}
+
+export async function createDirectoryWithAI({
+    name,
+    prompt,
+    organization,
+    owner,
+}: AIDirectoryOptions) {
     const t = await getTranslations('actions.directories');
 
     // AI prompt validation schema
@@ -108,20 +134,20 @@ export async function createDirectoryWithAI(prompt: string, name: string) {
             };
         }
 
-        // TODO: Call AI generation endpoint when available
-        // For now, we'll create a basic directory based on the prompt
-        const slug = validation.data.name
-            ? validation.data.name
-                  .toLowerCase()
-                  .replace(/[^a-z0-9]+/g, '-')
-                  .replace(/^-+|-+$/g, '')
-            : 'ai-generated-' + Date.now();
+        const directoryDetails = await directoryAPI.generateDetails({
+            directory_name: validation.data.name,
+            prompt: validation.data.prompt,
+        });
+
+        // Determine organization settings
+        const isOrganization = Boolean(organization || (owner && owner.trim() !== ''));
 
         const directoryData: CreateDirectoryDto = {
-            name: validation.data.name || 'AI Generated Directory',
-            slug,
-            description: `Directory created from prompt: ${validation.data.prompt.substring(0, 200)}...`,
-            organization: false,
+            name: validation.data.name,
+            slug: directoryDetails.slug,
+            description: directoryDetails.description,
+            organization: isOrganization,
+            owner: isOrganization ? owner : undefined,
             repoProvider: RepoProvider.GITHUB,
         };
 
@@ -136,8 +162,11 @@ export async function createDirectoryWithAI(prompt: string, name: string) {
 
         const directory = await directoryAPI.create(directoryValidation.data);
 
-        // TODO: Trigger AI generation process
-        // This would typically be an async job that generates items
+        itemsGeneratorAPI.generate(directory.id, {
+            name: validation.data.name,
+            prompt: validation.data.prompt,
+            target_keywords: directoryDetails.keywords,
+        });
 
         return {
             success: true,

@@ -42,7 +42,10 @@ export function DashboardLayoutClient({ user, children }: DashboardLayoutClientP
                         isSidebarOpen={sidebarOpen}
                     />
 
-                    <main className="flex-1 overflow-y-auto bg-surface dark:bg-surface-dark min-h-0">
+                    <main
+                        className="flex-1 overflow-y-auto bg-surface dark:bg-surface-dark min-h-0"
+                        id="main-content"
+                    >
                         {children}
                     </main>
                 </div>
