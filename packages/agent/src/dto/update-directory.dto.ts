@@ -5,11 +5,11 @@ import { MarkdownReadmeConfigDto } from './create-directory.dto';
 export class UpdateDirectoryDto {
     @IsString()
     @IsOptional()
-    name: string;
+    name?: string;
 
     @IsString()
     @IsOptional()
-    description: string;
+    description?: string;
 
     @IsOptional()
     @ValidateNested()

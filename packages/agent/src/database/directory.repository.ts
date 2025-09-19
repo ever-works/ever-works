@@ -12,25 +12,37 @@ export class DirectoryRepository {
         private readonly repository: Repository<Directory>,
     ) {}
 
-    async create(directoryData: Partial<Directory>): Promise<Directory> {
-        const directory = this.repository.create(directoryData);
+    async create(dto: Partial<Directory>, user: User): Promise<Directory> {
+        let exists: Directory | null = null;
+        if (dto.owner) {
+            exists = await this.findByOwnerAndSlug(dto.owner, dto.slug);
+            exists ??= await this.findByUserAndSlug(user.id, dto.slug);
+        } else {
+            exists = await this.findByUserAndSlug(user.id, dto.slug);
+        }
+
+        if (exists) {
+            throw new Error('Directory already exists');
+        }
+
+        const directory = this.repository.create(dto);
         return await this.repository.save(directory);
     }
 
-    async createOrUpdate(directoryData: Partial<Directory>, user: User): Promise<Directory> {
+    async createOrUpdate(dto: Partial<Directory>, user: User): Promise<Directory> {
         let exists: Directory | null = null;
-        if (directoryData.owner) {
-            exists = await this.findByOwnerAndSlug(directoryData.owner, directoryData.slug);
-            exists ??= await this.findByUserAndSlug(user.id, directoryData.slug);
+        if (dto.owner) {
+            exists = await this.findByOwnerAndSlug(dto.owner, dto.slug);
+            exists ??= await this.findByUserAndSlug(user.id, dto.slug);
         } else {
-            exists = await this.findByUserAndSlug(user.id, directoryData.slug);
+            exists = await this.findByUserAndSlug(user.id, dto.slug);
         }
 
         let directory: Directory;
         if (exists && exists.userId === user.id) {
-            directory = await this.update(exists.id, directoryData);
+            directory = await this.update(exists.id, dto);
         } else {
-            directory = this.repository.create(directoryData);
+            directory = this.repository.create(dto);
         }
 
         directory = await this.repository.save(directory);

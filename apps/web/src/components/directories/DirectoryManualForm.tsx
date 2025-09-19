@@ -70,7 +70,7 @@ export function DirectoryManualForm({ user }: DirectoryManualFormProps) {
                     router.push(ROUTES.DASHBOARD_DIRECTORIES);
                 }
             } else if (result.requiresGitHub) {
-                toast.error(result.error || 'Please connect your GitHub account first');
+                toast.error(result.error || t('githubRequired'));
                 router.push(ROUTES.DASHBOARD_DIRECTORIES_NEW);
             } else {
                 toast.error(result.error || 'Failed to create directory');
@@ -265,7 +265,7 @@ export function DirectoryManualForm({ user }: DirectoryManualFormProps) {
                         {/* README Footer */}
                         <div className="space-y-3">
                             <Textarea
-                                label="Custom README Footer"
+                                label={t('footerLabel')}
                                 value={formData.readmeConfig?.footer || ''}
                                 onChange={(e) =>
                                     setFormData({
@@ -276,7 +276,7 @@ export function DirectoryManualForm({ user }: DirectoryManualFormProps) {
                                         },
                                     })
                                 }
-                                placeholder="Add custom content to the bottom of your README file"
+                                placeholder={t('footerPlaceholder')}
                                 rows={3}
                                 variant="form"
                             />
@@ -291,7 +291,7 @@ export function DirectoryManualForm({ user }: DirectoryManualFormProps) {
                                         },
                                     })
                                 }
-                                label="Replace default footer entirely"
+                                label={t('footerOverwrite')}
                                 variant="form"
                             />
                         </div>

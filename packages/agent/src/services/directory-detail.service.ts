@@ -71,9 +71,8 @@ export class DirectoryDetailService {
 
         try {
             // Generate AI-extracted details
-            const prompt_template =
-                HumanMessagePromptTemplate.fromTemplate(DIRECTORY_DETAIL_PROMPT);
-            const result = await prompt_template
+            const promptTemplate = HumanMessagePromptTemplate.fromTemplate(DIRECTORY_DETAIL_PROMPT);
+            const result = await promptTemplate
                 .pipe(this.llm.withStructuredOutput(directoryDetailSchema))
                 .invoke({
                     name,

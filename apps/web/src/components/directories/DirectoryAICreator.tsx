@@ -24,6 +24,11 @@ export function DirectoryAICreator({ user }: DirectoryAICreatorProps) {
     const t = useTranslations('dashboard.directoryCreation.ai');
 
     const handleGenerate = async () => {
+        if (!directoryName.trim()) {
+            toast.error(t('errors.nameRequired'));
+            return;
+        }
+
         if (!prompt.trim()) {
             toast.error(t('errors.promptRequired'));
             return;
@@ -44,7 +49,7 @@ export function DirectoryAICreator({ user }: DirectoryAICreatorProps) {
                     router.push(ROUTES.DASHBOARD_DIRECTORIES);
                 }
             } else if (result.requiresGitHub) {
-                toast.error(result.error || 'Please connect your GitHub account first');
+                toast.error(result.error || t('githubRequired'));
                 router.push(ROUTES.DASHBOARD_DIRECTORIES_NEW);
             } else {
                 toast.error(result.error || 'Failed to create directory');

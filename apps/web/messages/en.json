@@ -370,6 +370,7 @@
                 "directoryNamePlaceholder": "e.g., Awesome AI Tools",
                 "directoryNameHelp": "AI will suggest a name if you leave this empty",
                 "promptLabel": "Describe Your Directory",
+                "githubRequired": "Please connect your GitHub account first.",
                 "promptPlaceholder": "Describe what kind of directory you want to create, what items it should contain, and any specific requirements...",
                 "inspirationText": "Need inspiration? Try one of these:",
                 "examplePrompts": {
@@ -425,6 +426,7 @@
                 "namePlaceholder": "e.g., Awesome AI Tools",
                 "slugLabel": "Directory Slug *",
                 "slugPlaceholder": "awesome-ai-tools",
+                "githubRequired": "Please connect your GitHub account first.",
                 "slugHelp": "URL-friendly identifier (lowercase letters, numbers, and hyphens only)",
                 "descriptionLabel": "Description *",
                 "descriptionPlaceholder": "A curated list of the best AI tools and resources for developers",

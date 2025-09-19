@@ -157,10 +157,10 @@ export const generateCommand = new Command('generate')
                     spinner.fail('\n✗ Generation failed');
                     return;
                 } else {
-                    console.log(chalk.green('\n✓ Generation process started!'));
+                    spinner.succeed('\n✓ Generation process started!');
                 }
 
-                // Tell user to to use ever-works status to check status
+                // Tell user to use ever-works status to check status
                 console.log(chalk.cyan('\n--- Next Steps ---'));
                 console.log(
                     chalk.gray('  • Use ') +

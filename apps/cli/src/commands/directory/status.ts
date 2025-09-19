@@ -11,7 +11,7 @@ export const statusCommand = new Command('status')
     .description('Check the status of a directory')
     .action(async () => {
         try {
-            console.log(chalk.cyan.bold('\nUpdate Directory\n'));
+            console.log(chalk.cyan.bold('\nDirectory Status\n'));
 
             // Ensure user is authenticated
             await requireAuth();

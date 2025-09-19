@@ -35,13 +35,13 @@ export interface GenerateDirectoryDetailDto {
     prompt: string;
 }
 
-enum GenerateStatusType {
+export enum GenerateStatusType {
     GENERATING = 'generating',
     GENERATED = 'generated',
     ERROR = 'error',
 }
 
-type GenerateStatus = {
+export type GenerateStatus = {
     status: GenerateStatusType;
     step?: string;
     error?: string;

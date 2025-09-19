@@ -149,20 +149,26 @@ export class AgentService {
             organization: organization,
         };
 
-        if (await this.directoryExists(slug, user)) {
+        try {
+            const dir = await this.directoryRepository.create(directoryData, user);
+            dir.owner = dir.getRepoOwner();
+
+            return {
+                status: 'success',
+                directory: dir,
+            };
+        } catch (error) {
+            if (error instanceof HttpException) {
+                throw error;
+            }
+
+            this.logger.error('Failed to create directory:', error);
+
             throw new BadRequestException({
                 status: 'error',
-                message: 'Directory with this slug already exists',
+                message: this.clearMessageError(error),
             });
         }
-
-        const dir = await this.directoryRepository.create(directoryData);
-        dir.owner = dir.getRepoOwner();
-
-        return {
-            status: 'success',
-            directory: dir,
-        };
     }
 
     async updateDirectory(id: string, updateDto: UpdateDirectoryDto, user: User) {
