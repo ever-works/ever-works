@@ -25,8 +25,10 @@ export class DirectoryRepository {
             throw new Error('Directory already exists');
         }
 
-        const directory = this.repository.create(dto);
-        return await this.repository.save(directory);
+        let directory = this.repository.create(dto);
+        directory = await this.repository.save(directory);
+
+        return this.findById(directory.id);
     }
 
     async createOrUpdate(dto: Partial<Directory>, user: User): Promise<Directory> {

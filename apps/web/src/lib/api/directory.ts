@@ -105,7 +105,7 @@ export const directoryAPI = {
 
     // Create a new directory
     create: async (data: CreateDirectoryDto) => {
-        return serverMutation<Directory>({
+        return serverMutation<APIResponse<{ directory: Directory }>>({
             endpoint: '/directories',
             data,
             method: 'POST',
@@ -115,7 +115,7 @@ export const directoryAPI = {
 
     // Update a directory by ID
     update: async (id: string, data: UpdateDirectoryDto) => {
-        return serverMutation<Directory>({
+        return serverMutation<APIResponse<{ directory: Directory }>>({
             endpoint: `/directories/${id}`,
             data,
             method: 'PUT',

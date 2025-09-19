@@ -160,9 +160,9 @@ export async function createDirectoryWithAI({
             };
         }
 
-        const directory = await directoryAPI.create(directoryValidation.data);
+        const { directory } = await directoryAPI.create(directoryValidation.data);
 
-        itemsGeneratorAPI.generate(directory.id, {
+        await itemsGeneratorAPI.generate(directory.id, {
             name: validation.data.name,
             prompt: validation.data.prompt,
             target_keywords: directoryDetails.keywords,
