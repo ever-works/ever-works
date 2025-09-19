@@ -33,6 +33,9 @@ export class OAuthToken {
     username: string;
 
     @Column({ nullable: true })
+    email: string;
+
+    @Column({ nullable: true })
     tokenType: string; // Usually 'Bearer'
 
     @Column({ nullable: true })

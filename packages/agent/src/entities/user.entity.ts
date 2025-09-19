@@ -10,6 +10,7 @@ import { OAuthToken } from './oauth-token.entity';
 import { ClassToObject } from './types';
 import { config } from '@src/config';
 import { Directory } from './directory.entity';
+import { RepoProvider } from '@src/dto';
 
 @Entity({ name: 'users' })
 export class User {
@@ -78,7 +79,7 @@ export class User {
 
     local: boolean = false;
 
-    getGitToken(): string | null {
+    getGitToken(provider: RepoProvider = RepoProvider.GITHUB): string | null {
         if (this.local) {
             return config.github.getApiKey() || null;
         }
@@ -89,20 +90,24 @@ export class User {
         }
 
         // Find GitHub token
-        const githubToken = this.oauthTokens.find((token) => token.provider === 'github');
-        if (!githubToken) {
+        const providerToken = this.oauthTokens.find((token) => token.provider === provider);
+        if (!providerToken) {
             return null;
         }
 
         // Check if token is expired
-        if (githubToken.expiresAt && new Date() > githubToken.expiresAt) {
+        if (providerToken.expiresAt && new Date() > providerToken.expiresAt) {
             return null;
         }
 
-        return githubToken.accessToken;
+        return providerToken.accessToken;
     }
 
-    asCommitter() {
-        return { name: this.username, email: this.email };
+    asCommitter(provider: RepoProvider = RepoProvider.GITHUB) {
+        const providerToken = (this.oauthTokens || []).find((token) => token.provider === provider);
+        const username = providerToken?.metadata?.login || providerToken?.username || this.username;
+        const email = providerToken?.email || this.email;
+
+        return { name: username, email };
     }
 }

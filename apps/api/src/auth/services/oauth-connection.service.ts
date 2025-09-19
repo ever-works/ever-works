@@ -195,6 +195,7 @@ export class OAuthConnectionService {
             provider: AuthProviders.GITHUB,
             accessToken: access_token,
             tokenType: token_type,
+            email: userResponse.data.email || null,
             scope,
             metadata: {
                 login: userResponse.data.login,
@@ -248,6 +249,7 @@ export class OAuthConnectionService {
             refreshToken: refresh_token,
             tokenType: token_type,
             scope,
+            email: userResponse.data.email || null,
             expiresAt,
             metadata: {
                 sub: userResponse.data.id,
