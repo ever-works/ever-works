@@ -5,6 +5,8 @@ RUN npm install -g npm@latest && \
     npm install -g pnpm@10 && \
     npm install -g turbo@latest
 
+ENV CI=true
+
 #--
 FROM base AS builder
 
@@ -24,6 +26,7 @@ WORKDIR /app
 
 ENV NODE_ENV=build
 ENV NEXT_BUILD_OUTPUT=standalone
+ENV CI=true
 
 # Install python3
 RUN apk add --no-cache python3 pkgconfig build-base
@@ -42,7 +45,7 @@ COPY --from=builder /app/out/full/ .
 RUN pnpm build --filter=ever-works-web...
 # Prune dev deps
 RUN sed -i '/"prepare.*husky/d' package.json
-RUN cd apps/web && (echo "Y" | pnpm prune --prod)
+RUN cd apps/web && pnpm prune --prod
 
 #--
 # Build
