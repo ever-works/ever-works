@@ -75,7 +75,7 @@ export async function createDirectory(data: CreateDirectoryDto) {
         }
 
         // Create the directory with validated data
-        const directory = await directoryAPI.create(validation.data);
+        const { directory } = await directoryAPI.create(validation.data);
 
         return {
             success: true,
