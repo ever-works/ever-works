@@ -28,6 +28,9 @@ export const config = {
         getPort() {
             return process.env.DATABASE_PORT;
         },
+        autoMigrate() {
+            return process.env.DATABASE_AUTOMIGRATE !== 'false';
+        },
         loggingEnabled() {
             return process.env.DATABASE_LOGGING === 'true';
         },

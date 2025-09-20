@@ -12,7 +12,13 @@ import * as fs from 'fs';
 import { config } from '@src/config';
 import { getTlsOptions, parseDatabaseUrl } from './utils';
 
-export type DatabaseType = 'better-sqlite3' | 'postgres' | 'mysql' | 'mariadb';
+export type DatabaseType =
+    | 'better-sqlite3'
+    | 'sqlite'
+    | 'sqlite3'
+    | 'postgres'
+    | 'mysql'
+    | 'mariadb';
 
 export interface DatabaseConfig extends Omit<TypeOrmModuleOptions, 'type'> {
     type: DatabaseType;
@@ -39,7 +45,7 @@ export const databaseConfig = registerAs('database', (): DatabaseConfig => {
 
     const baseConfig: any = {
         entities: ENTITIES,
-        synchronize: environment !== 'production',
+        synchronize: config.database.autoMigrate(),
         logging: config.database.loggingEnabled(),
     };
 
@@ -47,7 +53,6 @@ export const databaseConfig = registerAs('database', (): DatabaseConfig => {
         baseConfig.ssl = getTlsOptions(true, config.database.databaseCaCert());
     }
 
-    // @ts-ignore
     if (dbType === 'sqlite' || dbType === 'sqlite3') {
         dbType = 'better-sqlite3';
     }
