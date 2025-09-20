@@ -43,7 +43,7 @@ spec:
     spec:
       containers:
         - name: ever-works-api
-          image: ghcr.io/ever-co/ever-works-api:latest
+          image: registry.digitalocean.com/ever/ever-works-api:latest
           imagePullPolicy: Always
           env:
             - name: WEB_APP_URL
@@ -116,6 +116,8 @@ spec:
             # Database
             - name: DATABASE_TYPE
               value: $DATABASE_TYPE
+            - name: DATABASE_URL
+              value: $DATABASE_URL
             - name: DATABASE_HOST
               value: $DATABASE_HOST
             - name: DATABASE_PORT
@@ -126,6 +128,10 @@ spec:
               value: $DATABASE_PASSWORD
             - name: DATABASE_NAME
               value: $DATABASE_NAME
+            - name: DATABASE_SSL_MODE
+              value: $DATABASE_SSL_MODE
+            - name: DATABASE_CA_CERT
+              value: $DATABASE_CA_CERT
 
             # Mail
             - name: SMTP_HOST
@@ -171,7 +177,7 @@ spec:
     spec:
       containers:
         - name: ever-works-web
-          image: ghcr.io/ever-co/ever-works-web:latest
+          image: registry.digitalocean.com/ever/ever-works-web:latest
           imagePullPolicy: Always
           env:
             - name: AUTH_SECRET
