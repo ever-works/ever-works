@@ -8,6 +8,7 @@ import { DirectoriesModule } from './directories/directories.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { MailModule } from './mail/mail.module';
 import { LoggingInterceptor } from './logging.interceptor';
+import { APIController } from './api.controller';
 
 @Module({
     imports: [
@@ -31,5 +32,6 @@ import { LoggingInterceptor } from './logging.interceptor';
             useClass: LoggingInterceptor,
         },
     ],
+    controllers: [APIController],
 })
 export class ApiModule {}

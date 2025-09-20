@@ -39,7 +39,7 @@ export const databaseConfig = registerAs('database', (): DatabaseConfig => {
 
     const baseConfig: any = {
         entities: ENTITIES,
-        synchronize: environment !== 'production',
+        synchronize: config.database.autoMigrate(),
         logging: config.database.loggingEnabled(),
     };
 
