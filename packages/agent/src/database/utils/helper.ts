@@ -21,7 +21,7 @@ export const getTlsOptions = (
         const sslCert = buff.toString('ascii');
 
         return {
-            rejectUnauthorized: false,
+            rejectUnauthorized: true,
             ca: sslCert,
         };
     } catch (error) {
