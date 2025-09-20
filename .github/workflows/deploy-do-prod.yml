@@ -48,61 +48,61 @@ jobs:
           envsubst < $GITHUB_WORKSPACE/.deploy/k8s/k8s-manifest.prod.yaml | kubectl --context do-sfo2-k8s-gauzy apply -f -
         env:
           # WEB ENV
-          AUTH_SECRET: ${{ secrets.AUTH_SECRET || '' }}
+          AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
 
           # API ENV
           WEB_APP_URL: https://app.ever.works
           ALLOWED_ORIGINS: https://app.ever.works,https://api.ever.works
-          JWT_SECRET: ${{ secrets.JWT_SECRET || '' }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
           # Github
-          GH_APIKEY: ${{ secrets.GH_APIKEY || '' }}
-          GH_OWNER: ${{ secrets.GH_OWNER || '' }}
+          GH_APIKEY: ${{ secrets.GH_APIKEY }}
+          GH_OWNER: ${{ secrets.GH_OWNER }}
           # Git
-          GIT_NAME: ${{ secrets.GIT_NAME || '' }}
-          GIT_EMAIL: ${{ secrets.GIT_EMAIL || '' }}
+          GIT_NAME: ${{ secrets.GIT_NAME }}
+          GIT_EMAIL: ${{ secrets.GIT_EMAIL }}
           # Vercel
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN || '' }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           # GitHub Auth
-          GH_CLIENT_ID: ${{ secrets.GH_CLIENT_ID || '' }}
-          GH_CLIENT_SECRET: ${{ secrets.GH_CLIENT_SECRET || '' }}
+          GH_CLIENT_ID: ${{ secrets.GH_CLIENT_ID }}
+          GH_CLIENT_SECRET: ${{ secrets.GH_CLIENT_SECRET }}
           GH_CALLBACK_URL: https://app.ever.works/api/auth/github/callback
           # Google Auth
-          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID || '' }}
-          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET || '' }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
           GOOGLE_CALLBACK_URL: https://app.ever.works/api/auth/google/callback
           # AI Configuration
-          AI_DEFAULT_PROVIDER: ${{ secrets.AI_DEFAULT_PROVIDER || '' }}
+          AI_DEFAULT_PROVIDER: ${{ secrets.AI_DEFAULT_PROVIDER }}
           # OpenAI
-          OPENAI_MODEL: ${{ secrets.OPENAI_MODEL || '' }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY || '' }}
+          OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           # OpenRouter
-          OPENROUTER_MODEL: ${{ secrets.OPENROUTER_MODEL || '' }}
-          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY || '' }}
+          OPENROUTER_MODEL: ${{ secrets.OPENROUTER_MODEL }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           # Tavily
-          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY || '' }}
+          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
           # SEARCH SERVICES
-          EXTRACT_CONTENT_SERVICE: ${{ secrets.EXTRACT_CONTENT_SERVICE || '' }}
-          WEB_SEARCH_SERVICE: ${{ secrets.WEB_SEARCH_SERVICE || '' }}
+          EXTRACT_CONTENT_SERVICE: ${{ secrets.EXTRACT_CONTENT_SERVICE }}
+          WEB_SEARCH_SERVICE: ${{ secrets.WEB_SEARCH_SERVICE }}
           # Database
-          DATABASE_TYPE: ${{ secrets.DATABASE_TYPE || '' }}
-          DATABASE_URL: ${{ secrets.DATABASE_URL || '' }}
-          DATABASE_HOST: ${{ secrets.DATABASE_HOST || '' }}
-          DATABASE_PORT: ${{ secrets.DATABASE_PORT || '' }}
-          DATABASE_USERNAME: ${{ secrets.DATABASE_USERNAME || '' }}
-          DATABASE_PASSWORD: ${{ secrets.DATABASE_PASSWORD || '' }}
-          DATABASE_NAME: ${{ secrets.DATABASE_NAME || '' }}
+          DATABASE_TYPE: ${{ secrets.DATABASE_TYPE }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_HOST: ${{ secrets.DATABASE_HOST }}
+          DATABASE_PORT: ${{ secrets.DATABASE_PORT }}
+          DATABASE_USERNAME: ${{ secrets.DATABASE_USERNAME }}
+          DATABASE_PASSWORD: ${{ secrets.DATABASE_PASSWORD }}
+          DATABASE_NAME: ${{ secrets.DATABASE_NAME }}
           # Enable SSL/TLS for database connections (true/false)
-          DATABASE_SSL_MODE: ${{ secrets.DATABASE_SSL_MODE || '' }}
-          DATABASE_CA_CERT: ${{ secrets.DATABASE_CA_CERT || '' }}
+          DATABASE_SSL_MODE: ${{ secrets.DATABASE_SSL_MODE }}
+          DATABASE_CA_CERT: ${{ secrets.DATABASE_CA_CERT }}
           # Mail
-          MAILER_PROVIDER: ${{ secrets.MAILER_PROVIDER || '' }}
-          SMTP_HOST: ${{ secrets.SMTP_HOST || '' }}
-          SMTP_PORT: ${{ secrets.SMTP_PORT || '' }}
-          SMTP_SECURE: ${{ secrets.SMTP_SECURE || '' }}
-          SMTP_IGNORE_TLS: ${{ secrets.SMTP_IGNORE_TLS || '' }}
-          SMTP_USER: ${{ secrets.SMTP_USER || '' }}
-          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD || '' }}
-          MAIL_FROM: ${{ secrets.MAIL_FROM || '' }}
+          MAILER_PROVIDER: ${{ secrets.MAILER_PROVIDER }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_SECURE: ${{ secrets.SMTP_SECURE }}
+          SMTP_IGNORE_TLS: ${{ secrets.SMTP_IGNORE_TLS }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          MAIL_FROM: ${{ secrets.MAIL_FROM }}
 
       # we need this step because for now we just use :latest tag
       # note: for production we will use different strategy later
