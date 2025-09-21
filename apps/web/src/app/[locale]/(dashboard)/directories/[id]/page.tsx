@@ -1,19 +1,25 @@
 import { Directory, directoryAPI } from '@/lib/api';
-import { notFound } from 'next/navigation';
+import { DirectoryStatusCard } from '@/components/directories/detail/DirectoryStatusCard';
+import { DirectoryInfo } from '@/components/directories/detail/overview/DirectoryInfo';
+import { DirectoryStats } from '@/components/directories/detail/overview/DirectoryStats';
+import { DirectoryActivity } from '@/components/directories/detail/overview/DirectoryActivity';
 
 type Params = { params: Promise<{ id: string }> };
 
-export default async function DirectoryPage({ params }: Params) {
+export default async function DirectoryOverviewPage({ params }: Params) {
     const { id } = await params;
-    let directory: Directory;
 
-    try {
-        const res = await directoryAPI.get(id);
-        directory = res.directory;
-    } catch (error) {
-        console.error('Failed to fetch directory:', error);
-        notFound();
-    }
+    const res = await directoryAPI.get(id);
+    const directory = res.directory;
 
-    return <div>Directory Page {directory.name}</div>;
+    return (
+        <div className="space-y-6">
+            <DirectoryStatusCard directory={directory} />
+            <DirectoryStats directory={directory} />
+            <div className="grid lg:grid-cols-2 gap-6">
+                <DirectoryInfo directory={directory} />
+                <DirectoryActivity directoryId={directory.id} />
+            </div>
+        </div>
+    );
 }

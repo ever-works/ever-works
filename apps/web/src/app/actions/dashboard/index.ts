@@ -2,3 +2,4 @@
 export * from './oauth';
 export * from './directories';
 export * from './navigation';
+export * from './generator';

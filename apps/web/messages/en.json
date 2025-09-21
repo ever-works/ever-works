@@ -356,6 +356,161 @@
             "title": "Your Directories",
             "createButton": "Create Directory"
         },
+        "directoryDetail": {
+            "status": {
+                "notStarted": "Not Started",
+                "generating": "Generating",
+                "generated": "Generated",
+                "error": "Error"
+            },
+            "tabs": {
+                "overview": "Overview",
+                "items": "Items",
+                "generator": "Generator",
+                "settings": "Settings"
+            },
+            "statusCard": {
+                "notStarted": {
+                    "title": "Generation Not Started",
+                    "description": "Start generating items for your directory to populate it with content.",
+                    "action": "Start Generation"
+                },
+                "generating": {
+                    "title": "Generation in Progress",
+                    "description": "Processing your request...",
+                    "processing": "Processing..."
+                },
+                "generated": {
+                    "title": "Generation Complete",
+                    "description": "Your directory has been successfully populated with items.",
+                    "viewItems": "View Items",
+                    "regenerate": "Regenerate"
+                },
+                "error": {
+                    "title": "Generation Failed",
+                    "description": "An error occurred during generation.",
+                    "retry": "Retry Generation"
+                }
+            },
+            "stats": {
+                "totalItems": "Total Items",
+                "categories": "Categories",
+                "generationStatus": "Generation Status",
+                "daysActive": "Days Active"
+            },
+            "info": {
+                "title": "Directory Information",
+                "slug": "Slug",
+                "repoProvider": "Repository Provider",
+                "organization": "Organization",
+                "created": "Created",
+                "lastUpdated": "Last Updated",
+                "readmeHeader": "README Header",
+                "readmeFooter": "README Footer",
+                "custom": "Custom",
+                "customOverwrite": "Custom (Overwrite)",
+                "yes": "Yes",
+                "no": "No"
+            },
+            "activity": {
+                "title": "Recent Activity",
+                "noActivity": "No activity yet",
+                "created": "Directory Created",
+                "directoryCreated": "Directory was successfully created",
+                "justNow": "Just now"
+            },
+            "items": {
+                "noItemsTitle": "No Items Yet",
+                "noItemsDescription": "Your directory doesn't have any items yet. Generate items to populate your directory with content.",
+                "generateItems": "Generate Items",
+                "searchPlaceholder": "Search items...",
+                "allCategories": "All Categories",
+                "showing": "Showing {current} of {total} items",
+                "noMatch": "No items match your search criteria",
+                "source": "Source"
+            },
+            "generator": {
+                "regenerationWarning": "Regeneration Warning",
+                "regenerationWarningDescription": "This directory has already been generated. Starting a new generation will replace existing items.",
+                "requiredInfo": "Required Information",
+                "directoryName": "Directory Name",
+                "generationPrompt": "Generation Prompt",
+                "promptPlaceholder": "Describe what items should be generated for this directory...",
+                "promptHelperText": "Be specific about the type of content you want to generate",
+                "repositoryDescription": "Repository Description",
+                "repositoryPlaceholder": "Brief description of the repository (optional)",
+                "startGeneration": "Start Generation",
+                "regenerateItems": "Regenerate Items",
+                "cancel": "Cancel",
+                "companyInformation": "Company Information",
+                "companyInfoDescription": "Optional company details for branded content",
+                "companyName": "Company Name",
+                "companyNamePlaceholder": "Enter company name",
+                "companyWebsite": "Company Website",
+                "companyWebsitePlaceholder": "https://example.com",
+                "categoriesKeywords": "Categories & Keywords",
+                "categoriesDescription": "Define categories and keywords for content organization",
+                "initialCategories": "Initial Categories",
+                "priorityCategories": "Priority Categories",
+                "targetKeywords": "Target Keywords",
+                "addCategoryPlaceholder": "Add category",
+                "addPriorityCategoryPlaceholder": "Add priority category",
+                "addKeywordPlaceholder": "Add keyword",
+                "add": "Add",
+                "sourceUrls": "Source URLs",
+                "sourceUrlsDescription": "Add specific URLs to extract content from",
+                "sourceUrlPlaceholder": "https://example.com/page",
+                "addUrl": "Add URL",
+                "noSourceUrlsMessage": "No source URLs added. The generator will use search to find content.",
+                "advancedConfig": "Advanced Configuration",
+                "advancedConfigDescription": "Fine-tune generation parameters and behavior",
+                "generationMethod": "Generation Method",
+                "methodCreateUpdate": "Create or Update",
+                "methodRecreate": "Recreate (Replace All)",
+                "updateWithPullRequest": "Update with Pull Request",
+                "updateWithPullRequestDescription": "Create a pull request instead of direct commits",
+                "enableBadgeEvaluation": "Enable Badge Evaluation",
+                "enableBadgeEvaluationDescription": "Evaluate and add quality badges to items",
+                "websiteRepositoryCreationMethod": "Website Repository Creation Method",
+                "methodDuplicate": "Duplicate",
+                "methodFork": "Fork",
+                "methodCreateFromTemplate": "Create from Template",
+                "aiProcessingConfiguration": "AI Processing Configuration",
+                "maxSearchQueries": "Max Search Queries",
+                "resultsPerQuery": "Results per Query",
+                "maxPagesToProcess": "Max Pages to Process",
+                "relevanceThreshold": "Relevance Threshold",
+                "aiFirstGeneration": "AI-First Generation",
+                "aiFirstGenerationDescription": "Prioritize AI-generated content",
+                "contentFiltering": "Content Filtering",
+                "contentFilteringDescription": "Enable content quality filtering"
+            },
+            "progress": {
+                "title": "Generation in Progress",
+                "processingRequest": "Processing your request...",
+                "steps": {
+                    "init": "Initializing",
+                    "fetch": "Fetching Data",
+                    "process": "Processing Items",
+                    "generate": "Generating Content",
+                    "save": "Saving Results",
+                    "complete": "Completing"
+                },
+                "progress": "Progress",
+                "closeNote": "This may take a few minutes. You can close this page and come back later."
+            },
+            "settings": {
+                "generalTitle": "General Settings",
+                "readmeTitle": "README Configuration",
+                "dangerTitle": "Danger Zone",
+                "dangerDescription": "Once you delete a directory, there is no going back. Please be certain.",
+                "deleteConfirm": "Are you absolutely sure?",
+                "deleteButton": "Delete Directory",
+                "yesDelete": "Yes, Delete",
+                "saveChanges": "Save Changes",
+                "updateReadme": "Update README"
+            }
+        },
         "directoryCreation": {
             "title": "Create New Directory",
             "subtitle": "Choose how you'd like to create your directory",
@@ -695,6 +850,14 @@
             "organization": {
                 "requiredWhenOwnerProvided": "Organization must be enabled when owner is provided"
             }
+        },
+        "generator": {
+            "promptRequired": "Prompt is required",
+            "nameRequired": "Name is required",
+            "generationStartedSuccessfully": "Generation started successfully",
+            "failedToGenerateItems": "Failed to generate items",
+            "markdownRegeneratedSuccessfully": "Markdown regenerated successfully",
+            "failedToRegenerateMarkdown": "Failed to regenerate markdown"
         },
         "settings": {
             "profile": {
