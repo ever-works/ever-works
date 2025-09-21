@@ -206,6 +206,8 @@ kind: Ingress
 metadata:
   name: ever-works-web-dev-ing
   namespace: default
+  annotations:
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
 spec:
   ingressClassName: nginx
   rules:
@@ -230,6 +232,8 @@ kind: Ingress
 metadata:
   name: ever-works-api-dev-ing
   namespace: default
+  annotations:
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
 spec:
   ingressClassName: nginx
   rules:
