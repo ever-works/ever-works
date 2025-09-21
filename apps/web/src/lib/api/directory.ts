@@ -1,6 +1,6 @@
 import 'server-only';
 import { serverFetch, serverMutation } from './server-api';
-import { RepoProvider } from './enums';
+import { GenerateStatusType, RepoProvider } from './enums';
 import { ItemData } from './types';
 
 export interface MarkdownReadmeConfig {
@@ -33,12 +33,6 @@ export interface DeleteDirectoryDto {
 export interface GenerateDirectoryDetailDto {
     directory_name: string;
     prompt: string;
-}
-
-export enum GenerateStatusType {
-    GENERATING = 'generating',
-    GENERATED = 'generated',
-    ERROR = 'error',
 }
 
 export type GenerateStatus = {

@@ -1,3 +1,5 @@
+import { BadgeType, BadgeValue } from './enums';
+
 export interface MessageResponse {
     success: boolean;
     message?: string;
@@ -12,17 +14,6 @@ export interface Category {
     description?: string;
     icon_url?: string;
     priority?: number;
-}
-
-export enum BadgeType {
-    SECURITY = 'security',
-    LICENSE = 'license',
-    QUALITY = 'quality',
-}
-
-export enum BadgeValue {
-    A = 'A', // Good/Pass
-    F = 'F', // Fail
 }
 
 export interface Badge {
@@ -70,7 +61,7 @@ export interface ItemData {
     description: string;
     featured?: boolean;
     source_url: string;
-    category: string | Category;
+    category: string;
     slug?: string;
     tags: string[] | Tag[];
     markdown?: string;

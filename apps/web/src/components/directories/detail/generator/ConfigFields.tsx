@@ -2,7 +2,8 @@
 
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
-import { ConfigDto, GenerationMethod, WebsiteRepositoryCreationMethod } from '@/lib/api/items-generator';
+import { GenerationMethod, WebsiteRepositoryCreationMethod } from '@/lib/api/enums';
+import { ConfigDto } from '@/lib/api/types-only';
 import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
 
@@ -12,13 +13,15 @@ interface ConfigFieldsProps {
     updateWithPullRequest?: boolean;
     badgeEvaluationEnabled?: boolean;
     websiteRepositoryCreationMethod?: WebsiteRepositoryCreationMethod;
-    onChange: (updates: Partial<{
-        config?: ConfigDto;
-        generation_method?: GenerationMethod;
-        update_with_pull_request?: boolean;
-        badge_evaluation_enabled?: boolean;
-        website_repository_creation_method?: WebsiteRepositoryCreationMethod;
-    }>) => void;
+    onChange: (
+        updates: Partial<{
+            config?: ConfigDto;
+            generation_method?: GenerationMethod;
+            update_with_pull_request?: boolean;
+            badge_evaluation_enabled?: boolean;
+            website_repository_creation_method?: WebsiteRepositoryCreationMethod;
+        }>,
+    ) => void;
 }
 
 export function ConfigFields({
@@ -40,7 +43,9 @@ export function ConfigFields({
                 </label>
                 <select
                     value={generationMethod}
-                    onChange={(e) => onChange({ generation_method: e.target.value as GenerationMethod })}
+                    onChange={(e) =>
+                        onChange({ generation_method: e.target.value as GenerationMethod })
+                    }
                     className={cn(
                         'w-full px-3 py-2 rounded-lg border text-sm',
                         'bg-surface dark:bg-surface-dark',
@@ -48,7 +53,9 @@ export function ConfigFields({
                         'text-text dark:text-text-dark',
                     )}
                 >
-                    <option value={GenerationMethod.CREATE_UPDATE}>{t('methodCreateUpdate')}</option>
+                    <option value={GenerationMethod.CREATE_UPDATE}>
+                        {t('methodCreateUpdate')}
+                    </option>
                     <option value={GenerationMethod.RECREATE}>{t('methodRecreate')}</option>
                 </select>
             </div>
@@ -79,7 +86,12 @@ export function ConfigFields({
                 </label>
                 <select
                     value={websiteRepositoryCreationMethod}
-                    onChange={(e) => onChange({ website_repository_creation_method: e.target.value as WebsiteRepositoryCreationMethod })}
+                    onChange={(e) =>
+                        onChange({
+                            website_repository_creation_method: e.target
+                                .value as WebsiteRepositoryCreationMethod,
+                        })
+                    }
                     className={cn(
                         'w-full px-3 py-2 rounded-lg border text-sm',
                         'bg-surface dark:bg-surface-dark',
@@ -87,9 +99,13 @@ export function ConfigFields({
                         'text-text dark:text-text-dark',
                     )}
                 >
-                    <option value={WebsiteRepositoryCreationMethod.DUPLICATE}>{t('methodDuplicate')}</option>
+                    <option value={WebsiteRepositoryCreationMethod.DUPLICATE}>
+                        {t('methodDuplicate')}
+                    </option>
                     <option value={WebsiteRepositoryCreationMethod.FORK}>{t('methodFork')}</option>
-                    <option value={WebsiteRepositoryCreationMethod.CREATE_USING_TEMPLATE}>{t('methodCreateFromTemplate')}</option>
+                    <option value={WebsiteRepositoryCreationMethod.CREATE_USING_TEMPLATE}>
+                        {t('methodCreateFromTemplate')}
+                    </option>
                 </select>
             </div>
 
@@ -104,9 +120,14 @@ export function ConfigFields({
                         label={t('maxSearchQueries')}
                         type="number"
                         value={config?.max_search_queries || 10}
-                        onChange={(e) => onChange({
-                            config: { ...config, max_search_queries: parseInt(e.target.value) || 10 }
-                        })}
+                        onChange={(e) =>
+                            onChange({
+                                config: {
+                                    ...config,
+                                    max_search_queries: parseInt(e.target.value) || 10,
+                                },
+                            })
+                        }
                         variant="form"
                         min="1"
                         max="50"
@@ -116,9 +137,14 @@ export function ConfigFields({
                         label={t('resultsPerQuery')}
                         type="number"
                         value={config?.max_results_per_query || 5}
-                        onChange={(e) => onChange({
-                            config: { ...config, max_results_per_query: parseInt(e.target.value) || 5 }
-                        })}
+                        onChange={(e) =>
+                            onChange({
+                                config: {
+                                    ...config,
+                                    max_results_per_query: parseInt(e.target.value) || 5,
+                                },
+                            })
+                        }
                         variant="form"
                         min="1"
                         max="20"
@@ -128,9 +154,14 @@ export function ConfigFields({
                         label={t('maxPagesToProcess')}
                         type="number"
                         value={config?.max_pages_to_process || 10}
-                        onChange={(e) => onChange({
-                            config: { ...config, max_pages_to_process: parseInt(e.target.value) || 10 }
-                        })}
+                        onChange={(e) =>
+                            onChange({
+                                config: {
+                                    ...config,
+                                    max_pages_to_process: parseInt(e.target.value) || 10,
+                                },
+                            })
+                        }
                         variant="form"
                         min="1"
                         max="100"
@@ -141,9 +172,14 @@ export function ConfigFields({
                         type="number"
                         step="0.1"
                         value={config?.relevance_threshold_content || 0.7}
-                        onChange={(e) => onChange({
-                            config: { ...config, relevance_threshold_content: parseFloat(e.target.value) || 0.7 }
-                        })}
+                        onChange={(e) =>
+                            onChange({
+                                config: {
+                                    ...config,
+                                    relevance_threshold_content: parseFloat(e.target.value) || 0.7,
+                                },
+                            })
+                        }
                         variant="form"
                         min="0"
                         max="1"
@@ -153,9 +189,14 @@ export function ConfigFields({
                 <div className="space-y-3">
                     <Checkbox
                         checked={config?.ai_first_generation_enabled || false}
-                        onChange={(e) => onChange({
-                            config: { ...config, ai_first_generation_enabled: e.target.checked }
-                        })}
+                        onChange={(e) =>
+                            onChange({
+                                config: {
+                                    ...config,
+                                    ai_first_generation_enabled: e.target.checked,
+                                },
+                            })
+                        }
                         label={t('aiFirstGeneration')}
                         description={t('aiFirstGenerationDescription')}
                         variant="form"
@@ -163,9 +204,11 @@ export function ConfigFields({
 
                     <Checkbox
                         checked={config?.content_filtering_enabled || false}
-                        onChange={(e) => onChange({
-                            config: { ...config, content_filtering_enabled: e.target.checked }
-                        })}
+                        onChange={(e) =>
+                            onChange({
+                                config: { ...config, content_filtering_enabled: e.target.checked },
+                            })
+                        }
                         label={t('contentFiltering')}
                         description={t('contentFilteringDescription')}
                         variant="form"

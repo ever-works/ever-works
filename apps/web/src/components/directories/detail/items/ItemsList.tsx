@@ -1,10 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { ItemData } from '@/lib/api';
+import { ItemData } from '@/lib/api/types-only';
 import { cn } from '@/lib/utils/cn';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { useTranslations } from 'next-intl';
 
 interface ItemsListProps {
     items: ItemData[];
@@ -12,17 +13,19 @@ interface ItemsListProps {
 }
 
 export function ItemsList({ items: initialItems, directoryId }: ItemsListProps) {
+    const t = useTranslations('dashboard.directoryDetail.items');
     const [items, setItems] = useState(initialItems);
     const [searchQuery, setSearchQuery] = useState('');
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
     // Get unique categories
-    const categories = Array.from(new Set(items.map(item => item.category).filter(Boolean)));
+    const categories = Array.from(new Set(items.map((item) => item.category).filter(Boolean)));
 
     // Filter items based on search and category
-    const filteredItems = items.filter(item => {
-        const matchesSearch = searchQuery === '' ||
+    const filteredItems = items.filter((item) => {
+        const matchesSearch =
+            searchQuery === '' ||
             item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
             item.description?.toLowerCase().includes(searchQuery.toLowerCase());
 
@@ -38,17 +41,11 @@ export function ItemsList({ items: initialItems, directoryId }: ItemsListProps) 
                 <div className="flex-1">
                     <Input
                         type="text"
-                        placeholder="Search items..."
+                        placeholder={t('searchPlaceholder')}
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         variant="form"
                         className="w-full"
-                        icon={
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                            </svg>
-                        }
                     />
                 </div>
 
@@ -63,9 +60,11 @@ export function ItemsList({ items: initialItems, directoryId }: ItemsListProps) 
                             'text-text dark:text-text-dark',
                         )}
                     >
-                        <option value="">All Categories</option>
-                        {categories.map(cat => (
-                            <option key={cat} value={cat}>{cat}</option>
+                        <option value="">{t('allCategories')}</option>
+                        {categories.map((cat) => (
+                            <option key={cat} value={cat}>
+                                {cat}
+                            </option>
                         ))}
                     </select>
 
@@ -76,9 +75,18 @@ export function ItemsList({ items: initialItems, directoryId }: ItemsListProps) 
                             onClick={() => setViewMode('grid')}
                             className="rounded-r-none"
                         >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                    d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                            <svg
+                                className="w-4 h-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"
+                                />
                             </svg>
                         </Button>
                         <Button
@@ -87,9 +95,18 @@ export function ItemsList({ items: initialItems, directoryId }: ItemsListProps) 
                             onClick={() => setViewMode('list')}
                             className="rounded-l-none"
                         >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                    d="M4 6h16M4 12h16M4 18h16" />
+                            <svg
+                                className="w-4 h-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M4 6h16M4 12h16M4 18h16"
+                                />
                             </svg>
                         </Button>
                     </div>
@@ -99,7 +116,7 @@ export function ItemsList({ items: initialItems, directoryId }: ItemsListProps) 
             {/* Items Count */}
             <div className="flex items-center justify-between">
                 <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
-                    Showing {filteredItems.length} of {items.length} items
+                    {t('showing', { current: filteredItems.length, total: items.length })}
                 </p>
             </div>
 
@@ -107,15 +124,17 @@ export function ItemsList({ items: initialItems, directoryId }: ItemsListProps) 
             {filteredItems.length === 0 ? (
                 <div className="text-center py-12">
                     <p className="text-text-secondary dark:text-text-secondary-dark">
-                        No items match your search criteria
+                        {t('noMatch')}
                     </p>
                 </div>
             ) : (
-                <div className={cn(
-                    viewMode === 'grid'
-                        ? 'grid sm:grid-cols-2 lg:grid-cols-3 gap-4'
-                        : 'space-y-2'
-                )}>
+                <div
+                    className={cn(
+                        viewMode === 'grid'
+                            ? 'grid sm:grid-cols-2 lg:grid-cols-3 gap-4'
+                            : 'space-y-2',
+                    )}
+                >
                     {filteredItems.map((item) => (
                         <ItemCard key={item.slug} item={item} viewMode={viewMode} />
                     ))}
@@ -131,18 +150,19 @@ interface ItemCardProps {
 }
 
 function ItemCard({ item, viewMode }: ItemCardProps) {
+    const t = useTranslations('dashboard.directoryDetail.items');
     if (viewMode === 'list') {
         return (
-            <div className={cn(
-                'flex items-center gap-4 p-4 rounded-lg border',
-                'bg-card dark:bg-card-dark',
-                'border-card-border dark:border-card-border-dark',
-                'hover:border-primary/50 transition-colors',
-            )}>
+            <div
+                className={cn(
+                    'flex items-center gap-4 p-4 rounded-lg border',
+                    'bg-card dark:bg-card-dark',
+                    'border-card-border dark:border-card-border-dark',
+                    'hover:border-primary/50 transition-colors',
+                )}
+            >
                 <div className="flex-1">
-                    <h4 className="font-medium text-text dark:text-text-dark">
-                        {item.name}
-                    </h4>
+                    <h4 className="font-medium text-text dark:text-text-dark">{item.name}</h4>
                     {item.description && (
                         <p className="text-sm text-text-secondary dark:text-text-secondary-dark line-clamp-1">
                             {item.description}
@@ -156,8 +176,12 @@ function ItemCard({ item, viewMode }: ItemCardProps) {
                 )}
                 <Button variant="ghost" size="sm">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                            d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                        />
                     </svg>
                 </Button>
             </div>
@@ -165,20 +189,26 @@ function ItemCard({ item, viewMode }: ItemCardProps) {
     }
 
     return (
-        <div className={cn(
-            'p-4 rounded-lg border',
-            'bg-card dark:bg-card-dark',
-            'border-card-border dark:border-card-border-dark',
-            'hover:border-primary/50 transition-colors',
-        )}>
+        <div
+            className={cn(
+                'p-4 rounded-lg border',
+                'bg-card dark:bg-card-dark',
+                'border-card-border dark:border-card-border-dark',
+                'hover:border-primary/50 transition-colors',
+            )}
+        >
             <div className="flex items-start justify-between mb-2">
                 <h4 className="font-medium text-text dark:text-text-dark line-clamp-1">
                     {item.name}
                 </h4>
                 <Button variant="ghost" size="sm">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                            d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                        <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"
+                        />
                     </svg>
                 </Button>
             </div>
@@ -202,11 +232,20 @@ function ItemCard({ item, viewMode }: ItemCardProps) {
                         rel="noopener noreferrer"
                         className="text-xs text-primary hover:underline flex items-center gap-1"
                     >
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        <svg
+                            className="w-3 h-3"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                            />
                         </svg>
-                        Source
+                        {t('source')}
                     </a>
                 )}
             </div>

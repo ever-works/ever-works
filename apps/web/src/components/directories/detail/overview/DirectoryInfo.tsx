@@ -1,6 +1,6 @@
 'use client';
 
-import { Directory } from '@/lib/api';
+import { Directory } from '@/lib/api/types-only';
 import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
 

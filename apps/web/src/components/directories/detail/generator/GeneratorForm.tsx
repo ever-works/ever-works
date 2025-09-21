@@ -1,8 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { Directory } from '@/lib/api';
-import { CreateItemsGeneratorDto, GenerationMethod, WebsiteRepositoryCreationMethod } from '@/lib/api/items-generator';
+import { Directory, CreateItemsGeneratorDto } from '@/lib/api/types-only';
 import { RequiredFields } from './RequiredFields';
 import { CompanyFields } from './CompanyFields';
 import { CategoriesFields } from './CategoriesFields';
@@ -14,6 +13,7 @@ import { toast } from 'sonner';
 import { useRouter } from '@/i18n/navigation';
 import { generateItems } from '@/app/actions/dashboard/generator';
 import { useTranslations } from 'next-intl';
+import { GenerationMethod, WebsiteRepositoryCreationMethod } from '@/lib/api/enums';
 
 interface GeneratorFormProps {
     directoryId: string;
@@ -52,10 +52,8 @@ export function GeneratorForm({ directoryId, directory }: GeneratorFormProps) {
     });
 
     const toggleSection = (section: string) => {
-        setExpandedSections(prev =>
-            prev.includes(section)
-                ? prev.filter(s => s !== section)
-                : [...prev, section]
+        setExpandedSections((prev) =>
+            prev.includes(section) ? prev.filter((s) => s !== section) : [...prev, section],
         );
     };
 
@@ -79,21 +77,33 @@ export function GeneratorForm({ directoryId, directory }: GeneratorFormProps) {
         });
     };
 
-    const hasExistingGeneration = directory.generateStatus !== null && directory.generateStatus !== undefined;
+    const hasExistingGeneration =
+        directory.generateStatus !== null && directory.generateStatus !== undefined;
 
     return (
         <form onSubmit={handleSubmit} className="space-y-6 max-w-4xl">
             {/* Status Alert */}
             {hasExistingGeneration && (
-                <div className={cn(
-                    'rounded-lg border p-4',
-                    'bg-amber-50 dark:bg-amber-900/20',
-                    'border-amber-200 dark:border-amber-800',
-                )}>
+                <div
+                    className={cn(
+                        'rounded-lg border p-4',
+                        'bg-amber-50 dark:bg-amber-900/20',
+                        'border-amber-200 dark:border-amber-800',
+                    )}
+                >
                     <div className="flex gap-3">
-                        <svg className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        <svg
+                            className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                            />
                         </svg>
                         <div>
                             <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
@@ -204,22 +214,28 @@ interface CollapsibleSectionProps {
     children: React.ReactNode;
 }
 
-function CollapsibleSection({ title, description, isExpanded, onToggle, children }: CollapsibleSectionProps) {
+function CollapsibleSection({
+    title,
+    description,
+    isExpanded,
+    onToggle,
+    children,
+}: CollapsibleSectionProps) {
     return (
-        <div className={cn(
-            'rounded-lg border',
-            'bg-card dark:bg-card-dark',
-            'border-card-border dark:border-card-border-dark',
-        )}>
+        <div
+            className={cn(
+                'rounded-lg border',
+                'bg-card dark:bg-card-dark',
+                'border-card-border dark:border-card-border-dark',
+            )}
+        >
             <button
                 type="button"
                 onClick={onToggle}
                 className="w-full px-6 py-4 flex items-center justify-between text-left hover:bg-surface dark:hover:bg-surface-dark transition-colors"
             >
                 <div>
-                    <h3 className="text-lg font-medium text-text dark:text-text-dark">
-                        {title}
-                    </h3>
+                    <h3 className="text-lg font-medium text-text dark:text-text-dark">{title}</h3>
                     <p className="text-sm text-text-secondary dark:text-text-secondary-dark mt-1">
                         {description}
                     </p>
@@ -233,14 +249,15 @@ function CollapsibleSection({ title, description, isExpanded, onToggle, children
                     stroke="currentColor"
                     viewBox="0 0 24 24"
                 >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M19 9l-7 7-7-7"
+                    />
                 </svg>
             </button>
-            {isExpanded && (
-                <div className="px-6 pb-4">
-                    {children}
-                </div>
-            )}
+            {isExpanded && <div className="px-6 pb-4">{children}</div>}
         </div>
     );
 }

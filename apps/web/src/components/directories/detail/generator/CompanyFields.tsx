@@ -1,7 +1,7 @@
 'use client';
 
 import { Input } from '@/components/ui/input';
-import { CompanyDto } from '@/lib/api/items-generator';
+import { CompanyDto } from '@/lib/api/types-only';
 import { useTranslations } from 'next-intl';
 
 interface CompanyFieldsProps {
@@ -18,7 +18,13 @@ export function CompanyFields({ company, onChange }: CompanyFieldsProps) {
                 label={t('companyName')}
                 type="text"
                 value={company?.name || ''}
-                onChange={(e) => onChange(e.target.value ? { ...company, name: e.target.value, website: company?.website || '' } : undefined)}
+                onChange={(e) =>
+                    onChange(
+                        e.target.value
+                            ? { ...company, name: e.target.value, website: company?.website || '' }
+                            : undefined,
+                    )
+                }
                 placeholder={t('companyNamePlaceholder')}
                 variant="form"
             />
@@ -27,7 +33,15 @@ export function CompanyFields({ company, onChange }: CompanyFieldsProps) {
                 label={t('companyWebsite')}
                 type="url"
                 value={company?.website || ''}
-                onChange={(e) => onChange(company?.name ? { ...company, website: e.target.value } : e.target.value ? { name: '', website: e.target.value } : undefined)}
+                onChange={(e) =>
+                    onChange(
+                        company?.name
+                            ? { ...company, website: e.target.value }
+                            : e.target.value
+                              ? { name: '', website: e.target.value }
+                              : undefined,
+                    )
+                }
                 placeholder={t('companyWebsitePlaceholder')}
                 variant="form"
             />

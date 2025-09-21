@@ -1,7 +1,7 @@
 import { directoryAPI } from '@/lib/api';
 import { GeneratorForm } from '@/components/directories/detail/generator/GeneratorForm';
 import { GenerationProgress } from '@/components/directories/detail/generator/GenerationProgress';
-import { GenerateStatusType } from '@/lib/api';
+import { GenerateStatusType } from '@/lib/api/enums';
 
 type Params = { params: Promise<{ id: string }> };
 

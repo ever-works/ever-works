@@ -1,4 +1,5 @@
-import { directoryAPI, ItemData } from '@/lib/api';
+import { directoryAPI } from '@/lib/api';
+import type { ItemData } from '@/lib/api/types-only';
 import { ItemsList } from '@/components/directories/detail/items/ItemsList';
 import { ItemsEmptyState } from '@/components/directories/detail/items/ItemsEmptyState';
 
