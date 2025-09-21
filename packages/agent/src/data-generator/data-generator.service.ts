@@ -310,6 +310,19 @@ export class DataGeneratorService {
      * Get last request data from config
      */
     async getLastRequestData(directory: Directory, user: User) {
+        const config = await this.config(directory, user);
+        return config.metadata?.last_request_data;
+    }
+
+    /**
+     * Get existing items from the repository
+     */
+
+    async getItems(directory: Directory, user: User) {
+        return (await this.getExistingData(directory, user)).existingItems;
+    }
+
+    async config(directory: Directory, user: User) {
         const token = user.getGitToken();
         const committer = user.asCommitter();
 
@@ -323,16 +336,7 @@ export class DataGeneratorService {
         });
         const data = await DataRepository.create(dest);
 
-        const config = await data.getConfig();
-        return config.metadata?.last_request_data;
-    }
-
-    /**
-     * Get existing items from the repository
-     */
-
-    async getItems(directory: Directory, user: User) {
-        return (await this.getExistingData(directory, user)).existingItems;
+        return data.getConfig();
     }
 
     /**

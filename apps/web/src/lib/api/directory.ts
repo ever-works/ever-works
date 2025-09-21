@@ -1,7 +1,8 @@
 import 'server-only';
 import { serverFetch, serverMutation } from './server-api';
-import { GenerateStatusType, RepoProvider } from './enums';
+import { GenerateStatusType, GenerationMethod, RepoProvider } from './enums';
 import { ItemData } from './types';
+import { CreateItemsGeneratorDto } from './items-generator';
 
 export interface MarkdownReadmeConfig {
     header?: string;
@@ -80,6 +81,29 @@ export interface DirectoryDetails {
     categories: string[];
 }
 
+export type PRUpdate = {
+    branch: string;
+    title: string;
+    body: string;
+};
+
+export interface DirectoryConfig {
+    company_name?: string;
+    company_website?: string;
+    content_table?: boolean;
+    item_name?: string;
+    items_name?: string;
+    copyright_year?: number;
+    paging_mode?: string;
+    autoapproval?: boolean;
+    metadata?: {
+        initial_prompt?: string;
+        generation_method?: GenerationMethod;
+        pr_update?: PRUpdate | null;
+        last_request_data?: CreateItemsGeneratorDto;
+    } & (Record<string, any> & {});
+}
+
 export const directoryAPI = {
     // Get all directories with pagination and search
     getAll: async (options?: { limit?: number; offset?: number; search?: string }) => {
@@ -130,6 +154,11 @@ export const directoryAPI = {
     // Get directory items
     getItems: async (id: string) => {
         return serverFetch<APIResponse<{ items: ItemData[] }>>(`/directories/${id}/items`);
+    },
+
+    // Get directory config
+    getConfig: async (id: string) => {
+        return serverFetch<APIResponse<{ config: DirectoryConfig }>>(`/directories/${id}/config`);
     },
 
     // Generate directory details from name and prompt

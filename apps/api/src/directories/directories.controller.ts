@@ -97,6 +97,13 @@ export class DirectoriesController {
         return this.agentService.directoryItems(id, user);
     }
 
+    @Get('directories/:id/config')
+    @HttpCode(HttpStatus.OK)
+    async getDirectoryConfig(@CurrentUser() auth: AuthenticatedUser, @Param('id') id: string) {
+        const user = await this.authService.getUser(auth.userId);
+        return this.agentService.directoryConfig(id, user);
+    }
+
     @Post('directories/generate-details')
     @HttpCode(HttpStatus.OK)
     async generateDirectoryDetails(

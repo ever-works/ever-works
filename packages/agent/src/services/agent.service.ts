@@ -231,6 +231,29 @@ export class AgentService {
         }
     }
 
+    async directoryConfig(directoryId: string, user: User) {
+        const directory = await this.validateDirectoryOwnership(directoryId, user.id);
+
+        try {
+            const config = await this.dataGenerator.config(directory, user);
+            return {
+                status: 'success',
+                config,
+            };
+        } catch (error) {
+            if (error instanceof HttpException) {
+                throw error;
+            }
+
+            this.logger.error('Failed to get directory config:', error);
+
+            throw new BadRequestException({
+                status: 'error',
+                message: this.clearMessageError(error),
+            });
+        }
+    }
+
     async generateItemsGenerator(
         directoryId: string,
         createItemsGeneratorDto: CreateItemsGeneratorDto,
