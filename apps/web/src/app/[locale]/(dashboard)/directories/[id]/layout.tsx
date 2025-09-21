@@ -1,7 +1,6 @@
 import { Directory, directoryAPI } from '@/lib/api';
 import { notFound } from 'next/navigation';
-import { DirectoryHeader } from '@/components/directories/detail/DirectoryHeader';
-import { DirectoryTabs } from '@/components/directories/detail/DirectoryTabs';
+import { DirectoryLayoutClient } from '@/components/directories/detail/DirectoryLayoutClient';
 
 type LayoutParams = {
     params: Promise<{ id: string }>;
@@ -20,11 +19,5 @@ export default async function DirectoryLayout({ params, children }: LayoutParams
         notFound();
     }
 
-    return (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
-            <DirectoryHeader directory={directory} />
-            <DirectoryTabs directoryId={directory.id} />
-            <div className="mt-6">{children}</div>
-        </div>
-    );
+    return <DirectoryLayoutClient directory={directory}>{children}</DirectoryLayoutClient>;
 }

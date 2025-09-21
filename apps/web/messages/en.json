@@ -412,6 +412,23 @@
                 "yes": "Yes",
                 "no": "No"
             },
+            "config": {
+                "title": "Configuration Details",
+                "initialPrompt": "Initial Generation Prompt",
+                "companyDetails": "Company Information",
+                "companyName": "Company Name",
+                "companyWebsite": "Website",
+                "generationSettings": "Generation Settings",
+                "generationMethod": "Generation Method",
+                "autoApproval": "Auto Approval",
+                "pagingMode": "Paging Mode",
+                "contentTable": "Content Table",
+                "enabled": "Enabled",
+                "disabled": "Disabled",
+                "pullRequestUpdate": "Pull Request Details",
+                "branch": "Branch",
+                "prTitle": "PR Title"
+            },
             "activity": {
                 "title": "Recent Activity",
                 "noActivity": "No activity yet",
