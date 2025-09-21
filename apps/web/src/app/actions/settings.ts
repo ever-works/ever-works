@@ -13,19 +13,16 @@ import { getTranslations } from 'next-intl/server';
 // Profile Actions
 export async function updateProfile(data: { username: string }) {
     const t = await getTranslations('actions.settings.profile');
-    
+
     // Validation schema with translations
     const updateProfileSchema = z.object({
         username: z
             .string()
             .min(1, t('usernameRequired'))
             .max(50, t('usernameMaxLength'))
-            .regex(
-                /^[a-zA-Z0-9_-]+$/,
-                t('usernameFormat'),
-            ),
+            .regex(/^[a-zA-Z0-9_-]+$/, t('usernameFormat')),
     });
-    
+
     try {
         const user = await getAuthFromCookie();
         if (!user) {
@@ -56,16 +53,13 @@ export async function updateProfile(data: { username: string }) {
 // Security Actions
 export async function updatePassword(data: { currentPassword: string; newPassword: string }) {
     const t = await getTranslations('actions.settings.password');
-    
+
     // Validation schema with translations
     const updatePasswordSchema = z.object({
         currentPassword: z.string().min(1, t('currentRequired')),
-        newPassword: z
-            .string()
-            .min(8, t('newMinLength'))
-            .max(100, t('newMaxLength')),
+        newPassword: z.string().min(8, t('newMinLength')).max(100, t('newMaxLength')),
     });
-    
+
     try {
         const user = await getAuthFromCookie();
         if (!user) {
@@ -95,7 +89,7 @@ export async function updatePassword(data: { currentPassword: string; newPasswor
 // API Token Actions
 export async function updateVercelToken(token: string) {
     const t = await getTranslations('actions.settings.vercel');
-    
+
     // Validation schema with translations
     const vercelTokenSchema = z.object({
         token: z
@@ -103,7 +97,7 @@ export async function updateVercelToken(token: string) {
             .min(1, t('tokenRequired'))
             .regex(/^vc_[A-Za-z0-9]+$/, t('invalidFormat')),
     });
-    
+
     try {
         const user = await getAuthFromCookie();
         if (!user) {
@@ -133,7 +127,7 @@ export async function updateVercelToken(token: string) {
 
 export async function removeVercelToken() {
     const t = await getTranslations('actions.settings.vercel');
-    
+
     try {
         const user = await getAuthFromCookie();
         if (!user) {
@@ -155,7 +149,7 @@ export async function removeVercelToken() {
 // OAuth Actions
 export async function disconnectGitHub() {
     const t = await getTranslations('actions.settings.github');
-    
+
     try {
         const user = await getAuthFromCookie();
         if (!user) {
@@ -190,7 +184,7 @@ export async function updateNotificationPreferences(preferences: {
     };
 }) {
     const t = await getTranslations('actions.settings.notifications');
-    
+
     // Validation schema
     const notificationPreferencesSchema = z.object({
         email: z.object({
@@ -206,7 +200,7 @@ export async function updateNotificationPreferences(preferences: {
             systemUpdates: z.boolean(),
         }),
     });
-    
+
     try {
         const user = await getAuthFromCookie();
         if (!user) {
@@ -238,7 +232,7 @@ export async function updateNotificationPreferences(preferences: {
 // Danger Zone Actions
 export async function deleteAccount() {
     const t = await getTranslations('actions.settings.danger');
-    
+
     try {
         const user = await getAuthFromCookie();
         if (!user) {

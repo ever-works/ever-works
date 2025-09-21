@@ -110,7 +110,10 @@ export default function RegisterPage() {
                         className="w-4 h-4 mt-0.5 bg-surface-secondary dark:bg-surface-secondary-dark border-border dark:border-border-dark rounded text-primary focus:ring-primary"
                     />
 
-                    <label htmlFor="terms" className="ml-2 text-sm text-text-secondary dark:text-text-secondary-dark">
+                    <label
+                        htmlFor="terms"
+                        className="ml-2 text-sm text-text-secondary dark:text-text-secondary-dark"
+                    >
                         {t('form.terms.text')}{' '}
                         <Link href="/terms" className="text-primary hover:text-primary-hover">
                             {t('form.terms.termsLink')}
@@ -122,12 +125,7 @@ export default function RegisterPage() {
                     </label>
                 </div>
 
-                <Button
-                    type="submit"
-                    disabled={isPending}
-                    loading={isPending}
-                    fullWidth
-                >
+                <Button type="submit" disabled={isPending} loading={isPending} fullWidth>
                     {isPending ? t('form.submitting') : t('form.submit')}
                 </Button>
 

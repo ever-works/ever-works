@@ -21,12 +21,7 @@ interface SettingsClientProps {
     githubScopes: string[];
 }
 
-
-export function SettingsClient({
-    user,
-    githubConnected,
-    githubScopes,
-}: SettingsClientProps) {
+export function SettingsClient({ user, githubConnected, githubScopes }: SettingsClientProps) {
     const [activeTab, setActiveTab] = useState('profile');
     const t = useTranslations('dashboard.settings');
 
@@ -43,9 +38,7 @@ export function SettingsClient({
         <div className="max-w-7xl mx-auto px-4 py-8">
             <div className="mb-8">
                 <h1 className="text-3xl font-bold text-text dark:text-text-dark">{t('title')}</h1>
-                <p className="text-text-muted dark:text-text-muted-dark mt-2">
-                    {t('subtitle')}
-                </p>
+                <p className="text-text-muted dark:text-text-muted-dark mt-2">{t('subtitle')}</p>
             </div>
 
             <div className="flex flex-col lg:flex-row gap-8">

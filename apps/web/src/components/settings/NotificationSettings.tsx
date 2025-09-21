@@ -16,13 +16,13 @@ interface NotificationSettingsProps {
 export function NotificationSettings({ user }: NotificationSettingsProps) {
     const [isPending, startTransition] = useTransition();
     const t = useTranslations('dashboard.notifications');
-    
+
     // Email notifications
     const [emailUpdates, setEmailUpdates] = useState(true);
     const [emailNewItems, setEmailNewItems] = useState(false);
     const [emailWeeklyDigest, setEmailWeeklyDigest] = useState(true);
     const [emailMarketing, setEmailMarketing] = useState(false);
-    
+
     // In-app notifications
     const [appNewItems, setAppNewItems] = useState(true);
     const [appComments, setAppComments] = useState(true);
@@ -64,9 +64,7 @@ export function NotificationSettings({ user }: NotificationSettingsProps) {
                 <h2 className="text-xl font-semibold text-text dark:text-text-dark mb-4">
                     {t('title')}
                 </h2>
-                <p className="text-text-muted dark:text-text-muted-dark text-sm">
-                    {t('subtitle')}
-                </p>
+                <p className="text-text-muted dark:text-text-muted-dark text-sm">{t('subtitle')}</p>
             </div>
 
             {/* Email Notifications */}
@@ -74,7 +72,7 @@ export function NotificationSettings({ user }: NotificationSettingsProps) {
                 <h3 className="text-lg font-medium text-text dark:text-text-dark">
                     {t('email.title')}
                 </h3>
-                
+
                 <div className="space-y-3">
                     <label className="flex items-center justify-between cursor-pointer">
                         <div>
@@ -151,7 +149,7 @@ export function NotificationSettings({ user }: NotificationSettingsProps) {
                 <h3 className="text-lg font-medium text-text dark:text-text-dark">
                     {t('app.title')}
                 </h3>
-                
+
                 <div className="space-y-3">
                     <label className="flex items-center justify-between cursor-pointer">
                         <div>

@@ -49,9 +49,7 @@ export function ProfileSettings({ user }: ProfileSettingsProps) {
                 <h2 className="text-xl font-semibold text-text dark:text-text-dark mb-4">
                     {t('title')}
                 </h2>
-                <p className="text-text-muted dark:text-text-muted-dark text-sm">
-                    {t('subtitle')}
-                </p>
+                <p className="text-text-muted dark:text-text-muted-dark text-sm">{t('subtitle')}</p>
             </div>
 
             <div className="space-y-4">
@@ -75,10 +73,7 @@ export function ProfileSettings({ user }: ProfileSettingsProps) {
 
                 {/* Save Button */}
                 <div className="flex justify-end">
-                    <Button
-                        onClick={handleSaveProfile}
-                        loading={isPending}
-                    >
+                    <Button onClick={handleSaveProfile} loading={isPending}>
                         {t('actions.save')}
                     </Button>
                 </div>

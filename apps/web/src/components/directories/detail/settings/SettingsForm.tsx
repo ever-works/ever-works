@@ -59,11 +59,13 @@ export function SettingsForm({ directory }: SettingsFormProps) {
     return (
         <div className="space-y-6">
             {/* General Settings */}
-            <div className={cn(
-                'rounded-lg border p-6',
-                'bg-card dark:bg-card-dark',
-                'border-card-border dark:border-card-border-dark',
-            )}>
+            <div
+                className={cn(
+                    'rounded-lg border p-6',
+                    'bg-card dark:bg-card-dark',
+                    'border-card-border dark:border-card-border-dark',
+                )}
+            >
                 <h3 className="text-lg font-semibold text-text dark:text-text-dark mb-4">
                     General Settings
                 </h3>
@@ -94,11 +96,13 @@ export function SettingsForm({ directory }: SettingsFormProps) {
             </div>
 
             {/* README Configuration */}
-            <div className={cn(
-                'rounded-lg border p-6',
-                'bg-card dark:bg-card-dark',
-                'border-card-border dark:border-card-border-dark',
-            )}>
+            <div
+                className={cn(
+                    'rounded-lg border p-6',
+                    'bg-card dark:bg-card-dark',
+                    'border-card-border dark:border-card-border-dark',
+                )}
+            >
                 <h3 className="text-lg font-semibold text-text dark:text-text-dark mb-4">
                     README Configuration
                 </h3>
@@ -108,26 +112,30 @@ export function SettingsForm({ directory }: SettingsFormProps) {
                         <Textarea
                             label="Custom Header"
                             value={formData.readmeConfig?.header || ''}
-                            onChange={(e) => setFormData({
-                                ...formData,
-                                readmeConfig: {
-                                    ...formData.readmeConfig,
-                                    header: e.target.value,
-                                },
-                            })}
+                            onChange={(e) =>
+                                setFormData({
+                                    ...formData,
+                                    readmeConfig: {
+                                        ...formData.readmeConfig,
+                                        header: e.target.value,
+                                    },
+                                })
+                            }
                             placeholder="Add custom content to the README header"
                             rows={3}
                             variant="form"
                         />
                         <Checkbox
                             checked={formData.readmeConfig?.overwriteDefaultHeader || false}
-                            onChange={(e) => setFormData({
-                                ...formData,
-                                readmeConfig: {
-                                    ...formData.readmeConfig,
-                                    overwriteDefaultHeader: e.target.checked,
-                                },
-                            })}
+                            onChange={(e) =>
+                                setFormData({
+                                    ...formData,
+                                    readmeConfig: {
+                                        ...formData.readmeConfig,
+                                        overwriteDefaultHeader: e.target.checked,
+                                    },
+                                })
+                            }
                             label="Overwrite default header"
                             variant="form"
                         />
@@ -137,26 +145,30 @@ export function SettingsForm({ directory }: SettingsFormProps) {
                         <Textarea
                             label="Custom Footer"
                             value={formData.readmeConfig?.footer || ''}
-                            onChange={(e) => setFormData({
-                                ...formData,
-                                readmeConfig: {
-                                    ...formData.readmeConfig,
-                                    footer: e.target.value,
-                                },
-                            })}
+                            onChange={(e) =>
+                                setFormData({
+                                    ...formData,
+                                    readmeConfig: {
+                                        ...formData.readmeConfig,
+                                        footer: e.target.value,
+                                    },
+                                })
+                            }
                             placeholder="Add custom content to the README footer"
                             rows={3}
                             variant="form"
                         />
                         <Checkbox
                             checked={formData.readmeConfig?.overwriteDefaultFooter || false}
-                            onChange={(e) => setFormData({
-                                ...formData,
-                                readmeConfig: {
-                                    ...formData.readmeConfig,
-                                    overwriteDefaultFooter: e.target.checked,
-                                },
-                            })}
+                            onChange={(e) =>
+                                setFormData({
+                                    ...formData,
+                                    readmeConfig: {
+                                        ...formData.readmeConfig,
+                                        overwriteDefaultFooter: e.target.checked,
+                                    },
+                                })
+                            }
                             label="Overwrite default footer"
                             variant="form"
                         />
@@ -169,11 +181,13 @@ export function SettingsForm({ directory }: SettingsFormProps) {
             </div>
 
             {/* Danger Zone */}
-            <div className={cn(
-                'rounded-lg border-2 p-6',
-                'bg-red-50 dark:bg-red-900/20',
-                'border-red-200 dark:border-red-800',
-            )}>
+            <div
+                className={cn(
+                    'rounded-lg border-2 p-6',
+                    'bg-red-50 dark:bg-red-900/20',
+                    'border-red-200 dark:border-red-800',
+                )}
+            >
                 <h3 className="text-lg font-semibold text-red-800 dark:text-red-200 mb-2">
                     Danger Zone
                 </h3>

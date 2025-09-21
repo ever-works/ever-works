@@ -10,14 +10,14 @@ export interface CheckboxProps extends Omit<InputHTMLAttributes<HTMLInputElement
     variant?: 'default' | 'form';
 }
 
-const Checkbox = ({ 
-    className, 
-    label, 
+const Checkbox = ({
+    className,
+    label,
     description,
-    error, 
-    id, 
-    variant = 'default', 
-    ...props 
+    error,
+    id,
+    variant = 'default',
+    ...props
 }: CheckboxProps) => {
     const checkboxReactId = useId();
     const checkboxId = id || checkboxReactId;
@@ -34,9 +34,7 @@ const Checkbox = ({
                         'text-primary focus:ring-primary focus:ring-2 focus:ring-offset-0',
                         'disabled:opacity-50 disabled:cursor-not-allowed',
                         // Variant-specific styles
-                        variant === 'form' && [
-                            'bg-surface dark:bg-surface-dark',
-                        ],
+                        variant === 'form' && ['bg-surface dark:bg-surface-dark'],
                         variant === 'default' && [
                             'bg-surface-secondary dark:bg-surface-secondary-dark',
                         ],

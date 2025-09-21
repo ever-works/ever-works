@@ -15,11 +15,13 @@ export function RequiredFields({ formData, onChange }: RequiredFieldsProps) {
     const t = useTranslations('dashboard.directoryDetail.generator');
 
     return (
-        <div className={cn(
-            'rounded-lg border p-6',
-            'bg-card dark:bg-card-dark',
-            'border-card-border dark:border-card-border-dark',
-        )}>
+        <div
+            className={cn(
+                'rounded-lg border p-6',
+                'bg-card dark:bg-card-dark',
+                'border-card-border dark:border-card-border-dark',
+            )}
+        >
             <h3 className="text-lg font-medium text-text dark:text-text-dark mb-4">
                 {t('requiredInfo')}
             </h3>

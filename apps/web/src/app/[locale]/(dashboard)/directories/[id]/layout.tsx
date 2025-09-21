@@ -24,9 +24,7 @@ export default async function DirectoryLayout({ params, children }: LayoutParams
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
             <DirectoryHeader directory={directory} />
             <DirectoryTabs directoryId={directory.id} />
-            <div className="mt-6">
-                {children}
-            </div>
+            <div className="mt-6">{children}</div>
         </div>
     );
 }

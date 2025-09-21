@@ -58,9 +58,7 @@ export function OAuthConnections({ githubConnected, githubScopes }: OAuthConnect
                 <h2 className="text-xl font-semibold text-text dark:text-text-dark mb-4">
                     {t('title')}
                 </h2>
-                <p className="text-text-muted dark:text-text-muted-dark text-sm">
-                    {t('subtitle')}
-                </p>
+                <p className="text-text-muted dark:text-text-muted-dark text-sm">{t('subtitle')}</p>
             </div>
 
             {/* GitHub Connection */}
@@ -72,11 +70,11 @@ export function OAuthConnections({ githubConnected, githubScopes }: OAuthConnect
                         </div>
 
                         <div>
-                            <h3 className="font-medium text-text dark:text-text-dark">{t('github.name')}</h3>
+                            <h3 className="font-medium text-text dark:text-text-dark">
+                                {t('github.name')}
+                            </h3>
                             <p className="text-sm text-text-muted dark:text-text-muted-dark">
-                                {githubConnected
-                                    ? t('github.connected')
-                                    : t('github.disconnected')}
+                                {githubConnected ? t('github.connected') : t('github.disconnected')}
                             </p>
                             {githubConnected && githubScopes.length > 0 && (
                                 <div className="mt-2">

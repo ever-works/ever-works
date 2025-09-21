@@ -65,7 +65,10 @@ export function CategoriesFields({
                         type="text"
                         value={newCategory}
                         onChange={(e) => setNewCategory(e.target.value)}
-                        onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addItem('initial', newCategory))}
+                        onKeyPress={(e) =>
+                            e.key === 'Enter' &&
+                            (e.preventDefault(), addItem('initial', newCategory))
+                        }
                         placeholder={t('addCategoryPlaceholder')}
                         variant="form"
                     />
@@ -110,7 +113,10 @@ export function CategoriesFields({
                         type="text"
                         value={newPriority}
                         onChange={(e) => setNewPriority(e.target.value)}
-                        onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addItem('priority', newPriority))}
+                        onKeyPress={(e) =>
+                            e.key === 'Enter' &&
+                            (e.preventDefault(), addItem('priority', newPriority))
+                        }
                         placeholder={t('addPriorityCategoryPlaceholder')}
                         variant="form"
                     />
@@ -155,7 +161,10 @@ export function CategoriesFields({
                         type="text"
                         value={newKeyword}
                         onChange={(e) => setNewKeyword(e.target.value)}
-                        onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addItem('keyword', newKeyword))}
+                        onKeyPress={(e) =>
+                            e.key === 'Enter' &&
+                            (e.preventDefault(), addItem('keyword', newKeyword))
+                        }
                         placeholder={t('addKeywordPlaceholder')}
                         variant="form"
                     />

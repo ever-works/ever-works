@@ -1,35 +1,35 @@
 {
-  "name": "ever-works-web",
-  "version": "0.1.0",
-  "private": true,
-  "scripts": {
-    "dev": "next dev --turbopack",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint",
-    "format": "prettier --write \"**/*.{ts,tsx,jsx,json,css,md}\""
-  },
-  "dependencies": {
-    "clsx": "^2.1.1",
-    "deepmerge": "^4.3.1",
-    "iron-session": "^8.0.4",
-    "jwt-decode": "^4.0.0",
-    "lucide-react": "^0.542.0",
-    "next": "15.4.7",
-    "next-intl": "^4.3.4",
-    "path-to-regexp": "^8.2.0",
-    "react": "19.1.0",
-    "react-dom": "19.1.0",
-    "sonner": "^2.0.7",
-    "tailwind-merge": "^3.3.1",
-    "zod": "^3.25.76"
-  },
-  "devDependencies": {
-    "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "tailwindcss": "^4",
-    "typescript": "^5"
-  }
+    "name": "ever-works-web",
+    "version": "0.1.0",
+    "private": true,
+    "scripts": {
+        "dev": "next dev --turbopack",
+        "build": "next build",
+        "start": "next start",
+        "lint": "next lint",
+        "format": "prettier --write \"**/*.{ts,tsx,jsx,json,css,md}\""
+    },
+    "dependencies": {
+        "clsx": "^2.1.1",
+        "deepmerge": "^4.3.1",
+        "iron-session": "^8.0.4",
+        "jwt-decode": "^4.0.0",
+        "lucide-react": "^0.542.0",
+        "next": "15.4.7",
+        "next-intl": "^4.3.4",
+        "path-to-regexp": "^8.2.0",
+        "react": "19.1.0",
+        "react-dom": "19.1.0",
+        "sonner": "^2.0.7",
+        "tailwind-merge": "^3.3.1",
+        "zod": "^3.25.76"
+    },
+    "devDependencies": {
+        "@tailwindcss/postcss": "^4",
+        "@types/node": "^20",
+        "@types/react": "^19",
+        "@types/react-dom": "^19",
+        "tailwindcss": "^4",
+        "typescript": "^5"
+    }
 }
