@@ -96,17 +96,17 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
             } else {
                 // Full form: requires prompt for generate endpoint
                 if (!formData.prompt.trim()) {
-                    toast.error('Prompt is required');
+                    toast.error(t('promptRequired'));
                     return;
                 }
                 result = await generateItems(directoryId, formData);
             }
 
             if (result.success) {
-                toast.success(result.message || 'Operation started successfully');
+                toast.success(result.message || t('operationStartedSuccessfully'));
                 router.refresh();
             } else {
-                toast.error(result.error || 'Failed to start operation');
+                toast.error(result.error || t('failedToStartOperation'));
             }
         });
     };
