@@ -1,8 +1,14 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { Directory, CreateItemsGeneratorDto } from '@/lib/api/types-only';
+import {
+    Directory,
+    CreateItemsGeneratorDto,
+    DirectoryConfig,
+    UpdateItemsGeneratorDto,
+} from '@/lib/api/types-only';
 import { RequiredFields } from './RequiredFields';
+import { UpdateItemsFields } from './UpdateItemsFields';
 import { CompanyFields } from './CompanyFields';
 import { CategoriesFields } from './CategoriesFields';
 import { SourceFields } from './SourceFields';
@@ -11,35 +17,47 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils/cn';
 import { toast } from 'sonner';
 import { useRouter } from '@/i18n/navigation';
-import { generateItems } from '@/app/actions/dashboard/generator';
+import { generateItems, updateItems } from '@/app/actions/dashboard/generator';
 import { useTranslations } from 'next-intl';
 import { GenerationMethod, WebsiteRepositoryCreationMethod } from '@/lib/api/enums';
 
 interface GeneratorFormProps {
     directoryId: string;
     directory: Directory;
+    config?: DirectoryConfig;
 }
 
-export function GeneratorForm({ directoryId, directory }: GeneratorFormProps) {
+export function GeneratorForm({ directoryId, directory, config }: GeneratorFormProps) {
     const router = useRouter();
     const t = useTranslations('dashboard.directoryDetail.generator');
     const [isPending, startTransition] = useTransition();
     const [expandedSections, setExpandedSections] = useState<string[]>([]);
+    const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
+
+    // Check if directory has been generated before
+    const isGenerated = directory.generateStatus !== null && directory.generateStatus !== undefined;
+    const initialPrompt = config?.metadata?.initial_prompt || '';
+    const lastRequestData = config?.metadata?.last_request_data;
 
     const [formData, setFormData] = useState<CreateItemsGeneratorDto>({
         name: directory.name,
-        prompt: '',
-        company: undefined,
-        initial_categories: [],
-        priority_categories: [],
-        target_keywords: [],
-        source_urls: [],
-        repository_description: '',
-        generation_method: GenerationMethod.CREATE_UPDATE,
-        update_with_pull_request: false,
-        badge_evaluation_enabled: true,
-        website_repository_creation_method: WebsiteRepositoryCreationMethod.DUPLICATE,
-        config: {
+        prompt: initialPrompt,
+        company: lastRequestData?.company || undefined,
+        initial_categories: lastRequestData?.initial_categories || [],
+        priority_categories: lastRequestData?.priority_categories || [],
+        target_keywords: lastRequestData?.target_keywords || [],
+        source_urls: lastRequestData?.source_urls || [],
+        repository_description: lastRequestData?.repository_description || '',
+        generation_method: lastRequestData?.generation_method || GenerationMethod.CREATE_UPDATE,
+        update_with_pull_request:
+            lastRequestData?.update_with_pull_request !== undefined
+                ? lastRequestData.update_with_pull_request
+                : true,
+        badge_evaluation_enabled: lastRequestData?.badge_evaluation_enabled !== false,
+        website_repository_creation_method:
+            lastRequestData?.website_repository_creation_method ||
+            WebsiteRepositoryCreationMethod.DUPLICATE,
+        config: lastRequestData?.config || {
             max_search_queries: 10,
             max_results_per_query: 5,
             max_pages_to_process: 10,
@@ -60,126 +78,144 @@ export function GeneratorForm({ directoryId, directory }: GeneratorFormProps) {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        if (!formData.prompt.trim()) {
-            toast.error('Prompt is required');
-            return;
-        }
-
         startTransition(async () => {
-            const result = await generateItems(directoryId, formData);
+            let result;
+
+            // Minimal form (existing directory, not showing advanced options)
+            // Uses update endpoint which doesn't require prompt
+            if (
+                isGenerated &&
+                !showAdvancedOptions &&
+                formData.generation_method !== GenerationMethod.RECREATE
+            ) {
+                const updateData: UpdateItemsGeneratorDto = {
+                    generation_method: formData.generation_method,
+                    update_with_pull_request: formData.update_with_pull_request,
+                };
+                result = await updateItems(directoryId, updateData);
+            } else {
+                // Full form: requires prompt for generate endpoint
+                if (!formData.prompt.trim()) {
+                    toast.error('Prompt is required');
+                    return;
+                }
+                result = await generateItems(directoryId, formData);
+            }
 
             if (result.success) {
-                toast.success('Generation started successfully');
+                toast.success(result.message || 'Operation started successfully');
                 router.refresh();
             } else {
-                toast.error(result.error || 'Failed to start generation');
+                toast.error(result.error || 'Failed to start operation');
             }
         });
     };
 
-    const hasExistingGeneration =
-        directory.generateStatus !== null && directory.generateStatus !== undefined;
+    // Determine button text based on context
+    const getButtonText = () => {
+        if (!isGenerated) {
+            return t('startGeneration');
+        }
+        if (formData.generation_method === GenerationMethod.RECREATE) {
+            return t('recreateDirectory');
+        }
+        return t('updateItems');
+    };
 
     return (
         <form onSubmit={handleSubmit} className="space-y-6 max-w-4xl">
-            {/* Status Alert */}
-            {hasExistingGeneration && (
-                <div
-                    className={cn(
-                        'rounded-lg border p-4',
-                        'bg-amber-50 dark:bg-amber-900/20',
-                        'border-amber-200 dark:border-amber-800',
-                    )}
-                >
-                    <div className="flex gap-3">
-                        <svg
-                            className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                            />
-                        </svg>
-                        <div>
-                            <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
-                                {t('regenerationWarning')}
-                            </p>
-                            <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
-                                {t('regenerationWarningDescription')}
-                            </p>
-                        </div>
-                    </div>
+            {/* Show update fields for existing directories, full fields for new/expanded */}
+            {isGenerated && !showAdvancedOptions ? (
+                <UpdateItemsFields
+                    generationMethod={formData.generation_method}
+                    updateWithPullRequest={formData.update_with_pull_request}
+                    onChange={(updates) => setFormData({ ...formData, ...updates })}
+                />
+            ) : (
+                <RequiredFields
+                    formData={formData}
+                    onChange={(updates) => setFormData({ ...formData, ...updates })}
+                />
+            )}
+
+            {/* Advanced Options Toggle for existing directories */}
+            {isGenerated && (
+                <div className="flex justify-end">
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
+                        className="text-sm"
+                    >
+                        {showAdvancedOptions ? t('hideAdvancedOptions') : t('showAdvancedOptions')}
+                    </Button>
                 </div>
             )}
 
-            {/* Required Fields */}
-            <RequiredFields
-                formData={formData}
-                onChange={(updates) => setFormData({ ...formData, ...updates })}
-            />
+            {/* Show additional advanced options for new directories or when toggled */}
+            {(!isGenerated || showAdvancedOptions) && (
+                <>
+                    {/* Company Information */}
+                    <CollapsibleSection
+                        title={t('companyInformation')}
+                        description={t('companyInfoDescription')}
+                        isExpanded={expandedSections.includes('company')}
+                        onToggle={() => toggleSection('company')}
+                    >
+                        <CompanyFields
+                            company={formData.company}
+                            onChange={(company) => setFormData({ ...formData, company })}
+                        />
+                    </CollapsibleSection>
 
-            {/* Company Information */}
-            <CollapsibleSection
-                title={t('companyInformation')}
-                description={t('companyInfoDescription')}
-                isExpanded={expandedSections.includes('company')}
-                onToggle={() => toggleSection('company')}
-            >
-                <CompanyFields
-                    company={formData.company}
-                    onChange={(company) => setFormData({ ...formData, company })}
-                />
-            </CollapsibleSection>
+                    {/* Categories & Keywords */}
+                    <CollapsibleSection
+                        title={t('categoriesKeywords')}
+                        description={t('categoriesDescription')}
+                        isExpanded={expandedSections.includes('categories')}
+                        onToggle={() => toggleSection('categories')}
+                    >
+                        <CategoriesFields
+                            initialCategories={formData.initial_categories || []}
+                            priorityCategories={formData.priority_categories || []}
+                            targetKeywords={formData.target_keywords || []}
+                            onChange={(updates) => setFormData({ ...formData, ...updates })}
+                        />
+                    </CollapsibleSection>
 
-            {/* Categories & Keywords */}
-            <CollapsibleSection
-                title={t('categoriesKeywords')}
-                description={t('categoriesDescription')}
-                isExpanded={expandedSections.includes('categories')}
-                onToggle={() => toggleSection('categories')}
-            >
-                <CategoriesFields
-                    initialCategories={formData.initial_categories || []}
-                    priorityCategories={formData.priority_categories || []}
-                    targetKeywords={formData.target_keywords || []}
-                    onChange={(updates) => setFormData({ ...formData, ...updates })}
-                />
-            </CollapsibleSection>
+                    {/* Source URLs */}
+                    <CollapsibleSection
+                        title={t('sourceUrls')}
+                        description={t('sourceUrlsDescription')}
+                        isExpanded={expandedSections.includes('sources')}
+                        onToggle={() => toggleSection('sources')}
+                    >
+                        <SourceFields
+                            sourceUrls={formData.source_urls || []}
+                            onChange={(source_urls) => setFormData({ ...formData, source_urls })}
+                        />
+                    </CollapsibleSection>
 
-            {/* Source URLs */}
-            <CollapsibleSection
-                title={t('sourceUrls')}
-                description={t('sourceUrlsDescription')}
-                isExpanded={expandedSections.includes('sources')}
-                onToggle={() => toggleSection('sources')}
-            >
-                <SourceFields
-                    sourceUrls={formData.source_urls || []}
-                    onChange={(source_urls) => setFormData({ ...formData, source_urls })}
-                />
-            </CollapsibleSection>
-
-            {/* Advanced Configuration */}
-            <CollapsibleSection
-                title={t('advancedConfig')}
-                description={t('advancedConfigDescription')}
-                isExpanded={expandedSections.includes('config')}
-                onToggle={() => toggleSection('config')}
-            >
-                <ConfigFields
-                    config={formData.config}
-                    generationMethod={formData.generation_method}
-                    updateWithPullRequest={formData.update_with_pull_request || false}
-                    badgeEvaluationEnabled={formData.badge_evaluation_enabled || false}
-                    websiteRepositoryCreationMethod={formData.website_repository_creation_method}
-                    onChange={(updates) => setFormData({ ...formData, ...updates })}
-                />
-            </CollapsibleSection>
+                    {/* Advanced Configuration */}
+                    <CollapsibleSection
+                        title={t('advancedConfig')}
+                        description={t('advancedConfigDescription')}
+                        isExpanded={expandedSections.includes('config')}
+                        onToggle={() => toggleSection('config')}
+                    >
+                        <ConfigFields
+                            config={formData.config}
+                            generationMethod={formData.generation_method}
+                            updateWithPullRequest={formData.update_with_pull_request || false}
+                            badgeEvaluationEnabled={formData.badge_evaluation_enabled || false}
+                            websiteRepositoryCreationMethod={
+                                formData.website_repository_creation_method
+                            }
+                            onChange={(updates) => setFormData({ ...formData, ...updates })}
+                        />
+                    </CollapsibleSection>
+                </>
+            )}
 
             {/* Actions */}
             <div className="flex gap-3 pt-6">
@@ -190,7 +226,7 @@ export function GeneratorForm({ directoryId, directory }: GeneratorFormProps) {
                     variant="primary"
                     size="lg"
                 >
-                    {hasExistingGeneration ? t('regenerateItems') : t('startGeneration')}
+                    {getButtonText()}
                 </Button>
                 <Button
                     type="button"

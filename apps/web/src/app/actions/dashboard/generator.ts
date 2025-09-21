@@ -1,6 +1,6 @@
 'use server';
 
-import { itemsGeneratorAPI, CreateItemsGeneratorDto } from '@/lib/api';
+import { itemsGeneratorAPI, CreateItemsGeneratorDto, UpdateItemsGeneratorDto } from '@/lib/api';
 import { getTranslations } from 'next-intl/server';
 
 export async function generateItems(directoryId: string, data: CreateItemsGeneratorDto) {
@@ -35,6 +35,27 @@ export async function generateItems(directoryId: string, data: CreateItemsGenera
         return {
             success: false,
             error: error instanceof Error ? error.message : t('failedToGenerateItems'),
+        };
+    }
+}
+
+export async function updateItems(directoryId: string, data: UpdateItemsGeneratorDto) {
+    const t = await getTranslations('actions.generator');
+
+    try {
+        // Call the API to update items
+        const result = await itemsGeneratorAPI.update(directoryId, data);
+
+        return {
+            success: true,
+            data: result,
+            message: t('updateStartedSuccessfully'),
+        };
+    } catch (error) {
+        console.error('Failed to update items:', error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : t('failedToUpdateItems'),
         };
     }
 }

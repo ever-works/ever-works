@@ -2,7 +2,10 @@
 
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Select } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { CreateItemsGeneratorDto } from '@/lib/api/types-only';
+import { GenerationMethod } from '@/lib/api/enums';
 import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
 
@@ -32,7 +35,7 @@ export function RequiredFields({ formData, onChange }: RequiredFieldsProps) {
                     type="text"
                     value={formData.name || ''}
                     onChange={(e) => onChange({ name: e.target.value })}
-                    placeholder="Enter directory name"
+                    placeholder={t('directoryNamePlaceholder')}
                     variant="form"
                     required
                     disabled
@@ -56,6 +59,31 @@ export function RequiredFields({ formData, onChange }: RequiredFieldsProps) {
                     placeholder={t('repositoryPlaceholder')}
                     rows={2}
                     variant="form"
+                />
+
+                <Select
+                    label={t('generationMethod')}
+                    value={formData.generation_method || GenerationMethod.CREATE_UPDATE}
+                    onChange={(e) =>
+                        onChange({ generation_method: e.target.value as GenerationMethod })
+                    }
+                    variant="form"
+                >
+                    <option value={GenerationMethod.CREATE_UPDATE}>
+                        {t('methodCreateUpdate')}
+                    </option>
+                    <option value={GenerationMethod.RECREATE}>{t('methodRecreate')}</option>
+                </Select>
+
+                <Switch
+                    label={t('updateWithPullRequest')}
+                    checked={
+                        formData.update_with_pull_request !== undefined
+                            ? formData.update_with_pull_request
+                            : true
+                    }
+                    onChange={(checked) => onChange({ update_with_pull_request: checked })}
+                    helperText={t('updateWithPullRequestDescription')}
                 />
             </div>
         </div>

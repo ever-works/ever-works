@@ -30,6 +30,8 @@ export type {
     DeleteDirectoryResponse,
     APIResponse,
     DirectoryDetails,
+    DirectoryConfig,
+    PRUpdate,
 } from './directory';
 
 export type {
