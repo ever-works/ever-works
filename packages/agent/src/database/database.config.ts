@@ -1,11 +1,7 @@
 import { registerAs } from '@nestjs/config';
 import { TypeOrmModuleOptions } from '@nestjs/typeorm';
-import { Directory } from '../entities/directory.entity';
-import { User } from '../entities/user.entity';
-import { RefreshToken } from '../entities/refresh-token.entity';
-import { OAuthToken } from '../entities/oauth-token.entity';
-import { ChatHistory } from '../entities/chat-history.entity';
-import { ChatMessage } from '../entities/chat-message.entity';
+import { CacheEntry } from '../entities/cache.entity';
+import { RefreshToken, OAuthToken, ChatHistory, ChatMessage, User, Directory } from '../entities';
 import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs';
@@ -36,7 +32,15 @@ export interface DatabaseConfig extends Omit<TypeOrmModuleOptions, 'type'> {
     ssl?: any;
 }
 
-export const ENTITIES = [Directory, User, RefreshToken, OAuthToken, ChatHistory, ChatMessage];
+export const ENTITIES = [
+    Directory,
+    User,
+    RefreshToken,
+    OAuthToken,
+    ChatHistory,
+    ChatMessage,
+    CacheEntry,
+];
 
 export const databaseConfig = registerAs('database', (): DatabaseConfig => {
     const environment = config.getEnvironment() || 'development';

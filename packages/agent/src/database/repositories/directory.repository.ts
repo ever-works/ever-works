@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, ILike } from 'typeorm';
-import { Directory } from '../entities/directory.entity';
-import { User } from '../entities';
-import { prepareLikeSearchTerm } from './utils';
+import { Directory } from '../../entities/directory.entity';
+import { User } from '../../entities';
+import { prepareLikeSearchTerm } from '../utils';
 
 @Injectable()
 export class DirectoryRepository {

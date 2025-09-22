@@ -52,6 +52,10 @@
         "./config": {
             "types": "./dist/config/index.d.ts",
             "default": "./dist/config/index.js"
+        },
+        "./cache": {
+            "types": "./dist/cache/index.d.ts",
+            "default": "./dist/cache/index.js"
         }
     },
     "scripts": {
@@ -65,11 +69,11 @@
         "@nestjs/common": "*",
         "@nestjs/core": "*",
         "@nestjs/platform-express": "*",
-        "reflect-metadata": "*",
-        "rxjs": "*",
         "better-sqlite3": "^12.2",
+        "mysql2": "^3.14",
         "pg": "^8.16",
-        "mysql2": "^3.14"
+        "reflect-metadata": "*",
+        "rxjs": "*"
     },
     "peerDependenciesMeta": {
         "better-sqlite3": {
@@ -120,6 +124,7 @@
         "@langchain/openai": "0.5.12",
         "@langchain/textsplitters": "^0.1.0",
         "@nestjs/bullmq": "^10.2.3",
+        "@nestjs/cache-manager": "^3.0.1",
         "@nestjs/config": "^4.0.2",
         "@nestjs/typeorm": "^11.0.0",
         "@supabase/supabase-js": "^2.50.3",
@@ -129,6 +134,7 @@
         "@types/string-similarity": "^4.0.2",
         "axios": "^1.12.2",
         "bullmq": "^5.56.1",
+        "cache-manager": "^7.2.0",
         "cheerio": "^1.1.0",
         "class-transformer": "^0.5.1",
         "class-validator": "^0.14.2",

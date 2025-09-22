@@ -1,13 +1,13 @@
 import { Logger, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { DirectoryRepository } from './directory.repository';
-import { RefreshTokenRepository } from './refresh-token.repository';
-import { OAuthTokenRepository } from './oauth-token.repository';
+import { DirectoryRepository } from './repositories/directory.repository';
+import { RefreshTokenRepository } from './repositories/refresh-token.repository';
+import { OAuthTokenRepository } from './repositories/oauth-token.repository';
 import { databaseConfig, ENTITIES } from './database.config';
-import { UserRepository } from './user.repository';
+import { UserRepository } from './repositories/user.repository';
 import { UserGitHubService } from './user-github.service';
-import { ChatHistoryRepository } from './chat-history.repository';
+import { ChatHistoryRepository } from './repositories/chat-history.repository';
 
 @Module({
     imports: [

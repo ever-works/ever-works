@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { OAuthToken } from '../entities/oauth-token.entity';
+import { OAuthToken } from '../../entities/oauth-token.entity';
 
 @Injectable()
 export class OAuthTokenRepository {

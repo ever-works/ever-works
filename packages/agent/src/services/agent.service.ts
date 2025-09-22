@@ -11,7 +11,7 @@ import { WebsiteGeneratorService } from '../website-generator/website-generator.
 import { WebsiteUpdateService } from '../website-generator/website-update.service';
 import { Directory } from '../entities/directory.entity';
 import { User } from '../entities/user.entity';
-import { DirectoryRepository } from '../database/directory.repository';
+import { DirectoryRepository } from '../database/repositories/directory.repository';
 import {
     CreateItemsGeneratorDto,
     GenerationMethod,
