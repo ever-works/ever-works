@@ -21,7 +21,7 @@ export default function NewDirectoryClient({ user, githubConnection }: NewDirect
 
     if (creationMode === null) {
         return (
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
+            <div className="w-full">
                 {/* GitHub Connection Alert */}
                 <GitHubConnectionAlert githubConnected={!!githubConnection?.connected} />
 
@@ -154,7 +154,7 @@ export default function NewDirectoryClient({ user, githubConnection }: NewDirect
     }
 
     return (
-        <div className="flex gap-6 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
+        <div className="flex gap-6 w-full">
             {/* Main Content */}
             <div className="flex-1">
                 <div className="mb-8">
