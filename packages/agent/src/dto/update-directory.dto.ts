@@ -11,6 +11,13 @@ export class UpdateDirectoryDto {
     @IsOptional()
     description?: string;
 
+    @IsString()
+    @IsOptional()
+    owner?: string;
+
+    @IsOptional()
+    organization?: boolean;
+
     @IsOptional()
     @ValidateNested()
     @Type(() => MarkdownReadmeConfigDto)

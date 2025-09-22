@@ -10,6 +10,8 @@ import { GitHubScopePresets, hasRequiredAgentScopes } from '../config/github-sco
 interface ConnectionInfo {
     provider: string;
     connected: boolean;
+    email: string | null;
+    username: string | null;
     scopes?: string[];
     connectedAt?: Date;
     metadata?: Record<string, any>;
@@ -52,10 +54,14 @@ export class OAuthConnectionService {
             {
                 provider: AuthProviders.GITHUB,
                 connected: false,
+                email: null,
+                username: null,
             },
             {
                 provider: AuthProviders.GOOGLE,
                 connected: false,
+                email: null,
+                username: null,
             },
         ];
 
@@ -63,6 +69,8 @@ export class OAuthConnectionService {
             const connection = connections.find((c) => c.provider === token.provider);
             if (connection) {
                 connection.connected = true;
+                connection.email = token.email;
+                connection.username = token.username || token.metadata?.login;
                 connection.scopes = token.scope?.split(' ') || [];
                 connection.connectedAt = token.createdAt;
                 connection.metadata = token.metadata;
@@ -81,8 +89,10 @@ export class OAuthConnectionService {
         return {
             provider,
             connected: !!token,
+            email: token?.email,
             scopes: token?.scope?.split(' ') || [],
             connectedAt: token?.createdAt,
+            username: token?.username || token?.metadata?.login,
             metadata: token?.metadata,
         };
     }
@@ -196,6 +206,7 @@ export class OAuthConnectionService {
             accessToken: access_token,
             tokenType: token_type,
             email: userResponse.data.email || null,
+            username: userResponse.data.login,
             scope,
             metadata: {
                 login: userResponse.data.login,
@@ -209,6 +220,8 @@ export class OAuthConnectionService {
             connected: true,
             scopes: scope?.split(' ') || [],
             connectedAt: new Date(),
+            email: userResponse.data.email || null,
+            username: userResponse.data.login,
             metadata: {
                 username: userResponse.data.login,
             },
@@ -263,6 +276,8 @@ export class OAuthConnectionService {
             connected: true,
             scopes: scope?.split(' ') || [],
             connectedAt: new Date(),
+            email: userResponse.data.email || null,
+            username: userResponse.data.name,
             metadata: {
                 email: userResponse.data.email,
             },

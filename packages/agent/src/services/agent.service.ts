@@ -178,6 +178,10 @@ export class AgentService {
             const updatedDirectory = await this.directoryRepository.update(id, {
                 name: updateDto.name || directory.name,
                 description: updateDto.description || directory.description,
+                // If we haven't generated the directory yet, we can update the owner and organization
+                ...(!directory.generateStatus
+                    ? { owner: updateDto.owner, organization: updateDto.organization }
+                    : {}),
                 readmeConfig: {
                     ...directory.readmeConfig,
                     ...updateDto.readmeConfig,

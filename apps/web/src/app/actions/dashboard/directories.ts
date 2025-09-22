@@ -1,8 +1,14 @@
 'use server';
 
 import { z } from 'zod';
-import { directoryAPI, CreateDirectoryDto, itemsGeneratorAPI, UpdateDirectoryDto } from '@/lib/api';
-import { checkGitHubConnection } from './oauth';
+import {
+    directoryAPI,
+    CreateDirectoryDto,
+    itemsGeneratorAPI,
+    UpdateDirectoryDto,
+    ConnectionInfo,
+} from '@/lib/api';
+import { checkOAuthConnection } from './oauth';
 import { RepoProvider } from '@/lib/api/enums';
 import { getTranslations } from 'next-intl/server';
 
@@ -49,6 +55,41 @@ const getCreateDirectorySchema = async () => {
     return createDirectorySchema;
 };
 
+const checkOrganization = (
+    oauthConnect: ConnectionInfo,
+    data: { owner?: string; organization?: boolean },
+) => {
+    if (!oauthConnect.connected) {
+        return {
+            organization: data.organization || false,
+            owner: data.owner || null,
+        };
+    }
+
+    const oauthUsername = oauthConnect.username || oauthConnect.metadata?.login;
+
+    if (!data.organization) {
+        return {
+            organization: false,
+            owner: oauthUsername || null,
+        };
+    }
+
+    const owner = data.owner?.trim();
+
+    if (owner && oauthUsername && owner !== oauthUsername) {
+        return {
+            organization: true,
+            owner: oauthUsername || null,
+        };
+    }
+
+    return {
+        organization: false,
+        owner: oauthUsername || null,
+    };
+};
+
 export async function createDirectory(data: CreateDirectoryDto) {
     const t = await getTranslations('actions.directories');
 
@@ -65,14 +106,22 @@ export async function createDirectory(data: CreateDirectoryDto) {
         }
 
         // Check GitHub connection first
-        const githubCheck = await checkGitHubConnection();
-        if (!githubCheck.connected) {
+        const oauthCheck = await checkOAuthConnection(validation.data.repoProvider);
+        if (!oauthCheck.connected) {
             return {
                 success: false,
                 error: t('githubRequired'),
                 requiresGitHub: true,
             };
         }
+
+        const { organization, owner } = checkOrganization(
+            oauthCheck as ConnectionInfo,
+            validation.data,
+        );
+
+        validation.data.organization = organization;
+        validation.data.owner = owner;
 
         // Create the directory with validated data
         const { directory } = await directoryAPI.create(validation.data);
@@ -98,25 +147,21 @@ interface AIDirectoryOptions {
     owner?: string;
 }
 
-export async function createDirectoryWithAI({
-    name,
-    prompt,
-    organization,
-    owner,
-}: AIDirectoryOptions) {
+export async function createDirectoryWithAI(request: AIDirectoryOptions) {
     const t = await getTranslations('actions.directories');
 
     // AI prompt validation schema
     const aiPromptSchema = z.object({
         prompt: z.string().min(10, t('prompt.minLength')).max(1000, t('prompt.maxLength')),
         name: z.string().min(1, t('name.required')).max(100, t('name.maxLength')),
+        repoProvider: z.nativeEnum(RepoProvider).optional().default(RepoProvider.GITHUB),
     });
 
     const createDirectorySchema = await getCreateDirectorySchema();
 
     try {
         // Validate input
-        const validation = aiPromptSchema.safeParse({ prompt, name });
+        const validation = aiPromptSchema.safeParse({ prompt: request.prompt, name: request.name });
         if (!validation.success) {
             return {
                 success: false,
@@ -125,8 +170,8 @@ export async function createDirectoryWithAI({
         }
 
         // Check GitHub connection first
-        const githubCheck = await checkGitHubConnection();
-        if (!githubCheck.connected) {
+        const oauthCheck = await checkOAuthConnection(validation.data.repoProvider);
+        if (!oauthCheck.connected) {
             return {
                 success: false,
                 error: t('githubRequired'),
@@ -140,15 +185,15 @@ export async function createDirectoryWithAI({
         });
 
         // Determine organization settings
-        const isOrganization = Boolean(organization || (owner && owner.trim() !== ''));
+        const { organization, owner } = checkOrganization(oauthCheck as ConnectionInfo, request);
 
         const directoryData: CreateDirectoryDto = {
             name: validation.data.name,
             slug: directoryDetails.slug,
             description: directoryDetails.description,
-            organization: isOrganization,
-            owner: isOrganization ? owner : undefined,
-            repoProvider: RepoProvider.GITHUB,
+            organization,
+            owner,
+            repoProvider: validation.data.repoProvider,
         };
 
         // Validate the generated directory data
@@ -220,6 +265,16 @@ export async function updateDirectory(directoryId: string, data: UpdateDirectory
                 error: validation.error.errors[0].message,
             };
         }
+
+        const oauthCheck = await checkOAuthConnection(RepoProvider.GITHUB);
+
+        const { organization, owner } = checkOrganization(
+            oauthCheck as ConnectionInfo,
+            validation.data,
+        );
+
+        validation.data.organization = organization;
+        validation.data.owner = owner;
 
         await directoryAPI.update(directoryId, validation.data);
 

@@ -27,18 +27,18 @@ export class OAuthTokenRepository {
         }
 
         const token = this.repository.create(tokenData);
-        return await this.repository.save(token);
+        return this.repository.save(token);
     }
 
     async findByUserAndProvider(userId: string, provider: string): Promise<OAuthToken | null> {
-        return await this.repository.findOne({
+        return this.repository.findOne({
             where: { userId, provider },
             relations: ['user'],
         });
     }
 
     async findByUserId(userId: string): Promise<OAuthToken[]> {
-        return await this.repository.find({
+        return this.repository.find({
             where: { userId },
             order: { provider: 'ASC' },
         });

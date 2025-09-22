@@ -1,5 +1,5 @@
 import { redirect } from '@/i18n/navigation';
-import { authAPI, AuthResponse, OAuthConnectionResponse } from '@/lib/api';
+import { authAPI, AuthResponse, ConnectionInfo } from '@/lib/api';
 import { getOAuthStateCookie, setAuthCookies } from '@/lib/auth';
 import { getRedirectUrl } from '@/lib/auth/redirect';
 import { ROUTES } from '@/lib/constants';
@@ -57,7 +57,7 @@ async function connectOauth(
     locale: string,
 ) {
     let href: string = returnPath || ROUTES.DASHBOARD;
-    let connectionResponse: OAuthConnectionResponse | null = null;
+    let connectionResponse: ConnectionInfo | null = null;
 
     try {
         switch (provider) {

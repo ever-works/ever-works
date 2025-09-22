@@ -63,8 +63,8 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
             max_pages_to_process: 10,
             relevance_threshold_content: 0.7,
             min_content_length_for_extraction: 100,
-            ai_first_generation_enabled: true,
-            content_filtering_enabled: true,
+            ai_first_generation_enabled: false,
+            content_filtering_enabled: false,
             prompt_comparison_confidence_threshold: 0.8,
         },
     });

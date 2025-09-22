@@ -60,13 +60,17 @@ export interface OAuthUrlResponse {
     url: string;
 }
 
-export interface OAuthConnectionResponse {
+export interface ConnectionInfo {
     provider: string;
     connected: boolean;
-    scopes: string[];
-    metadata: Record<string, any>;
-    connectedAt: string;
+    email?: string;
+    username?: string;
+    scopes?: string[];
+    connectedAt?: Date;
+    metadata?: Record<string, any>;
 }
+
+interface OAuthConnectionResponse extends ConnectionInfo {}
 
 export interface TokenValidationResponse {
     valid: boolean;
@@ -236,9 +240,7 @@ export const authAPI = {
         },
 
         checkConnection: async (provider: string) => {
-            return serverFetch<{ connected: boolean; scopes?: string[] }>(
-                `/auth/connections/${provider}`,
-            );
+            return serverFetch<OAuthConnectionResponse>(`/auth/connections/${provider}`);
         },
 
         getConnectUrl: async (

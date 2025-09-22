@@ -7,18 +7,28 @@ import { generateHexToken } from '@/lib/utils/random';
 
 export async function checkGitHubConnection() {
     try {
-        const connection = await authAPI.oauth_connections.checkConnection('github');
-        return {
-            success: true,
-            connected: connection.connected || false,
-            scopes: connection.scopes,
-        };
+        return await authAPI.oauth_connections.checkConnection('github');
     } catch (error) {
         console.error('Failed to check GitHub connection:', error);
         return {
             success: false,
             connected: false,
             error: error instanceof Error ? error.message : 'Failed to check connection',
+        };
+    }
+}
+
+export async function checkOAuthConnection(provider: string) {
+    try {
+        return await authAPI.oauth_connections.checkConnection(provider);
+    } catch (error) {
+        console.error(`Failed to check ${provider} connection:`, error);
+
+        return {
+            success: false,
+            connected: false,
+            error:
+                error instanceof Error ? error.message : `Failed to check ${provider} connection`,
         };
     }
 }

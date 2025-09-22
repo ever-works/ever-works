@@ -13,7 +13,7 @@ export type {
     ResetPasswordDto,
     AuthResponse,
     OAuthUrlResponse,
-    OAuthConnectionResponse,
+    ConnectionInfo,
     TokenValidationResponse,
 } from './auth';
 
