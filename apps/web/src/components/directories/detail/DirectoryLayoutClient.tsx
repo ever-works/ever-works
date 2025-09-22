@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { useRouter } from '@/i18n/navigation';
-import { Directory } from '@/lib/api/types-only';
+import { ConnectionInfo, Directory } from '@/lib/api/types-only';
 import { DirectoryHeader } from './DirectoryHeader';
 import { DirectoryTabs } from './DirectoryTabs';
 import { GenerateStatusType } from '@/lib/api/enums';
@@ -10,9 +10,14 @@ import { GenerateStatusType } from '@/lib/api/enums';
 interface DirectoryLayoutClientProps {
     directory: Directory;
     children: React.ReactNode;
+    oauthConnection: ConnectionInfo | null;
 }
 
-export function DirectoryLayoutClient({ directory, children }: DirectoryLayoutClientProps) {
+export function DirectoryLayoutClient({
+    directory,
+    oauthConnection,
+    children,
+}: DirectoryLayoutClientProps) {
     const router = useRouter();
     const isGenerating = directory.generateStatus?.status === GenerateStatusType.GENERATING;
 
@@ -38,9 +43,37 @@ export function DirectoryLayoutClient({ directory, children }: DirectoryLayoutCl
 
     return (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
-            <DirectoryHeader directory={directory} />
+            <DirectoryHeader
+                directory={directory}
+                repoLink={repoLink(directory, oauthConnection)}
+            />
+
             <DirectoryTabs directoryId={directory.id} />
             <div className="mt-6">{children}</div>
         </div>
     );
+}
+
+function repoLink(directory: Directory, oauthConnection: ConnectionInfo | null) {
+    if (!oauthConnection?.connected) {
+        return null;
+    }
+
+    let providerUrl: string | null = null;
+
+    switch (directory.repoProvider) {
+        case 'github':
+            providerUrl = 'https://github.com';
+            break;
+
+        default:
+            return null;
+    }
+
+    const username = oauthConnection.username || oauthConnection.metadata?.login;
+    if (!username) {
+        return null;
+    }
+
+    return `${providerUrl}/${username}/${directory.slug}`;
 }

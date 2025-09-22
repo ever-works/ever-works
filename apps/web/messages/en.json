@@ -677,7 +677,8 @@
                     "connectedAccount": "Connected account:",
                     "requiredNote": "Required to create directories",
                     "connectButton": "Connect GitHub",
-                    "connectingButton": "Connecting..."
+                    "connectingButton": "Connecting...",
+                    "failedToConnect": "Failed to connect GitHub"
                 }
             }
         },

@@ -8,25 +8,22 @@ import { DirectoryManualForm } from '@/components/directories/DirectoryManualFor
 import { GitHubConnectionAlert } from './github-connection-alert';
 import { GitHubStatusSidebar } from './github-status-sidebar';
 import { useTranslations } from 'next-intl';
+import { ConnectionInfo } from '@/lib/api';
 
 interface NewDirectoryClientProps {
     user: AuthUser;
-    githubConnected: boolean;
+    githubConnection: ConnectionInfo | null;
 }
 
-export default function NewDirectoryClient({
-    user,
-    githubConnected: initialGithubConnected,
-}: NewDirectoryClientProps) {
+export default function NewDirectoryClient({ user, githubConnection }: NewDirectoryClientProps) {
     const [creationMode, setCreationMode] = useState<'ai' | 'manual' | null>(null);
-    const [githubConnected] = useState(initialGithubConnected);
     const t = useTranslations('dashboard.directoryCreation');
 
     if (creationMode === null) {
         return (
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
                 {/* GitHub Connection Alert */}
-                <GitHubConnectionAlert githubConnected={githubConnected} />
+                <GitHubConnectionAlert githubConnected={!!githubConnection?.connected} />
 
                 <div className="mb-8">
                     <h1 className="text-3xl font-bold text-text dark:text-text-dark">
@@ -190,7 +187,7 @@ export default function NewDirectoryClient({
             </div>
 
             {/* GitHub Status Sidebar */}
-            <GitHubStatusSidebar user={user} githubConnected={githubConnected} />
+            <GitHubStatusSidebar user={user} githubConnection={githubConnection} />
         </div>
     );
 }

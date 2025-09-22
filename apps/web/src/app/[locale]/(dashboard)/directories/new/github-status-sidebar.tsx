@@ -8,13 +8,15 @@ import { ROUTES } from '@/lib/constants';
 import { AuthUser } from '@/lib/auth';
 import Image from 'next/image';
 import { useTranslations } from 'next-intl';
+import { ConnectionInfo } from '@/lib/api';
+import Link from 'next/link';
 
 interface GitHubStatusSidebarProps {
     user: AuthUser;
-    githubConnected: boolean;
+    githubConnection: ConnectionInfo | null;
 }
 
-export function GitHubStatusSidebar({ user, githubConnected }: GitHubStatusSidebarProps) {
+export function GitHubStatusSidebar({ user, githubConnection }: GitHubStatusSidebarProps) {
     const [isPending, startTransition] = useTransition();
     const t = useTranslations('dashboard.github.connection.status');
 
@@ -25,10 +27,13 @@ export function GitHubStatusSidebar({ user, githubConnected }: GitHubStatusSideb
             if (result.success && result.url) {
                 window.location.href = result.url;
             } else {
-                toast.error(result.error || 'Failed to connect GitHub');
+                toast.error(result.error || t('failedToConnect'));
             }
         });
     };
+
+    const githubConnected = !!githubConnection?.connected;
+    const githubUsername = githubConnection?.username || user.username;
 
     return (
         <aside className="w-80 flex-shrink-0">
@@ -72,20 +77,28 @@ export function GitHubStatusSidebar({ user, githubConnected }: GitHubStatusSideb
                             <p className="text-xs text-text-muted dark:text-text-muted-dark mb-2">
                                 {t('connectedAccount')}
                             </p>
-                            <div className="flex items-center gap-2">
+                            <div className="inline-flex items-center gap-2 relative group/github">
+                                <Link
+                                    href={`https://github.com/${githubUsername}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="absolute inset-0 z-10"
+                                />
+
                                 {user.avatar && (
                                     <div className="relative w-6 h-6">
                                         <Image
                                             src={user.avatar}
-                                            alt={user.username}
+                                            alt={githubUsername}
                                             fill
                                             className="w-6 h-6 rounded-full"
                                             sizes="40px"
                                         />
                                     </div>
                                 )}
-                                <span className="text-sm text-text dark:text-text-dark">
-                                    {user.username}
+
+                                <span className="text-sm text-text dark:text-text-dark group-hover/github:text-primary">
+                                    {githubUsername}
                                 </span>
                             </div>
                         </div>
