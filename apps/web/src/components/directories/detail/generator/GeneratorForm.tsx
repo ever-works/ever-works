@@ -53,7 +53,7 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
             lastRequestData?.update_with_pull_request !== undefined
                 ? lastRequestData.update_with_pull_request
                 : true,
-        badge_evaluation_enabled: lastRequestData?.badge_evaluation_enabled !== false,
+        badge_evaluation_enabled: lastRequestData?.badge_evaluation_enabled || false,
         website_repository_creation_method:
             lastRequestData?.website_repository_creation_method ||
             WebsiteRepositoryCreationMethod.DUPLICATE,
@@ -260,7 +260,7 @@ function CollapsibleSection({
     return (
         <div
             className={cn(
-                'rounded-lg border',
+                'rounded-lg border overflow-hidden',
                 'bg-card dark:bg-card-dark',
                 'border-card-border dark:border-card-border-dark',
             )}
@@ -293,7 +293,7 @@ function CollapsibleSection({
                     />
                 </svg>
             </button>
-            {isExpanded && <div className="px-6 pb-4">{children}</div>}
+            {isExpanded && <div className="px-6 pb-4 pt-2">{children}</div>}
         </div>
     );
 }

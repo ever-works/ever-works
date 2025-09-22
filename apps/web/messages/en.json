@@ -507,7 +507,7 @@
                 "maxPagesToProcess": "Max Pages to Process",
                 "relevanceThreshold": "Relevance Threshold",
                 "aiFirstGeneration": "AI-First Generation",
-                "aiFirstGenerationDescription": "Prioritize AI-generated content",
+                "aiFirstGenerationDescription": "Enable AI-generation of initial items before web search.",
                 "contentFiltering": "Content Filtering",
                 "contentFilteringDescription": "Enable content quality filtering"
             },

@@ -1,20 +1,20 @@
 'use server';
 
 import { z } from 'zod';
-import { directoryAPI, CreateDirectoryDto, itemsGeneratorAPI } from '@/lib/api';
+import { directoryAPI, CreateDirectoryDto, itemsGeneratorAPI, UpdateDirectoryDto } from '@/lib/api';
 import { checkGitHubConnection } from './oauth';
 import { RepoProvider } from '@/lib/api/enums';
 import { getTranslations } from 'next-intl/server';
 
+const readmeConfigSchema = z.object({
+    header: z.string().optional(),
+    overwriteDefaultHeader: z.boolean().optional(),
+    footer: z.string().optional(),
+    overwriteDefaultFooter: z.boolean().optional(),
+});
+
 const getCreateDirectorySchema = async () => {
     const t = await getTranslations('actions.directories');
-
-    const readmeConfigSchema = z.object({
-        header: z.string().optional(),
-        overwriteDefaultHeader: z.boolean().optional(),
-        footer: z.string().optional(),
-        overwriteDefaultFooter: z.boolean().optional(),
-    });
 
     const createDirectorySchema = z
         .object({
@@ -179,6 +179,43 @@ export async function createDirectoryWithAI({
         return {
             success: false,
             error: error instanceof Error ? error.message : t('createFailed'),
+        };
+    }
+}
+
+export async function updateDirectory(directoryId: string, data: UpdateDirectoryDto) {
+    const t = await getTranslations('actions.directories');
+
+    const createDirectorySchema = z.object({
+        name: z.string().min(1, t('name.required')).max(100, t('name.maxLength')),
+        description: z
+            .string()
+            .min(1, t('description.required'))
+            .max(500, t('description.maxLength')),
+        readmeConfig: readmeConfigSchema.optional(),
+    });
+
+    try {
+        // Validate input data
+        const validation = createDirectorySchema.safeParse(data);
+        if (!validation.success) {
+            return {
+                success: false,
+                error: validation.error.errors[0].message,
+            };
+        }
+
+        await directoryAPI.update(directoryId, validation.data);
+
+        return {
+            success: true,
+            message: t('updateSuccess'),
+        };
+    } catch (error) {
+        console.error('Failed to update directory:', error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : t('updateFailed'),
         };
     }
 }

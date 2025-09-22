@@ -10,7 +10,7 @@ export default async function DirectoryGeneratorPage({ params }: Params) {
 
     const [directoryRes, configRes] = await Promise.all([
         directoryAPI.get(id),
-        directoryAPI.getConfig(id),
+        directoryAPI.getConfig(id).catch(() => ({ config: undefined })),
     ]);
 
     const directory = directoryRes.directory;

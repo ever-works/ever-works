@@ -45,7 +45,13 @@ export function SourceFields({ sourceUrls, onChange }: SourceFieldsProps) {
                     placeholder={t('sourceUrlPlaceholder')}
                     variant="form"
                 />
-                <Button type="button" onClick={addUrl} variant="secondary" size="sm">
+                <Button
+                    type="button"
+                    onClick={addUrl}
+                    variant="secondary"
+                    size="sm"
+                    className="whitespace-nowrap"
+                >
                     {t('addUrl')}
                 </Button>
             </div>

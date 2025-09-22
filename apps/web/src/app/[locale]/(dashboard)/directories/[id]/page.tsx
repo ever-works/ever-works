@@ -17,7 +17,10 @@ export default async function DirectoryOverviewPage({ params }: Params) {
 
     const directory = directoryRes.directory;
     const config = configRes.config;
-    const isGenerating = directory.generateStatus?.status === GenerateStatusType.GENERATING;
+
+    const isGenerating =
+        !directory.generateStatus?.status ||
+        directory.generateStatus?.status === GenerateStatusType.GENERATING;
 
     return (
         <div className="space-y-6">

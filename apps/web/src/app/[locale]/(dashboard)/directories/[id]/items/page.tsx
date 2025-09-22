@@ -12,7 +12,7 @@ export default async function DirectoryItemsPage({ params }: Params) {
     let error: string | null = null;
 
     try {
-        const res = await directoryAPI.getItems(id);
+        const res = await directoryAPI.getItems(id).catch(() => ({ items: [] }));
         items = res.items || [];
     } catch (err) {
         console.error('Failed to fetch items:', err);
