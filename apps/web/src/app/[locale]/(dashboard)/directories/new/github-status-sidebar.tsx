@@ -98,7 +98,7 @@ export function GitHubStatusSidebar({ user, githubConnection }: GitHubStatusSide
                                 )}
 
                                 <span className="text-sm text-text dark:text-text-dark group-hover/github:text-primary">
-                                    {githubUsername}
+                                    @{githubUsername}
                                 </span>
                             </div>
                         </div>

@@ -60,31 +60,6 @@ export function RequiredFields({ formData, onChange }: RequiredFieldsProps) {
                     rows={2}
                     variant="form"
                 />
-
-                <Select
-                    label={t('generationMethod')}
-                    value={formData.generation_method || GenerationMethod.CREATE_UPDATE}
-                    onChange={(e) =>
-                        onChange({ generation_method: e.target.value as GenerationMethod })
-                    }
-                    variant="form"
-                >
-                    <option value={GenerationMethod.CREATE_UPDATE}>
-                        {t('methodCreateUpdate')}
-                    </option>
-                    <option value={GenerationMethod.RECREATE}>{t('methodRecreate')}</option>
-                </Select>
-
-                <Switch
-                    label={t('updateWithPullRequest')}
-                    checked={
-                        formData.update_with_pull_request !== undefined
-                            ? formData.update_with_pull_request
-                            : true
-                    }
-                    onChange={(checked) => onChange({ update_with_pull_request: checked })}
-                    helperText={t('updateWithPullRequestDescription')}
-                />
             </div>
         </div>
     );
