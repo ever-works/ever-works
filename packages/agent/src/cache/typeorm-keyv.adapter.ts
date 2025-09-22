@@ -4,23 +4,25 @@ import { CacheEntry } from '../entities/cache.entity';
 
 export interface TypeORMKeyvOptions {
     repository: Repository<CacheEntry>;
+    ttl?: number;
     namespace?: string;
 }
 
 export class TypeORMKeyvAdapter extends EventEmitter {
     private repository: Repository<CacheEntry>;
-    public namespace: string;
+    public _namespace: string;
 
     opts: any = {};
 
     constructor(options: TypeORMKeyvOptions) {
         super();
         this.repository = options.repository;
-        this.namespace = options.namespace || 'cache';
+        this.opts.ttl = options.ttl;
+        this._namespace = options.namespace || 'app-cache';
     }
 
     private createKey(key: string): string {
-        return `${this.namespace}:${key}`;
+        return `${this._namespace}:${key}`;
     }
 
     async get(key: string): Promise<any> {
@@ -76,7 +78,7 @@ export class TypeORMKeyvAdapter extends EventEmitter {
     async clear(): Promise<void> {
         try {
             await this.repository.delete({
-                key: Like(`${this.namespace}:%`),
+                key: Like(`${this._namespace}:%`),
             });
         } catch (error) {
             this.emit('error', error);
@@ -116,5 +118,24 @@ export class TypeORMKeyvAdapter extends EventEmitter {
 
     disconnect?(): Promise<void> {
         return Promise.resolve();
+    }
+
+    wrap<T>(
+        key: string,
+        fn: () => T | Promise<T>,
+        options?: number | { ttl?: number },
+    ): Promise<T> {
+        const ttl = typeof options === 'number' ? options : options.ttl || this.opts.ttl;
+
+        return this.get(key).then((cachedValue) => {
+            if (cachedValue !== undefined) {
+                return cachedValue;
+            }
+
+            return Promise.resolve(fn()).then((value) => {
+                this.set(key, value, ttl);
+                return value;
+            });
+        });
     }
 }

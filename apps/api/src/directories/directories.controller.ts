@@ -4,6 +4,7 @@ import {
     Get,
     HttpCode,
     HttpStatus,
+    Inject,
     Param,
     Post,
     Put,
@@ -29,11 +30,13 @@ import { UpdateWebsiteRepositoryResponseDto } from '@packages/agent/website-gene
 import { AuthService, CurrentUser, JwtAuthGuard } from '../auth';
 import { AuthenticatedUser } from '@src/auth/types/jwt.types';
 import { GenerateDirectoryDetailDto } from './dto/generate-detail.dto';
+import { CACHE_MANAGER, Cache } from '@packages/agent/cache';
 
 @Controller('api')
 @UseGuards(JwtAuthGuard)
 export class DirectoriesController {
     constructor(
+        @Inject(CACHE_MANAGER) private cacheManager: Cache,
         private readonly agentService: AgentService,
         private readonly authService: AuthService,
         private readonly directoryDetailService: DirectoryDetailService,
@@ -93,15 +96,33 @@ export class DirectoriesController {
     @Get('directories/:id/items')
     @HttpCode(HttpStatus.OK)
     async getDirectoryItems(@CurrentUser() auth: AuthenticatedUser, @Param('id') id: string) {
-        const user = await this.authService.getUser(auth.userId);
-        return this.agentService.directoryItems(id, user);
+        const cacheKey = `directory-items-${id}-${auth.userId}`;
+        const ttl = 1000 * 60 * 5; // 5 minutes
+
+        return this.cacheManager.wrap(
+            cacheKey,
+            async () => {
+                const user = await this.authService.getUser(auth.userId);
+                return this.agentService.directoryItems(id, user);
+            },
+            ttl,
+        );
     }
 
     @Get('directories/:id/config')
     @HttpCode(HttpStatus.OK)
     async getDirectoryConfig(@CurrentUser() auth: AuthenticatedUser, @Param('id') id: string) {
-        const user = await this.authService.getUser(auth.userId);
-        return this.agentService.directoryConfig(id, user);
+        const cacheKey = `directory-config-${id}-${auth.userId}`;
+        const ttl = 1000 * 60 * 5; // 5 minutes
+
+        return this.cacheManager.wrap(
+            cacheKey,
+            async () => {
+                const user = await this.authService.getUser(auth.userId);
+                return this.agentService.directoryConfig(id, user);
+            },
+            ttl,
+        );
     }
 
     @Post('directories/generate-details')

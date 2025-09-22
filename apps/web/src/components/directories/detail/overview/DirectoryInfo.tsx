@@ -1,6 +1,7 @@
 'use client';
 
 import { Directory } from '@/lib/api/types-only';
+import { useMounted } from '@/lib/hooks/use-mounted';
 import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
 
@@ -56,7 +57,7 @@ export function DirectoryInfo({ directory }: DirectoryInfoProps) {
         },
         {
             label: t('created'),
-            value: new Date(directory.createdAt).toLocaleString(),
+            value: new Date(directory.createdAt),
             icon: (
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path
@@ -70,7 +71,7 @@ export function DirectoryInfo({ directory }: DirectoryInfoProps) {
         },
         {
             label: t('lastUpdated'),
-            value: new Date(directory.updatedAt).toLocaleString(),
+            value: new Date(directory.updatedAt),
             icon: (
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path
@@ -146,7 +147,11 @@ export function DirectoryInfo({ directory }: DirectoryInfoProps) {
                                 {item.label}
                             </p>
                             <p className="text-sm font-medium text-text dark:text-text-dark">
-                                {item.value}
+                                {item.value instanceof Date ? (
+                                    <DisplayDate date={item.value.toISOString()} />
+                                ) : (
+                                    item.value
+                                )}
                             </p>
                         </div>
                     </div>
@@ -154,4 +159,12 @@ export function DirectoryInfo({ directory }: DirectoryInfoProps) {
             </div>
         </div>
     );
+}
+
+function DisplayDate({ date }: { date: string }) {
+    const isMounted = useMounted();
+
+    if (!isMounted) return null;
+
+    return <time dateTime={date}>{new Date(date).toLocaleString()}</time>;
 }

@@ -1,14 +1,14 @@
 export interface JwtPayload {
-    sub: string;                    // User ID (JWT standard)
+    sub: string; // User ID (JWT standard)
     email: string;
-    provider: string;              // Registration provider
+    provider: string; // Registration provider
     username: string;
     emailVerified: boolean;
     isActive: boolean;
     avatar: string | null;
-    iat: number;                   // Issued at timestamp
-    iss: string;                   // Issuer
-    aud: string;                   // Audience
+    iat: number; // Issued at timestamp
+    iss: string; // Issuer
+    aud: string; // Audience
 }
 
 export interface AuthenticatedUser {

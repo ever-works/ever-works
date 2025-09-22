@@ -64,14 +64,10 @@ export const config = {
         clientId: () => process.env.GH_CLIENT_ID,
         clientSecret: () => process.env.GH_CLIENT_SECRET,
         callbackUrl: () => {
-            return (
-                process.env.GH_CALLBACK_URL || 'http://localhost:3100/api/auth/github/callback'
-            );
+            return process.env.GH_CALLBACK_URL || 'http://localhost:3100/api/auth/github/callback';
         },
         connectCallbackUrl: () => {
-            return (
-                process.env.GH_CALLBACK_URL || 'http://localhost:3100/api/auth/github/callback'
-            );
+            return process.env.GH_CALLBACK_URL || 'http://localhost:3100/api/auth/github/callback';
         },
     },
 };

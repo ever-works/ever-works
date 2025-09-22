@@ -10,11 +10,9 @@ type CacheOptions = {
     isGlobal?: boolean;
 };
 
-export const Cache = {
+export const CacheFactory = {
     InMemory() {
-        return CacheModule.register({
-            stores: [],
-        });
+        return CacheModule.register();
     },
 
     TypeORM(options?: CacheOptions) {
@@ -28,7 +26,8 @@ export const Cache = {
                 // Create the TypeORM adapter
                 const typeormAdapter = new TypeORMKeyvAdapter({
                     repository,
-                    namespace: options?.namespace || 'app-cache',
+                    namespace: options?.namespace,
+                    ttl: options?.ttl,
                 });
 
                 return { stores: [typeormAdapter] };

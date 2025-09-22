@@ -105,9 +105,9 @@ To generate data and create a GitHub repository for the directory, send a POST r
 
 **URL Parameters:**
 
-| Parameter | Type   | Required   | Description                       |
-| --------- | ------ | ---------- | --------------------------------- |
-| `id`      | string | `required` | The ID of the directory           |
+| Parameter | Type   | Required   | Description             |
+| --------- | ------ | ---------- | ----------------------- |
+| `id`      | string | `required` | The ID of the directory |
 
 **Request Body:**
 
@@ -358,16 +358,16 @@ POST /api/directories/{id}/submit-item
 
 **Response Fields:**
 
-| Field           | Type    | Description                                                     |
-| --------------- | ------- | --------------------------------------------------------------- |
-| `status`        | string  | Status of the operation: `success`, `error`, or `pending`       |
-| `slug`          | string  | Directory slug                                                  |
-| `item_name`     | string  | Name of the submitted item                                      |
-| `message`       | string  | Status message                                                  |
-| `pr_number`     | number  | _(Success only)_ GitHub PR number if created                    |
-| `pr_url`        | string  | _(Success only)_ GitHub PR URL if created                       |
-| `branch_name`   | string  | _(Success only)_ Git branch name if created                     |
-| `auto_merged`   | boolean | _(Success only)_ Whether the PR was automatically merged        |
+| Field         | Type    | Description                                               |
+| ------------- | ------- | --------------------------------------------------------- |
+| `status`      | string  | Status of the operation: `success`, `error`, or `pending` |
+| `slug`        | string  | Directory slug                                            |
+| `item_name`   | string  | Name of the submitted item                                |
+| `message`     | string  | Status message                                            |
+| `pr_number`   | number  | _(Success only)_ GitHub PR number if created              |
+| `pr_url`      | string  | _(Success only)_ GitHub PR URL if created                 |
+| `branch_name` | string  | _(Success only)_ Git branch name if created               |
+| `auto_merged` | boolean | _(Success only)_ Whether the PR was automatically merged  |
 
 **Auto-Merge Behavior:**
 
@@ -458,16 +458,16 @@ POST /api/directories/{id}/remove-item
 
 **Response Fields:**
 
-| Field           | Type   | Description                                                     |
-| --------------- | ------ | --------------------------------------------------------------- |
-| `status`        | string | Status of the operation: `success`, `error`, or `pending`       |
-| `slug`          | string | Directory slug                                                  |
-| `item_name`     | string | Name of the removed item                                        |
-| `item_slug`     | string | Slug of the removed item                                        |
-| `message`       | string | Status message                                                  |
-| `pr_number`     | number | _(Success only)_ GitHub PR number if created                    |
-| `pr_url`        | string | _(Success only)_ GitHub PR URL if created                       |
-| `branch_name`   | string | _(Success only)_ Git branch name if created                     |
+| Field         | Type   | Description                                               |
+| ------------- | ------ | --------------------------------------------------------- |
+| `status`      | string | Status of the operation: `success`, `error`, or `pending` |
+| `slug`        | string | Directory slug                                            |
+| `item_name`   | string | Name of the removed item                                  |
+| `item_slug`   | string | Slug of the removed item                                  |
+| `message`     | string | Status message                                            |
+| `pr_number`   | number | _(Success only)_ GitHub PR number if created              |
+| `pr_url`      | string | _(Success only)_ GitHub PR URL if created                 |
+| `branch_name` | string | _(Success only)_ Git branch name if created               |
 
 **Example with Immediate Publishing:**
 
@@ -548,12 +548,12 @@ POST /api/extract-item-details
 
 **Response Fields:**
 
-| Field           | Type     | Description                                                     |
-| --------------- | -------- | --------------------------------------------------------------- |
-| `status`        | string   | Status of the operation: `success` or `error`                   |
-| `source_url`    | string   | The URL that was processed                                      |
-| `item`          | ItemData | _(Success only)_ Complete item data with all extracted details  |
-| `message`       | string   | Status message                                                  |
+| Field        | Type     | Description                                                    |
+| ------------ | -------- | -------------------------------------------------------------- |
+| `status`     | string   | Status of the operation: `success` or `error`                  |
+| `source_url` | string   | The URL that was processed                                     |
+| `item`       | ItemData | _(Success only)_ Complete item data with all extracted details |
+| `message`    | string   | Status message                                                 |
 
 **ItemData Fields:**
 
@@ -632,14 +632,14 @@ POST /api/directories/{id}/update-website
 
 **Response Fields:**
 
-| Field           | Type   | Description                                                               |
-| --------------- | ------ | ------------------------------------------------------------------------- |
-| `status`        | string | Status of the operation: `success` or `error`                             |
-| `slug`          | string | The directory slug that was updated                                       |
-| `owner`         | string | The GitHub owner (user or organization) of the repository                 |
-| `repository`    | string | Full repository name in `owner/repo-name` format                          |
-| `message`       | string | Descriptive message about the update operation                            |
-| `method_used`   | string | The update method that was successfully used (see Update Methods below)   |
+| Field         | Type   | Description                                                             |
+| ------------- | ------ | ----------------------------------------------------------------------- |
+| `status`      | string | Status of the operation: `success` or `error`                           |
+| `slug`        | string | The directory slug that was updated                                     |
+| `owner`       | string | The GitHub owner (user or organization) of the repository               |
+| `repository`  | string | Full repository name in `owner/repo-name` format                        |
+| `message`     | string | Descriptive message about the update operation                          |
+| `method_used` | string | The update method that was successfully used (see Update Methods below) |
 
 **Update Methods:**
 
