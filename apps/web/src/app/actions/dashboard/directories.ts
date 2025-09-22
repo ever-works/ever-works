@@ -186,18 +186,34 @@ export async function createDirectoryWithAI({
 export async function updateDirectory(directoryId: string, data: UpdateDirectoryDto) {
     const t = await getTranslations('actions.directories');
 
-    const createDirectorySchema = z.object({
-        name: z.string().min(1, t('name.required')).max(100, t('name.maxLength')),
-        description: z
-            .string()
-            .min(1, t('description.required'))
-            .max(500, t('description.maxLength')),
-        readmeConfig: readmeConfigSchema.optional(),
-    });
+    const updateDirectorySchema = z
+        .object({
+            name: z.string().min(1, t('name.required')).max(100, t('name.maxLength')),
+            description: z
+                .string()
+                .min(1, t('description.required'))
+                .max(500, t('description.maxLength')),
+            owner: z.string().optional(),
+            organization: z.boolean().optional(),
+            readmeConfig: readmeConfigSchema.optional(),
+        })
+        .refine(
+            (data) => {
+                // If owner is provided and not empty, organization should be true
+                if (data.owner && data.owner.trim() !== '' && !data.organization) {
+                    return false;
+                }
+                return true;
+            },
+            {
+                message: t('organization.requiredWhenOwnerProvided'),
+                path: ['organization'],
+            },
+        );
 
     try {
         // Validate input data
-        const validation = createDirectorySchema.safeParse(data);
+        const validation = updateDirectorySchema.safeParse(data);
         if (!validation.success) {
             return {
                 success: false,

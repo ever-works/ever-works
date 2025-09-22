@@ -9,8 +9,9 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils/cn';
 import { toast } from 'sonner';
 import { useRouter } from '@/i18n/navigation';
-import { deleteDirectory } from '@/app/actions/dashboard/directories';
+import { updateDirectory, deleteDirectory } from '@/app/actions/dashboard/directories';
 import { ROUTES } from '@/lib/constants';
+import { useTranslations } from 'next-intl';
 
 interface SettingsFormProps {
     directory: Directory;
@@ -18,12 +19,20 @@ interface SettingsFormProps {
 
 export function SettingsForm({ directory }: SettingsFormProps) {
     const router = useRouter();
+    const t = useTranslations('dashboard.directoryDetail.settings');
     const [isPending, startTransition] = useTransition();
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+    // Check if directory can be edited (not currently generating)
+    const isGenerated = directory.generateStatus !== null && directory.generateStatus !== undefined;
+
+    const canEditOrganization = !isGenerated;
 
     const [formData, setFormData] = useState<UpdateDirectoryDto>({
         name: directory.name,
         description: directory.description,
+        organization: directory.organization,
+        owner: directory.owner || '',
         readmeConfig: directory.readmeConfig || {
             header: '',
             overwriteDefaultHeader: false,
@@ -34,8 +43,17 @@ export function SettingsForm({ directory }: SettingsFormProps) {
 
     const handleUpdate = async (e: React.FormEvent) => {
         e.preventDefault();
-        // TODO: Implement update action
-        toast.success('Settings updated successfully');
+
+        startTransition(async () => {
+            const result = await updateDirectory(directory.id, formData);
+
+            if (result.success) {
+                toast.success(result.message || t('updateSuccess'));
+                router.refresh();
+            } else {
+                toast.error(result.error || t('updateFailed'));
+            }
+        });
     };
 
     const handleDelete = async () => {
@@ -67,12 +85,12 @@ export function SettingsForm({ directory }: SettingsFormProps) {
                 )}
             >
                 <h3 className="text-lg font-semibold text-text dark:text-text-dark mb-4">
-                    General Settings
+                    {t('generalSettings')}
                 </h3>
 
                 <form onSubmit={handleUpdate} className="space-y-4">
                     <Input
-                        label="Directory Name"
+                        label={t('directoryName')}
                         type="text"
                         value={formData.name}
                         onChange={(e) => setFormData({ ...formData, name: e.target.value })}
@@ -81,7 +99,7 @@ export function SettingsForm({ directory }: SettingsFormProps) {
                     />
 
                     <Textarea
-                        label="Description"
+                        label={t('description')}
                         value={formData.description}
                         onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                         rows={3}
@@ -89,8 +107,49 @@ export function SettingsForm({ directory }: SettingsFormProps) {
                         required
                     />
 
-                    <Button type="submit" disabled={isPending} variant="primary">
-                        Save Changes
+                    {/* Organization fields */}
+                    {(directory.organization || canEditOrganization || formData.organization) && (
+                        <>
+                            <Checkbox
+                                checked={formData.organization || false}
+                                onChange={(e) => {
+                                    const isOrg = e.target.checked;
+                                    setFormData({
+                                        ...formData,
+                                        organization: isOrg,
+                                        owner: isOrg ? formData.owner : '',
+                                    });
+                                }}
+                                label={t('organizationRepository')}
+                                description={t('organizationHelp')}
+                                variant="form"
+                                disabled={!canEditOrganization}
+                            />
+
+                            {formData.organization && (
+                                <Input
+                                    label={t('organizationName')}
+                                    type="text"
+                                    value={formData.owner || ''}
+                                    onChange={(e) =>
+                                        setFormData({ ...formData, owner: e.target.value })
+                                    }
+                                    placeholder={t('organizationNamePlaceholder')}
+                                    variant="form"
+                                    disabled={!canEditOrganization}
+                                    required={formData.organization}
+                                />
+                            )}
+                        </>
+                    )}
+
+                    <Button
+                        type="submit"
+                        disabled={isPending}
+                        loading={isPending}
+                        variant="primary"
+                    >
+                        {t('saveChanges')}
                     </Button>
                 </form>
             </div>
@@ -104,13 +163,13 @@ export function SettingsForm({ directory }: SettingsFormProps) {
                 )}
             >
                 <h3 className="text-lg font-semibold text-text dark:text-text-dark mb-4">
-                    README Configuration
+                    {t('readmeConfiguration')}
                 </h3>
 
                 <div className="space-y-4">
                     <div className="space-y-3">
                         <Textarea
-                            label="Custom Header"
+                            label={t('customHeader')}
                             value={formData.readmeConfig?.header || ''}
                             onChange={(e) =>
                                 setFormData({
@@ -121,7 +180,7 @@ export function SettingsForm({ directory }: SettingsFormProps) {
                                     },
                                 })
                             }
-                            placeholder="Add custom content to the README header"
+                            placeholder={t('customHeaderPlaceholder')}
                             rows={3}
                             variant="form"
                         />
@@ -136,14 +195,14 @@ export function SettingsForm({ directory }: SettingsFormProps) {
                                     },
                                 })
                             }
-                            label="Overwrite default header"
+                            label={t('overwriteDefaultHeader')}
                             variant="form"
                         />
                     </div>
 
                     <div className="space-y-3">
                         <Textarea
-                            label="Custom Footer"
+                            label={t('customFooter')}
                             value={formData.readmeConfig?.footer || ''}
                             onChange={(e) =>
                                 setFormData({
@@ -154,7 +213,7 @@ export function SettingsForm({ directory }: SettingsFormProps) {
                                     },
                                 })
                             }
-                            placeholder="Add custom content to the README footer"
+                            placeholder={t('customFooterPlaceholder')}
                             rows={3}
                             variant="form"
                         />
@@ -169,13 +228,19 @@ export function SettingsForm({ directory }: SettingsFormProps) {
                                     },
                                 })
                             }
-                            label="Overwrite default footer"
+                            label={t('overwriteDefaultFooter')}
                             variant="form"
                         />
                     </div>
 
-                    <Button type="button" disabled={isPending} variant="secondary">
-                        Update README
+                    <Button
+                        type="button"
+                        onClick={handleUpdate}
+                        disabled={isPending}
+                        loading={isPending}
+                        variant="secondary"
+                    >
+                        {t('updateReadme')}
                     </Button>
                 </div>
             </div>
@@ -189,16 +254,14 @@ export function SettingsForm({ directory }: SettingsFormProps) {
                 )}
             >
                 <h3 className="text-lg font-semibold text-red-800 dark:text-red-200 mb-2">
-                    Danger Zone
+                    {t('dangerZone')}
                 </h3>
-                <p className="text-sm text-red-700 dark:text-red-300 mb-4">
-                    Once you delete a directory, there is no going back. Please be certain.
-                </p>
+                <p className="text-sm text-red-700 dark:text-red-300 mb-4">{t('deleteWarning')}</p>
 
                 {showDeleteConfirm ? (
                     <div className="flex items-center gap-3">
                         <p className="text-sm text-red-700 dark:text-red-300">
-                            Are you absolutely sure?
+                            {t('deleteConfirm')}
                         </p>
                         <Button
                             onClick={handleDelete}
@@ -207,14 +270,14 @@ export function SettingsForm({ directory }: SettingsFormProps) {
                             variant="primary"
                             className="bg-red-600 hover:bg-red-700"
                         >
-                            Yes, Delete
+                            {t('deleteConfirmButton')}
                         </Button>
                         <Button
                             onClick={() => setShowDeleteConfirm(false)}
                             disabled={isPending}
                             variant="secondary"
                         >
-                            Cancel
+                            {t('cancel')}
                         </Button>
                     </div>
                 ) : (
@@ -224,7 +287,7 @@ export function SettingsForm({ directory }: SettingsFormProps) {
                         variant="secondary"
                         className="border-red-600 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30"
                     >
-                        Delete Directory
+                        {t('deleteButton')}
                     </Button>
                 )}
             </div>

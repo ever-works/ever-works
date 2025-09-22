@@ -24,6 +24,8 @@ export interface CreateDirectoryDto {
 export interface UpdateDirectoryDto {
     name?: string;
     description?: string;
+    owner?: string;
+    organization?: boolean;
     readmeConfig?: MarkdownReadmeConfig;
 }
 

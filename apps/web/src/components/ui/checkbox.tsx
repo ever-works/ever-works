@@ -24,7 +24,7 @@ const Checkbox = ({
 
     return (
         <div className="w-full">
-            <label htmlFor={checkboxId} className="flex items-start gap-3 cursor-pointer">
+            <label htmlFor={checkboxId} className="flex items-center gap-3 cursor-pointer">
                 <input
                     type="checkbox"
                     id={checkboxId}
