@@ -1,10 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils/cn';
 import { ROUTES } from '@/lib/constants';
 import { useTranslations } from 'next-intl';
+import { usePathname } from '@/i18n/navigation';
 
 interface DirectoryTabsProps {
     directoryId: string;

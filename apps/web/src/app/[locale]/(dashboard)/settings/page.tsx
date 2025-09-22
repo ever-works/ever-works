@@ -1,16 +1,7 @@
-import { getAuthFromCookie } from '@/lib/auth';
 import { authAPI } from '@/lib/api/auth';
-import { redirect } from 'next/navigation';
-import { ROUTES } from '@/lib/constants';
 import { ProfileSettings } from '@/components/settings/ProfileSettings';
 
 export default async function SettingsPage() {
-    const user = await getAuthFromCookie();
-
-    if (!user) {
-        redirect(ROUTES.AUTH_LOGIN);
-    }
-
     // Get fresh profile
     const profile = await authAPI.getFreshProfile();
 

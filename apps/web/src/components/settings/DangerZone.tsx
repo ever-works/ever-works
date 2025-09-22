@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react';
 import { cn } from '@/lib/utils/cn';
 import { deleteAccount } from '@/app/actions/settings';
 import { toast } from 'sonner';
-import { useRouter } from 'next/navigation';
+import { useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { useTranslations } from 'next-intl';
 
