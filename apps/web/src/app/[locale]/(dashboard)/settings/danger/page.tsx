@@ -2,17 +2,16 @@ import { getAuthFromCookie } from '@/lib/auth';
 import { authAPI } from '@/lib/api/auth';
 import { redirect } from 'next/navigation';
 import { ROUTES } from '@/lib/constants';
-import { ProfileSettings } from '@/components/settings/ProfileSettings';
+import { DangerZone } from '@/components/settings/DangerZone';
 
-export default async function SettingsPage() {
+export default async function DangerZoneSettingsPage() {
     const user = await getAuthFromCookie();
 
     if (!user) {
         redirect(ROUTES.AUTH_LOGIN);
     }
 
-    // Get fresh profile
     const profile = await authAPI.getFreshProfile();
 
-    return <ProfileSettings user={profile} />;
+    return <DangerZone user={profile} />;
 }
