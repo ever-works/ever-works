@@ -30,7 +30,15 @@ export const ROUTES = {
     DASHBOARD_DIRECTORIES: '/directories',
     DASHBOARD_DIRECTORIES_NEW: '/directories/new',
     DASHBOARD_DIRECTORY: (id: string) => `/directories/${id}`,
+    // Settings
     DASHBOARD_SETTINGS: '/settings',
+    DASHBOARD_SETTINGS_PROFILE: '/settings',
+    DASHBOARD_SETTINGS_SECURITY: '/settings/security',
+    DASHBOARD_SETTINGS_API_TOKENS: '/settings/api-tokens',
+    DASHBOARD_SETTINGS_OAUTH: '/settings/oauth',
+    DASHBOARD_SETTINGS_NOTIFICATIONS: '/settings/notifications',
+    DASHBOARD_SETTINGS_DANGER_ZONE: '/settings/danger',
+    // Profile
     DASHBOARD_PROFILE: '/profile',
     DASHBOARD_ANALYTICS: '/analytics',
     DASHBOARD_NOTIFICATIONS: '/notifications',

@@ -55,11 +55,11 @@ export function ProfileSettings({ user }: ProfileSettingsProps) {
             <div className="space-y-4">
                 {/* Username Field */}
                 <Input
-                    label={t('fields.username')}
+                    label={t('fields.name')}
                     type="text"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
-                    placeholder={t('placeholders.username')}
+                    placeholder={t('placeholders.name')}
                 />
 
                 {/* Email Field (Read-only) */}

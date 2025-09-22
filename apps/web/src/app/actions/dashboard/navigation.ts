@@ -24,11 +24,6 @@ export async function redirectToSettings() {
     redirect({ locale, href: ROUTES.DASHBOARD_SETTINGS });
 }
 
-export async function redirectToProfile() {
-    const locale = await getLocale();
-    redirect({ locale, href: ROUTES.DASHBOARD_PROFILE });
-}
-
 export async function redirectToAnalytics() {
     const locale = await getLocale();
     redirect({ locale, href: ROUTES.DASHBOARD_ANALYTICS });

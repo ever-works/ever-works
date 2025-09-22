@@ -260,11 +260,13 @@
                 "title": "Profile Settings",
                 "subtitle": "Update your profile information and avatar",
                 "fields": {
+                    "name": "Name",
                     "username": "Username",
                     "email": "Email",
                     "emailHelperText": "Email cannot be changed"
                 },
                 "placeholders": {
+                    "name": "Enter your name",
                     "username": "Enter your username"
                 },
                 "actions": {

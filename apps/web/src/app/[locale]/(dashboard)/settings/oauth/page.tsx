@@ -3,7 +3,7 @@ import { RepoProvider } from '@/lib/api/enums';
 import { OAuthConnections } from '@/components/settings/OAuthConnections';
 
 export default async function OAuthSettingsPage() {
-    const [profile, connections] = await Promise.all([
+    const [profile, githubConnection] = await Promise.all([
         authAPI.getFreshProfile(),
         authAPI.oauth_connections.checkConnection(RepoProvider.GITHUB),
     ]);
@@ -11,10 +11,8 @@ export default async function OAuthSettingsPage() {
     return (
         <OAuthConnections
             user={profile}
-            githubConnected={!!connections.connected}
-            googleConnected={false}
-            githubScopes={connections?.scopes || []}
-            googleScopes={[]}
+            githubConnection={githubConnection}
+            googleConnection={null}
         />
     );
 }

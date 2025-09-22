@@ -8,25 +8,27 @@ import { toast } from 'sonner';
 import { ROUTES } from '@/lib/constants';
 import { GitHubIcon } from '@/components/icons/GitHubIcon';
 import { useTranslations } from 'next-intl';
+import { ConnectionInfo } from '@/lib/api';
 
 interface OAuthConnectionsProps {
     user: {
         id: string;
         email: string;
     };
-    githubConnected: boolean;
-    googleConnected: boolean;
-    githubScopes: string[];
-    googleScopes: string[];
+    githubConnection: ConnectionInfo | null;
+    googleConnection: ConnectionInfo | null;
 }
 
-export function OAuthConnections({ githubConnected, githubScopes }: OAuthConnectionsProps) {
+export function OAuthConnections({ githubConnection }: OAuthConnectionsProps) {
     const [isPending, startTransition] = useTransition();
     const t = useTranslations('dashboard.settings.oauth');
 
+    const githubConnected = !!githubConnection?.connected;
+    const githubScopes = githubConnection?.scopes || [];
+
     const handleGitHubConnect = () => {
         startTransition(async () => {
-            const result = await connectGitHub(ROUTES.DASHBOARD_SETTINGS);
+            const result = await connectGitHub(ROUTES.DASHBOARD_SETTINGS_OAUTH);
 
             if (result.success && result.url) {
                 window.location.href = result.url;

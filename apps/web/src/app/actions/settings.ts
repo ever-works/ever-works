@@ -7,20 +7,23 @@ import { getAuthFromCookie } from '@/lib/auth';
 import { revalidatePath } from 'next/cache';
 import { ROUTES } from '@/lib/constants';
 import { getTranslations } from 'next-intl/server';
+import { VALIDATION_RULES } from './validation';
 
 // Note: Validation schemas are now created inside each function with translations
 
 // Profile Actions
 export async function updateProfile(data: { username: string }) {
     const t = await getTranslations('actions.settings.profile');
+    const tAuth = await getTranslations('validation.auth');
 
     // Validation schema with translations
     const updateProfileSchema = z.object({
         username: z
             .string()
-            .min(1, t('usernameRequired'))
-            .max(50, t('usernameMaxLength'))
-            .regex(/^[a-zA-Z0-9_-]+$/, t('usernameFormat')),
+            .min(
+                VALIDATION_RULES.USERNAME_MIN_LENGTH,
+                tAuth('username.minLength', { length: VALIDATION_RULES.USERNAME_MIN_LENGTH }),
+            ),
     });
 
     try {
@@ -53,11 +56,17 @@ export async function updateProfile(data: { username: string }) {
 // Security Actions
 export async function updatePassword(data: { currentPassword: string; newPassword: string }) {
     const t = await getTranslations('actions.settings.password');
+    const tAuth = await getTranslations('validation.auth');
 
     // Validation schema with translations
     const updatePasswordSchema = z.object({
         currentPassword: z.string().min(1, t('currentRequired')),
-        newPassword: z.string().min(8, t('newMinLength')).max(100, t('newMaxLength')),
+        newPassword: z
+            .string()
+            .min(6, tAuth('password.minLength', { length: 6 }))
+            .regex(/[a-z]/, tAuth('password.lowercase'))
+            .regex(/(\d|\W)/, tAuth('password.numberOrSpecial'))
+            .regex(/^[^.\n]/, tAuth('password.cannotStartWith')),
     });
 
     try {
@@ -157,7 +166,7 @@ export async function disconnectGitHub() {
         }
 
         await authAPI.oauth_connections.disconnect('github');
-        revalidatePath(ROUTES.DASHBOARD_SETTINGS);
+        revalidatePath(ROUTES.DASHBOARD_SETTINGS_OAUTH);
 
         return { success: true, message: t('disconnectSuccess') };
     } catch (error: any) {
