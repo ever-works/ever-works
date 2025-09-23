@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button';
 import { useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { useTranslations } from 'next-intl';
-import { GenerateStatusType } from '@/lib/api/enums';
+import { GenerateStatusType, ItemsGeneratorSteps } from '@/lib/api/enums';
+import { getStepText } from '@/lib/utils/generator-steps';
 
 interface DirectoryStatusCardProps {
     directory: Directory;
@@ -15,6 +16,7 @@ interface DirectoryStatusCardProps {
 export function DirectoryStatusCard({ directory }: DirectoryStatusCardProps) {
     const router = useRouter();
     const t = useTranslations('dashboard.directoryDetail.statusCard');
+    const tProgress = useTranslations('dashboard.directoryDetail.progress');
 
     const getStatusConfig = () => {
         if (!directory.generateStatus) {
@@ -52,10 +54,14 @@ export function DirectoryStatusCard({ directory }: DirectoryStatusCardProps) {
             };
         }
 
+        // Get proper step description
+        const currentStep = directory.generateStatus.step as ItemsGeneratorSteps | undefined;
+        const stepText = getStepText(currentStep, tProgress);
+
         const configs = {
             [GenerateStatusType.GENERATING]: {
                 title: t('generating.title'),
-                description: directory.generateStatus.step || t('generating.description'),
+                description: stepText || t('generating.description'),
                 color: 'border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20',
                 icon: (
                     <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">

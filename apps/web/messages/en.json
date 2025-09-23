@@ -517,12 +517,20 @@
                 "title": "Generation in Progress",
                 "processingRequest": "Processing your request...",
                 "steps": {
-                    "init": "Initializing",
-                    "fetch": "Fetching Data",
-                    "process": "Processing Items",
-                    "generate": "Generating Content",
-                    "save": "Saving Results",
-                    "complete": "Completing"
+                    "promptComparison": "Comparing prompts",
+                    "promptProcessing": "Processing your prompt",
+                    "aiFirstItemsGeneration": "Generating initial AI items",
+                    "searchQueriesGeneration": "Creating search queries",
+                    "webSearch": "Searching the web",
+                    "contentRetrieval": "Retrieving content",
+                    "contentFiltering": "Filtering relevant content",
+                    "itemsExtraction": "Extracting items from content",
+                    "deduplicationDataAggregation": "Removing duplicates and aggregating data",
+                    "categoriesTagsProcessing": "Processing categories and tags",
+                    "sourcesValidation": "Validating sources",
+                    "badgesProcessing": "Processing quality badges",
+                    "itemsProcessing": "Finalizing items",
+                    "processing": "Processing..."
                 },
                 "progress": "Progress",
                 "closeNote": "This may take a few minutes. You can close this page and come back later."

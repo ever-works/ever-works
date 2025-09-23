@@ -1,10 +1,12 @@
 'use client';
 
 import { Directory } from '@/lib/api/types-only';
+import { ItemsGeneratorSteps } from '@/lib/api/enums';
 import { cn } from '@/lib/utils/cn';
 import { useEffect, useState } from 'react';
 import { useRouter } from '@/i18n/navigation';
 import { useTranslations } from 'next-intl';
+import { getStepProgress, getStepText } from '@/lib/utils/generator-steps';
 
 interface GenerationProgressProps {
     directory: Directory;
@@ -30,38 +32,26 @@ export function GenerationProgress({ directory }: GenerationProgressProps) {
         return () => clearInterval(interval);
     }, [router]);
 
-    const steps = [
-        { id: 'prompt-processing', label: 'Prompt Processing' },
-        { id: 'ai-first-items-generation', label: 'AI-First Items Generation' },
-        { id: 'search-queries-generation', label: 'Search Query Generation' },
-        { id: 'web-search', label: 'Web Search' },
-        { id: 'content-retrieval', label: 'Content Retrieval' },
-        { id: 'content-filtering', label: 'Content Pre-filtering & Relevance Assessment' },
-        { id: 'item-extraction', label: 'AI-Driven Structured Data Extraction for Items from Web' },
-        { id: 'deduplication', label: 'Deduplication and Data Aggregation' },
-        { id: 'category-processing', label: 'Category and Tag Generation' },
-        { id: 'source-validation', label: 'Source URLs Validation' },
-        { id: 'badge-processing', label: 'Badge Processing' },
-        { id: 'markdown-generation', label: 'Markdown Generation' },
-    ];
-
-    const currentStepIndex = steps.findIndex((s) =>
-        directory.generateStatus?.step?.toLowerCase().includes(s.id),
-    );
+    // Get current step and progress
+    const currentStep = directory.generateStatus?.step as ItemsGeneratorSteps | undefined;
+    const progressPercentage = currentStep ? getStepProgress(currentStep) : 0;
+    const stepText = getStepText(currentStep, t);
 
     return (
-        <div className="max-w-3xl mx-auto py-8">
+        <div className="max-w-2xl mx-auto py-12">
             <div
                 className={cn(
-                    'rounded-lg border p-8',
+                    'rounded-lg border',
                     'bg-card dark:bg-card-dark',
                     'border-card-border dark:border-card-border-dark',
+                    'overflow-hidden',
                 )}
             >
-                <div className="text-center mb-8">
-                    <div className="w-20 h-20 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center mx-auto mb-4">
+                {/* Header Section */}
+                <div className="p-8 pb-6 text-center">
+                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 dark:bg-primary/20 mb-4">
                         <svg
-                            className="animate-spin h-10 w-10 text-blue-600 dark:text-blue-400"
+                            className="animate-spin h-8 w-8 text-primary"
                             fill="none"
                             viewBox="0 0 24 24"
                         >
@@ -80,86 +70,56 @@ export function GenerationProgress({ directory }: GenerationProgressProps) {
                             />
                         </svg>
                     </div>
-                    <h2 className="text-2xl font-bold text-text dark:text-text-dark mb-2">
+                    <h2 className="text-xl font-semibold text-text dark:text-text-dark mb-2">
                         {t('title')}
                         {dots}
                     </h2>
-                    <p className="text-text-secondary dark:text-text-secondary-dark">
-                        {directory.generateStatus?.step || t('processingRequest')}
+                    <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
+                        {stepText}
                     </p>
                 </div>
 
-                {/* Progress Steps */}
-                <div className="space-y-3 mb-8">
-                    {steps.map((step, index) => {
-                        const isActive = index === currentStepIndex;
-                        const isComplete = currentStepIndex > index;
-
-                        return (
-                            <div key={step.id} className="flex items-center gap-3">
+                {/* Progress Section */}
+                <div className="px-8 pb-8">
+                    {/* Progress Bar Container */}
+                    <div className="mb-6">
+                        <div className="flex items-center justify-between text-xs text-text-muted dark:text-text-muted-dark mb-2">
+                            <span className="font-medium">{t('progress')}</span>
+                            <span className="font-medium">{progressPercentage}%</span>
+                        </div>
+                        <div className="relative">
+                            <div className="w-full h-2 bg-surface-tertiary dark:bg-surface-tertiary-dark rounded-full overflow-hidden">
                                 <div
-                                    className={cn(
-                                        'w-8 h-8 rounded-full flex items-center justify-center',
-                                        isComplete && 'bg-green-100 dark:bg-green-900',
-                                        isActive && 'bg-blue-100 dark:bg-blue-900',
-                                        !isComplete && !isActive && 'bg-gray-100 dark:bg-gray-800',
-                                    )}
+                                    className="h-full bg-primary rounded-full transition-all duration-700 ease-out"
+                                    style={{ width: `${progressPercentage}%` }}
                                 >
-                                    {isComplete ? (
-                                        <svg
-                                            className="w-4 h-4 text-green-600 dark:text-green-400"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            viewBox="0 0 24 24"
-                                        >
-                                            <path
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                                strokeWidth={2}
-                                                d="M5 13l4 4L19 7"
-                                            />
-                                        </svg>
-                                    ) : isActive ? (
-                                        <div className="w-2 h-2 bg-blue-600 dark:bg-blue-400 rounded-full animate-pulse" />
-                                    ) : (
-                                        <div className="w-2 h-2 bg-gray-400 dark:bg-gray-600 rounded-full" />
-                                    )}
+                                    <div className="h-full bg-gradient-to-r from-primary via-primary to-primary/80 animate-gradient" />
                                 </div>
-                                <span
-                                    className={cn(
-                                        'text-sm font-medium',
-                                        isComplete && 'text-green-600 dark:text-green-400',
-                                        isActive && 'text-blue-600 dark:text-blue-400',
-                                        !isComplete &&
-                                            !isActive &&
-                                            'text-gray-400 dark:text-gray-600',
-                                    )}
-                                >
-                                    {step.label}
-                                </span>
                             </div>
-                        );
-                    })}
-                </div>
-
-                {/* Progress Bar */}
-                <div className="mb-6">
-                    <div className="flex items-center justify-between text-sm text-text-muted dark:text-text-muted-dark mb-2">
-                        <span>{t('progress')}</span>
-                        <span>{Math.round(((currentStepIndex + 1) / steps.length) * 100)}%</span>
+                        </div>
                     </div>
-                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                        <div
-                            className="bg-blue-600 h-2 rounded-full transition-all duration-500"
-                            style={{ width: `${((currentStepIndex + 1) / steps.length) * 100}%` }}
-                        />
-                    </div>
-                </div>
 
-                <div className="text-center">
-                    <p className="text-sm text-text-muted dark:text-text-muted-dark">
-                        {t('closeNote')}
-                    </p>
+                    {/* Info Note */}
+                    <div className="bg-surface-secondary dark:bg-surface-secondary-dark rounded-lg p-4">
+                        <div className="flex items-start gap-3">
+                            <svg
+                                className="w-5 h-5 text-text-muted dark:text-text-muted-dark mt-0.5 flex-shrink-0"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                                />
+                            </svg>
+                            <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
+                                {t('closeNote')}
+                            </p>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
