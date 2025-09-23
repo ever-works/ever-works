@@ -171,12 +171,12 @@ export function ConfigFields({
                         label={t('relevanceThreshold')}
                         type="number"
                         step="0.1"
-                        value={config?.relevance_threshold_content || 0.7}
+                        value={config?.relevance_threshold_content || 0.5}
                         onChange={(e) =>
                             onChange({
                                 config: {
                                     ...config,
-                                    relevance_threshold_content: parseFloat(e.target.value) || 0.7,
+                                    relevance_threshold_content: parseFloat(e.target.value) || 0.5,
                                 },
                             })
                         }

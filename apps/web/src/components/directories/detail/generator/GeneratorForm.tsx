@@ -58,7 +58,7 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
             max_search_queries: 10,
             max_results_per_query: 5,
             max_pages_to_process: 10,
-            relevance_threshold_content: 0.7,
+            relevance_threshold_content: 0.5,
             min_content_length_for_extraction: 100,
             ai_first_generation_enabled: false,
             content_filtering_enabled: false,
