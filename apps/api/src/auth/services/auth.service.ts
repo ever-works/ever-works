@@ -21,6 +21,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { UserCreatedEvent, UserForgotPasswordEvent } from '../../events';
 import { ForgotPasswordDto } from '../dto/email-verification.dto';
 import { GitHubScopePresets } from '../config/github-scopes.config';
+import { UpdateProfileDto } from '../dto/update-profile.dto';
 
 @Injectable()
 export class AuthService {
@@ -445,24 +446,17 @@ export class AuthService {
         };
     }
 
-    async updateUserProfile(userId: string, updateData: { username?: string; avatar?: string }) {
+    async updateUserProfile(userId: string, updateData: UpdateProfileDto) {
         const user = await this.userRepository.findById(userId);
         if (!user) {
             throw new BadRequestException('User not found');
-        }
-
-        // Check if username is being changed and if it's already taken
-        if (updateData.username && updateData.username !== user.username) {
-            const existingUser = await this.userRepository.findByUsername(updateData.username);
-            if (existingUser) {
-                throw new ConflictException('Username already taken');
-            }
         }
 
         // Update user profile
         await this.userRepository.update(userId, {
             ...(updateData.username && { username: updateData.username }),
             ...(updateData.avatar && { avatar: updateData.avatar }),
+            ...(updateData.vercelToken && { vercelToken: updateData.vercelToken }),
         });
 
         // Return updated profile

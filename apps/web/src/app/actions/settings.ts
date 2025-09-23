@@ -122,7 +122,7 @@ export async function updateVercelToken(token: string) {
             };
         }
 
-        await settingsAPI.updateVercelToken(validation.data.token);
+        await authAPI.updateProfile({ vercelToken: validation.data.token });
         revalidatePath(ROUTES.DASHBOARD_SETTINGS);
 
         return { success: true, message: t('saveSuccess') };

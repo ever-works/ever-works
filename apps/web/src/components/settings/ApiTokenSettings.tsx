@@ -5,18 +5,16 @@ import { cn } from '@/lib/utils/cn';
 import { updateVercelToken, removeVercelToken } from '@/app/actions/settings';
 import { toast } from 'sonner';
 import { useTranslations } from 'next-intl';
+import { UserProfile } from '@/lib/api';
 
 interface ApiTokenSettingsProps {
-    user: {
-        id: string;
-        email: string;
-    };
+    user: UserProfile;
 }
 
 export function ApiTokenSettings({ user }: ApiTokenSettingsProps) {
     const [isPending, startTransition] = useTransition();
-    const [vercelToken, setVercelToken] = useState('');
-    const [hasVercelToken, setHasVercelToken] = useState(false);
+    const [vercelToken, setVercelToken] = useState(user.vercelToken || '');
+    const [hasVercelToken, setHasVercelToken] = useState(!!user.vercelToken);
     const [showToken, setShowToken] = useState(false);
     const t = useTranslations('dashboard.apiTokens');
 

@@ -9,4 +9,8 @@ export class UpdateProfileDto {
     @IsUrl()
     @IsOptional()
     avatar?: string;
+
+    @IsString()
+    @IsOptional()
+    vercelToken?: string;
 }

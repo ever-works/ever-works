@@ -54,5 +54,13 @@ export class DeployController {
             directory,
             user,
         );
+
+        return {
+            status: 'success',
+            slug: directory.slug,
+            owner: directory.getRepoOwner(),
+            repository: `${directory.getRepoOwner()}/${directory.getWebsiteRepo()}`,
+            message: 'Deployment started',
+        };
     }
 }
