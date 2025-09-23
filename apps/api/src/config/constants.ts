@@ -28,7 +28,7 @@ export enum AuthProviders {
 }
 
 export const config = {
-    debug: () => process.env.DEBUG === 'true',
+    debug: () => process.env.HTTP_DEBUG === 'true',
 
     webAppUrl: () => process.env.WEB_URL || 'http://localhost:3000',
 
