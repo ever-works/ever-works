@@ -49,6 +49,7 @@ export function ApiTokenSettings({ user }: ApiTokenSettingsProps) {
 
                 if (result.success) {
                     toast.success(t('vercel.messages.removeSuccess'));
+                    setVercelToken('');
                     setHasVercelToken(false);
                 } else {
                     toast.error(result.error || t('vercel.messages.removeFailed'));

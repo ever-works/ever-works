@@ -5,7 +5,7 @@ import { useRouter } from '@/i18n/navigation';
 import { ConnectionInfo, Directory } from '@/lib/api/types-only';
 import { DirectoryHeader } from './DirectoryHeader';
 import { DirectoryTabs } from './DirectoryTabs';
-import { GenerateStatusType } from '@/lib/api/enums';
+import { GenerateStatusType, RepoProvider } from '@/lib/api/enums';
 
 interface DirectoryLayoutClientProps {
     directory: Directory;
@@ -62,7 +62,7 @@ function repoLink(directory: Directory, oauthConnection: ConnectionInfo | null) 
     let providerUrl: string | null = null;
 
     switch (directory.repoProvider) {
-        case 'github':
+        case RepoProvider.GITHUB:
             providerUrl = 'https://github.com';
             break;
 

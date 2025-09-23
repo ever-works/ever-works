@@ -1,5 +1,6 @@
 import { redirect } from '@/i18n/navigation';
 import { authAPI, AuthResponse, ConnectionInfo } from '@/lib/api';
+import { OAuthProcessType, OAuthProvider } from '@/lib/api/enums';
 import { getOAuthStateCookie, setAuthCookies } from '@/lib/auth';
 import { getRedirectUrl } from '@/lib/auth/redirect';
 import { ROUTES } from '@/lib/constants';
@@ -19,7 +20,7 @@ export async function GET(
     const code = queryParams.get('code');
     const state = queryParams.get('state');
     const returnPath = queryParams.get('returnPath');
-    const process = queryParams.get('process') as 'login' | 'connect' | undefined;
+    const process = queryParams.get('process') as OAuthProcessType | undefined;
 
     const locale = await getLocale();
 
@@ -40,17 +41,17 @@ export async function GET(
 
     // Login process
     if (process === 'login' || !process) {
-        await loginOauth(provider, code, state || '', locale);
+        await loginOauth(provider as OAuthProvider, code, state || '', locale);
         return;
     }
 
     // Connection process
-    await connectOauth(provider, returnPath, code, state || '', locale);
+    await connectOauth(provider as OAuthProvider, returnPath, code, state || '', locale);
     return;
 }
 
 async function connectOauth(
-    provider: string,
+    provider: OAuthProvider,
     returnPath: string | null,
     code: string,
     state: string,
@@ -61,9 +62,9 @@ async function connectOauth(
 
     try {
         switch (provider) {
-            case 'github': {
+            case OAuthProvider.GITHUB: {
                 const response = await authAPI.oauth_connections.connectCallback(
-                    'github',
+                    OAuthProvider.GITHUB,
                     code,
                     state || undefined,
                 );
@@ -78,18 +79,18 @@ async function connectOauth(
     return redirect({ locale, href: href + '?oauth_connected=true' });
 }
 
-async function loginOauth(provider: string, code: string, state: string, locale: string) {
+async function loginOauth(provider: OAuthProvider, code: string, state: string, locale: string) {
     let href: string = ROUTES.DASHBOARD;
     let authResponse: AuthResponse | null = null;
 
     try {
         switch (provider) {
-            case 'github': {
+            case OAuthProvider.GITHUB: {
                 const response = await authAPI.connectGitHubCallback(code, state || undefined);
                 authResponse = response;
                 break;
             }
-            case 'google': {
+            case OAuthProvider.GOOGLE: {
                 const response = await authAPI.connectGoogleCallback(code, state || undefined);
                 authResponse = response;
                 break;

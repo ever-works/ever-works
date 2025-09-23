@@ -8,6 +8,7 @@ import { revalidatePath } from 'next/cache';
 import { ROUTES } from '@/lib/constants';
 import { getTranslations } from 'next-intl/server';
 import { VALIDATION_RULES } from './validation';
+import { OAuthProvider } from '@/lib/api/enums';
 
 // Note: Validation schemas are now created inside each function with translations
 
@@ -104,7 +105,7 @@ export async function updateVercelToken(token: string) {
         token: z
             .string()
             .min(1, t('tokenRequired'))
-            .regex(/^vc_[A-Za-z0-9]+$/, t('invalidFormat')),
+            .regex(/^[A-Za-z0-9]+$/, t('invalidFormat')),
     });
 
     try {
@@ -123,7 +124,7 @@ export async function updateVercelToken(token: string) {
         }
 
         await authAPI.updateProfile({ vercelToken: validation.data.token });
-        revalidatePath(ROUTES.DASHBOARD_SETTINGS);
+        revalidatePath(ROUTES.DASHBOARD_SETTINGS_API_TOKENS);
 
         return { success: true, message: t('saveSuccess') };
     } catch (error: any) {
@@ -143,8 +144,8 @@ export async function removeVercelToken() {
             return { success: false, error: t('notAuthenticated') };
         }
 
-        await settingsAPI.removeVercelToken();
-        revalidatePath(ROUTES.DASHBOARD_SETTINGS);
+        await authAPI.updateProfile({ vercelToken: '' });
+        revalidatePath(ROUTES.DASHBOARD_SETTINGS_API_TOKENS);
 
         return { success: true, message: t('removeSuccess') };
     } catch (error: any) {
@@ -165,7 +166,7 @@ export async function disconnectGitHub() {
             return { success: false, error: t('notAuthenticated') };
         }
 
-        await authAPI.oauth_connections.disconnect('github');
+        await authAPI.oauth_connections.disconnect(OAuthProvider.GITHUB);
         revalidatePath(ROUTES.DASHBOARD_SETTINGS_OAUTH);
 
         return { success: true, message: t('disconnectSuccess') };

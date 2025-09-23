@@ -452,11 +452,15 @@ export class AuthService {
             throw new BadRequestException('User not found');
         }
 
+        const isNotNull = (value: any) => {
+            return value !== null && value !== undefined;
+        };
+
         // Update user profile
         await this.userRepository.update(userId, {
-            ...(updateData.username && { username: updateData.username }),
-            ...(updateData.avatar && { avatar: updateData.avatar }),
-            ...(updateData.vercelToken && { vercelToken: updateData.vercelToken }),
+            ...(isNotNull(updateData.username) && { username: updateData.username }),
+            ...(isNotNull(updateData.avatar) && { avatar: updateData.avatar }),
+            ...(isNotNull(updateData.vercelToken) && { vercelToken: updateData.vercelToken }),
         });
 
         // Return updated profile

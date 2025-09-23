@@ -1,6 +1,7 @@
 import 'server-only';
 import { serverFetch, serverMutation } from './server-api';
 import { MessageResponse } from './types';
+import { OAuthProvider } from './enums';
 
 // DTOs - Auth
 export interface RegisterDto {
@@ -66,7 +67,7 @@ export interface OAuthUrlResponse {
 }
 
 export interface ConnectionInfo {
-    provider: string;
+    provider: OAuthProvider;
     connected: boolean;
     email?: string;
     username?: string;
@@ -244,12 +245,12 @@ export const authAPI = {
             return serverFetch<OAuthConnectionResponse[]>('/auth/connections');
         },
 
-        checkConnection: async (provider: string) => {
+        checkConnection: async (provider: `${OAuthProvider}`) => {
             return serverFetch<OAuthConnectionResponse>(`/auth/connections/${provider}`);
         },
 
         getConnectUrl: async (
-            provider: string,
+            provider: OAuthProvider,
             callbackUrl?: string,
             state?: string,
         ): Promise<{ url: string; state: string }> => {
@@ -263,7 +264,7 @@ export const authAPI = {
             );
         },
 
-        connectCallback: async (provider: string, code: string, state?: string) => {
+        connectCallback: async (provider: OAuthProvider, code: string, state?: string) => {
             const params = new URLSearchParams({ code });
             if (state) params.append('state', state);
             return serverFetch<OAuthConnectionResponse>(
@@ -271,7 +272,7 @@ export const authAPI = {
             );
         },
 
-        requestAdditionalScopes: async (provider: string, scopes: string[]) => {
+        requestAdditionalScopes: async (provider: OAuthProvider, scopes: string[]) => {
             return serverMutation<MessageResponse>({
                 endpoint: `/auth/connections/${provider}/request-scopes`,
                 data: { scopes },
@@ -280,7 +281,7 @@ export const authAPI = {
             });
         },
 
-        disconnect: async (provider: string) => {
+        disconnect: async (provider: OAuthProvider) => {
             return serverMutation<void>({
                 endpoint: `/auth/connections/${provider}`,
                 data: {},

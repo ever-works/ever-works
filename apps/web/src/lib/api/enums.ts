@@ -2,6 +2,11 @@ export enum RepoProvider {
     GITHUB = 'github',
 }
 
+export enum OAuthProvider {
+    GITHUB = 'github',
+    GOOGLE = 'google',
+}
+
 export enum BadgeType {
     SECURITY = 'security',
     LICENSE = 'license',
@@ -44,4 +49,9 @@ export enum ItemsGeneratorSteps {
     SOURCES_VALIDATION = 'sources-validation',
     BADGES_PROCESSING = 'badges-processing',
     ITEMS_PROCESSING = 'items-processing',
+}
+
+export enum OAuthProcessType {
+    LOGIN = 'login',
+    CONNECT = 'connect',
 }
