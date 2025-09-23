@@ -7,6 +7,7 @@ import {
     itemsGeneratorAPI,
     UpdateDirectoryDto,
     ConnectionInfo,
+    DeleteDirectoryDto,
 } from '@/lib/api';
 import { checkOAuthConnection } from './oauth';
 import { RepoProvider } from '@/lib/api/enums';
@@ -291,7 +292,7 @@ export async function updateDirectory(directoryId: string, data: UpdateDirectory
     }
 }
 
-export async function deleteDirectory(directoryId: string) {
+export async function deleteDirectory(directoryId: string, options?: DeleteDirectoryDto) {
     const t = await getTranslations('actions.directories');
 
     // Delete directory validation schema
@@ -309,9 +310,7 @@ export async function deleteDirectory(directoryId: string) {
             };
         }
 
-        await directoryAPI.delete(validation.data.id, {
-            confirmation: true,
-        });
+        await directoryAPI.delete(validation.data.id, options || {});
 
         return {
             success: true,

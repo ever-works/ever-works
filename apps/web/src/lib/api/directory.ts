@@ -30,7 +30,9 @@ export interface UpdateDirectoryDto {
 }
 
 export interface DeleteDirectoryDto {
-    confirmation: boolean;
+    delete_data_repository?: boolean;
+    delete_markdown_repository?: boolean;
+    delete_website_repository?: boolean;
 }
 
 export interface GenerateDirectoryDetailDto {

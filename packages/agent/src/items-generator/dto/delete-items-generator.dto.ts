@@ -11,15 +11,15 @@ export class DeleteDirectoryDto {
 
     @IsOptional()
     @IsBoolean()
-    delete_data_repository?: boolean = true;
+    delete_data_repository?: boolean = false;
 
     @IsOptional()
     @IsBoolean()
-    delete_markdown_repository?: boolean = true;
+    delete_markdown_repository?: boolean = false;
 
     @IsOptional()
     @IsBoolean()
-    delete_website_repository?: boolean = true;
+    delete_website_repository?: boolean = false;
 }
 
 export interface DeleteDirectoryResponseDto {

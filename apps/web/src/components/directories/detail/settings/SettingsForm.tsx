@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { Directory, UpdateDirectoryDto } from '@/lib/api/types-only';
+import { DeleteDirectoryDto } from '@/lib/api/directory';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -21,7 +22,6 @@ export function SettingsForm({ directory }: SettingsFormProps) {
     const router = useRouter();
     const t = useTranslations('dashboard.directoryDetail.settings');
     const [isPending, startTransition] = useTransition();
-    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
     // Check if directory can be edited (not currently generating)
     const isGenerated = directory.generateStatus !== null && directory.generateStatus !== undefined;
@@ -52,24 +52,6 @@ export function SettingsForm({ directory }: SettingsFormProps) {
                 router.refresh();
             } else {
                 toast.error(result.error || t('updateFailed'));
-            }
-        });
-    };
-
-    const handleDelete = async () => {
-        if (!showDeleteConfirm) {
-            setShowDeleteConfirm(true);
-            return;
-        }
-
-        startTransition(async () => {
-            const result = await deleteDirectory(directory.id);
-
-            if (result.success) {
-                toast.success(result.message || 'Directory deleted successfully');
-                router.push(ROUTES.DASHBOARD_DIRECTORIES);
-            } else {
-                toast.error(result.error || 'Failed to delete directory');
             }
         });
     };
@@ -246,51 +228,147 @@ export function SettingsForm({ directory }: SettingsFormProps) {
             </div>
 
             {/* Danger Zone */}
-            <div
-                className={cn(
-                    'rounded-lg border-2 p-6',
-                    'bg-red-50 dark:bg-red-900/20',
-                    'border-red-200 dark:border-red-800',
-                )}
-            >
+            <DeleteComponent directory={directory} />
+        </div>
+    );
+}
+
+function DeleteComponent({ directory }: { directory: Directory }) {
+    const t = useTranslations('dashboard.directoryDetail.settings');
+    const router = useRouter();
+    const [isPending, startTransition] = useTransition();
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [deleteOptions, setDeleteOptions] = useState<DeleteDirectoryDto>({
+        delete_data_repository: false,
+        delete_markdown_repository: false,
+        delete_website_repository: false,
+    });
+
+    const handleDelete = async () => {
+        if (!showDeleteConfirm) {
+            setShowDeleteConfirm(true);
+            return;
+        }
+
+        startTransition(async () => {
+            const result = await deleteDirectory(directory.id, deleteOptions);
+
+            if (result.success) {
+                toast.success(result.message || t('deleteSuccess'));
+                router.push(ROUTES.DASHBOARD_DIRECTORIES);
+            } else {
+                toast.error(result.error || t('deleteFailed'));
+            }
+        });
+    };
+    return (
+        <div
+            className={cn(
+                'rounded-lg border-2 p-6',
+                'bg-red-50 dark:bg-red-950/30',
+                'border-red-200 dark:border-red-900',
+            )}
+        >
+            <div className="mb-4">
                 <h3 className="text-lg font-semibold text-red-800 dark:text-red-200 mb-2">
                     {t('dangerZone')}
                 </h3>
-                <p className="text-sm text-red-700 dark:text-red-300 mb-4">{t('deleteWarning')}</p>
+                <p className="text-sm text-red-700 dark:text-red-300">{t('deleteWarning')}</p>
+            </div>
 
-                {showDeleteConfirm ? (
-                    <div className="flex items-center gap-3">
-                        <p className="text-sm text-red-700 dark:text-red-300">
+            {showDeleteConfirm ? (
+                <div className="space-y-4">
+                    {/* Repository deletion options */}
+                    <div className="bg-card dark:bg-card-dark border border-card-border dark:border-card-border-dark rounded-lg p-4">
+                        <p className="text-sm font-medium text-red-800 dark:text-red-200 mb-3">
+                            {t('deleteOptions')}
+                        </p>
+                        <div className="space-y-2">
+                            <Checkbox
+                                checked={deleteOptions.delete_data_repository || false}
+                                onChange={(e) =>
+                                    setDeleteOptions({
+                                        ...deleteOptions,
+                                        delete_data_repository: e.target.checked,
+                                    })
+                                }
+                                label={t('deleteDataRepository')}
+                                description={t('deleteDataRepositoryDescription')}
+                                variant="form"
+                            />
+                            <Checkbox
+                                checked={deleteOptions.delete_markdown_repository || false}
+                                onChange={(e) =>
+                                    setDeleteOptions({
+                                        ...deleteOptions,
+                                        delete_markdown_repository: e.target.checked,
+                                    })
+                                }
+                                label={t('deleteMarkdownRepository')}
+                                description={t('deleteMarkdownRepositoryDescription')}
+                                variant="form"
+                            />
+                            <Checkbox
+                                checked={deleteOptions.delete_website_repository || false}
+                                onChange={(e) =>
+                                    setDeleteOptions({
+                                        ...deleteOptions,
+                                        delete_website_repository: e.target.checked,
+                                    })
+                                }
+                                label={t('deleteWebsiteRepository')}
+                                description={t('deleteWebsiteRepositoryDescription')}
+                                variant="form"
+                            />
+                        </div>
+                    </div>
+
+                    {/* Confirmation section */}
+                    <div className="bg-red-200/50 dark:bg-red-900/30 border border-red-300 dark:border-red-800 rounded-lg p-4">
+                        <p className="text-sm font-medium text-red-900 dark:text-red-100 mb-2">
                             {t('deleteConfirm')}
                         </p>
-                        <Button
-                            onClick={handleDelete}
-                            disabled={isPending}
-                            loading={isPending}
-                            variant="primary"
-                            className="bg-red-600 hover:bg-red-700"
-                        >
-                            {t('deleteConfirmButton')}
-                        </Button>
-                        <Button
-                            onClick={() => setShowDeleteConfirm(false)}
-                            disabled={isPending}
-                            variant="secondary"
-                        >
-                            {t('cancel')}
-                        </Button>
+                        <p className="text-xs text-red-800 dark:text-red-200 mb-4">
+                            {t('deleteConfirmDetail')}
+                        </p>
+                        <div className="flex items-center gap-3">
+                            <Button
+                                onClick={handleDelete}
+                                disabled={isPending}
+                                loading={isPending}
+                                variant="danger"
+                                className="bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800"
+                            >
+                                {t('deleteConfirmButton')}
+                            </Button>
+                            <Button
+                                onClick={() => {
+                                    setShowDeleteConfirm(false);
+                                    setDeleteOptions({
+                                        delete_data_repository: false,
+                                        delete_markdown_repository: false,
+                                        delete_website_repository: false,
+                                    });
+                                }}
+                                disabled={isPending}
+                                variant="ghost"
+                                className="bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600"
+                            >
+                                {t('cancel')}
+                            </Button>
+                        </div>
                     </div>
-                ) : (
-                    <Button
-                        onClick={handleDelete}
-                        disabled={isPending}
-                        variant="secondary"
-                        className="border-red-600 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30"
-                    >
-                        {t('deleteButton')}
-                    </Button>
-                )}
-            </div>
+                </div>
+            ) : (
+                <Button
+                    onClick={handleDelete}
+                    disabled={isPending}
+                    variant="danger"
+                    className="bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800"
+                >
+                    {t('deleteButton')}
+                </Button>
+            )}
         </div>
     );
 }
