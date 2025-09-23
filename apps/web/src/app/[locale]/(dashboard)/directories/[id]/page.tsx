@@ -18,14 +18,14 @@ export default async function DirectoryOverviewPage({ params }: Params) {
     const directory = directoryRes.directory;
     const config = configRes.config;
 
-    const isGenerating =
+    const showStatusCard =
         !directory.generateStatus?.status ||
         directory.generateStatus?.status === GenerateStatusType.GENERATING;
 
     return (
         <div className="space-y-6">
-            {/* Only show status card when generating */}
-            {isGenerating && <DirectoryStatusCard directory={directory} />}
+            {showStatusCard && <DirectoryStatusCard directory={directory} />}
+
             <DirectoryStats directory={directory} />
 
             {/* Directory Info and Config side by side */}

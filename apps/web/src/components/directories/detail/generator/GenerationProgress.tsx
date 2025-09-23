@@ -4,7 +4,6 @@ import { Directory } from '@/lib/api/types-only';
 import { ItemsGeneratorSteps } from '@/lib/api/enums';
 import { cn } from '@/lib/utils/cn';
 import { useEffect, useState } from 'react';
-import { useRouter } from '@/i18n/navigation';
 import { useTranslations } from 'next-intl';
 import { getStepProgress, getStepText } from '@/lib/utils/generator-steps';
 
@@ -13,7 +12,6 @@ interface GenerationProgressProps {
 }
 
 export function GenerationProgress({ directory }: GenerationProgressProps) {
-    const router = useRouter();
     const t = useTranslations('dashboard.directoryDetail.progress');
     const [dots, setDots] = useState('');
 
@@ -21,16 +19,9 @@ export function GenerationProgress({ directory }: GenerationProgressProps) {
         const interval = setInterval(() => {
             setDots((prev) => (prev.length >= 3 ? '' : prev + '.'));
         }, 500);
+
         return () => clearInterval(interval);
     }, []);
-
-    // Auto-refresh page every 5 seconds to check status
-    useEffect(() => {
-        const interval = setInterval(() => {
-            router.refresh();
-        }, 5000);
-        return () => clearInterval(interval);
-    }, [router]);
 
     // Get current step and progress
     const currentStep = directory.generateStatus?.step as ItemsGeneratorSteps | undefined;
