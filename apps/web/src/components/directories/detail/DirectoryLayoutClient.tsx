@@ -48,7 +48,7 @@ export function DirectoryLayoutClient({
                 repoLink={repoLink(directory, oauthConnection)}
             />
 
-            <DirectoryTabs directoryId={directory.id} />
+            <DirectoryTabs directory={directory} />
             <div className="mt-6">{children}</div>
         </div>
     );

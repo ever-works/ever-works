@@ -5,19 +5,22 @@ import { cn } from '@/lib/utils/cn';
 import { ROUTES } from '@/lib/constants';
 import { useTranslations } from 'next-intl';
 import { usePathname } from '@/i18n/navigation';
+import { Directory } from '@/lib/api';
+import { GenerateStatusType } from '@/lib/api/enums';
 
 interface DirectoryTabsProps {
-    directoryId: string;
+    directory: Directory;
 }
 
-export function DirectoryTabs({ directoryId }: DirectoryTabsProps) {
+export function DirectoryTabs({ directory }: DirectoryTabsProps) {
     const pathname = usePathname();
     const t = useTranslations('dashboard.directoryDetail.tabs');
+    const isGenerated = directory.generateStatus?.status === GenerateStatusType.GENERATED;
 
     const tabs = [
         {
             name: t('overview'),
-            href: ROUTES.DASHBOARD_DIRECTORY(directoryId),
+            href: ROUTES.DASHBOARD_DIRECTORY(directory.id),
             icon: (
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path
@@ -28,11 +31,11 @@ export function DirectoryTabs({ directoryId }: DirectoryTabsProps) {
                     />
                 </svg>
             ),
-            isActive: pathname.endsWith(`/directories/${directoryId}`),
+            isActive: pathname.endsWith(`/directories/${directory.id}`),
         },
         {
             name: t('items'),
-            href: `${ROUTES.DASHBOARD_DIRECTORY(directoryId)}/items`,
+            href: `${ROUTES.DASHBOARD_DIRECTORY(directory.id)}/items`,
             icon: (
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path
@@ -47,7 +50,7 @@ export function DirectoryTabs({ directoryId }: DirectoryTabsProps) {
         },
         {
             name: t('generator'),
-            href: `${ROUTES.DASHBOARD_DIRECTORY(directoryId)}/generator`,
+            href: `${ROUTES.DASHBOARD_DIRECTORY(directory.id)}/generator`,
             icon: (
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path
@@ -60,9 +63,33 @@ export function DirectoryTabs({ directoryId }: DirectoryTabsProps) {
             ),
             isActive: pathname.includes('/generator'),
         },
+        ...(isGenerated
+            ? [
+                  {
+                      name: t('deploy'),
+                      href: `${ROUTES.DASHBOARD_DIRECTORY(directory.id)}/deploy`,
+                      icon: (
+                          <svg
+                              className="w-4 h-4"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                          >
+                              <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M7 16l-4-4m0 0l4-4m-4 4h18M17 8l4 4m0 0l-4 4m4-4H3"
+                              />
+                          </svg>
+                      ),
+                      isActive: pathname.includes('/deploy'),
+                  },
+              ]
+            : []),
         {
             name: t('settings'),
-            href: `${ROUTES.DASHBOARD_DIRECTORY(directoryId)}/settings`,
+            href: `${ROUTES.DASHBOARD_DIRECTORY(directory.id)}/settings`,
             icon: (
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path

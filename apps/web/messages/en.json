@@ -369,6 +369,7 @@
                 "overview": "Overview",
                 "items": "Items",
                 "generator": "Generator",
+                "deploy": "Deploy",
                 "settings": "Settings"
             },
             "statusCard": {
@@ -575,6 +576,49 @@
                 "updateReadme": "Update README",
                 "updateSuccess": "Settings updated successfully",
                 "updateFailed": "Failed to update settings"
+            },
+            "deploy": {
+                "noTokenAlert": {
+                    "title": "Vercel Token Required",
+                    "description": "To deploy your directory to Vercel, you need to configure your Vercel API token in your account settings.",
+                    "configureButton": "Go to API Tokens Settings",
+                    "getTokenButton": "Get Vercel Token",
+                    "howTo": {
+                        "title": "How to configure your Vercel token:",
+                        "step1": "Click 'Get Vercel Token' to open the Vercel dashboard",
+                        "step2": "Create a new token with deployment permissions",
+                        "step3": "Copy the generated token",
+                        "step4": "Go to API Tokens Settings and paste your token in the Vercel section"
+                    }
+                },
+                "form": {
+                    "deployToVercel": {
+                        "title": "Deploy to Vercel",
+                        "description": "Deploy your directory as a static website on Vercel's global edge network.",
+                        "deployButton": "Deploy Now",
+                        "deployingButton": "Deploying...",
+                        "successMessage": "Your website has been successfully deployed!"
+                    },
+                    "updateRepository": {
+                        "title": "Update Website Repository",
+                        "description": "Sync the latest changes from your directory to the website repository.",
+                        "updateButton": "Update Repository",
+                        "updatingButton": "Updating..."
+                    },
+                    "messages": {
+                        "deploySuccess": "Deployment started successfully",
+                        "deployPending": "Deployment is queued and will start shortly",
+                        "deployFailed": "Failed to deploy to Vercel",
+                        "deployError": "An error occurred during deployment",
+                        "updateSuccess": "Repository updated successfully",
+                        "updateFailed": "Failed to update repository",
+                        "updateError": "An error occurred while updating the repository"
+                    },
+                    "info": {
+                        "deployInfo": "Deployment typically takes 1-3 minutes. You'll receive a URL once complete.",
+                        "updateInfo": "Updates sync your directory content to the website repository for the next deployment."
+                    }
+                }
             }
         },
         "directoryCreation": {
