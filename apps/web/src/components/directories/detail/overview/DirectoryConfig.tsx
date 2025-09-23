@@ -73,7 +73,7 @@ export function DirectoryConfig({ config }: DirectoryConfigProps) {
                 )}
 
                 {/* Generation Settings */}
-                <div>
+                <div className="hidden">
                     <h4 className="text-sm font-medium text-text-secondary dark:text-text-secondary-dark mb-2">
                         {t('generationSettings')}
                     </h4>

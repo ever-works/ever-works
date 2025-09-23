@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils/cn';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useTranslations } from 'next-intl';
+import { Link } from '@/i18n/navigation';
 
 interface ItemsListProps {
     items: ItemData[];
@@ -174,16 +175,29 @@ function ItemCard({ item, viewMode }: ItemCardProps) {
                         {item.category}
                     </span>
                 )}
-                <Button variant="ghost" size="sm">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-                        />
-                    </svg>
-                </Button>
+
+                {item.source_url && (
+                    <Link
+                        href={item.source_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs hover:underline flex items-center gap-1"
+                    >
+                        <svg
+                            className="w-3 h-3"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                            />
+                        </svg>
+                    </Link>
+                )}
             </div>
         );
     }
@@ -201,7 +215,7 @@ function ItemCard({ item, viewMode }: ItemCardProps) {
                 <h4 className="font-medium text-text dark:text-text-dark line-clamp-1">
                     {item.name}
                 </h4>
-                <Button variant="ghost" size="sm">
+                {/* <Button variant="ghost" size="sm">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path
                             strokeLinecap="round"
@@ -210,7 +224,7 @@ function ItemCard({ item, viewMode }: ItemCardProps) {
                             d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"
                         />
                     </svg>
-                </Button>
+                </Button> */}
             </div>
 
             {item.description && (
@@ -226,7 +240,7 @@ function ItemCard({ item, viewMode }: ItemCardProps) {
                     </span>
                 )}
                 {item.source_url && (
-                    <a
+                    <Link
                         href={item.source_url}
                         target="_blank"
                         rel="noopener noreferrer"
@@ -246,7 +260,7 @@ function ItemCard({ item, viewMode }: ItemCardProps) {
                             />
                         </svg>
                         {t('source')}
-                    </a>
+                    </Link>
                 )}
             </div>
         </div>
