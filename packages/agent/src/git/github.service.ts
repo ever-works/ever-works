@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Octokit, RequestError } from 'octokit';
 import { GitProvider, ICommitter, IGitAuth } from './git.provider';
-import * as sodium from 'libsodium-wrappers';
+import _sodium from 'libsodium-wrappers';
 import * as fs from 'node:fs';
 import * as http from 'isomorphic-git/http/node';
 import git from 'isomorphic-git';
@@ -306,16 +306,16 @@ export class GithubService extends GitProvider {
             auth: token,
         });
 
-        await sodium.ready;
-        const binkey = sodium.from_base64(publicKey.key, sodium.base64_variants.ORIGINAL);
-        const binsec = sodium.from_string(data.value);
-        const encryptedBytes = sodium.crypto_box_seal(binsec, binkey);
+        await _sodium.ready;
+        const binkey = _sodium.from_base64(publicKey.key, _sodium.base64_variants.ORIGINAL);
+        const binsec = _sodium.from_string(data.value);
+        const encryptedBytes = _sodium.crypto_box_seal(binsec, binkey);
 
         await octokit.rest.actions.createOrUpdateRepoSecret({
             owner: data.owner,
             repo: data.repo,
             secret_name: data.key,
-            encrypted_value: sodium.to_base64(encryptedBytes, sodium.base64_variants.ORIGINAL),
+            encrypted_value: _sodium.to_base64(encryptedBytes, _sodium.base64_variants.ORIGINAL),
             key_id: publicKey.key_id,
         });
     }
