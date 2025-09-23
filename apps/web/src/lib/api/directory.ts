@@ -106,6 +106,17 @@ export interface DirectoryConfig {
     } & (Record<string, any> & {});
 }
 
+export interface DirectoryCount {
+    items: number;
+    categories: number;
+    tags: number;
+}
+
+export interface DirectoryCategoriesTags {
+    categories: string[];
+    tags: string[];
+}
+
 export const directoryAPI = {
     // Get all directories with pagination and search
     getAll: async (options?: { limit?: number; offset?: number; search?: string }) => {
@@ -161,6 +172,18 @@ export const directoryAPI = {
     // Get directory config
     getConfig: async (id: string) => {
         return serverFetch<APIResponse<{ config: DirectoryConfig }>>(`/directories/${id}/config`);
+    },
+
+    // Get directory count
+    getCount: async (id: string) => {
+        return serverFetch<APIResponse<DirectoryCount>>(`/directories/${id}/count`);
+    },
+
+    // Get directory categories and tags
+    getCategoriesTags: async (id: string) => {
+        return serverFetch<APIResponse<DirectoryCategoriesTags>>(
+            `/directories/${id}/categories-tags`,
+        );
     },
 
     // Generate directory details from name and prompt

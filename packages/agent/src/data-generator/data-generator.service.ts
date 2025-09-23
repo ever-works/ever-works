@@ -323,7 +323,40 @@ export class DataGeneratorService {
         return (await this.getExistingData(directory, user)).existingItems;
     }
 
+    async getCategoriesTags(directory: Directory, user: User) {
+        const data = await this.repositoryData(directory, user);
+
+        const [categories, tags] = await Promise.all([data.getCategories(), data.getTags()]);
+
+        return {
+            categories,
+            tags,
+        };
+    }
+
+    async count(directory: Directory, user: User) {
+        const data = await this.repositoryData(directory, user);
+
+        const [categories, tags, items] = await Promise.all([
+            data.getCategories(),
+            data.getTags(),
+            data.getItems(),
+        ]);
+
+        return {
+            items: items.length,
+            categories: categories.length,
+            tags: tags.length,
+        };
+    }
+
     async config(directory: Directory, user: User) {
+        const data = await this.repositoryData(directory, user);
+
+        return data.getConfig();
+    }
+
+    private async repositoryData(directory: Directory, user: User) {
         const token = user.getGitToken();
         const committer = user.asCommitter();
 
@@ -335,9 +368,10 @@ export class DataGeneratorService {
             token,
             committer,
         });
+
         const data = await DataRepository.create(dest);
 
-        return data.getConfig();
+        return data;
     }
 
     /**

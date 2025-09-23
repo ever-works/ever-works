@@ -70,6 +70,8 @@ WORKDIR /app/apps/api
 
 ENV PORT=3100
 
+VOLUME [ "/tmp/ever-works-repos" ]
+
 EXPOSE 3100
 
 CMD ["node", "/app/apps/api/dist/main"]

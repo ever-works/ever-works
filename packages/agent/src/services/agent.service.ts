@@ -292,6 +292,56 @@ export class AgentService {
         };
     }
 
+    async directoryCount(directoryId: string, user: User) {
+        const directory = await this.validateDirectoryOwnership(directoryId, user.id);
+
+        try {
+            const count = await this.dataGenerator.count(directory, user);
+            return {
+                status: 'success',
+                ...count,
+            };
+        } catch (error) {
+            if (error instanceof HttpException) {
+                throw error;
+            }
+
+            this.logger.error('Failed to get directory count:', error);
+
+            throw new BadRequestException({
+                status: 'error',
+                message: this.clearMessageError(error),
+            });
+        }
+    }
+
+    async directoryCategoriesTags(directoryId: string, user: User) {
+        const directory = await this.validateDirectoryOwnership(directoryId, user.id);
+
+        try {
+            const { categories, tags } = await this.dataGenerator.getCategoriesTags(
+                directory,
+                user,
+            );
+            return {
+                status: 'success',
+                categories,
+                tags,
+            };
+        } catch (error) {
+            if (error instanceof HttpException) {
+                throw error;
+            }
+
+            this.logger.error('Failed to get directory categories and tags:', error);
+
+            throw new BadRequestException({
+                status: 'error',
+                message: this.clearMessageError(error),
+            });
+        }
+    }
+
     async updateItemsGenerator(
         directoryId: string,
         updateItemsGeneratorDto: UpdateItemsGeneratorDto,

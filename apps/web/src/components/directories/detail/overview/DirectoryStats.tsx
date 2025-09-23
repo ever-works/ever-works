@@ -6,6 +6,9 @@ import { useTranslations } from 'next-intl';
 
 interface DirectoryStatsProps {
     directory: Directory;
+    itemsCount: number;
+    categoriesCount: number;
+    tagsCount: number;
 }
 
 interface StatCardProps {
@@ -56,10 +59,8 @@ function StatCard({ title, value, icon, trend, color }: StatCardProps) {
     );
 }
 
-export function DirectoryStats({ directory }: DirectoryStatsProps) {
+export function DirectoryStats({ categoriesCount, itemsCount, directory }: DirectoryStatsProps) {
     const t = useTranslations('dashboard.directoryDetail.stats');
-    // @ts-ignore - items_count will be added to Directory type later
-    const itemsCount = directory.items_count || 0;
 
     const stats = [
         {
@@ -84,7 +85,7 @@ export function DirectoryStats({ directory }: DirectoryStatsProps) {
         },
         {
             title: t('categories'),
-            value: 0, // Will be calculated from items
+            value: categoriesCount,
             icon: (
                 <svg
                     className="w-5 h-5 text-purple-600 dark:text-purple-400"

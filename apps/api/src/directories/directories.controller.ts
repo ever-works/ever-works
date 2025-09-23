@@ -32,6 +32,8 @@ import { AuthenticatedUser } from '@src/auth/types/jwt.types';
 import { GenerateDirectoryDetailDto } from './dto/generate-detail.dto';
 import { CACHE_MANAGER, Cache } from '@packages/agent/cache';
 
+let CACHE_TTL = 1000 * 60 * 5; // 5 minutes
+
 @Controller('api')
 @UseGuards(JwtAuthGuard)
 export class DirectoriesController {
@@ -97,7 +99,6 @@ export class DirectoriesController {
     @HttpCode(HttpStatus.OK)
     async getDirectoryItems(@CurrentUser() auth: AuthenticatedUser, @Param('id') id: string) {
         const cacheKey = `directory-items-${id}-${auth.userId}`;
-        const ttl = 1000 * 60 * 5; // 5 minutes
 
         return this.cacheManager.wrap(
             cacheKey,
@@ -105,7 +106,7 @@ export class DirectoriesController {
                 const user = await this.authService.getUser(auth.userId);
                 return this.agentService.directoryItems(id, user);
             },
-            ttl,
+            CACHE_TTL,
         );
     }
 
@@ -113,7 +114,6 @@ export class DirectoriesController {
     @HttpCode(HttpStatus.OK)
     async getDirectoryConfig(@CurrentUser() auth: AuthenticatedUser, @Param('id') id: string) {
         const cacheKey = `directory-config-${id}-${auth.userId}`;
-        const ttl = 1000 * 60 * 5; // 5 minutes
 
         return this.cacheManager.wrap(
             cacheKey,
@@ -121,7 +121,40 @@ export class DirectoriesController {
                 const user = await this.authService.getUser(auth.userId);
                 return this.agentService.directoryConfig(id, user);
             },
-            ttl,
+            CACHE_TTL,
+        );
+    }
+
+    @Get('directories/:id/count')
+    @HttpCode(HttpStatus.OK)
+    async getDirectoryStatus(@CurrentUser() auth: AuthenticatedUser, @Param('id') id: string) {
+        const cacheKey = `directory-count-${id}-${auth.userId}`;
+
+        return this.cacheManager.wrap(
+            cacheKey,
+            async () => {
+                const user = await this.authService.getUser(auth.userId);
+                return this.agentService.directoryCount(id, user);
+            },
+            CACHE_TTL,
+        );
+    }
+
+    @Get('directories/:id/categories-tags')
+    @HttpCode(HttpStatus.OK)
+    async getDirectoryCategoriesTags(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') id: string,
+    ) {
+        const cacheKey = `directory-categories-tags-${id}-${auth.userId}`;
+
+        return this.cacheManager.wrap(
+            cacheKey,
+            async () => {
+                const user = await this.authService.getUser(auth.userId);
+                return this.agentService.directoryCategoriesTags(id, user);
+            },
+            CACHE_TTL,
         );
     }
 

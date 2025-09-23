@@ -10,9 +10,10 @@ type Params = { params: Promise<{ id: string }> };
 export default async function DirectoryOverviewPage({ params }: Params) {
     const { id } = await params;
 
-    const [directoryRes, configRes] = await Promise.all([
+    const [directoryRes, configRes, countRes] = await Promise.all([
         directoryAPI.get(id),
         directoryAPI.getConfig(id).catch(() => ({ config: null })),
+        directoryAPI.getCount(id).catch(() => ({ items: 0, categories: 0, tags: 0 })),
     ]);
 
     const directory = directoryRes.directory;
@@ -26,7 +27,12 @@ export default async function DirectoryOverviewPage({ params }: Params) {
         <div className="space-y-6">
             {showStatusCard && <DirectoryStatusCard directory={directory} />}
 
-            <DirectoryStats directory={directory} />
+            <DirectoryStats
+                itemsCount={countRes.items}
+                categoriesCount={countRes.categories}
+                tagsCount={countRes.tags}
+                directory={directory}
+            />
 
             {/* Directory Info and Config side by side */}
             <div className="grid lg:grid-cols-2 gap-6">
