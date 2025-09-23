@@ -31,12 +31,18 @@ export function GenerationProgress({ directory }: GenerationProgressProps) {
     }, [router]);
 
     const steps = [
-        { id: 'init', label: t('steps.init') },
-        { id: 'fetch', label: t('steps.fetch') },
-        { id: 'process', label: t('steps.process') },
-        { id: 'generate', label: t('steps.generate') },
-        { id: 'save', label: t('steps.save') },
-        { id: 'complete', label: t('steps.complete') },
+        { id: 'prompt-processing', label: 'Prompt Processing' },
+        { id: 'ai-first-items-generation', label: 'AI-First Items Generation' },
+        { id: 'search-queries-generation', label: 'Search Query Generation' },
+        { id: 'web-search', label: 'Web Search' },
+        { id: 'content-retrieval', label: 'Content Retrieval' },
+        { id: 'content-filtering', label: 'Content Pre-filtering & Relevance Assessment' },
+        { id: 'item-extraction', label: 'AI-Driven Structured Data Extraction for Items from Web' },
+        { id: 'deduplication', label: 'Deduplication and Data Aggregation' },
+        { id: 'category-processing', label: 'Category and Tag Generation' },
+        { id: 'source-validation', label: 'Source URLs Validation' },
+        { id: 'badge-processing', label: 'Badge Processing' },
+        { id: 'markdown-generation', label: 'Markdown Generation' },
     ];
 
     const currentStepIndex = steps.findIndex((s) =>
