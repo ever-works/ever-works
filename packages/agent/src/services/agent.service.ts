@@ -153,6 +153,14 @@ export class AgentService {
             const dir = await this.directoryRepository.create(directoryData, user);
             dir.owner = dir.getRepoOwner();
 
+            // Update generate status if repository is already existing
+            const items = await this.dataGenerator.getItems(dir, user).catch(() => []);
+            if (items.length > 0) {
+                await this.directoryRepository.updateGenerateStatus(dir.id, {
+                    status: GenerateStatusType.GENERATED,
+                });
+            }
+
             return {
                 status: 'success',
                 directory: dir,
