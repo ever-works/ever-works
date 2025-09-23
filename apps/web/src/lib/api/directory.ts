@@ -51,6 +51,7 @@ export interface Directory {
     name: string;
     description: string;
     owner?: string;
+    website?: string;
     organization: boolean;
     repoProvider: RepoProvider;
     readmeConfig?: MarkdownReadmeConfig;

@@ -212,11 +212,13 @@ export function DirectoryHeader({ directory, repoLink }: DirectoryHeaderProps) {
                     </div>
                 </div>
 
-                <div className="ml-6">
-                    <Button variant="ghost" size="sm">
-                        <Link className="w-4 h-4" />
-                    </Button>
-                </div>
+                {directory.website && (
+                    <div className="ml-6">
+                        <Button href={directory.website} variant="ghost" size="sm">
+                            <Link className="w-4 h-4" />
+                        </Button>
+                    </div>
+                )}
             </div>
         </div>
     );
