@@ -30,7 +30,7 @@ export enum AuthProviders {
 export const config = {
     debug: () => process.env.DEBUG === 'true',
 
-    webAppUrl: () => process.env.WEB_APP_URL || 'http://localhost:3000',
+    webAppUrl: () => process.env.WEB_URL || 'http://localhost:3000',
 
     mail: {
         provider: (): 'smtp' | 'faker' => {

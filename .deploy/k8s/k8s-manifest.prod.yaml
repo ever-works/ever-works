@@ -46,7 +46,7 @@ spec:
           image: registry.digitalocean.com/ever/ever-works-api:latest
           imagePullPolicy: Always
           env:
-            - name: WEB_APP_URL
+            - name: WEB_URL
               value: https://app.ever.works
             - name: API_URL
               value: https://api.ever.works

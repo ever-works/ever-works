@@ -51,7 +51,7 @@ jobs:
           AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
 
           # API ENV
-          WEB_APP_URL: https://app.ever.works
+          WEB_URL: https://app.ever.works
           ALLOWED_ORIGINS: https://app.ever.works,https://api.ever.works
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           # Github
