@@ -56,7 +56,7 @@ export class DeployController {
         );
 
         return {
-            status: 'success',
+            status: 'pending',
             slug: directory.slug,
             owner: directory.getRepoOwner(),
             repository: `${directory.getRepoOwner()}/${directory.getWebsiteRepo()}`,

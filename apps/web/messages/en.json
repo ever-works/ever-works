@@ -594,14 +594,14 @@
                 "form": {
                     "deployToVercel": {
                         "title": "Deploy to Vercel",
-                        "description": "Deploy your directory as a static website on Vercel's global edge network.",
+                        "description": "Deploy your directory website repository on Vercel.",
                         "deployButton": "Deploy Now",
                         "deployingButton": "Deploying...",
                         "successMessage": "Your website has been successfully deployed!"
                     },
                     "updateRepository": {
                         "title": "Update Website Repository",
-                        "description": "Sync the latest changes from your directory to the website repository.",
+                        "description": "Sync the latest changes from the template to the website repository.",
                         "updateButton": "Update Repository",
                         "updatingButton": "Updating..."
                     },

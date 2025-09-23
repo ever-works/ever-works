@@ -16,7 +16,10 @@ export default async function DeployPage({ params }: DeployPageParams) {
     let userProfile;
 
     try {
-        let [res, userProfileRes] = await Promise.all([directoryAPI.get(id), authAPI.getProfile()]);
+        let [res, userProfileRes] = await Promise.all([
+            directoryAPI.get(id),
+            authAPI.getFreshProfile(),
+        ]);
         directory = res.directory;
         userProfile = userProfileRes;
 

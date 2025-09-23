@@ -50,24 +50,6 @@ export function DeployForm({ directory }: DeployFormProps) {
         });
     };
 
-    const handleUpdateRepository = () => {
-        startTransition(async () => {
-            try {
-                const result = await updateWebsiteRepository(directory.id);
-
-                if (result.success) {
-                    toast.success(t('form.messages.updateSuccess'));
-                    router.refresh();
-                } else {
-                    toast.error(result.error || t('form.messages.updateFailed'));
-                }
-            } catch (error) {
-                console.error('Update repository failed:', error);
-                toast.error(t('form.messages.updateError'));
-            }
-        });
-    };
-
     return (
         <div className="space-y-6">
             {/* Deploy to Vercel Section */}
@@ -129,42 +111,7 @@ export function DeployForm({ directory }: DeployFormProps) {
             </div>
 
             {/* Update Repository Section */}
-            <div className="rounded-lg bg-surface dark:bg-surface-dark border border-border dark:border-border-dark p-6">
-                <div className="flex items-start gap-4">
-                    <div
-                        className={cn(
-                            'flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center',
-                            'bg-info/10 dark:bg-info-dark/10',
-                        )}
-                    >
-                        <RefreshCw className="w-5 h-5 text-info dark:text-info-dark" />
-                    </div>
-                    <div className="flex-1">
-                        <h3 className="text-lg font-semibold text-text dark:text-text-dark mb-2">
-                            {t('form.updateRepository.title')}
-                        </h3>
-                        <p className="text-text-secondary dark:text-text-secondary-dark mb-4">
-                            {t('form.updateRepository.description')}
-                        </p>
-
-                        <button
-                            onClick={handleUpdateRepository}
-                            disabled={isPending}
-                            className={cn(
-                                'px-6 py-2 rounded-lg font-medium transition-colors',
-                                'bg-surface-secondary dark:bg-surface-secondary-dark',
-                                'text-text dark:text-text-dark',
-                                'hover:bg-surface-hover dark:hover:bg-surface-hover-dark',
-                                'disabled:opacity-50 disabled:cursor-not-allowed',
-                            )}
-                        >
-                            {isPending
-                                ? t('form.updateRepository.updatingButton')
-                                : t('form.updateRepository.updateButton')}
-                        </button>
-                    </div>
-                </div>
-            </div>
+            <UpdateWebsiteRepository directory={directory} />
 
             {/* Info Section */}
             <div className="p-6 rounded-lg bg-info/5 dark:bg-info-dark/5 border border-info/20 dark:border-info-dark/20">
@@ -174,6 +121,69 @@ export function DeployForm({ directory }: DeployFormProps) {
                         <p>{t('form.info.deployInfo')}</p>
                         <p>{t('form.info.updateInfo')}</p>
                     </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function UpdateWebsiteRepository({ directory }: DeployFormProps) {
+    const t = useTranslations('dashboard.directoryDetail.deploy');
+    const [isPending, startTransition] = useTransition();
+    const router = useRouter();
+
+    const handleUpdateRepository = () => {
+        startTransition(async () => {
+            try {
+                const result = await updateWebsiteRepository(directory.id);
+
+                if (result.success) {
+                    toast.success(t('form.messages.updateSuccess'));
+                    router.refresh();
+                } else {
+                    toast.error(result.error || t('form.messages.updateFailed'));
+                }
+            } catch (error) {
+                console.error('Update repository failed:', error);
+                toast.error(t('form.messages.updateError'));
+            }
+        });
+    };
+
+    return (
+        <div className="rounded-lg bg-surface dark:bg-surface-dark border border-border dark:border-border-dark p-6">
+            <div className="flex items-start gap-4">
+                <div
+                    className={cn(
+                        'flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center',
+                        'bg-info/10 dark:bg-info-dark/10',
+                    )}
+                >
+                    <RefreshCw className="w-5 h-5 text-info dark:text-info-dark" />
+                </div>
+                <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-text dark:text-text-dark mb-2">
+                        {t('form.updateRepository.title')}
+                    </h3>
+                    <p className="text-text-secondary dark:text-text-secondary-dark mb-4">
+                        {t('form.updateRepository.description')}
+                    </p>
+
+                    <button
+                        onClick={handleUpdateRepository}
+                        disabled={isPending}
+                        className={cn(
+                            'px-6 py-2 rounded-lg font-medium transition-colors',
+                            'bg-surface-secondary dark:bg-surface-secondary-dark',
+                            'text-text dark:text-text-dark',
+                            'hover:bg-surface-hover dark:hover:bg-surface-hover-dark',
+                            'disabled:opacity-50 disabled:cursor-not-allowed',
+                        )}
+                    >
+                        {isPending
+                            ? t('form.updateRepository.updatingButton')
+                            : t('form.updateRepository.updateButton')}
+                    </button>
                 </div>
             </div>
         </div>
