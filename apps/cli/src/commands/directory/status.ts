@@ -5,7 +5,12 @@ import { requireAuth } from '../auth';
 import { getApiService } from '../../services/api.service';
 import { DirectoryPromptService } from './directory-prompt.service';
 import { handleCliError } from '../../utils/error';
-import { GenerateStatusType } from '@packages/cli-shared';
+import {
+    GenerateStatusType,
+    getStepProgress,
+    getStepText,
+    ItemsGeneratorSteps,
+} from '@packages/cli-shared';
 
 export const statusCommand = new Command('status')
     .description('Check the status of a directory')
@@ -82,7 +87,11 @@ export const statusCommand = new Command('status')
                         const timeStr = `[${Math.floor(elapsed / 60)}m ${elapsed % 60}s]`;
 
                         if (freshDirectory.generateStatus?.step) {
-                            spinner.text = `Generating ${timeStr}: ${freshDirectory.generateStatus.step}`;
+                            const step = freshDirectory.generateStatus.step as ItemsGeneratorSteps;
+                            const stepText = getStepText(step);
+                            const progress = getStepProgress(step);
+
+                            spinner.text = `Generating ${timeStr}: ${stepText} - ${progress}%`;
                         } else {
                             spinner.text = `Generating ${timeStr}...`;
                         }

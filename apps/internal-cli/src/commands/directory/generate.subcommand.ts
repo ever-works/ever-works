@@ -15,6 +15,8 @@ import {
 import { DirectoryPromptService } from './directory-prompt.service';
 import { ConfigCheckService } from './config-check.service';
 import { handleCliError } from './error';
+import { Directory, GenerateStatusType, User } from '@packages/agent/entities';
+import { getStepProgress, getStepText, ItemsGeneratorSteps } from '@packages/cli-shared';
 
 @SubCommand({
     name: 'generate',
@@ -112,12 +114,15 @@ export class GenerateSubCommand extends CommandRunner {
             try {
                 const user = await this.userRepository.createOrGetLocalUser();
 
-                const result = await this.agentService.generateItemsGenerator(
+                const generatorPromise = this.agentService.generateItemsGenerator(
                     directory.id,
                     createDto,
                     user,
                     true,
                 );
+                const checkStatus = this.generationStatus(spinner, user, directory);
+
+                const [result] = await Promise.all([generatorPromise, checkStatus()]);
 
                 spinner.stop();
 
@@ -150,6 +155,68 @@ export class GenerateSubCommand extends CommandRunner {
             handleCliError(error, 'Failed to generate directory content');
             process.exit(1);
         }
+    }
+
+    private generationStatus(spinner: ora.Ora, user: User, directory: Directory) {
+        // Configuration
+        const POLL_INTERVAL = 5000;
+        const MAX_POLL_TIME = 30 * 60 * 1000; // 30 minutes max
+        const startTime = Date.now();
+
+        const checkStatus = async () => {
+            try {
+                // Check if we've exceeded max polling time
+                if (Date.now() - startTime > MAX_POLL_TIME) {
+                    spinner.warn('\n⚠ Status check timed out after 30 minutes');
+                    spinner.stop();
+                    return;
+                }
+
+                const { directory: freshDirectory } = await this.agentService.getDirectory(
+                    directory.id,
+                    user,
+                );
+
+                if (freshDirectory.generateStatus?.status === GenerateStatusType.GENERATED) {
+                    spinner.succeed('\n✓ Generation process finished!');
+                    spinner.stop();
+
+                    // Show additional info if available
+                    console.log(chalk.cyan('\n--- Generation Complete ---'));
+                    console.log(chalk.gray('  • Directory is ready for use'));
+                } else if (freshDirectory.generateStatus?.status === GenerateStatusType.ERROR) {
+                    spinner.fail('\n✗ Generation failed');
+
+                    if (freshDirectory.generateStatus?.error) {
+                        console.log(chalk.red(`Error: ${freshDirectory.generateStatus.error}`));
+                    }
+                    spinner.stop();
+                } else {
+                    // Update spinner text with current step
+                    const elapsed = Math.floor((Date.now() - startTime) / 1000);
+                    const timeStr = `[${Math.floor(elapsed / 60)}m ${elapsed % 60}s]`;
+
+                    if (freshDirectory.generateStatus?.step) {
+                        const step = freshDirectory.generateStatus.step as ItemsGeneratorSteps;
+                        const stepText = getStepText(step);
+                        const progress = getStepProgress(step);
+
+                        spinner.text = `Generating ${timeStr}: ${stepText} - ${progress}%`;
+                    } else {
+                        spinner.text = `Generating ${timeStr}...`;
+                    }
+
+                    // Poll again after interval
+                    setTimeout(checkStatus, POLL_INTERVAL);
+                }
+            } catch (error) {
+                spinner.fail('Failed to fetch directory status');
+                console.error(chalk.red('Error details:'), error);
+                spinner.stop();
+            }
+        };
+
+        return checkStatus;
     }
 
     private async promptRequiredFields(): Promise<{
