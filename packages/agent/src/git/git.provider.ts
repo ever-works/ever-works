@@ -38,15 +38,22 @@ export abstract class GitProvider {
         repo,
         token,
         committer,
+        autoSwitchToMainBranch = true,
     }: {
         owner: string;
         repo: string;
         token: string;
         committer: ICommitter;
+        autoSwitchToMainBranch?: boolean;
     }): Promise<string> {
         const dir = this.getDir(owner, repo);
         const url = this.getURL(owner, repo);
         const auth = this.getAuth(token);
+
+        if (autoSwitchToMainBranch) {
+            // Switch to main branch if we're on a different branch
+            await this.switchToMainBranch(dir).catch(() => null);
+        }
 
         if (await this.directoryExists(dir)) {
             try {
