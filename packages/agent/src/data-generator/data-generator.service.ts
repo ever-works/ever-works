@@ -64,12 +64,7 @@ export class DataGeneratorService {
 
         // If no items were generated, we don't need to do anything else
         if (!generatedItems || generatedItems.items.length === 0) {
-            const dataDir = this.githubService.getDir(
-                directory.getRepoOwner(),
-                directory.getDataRepo(),
-            );
-
-            await DataRepository.create(dataDir).then((data) => data.cleanup());
+            // We could call data.cleanup() here but it's not necessary
             return;
         }
 
@@ -286,11 +281,7 @@ export class DataGeneratorService {
             }
         } catch (err) {
             this.logger.error('Failed to initialize data repository', err);
-            await data.cleanup();
             throw err;
-        } finally {
-            // never cleanup data with (data.cleanup()),
-            // we need this repo for future updates
         }
 
         return true;

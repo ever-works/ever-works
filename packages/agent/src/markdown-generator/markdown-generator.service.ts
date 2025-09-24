@@ -9,6 +9,7 @@ import { DataRepository, PRUpdate } from '../data-generator/data-repository';
 import { ReadmeBuilder } from './readme-builder';
 import { MarkdownRepository } from './markdown-repository';
 import { GenerationMethod } from '../items-generator/dto';
+import { DirectoryRepository } from '../database';
 
 type InitializeOptions = {
     repository_description?: string;
@@ -21,7 +22,10 @@ type InitializeOptions = {
 export class MarkdownGeneratorService {
     private readonly logger = new Logger(MarkdownGeneratorService.name);
 
-    constructor(private readonly githubService: GithubService) {}
+    constructor(
+        private readonly githubService: GithubService,
+        private readonly directoryRepository: DirectoryRepository,
+    ) {}
 
     async initialize(directory: Directory, user: User, options: InitializeOptions = {}) {
         const token = user.getGitToken();
@@ -162,7 +166,7 @@ export class MarkdownGeneratorService {
                     `Creating PR from ${pr_update.branch} to ${defaultBranch} for ${directory.slug}`,
                 );
 
-                await this.githubService
+                const pr = await this.githubService
                     .createPR(
                         {
                             owner: directory.getRepoOwner(),
@@ -176,15 +180,26 @@ export class MarkdownGeneratorService {
                     )
                     .catch((err) => {
                         this.logger.error('Failed to create PR', err);
+                        return null;
                     });
+
+                if (pr) {
+                    await this.directoryRepository.updateLastPullRequest(directory.id, {
+                        main: {
+                            branch: pr_update.branch,
+                            title: pr_update.title,
+                            body: pr_update.body,
+                            number: pr.number,
+                            url: pr.html_url,
+                        },
+                    });
+                }
             } else {
                 this.logger.log(`Pushed changes to main branch for ${directory.slug}`);
             }
         } catch (err) {
             this.logger.error('Error during markdown generation', err);
             throw err;
-        } finally {
-            await Promise.all([dataRepo.cleanup(), markdownRepo.cleanup()]);
         }
     }
 
@@ -218,7 +233,11 @@ export class MarkdownGeneratorService {
 
         try {
             // Delete the GitHub repository
-            await this.githubService.deleteRepository(directory.getRepoOwner(), directory.slug, token);
+            await this.githubService.deleteRepository(
+                directory.getRepoOwner(),
+                directory.slug,
+                token,
+            );
             this.logger.log(
                 `Successfully deleted markdown repository: ${directory.getRepoOwner()}/${directory.slug}`,
             );
