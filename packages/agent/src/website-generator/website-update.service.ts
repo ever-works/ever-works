@@ -143,7 +143,7 @@ export class WebsiteUpdateService {
         await this.githubService.remoteAdd(originalDir, 'origin', targetRepoUrl);
 
         // Push to the target repository
-        await this.githubService.push(originalDir, token);
+        await this.githubService.push(originalDir, token, true);
 
         this.logger.log(
             `Successfully updated ${directory.getRepoOwner()}/${websiteRepo} using duplicate method`,
