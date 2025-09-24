@@ -125,18 +125,14 @@ export function DirectoryStatusCard({ directory }: DirectoryStatusCardProps) {
                 action: (
                     <div className="flex gap-2">
                         <Button
-                            onClick={() =>
-                                router.push(`${ROUTES.DASHBOARD_DIRECTORY(directory.id)}/items`)
-                            }
+                            href={`${ROUTES.DASHBOARD_DIRECTORY(directory.id)}/items`}
                             variant="secondary"
                             size="sm"
                         >
                             {t('generated.viewItems')}
                         </Button>
                         <Button
-                            onClick={() =>
-                                router.push(`${ROUTES.DASHBOARD_DIRECTORY(directory.id)}/generator`)
-                            }
+                            href={`${ROUTES.DASHBOARD_DIRECTORY(directory.id)}/generator`}
                             variant="ghost"
                             size="sm"
                         >
@@ -163,9 +159,7 @@ export function DirectoryStatusCard({ directory }: DirectoryStatusCardProps) {
                 ),
                 action: (
                     <Button
-                        onClick={() =>
-                            router.push(`${ROUTES.DASHBOARD_DIRECTORY(directory.id)}/generator`)
-                        }
+                        href={`${ROUTES.DASHBOARD_DIRECTORY(directory.id)}/generator`}
                         variant="primary"
                         size="sm"
                     >

@@ -9,6 +9,7 @@ import { Link, useRouter } from '@/i18n/navigation';
 import { deployToVercel, updateWebsiteRepository } from '@/app/actions/dashboard/deploy';
 import { RefreshCw, Info, Loader2, Triangle } from 'lucide-react';
 import { useDirectoryDetail } from '../DirectoryDetailContext';
+import { Button } from '@/components/ui/button';
 
 interface DeployFormProps {
     directory: Directory;
@@ -87,15 +88,10 @@ export function DeployForm({ directory }: DeployFormProps) {
                             </div>
                         )}
 
-                        <button
+                        <Button
                             onClick={handleDeploy}
                             disabled={isPending || deploymentStatus === 'deploying'}
-                            className={cn(
-                                'px-6 py-2 rounded-lg font-medium transition-colors',
-                                'bg-primary dark:bg-primary-dark text-white',
-                                'hover:bg-primary/90 dark:hover:bg-primary-dark/90',
-                                'disabled:opacity-50 disabled:cursor-not-allowed',
-                            )}
+                            size="lg"
                         >
                             {deploymentStatus === 'deploying' ? (
                                 <span className="flex items-center gap-2">
@@ -105,7 +101,7 @@ export function DeployForm({ directory }: DeployFormProps) {
                             ) : (
                                 t('form.deployToVercel.deployButton')
                             )}
-                        </button>
+                        </Button>
                     </div>
                 </div>
             </div>
@@ -178,21 +174,15 @@ function UpdateWebsiteRepository({ directory }: DeployFormProps) {
                         </Link>
                     </p>
 
-                    <button
+                    <Button
                         onClick={handleUpdateRepository}
                         disabled={isPending}
-                        className={cn(
-                            'px-6 py-2 rounded-lg font-medium transition-colors',
-                            'bg-surface-secondary dark:bg-surface-secondary-dark',
-                            'text-text dark:text-text-dark',
-                            'hover:bg-surface-hover dark:hover:bg-surface-hover-dark',
-                            'disabled:opacity-50 disabled:cursor-not-allowed',
-                        )}
+                        variant="secondary"
                     >
                         {isPending
                             ? t('form.updateRepository.updatingButton')
                             : t('form.updateRepository.updateButton')}
-                    </button>
+                    </Button>
                 </div>
             </div>
         </div>

@@ -181,12 +181,14 @@ export class GithubService extends GitProvider {
         name,
         token,
         committer,
+        forcePush,
     }: {
         owner: string;
         repo: string;
         name: string;
         token: string;
         committer: ICommitter;
+        forcePush?: boolean;
     }) {
         const duplicated = await this.createEmptyRepo(name, '', token);
         const origin = duplicated.clone_url;
@@ -202,7 +204,7 @@ export class GithubService extends GitProvider {
 
         await this.remoteRemove(originalDir, 'origin');
         await this.remoteAdd(originalDir, 'origin', origin);
-        await this.push(originalDir, token);
+        await this.push(originalDir, token, forcePush);
 
         return originalDir;
     }

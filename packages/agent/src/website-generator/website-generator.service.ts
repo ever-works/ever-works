@@ -31,6 +31,7 @@ export class WebsiteGeneratorService {
             name: directory.getWebsiteRepo(),
             token,
             committer,
+            forcePush: true,
         });
     }
 

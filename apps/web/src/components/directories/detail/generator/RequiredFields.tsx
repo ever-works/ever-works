@@ -2,10 +2,7 @@
 
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Select } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
 import { CreateItemsGeneratorDto } from '@/lib/api/types-only';
-import { GenerationMethod } from '@/lib/api/enums';
 import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
 

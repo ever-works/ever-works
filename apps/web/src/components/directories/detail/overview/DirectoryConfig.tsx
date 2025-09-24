@@ -142,8 +142,9 @@ export function DirectoryConfig({ config }: DirectoryConfigProps) {
                                     href={mainPR?.url || '#'}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="text-sm text-text dark:text-text-dark font-mono"
+                                    className="text-sm text-primary hover:underline font-mono"
                                 >
+                                    {mainPR?.branch.substring(0, 10)} -{' '}
                                     {mainPR?.number ? `#${mainPR.number}` : '-'}
                                 </Link>
                             </div>
@@ -156,8 +157,9 @@ export function DirectoryConfig({ config }: DirectoryConfigProps) {
                                     href={dataPR?.url || '#'}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="text-sm text-text dark:text-text-dark"
+                                    className="text-sm text-primary hover:underline font-mono"
                                 >
+                                    {mainPR?.branch.substring(0, 10)} -{' '}
                                     {dataPR?.number ? `#${dataPR.number}` : '-'}
                                 </Link>
                             </div>

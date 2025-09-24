@@ -179,7 +179,7 @@ export abstract class GitProvider {
         return git.statusMatrix({ fs, dir });
     }
 
-    push(dir: string, token: string) {
+    push(dir: string, token: string, force: boolean = false) {
         const auth = this.getAuth(token);
 
         return git.push({
@@ -187,6 +187,7 @@ export abstract class GitProvider {
             fs,
             http,
             dir,
+            force,
         });
     }
 
