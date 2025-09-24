@@ -805,6 +805,8 @@ export class AgentService {
             status: GenerateStatusType.GENERATING,
         });
 
+        let hasError = false;
+
         try {
             const generated = await this.dataGenerator.initialize(directory, user, dto);
 
@@ -823,10 +825,6 @@ export class AgentService {
                     ),
                 ]);
             }
-
-            await this.directoryRepository.updateGenerateStatus(directory.id, {
-                status: GenerateStatusType.GENERATED,
-            });
         } catch (error) {
             await this.directoryRepository.updateGenerateStatus(directory.id, {
                 status: GenerateStatusType.ERROR,
@@ -837,7 +835,16 @@ export class AgentService {
                 throw error;
             }
 
+            hasError = true;
+
             console.error('Error during generation:', error);
+        }
+
+        if (!hasError) {
+            await this.directoryRepository.updateGenerateStatus(directory.id, {
+                status: GenerateStatusType.GENERATED,
+                step: null,
+            });
         }
 
         const endTime = new Date();

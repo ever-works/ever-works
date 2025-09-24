@@ -198,7 +198,7 @@ export class DataRepository {
         return Promise.all(promises).then((items) => items.filter(Boolean));
     }
 
-    async getItem(slug: string): Promise<ItemData> {
+    async getItem(slug: string): Promise<ItemData | null> {
         const ymlPath = path.join(this.getItemPath(slug), `${slug}.yml`);
 
         try {
@@ -209,11 +209,19 @@ export class DataRepository {
         } catch (err) {
             if (err?.code === 'ENOENT') {
                 const yamlPath = path.join(this.getItemPath(slug), `${slug}.yaml`);
-                const content = await fs.readFile(yamlPath, 'utf-8');
-                const item = yaml.parse(content);
+                try {
+                    const content = await fs.readFile(yamlPath, 'utf-8');
+                    const item = yaml.parse(content);
+                    return { ...item, slug };
+                } catch (yamlErr) {
+                    if (yamlErr?.code === 'ENOENT') {
+                        return null;
+                    }
 
-                return { ...item, slug };
+                    throw yamlErr;
+                }
             }
+
             throw err;
         }
     }

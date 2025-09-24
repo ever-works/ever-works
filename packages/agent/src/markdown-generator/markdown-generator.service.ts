@@ -113,6 +113,10 @@ export class MarkdownGeneratorService {
                 }
 
                 const item = await dataRepo.getItem(slug);
+                if (!item) {
+                    continue;
+                }
+
                 if (Array.isArray(item.tags)) {
                     item.tags = item.tags.map((tag) => this.populate<Tag>(tag, tags));
                 }
