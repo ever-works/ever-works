@@ -3,7 +3,7 @@
  * This is the source template used for creating and updating website repositories
  */
 export const WEBSITE_TEMPLATE_CONFIG = {
-    owner: 'ever-co',
+    owner: 'ever-works',
     repo: 'ever-works-website-template',
 } as const;
 
