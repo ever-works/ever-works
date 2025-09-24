@@ -110,8 +110,11 @@ export function DirectoryHeader({ directory }: DirectoryHeaderProps) {
                             {status.icon}
                             {status.label}
                             {directory.generateStatus?.step && (
-                                <span className="ml-1 text-xs opacity-75">
-                                    • {getStepText(directory.generateStatus.step, tProgress)}
+                                <span className="text-xs opacity-75">
+                                    •{' '}
+                                    <span className="ml-1">
+                                        {getStepText(directory.generateStatus.step, tProgress)}
+                                    </span>
                                 </span>
                             )}
                         </span>
