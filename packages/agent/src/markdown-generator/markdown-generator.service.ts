@@ -257,6 +257,15 @@ export class MarkdownGeneratorService {
         }
     }
 
+    async cleanup(directory: Directory) {
+        const dataDir = this.githubService.getDir(
+            directory.getRepoOwner(),
+            directory.getMainRepo(),
+        );
+
+        return new MarkdownRepository(dataDir).cleanup();
+    }
+
     private async generateReadme(
         data: DataRepository,
         markdowns: Set<string>,

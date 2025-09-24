@@ -676,6 +676,14 @@ export class AgentService {
             // Remove directory from database
             await this.directoryRepository.delete(directory.id);
 
+            await Promise.all([
+                this.dataGenerator.cleanup(directory),
+                this.markdownGenerator.cleanup(directory),
+                this.websiteGenerator.cleanup(directory),
+            ]).catch((error) => {
+                this.logger.error('Failed to cleanup repositories:', error);
+            });
+
             return {
                 status: 'success',
                 slug: directory.slug,

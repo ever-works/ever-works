@@ -311,13 +311,6 @@ export class DataGeneratorService {
             // Delete the GitHub repository
             await this.githubService.deleteRepository(directory.getRepoOwner(), repo, token);
 
-            const dataDir = this.githubService.getDir(
-                directory.getRepoOwner(),
-                directory.getDataRepo(),
-            );
-
-            DataRepository.create(dataDir).then((data) => data.cleanup());
-
             this.logger.log(
                 `Successfully deleted data repository: ${directory.getRepoOwner()}/${repo}`,
             );
@@ -328,6 +321,15 @@ export class DataGeneratorService {
             );
             throw error;
         }
+    }
+
+    public cleanup(directory: Directory) {
+        const dataDir = this.githubService.getDir(
+            directory.getRepoOwner(),
+            directory.getDataRepo(),
+        );
+
+        return DataRepository.create(dataDir).then((data) => data.cleanup());
     }
 
     /**
