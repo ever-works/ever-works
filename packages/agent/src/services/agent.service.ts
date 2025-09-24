@@ -804,7 +804,10 @@ export class AgentService {
                 await Promise.all([
                     this.markdownGenerator.initialize(directory, user, {
                         repository_description: dto.repository_description,
+                        generation_method: generated.generation_method,
+                        pr_update: generated.prUpdate,
                     }),
+
                     this.websiteGenerator.initialize(
                         directory,
                         user,

@@ -44,6 +44,7 @@ export class MarkdownGeneratorService {
             await this.githubService.createEmptyRepo(directory.slug, description, token);
         }
 
+        // Calling CloneOrPull switches to main branch by default
         const markdownPath = await this.githubService.cloneOrPull({
             owner: directory.getRepoOwner(),
             repo: directory.slug,
@@ -51,6 +52,7 @@ export class MarkdownGeneratorService {
             committer,
         });
 
+        // Calling CloneOrPull switches to main branch by default
         const dataPath = await this.githubService.cloneOrPull({
             owner: directory.getRepoOwner(),
             repo: directory.getDataRepo(),
@@ -60,11 +62,6 @@ export class MarkdownGeneratorService {
 
         const markdownRepo = new MarkdownRepository(markdownPath);
         const dataRepo = await DataRepository.create(dataPath);
-
-        const markdowns = new Set<string>(); // will be needed to check if markdown exists before referencing them in README
-        const categories = await this.loadCategories(dataRepo);
-        const tags = await this.loadTags(dataRepo);
-        const config = await dataRepo.getConfig();
 
         try {
             const slugs = await fs.readdir(dataRepo.dataDir);
@@ -77,11 +74,8 @@ export class MarkdownGeneratorService {
                     return null;
                 });
 
-            const configMetadata = config?.metadata || {};
-
-            const generation_method =
-                options?.generation_method || configMetadata?.generation_method;
-            const pr_update = options?.pr_update || configMetadata?.pr_update;
+            const generation_method = options?.generation_method;
+            const pr_update = options?.pr_update;
 
             let canCreatePR =
                 generation_method !== GenerationMethod.RECREATE && !!pr_update?.branch;
@@ -96,14 +90,19 @@ export class MarkdownGeneratorService {
 
                 await markdownRepo.resetFiles();
             } else if (canCreatePR) {
-                // Switch to PR branch
-                await this.githubService
-                    .switchToBranch(markdownRepo.dir, pr_update.branch, true)
-                    .catch((err) => {
-                        canCreatePR = false;
-                        this.logger.error('Failed to switch to PR branch', err);
-                    });
+                // Switch to PR branch (both repos)
+                await Promise.all([
+                    this.githubService.switchToBranch(markdownRepo.dir, pr_update.branch, true),
+                    this.githubService.switchToBranch(dataRepo.dir, pr_update.branch, true),
+                ]).catch((err) => {
+                    canCreatePR = false;
+                    this.logger.error('Failed to switch to PR branch', err);
+                });
             }
+
+            const markdowns = new Set<string>(); // will be needed to check if markdown exists before referencing them in README
+            const categories = await this.loadCategories(dataRepo);
+            const tags = await this.loadTags(dataRepo);
 
             const groups = {}; // we want to group items by category, like: { 'open-source': [items], 'commercial': [items] }
             for (const slug of slugs) {

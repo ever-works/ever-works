@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { GithubService } from '../git/github.service';
 import { Directory } from '../entities/directory.entity';
 import { User } from '../entities/user.entity';
-import { DataRepository } from './data-repository';
+import { DataRepository, PRUpdate } from './data-repository';
 import { slugifyText } from '../items-generator/utils/text.utils';
 import { ItemsGeneratorService } from '../items-generator/items-generator.service';
 import {
@@ -246,6 +246,8 @@ export class DataGeneratorService {
             await this.githubService.push(dest, token);
             this.logger.log(`All processed and pushed to ${directory.getRepoOwner()}/${repo}`);
 
+            let prUpdate: PRUpdate | null = null;
+
             // create PR if we are in update mode and branch was created
             if (newBranchName && defaultBranch && createOrUpdate) {
                 const pr = await this.githubService.createPR(
@@ -259,6 +261,14 @@ export class DataGeneratorService {
                     },
                     token,
                 );
+
+                prUpdate = {
+                    branch: newBranchName,
+                    title: prTitle,
+                    body: prBody,
+                    number: pr.number,
+                    url: pr.html_url,
+                };
 
                 // Save PR details to the directory
                 await this.directoryRepository.updateLastPullRequest(directory.id, {
@@ -279,12 +289,15 @@ export class DataGeneratorService {
                     `Successfully created and pushed data repository - initialized with ${newItems.length} items.`,
                 );
             }
+
+            return {
+                prUpdate,
+                generation_method: createItemsGeneratorDto.generation_method,
+            };
         } catch (err) {
             this.logger.error('Failed to initialize data repository', err);
             throw err;
         }
-
-        return true;
     }
 
     /**
