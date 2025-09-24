@@ -206,6 +206,8 @@ export class GithubService extends GitProvider {
         await this.remoteAdd(originalDir, 'origin', origin);
         await this.push(originalDir, token, forcePush);
 
+        await this.enableWorkflows(duplicated.owner.login, duplicated.name, token);
+
         return originalDir;
     }
 
@@ -240,7 +242,30 @@ export class GithubService extends GitProvider {
         await this.remoteAdd(originalDir, 'origin', origin);
         await this.push(originalDir, token);
 
+        await this.enableWorkflows(duplicated.owner.login, duplicated.name, token);
+
         return originalDir;
+    }
+
+    private async enableWorkflows(owner: string, repo: string, token: string) {
+        const octokit = new Octokit({ auth: token });
+
+        const {
+            data: { workflows },
+        } = await octokit.rest.actions.listRepoWorkflows({
+            owner,
+            repo,
+        });
+
+        await Promise.allSettled(
+            workflows.map((workflow) => {
+                return octokit.rest.actions.enableWorkflow({
+                    owner,
+                    repo,
+                    workflow_id: workflow.id,
+                });
+            }),
+        );
     }
 
     async createRepoFromTemplate(

@@ -18,6 +18,8 @@ export function DirectoryHeader({ directory }: DirectoryHeaderProps) {
     const tProgress = useTranslations('dashboard.directoryDetail.progress');
     const { repoLinks } = useDirectoryDetail();
 
+    const isGenerating = directory.generateStatus?.status === GenerateStatusType.GENERATING;
+
     const getStatusDisplay = () => {
         if (!directory.generateStatus) {
             return {
@@ -109,7 +111,7 @@ export function DirectoryHeader({ directory }: DirectoryHeaderProps) {
                         >
                             {status.icon}
                             {status.label}
-                            {directory.generateStatus?.step && (
+                            {directory.generateStatus?.step && isGenerating && (
                                 <span className="text-xs opacity-75">
                                     •{' '}
                                     <span className="ml-1">

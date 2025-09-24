@@ -811,20 +811,18 @@ export class AgentService {
             const generated = await this.dataGenerator.initialize(directory, user, dto);
 
             if (generated) {
-                await Promise.all([
-                    this.markdownGenerator.initialize(directory, user, {
-                        repository_description: dto.repository_description,
-                        generation_method: generated.generation_method,
-                        pr_update: generated.prUpdate,
-                    }),
-
-                    this.websiteGenerator.initialize(
-                        directory,
-                        user,
-                        dto.website_repository_creation_method,
-                    ),
-                ]);
+                await this.markdownGenerator.initialize(directory, user, {
+                    repository_description: dto.repository_description,
+                    generation_method: generated.generation_method,
+                    pr_update: generated.prUpdate,
+                });
             }
+
+            await this.websiteGenerator.initialize(
+                directory,
+                user,
+                dto.website_repository_creation_method,
+            );
         } catch (error) {
             await this.directoryRepository.updateGenerateStatus(directory.id, {
                 status: GenerateStatusType.ERROR,
