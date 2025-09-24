@@ -68,6 +68,10 @@ export class Directory {
         return `${this.slug}-website`;
     }
 
+    getMainRepo() {
+        return this.slug;
+    }
+
     getRepoOwner(): string {
         const oauthToken = (this.user?.oauthTokens || []).find(
             (token) => token.provider === this.repoProvider,

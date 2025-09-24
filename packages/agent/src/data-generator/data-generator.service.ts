@@ -297,6 +297,14 @@ export class DataGeneratorService {
         try {
             // Delete the GitHub repository
             await this.githubService.deleteRepository(directory.getRepoOwner(), repo, token);
+
+            const dataDir = this.githubService.getDir(
+                directory.getRepoOwner(),
+                directory.getDataRepo(),
+            );
+
+            DataRepository.create(dataDir).then((data) => data.cleanup());
+
             this.logger.log(
                 `Successfully deleted data repository: ${directory.getRepoOwner()}/${repo}`,
             );

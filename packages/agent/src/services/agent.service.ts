@@ -609,28 +609,18 @@ export class AgentService {
     }
 
     async deleteDirectory(
-        id: string,
+        directoryId: string,
         deleteDirectoryDto: DeleteDirectoryDto,
         user: User,
     ): Promise<DeleteDirectoryResponseDto> {
-        let directory: Directory | null = null;
+        const directory = await this.validateDirectoryOwnership(directoryId, user.id);
 
         try {
-            // Check if directory exists and belongs to the user
-            directory = await this.directoryRepository.findById(id);
-            if (!directory) {
-                throw new NotFoundException({
-                    status: 'error',
-                    id,
-                    message: 'Directory not found',
-                });
-            }
-
             // Verify the directory belongs to the user
             if (directory.userId !== user.id) {
                 throw new BadRequestException({
                     status: 'error',
-                    id,
+                    directoryId,
                     message: 'You do not have permission to delete this directory',
                 });
             }

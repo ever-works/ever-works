@@ -96,8 +96,18 @@ export class WebsiteGeneratorService {
         try {
             // Delete the GitHub repository
             await this.githubService.deleteRepository(directory.getRepoOwner(), websiteRepo, token);
+            this.cleanup(directory);
         } catch (error) {
             throw error;
         }
+    }
+
+    private cleanup(directory: Directory) {
+        const dataDir = this.githubService.getDir(
+            directory.getRepoOwner(),
+            directory.getWebsiteRepo(),
+        );
+
+        return fs.rm(dataDir, { recursive: true, force: true });
     }
 }

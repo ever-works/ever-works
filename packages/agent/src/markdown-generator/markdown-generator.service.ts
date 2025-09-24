@@ -238,6 +238,14 @@ export class MarkdownGeneratorService {
                 directory.slug,
                 token,
             );
+
+            const dataDir = this.githubService.getDir(
+                directory.getRepoOwner(),
+                directory.getMainRepo(),
+            );
+
+            new MarkdownRepository(dataDir).cleanup();
+
             this.logger.log(
                 `Successfully deleted markdown repository: ${directory.getRepoOwner()}/${directory.slug}`,
             );
