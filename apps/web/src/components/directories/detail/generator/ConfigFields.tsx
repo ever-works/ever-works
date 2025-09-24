@@ -100,9 +100,8 @@ export function ConfigFields({
                     )}
                 >
                     <option value={WebsiteRepositoryCreationMethod.DUPLICATE}>
-                        {t('methodDuplicate')}
+                        {t('methodDuplicate')} ({t('recommended')})
                     </option>
-                    <option value={WebsiteRepositoryCreationMethod.FORK}>{t('methodFork')}</option>
                     <option value={WebsiteRepositoryCreationMethod.CREATE_USING_TEMPLATE}>
                         {t('methodCreateFromTemplate')}
                     </option>

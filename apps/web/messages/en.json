@@ -465,6 +465,7 @@
                 "failedToStartOperation": "Failed to start operation",
                 "directoryName": "Directory Name",
                 "generationPrompt": "Generation Prompt",
+                "recommended": "Recommended",
                 "promptPlaceholder": "Describe what items should be generated for this directory...",
                 "promptHelperText": "Be specific about the type of content you want to generate",
                 "repositoryDescription": "Repository Description",

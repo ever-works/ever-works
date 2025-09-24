@@ -31,7 +31,6 @@ export enum GenerationMethod {
 
 export enum WebsiteRepositoryCreationMethod {
     DUPLICATE = 'duplicate',
-    FORK = 'fork',
     CREATE_USING_TEMPLATE = 'create-using-template',
 }
 

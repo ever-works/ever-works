@@ -325,7 +325,6 @@ export class GenerateSubCommand extends CommandRunner {
                     name: 'Duplicate (recommended)',
                     value: WebsiteRepositoryCreationMethod.DUPLICATE,
                 },
-                { name: 'Fork', value: WebsiteRepositoryCreationMethod.FORK },
                 {
                     name: 'Create using template',
                     value: WebsiteRepositoryCreationMethod.CREATE_USING_TEMPLATE,

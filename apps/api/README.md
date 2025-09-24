@@ -175,7 +175,7 @@ To generate data and create a GitHub repository for the directory, send a POST r
 | `source_urls`                        | string[] | `optional` | `[]`            | Additional URLs to process for content extraction                                                         |
 | `generation_method`                  | enum     | `optional` | `create-update` | Generation method: `create-update` or `recreate` (see Generation Methods below)                           |
 | `update_with_pull_request`           | boolean  | `optional` | `true`          | Whether to update the repository with a pull request or directly commit the changes to main branch.       |
-| `website_repository_creation_method` | enum     | `optional` | `duplicate`     | Method for creating the website repository: `duplicate`, `fork`, or `create-using-template` (see below)   |
+| `website_repository_creation_method` | enum     | `optional` | `duplicate`     | Method for creating the website repository: `duplicate` or `create-using-template` (see below)            |
 | `badge_evaluation_enabled`           | boolean  | `optional` | `false`         | Whether to evaluate badges for the generated items                                                        |
 | `config`                             | object   | `optional` | -               | Advanced configuration options                                                                            |
 
@@ -211,7 +211,6 @@ To generate data and create a GitHub repository for the directory, send a POST r
 | Method                  | Description                                                                                                                                 |
 | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
 | `duplicate`             | **Default behavior.** Creates an independent copy (duplicate) of the template repository. This is a full clone.                             |
-| `fork`                  | Creates a fork of the template repository under the specified user or organization. This maintains a link to the original template.         |
 | `create-using-template` | Creates a new repository using the template repository as a GitHub template. This initializes the new repository with the template's files. |
 
 **Features:**
@@ -645,11 +644,10 @@ POST /api/directories/{id}/update-website
 
 The service automatically tries different update strategies in order of preference:
 
-| Method                  | Description                                                                                                                        |
-| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `fork`                  | **Preferred method.** Pulls latest changes from the upstream template repository. Only works if the repository is actually a fork. |
-| `duplicate`             | **Fallback method.** Clones the original template, replaces the remote origin, and pushes to the target repository.                |
-| `create-using-template` | **Last resort.** Clones both repositories, copies files from template to target (excluding .git), commits and pushes the changes.  |
+| Method                  | Description                                                                                                                       |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `duplicate`             | **Fallback method.** Clones the original template, replaces the remote origin, and pushes to the target repository.               |
+| `create-using-template` | **Last resort.** Clones both repositories, copies files from template to target (excluding .git), commits and pushes the changes. |
 
 **Error Responses:**
 
