@@ -3,13 +3,19 @@
 import { DirectoryConfig as DirectoryConfigType } from '@/lib/api/types-only';
 import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
+import { useDirectoryDetail } from '../DirectoryDetailContext';
+import { Link } from '@/i18n/navigation';
 
 interface DirectoryConfigProps {
     config: DirectoryConfigType;
 }
 
 export function DirectoryConfig({ config }: DirectoryConfigProps) {
+    const { directory } = useDirectoryDetail();
     const t = useTranslations('dashboard.directoryDetail.config');
+
+    const mainPR = directory.lastPullRequest?.main;
+    const dataPR = directory.lastPullRequest?.data;
 
     return (
         <div
@@ -122,7 +128,7 @@ export function DirectoryConfig({ config }: DirectoryConfigProps) {
                 </div>
 
                 {/* PR Update Information */}
-                {config.metadata?.pr_update && (
+                {(mainPR || dataPR) && (
                     <div>
                         <h4 className="text-sm font-medium text-text-secondary dark:text-text-secondary-dark mb-2">
                             {t('pullRequestUpdate')}
@@ -130,22 +136,31 @@ export function DirectoryConfig({ config }: DirectoryConfigProps) {
                         <div className="bg-surface dark:bg-surface-dark rounded-md p-3 space-y-2">
                             <div>
                                 <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                                    {t('branch')}
+                                    {t('mainRepository')}
                                 </p>
-                                <p className="text-sm text-text dark:text-text-dark font-mono">
-                                    {config.metadata.pr_update.branch}
-                                </p>
+                                <Link
+                                    href={mainPR?.url || '#'}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-sm text-text dark:text-text-dark font-mono"
+                                >
+                                    {mainPR?.number ? `#${mainPR.number}` : '-'}
+                                </Link>
                             </div>
-                            {config.metadata.pr_update.title && (
-                                <div>
-                                    <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                                        {t('prTitle')}
-                                    </p>
-                                    <p className="text-sm text-text dark:text-text-dark">
-                                        {config.metadata.pr_update.title}
-                                    </p>
-                                </div>
-                            )}
+
+                            <div>
+                                <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                                    {t('dataRepository')}
+                                </p>
+                                <Link
+                                    href={dataPR?.url || '#'}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-sm text-text dark:text-text-dark"
+                                >
+                                    {dataPR?.number ? `#${dataPR.number}` : '-'}
+                                </Link>
+                            </div>
                         </div>
                     </div>
                 )}

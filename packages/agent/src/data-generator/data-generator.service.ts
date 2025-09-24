@@ -16,7 +16,7 @@ import { format } from 'date-fns';
 import { DirectoryRepository } from '../database';
 import { GenerateStatusType } from '../entities/types';
 import { LEGAL_NOTICE, LICENSE_TEXT } from './texts';
-import { ItemsGeneratorSteps } from '../items-generator/constants/steps';
+import { ItemsGeneratorStep } from '../items-generator/constants/steps';
 
 @Injectable()
 export class DataGeneratorService {
@@ -230,7 +230,7 @@ export class DataGeneratorService {
 
             // Process items (with markdown generation, writing to disk and committing)
             this.logger.log(`Processing ${newItems.length} items...`);
-            this.onGenerationProgress(ItemsGeneratorSteps.ITEMS_PROCESSING, directory);
+            this.onGenerationProgress(ItemsGeneratorStep.ITEMS_PROCESSING, directory);
 
             const itemsWithMarkdown =
                 await this.itemsGeneratorService.generateMarkdownForItems(newItems);

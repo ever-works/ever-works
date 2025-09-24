@@ -1,6 +1,6 @@
 import 'server-only';
 import { serverFetch, serverMutation } from './server-api';
-import { GenerateStatusType, GenerationMethod, RepoProvider } from './enums';
+import { GenerateStatusType, GenerationMethod, ItemsGeneratorStep, RepoProvider } from './enums';
 import { ItemData } from './types';
 import { CreateItemsGeneratorDto } from './items-generator';
 
@@ -42,7 +42,7 @@ export interface GenerateDirectoryDetailDto {
 
 export type GenerateStatus = {
     status: GenerateStatusType;
-    step?: string;
+    step?: ItemsGeneratorStep;
     error?: string;
 };
 

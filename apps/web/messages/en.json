@@ -434,7 +434,9 @@
                 "disabled": "Disabled",
                 "pullRequestUpdate": "Pull Request Details",
                 "branch": "Branch",
-                "prTitle": "PR Title"
+                "prTitle": "PR Title",
+                "mainRepository": "Main Repository",
+                "dataRepository": "Data Repository"
             },
             "activity": {
                 "title": "Recent Activity",

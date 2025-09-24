@@ -204,13 +204,13 @@ export function DirectoryInfo({ directory }: DirectoryInfoProps) {
                                 <p className="text-xs text-text-muted dark:text-text-muted-dark mb-1">
                                     {item.label}
                                 </p>
-                                <p className="text-sm font-medium text-text dark:text-text-dark">
+                                <div className="text-sm font-medium text-text dark:text-text-dark">
                                     {item.value instanceof Date ? (
                                         <DisplayDate date={item.value.toISOString()} />
                                     ) : (
                                         item.value
                                     )}
-                                </p>
+                                </div>
                             </div>
                         </div>
                     ))}

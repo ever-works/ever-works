@@ -7,6 +7,7 @@ import { useTranslations } from 'next-intl';
 import { GenerateStatusType } from '@/lib/api/enums';
 import { Link } from 'lucide-react';
 import { useDirectoryDetail } from './DirectoryDetailContext';
+import { getStepText } from '@/lib/utils/generator-steps';
 
 interface DirectoryHeaderProps {
     directory: Directory;
@@ -14,6 +15,7 @@ interface DirectoryHeaderProps {
 
 export function DirectoryHeader({ directory }: DirectoryHeaderProps) {
     const t = useTranslations('dashboard.directoryDetail');
+    const tProgress = useTranslations('dashboard.directoryDetail.progress');
     const { repoLinks } = useDirectoryDetail();
 
     const getStatusDisplay = () => {
@@ -109,7 +111,7 @@ export function DirectoryHeader({ directory }: DirectoryHeaderProps) {
                             {status.label}
                             {directory.generateStatus?.step && (
                                 <span className="ml-1 text-xs opacity-75">
-                                    • {directory.generateStatus.step}
+                                    • {getStepText(directory.generateStatus.step, tProgress)}
                                 </span>
                             )}
                         </span>

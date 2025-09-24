@@ -1,4 +1,4 @@
-export enum ItemsGeneratorSteps {
+export enum ItemsGeneratorStep {
     PROMPT_COMPARISON = 'prompt-comparison',
     PROMPT_PROCESSING = 'prompt-processing',
     AI_FIRST_ITEMS_GENERATION = 'ai-first-items-generation',

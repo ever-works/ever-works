@@ -16,7 +16,7 @@ import { DirectoryPromptService } from './directory-prompt.service';
 import { ConfigCheckService } from './config-check.service';
 import { handleCliError } from './error';
 import { Directory, GenerateStatusType, User } from '@packages/agent/entities';
-import { getStepProgress, getStepText, ItemsGeneratorSteps } from '@packages/cli-shared';
+import { getStepProgress, getStepText, ItemsGeneratorStep } from '@packages/cli-shared';
 
 @SubCommand({
     name: 'generate',
@@ -197,7 +197,7 @@ export class GenerateSubCommand extends CommandRunner {
                     const timeStr = `[${Math.floor(elapsed / 60)}m ${elapsed % 60}s]`;
 
                     if (freshDirectory.generateStatus?.step) {
-                        const step = freshDirectory.generateStatus.step as ItemsGeneratorSteps;
+                        const step = freshDirectory.generateStatus.step as ItemsGeneratorStep;
                         const stepText = getStepText(step);
                         const progress = getStepProgress(step);
 

@@ -1,27 +1,27 @@
-import { ItemsGeneratorSteps } from '@/lib/api/enums';
+import { ItemsGeneratorStep } from '@/lib/api/enums';
 
-export function getStepTranslationKey(step: ItemsGeneratorSteps): string {
-    const stepKeys: Record<ItemsGeneratorSteps, string> = {
-        [ItemsGeneratorSteps.PROMPT_COMPARISON]: 'promptComparison',
-        [ItemsGeneratorSteps.PROMPT_PROCESSING]: 'promptProcessing',
-        [ItemsGeneratorSteps.AI_FIRST_ITEMS_GENERATION]: 'aiFirstItemsGeneration',
-        [ItemsGeneratorSteps.SEARCH_QUERIES_GENERATION]: 'searchQueriesGeneration',
-        [ItemsGeneratorSteps.WEB_SEARCH]: 'webSearch',
-        [ItemsGeneratorSteps.CONTENT_RETRIEVAL]: 'contentRetrieval',
-        [ItemsGeneratorSteps.CONTENT_FILTERING]: 'contentFiltering',
-        [ItemsGeneratorSteps.ITEMS_EXTRACTION]: 'itemsExtraction',
-        [ItemsGeneratorSteps.DEDUPLICATION_AND_DATA_AGGREGATION]: 'deduplicationDataAggregation',
-        [ItemsGeneratorSteps.CATEGORIES_TAGS_PROCESSING]: 'categoriesTagsProcessing',
-        [ItemsGeneratorSteps.SOURCES_VALIDATION]: 'sourcesValidation',
-        [ItemsGeneratorSteps.BADGES_PROCESSING]: 'badgesProcessing',
-        [ItemsGeneratorSteps.ITEMS_PROCESSING]: 'itemsProcessing',
+export function getStepTranslationKey(step: ItemsGeneratorStep): string {
+    const stepKeys: Record<ItemsGeneratorStep, string> = {
+        [ItemsGeneratorStep.PROMPT_COMPARISON]: 'promptComparison',
+        [ItemsGeneratorStep.PROMPT_PROCESSING]: 'promptProcessing',
+        [ItemsGeneratorStep.AI_FIRST_ITEMS_GENERATION]: 'aiFirstItemsGeneration',
+        [ItemsGeneratorStep.SEARCH_QUERIES_GENERATION]: 'searchQueriesGeneration',
+        [ItemsGeneratorStep.WEB_SEARCH]: 'webSearch',
+        [ItemsGeneratorStep.CONTENT_RETRIEVAL]: 'contentRetrieval',
+        [ItemsGeneratorStep.CONTENT_FILTERING]: 'contentFiltering',
+        [ItemsGeneratorStep.ITEMS_EXTRACTION]: 'itemsExtraction',
+        [ItemsGeneratorStep.DEDUPLICATION_AND_DATA_AGGREGATION]: 'deduplicationDataAggregation',
+        [ItemsGeneratorStep.CATEGORIES_TAGS_PROCESSING]: 'categoriesTagsProcessing',
+        [ItemsGeneratorStep.SOURCES_VALIDATION]: 'sourcesValidation',
+        [ItemsGeneratorStep.BADGES_PROCESSING]: 'badgesProcessing',
+        [ItemsGeneratorStep.ITEMS_PROCESSING]: 'itemsProcessing',
     };
 
     return stepKeys[step] || 'processing';
 }
 
-export function getStepProgress(step: ItemsGeneratorSteps): number {
-    const steps = Object.values(ItemsGeneratorSteps);
+export function getStepProgress(step: ItemsGeneratorStep): number {
+    const steps = Object.values(ItemsGeneratorStep);
     const currentIndex = steps.indexOf(step);
 
     if (currentIndex === -1) return 0;
@@ -30,7 +30,7 @@ export function getStepProgress(step: ItemsGeneratorSteps): number {
     return Math.round(((currentIndex + 1) / steps.length) * 100);
 }
 
-export function getStepText(step: ItemsGeneratorSteps | undefined, t: Function): string {
+export function getStepText(step: ItemsGeneratorStep | undefined, t: Function): string {
     if (!step) {
         return t('steps.processing');
     }

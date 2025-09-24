@@ -9,7 +9,7 @@ import {
     GenerateStatusType,
     getStepProgress,
     getStepText,
-    ItemsGeneratorSteps,
+    ItemsGeneratorStep,
 } from '@packages/cli-shared';
 
 export const statusCommand = new Command('status')
@@ -87,7 +87,7 @@ export const statusCommand = new Command('status')
                         const timeStr = `[${Math.floor(elapsed / 60)}m ${elapsed % 60}s]`;
 
                         if (freshDirectory.generateStatus?.step) {
-                            const step = freshDirectory.generateStatus.step as ItemsGeneratorSteps;
+                            const step = freshDirectory.generateStatus.step as ItemsGeneratorStep;
                             const stepText = getStepText(step);
                             const progress = getStepProgress(step);
 

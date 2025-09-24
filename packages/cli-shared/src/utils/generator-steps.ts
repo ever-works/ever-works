@@ -1,4 +1,4 @@
-export enum ItemsGeneratorSteps {
+export enum ItemsGeneratorStep {
 	PROMPT_COMPARISON = 'prompt-comparison',
 	PROMPT_PROCESSING = 'prompt-processing',
 	AI_FIRST_ITEMS_GENERATION = 'ai-first-items-generation',
@@ -14,28 +14,28 @@ export enum ItemsGeneratorSteps {
 	ITEMS_PROCESSING = 'items-processing'
 }
 
-export function getStepText(step: ItemsGeneratorSteps): string {
-	const steps: Record<ItemsGeneratorSteps, string> = {
-		[ItemsGeneratorSteps.PROMPT_COMPARISON]: 'Comparing prompts',
-		[ItemsGeneratorSteps.PROMPT_PROCESSING]: 'Processing your prompt',
-		[ItemsGeneratorSteps.AI_FIRST_ITEMS_GENERATION]: 'Generating initial AI items',
-		[ItemsGeneratorSteps.SEARCH_QUERIES_GENERATION]: 'Creating search queries',
-		[ItemsGeneratorSteps.WEB_SEARCH]: 'Searching the web',
-		[ItemsGeneratorSteps.CONTENT_RETRIEVAL]: 'Retrieving content',
-		[ItemsGeneratorSteps.CONTENT_FILTERING]: 'Filtering relevant content',
-		[ItemsGeneratorSteps.ITEMS_EXTRACTION]: 'Extracting items from content',
-		[ItemsGeneratorSteps.DEDUPLICATION_AND_DATA_AGGREGATION]: 'Removing duplicates and aggregating data',
-		[ItemsGeneratorSteps.CATEGORIES_TAGS_PROCESSING]: 'Processing categories and tags',
-		[ItemsGeneratorSteps.SOURCES_VALIDATION]: 'Validating sources',
-		[ItemsGeneratorSteps.BADGES_PROCESSING]: 'Processing quality badges',
-		[ItemsGeneratorSteps.ITEMS_PROCESSING]: 'Finalizing items'
+export function getStepText(step: ItemsGeneratorStep): string {
+	const steps: Record<ItemsGeneratorStep, string> = {
+		[ItemsGeneratorStep.PROMPT_COMPARISON]: 'Comparing prompts',
+		[ItemsGeneratorStep.PROMPT_PROCESSING]: 'Processing your prompt',
+		[ItemsGeneratorStep.AI_FIRST_ITEMS_GENERATION]: 'Generating initial AI items',
+		[ItemsGeneratorStep.SEARCH_QUERIES_GENERATION]: 'Creating search queries',
+		[ItemsGeneratorStep.WEB_SEARCH]: 'Searching the web',
+		[ItemsGeneratorStep.CONTENT_RETRIEVAL]: 'Retrieving content',
+		[ItemsGeneratorStep.CONTENT_FILTERING]: 'Filtering relevant content',
+		[ItemsGeneratorStep.ITEMS_EXTRACTION]: 'Extracting items from content',
+		[ItemsGeneratorStep.DEDUPLICATION_AND_DATA_AGGREGATION]: 'Removing duplicates and aggregating data',
+		[ItemsGeneratorStep.CATEGORIES_TAGS_PROCESSING]: 'Processing categories and tags',
+		[ItemsGeneratorStep.SOURCES_VALIDATION]: 'Validating sources',
+		[ItemsGeneratorStep.BADGES_PROCESSING]: 'Processing quality badges',
+		[ItemsGeneratorStep.ITEMS_PROCESSING]: 'Finalizing items'
 	};
 
 	return steps[step] || 'Processing';
 }
 
-export function getStepProgress(step: ItemsGeneratorSteps): number {
-	const steps = Object.values(ItemsGeneratorSteps);
+export function getStepProgress(step: ItemsGeneratorStep): number {
+	const steps = Object.values(ItemsGeneratorStep);
 	const currentIndex = steps.indexOf(step);
 
 	if (currentIndex === -1) return 0;

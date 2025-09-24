@@ -1,7 +1,7 @@
 'use client';
 
 import { Directory } from '@/lib/api/types-only';
-import { ItemsGeneratorSteps } from '@/lib/api/enums';
+import { ItemsGeneratorStep } from '@/lib/api/enums';
 import { cn } from '@/lib/utils/cn';
 import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
@@ -24,7 +24,7 @@ export function GenerationProgress({ directory }: GenerationProgressProps) {
     }, []);
 
     // Get current step and progress
-    const currentStep = directory.generateStatus?.step as ItemsGeneratorSteps | undefined;
+    const currentStep = directory.generateStatus?.step as ItemsGeneratorStep | undefined;
     const progressPercentage = currentStep ? getStepProgress(currentStep) : 0;
     const stepText = getStepText(currentStep, t);
 

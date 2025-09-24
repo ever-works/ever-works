@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { useTranslations } from 'next-intl';
-import { GenerateStatusType, ItemsGeneratorSteps } from '@/lib/api/enums';
+import { GenerateStatusType, ItemsGeneratorStep } from '@/lib/api/enums';
 import { getStepProgress, getStepText } from '@/lib/utils/generator-steps';
 
 interface DirectoryStatusCardProps {
@@ -61,7 +61,7 @@ export function DirectoryStatusCard({ directory }: DirectoryStatusCardProps) {
         }
 
         // Get proper step description
-        const currentStep = generateStatus?.step as ItemsGeneratorSteps | undefined;
+        const currentStep = generateStatus?.step as ItemsGeneratorStep | undefined;
         const progressPercentage = currentStep ? getStepProgress(currentStep) : 0;
         const stepText = getStepText(currentStep, tProgress);
 

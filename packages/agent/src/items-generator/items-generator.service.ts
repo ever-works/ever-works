@@ -18,7 +18,7 @@ import { Category, ItemData, Tag } from './dto';
 import { IDataConfig } from '../data-generator/data-repository';
 import { WebPageData } from './interfaces/items-generator.interfaces';
 import { Directory } from '../entities';
-import { ItemsGeneratorSteps } from './constants/steps';
+import { ItemsGeneratorStep } from './constants/steps';
 
 @Injectable()
 export class ItemsGeneratorService {
@@ -101,7 +101,7 @@ export class ItemsGeneratorService {
                 createItemsGeneratorDto.generation_method === GenerationMethod.CREATE_UPDATE &&
                 existingItems.length > 0
             ) {
-                onProgress?.(ItemsGeneratorSteps.PROMPT_COMPARISON);
+                onProgress?.(ItemsGeneratorStep.PROMPT_COMPARISON);
                 this.logger.log(`[${directorySlug}] 1.0. Prompt Comparison - Starting`);
 
                 const comparisonResult = await this.promptComparisonService.comparePrompts(
@@ -134,7 +134,7 @@ export class ItemsGeneratorService {
             }
 
             // 1.1. Process Prompt (Extract URLs, Categories, Priorities, and Featured Item Hints)
-            onProgress?.(ItemsGeneratorSteps.PROMPT_PROCESSING);
+            onProgress?.(ItemsGeneratorStep.PROMPT_PROCESSING);
             this.logger.log(
                 `[${directorySlug}] 1.1. Prompt Processing (URLs, Categories, Priorities, and Featured Hints) - Starting`,
             );
@@ -209,7 +209,7 @@ export class ItemsGeneratorService {
             let initialAiItems: ItemData[] = [];
 
             if (config.ai_first_generation_enabled) {
-                onProgress?.(ItemsGeneratorSteps.AI_FIRST_ITEMS_GENERATION);
+                onProgress?.(ItemsGeneratorStep.AI_FIRST_ITEMS_GENERATION);
                 this.logger.log(`[${directorySlug}] 1.5. AI-First Item Generation - Invoking`);
 
                 initialAiItems = await this.aiItemGenerationService.generateInitialItemsWithAI(
@@ -223,7 +223,7 @@ export class ItemsGeneratorService {
             }
 
             // 2. AI-Powered Search Query Generation
-            onProgress?.(ItemsGeneratorSteps.SEARCH_QUERIES_GENERATION);
+            onProgress?.(ItemsGeneratorStep.SEARCH_QUERIES_GENERATION);
             this.logger.log(`[${directorySlug}] 2. AI-Powered Search Query Generation - Starting`);
 
             const searchQueries =
@@ -233,7 +233,7 @@ export class ItemsGeneratorService {
             this.logger.log(`[${directorySlug}] Generated ${searchQueries.length} search queries.`);
 
             // 3. Web Search & Content Retrieval
-            onProgress?.(ItemsGeneratorSteps.WEB_SEARCH);
+            onProgress?.(ItemsGeneratorStep.WEB_SEARCH);
             this.logger.log(`[${directorySlug}] 3. Web Search & Content Retrieval - Starting`);
 
             const processedSourceUrls = new Set<string>();
@@ -252,7 +252,7 @@ export class ItemsGeneratorService {
             }
 
             // Then proceed with normal web search
-            onProgress?.(ItemsGeneratorSteps.CONTENT_RETRIEVAL);
+            onProgress?.(ItemsGeneratorStep.CONTENT_RETRIEVAL);
             const searchWebPages = await this.webPageRetrievalService.retrieveWebPages(
                 directorySlug,
                 searchQueries,
@@ -270,7 +270,7 @@ export class ItemsGeneratorService {
 
             if (config.content_filtering_enabled) {
                 // 4. Content Pre-filtering & Relevance Assessment
-                onProgress?.(ItemsGeneratorSteps.CONTENT_FILTERING);
+                onProgress?.(ItemsGeneratorStep.CONTENT_FILTERING);
                 webPages = await this.contentFilteringService.filterAndAssessPages(
                     directorySlug,
                     webPages,
@@ -285,7 +285,7 @@ export class ItemsGeneratorService {
             }
 
             // 5. AI-Driven Structured Data Extraction for Items (from Web)
-            onProgress?.(ItemsGeneratorSteps.ITEMS_EXTRACTION);
+            onProgress?.(ItemsGeneratorStep.ITEMS_EXTRACTION);
             this.logger.log(
                 `[${directorySlug}] 5. AI-Driven Structured Data Extraction for Items from Web - Starting`,
             );
@@ -308,7 +308,7 @@ export class ItemsGeneratorService {
             );
 
             // 6. Deduplication and Data Aggregation
-            onProgress?.(ItemsGeneratorSteps.DEDUPLICATION_AND_DATA_AGGREGATION);
+            onProgress?.(ItemsGeneratorStep.DEDUPLICATION_AND_DATA_AGGREGATION);
             this.logger.log(`[${directorySlug}] 6. Deduplication and Data Aggregation - Starting`);
 
             const { aggregatedItems, metrics } =
@@ -322,7 +322,7 @@ export class ItemsGeneratorService {
                 });
 
             // 7. Category and Tag Generation
-            onProgress?.(ItemsGeneratorSteps.CATEGORIES_TAGS_PROCESSING);
+            onProgress?.(ItemsGeneratorStep.CATEGORIES_TAGS_PROCESSING);
             this.logger.log(`[${directorySlug}] 7. Category and Tag Generation - Starting`);
 
             // Create a modified DTO with merged priority categories
@@ -348,7 +348,7 @@ export class ItemsGeneratorService {
             );
 
             // 8. Filter and Validate Source URLs for all discovered items
-            onProgress?.(ItemsGeneratorSteps.SOURCES_VALIDATION);
+            onProgress?.(ItemsGeneratorStep.SOURCES_VALIDATION);
             this.logger.log(`[${directorySlug}] 8. Filter and Validate Source URLs - Starting`);
 
             let validatedItems = await this.sourceValidationService.filterAndValidateSourceItems(
@@ -358,7 +358,7 @@ export class ItemsGeneratorService {
 
             // 9. Badge Processing for Repository Items
             if (createItemsGeneratorDto.badge_evaluation_enabled) {
-                onProgress?.(ItemsGeneratorSteps.BADGES_PROCESSING);
+                onProgress?.(ItemsGeneratorStep.BADGES_PROCESSING);
                 this.logger.log(
                     `[${directorySlug}] 9. Badge Processing for Repository Items - Starting`,
                 );
