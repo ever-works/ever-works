@@ -450,7 +450,7 @@ export class DataGeneratorService {
                     existingConfig: config,
                 };
             } catch (error) {
-                this.logger.debug(`No existing data found in repository: ${error.message}`);
+                this.logger.error(`No existing data found in repository: `, error);
                 return {
                     existingItems: [],
                     existingCategories: [],

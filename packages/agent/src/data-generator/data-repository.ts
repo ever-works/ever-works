@@ -186,10 +186,16 @@ export class DataRepository {
             .filter((item) => item.isDirectory())
             .map(async (item) => {
                 const slug = item.name;
+
+                const itemDir = await fs.readdir(this.getItemPath(slug));
+                if (itemDir.length === 0) {
+                    return null;
+                }
+
                 return this.getItem(slug);
             });
 
-        return Promise.all(promises);
+        return Promise.all(promises).then((items) => items.filter(Boolean));
     }
 
     async getItem(slug: string): Promise<ItemData> {
