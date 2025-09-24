@@ -36,7 +36,7 @@ export function DirectoryLayoutClient({
                 requestAnimationFrame(() => {
                     window.scrollTo(scrollX, scrollY);
                 });
-            }, 5000); // Refresh every 5 seconds
+            }, 10 * 1000); // Refresh every 10 seconds
 
             return () => clearInterval(interval);
         }
