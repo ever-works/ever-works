@@ -10,6 +10,8 @@ export type PRUpdate = {
     branch: string;
     title: string;
     body: string;
+    number?: number;
+    url?: string;
 };
 
 export interface IDataConfig {

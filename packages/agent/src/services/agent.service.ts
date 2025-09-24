@@ -266,7 +266,7 @@ export class AgentService {
         }
     }
 
-    async generateItemsGenerator(
+    async generateItems(
         directoryId: string,
         createItemsGeneratorDto: CreateItemsGeneratorDto,
         user: User,

@@ -46,7 +46,7 @@ export class ItemsGeneratorService {
      * @param existing
      * @returns
      */
-    async generateItemsGenerator(
+    async generateItems(
         directory: Directory,
         createItemsGeneratorDto: CreateItemsGeneratorDto,
         existing: {

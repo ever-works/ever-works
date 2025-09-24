@@ -174,7 +174,7 @@ export class DirectoriesController {
 
     @Post('directories/:id/generate')
     @HttpCode(HttpStatus.ACCEPTED)
-    async generateItemsGenerator(
+    async generateItems(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id') id: string,
         @Body() createItemsGeneratorDto: CreateItemsGeneratorDto,
@@ -182,7 +182,7 @@ export class DirectoriesController {
         const user = await this.authService.getUser(auth.userId);
 
         // We don't await completion here, as the request can take a long time
-        return this.agentService.generateItemsGenerator(id, createItemsGeneratorDto, user, false);
+        return this.agentService.generateItems(id, createItemsGeneratorDto, user, false);
     }
 
     @Post('directories/:id/update')

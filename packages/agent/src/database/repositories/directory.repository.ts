@@ -191,4 +191,18 @@ export class DirectoryRepository {
     ): Promise<void> {
         await this.repository.update(id, { generateStatus });
     }
+
+    async updateLastPullRequest(
+        id: string,
+        lastPullRequest: Directory['lastPullRequest'],
+    ): Promise<void> {
+        const directory = await this.findById(id);
+
+        await this.repository.update(id, {
+            lastPullRequest: {
+                ...directory.lastPullRequest,
+                ...lastPullRequest,
+            },
+        });
+    }
 }

@@ -54,7 +54,7 @@ export class DataGeneratorService {
 
         // Generate items, the items generator will always to generate new items
         const generatedItems = await this.itemsGeneratorService
-            .generateItemsGenerator(directory, createItemsGeneratorDto, existingData, (step) => {
+            .generateItems(directory, createItemsGeneratorDto, existingData, (step) => {
                 this.onGenerationProgress(step, directory);
             })
             .catch((err) => {
@@ -253,7 +253,7 @@ export class DataGeneratorService {
 
             // create PR if we are in update mode and branch was created
             if (newBranchName && defaultBranch && createOrUpdate) {
-                await this.githubService.createPR(
+                const pr = await this.githubService.createPR(
                     {
                         owner: directory.getRepoOwner(),
                         repo: repo,
@@ -264,6 +264,17 @@ export class DataGeneratorService {
                     },
                     token,
                 );
+
+                // Save PR details to the directory
+                await this.directoryRepository.updateLastPullRequest(directory.id, {
+                    data: {
+                        branch: newBranchName,
+                        title: prTitle,
+                        body: prBody,
+                        number: pr.number,
+                        url: pr.html_url,
+                    },
+                });
 
                 this.logger.log(
                     `Successfully created and pushed data repository - created PR ${newBranchName} to ${defaultBranch}`,

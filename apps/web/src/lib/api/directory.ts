@@ -60,6 +60,7 @@ export interface Directory {
     generateStatus?: GenerateStatus;
     createdAt: string;
     updatedAt: string;
+    lastPullRequest?: { main?: PRUpdate; data?: PRUpdate };
 }
 
 export interface DirectoriesResponse {
@@ -90,6 +91,8 @@ export type PRUpdate = {
     branch: string;
     title: string;
     body: string;
+    number?: number;
+    url?: string;
 };
 
 export interface DirectoryConfig {

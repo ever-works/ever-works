@@ -49,7 +49,7 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
         source_urls: lastRequestData?.source_urls || [],
         repository_description: lastRequestData?.repository_description || '',
         generation_method: GenerationMethod.CREATE_UPDATE,
-        update_with_pull_request: true,
+        update_with_pull_request: false,
         badge_evaluation_enabled: lastRequestData?.badge_evaluation_enabled || false,
         website_repository_creation_method:
             lastRequestData?.website_repository_creation_method ||

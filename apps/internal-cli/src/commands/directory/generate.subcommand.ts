@@ -114,7 +114,7 @@ export class GenerateSubCommand extends CommandRunner {
             try {
                 const user = await this.userRepository.createOrGetLocalUser();
 
-                const generatorPromise = this.agentService.generateItemsGenerator(
+                const generatorPromise = this.agentService.generateItems(
                     directory.id,
                     createDto,
                     user,
