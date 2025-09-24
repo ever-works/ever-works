@@ -6,6 +6,7 @@ import { ConnectionInfo, Directory } from '@/lib/api/types-only';
 import { DirectoryHeader } from './DirectoryHeader';
 import { DirectoryTabs } from './DirectoryTabs';
 import { GenerateStatusType, RepoProvider } from '@/lib/api/enums';
+import { DirectoryDetailProvider } from './DirectoryDetailContext';
 
 interface DirectoryLayoutClientProps {
     directory: Directory;
@@ -42,38 +43,13 @@ export function DirectoryLayoutClient({
     }, [isGenerating, router]);
 
     return (
-        <div className="w-full">
-            <DirectoryHeader
-                directory={directory}
-                repoLink={repoLink(directory, oauthConnection)}
-            />
+        <DirectoryDetailProvider directory={directory} oauthConnection={oauthConnection}>
+            <div className="w-full">
+                <DirectoryHeader directory={directory} />
 
-            <DirectoryTabs directory={directory} />
-            <div className="mt-6">{children}</div>
-        </div>
+                <DirectoryTabs directory={directory} />
+                <div className="mt-6">{children}</div>
+            </div>
+        </DirectoryDetailProvider>
     );
-}
-
-function repoLink(directory: Directory, oauthConnection: ConnectionInfo | null) {
-    if (!oauthConnection?.connected) {
-        return null;
-    }
-
-    let providerUrl: string | null = null;
-
-    switch (directory.repoProvider) {
-        case RepoProvider.GITHUB:
-            providerUrl = 'https://github.com';
-            break;
-
-        default:
-            return null;
-    }
-
-    const username = oauthConnection.username || oauthConnection.metadata?.login;
-    if (!username) {
-        return null;
-    }
-
-    return `${providerUrl}/${username}/${directory.slug}`;
 }

@@ -6,14 +6,15 @@ import { Button } from '@/components/ui/button';
 import { useTranslations } from 'next-intl';
 import { GenerateStatusType } from '@/lib/api/enums';
 import { Link } from 'lucide-react';
+import { useDirectoryDetail } from './DirectoryDetailContext';
 
 interface DirectoryHeaderProps {
     directory: Directory;
-    repoLink: string | null;
 }
 
-export function DirectoryHeader({ directory, repoLink }: DirectoryHeaderProps) {
+export function DirectoryHeader({ directory }: DirectoryHeaderProps) {
     const t = useTranslations('dashboard.directoryDetail');
+    const { repoLinks } = useDirectoryDetail();
 
     const getStatusDisplay = () => {
         if (!directory.generateStatus) {
@@ -177,10 +178,10 @@ export function DirectoryHeader({ directory, repoLink }: DirectoryHeaderProps) {
                                 </>
                             );
 
-                            if (repoLink) {
+                            if (repoLinks?.main) {
                                 return (
                                     <a
-                                        href={repoLink}
+                                        href={repoLinks?.main}
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className="flex items-center gap-1.5"

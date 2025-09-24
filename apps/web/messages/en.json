@@ -404,6 +404,10 @@
             "info": {
                 "title": "Directory Information",
                 "slug": "Slug",
+                "repositories": "Repositories",
+                "dataRepo": "Data Repository",
+                "websiteRepo": "Website Repository",
+                "mainRepo": "Main Repository",
                 "repoProvider": "Repository Provider",
                 "organization": "Organization",
                 "created": "Created",
@@ -601,7 +605,8 @@
                     },
                     "updateRepository": {
                         "title": "Update Website Repository",
-                        "description": "Sync the latest changes from the template to the website repository.",
+                        "description": "Sync the latest changes from the template to the",
+                        "websiteRepository": "website repository",
                         "updateButton": "Update Repository",
                         "updatingButton": "Updating..."
                     },

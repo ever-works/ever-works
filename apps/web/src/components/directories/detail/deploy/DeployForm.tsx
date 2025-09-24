@@ -5,9 +5,10 @@ import { Directory } from '@/lib/api';
 import { cn } from '@/lib/utils/cn';
 import { toast } from 'sonner';
 import { useTranslations } from 'next-intl';
-import { useRouter } from '@/i18n/navigation';
+import { Link, useRouter } from '@/i18n/navigation';
 import { deployToVercel, updateWebsiteRepository } from '@/app/actions/dashboard/deploy';
 import { RefreshCw, Info, Loader2, Triangle } from 'lucide-react';
+import { useDirectoryDetail } from '../DirectoryDetailContext';
 
 interface DeployFormProps {
     directory: Directory;
@@ -15,7 +16,6 @@ interface DeployFormProps {
 
 export function DeployForm({ directory }: DeployFormProps) {
     const t = useTranslations('dashboard.directoryDetail.deploy');
-    const router = useRouter();
     const [isPending, startTransition] = useTransition();
     const [deploymentStatus, setDeploymentStatus] = useState<
         'idle' | 'deploying' | 'success' | 'error'
@@ -129,6 +129,7 @@ export function DeployForm({ directory }: DeployFormProps) {
 
 function UpdateWebsiteRepository({ directory }: DeployFormProps) {
     const t = useTranslations('dashboard.directoryDetail.deploy');
+    const { repoLinks } = useDirectoryDetail();
     const [isPending, startTransition] = useTransition();
     const router = useRouter();
 
@@ -166,7 +167,15 @@ function UpdateWebsiteRepository({ directory }: DeployFormProps) {
                         {t('form.updateRepository.title')}
                     </h3>
                     <p className="text-text-secondary dark:text-text-secondary-dark mb-4">
-                        {t('form.updateRepository.description')}
+                        {t('form.updateRepository.description')}{' '}
+                        <Link
+                            href={repoLinks?.websiteRepo || '#'}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-primary hover:text-primary-hover"
+                        >
+                            {t('form.updateRepository.websiteRepository')}
+                        </Link>
                     </p>
 
                     <button

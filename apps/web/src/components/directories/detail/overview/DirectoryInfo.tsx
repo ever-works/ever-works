@@ -1,9 +1,12 @@
 'use client';
 
+import { GenerateStatusType } from '@/lib/api/enums';
 import { Directory } from '@/lib/api/types-only';
 import { useMounted } from '@/lib/hooks/use-mounted';
 import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
+import { useDirectoryDetail } from '../DirectoryDetailContext';
+import { Link } from '@/i18n/navigation';
 
 interface DirectoryInfoProps {
     directory: Directory;
@@ -11,6 +14,7 @@ interface DirectoryInfoProps {
 
 export function DirectoryInfo({ directory }: DirectoryInfoProps) {
     const t = useTranslations('dashboard.directoryDetail.info');
+    const { repoLinks } = useDirectoryDetail();
 
     const infoItems = [
         {
@@ -56,6 +60,57 @@ export function DirectoryInfo({ directory }: DirectoryInfoProps) {
             ),
         },
         {
+            label: t('repositories'),
+            active:
+                !!repoLinks && directory.generateStatus?.status === GenerateStatusType.GENERATED,
+            value: (
+                <ul className="flex gap-2 flex-col list-inside">
+                    <li>
+                        <Link
+                            href={repoLinks?.dataRepo || '#'}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-primary hover:text-primary-hover"
+                        >
+                            {t('dataRepo')}
+                        </Link>
+                    </li>
+
+                    <li>
+                        <Link
+                            href={repoLinks?.websiteRepo || '#'}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-primary hover:text-primary-hover"
+                        >
+                            {t('websiteRepo')}
+                        </Link>
+                    </li>
+
+                    <li>
+                        <Link
+                            href={repoLinks?.main || '#'}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-primary hover:text-primary-hover"
+                        >
+                            {t('mainRepo')}
+                        </Link>
+                    </li>
+                </ul>
+            ),
+            icon: (
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h3m-3-8h7m-7 3h7m-7 3h7m2-10v16m-2-5h.01M7 20h5a2 2 0 002-2v-6a2 2 0 00-2-2H7a2 2 0 00-2 2v6a2 2 0 002 2h5m-2 4h.01"
+                    />
+                </svg>
+            ),
+        },
+        {
             label: t('created'),
             value: new Date(directory.createdAt),
             icon: (
@@ -69,20 +124,21 @@ export function DirectoryInfo({ directory }: DirectoryInfoProps) {
                 </svg>
             ),
         },
-        {
-            label: t('lastUpdated'),
-            value: new Date(directory.updatedAt),
-            icon: (
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                    />
-                </svg>
-            ),
-        },
+
+        // {
+        //     label: t('lastUpdated'),
+        //     value: new Date(directory.updatedAt),
+        //     icon: (
+        //         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        //             <path
+        //                 strokeLinecap="round"
+        //                 strokeLinejoin="round"
+        //                 strokeWidth={2}
+        //                 d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+        //             />
+        //         </svg>
+        //     ),
+        // },
     ];
 
     // Add README config if exists
@@ -137,25 +193,27 @@ export function DirectoryInfo({ directory }: DirectoryInfoProps) {
                 {t('title')}
             </h3>
             <div className="space-y-4">
-                {infoItems.map((item) => (
-                    <div key={item.label} className="flex items-start gap-3">
-                        <div className="mt-0.5 text-text-muted dark:text-text-muted-dark">
-                            {item.icon}
+                {infoItems
+                    .filter((item) => item.active !== false)
+                    .map((item) => (
+                        <div key={item.label} className="flex items-start gap-3">
+                            <div className="mt-0.5 text-text-muted dark:text-text-muted-dark">
+                                {item.icon}
+                            </div>
+                            <div className="flex-1">
+                                <p className="text-xs text-text-muted dark:text-text-muted-dark mb-1">
+                                    {item.label}
+                                </p>
+                                <p className="text-sm font-medium text-text dark:text-text-dark">
+                                    {item.value instanceof Date ? (
+                                        <DisplayDate date={item.value.toISOString()} />
+                                    ) : (
+                                        item.value
+                                    )}
+                                </p>
+                            </div>
                         </div>
-                        <div className="flex-1">
-                            <p className="text-xs text-text-muted dark:text-text-muted-dark mb-1">
-                                {item.label}
-                            </p>
-                            <p className="text-sm font-medium text-text dark:text-text-dark">
-                                {item.value instanceof Date ? (
-                                    <DisplayDate date={item.value.toISOString()} />
-                                ) : (
-                                    item.value
-                                )}
-                            </p>
-                        </div>
-                    </div>
-                ))}
+                    ))}
             </div>
         </div>
     );
