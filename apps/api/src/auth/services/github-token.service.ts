@@ -1,7 +1,7 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { OAuthTokenService } from './oauth-token.service';
 import { OAuthConnectionService } from './oauth-connection.service';
-import { AuthProviders } from '../../config/constants';
+import { AuthProvider } from '../../config/constants';
 import { GitHubScopePresets } from '../config/github-scopes.config';
 
 /**
@@ -26,7 +26,7 @@ export class GitHubTokenService {
         if (!scopeCheck.hasAgentScopes) {
             const authUrl = await this.oauthConnectionService.getConnectionUrl(
                 userId,
-                AuthProviders.GITHUB,
+                AuthProvider.GITHUB,
             );
 
             throw new UnauthorizedException({
@@ -63,7 +63,7 @@ export class GitHubTokenService {
     async getConnectionInfo(userId: string) {
         const connection = await this.oauthConnectionService.checkConnection(
             userId,
-            AuthProviders.GITHUB,
+            AuthProvider.GITHUB,
         );
 
         return {

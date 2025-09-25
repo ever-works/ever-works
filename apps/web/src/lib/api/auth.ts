@@ -1,6 +1,7 @@
 import 'server-only';
 import { serverFetch, serverMutation } from './server-api';
 import { MessageResponse } from './types';
+import { OAuthProvider } from './enums';
 
 // DTOs - Auth
 export interface RegisterDto {
@@ -27,6 +28,7 @@ export interface UpdatePasswordDto {
 export interface UpdateProfileDto {
     username?: string;
     avatar?: string;
+    vercelToken?: string;
 }
 
 // DTOs - Email Verification
@@ -48,31 +50,56 @@ export interface ResetPasswordDto {
 export interface AuthResponse {
     access_token: string;
     refresh_token: string;
-    user: {
-        id: string;
-        username: string;
-        email: string;
-        avatar?: string;
-    };
+    user: UserProfile;
+}
+
+export interface UserProfile {
+    id: string;
+    username: string;
+    email: string;
+    avatar?: string;
+    emailVerified?: boolean;
+    vercelToken?: string;
 }
 
 export interface OAuthUrlResponse {
     url: string;
 }
 
-export interface OAuthConnectionResponse {
-    provider: string;
+export interface ConnectionInfo {
+    provider: OAuthProvider;
     connected: boolean;
-    scopes: string[];
-    metadata: Record<string, any>;
-    connectedAt: string;
+    email?: string;
+    username?: string;
+    scopes?: string[];
+    connectedAt?: Date;
+    metadata?: Record<string, any>;
 }
+
+interface OAuthConnectionResponse extends ConnectionInfo {}
 
 export interface TokenValidationResponse {
     valid: boolean;
     message: string;
     email?: string;
     expiresAt?: Date;
+}
+
+// Github
+
+export interface GitHubOrganization {
+    login: string;
+    id: number;
+    node_id: string;
+    url: string;
+    repos_url: string;
+    events_url: string;
+    hooks_url: string;
+    issues_url: string;
+    members_url: string;
+    public_members_url: string;
+    avatar_url: string;
+    description: string;
 }
 
 export const authAPI = {
@@ -235,14 +262,12 @@ export const authAPI = {
             return serverFetch<OAuthConnectionResponse[]>('/auth/connections');
         },
 
-        checkConnection: async (provider: string) => {
-            return serverFetch<{ connected: boolean; scopes?: string[] }>(
-                `/auth/connections/${provider}`,
-            );
+        checkConnection: async (provider: `${OAuthProvider}`) => {
+            return serverFetch<OAuthConnectionResponse>(`/auth/connections/${provider}`);
         },
 
         getConnectUrl: async (
-            provider: string,
+            provider: OAuthProvider,
             callbackUrl?: string,
             state?: string,
         ): Promise<{ url: string; state: string }> => {
@@ -256,7 +281,7 @@ export const authAPI = {
             );
         },
 
-        connectCallback: async (provider: string, code: string, state?: string) => {
+        connectCallback: async (provider: OAuthProvider, code: string, state?: string) => {
             const params = new URLSearchParams({ code });
             if (state) params.append('state', state);
             return serverFetch<OAuthConnectionResponse>(
@@ -264,7 +289,7 @@ export const authAPI = {
             );
         },
 
-        requestAdditionalScopes: async (provider: string, scopes: string[]) => {
+        requestAdditionalScopes: async (provider: OAuthProvider, scopes: string[]) => {
             return serverMutation<MessageResponse>({
                 endpoint: `/auth/connections/${provider}/request-scopes`,
                 data: { scopes },
@@ -273,7 +298,11 @@ export const authAPI = {
             });
         },
 
-        disconnect: async (provider: string) => {
+        ensureConnection: async (provider: `${OAuthProvider}`) => {
+            return serverFetch<{ connected: boolean }>(`/auth/connections/${provider}/ensure`);
+        },
+
+        disconnect: async (provider: OAuthProvider) => {
             return serverMutation<void>({
                 endpoint: `/auth/connections/${provider}`,
                 data: {},
@@ -283,12 +312,8 @@ export const authAPI = {
         },
 
         // GitHub specific
-        getGitHubRepositories: async () => {
-            return serverFetch<any[]>('/auth/connections/github/repositories');
-        },
-
         getGitHubOrgs: async () => {
-            return serverFetch<any[]>('/auth/connections/github/orgs');
+            return serverFetch<GitHubOrganization[]>('/auth/connections/github/orgs');
         },
 
         checkGitHubScopes: async (requiredScopes: string[]) => {

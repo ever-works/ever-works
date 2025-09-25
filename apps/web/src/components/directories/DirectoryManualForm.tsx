@@ -14,6 +14,8 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
+import { OrganizationSelector } from './OrganizationSelector';
+import { ChevronDown, Plus } from 'lucide-react';
 
 interface DirectoryManualFormProps {
     user: AuthUser;
@@ -176,22 +178,12 @@ export function DirectoryManualForm({ user }: DirectoryManualFormProps) {
                             {t('advancedSubtitle')}
                         </p>
                     </div>
-                    <svg
+                    <ChevronDown
                         className={cn(
                             'w-5 h-5 text-text-secondary dark:text-text-secondary-dark transition-transform',
                             showAdvanced && 'rotate-180',
                         )}
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                    >
-                        <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M19 9l-7 7-7-7"
-                        />
-                    </svg>
+                    />
                 </Button>
 
                 {/* Advanced Fields */}
@@ -203,30 +195,19 @@ export function DirectoryManualForm({ user }: DirectoryManualFormProps) {
                             'border border-card-border dark:border-card-border-dark',
                         )}
                     >
-                        {/* Organization */}
-                        <Checkbox
-                            checked={formData.organization}
-                            onChange={(e) =>
-                                setFormData({ ...formData, organization: e.target.checked })
-                            }
-                            label={t('organizationLabel')}
-                            description={t('organizationHelp')}
-                            variant="form"
+                        {/* Organization Selector */}
+                        <OrganizationSelector
+                            value={formData.owner || ''}
+                            authId={user.sub}
+                            onChange={(value, isOrganization) => {
+                                setFormData({
+                                    ...formData,
+                                    owner: value,
+                                    organization: isOrganization,
+                                });
+                            }}
+                            disabled={isPending}
                         />
-
-                        {/* Owner */}
-                        {formData.organization && (
-                            <Input
-                                label={t('organizationNameLabel')}
-                                type="text"
-                                value={formData.owner || ''}
-                                onChange={(e) =>
-                                    setFormData({ ...formData, owner: e.target.value })
-                                }
-                                placeholder={t('organizationNamePlaceholder')}
-                                variant="form"
-                            />
-                        )}
 
                         {/* README Header */}
                         <div className="space-y-3">
@@ -312,19 +293,7 @@ export function DirectoryManualForm({ user }: DirectoryManualFormProps) {
                             t('creatingButton')
                         ) : (
                             <>
-                                <svg
-                                    className="w-5 h-5"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={2}
-                                        d="M12 4v16m8-8H4"
-                                    />
-                                </svg>
+                                <Plus className="w-5 h-5" />
                                 {t('createButton')}
                             </>
                         )}

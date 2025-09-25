@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, ILike } from 'typeorm';
-import { Directory } from '../entities/directory.entity';
-import { User } from '../entities';
-import { prepareLikeSearchTerm } from './utils';
+import { Directory } from '../../entities/directory.entity';
+import { User } from '../../entities';
+import { prepareLikeSearchTerm } from '../utils';
 
 @Injectable()
 export class DirectoryRepository {
@@ -25,8 +25,10 @@ export class DirectoryRepository {
             throw new Error('Directory already exists');
         }
 
-        const directory = this.repository.create(dto);
-        return await this.repository.save(directory);
+        let directory = this.repository.create(dto);
+        directory = await this.repository.save(directory);
+
+        return this.findById(directory.id);
     }
 
     async createOrUpdate(dto: Partial<Directory>, user: User): Promise<Directory> {
@@ -188,5 +190,19 @@ export class DirectoryRepository {
         generateStatus: Directory['generateStatus'],
     ): Promise<void> {
         await this.repository.update(id, { generateStatus });
+    }
+
+    async updateLastPullRequest(
+        id: string,
+        lastPullRequest: Directory['lastPullRequest'],
+    ): Promise<void> {
+        const directory = await this.findById(id);
+
+        await this.repository.update(id, {
+            lastPullRequest: {
+                ...directory.lastPullRequest,
+                ...lastPullRequest,
+            },
+        });
     }
 }

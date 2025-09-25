@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { GithubService } from '../git/github.service';
 import { Directory } from '../entities/directory.entity';
 import { User } from '../entities/user.entity';
-import { DataRepository } from './data-repository';
+import { DataRepository, PRUpdate } from './data-repository';
 import { slugifyText } from '../items-generator/utils/text.utils';
 import { ItemsGeneratorService } from '../items-generator/items-generator.service';
 import {
@@ -16,6 +16,7 @@ import { format } from 'date-fns';
 import { DirectoryRepository } from '../database';
 import { GenerateStatusType } from '../entities/types';
 import { LEGAL_NOTICE, LICENSE_TEXT } from './texts';
+import { ItemsGeneratorStep } from '../items-generator/constants/steps';
 
 @Injectable()
 export class DataGeneratorService {
@@ -53,7 +54,7 @@ export class DataGeneratorService {
 
         // Generate items, the items generator will always to generate new items
         const generatedItems = await this.itemsGeneratorService
-            .generateItemsGenerator(directory, createItemsGeneratorDto, existingData, (step) => {
+            .generateItems(directory, createItemsGeneratorDto, existingData, (step) => {
                 this.onGenerationProgress(step, directory);
             })
             .catch((err) => {
@@ -63,12 +64,7 @@ export class DataGeneratorService {
 
         // If no items were generated, we don't need to do anything else
         if (!generatedItems || generatedItems.items.length === 0) {
-            const dataDir = this.githubService.getDir(
-                directory.getRepoOwner(),
-                directory.getDataRepo(),
-            );
-
-            await DataRepository.create(dataDir).then((data) => data.cleanup());
+            // We could call data.cleanup() here but it's not necessary
             return;
         }
 
@@ -234,7 +230,7 @@ export class DataGeneratorService {
 
             // Process items (with markdown generation, writing to disk and committing)
             this.logger.log(`Processing ${newItems.length} items...`);
-            this.onGenerationProgress('Processing Items', directory);
+            this.onGenerationProgress(ItemsGeneratorStep.ITEMS_PROCESSING, directory);
 
             const itemsWithMarkdown =
                 await this.itemsGeneratorService.generateMarkdownForItems(newItems);
@@ -250,9 +246,11 @@ export class DataGeneratorService {
             await this.githubService.push(dest, token);
             this.logger.log(`All processed and pushed to ${directory.getRepoOwner()}/${repo}`);
 
+            let prUpdate: PRUpdate | null = null;
+
             // create PR if we are in update mode and branch was created
             if (newBranchName && defaultBranch && createOrUpdate) {
-                await this.githubService.createPR(
+                const pr = await this.githubService.createPR(
                     {
                         owner: directory.getRepoOwner(),
                         repo: repo,
@@ -264,6 +262,25 @@ export class DataGeneratorService {
                     token,
                 );
 
+                prUpdate = {
+                    branch: newBranchName,
+                    title: prTitle,
+                    body: prBody,
+                    number: pr.number,
+                    url: pr.html_url,
+                };
+
+                // Save PR details to the directory
+                await this.directoryRepository.updateLastPullRequest(directory.id, {
+                    data: {
+                        branch: newBranchName,
+                        title: prTitle,
+                        body: prBody,
+                        number: pr.number,
+                        url: pr.html_url,
+                    },
+                });
+
                 this.logger.log(
                     `Successfully created and pushed data repository - created PR ${newBranchName} to ${defaultBranch}`,
                 );
@@ -272,16 +289,15 @@ export class DataGeneratorService {
                     `Successfully created and pushed data repository - initialized with ${newItems.length} items.`,
                 );
             }
+
+            return {
+                prUpdate,
+                generation_method: createItemsGeneratorDto.generation_method,
+            };
         } catch (err) {
             this.logger.error('Failed to initialize data repository', err);
-            await data.cleanup();
             throw err;
-        } finally {
-            // never cleanup data with (data.cleanup()),
-            // we need this repo for future updates
         }
-
-        return true;
     }
 
     /**
@@ -294,6 +310,7 @@ export class DataGeneratorService {
         try {
             // Delete the GitHub repository
             await this.githubService.deleteRepository(directory.getRepoOwner(), repo, token);
+
             this.logger.log(
                 `Successfully deleted data repository: ${directory.getRepoOwner()}/${repo}`,
             );
@@ -306,10 +323,65 @@ export class DataGeneratorService {
         }
     }
 
+    public cleanup(directory: Directory) {
+        const dataDir = this.githubService.getDir(
+            directory.getRepoOwner(),
+            directory.getDataRepo(),
+        );
+
+        return DataRepository.create(dataDir).then((data) => data.cleanup());
+    }
+
     /**
      * Get last request data from config
      */
     async getLastRequestData(directory: Directory, user: User) {
+        const config = await this.config(directory, user);
+        return config.metadata?.last_request_data;
+    }
+
+    /**
+     * Get existing items from the repository
+     */
+
+    async getItems(directory: Directory, user: User) {
+        return (await this.getExistingData(directory, user)).existingItems;
+    }
+
+    async getCategoriesTags(directory: Directory, user: User) {
+        const data = await this.repositoryData(directory, user);
+
+        const [categories, tags] = await Promise.all([data.getCategories(), data.getTags()]);
+
+        return {
+            categories,
+            tags,
+        };
+    }
+
+    async count(directory: Directory, user: User) {
+        const data = await this.repositoryData(directory, user);
+
+        const [categories, tags, items] = await Promise.all([
+            data.getCategories(),
+            data.getTags(),
+            data.getItems(),
+        ]);
+
+        return {
+            items: items.length,
+            categories: categories.length,
+            tags: tags.length,
+        };
+    }
+
+    async config(directory: Directory, user: User) {
+        const data = await this.repositoryData(directory, user);
+
+        return data.getConfig();
+    }
+
+    private async repositoryData(directory: Directory, user: User) {
         const token = user.getGitToken();
         const committer = user.asCommitter();
 
@@ -321,18 +393,10 @@ export class DataGeneratorService {
             token,
             committer,
         });
+
         const data = await DataRepository.create(dest);
 
-        const config = await data.getConfig();
-        return config.metadata?.last_request_data;
-    }
-
-    /**
-     * Get existing items from the repository
-     */
-
-    async getItems(directory: Directory, user: User) {
-        return (await this.getExistingData(directory, user)).existingItems;
+        return data;
     }
 
     /**
@@ -388,7 +452,7 @@ export class DataGeneratorService {
                     existingConfig: config,
                 };
             } catch (error) {
-                this.logger.debug(`No existing data found in repository: ${error.message}`);
+                this.logger.error(`No existing data found in repository: `, error);
                 return {
                     existingItems: [],
                     existingCategories: [],

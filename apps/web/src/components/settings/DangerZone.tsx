@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react';
 import { cn } from '@/lib/utils/cn';
 import { deleteAccount } from '@/app/actions/settings';
 import { toast } from 'sonner';
-import { useRouter } from 'next/navigation';
+import { useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { useTranslations } from 'next-intl';
 
@@ -48,9 +48,7 @@ export function DangerZone({ user }: DangerZoneProps) {
         <div className="space-y-6">
             <div>
                 <h2 className="text-xl font-semibold text-danger mb-4">{t('title')}</h2>
-                <p className="text-text-muted dark:text-text-muted-dark text-sm">
-                    {t('subtitle')}
-                </p>
+                <p className="text-text-muted dark:text-text-muted-dark text-sm">{t('subtitle')}</p>
             </div>
 
             {/* Export Data */}

@@ -11,6 +11,8 @@ import { useTranslations } from 'next-intl';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { OrganizationSelector } from './OrganizationSelector';
+import { ChevronDown, Lightbulb, Check } from 'lucide-react';
 
 interface DirectoryAICreatorProps {
     user: AuthUser;
@@ -19,6 +21,9 @@ interface DirectoryAICreatorProps {
 export function DirectoryAICreator({ user }: DirectoryAICreatorProps) {
     const [prompt, setPrompt] = useState('');
     const [directoryName, setDirectoryName] = useState('');
+    const [organization, setOrganization] = useState(false);
+    const [owner, setOwner] = useState('');
+    const [showAdvanced, setShowAdvanced] = useState(false);
     const [isPending, startTransition] = useTransition();
     const router = useRouter();
     const t = useTranslations('dashboard.directoryCreation.ai');
@@ -35,7 +40,12 @@ export function DirectoryAICreator({ user }: DirectoryAICreatorProps) {
         }
 
         startTransition(async () => {
-            const result = await createDirectoryWithAI(prompt, directoryName);
+            const result = await createDirectoryWithAI({
+                name: directoryName,
+                prompt,
+                organization,
+                owner: organization ? owner : undefined,
+            });
 
             if (result.success) {
                 toast.success(result.message || t('success.started'));
@@ -56,25 +66,6 @@ export function DirectoryAICreator({ user }: DirectoryAICreatorProps) {
             }
         });
     };
-
-    const examplePrompts = [
-        {
-            name: t('examplePrompts.0.name'),
-            prompt: t('examplePrompts.0.prompt'),
-        },
-        {
-            name: t('examplePrompts.1.name'),
-            prompt: t('examplePrompts.1.prompt'),
-        },
-        {
-            name: t('examplePrompts.2.name'),
-            prompt: t('examplePrompts.2.prompt'),
-        },
-        {
-            name: t('examplePrompts.3.name'),
-            prompt: t('examplePrompts.3.prompt'),
-        },
-    ];
 
     return (
         <div className="space-y-6">
@@ -115,34 +106,62 @@ export function DirectoryAICreator({ user }: DirectoryAICreatorProps) {
                         variant="form"
                     />
 
-                    {/* Example Prompts */}
-                    <div>
-                        <p className="text-sm text-text-secondary dark:text-text-secondary-dark mb-3">
-                            {t('inspirationText')}
-                        </p>
-                        <div className="flex flex-wrap gap-2">
-                            {examplePrompts.map((example, index) => (
-                                <Button
-                                    key={index}
-                                    onClick={() => {
-                                        setPrompt(example.prompt);
-                                        setDirectoryName(example.name);
-                                    }}
-                                    variant="ghost"
-                                    size="sm"
-                                    className={cn(
-                                        'rounded-full',
-                                        'bg-surface dark:bg-surface-dark',
-                                        'border border-border dark:border-border-dark',
-                                        'text-text-secondary dark:text-text-secondary-dark',
-                                        'hover:border-primary hover:text-primary',
-                                    )}
-                                >
-                                    {example.name}
-                                </Button>
-                            ))}
+                    {/* Advanced Settings Toggle */}
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => setShowAdvanced(!showAdvanced)}
+                        fullWidth
+                        className={cn(
+                            'p-4 text-left justify-between',
+                            'bg-surface dark:bg-surface-dark',
+                            'border border-border dark:border-border-dark',
+                            'hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark',
+                        )}
+                    >
+                        <div>
+                            <h3 className="font-medium text-text dark:text-text-dark">
+                                {t('advancedSettings')}
+                            </h3>
+                            <p className="text-sm text-text-muted dark:text-text-muted-dark">
+                                {t('advancedSubtitle')}
+                            </p>
                         </div>
-                    </div>
+                        <ChevronDown
+                            className={cn(
+                                'w-5 h-5 text-text-secondary dark:text-text-secondary-dark transition-transform',
+                                showAdvanced && 'rotate-180',
+                            )}
+                        />
+                    </Button>
+
+                    {/* Advanced Fields */}
+                    {showAdvanced && (
+                        <div className="space-y-4 p-4 rounded-lg bg-surface dark:bg-surface-dark border border-border dark:border-border-dark">
+                            {/* Organization Selector */}
+                            <OrganizationSelector
+                                value={owner}
+                                authId={user.sub}
+                                onChange={(value, isOrganization) => {
+                                    setOwner(value);
+                                    setOrganization(isOrganization);
+                                }}
+                                disabled={isPending}
+                            />
+                        </div>
+                    )}
+
+                    {/* Example Prompts */}
+                    <ExamplePrompts
+                        onSelect={(selectedPrompt, selectedName) => {
+                            setPrompt(selectedPrompt);
+                            setDirectoryName(selectedName);
+
+                            document
+                                .getElementById('main-content')
+                                ?.scrollTo({ top: 0, behavior: 'smooth' });
+                        }}
+                    />
 
                     {/* AI Features Info */}
                     <div className={cn('p-4 rounded-lg', 'bg-primary/5 border border-primary/20')}>
@@ -151,67 +170,19 @@ export function DirectoryAICreator({ user }: DirectoryAICreatorProps) {
                         </h4>
                         <ul className="space-y-1 text-sm text-text-secondary dark:text-text-secondary-dark">
                             <li className="flex items-start gap-2">
-                                <svg
-                                    className="w-4 h-4 text-primary mt-0.5 flex-shrink-0"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={2}
-                                        d="M5 13l4 4L19 7"
-                                    />
-                                </svg>
+                                <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
                                 <span>{t('features.0')}</span>
                             </li>
                             <li className="flex items-start gap-2">
-                                <svg
-                                    className="w-4 h-4 text-primary mt-0.5 flex-shrink-0"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={2}
-                                        d="M5 13l4 4L19 7"
-                                    />
-                                </svg>
+                                <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
                                 <span>{t('features.1')}</span>
                             </li>
                             <li className="flex items-start gap-2">
-                                <svg
-                                    className="w-4 h-4 text-primary mt-0.5 flex-shrink-0"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={2}
-                                        d="M5 13l4 4L19 7"
-                                    />
-                                </svg>
+                                <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
                                 <span>{t('features.2')}</span>
                             </li>
                             <li className="flex items-start gap-2">
-                                <svg
-                                    className="w-4 h-4 text-primary mt-0.5 flex-shrink-0"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={2}
-                                        d="M5 13l4 4L19 7"
-                                    />
-                                </svg>
+                                <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
                                 <span>{t('features.3')}</span>
                             </li>
                         </ul>
@@ -231,19 +202,7 @@ export function DirectoryAICreator({ user }: DirectoryAICreatorProps) {
                                 t('generatingButton')
                             ) : (
                                 <>
-                                    <svg
-                                        className="w-5 h-5"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
-                                    >
-                                        <path
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            strokeWidth={2}
-                                            d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
-                                        />
-                                    </svg>
+                                    <Lightbulb className="w-5 h-5" />
                                     {t('generateButton')}
                                 </>
                             )}
@@ -271,6 +230,56 @@ export function DirectoryAICreator({ user }: DirectoryAICreatorProps) {
                 <p className="text-sm text-text-muted dark:text-text-muted-dark">
                     <strong>{t('noteTitle')}</strong> {t('noteText')}
                 </p>
+            </div>
+        </div>
+    );
+}
+
+function ExamplePrompts({ onSelect }: { onSelect: (prompt: string, name: string) => void }) {
+    const t = useTranslations('dashboard.directoryCreation.ai');
+
+    const examplePrompts = [
+        {
+            name: t('examplePrompts.0.name'),
+            prompt: t('examplePrompts.0.prompt'),
+        },
+        {
+            name: t('examplePrompts.1.name'),
+            prompt: t('examplePrompts.1.prompt'),
+        },
+        {
+            name: t('examplePrompts.2.name'),
+            prompt: t('examplePrompts.2.prompt'),
+        },
+        {
+            name: t('examplePrompts.3.name'),
+            prompt: t('examplePrompts.3.prompt'),
+        },
+    ];
+
+    return (
+        <div>
+            <p className="text-sm text-text-secondary dark:text-text-secondary-dark mb-3">
+                {t('inspirationText')}
+            </p>
+            <div className="flex flex-wrap gap-2">
+                {examplePrompts.map((example, index) => (
+                    <Button
+                        key={index}
+                        onClick={() => onSelect(example.prompt, example.name)}
+                        variant="ghost"
+                        size="sm"
+                        className={cn(
+                            'rounded-full',
+                            'bg-surface dark:bg-surface-dark',
+                            'border border-border dark:border-border-dark',
+                            'text-text-secondary dark:text-text-secondary-dark',
+                            'hover:border-primary hover:text-primary',
+                        )}
+                    >
+                        {example.name}
+                    </Button>
+                ))}
             </div>
         </div>
     );

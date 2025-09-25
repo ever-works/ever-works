@@ -1,18 +1,18 @@
 import { getAuthFromCookie } from '@/lib/auth';
-import { authAPI } from '@/lib/api/auth';
+import { authAPI, ConnectionInfo } from '@/lib/api/auth';
 import NewDirectoryClient from './new-directory-client';
+import { OAuthProvider } from '@/lib/api/enums';
 
 export default async function NewDirectoryPage() {
     const user = await getAuthFromCookie();
 
     // Check GitHub connection on the server
-    let githubConnected = false;
+    let connection: ConnectionInfo | null = null;
     try {
-        const connection = await authAPI.oauth_connections.checkConnection('github');
-        githubConnected = connection.connected || false;
+        connection = await authAPI.oauth_connections.checkConnection(OAuthProvider.GITHUB);
     } catch (error) {
         console.error('Failed to check GitHub connection:', error);
     }
 
-    return <NewDirectoryClient user={user!} githubConnected={githubConnected} />;
+    return <NewDirectoryClient user={user!} githubConnection={connection} />;
 }

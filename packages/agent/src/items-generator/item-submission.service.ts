@@ -239,6 +239,16 @@ export class ItemSubmissionService {
             // Get item details before removal for response
             const itemData = await data.getItem(removeItemDto.item_slug);
 
+            if (!itemData) {
+                return {
+                    status: 'error',
+                    slug: directory.slug,
+                    item_name: 'Unknown',
+                    item_slug: removeItemDto.item_slug,
+                    message: `Failed to retrieve item details for '${removeItemDto.item_slug}'`,
+                };
+            }
+
             // Get main branch
             const defaultBranch = await this.githubService.getMainBranch(dest);
 

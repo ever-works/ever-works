@@ -25,7 +25,7 @@ export class LoggingInterceptor implements NestInterceptor {
                 const delay = Date.now() - now;
 
                 this.logger.error(
-                    `Error Response: ${method} ${originalUrl} ${statusCode} - ${delay}ms`,
+                    `Error Response: ${method} ${originalUrl} ${statusCode || 400} - ${delay}ms`,
                 );
 
                 return throwError(() => err);
@@ -37,7 +37,7 @@ export class LoggingInterceptor implements NestInterceptor {
                 const delay = Date.now() - now;
 
                 this.logger.log(
-                    `Outgoing Response: ${method} ${originalUrl} ${statusCode} - ${delay}ms`,
+                    `Outgoing Response: ${method} ${originalUrl} ${statusCode || 200} - ${delay}ms`,
                 );
             }),
         );

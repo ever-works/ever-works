@@ -43,25 +43,6 @@ export interface NotificationPreferencesResponse {
 }
 
 export const settingsAPI = {
-    // Vercel Token
-    updateVercelToken: async (token: string) => {
-        return serverMutation<MessageResponse>({
-            endpoint: '/settings/vercel-token',
-            data: { token },
-            method: 'PUT',
-            wrapInData: false,
-        });
-    },
-
-    removeVercelToken: async () => {
-        return serverMutation<MessageResponse>({
-            endpoint: '/settings/vercel-token',
-            data: {},
-            method: 'DELETE',
-            wrapInData: false,
-        });
-    },
-
     getVercelTokenStatus: async () => {
         return serverFetch<VercelTokenStatus>('/settings/vercel-token/status');
     },

@@ -10,7 +10,7 @@ import {
     FunctionMessage,
     ToolMessage,
 } from '@langchain/core/messages';
-import { ChatHistoryRepository } from '../database/chat-history.repository';
+import { ChatHistoryRepository } from '../database/repositories/chat-history.repository';
 import { ChatMessage, MessageRole } from '../entities/chat-message.entity';
 
 export interface TypeORMChatMessageHistoryInput {

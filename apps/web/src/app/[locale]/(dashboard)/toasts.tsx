@@ -62,19 +62,6 @@ export default function DashboardToasts() {
             });
         }
 
-        // Clean up URL after showing toasts
-        if (isNewUser || isVerified) {
-            const timer = setTimeout(() => {
-                // Remove query params without page refresh
-                const url = new URL(window.location.href);
-                url.searchParams.delete('newUser');
-                url.searchParams.delete('verified');
-                window.history.replaceState({}, '', url.pathname);
-            }, 1000);
-
-            return () => clearTimeout(timer);
-        }
-
         if (isOAuthConnected) {
             toast.success(t('oauthConnected.title'), {
                 description: t('oauthConnected.description'),
@@ -90,6 +77,20 @@ export default function DashboardToasts() {
                     </svg>
                 ),
             });
+        }
+
+        // Clean up URL after showing toasts
+        if (isNewUser || isVerified || isOAuthConnected) {
+            const timer = setTimeout(() => {
+                // Remove query params without page refresh
+                const url = new URL(window.location.href);
+                url.searchParams.delete('newUser');
+                url.searchParams.delete('verified');
+                url.searchParams.delete('oauth_connected');
+                window.history.replaceState({}, '', url.pathname);
+            }, 1000);
+
+            return () => clearTimeout(timer);
         }
     }, [isNewUser, isVerified, isOAuthConnected, t]);
 

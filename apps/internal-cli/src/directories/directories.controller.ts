@@ -63,13 +63,13 @@ export class DirectoriesController {
 
     @Post('directories/:id/generate')
     @HttpCode(HttpStatus.ACCEPTED)
-    async generateItemsGenerator(
+    async generateItems(
         @Param('id') id: string,
         @Body() createItemsGeneratorDto: CreateItemsGeneratorDto,
     ): Promise<ItemsGeneratorResponseDto> {
         const user = await this.userRepository.createOrGetLocalUser();
         // We don't await completion here, as the request can take a long time
-        return this.agentService.generateItemsGenerator(id, createItemsGeneratorDto, user, false);
+        return this.agentService.generateItems(id, createItemsGeneratorDto, user, false);
     }
 
     @Post('directories/:id/update')

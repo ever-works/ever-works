@@ -7,25 +7,26 @@ import { getAuthFromCookie } from '@/lib/auth';
 import { revalidatePath } from 'next/cache';
 import { ROUTES } from '@/lib/constants';
 import { getTranslations } from 'next-intl/server';
+import { VALIDATION_RULES } from './validation';
+import { OAuthProvider } from '@/lib/api/enums';
 
 // Note: Validation schemas are now created inside each function with translations
 
 // Profile Actions
 export async function updateProfile(data: { username: string }) {
     const t = await getTranslations('actions.settings.profile');
-    
+    const tAuth = await getTranslations('validation.auth');
+
     // Validation schema with translations
     const updateProfileSchema = z.object({
         username: z
             .string()
-            .min(1, t('usernameRequired'))
-            .max(50, t('usernameMaxLength'))
-            .regex(
-                /^[a-zA-Z0-9_-]+$/,
-                t('usernameFormat'),
+            .min(
+                VALIDATION_RULES.USERNAME_MIN_LENGTH,
+                tAuth('username.minLength', { length: VALIDATION_RULES.USERNAME_MIN_LENGTH }),
             ),
     });
-    
+
     try {
         const user = await getAuthFromCookie();
         if (!user) {
@@ -56,16 +57,19 @@ export async function updateProfile(data: { username: string }) {
 // Security Actions
 export async function updatePassword(data: { currentPassword: string; newPassword: string }) {
     const t = await getTranslations('actions.settings.password');
-    
+    const tAuth = await getTranslations('validation.auth');
+
     // Validation schema with translations
     const updatePasswordSchema = z.object({
         currentPassword: z.string().min(1, t('currentRequired')),
         newPassword: z
             .string()
-            .min(8, t('newMinLength'))
-            .max(100, t('newMaxLength')),
+            .min(6, tAuth('password.minLength', { length: 6 }))
+            .regex(/[a-z]/, tAuth('password.lowercase'))
+            .regex(/(\d|\W)/, tAuth('password.numberOrSpecial'))
+            .regex(/^[^.\n]/, tAuth('password.cannotStartWith')),
     });
-    
+
     try {
         const user = await getAuthFromCookie();
         if (!user) {
@@ -95,15 +99,15 @@ export async function updatePassword(data: { currentPassword: string; newPasswor
 // API Token Actions
 export async function updateVercelToken(token: string) {
     const t = await getTranslations('actions.settings.vercel');
-    
+
     // Validation schema with translations
     const vercelTokenSchema = z.object({
         token: z
             .string()
             .min(1, t('tokenRequired'))
-            .regex(/^vc_[A-Za-z0-9]+$/, t('invalidFormat')),
+            .regex(/^[A-Za-z0-9]+$/, t('invalidFormat')),
     });
-    
+
     try {
         const user = await getAuthFromCookie();
         if (!user) {
@@ -119,8 +123,8 @@ export async function updateVercelToken(token: string) {
             };
         }
 
-        await settingsAPI.updateVercelToken(validation.data.token);
-        revalidatePath(ROUTES.DASHBOARD_SETTINGS);
+        await authAPI.updateProfile({ vercelToken: validation.data.token });
+        revalidatePath(ROUTES.DASHBOARD_SETTINGS_API_TOKENS);
 
         return { success: true, message: t('saveSuccess') };
     } catch (error: any) {
@@ -133,15 +137,15 @@ export async function updateVercelToken(token: string) {
 
 export async function removeVercelToken() {
     const t = await getTranslations('actions.settings.vercel');
-    
+
     try {
         const user = await getAuthFromCookie();
         if (!user) {
             return { success: false, error: t('notAuthenticated') };
         }
 
-        await settingsAPI.removeVercelToken();
-        revalidatePath(ROUTES.DASHBOARD_SETTINGS);
+        await authAPI.updateProfile({ vercelToken: '' });
+        revalidatePath(ROUTES.DASHBOARD_SETTINGS_API_TOKENS);
 
         return { success: true, message: t('removeSuccess') };
     } catch (error: any) {
@@ -155,15 +159,15 @@ export async function removeVercelToken() {
 // OAuth Actions
 export async function disconnectGitHub() {
     const t = await getTranslations('actions.settings.github');
-    
+
     try {
         const user = await getAuthFromCookie();
         if (!user) {
             return { success: false, error: t('notAuthenticated') };
         }
 
-        await authAPI.oauth_connections.disconnect('github');
-        revalidatePath(ROUTES.DASHBOARD_SETTINGS);
+        await authAPI.oauth_connections.disconnect(OAuthProvider.GITHUB);
+        revalidatePath(ROUTES.DASHBOARD_SETTINGS_OAUTH);
 
         return { success: true, message: t('disconnectSuccess') };
     } catch (error: any) {
@@ -190,7 +194,7 @@ export async function updateNotificationPreferences(preferences: {
     };
 }) {
     const t = await getTranslations('actions.settings.notifications');
-    
+
     // Validation schema
     const notificationPreferencesSchema = z.object({
         email: z.object({
@@ -206,7 +210,7 @@ export async function updateNotificationPreferences(preferences: {
             systemUpdates: z.boolean(),
         }),
     });
-    
+
     try {
         const user = await getAuthFromCookie();
         if (!user) {
@@ -238,7 +242,7 @@ export async function updateNotificationPreferences(preferences: {
 // Danger Zone Actions
 export async function deleteAccount() {
     const t = await getTranslations('actions.settings.danger');
-    
+
     try {
         const user = await getAuthFromCookie();
         if (!user) {

@@ -8,6 +8,7 @@ import {
 } from 'typeorm';
 import { User } from './user.entity';
 import { ClassToObject, GenerateStatus } from './types';
+import type { PRUpdate } from '@src/data-generator';
 
 @Entity({ name: 'directories' })
 export class Directory {
@@ -50,6 +51,9 @@ export class Directory {
     @Column('simple-json', { nullable: true })
     generateStatus?: GenerateStatus;
 
+    @Column('simple-json', { nullable: true })
+    lastPullRequest?: { main?: PRUpdate; data?: PRUpdate };
+
     @CreateDateColumn()
     createdAt: Date;
 
@@ -62,6 +66,10 @@ export class Directory {
 
     getWebsiteRepo() {
         return `${this.slug}-website`;
+    }
+
+    getMainRepo() {
+        return this.slug;
     }
 
     getRepoOwner(): string {

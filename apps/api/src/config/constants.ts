@@ -21,16 +21,16 @@ export const authConstants = {
     refreshTokenCleanupDays: 30,
 };
 
-export enum AuthProviders {
+export enum AuthProvider {
     LOCAL = 'local',
     GITHUB = 'github',
     GOOGLE = 'google',
 }
 
 export const config = {
-    debug: () => process.env.DEBUG === 'true',
+    debug: () => process.env.HTTP_DEBUG === 'true',
 
-    webAppUrl: () => process.env.WEB_APP_URL || 'http://localhost:3000',
+    webAppUrl: () => process.env.WEB_URL || 'http://localhost:3000',
 
     mail: {
         provider: (): 'smtp' | 'faker' => {
@@ -64,14 +64,10 @@ export const config = {
         clientId: () => process.env.GH_CLIENT_ID,
         clientSecret: () => process.env.GH_CLIENT_SECRET,
         callbackUrl: () => {
-            return (
-                process.env.GH_CALLBACK_URL || 'http://localhost:3100/api/auth/github/callback'
-            );
+            return process.env.GH_CALLBACK_URL || 'http://localhost:3100/api/auth/github/callback';
         },
         connectCallbackUrl: () => {
-            return (
-                process.env.GH_CALLBACK_URL || 'http://localhost:3100/api/auth/github/callback'
-            );
+            return process.env.GH_CALLBACK_URL || 'http://localhost:3100/api/auth/github/callback';
         },
     },
 };

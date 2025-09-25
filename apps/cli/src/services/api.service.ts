@@ -31,7 +31,7 @@ export interface CreateItemsGeneratorDto {
     target_keywords?: string[];
     source_urls?: string[];
     generation_method?: 'create-update' | 'recreate';
-    website_repository_creation_method?: 'duplicate' | 'fork' | 'create-using-template';
+    website_repository_creation_method?: 'duplicate' | 'create-using-template';
     repository_description?: string;
     update_with_pull_request?: boolean;
     badge_evaluation_enabled?: boolean;

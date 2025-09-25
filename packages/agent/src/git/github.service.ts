@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Octokit, RequestError } from 'octokit';
 import { GitProvider, ICommitter, IGitAuth } from './git.provider';
-import * as sodium from 'libsodium-wrappers';
+import _sodium from 'libsodium-wrappers';
 import * as fs from 'node:fs';
 import * as http from 'isomorphic-git/http/node';
 import git from 'isomorphic-git';
@@ -181,12 +181,14 @@ export class GithubService extends GitProvider {
         name,
         token,
         committer,
+        forcePush,
     }: {
         owner: string;
         repo: string;
         name: string;
         token: string;
         committer: ICommitter;
+        forcePush?: boolean;
     }) {
         const duplicated = await this.createEmptyRepo(name, '', token);
         const origin = duplicated.clone_url;
@@ -202,7 +204,9 @@ export class GithubService extends GitProvider {
 
         await this.remoteRemove(originalDir, 'origin');
         await this.remoteAdd(originalDir, 'origin', origin);
-        await this.push(originalDir, token);
+        await this.push(originalDir, token, forcePush);
+
+        this.enableWorkflows(duplicated.owner.login, duplicated.name, token);
 
         return originalDir;
     }
@@ -238,7 +242,48 @@ export class GithubService extends GitProvider {
         await this.remoteAdd(originalDir, 'origin', origin);
         await this.push(originalDir, token);
 
+        this.enableWorkflows(duplicated.owner.login, duplicated.name, token);
+
         return originalDir;
+    }
+
+    private async enableWorkflows(owner: string, repo: string, token: string) {
+        const octokit = new Octokit({ auth: token });
+
+        await new Promise((resolve) => setTimeout(resolve, 10000));
+
+        const {
+            data: { workflows },
+        } = await octokit.rest.actions.listRepoWorkflows({
+            owner,
+            repo,
+        });
+
+        const promises = workflows.map((workflow) => {
+            return octokit.rest.actions.enableWorkflow({
+                owner,
+                repo,
+                workflow_id: workflow.id,
+            });
+        });
+
+        promises.push(
+            octokit.rest.actions.setAllowedActionsRepository({
+                owner,
+                repo,
+                github_owned_allowed: true,
+            }),
+            octokit.rest.actions.setGithubActionsPermissionsRepository({
+                owner,
+                repo,
+                enabled: true,
+                allowed_actions: 'all',
+            }),
+        );
+
+        await Promise.allSettled(promises);
+
+        this.logger.log(`Enabled workflows for ${owner}/${repo}`);
     }
 
     async createRepoFromTemplate(
@@ -306,16 +351,16 @@ export class GithubService extends GitProvider {
             auth: token,
         });
 
-        await sodium.ready;
-        const binkey = sodium.from_base64(publicKey.key, sodium.base64_variants.ORIGINAL);
-        const binsec = sodium.from_string(data.value);
-        const encryptedBytes = sodium.crypto_box_seal(binsec, binkey);
+        await _sodium.ready;
+        const binkey = _sodium.from_base64(publicKey.key, _sodium.base64_variants.ORIGINAL);
+        const binsec = _sodium.from_string(data.value);
+        const encryptedBytes = _sodium.crypto_box_seal(binsec, binkey);
 
         await octokit.rest.actions.createOrUpdateRepoSecret({
             owner: data.owner,
             repo: data.repo,
             secret_name: data.key,
-            encrypted_value: sodium.to_base64(encryptedBytes, sodium.base64_variants.ORIGINAL),
+            encrypted_value: _sodium.to_base64(encryptedBytes, _sodium.base64_variants.ORIGINAL),
             key_id: publicKey.key_id,
         });
     }

@@ -2,6 +2,7 @@
 
 import { connectProvider } from '@/app/actions/auth';
 import { Button } from '@/components/ui/button';
+import { OAuthProvider } from '@/lib/api/enums';
 import { useTranslations } from 'next-intl';
 import { useTransition } from 'react';
 
@@ -9,7 +10,7 @@ export function SocialLoginButtons() {
     const t = useTranslations('auth.login');
     const [isPending, startTransition] = useTransition();
 
-    const handleConnectProvider = async (provider: 'github' | 'google') => {
+    const handleConnectProvider = async (provider: OAuthProvider) => {
         startTransition(async () => {
             const response = await connectProvider(provider);
             if (!response.success || !response.url) {
@@ -25,7 +26,7 @@ export function SocialLoginButtons() {
         <div className="grid grid-cols-2 gap-3">
             <Button
                 type="button"
-                onClick={() => handleConnectProvider('google')}
+                onClick={() => handleConnectProvider(OAuthProvider.GOOGLE)}
                 disabled={isPending}
                 variant="secondary"
             >
@@ -53,7 +54,7 @@ export function SocialLoginButtons() {
 
             <Button
                 type="button"
-                onClick={() => handleConnectProvider('github')}
+                onClick={() => handleConnectProvider(OAuthProvider.GITHUB)}
                 disabled={isPending}
                 variant="secondary"
             >

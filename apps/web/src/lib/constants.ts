@@ -15,7 +15,7 @@ export const ALLOWED_REDIRECT_URLS = (process.env.ALLOWED_REDIRECT_URLS || 'loca
     .map((url) => url.trim());
 
 // App URL
-export const APP_URL = process.env.NEXT_PUBLIC_WEB_URL || 'http://localhost:3000';
+export const WEB_URL = process.env.NEXT_PUBLIC_WEB_URL || 'http://localhost:3000';
 
 // AUTH Secret
 export const AUTH_SECRET = process.env.COOKIE_SECRET || process.env.AUTH_SECRET;
@@ -30,7 +30,19 @@ export const ROUTES = {
     DASHBOARD_DIRECTORIES: '/directories',
     DASHBOARD_DIRECTORIES_NEW: '/directories/new',
     DASHBOARD_DIRECTORY: (id: string) => `/directories/${id}`,
+    DASHBOARD_DIRECTORY_ITEMS: (id: string) => `/directories/${id}/items`,
+    DASHBOARD_DIRECTORY_GENERATOR: (id: string) => `/directories/${id}/generator`,
+    DASHBOARD_DIRECTORY_DEPLOY: (id: string) => `/directories/${id}/deploy`,
+    DASHBOARD_DIRECTORY_SETTINGS: (id: string) => `/directories/${id}/settings`,
+    // Settings
     DASHBOARD_SETTINGS: '/settings',
+    DASHBOARD_SETTINGS_PROFILE: '/settings',
+    DASHBOARD_SETTINGS_SECURITY: '/settings/security',
+    DASHBOARD_SETTINGS_API_TOKENS: '/settings/api-tokens',
+    DASHBOARD_SETTINGS_OAUTH: '/settings/oauth',
+    DASHBOARD_SETTINGS_NOTIFICATIONS: '/settings/notifications',
+    DASHBOARD_SETTINGS_DANGER_ZONE: '/settings/danger',
+    // Profile
     DASHBOARD_PROFILE: '/profile',
     DASHBOARD_ANALYTICS: '/analytics',
     DASHBOARD_NOTIFICATIONS: '/notifications',
@@ -59,7 +71,7 @@ export const routeWithParams = (route: string, params: Record<string, string>) =
 };
 
 export const withAppUrl = (route: string) => {
-    return new URL(route, APP_URL).toString();
+    return new URL(route, WEB_URL).toString();
 };
 
 export const PUBLIC_ROUTES = [

@@ -34,20 +34,6 @@ export class WebsiteUpdateService {
             );
         }
 
-        // Try to determine the creation method and update accordingly
-        // Since we can't reliably determine the original creation method from GitHub API,
-        // we'll try different update strategies in order of preference
-
-        try {
-            // First, try the fork method (pull from upstream)
-            const forkResult = await this.updateFork(directory, user);
-            if (forkResult) {
-                return { method: 'fork', message: 'Successfully updated fork from upstream' };
-            }
-        } catch (error) {
-            this.logger.warn(`Fork update failed: ${error.message}`);
-        }
-
         try {
             // If fork fails, try duplicate method (clone original, replace remote)
             await this.updateDuplicate(directory, user);
@@ -143,7 +129,7 @@ export class WebsiteUpdateService {
         await this.githubService.remoteAdd(originalDir, 'origin', targetRepoUrl);
 
         // Push to the target repository
-        await this.githubService.push(originalDir, token);
+        await this.githubService.push(originalDir, token, true);
 
         this.logger.log(
             `Successfully updated ${directory.getRepoOwner()}/${websiteRepo} using duplicate method`,

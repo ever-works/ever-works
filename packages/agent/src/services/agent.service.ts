@@ -11,7 +11,7 @@ import { WebsiteGeneratorService } from '../website-generator/website-generator.
 import { WebsiteUpdateService } from '../website-generator/website-update.service';
 import { Directory } from '../entities/directory.entity';
 import { User } from '../entities/user.entity';
-import { DirectoryRepository } from '../database/directory.repository';
+import { DirectoryRepository } from '../database/repositories/directory.repository';
 import {
     CreateItemsGeneratorDto,
     GenerationMethod,
@@ -153,6 +153,14 @@ export class AgentService {
             const dir = await this.directoryRepository.create(directoryData, user);
             dir.owner = dir.getRepoOwner();
 
+            // Update generate status if repository is already existing
+            const items = await this.dataGenerator.getItems(dir, user).catch(() => []);
+            if (items.length > 0) {
+                await this.directoryRepository.updateGenerateStatus(dir.id, {
+                    status: GenerateStatusType.GENERATED,
+                });
+            }
+
             return {
                 status: 'success',
                 directory: dir,
@@ -178,6 +186,10 @@ export class AgentService {
             const updatedDirectory = await this.directoryRepository.update(id, {
                 name: updateDto.name || directory.name,
                 description: updateDto.description || directory.description,
+                // If we haven't generated the directory yet, we can update the owner and organization
+                ...(!directory.generateStatus
+                    ? { owner: updateDto.owner, organization: updateDto.organization }
+                    : {}),
                 readmeConfig: {
                     ...directory.readmeConfig,
                     ...updateDto.readmeConfig,
@@ -231,7 +243,30 @@ export class AgentService {
         }
     }
 
-    async generateItemsGenerator(
+    async directoryConfig(directoryId: string, user: User) {
+        const directory = await this.validateDirectoryOwnership(directoryId, user.id);
+
+        try {
+            const config = await this.dataGenerator.config(directory, user);
+            return {
+                status: 'success',
+                config,
+            };
+        } catch (error) {
+            if (error instanceof HttpException) {
+                throw error;
+            }
+
+            this.logger.error('Failed to get directory config:', error);
+
+            throw new BadRequestException({
+                status: 'error',
+                message: this.clearMessageError(error),
+            });
+        }
+    }
+
+    async generateItems(
         directoryId: string,
         createItemsGeneratorDto: CreateItemsGeneratorDto,
         user: User,
@@ -263,6 +298,56 @@ export class AgentService {
             parameters: createItemsGeneratorDto,
             message: `Processing request for '${createItemsGeneratorDto.name}'. Check logs or data directory for updates.`,
         };
+    }
+
+    async directoryCount(directoryId: string, user: User) {
+        const directory = await this.validateDirectoryOwnership(directoryId, user.id);
+
+        try {
+            const count = await this.dataGenerator.count(directory, user);
+            return {
+                status: 'success',
+                ...count,
+            };
+        } catch (error) {
+            if (error instanceof HttpException) {
+                throw error;
+            }
+
+            this.logger.error('Failed to get directory count:', error);
+
+            throw new BadRequestException({
+                status: 'error',
+                message: this.clearMessageError(error),
+            });
+        }
+    }
+
+    async directoryCategoriesTags(directoryId: string, user: User) {
+        const directory = await this.validateDirectoryOwnership(directoryId, user.id);
+
+        try {
+            const { categories, tags } = await this.dataGenerator.getCategoriesTags(
+                directory,
+                user,
+            );
+            return {
+                status: 'success',
+                categories,
+                tags,
+            };
+        } catch (error) {
+            if (error instanceof HttpException) {
+                throw error;
+            }
+
+            this.logger.error('Failed to get directory categories and tags:', error);
+
+            throw new BadRequestException({
+                status: 'error',
+                message: this.clearMessageError(error),
+            });
+        }
     }
 
     async updateItemsGenerator(
@@ -524,28 +609,18 @@ export class AgentService {
     }
 
     async deleteDirectory(
-        id: string,
+        directoryId: string,
         deleteDirectoryDto: DeleteDirectoryDto,
         user: User,
     ): Promise<DeleteDirectoryResponseDto> {
-        let directory: Directory | null = null;
+        const directory = await this.validateDirectoryOwnership(directoryId, user.id);
 
         try {
-            // Check if directory exists and belongs to the user
-            directory = await this.directoryRepository.findById(id);
-            if (!directory) {
-                throw new NotFoundException({
-                    status: 'error',
-                    id,
-                    message: 'Directory not found',
-                });
-            }
-
             // Verify the directory belongs to the user
             if (directory.userId !== user.id) {
                 throw new BadRequestException({
                     status: 'error',
-                    id,
+                    directoryId,
                     message: 'You do not have permission to delete this directory',
                 });
             }
@@ -600,6 +675,14 @@ export class AgentService {
 
             // Remove directory from database
             await this.directoryRepository.delete(directory.id);
+
+            await Promise.all([
+                this.dataGenerator.cleanup(directory),
+                this.markdownGenerator.cleanup(directory),
+                this.websiteGenerator.cleanup(directory),
+            ]).catch((error) => {
+                this.logger.error('Failed to cleanup repositories:', error);
+            });
 
             return {
                 status: 'success',
@@ -722,25 +805,24 @@ export class AgentService {
             status: GenerateStatusType.GENERATING,
         });
 
+        let hasError = false;
+
         try {
             const generated = await this.dataGenerator.initialize(directory, user, dto);
 
             if (generated) {
-                await Promise.all([
-                    this.markdownGenerator.initialize(directory, user, {
-                        repository_description: dto.repository_description,
-                    }),
-                    this.websiteGenerator.initialize(
-                        directory,
-                        user,
-                        dto.website_repository_creation_method,
-                    ),
-                ]);
+                await this.markdownGenerator.initialize(directory, user, {
+                    repository_description: dto.repository_description,
+                    generation_method: generated.generation_method,
+                    pr_update: generated.prUpdate,
+                });
             }
 
-            await this.directoryRepository.updateGenerateStatus(directory.id, {
-                status: GenerateStatusType.GENERATED,
-            });
+            await this.websiteGenerator.initialize(
+                directory,
+                user,
+                dto.website_repository_creation_method,
+            );
         } catch (error) {
             await this.directoryRepository.updateGenerateStatus(directory.id, {
                 status: GenerateStatusType.ERROR,
@@ -751,7 +833,16 @@ export class AgentService {
                 throw error;
             }
 
+            hasError = true;
+
             console.error('Error during generation:', error);
+        }
+
+        if (!hasError) {
+            await this.directoryRepository.updateGenerateStatus(directory.id, {
+                status: GenerateStatusType.GENERATED,
+                step: null,
+            });
         }
 
         const endTime = new Date();

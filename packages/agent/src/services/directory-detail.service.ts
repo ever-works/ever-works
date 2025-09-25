@@ -17,6 +17,8 @@ Based on the name and prompt, extract the following information:
 1. A clear, concise description of what this directory is about
 2. Relevant keywords that describe the directory's content and purpose
 3. Any additional context that would help users understand the directory
+4. Avoid starting descriptions with phrases like "This directory is about..."; instead, get straight to the point.
+    e.g. instead of "Collection of AI tools for developers", write "AI tools for developers"
 
 Rules:
 - Description should be 1-2 sentences, clear and informative

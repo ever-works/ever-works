@@ -39,10 +39,16 @@ jobs:
       - name: Build Internal CLI
         working-directory: apps/internal-cli
         run: pnpm build:cli
+        env:
+          API_URL: ${{ secrets.API_URL }}
+          WEB_URL: ${{ secrets.WEB_URL }}
 
       - name: Build External CLI
         working-directory: apps/cli
         run: pnpm build:cli
+        env:
+          API_URL: ${{ secrets.API_URL }}
+          WEB_URL: ${{ secrets.WEB_URL }}
 
       - name: Test Internal CLI
         working-directory: apps/internal-cli

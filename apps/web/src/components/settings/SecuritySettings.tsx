@@ -72,9 +72,7 @@ export function SecuritySettings({ user }: SecuritySettingsProps) {
                 <h2 className="text-xl font-semibold text-text dark:text-text-dark mb-4">
                     {t('title')}
                 </h2>
-                <p className="text-text-muted dark:text-text-muted-dark text-sm">
-                    {t('subtitle')}
-                </p>
+                <p className="text-text-muted dark:text-text-muted-dark text-sm">{t('subtitle')}</p>
             </div>
 
             {/* Password Change Section */}
@@ -124,10 +122,7 @@ export function SecuritySettings({ user }: SecuritySettingsProps) {
                 </div>
 
                 <div className="flex justify-end">
-                    <Button
-                        onClick={handleUpdatePassword}
-                        loading={isPending}
-                    >
+                    <Button onClick={handleUpdatePassword} loading={isPending}>
                         {t('changePassword.actions.update')}
                     </Button>
                 </div>
@@ -141,10 +136,7 @@ export function SecuritySettings({ user }: SecuritySettingsProps) {
                 <p className="text-sm text-text-muted dark:text-text-muted-dark mb-4">
                     {t('twoFactor.subtitle')}
                 </p>
-                <Button
-                    variant="secondary"
-                    disabled
-                >
+                <Button variant="secondary" disabled>
                     {t('twoFactor.action')}
                 </Button>
             </div>
@@ -157,10 +149,7 @@ export function SecuritySettings({ user }: SecuritySettingsProps) {
                 <p className="text-sm text-text-muted dark:text-text-muted-dark mb-4">
                     {t('sessions.subtitle')}
                 </p>
-                <Button
-                    variant="secondary"
-                    disabled
-                >
+                <Button variant="secondary" disabled>
                     {t('sessions.action')}
                 </Button>
             </div>

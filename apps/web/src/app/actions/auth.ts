@@ -15,6 +15,7 @@ import { getLocale, getTranslations } from 'next-intl/server';
 import { isValidRedirectUrl } from '@/lib/utils';
 import { getRedirectUrl } from '@/lib/auth/redirect';
 import { generateHexToken } from '@/lib/utils/random';
+import { OAuthProvider } from '@/lib/api/enums';
 
 export async function login(identifier: string, password: string, redirectUrl: string | null) {
     const t = await getTranslations('validation.auth');
@@ -166,7 +167,7 @@ export async function logout() {
 // OAuth
 // =================
 
-export async function connectProvider(provider: 'github' | 'google') {
+export async function connectProvider(provider: OAuthProvider) {
     try {
         const state = generateHexToken(16);
         await setOAuthStateCookie(state);
@@ -174,14 +175,14 @@ export async function connectProvider(provider: 'github' | 'google') {
         const callbackUrl = routeWithParams(ROUTES.API_AUTH_CALLBACK, { provider });
 
         switch (provider) {
-            case 'github': {
+            case OAuthProvider.GITHUB: {
                 const { url } = await authAPI.getGitHubAuthUrl(withAppUrl(callbackUrl), state);
                 return {
                     success: true,
                     url,
                 };
             }
-            case 'google': {
+            case OAuthProvider.GOOGLE: {
                 const { url } = await authAPI.getGoogleAuthUrl(withAppUrl(callbackUrl), state);
                 return {
                     success: true,

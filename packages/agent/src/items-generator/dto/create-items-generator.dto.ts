@@ -20,7 +20,6 @@ export enum GenerationMethod {
 
 export enum WebsiteRepositoryCreationMethod {
     DUPLICATE = 'duplicate',
-    FORK = 'fork',
     CREATE_USING_TEMPLATE = 'create-using-template',
 }
 
@@ -56,7 +55,7 @@ export class ConfigDto {
     @IsOptional()
     @Min(0.01)
     @Max(1.0)
-    relevance_threshold_content: number = 0.85;
+    relevance_threshold_content: number = 0.5;
 
     @IsOptional()
     @IsInt()

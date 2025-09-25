@@ -9,6 +9,7 @@ import { DataRepository, PRUpdate } from '../data-generator/data-repository';
 import { ReadmeBuilder } from './readme-builder';
 import { MarkdownRepository } from './markdown-repository';
 import { GenerationMethod } from '../items-generator/dto';
+import { DirectoryRepository } from '../database';
 
 type InitializeOptions = {
     repository_description?: string;
@@ -21,7 +22,10 @@ type InitializeOptions = {
 export class MarkdownGeneratorService {
     private readonly logger = new Logger(MarkdownGeneratorService.name);
 
-    constructor(private readonly githubService: GithubService) {}
+    constructor(
+        private readonly githubService: GithubService,
+        private readonly directoryRepository: DirectoryRepository,
+    ) {}
 
     async initialize(directory: Directory, user: User, options: InitializeOptions = {}) {
         const token = user.getGitToken();
@@ -40,6 +44,7 @@ export class MarkdownGeneratorService {
             await this.githubService.createEmptyRepo(directory.slug, description, token);
         }
 
+        // Calling CloneOrPull switches to main branch by default
         const markdownPath = await this.githubService.cloneOrPull({
             owner: directory.getRepoOwner(),
             repo: directory.slug,
@@ -47,6 +52,7 @@ export class MarkdownGeneratorService {
             committer,
         });
 
+        // Calling CloneOrPull switches to main branch by default
         const dataPath = await this.githubService.cloneOrPull({
             owner: directory.getRepoOwner(),
             repo: directory.getDataRepo(),
@@ -56,11 +62,6 @@ export class MarkdownGeneratorService {
 
         const markdownRepo = new MarkdownRepository(markdownPath);
         const dataRepo = await DataRepository.create(dataPath);
-
-        const markdowns = new Set<string>(); // will be needed to check if markdown exists before referencing them in README
-        const categories = await this.loadCategories(dataRepo);
-        const tags = await this.loadTags(dataRepo);
-        const config = await dataRepo.getConfig();
 
         try {
             const slugs = await fs.readdir(dataRepo.dataDir);
@@ -73,11 +74,8 @@ export class MarkdownGeneratorService {
                     return null;
                 });
 
-            const configMetadata = config?.metadata || {};
-
-            const generation_method =
-                options?.generation_method || configMetadata?.generation_method;
-            const pr_update = options?.pr_update || configMetadata?.pr_update;
+            const generation_method = options?.generation_method;
+            const pr_update = options?.pr_update;
 
             let canCreatePR =
                 generation_method !== GenerationMethod.RECREATE && !!pr_update?.branch;
@@ -92,14 +90,19 @@ export class MarkdownGeneratorService {
 
                 await markdownRepo.resetFiles();
             } else if (canCreatePR) {
-                // Switch to PR branch
-                await this.githubService
-                    .switchToBranch(markdownRepo.dir, pr_update.branch, true)
-                    .catch((err) => {
-                        canCreatePR = false;
-                        this.logger.error('Failed to switch to PR branch', err);
-                    });
+                // Switch to PR branch (both repos)
+                await Promise.all([
+                    this.githubService.switchToBranch(markdownRepo.dir, pr_update.branch, true),
+                    this.githubService.switchToBranch(dataRepo.dir, pr_update.branch, true),
+                ]).catch((err) => {
+                    canCreatePR = false;
+                    this.logger.error('Failed to switch to PR branch', err);
+                });
             }
+
+            const markdowns = new Set<string>(); // will be needed to check if markdown exists before referencing them in README
+            const categories = await this.loadCategories(dataRepo);
+            const tags = await this.loadTags(dataRepo);
 
             const groups = {}; // we want to group items by category, like: { 'open-source': [items], 'commercial': [items] }
             for (const slug of slugs) {
@@ -110,6 +113,10 @@ export class MarkdownGeneratorService {
                 }
 
                 const item = await dataRepo.getItem(slug);
+                if (!item) {
+                    continue;
+                }
+
                 if (Array.isArray(item.tags)) {
                     item.tags = item.tags.map((tag) => this.populate<Tag>(tag, tags));
                 }
@@ -162,7 +169,7 @@ export class MarkdownGeneratorService {
                     `Creating PR from ${pr_update.branch} to ${defaultBranch} for ${directory.slug}`,
                 );
 
-                await this.githubService
+                const pr = await this.githubService
                     .createPR(
                         {
                             owner: directory.getRepoOwner(),
@@ -176,15 +183,26 @@ export class MarkdownGeneratorService {
                     )
                     .catch((err) => {
                         this.logger.error('Failed to create PR', err);
+                        return null;
                     });
+
+                if (pr) {
+                    await this.directoryRepository.updateLastPullRequest(directory.id, {
+                        main: {
+                            branch: pr_update.branch,
+                            title: pr_update.title,
+                            body: pr_update.body,
+                            number: pr.number,
+                            url: pr.html_url,
+                        },
+                    });
+                }
             } else {
                 this.logger.log(`Pushed changes to main branch for ${directory.slug}`);
             }
         } catch (err) {
             this.logger.error('Error during markdown generation', err);
             throw err;
-        } finally {
-            await Promise.all([dataRepo.cleanup(), markdownRepo.cleanup()]);
         }
     }
 
@@ -218,7 +236,19 @@ export class MarkdownGeneratorService {
 
         try {
             // Delete the GitHub repository
-            await this.githubService.deleteRepository(directory.getRepoOwner(), directory.slug, token);
+            await this.githubService.deleteRepository(
+                directory.getRepoOwner(),
+                directory.slug,
+                token,
+            );
+
+            const dataDir = this.githubService.getDir(
+                directory.getRepoOwner(),
+                directory.getMainRepo(),
+            );
+
+            new MarkdownRepository(dataDir).cleanup();
+
             this.logger.log(
                 `Successfully deleted markdown repository: ${directory.getRepoOwner()}/${directory.slug}`,
             );
@@ -229,6 +259,15 @@ export class MarkdownGeneratorService {
             );
             throw error;
         }
+    }
+
+    async cleanup(directory: Directory) {
+        const dataDir = this.githubService.getDir(
+            directory.getRepoOwner(),
+            directory.getMainRepo(),
+        );
+
+        return new MarkdownRepository(dataDir).cleanup();
     }
 
     private async generateReadme(

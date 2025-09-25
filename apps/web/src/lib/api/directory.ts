@@ -1,7 +1,8 @@
 import 'server-only';
 import { serverFetch, serverMutation } from './server-api';
-import { RepoProvider } from './enums';
+import { GenerateStatusType, GenerationMethod, ItemsGeneratorStep, RepoProvider } from './enums';
 import { ItemData } from './types';
+import { CreateItemsGeneratorDto } from './items-generator';
 
 export interface MarkdownReadmeConfig {
     header?: string;
@@ -23,11 +24,15 @@ export interface CreateDirectoryDto {
 export interface UpdateDirectoryDto {
     name?: string;
     description?: string;
+    owner?: string;
+    organization?: boolean;
     readmeConfig?: MarkdownReadmeConfig;
 }
 
 export interface DeleteDirectoryDto {
-    confirmation: boolean;
+    delete_data_repository?: boolean;
+    delete_markdown_repository?: boolean;
+    delete_website_repository?: boolean;
 }
 
 export interface GenerateDirectoryDetailDto {
@@ -35,15 +40,9 @@ export interface GenerateDirectoryDetailDto {
     prompt: string;
 }
 
-export enum GenerateStatusType {
-    GENERATING = 'generating',
-    GENERATED = 'generated',
-    ERROR = 'error',
-}
-
 export type GenerateStatus = {
     status: GenerateStatusType;
-    step?: string;
+    step?: ItemsGeneratorStep;
     error?: string;
 };
 
@@ -54,12 +53,14 @@ export interface Directory {
     name: string;
     description: string;
     owner?: string;
+    website?: string;
     organization: boolean;
     repoProvider: RepoProvider;
     readmeConfig?: MarkdownReadmeConfig;
     generateStatus?: GenerateStatus;
     createdAt: string;
     updatedAt: string;
+    lastPullRequest?: { main?: PRUpdate; data?: PRUpdate };
 }
 
 export interface DirectoriesResponse {
@@ -86,6 +87,42 @@ export interface DirectoryDetails {
     categories: string[];
 }
 
+export type PRUpdate = {
+    branch: string;
+    title: string;
+    body: string;
+    number?: number;
+    url?: string;
+};
+
+export interface DirectoryConfig {
+    company_name?: string;
+    company_website?: string;
+    content_table?: boolean;
+    item_name?: string;
+    items_name?: string;
+    copyright_year?: number;
+    paging_mode?: string;
+    autoapproval?: boolean;
+    metadata?: {
+        initial_prompt?: string;
+        generation_method?: GenerationMethod;
+        pr_update?: PRUpdate | null;
+        last_request_data?: CreateItemsGeneratorDto;
+    } & (Record<string, any> & {});
+}
+
+export interface DirectoryCount {
+    items: number;
+    categories: number;
+    tags: number;
+}
+
+export interface DirectoryCategoriesTags {
+    categories: string[];
+    tags: string[];
+}
+
 export const directoryAPI = {
     // Get all directories with pagination and search
     getAll: async (options?: { limit?: number; offset?: number; search?: string }) => {
@@ -105,7 +142,7 @@ export const directoryAPI = {
 
     // Create a new directory
     create: async (data: CreateDirectoryDto) => {
-        return serverMutation<Directory>({
+        return serverMutation<APIResponse<{ directory: Directory }>>({
             endpoint: '/directories',
             data,
             method: 'POST',
@@ -115,7 +152,7 @@ export const directoryAPI = {
 
     // Update a directory by ID
     update: async (id: string, data: UpdateDirectoryDto) => {
-        return serverMutation<Directory>({
+        return serverMutation<APIResponse<{ directory: Directory }>>({
             endpoint: `/directories/${id}`,
             data,
             method: 'PUT',
@@ -136,6 +173,23 @@ export const directoryAPI = {
     // Get directory items
     getItems: async (id: string) => {
         return serverFetch<APIResponse<{ items: ItemData[] }>>(`/directories/${id}/items`);
+    },
+
+    // Get directory config
+    getConfig: async (id: string) => {
+        return serverFetch<APIResponse<{ config: DirectoryConfig }>>(`/directories/${id}/config`);
+    },
+
+    // Get directory count
+    getCount: async (id: string) => {
+        return serverFetch<APIResponse<DirectoryCount>>(`/directories/${id}/count`);
+    },
+
+    // Get directory categories and tags
+    getCategoriesTags: async (id: string) => {
+        return serverFetch<APIResponse<DirectoryCategoriesTags>>(
+            `/directories/${id}/categories-tags`,
+        );
     },
 
     // Generate directory details from name and prompt

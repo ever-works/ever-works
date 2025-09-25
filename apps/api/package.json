@@ -12,7 +12,8 @@
         "start:debug": "nest start -b swc --debug --watch",
         "start:prod": "node dist/main",
         "build": "nest build -b swc",
-        "build:deps": "pnpm --filter '@packages/*' build"
+        "build:deps": "pnpm --filter '@packages/*' build",
+        "format": "prettier --write \"**/*.{ts,tsx,jsx,json,css,md}\""
     },
     "dependencies": {
         "@nestjs-modules/mailer": "^2.0.2",

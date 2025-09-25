@@ -5,18 +5,16 @@ import { cn } from '@/lib/utils/cn';
 import { updateVercelToken, removeVercelToken } from '@/app/actions/settings';
 import { toast } from 'sonner';
 import { useTranslations } from 'next-intl';
+import { UserProfile } from '@/lib/api';
 
 interface ApiTokenSettingsProps {
-    user: {
-        id: string;
-        email: string;
-    };
+    user: UserProfile;
 }
 
 export function ApiTokenSettings({ user }: ApiTokenSettingsProps) {
     const [isPending, startTransition] = useTransition();
-    const [vercelToken, setVercelToken] = useState('');
-    const [hasVercelToken, setHasVercelToken] = useState(false);
+    const [vercelToken, setVercelToken] = useState(user.vercelToken || '');
+    const [hasVercelToken, setHasVercelToken] = useState(!!user.vercelToken);
     const [showToken, setShowToken] = useState(false);
     const t = useTranslations('dashboard.apiTokens');
 
@@ -51,6 +49,7 @@ export function ApiTokenSettings({ user }: ApiTokenSettingsProps) {
 
                 if (result.success) {
                     toast.success(t('vercel.messages.removeSuccess'));
+                    setVercelToken('');
                     setHasVercelToken(false);
                 } else {
                     toast.error(result.error || t('vercel.messages.removeFailed'));
@@ -67,9 +66,7 @@ export function ApiTokenSettings({ user }: ApiTokenSettingsProps) {
                 <h2 className="text-xl font-semibold text-text dark:text-text-dark mb-4">
                     {t('title')}
                 </h2>
-                <p className="text-text-muted dark:text-text-muted-dark text-sm">
-                    {t('subtitle')}
-                </p>
+                <p className="text-text-muted dark:text-text-muted-dark text-sm">{t('subtitle')}</p>
             </div>
 
             {/* Vercel Integration */}

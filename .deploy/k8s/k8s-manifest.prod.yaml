@@ -46,7 +46,7 @@ spec:
           image: registry.digitalocean.com/ever/ever-works-api:latest
           imagePullPolicy: Always
           env:
-            - name: WEB_APP_URL
+            - name: WEB_URL
               value: https://app.ever.works
             - name: API_URL
               value: https://api.ever.works
@@ -151,11 +151,11 @@ spec:
 
           resources:
             requests:
-              memory: "256Mi"
-              cpu: "250m"
+              memory: "512Mi"
+              cpu: "500m"
             limits:
-              memory: "1Gi"
-              cpu: "1000m"
+              memory: "2Gi"
+              cpu: "2"
 
           ports:
             - containerPort: 3100
@@ -204,6 +204,8 @@ kind: Ingress
 metadata:
   name: ever-works-web-ing
   namespace: default
+  annotations:
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
 spec:
   ingressClassName: nginx
   rules:
@@ -228,6 +230,8 @@ kind: Ingress
 metadata:
   name: ever-works-api-ing
   namespace: default
+  annotations:
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
 spec:
   ingressClassName: nginx
   rules:

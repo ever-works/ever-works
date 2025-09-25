@@ -32,9 +32,10 @@ export function ThemeToggle({ className, variant = 'fixed' }: ThemeToggleProps =
         }
     };
 
-    const buttonClasses = variant === 'fixed' 
-        ? "fixed top-4 right-4 z-50 bg-surface dark:bg-surface-dark border border-border dark:border-border-dark"
-        : "";
+    const buttonClasses =
+        variant === 'fixed'
+            ? 'fixed top-4 right-4 z-50 bg-surface dark:bg-surface-dark border border-border dark:border-border-dark'
+            : '';
 
     // Prevent hydration mismatch by not rendering until mounted
     if (!mounted) {

@@ -260,11 +260,13 @@
                 "title": "Profile Settings",
                 "subtitle": "Update your profile information and avatar",
                 "fields": {
+                    "name": "Name",
                     "username": "Username",
                     "email": "Email",
                     "emailHelperText": "Email cannot be changed"
                 },
                 "placeholders": {
+                    "name": "Enter your name",
                     "username": "Enter your username"
                 },
                 "actions": {
@@ -356,10 +358,290 @@
             "title": "Your Directories",
             "createButton": "Create Directory"
         },
+        "directoryDetail": {
+            "status": {
+                "notStarted": "Not Started",
+                "generating": "Generating",
+                "generated": "Generated",
+                "error": "Error"
+            },
+            "tabs": {
+                "overview": "Overview",
+                "items": "Items",
+                "generator": "Generator",
+                "deploy": "Deploy",
+                "settings": "Settings"
+            },
+            "statusCard": {
+                "notStarted": {
+                    "title": "Generation Not Started",
+                    "description": "Start generating items for your directory to populate it with content.",
+                    "action": "Start Generation"
+                },
+                "generating": {
+                    "title": "Generation in Progress",
+                    "description": "Processing your request...",
+                    "processing": "Processing..."
+                },
+                "generated": {
+                    "title": "Generation Complete",
+                    "description": "Your directory has been successfully populated with items.",
+                    "viewItems": "View Items",
+                    "regenerate": "Regenerate"
+                },
+                "error": {
+                    "title": "Generation Failed",
+                    "description": "An error occurred during generation.",
+                    "retry": "Retry Generation"
+                }
+            },
+            "stats": {
+                "totalItems": "Total Items",
+                "categories": "Categories",
+                "generationStatus": "Generation Status",
+                "daysActive": "Days Active"
+            },
+            "info": {
+                "title": "Directory Information",
+                "slug": "Slug",
+                "repositories": "Repositories",
+                "dataRepo": "Data Repository",
+                "websiteRepo": "Website Repository",
+                "mainRepo": "Main Repository",
+                "repoProvider": "Repository Provider",
+                "organization": "Organization",
+                "created": "Created",
+                "lastUpdated": "Last Updated",
+                "readmeHeader": "README Header",
+                "readmeFooter": "README Footer",
+                "custom": "Custom",
+                "customOverwrite": "Custom (Overwrite)",
+                "yes": "Yes",
+                "no": "No"
+            },
+            "config": {
+                "title": "Configuration Details",
+                "initialPrompt": "Initial Generation Prompt",
+                "companyDetails": "Company Information",
+                "companyName": "Company Name",
+                "companyWebsite": "Website",
+                "generationSettings": "Generation Settings",
+                "generationMethod": "Generation Method",
+                "autoApproval": "Auto Approval",
+                "pagingMode": "Paging Mode",
+                "contentTable": "Content Table",
+                "enabled": "Enabled",
+                "disabled": "Disabled",
+                "pullRequestUpdate": "Pull Request Details",
+                "branch": "Branch",
+                "prTitle": "PR Title",
+                "mainRepository": "Main Repository",
+                "dataRepository": "Data Repository"
+            },
+            "activity": {
+                "title": "Recent Activity",
+                "noActivity": "No activity yet",
+                "created": "Directory Created",
+                "directoryCreated": "Directory was successfully created",
+                "justNow": "Just now"
+            },
+            "items": {
+                "noItemsTitle": "No Items Yet",
+                "noItemsDescription": "Your directory doesn't have any items yet. Generate items to populate your directory with content.",
+                "generateItems": "Generate Items",
+                "searchPlaceholder": "Search items...",
+                "allCategories": "All Categories",
+                "showing": "Showing {current} of {total} items",
+                "noMatch": "No items match your search criteria",
+                "source": "Source"
+            },
+            "generator": {
+                "regenerationWarning": "Regeneration Warning",
+                "regenerationWarningDescription": "This directory has already been generated. Starting a new generation will replace existing items.",
+                "requiredInfo": "Required Information",
+                "updateConfiguration": "Update Configuration",
+                "promptRequired": "Prompt is required",
+                "operationStartedSuccessfully": "Operation started successfully",
+                "failedToStartOperation": "Failed to start operation",
+                "directoryName": "Directory Name",
+                "generationPrompt": "Generation Prompt",
+                "recommended": "Recommended",
+                "promptPlaceholder": "Describe what items should be generated for this directory...",
+                "promptHelperText": "Be specific about the type of content you want to generate",
+                "repositoryDescription": "Repository Description",
+                "repositoryPlaceholder": "Brief description of the repository (optional)",
+                "startGeneration": "Start Generation",
+                "regenerateItems": "Regenerate Items",
+                "updateItems": "Update Items",
+                "recreateDirectory": "Recreate Directory",
+                "showAdvancedOptions": "Show Advanced Options",
+                "hideAdvancedOptions": "Hide Advanced Options",
+                "cancel": "Cancel",
+                "companyInformation": "Company Information",
+                "companyInfoDescription": "Optional company details for branded content",
+                "companyName": "Company Name",
+                "companyNamePlaceholder": "Enter company name",
+                "companyWebsite": "Company Website",
+                "companyWebsitePlaceholder": "https://example.com",
+                "categoriesKeywords": "Categories & Keywords",
+                "categoriesDescription": "Define categories and keywords for content organization",
+                "initialCategories": "Initial Categories",
+                "priorityCategories": "Priority Categories",
+                "targetKeywords": "Target Keywords",
+                "addCategoryPlaceholder": "Add category",
+                "addPriorityCategoryPlaceholder": "Add priority category",
+                "addKeywordPlaceholder": "Add keyword",
+                "add": "Add",
+                "sourceUrls": "Source URLs",
+                "sourceUrlsDescription": "Add specific URLs to extract content from",
+                "sourceUrlPlaceholder": "https://example.com/page",
+                "addUrl": "Add URL",
+                "noSourceUrlsMessage": "No source URLs added. The generator will use search to find content.",
+                "advancedConfig": "Advanced Configuration",
+                "advancedConfigDescription": "Fine-tune generation parameters and behavior",
+                "generationMethod": "Generation Method",
+                "methodCreateUpdate": "Create or Update",
+                "methodRecreate": "Recreate (Replace All)",
+                "updateWithPullRequest": "Update with Pull Request",
+                "updateWithPullRequestDescription": "Create a pull request instead of direct commits",
+                "enableBadgeEvaluation": "Enable Badge Evaluation",
+                "enableBadgeEvaluationDescription": "Evaluate and add quality badges to items",
+                "websiteRepositoryCreationMethod": "Website Repository Creation Method",
+                "methodDuplicate": "Duplicate",
+                "methodFork": "Fork",
+                "directoryNamePlaceholder": "Enter directory name",
+                "methodCreateFromTemplate": "Create from Template",
+                "aiProcessingConfiguration": "AI Processing Configuration",
+                "maxSearchQueries": "Max Search Queries",
+                "resultsPerQuery": "Results per Query",
+                "maxPagesToProcess": "Max Pages to Process",
+                "relevanceThreshold": "Relevance Threshold",
+                "aiFirstGeneration": "AI-First Generation",
+                "aiFirstGenerationDescription": "Enable AI-generation of initial items before web search.",
+                "contentFiltering": "Content Filtering",
+                "contentFilteringDescription": "Enable content quality filtering"
+            },
+            "progress": {
+                "title": "Generation in Progress",
+                "processingRequest": "Processing your request...",
+                "steps": {
+                    "promptComparison": "Comparing prompts",
+                    "promptProcessing": "Processing your prompt",
+                    "aiFirstItemsGeneration": "Generating initial AI items",
+                    "searchQueriesGeneration": "Creating search queries",
+                    "webSearch": "Searching the web",
+                    "contentRetrieval": "Retrieving content",
+                    "contentFiltering": "Filtering relevant content",
+                    "itemsExtraction": "Extracting items from content",
+                    "deduplicationDataAggregation": "Removing duplicates and aggregating data",
+                    "categoriesTagsProcessing": "Processing categories and tags",
+                    "sourcesValidation": "Validating sources",
+                    "badgesProcessing": "Processing quality badges",
+                    "itemsProcessing": "Finalizing items",
+                    "processing": "Processing..."
+                },
+                "progress": "Progress",
+                "closeNote": "This may take a few minutes. You can close this page and come back later."
+            },
+            "settings": {
+                "generalSettings": "General Settings",
+                "generalTitle": "General Settings",
+                "directoryName": "Directory Name",
+                "description": "Description",
+                "organizationRepository": "Organization Repository",
+                "organizationHelp": "Create repositories under an organization instead of your personal account",
+                "organizationName": "Organization Name",
+                "organizationNamePlaceholder": "Enter organization name",
+                "readmeConfiguration": "README Configuration",
+                "readmeTitle": "README Configuration",
+                "customHeader": "Custom Header",
+                "customHeaderPlaceholder": "Add custom content to the README header",
+                "overwriteDefaultHeader": "Overwrite default header",
+                "customFooter": "Custom Footer",
+                "customFooterPlaceholder": "Add custom content to the README footer",
+                "overwriteDefaultFooter": "Overwrite default footer",
+                "dangerZone": "Danger Zone",
+                "dangerTitle": "Danger Zone",
+                "deleteWarning": "Once you delete a directory, there is no going back. Please be certain.",
+                "dangerDescription": "Once you delete a directory, there is no going back. Please be certain.",
+                "deleteOptions": "Select what to delete:",
+                "deleteDataRepository": "Delete data repository",
+                "deleteDataRepositoryDescription": "Remove the JSON data repository from GitHub",
+                "deleteMarkdownRepository": "Delete markdown repository",
+                "deleteMarkdownRepositoryDescription": "Remove the markdown repository containing the README",
+                "deleteWebsiteRepository": "Delete website repository",
+                "deleteWebsiteRepositoryDescription": "Remove the deployed website repository",
+                "deleteConfirm": "Are you absolutely sure?",
+                "deleteConfirmDetail": "This action cannot be undone. The directory and selected repositories will be permanently deleted.",
+                "deleteButton": "Delete Directory",
+                "deleteConfirmButton": "Yes, Delete",
+                "deleteSuccess": "Directory deleted successfully",
+                "deleteFailed": "Failed to delete directory",
+                "yesDelete": "Yes, Delete",
+                "cancel": "Cancel",
+                "saveChanges": "Save Changes",
+                "updateReadme": "Update README",
+                "updateSuccess": "Settings updated successfully",
+                "updateFailed": "Failed to update settings"
+            },
+            "deploy": {
+                "noTokenAlert": {
+                    "title": "Vercel Token Required",
+                    "description": "To deploy your directory to Vercel, you need to configure your Vercel API token in your account settings.",
+                    "configureButton": "Go to API Tokens Settings",
+                    "getTokenButton": "Get Vercel Token",
+                    "howTo": {
+                        "title": "How to configure your Vercel token:",
+                        "step1": "Click 'Get Vercel Token' to open the Vercel dashboard",
+                        "step2": "Create a new token with deployment permissions",
+                        "step3": "Copy the generated token",
+                        "step4": "Go to API Tokens Settings and paste your token in the Vercel section"
+                    }
+                },
+                "form": {
+                    "deployToVercel": {
+                        "title": "Deploy to Vercel",
+                        "description": "Deploy your directory website repository on Vercel.",
+                        "deployButton": "Deploy Now",
+                        "deployingButton": "Deploying...",
+                        "successMessage": "Your website has been successfully deployed!"
+                    },
+                    "updateRepository": {
+                        "title": "Update Website Repository",
+                        "description": "Sync the latest changes from the template to the",
+                        "websiteRepository": "website repository",
+                        "updateButton": "Update Repository",
+                        "updatingButton": "Updating..."
+                    },
+                    "messages": {
+                        "deploySuccess": "Deployment started successfully",
+                        "deployPending": "Deployment is queued and will start shortly",
+                        "deployFailed": "Failed to deploy to Vercel",
+                        "deployError": "An error occurred during deployment",
+                        "updateSuccess": "Repository updated successfully",
+                        "updateFailed": "Failed to update repository",
+                        "updateError": "An error occurred while updating the repository"
+                    },
+                    "info": {
+                        "deployInfo": "Deployment typically takes 1-3 minutes. You'll receive a URL once complete.",
+                        "updateInfo": "Updates sync your directory content to the website repository for the next deployment."
+                    }
+                }
+            }
+        },
         "directoryCreation": {
             "title": "Create New Directory",
             "subtitle": "Choose how you'd like to create your directory",
             "backToOptions": "Back to options",
+            "organizationSelector": {
+                "label": "Repository Owner",
+                "loading": "Loading organizations...",
+                "personal": "Personal Account",
+                "personalAccount": "Repository will be created under your personal account",
+                "organizations": "Organizations",
+                "personalHelp": "The repository will be created under your personal GitHub account",
+                "organizationHelp": "The repository will be created under the {org} organization"
+            },
             "ai": {
                 "title": "Create with AI",
                 "subtitle": "Describe your directory idea in natural language and let AI handle the setup",
@@ -413,7 +695,13 @@
                     "started": "Directory creation started!",
                     "generating": "AI is generating content. This may take a few minutes...",
                     "created": "Directory created successfully!"
-                }
+                },
+                "advancedSettings": "Advanced Settings",
+                "advancedSubtitle": "Configure organization and repository settings",
+                "organizationLabel": "Organization Repository",
+                "organizationHelp": "Create repositories under an organization instead of your personal account",
+                "organizationNameLabel": "Organization Name",
+                "organizationNamePlaceholder": "Enter organization name"
             },
             "manual": {
                 "title": "Create Manually",
@@ -470,7 +758,8 @@
                     "connectedAccount": "Connected account:",
                     "requiredNote": "Required to create directories",
                     "connectButton": "Connect GitHub",
-                    "connectingButton": "Connecting..."
+                    "connectingButton": "Connecting...",
+                    "failedToConnect": "Failed to connect GitHub"
                 }
             }
         },
@@ -677,15 +966,31 @@
                 "minLength": "Prompt must be at least 10 characters",
                 "maxLength": "Prompt must be less than 1000 characters"
             },
+            "oauthRequired": "OAuth connection required. Please connect your {provider} account first.",
             "githubRequired": "GitHub connection required. Please connect your GitHub account first.",
             "createSuccess": "Directory created successfully!",
             "createFailed": "Failed to create directory",
+            "updateSuccess": "Directory updated successfully!",
+            "updateFailed": "Failed to update directory",
             "invalidGeneratedData": "Failed to generate valid directory data",
             "aiGenerationStarted": "Directory creation started! AI is generating content...",
             "invalidId": "Invalid directory ID",
             "deleteSuccess": "Directory deleted successfully",
             "deleteFailed": "Failed to delete directory",
-            "fetchFailed": "Failed to fetch directories"
+            "fetchFailed": "Failed to fetch directories",
+            "organization": {
+                "requiredWhenOwnerProvided": "Organization must be enabled when owner is provided"
+            }
+        },
+        "generator": {
+            "promptRequired": "Prompt is required",
+            "nameRequired": "Name is required",
+            "generationStartedSuccessfully": "Generation started successfully",
+            "updateStartedSuccessfully": "Update started successfully",
+            "failedToGenerateItems": "Failed to generate items",
+            "failedToUpdateItems": "Failed to update items",
+            "markdownRegeneratedSuccessfully": "Markdown regenerated successfully",
+            "failedToRegenerateMarkdown": "Failed to regenerate markdown"
         },
         "settings": {
             "profile": {
@@ -727,6 +1032,10 @@
                 "deleteFailed": "Failed to delete account",
                 "deleteDisabled": "Account deletion is disabled in demo"
             }
+        },
+        "deploy": {
+            "deployVercelFailed": "Failed to deploy to Vercel",
+            "updateRepositoryFailed": "Failed to update repository"
         }
     },
     "validation": {

@@ -31,6 +31,7 @@ export class WebsiteGeneratorService {
             name: directory.getWebsiteRepo(),
             token,
             committer,
+            forcePush: true,
         });
     }
 
@@ -69,8 +70,6 @@ export class WebsiteGeneratorService {
         try {
             if (operation === WebsiteRepositoryCreationMethod.DUPLICATE) {
                 path = await this.duplicate(directory, user);
-            } else if (operation === WebsiteRepositoryCreationMethod.FORK) {
-                path = await this.fork(directory, user);
             } else if (operation === WebsiteRepositoryCreationMethod.CREATE_USING_TEMPLATE) {
                 path = await this.createUsingTemplate(directory, user);
             } else {
@@ -98,5 +97,14 @@ export class WebsiteGeneratorService {
         } catch (error) {
             throw error;
         }
+    }
+
+    public cleanup(directory: Directory) {
+        const dataDir = this.githubService.getDir(
+            directory.getRepoOwner(),
+            directory.getWebsiteRepo(),
+        );
+
+        return fs.rm(dataDir, { recursive: true, force: true });
     }
 }

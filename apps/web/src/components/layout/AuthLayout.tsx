@@ -18,8 +18,12 @@ export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
             <div className="flex-1 flex items-center justify-center px-8 py-12">
                 <div className="w-full max-w-md">
                     <div className="mb-8 mt-5">
-                        <h1 className="text-3xl font-bold text-text dark:text-text-dark mb-2">{title}</h1>
-                        <p className="text-text-secondary dark:text-text-secondary-dark">{subtitle}</p>
+                        <h1 className="text-3xl font-bold text-text dark:text-text-dark mb-2">
+                            {title}
+                        </h1>
+                        <p className="text-text-secondary dark:text-text-secondary-dark">
+                            {subtitle}
+                        </p>
                     </div>
 
                     {children}
@@ -47,8 +51,12 @@ export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
                                 />
                             </svg>
                         </div>
-                        <h2 className="text-2xl font-bold text-text dark:text-text-dark mb-4">{t('feature.title')}</h2>
-                        <p className="text-text-secondary dark:text-text-secondary-dark mb-8">{t('feature.subtitle')}</p>
+                        <h2 className="text-2xl font-bold text-text dark:text-text-dark mb-4">
+                            {t('feature.title')}
+                        </h2>
+                        <p className="text-text-secondary dark:text-text-secondary-dark mb-8">
+                            {t('feature.subtitle')}
+                        </p>
                     </div>
 
                     <div className="space-y-4">

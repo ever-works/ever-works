@@ -1,17 +1,6 @@
 import 'server-only';
 import { serverMutation } from './server-api';
-
-// Enums
-export enum GenerationMethod {
-    CREATE_UPDATE = 'create-update',
-    RECREATE = 'recreate',
-}
-
-export enum WebsiteRepositoryCreationMethod {
-    DUPLICATE = 'duplicate',
-    FORK = 'fork',
-    CREATE_USING_TEMPLATE = 'create-using-template',
-}
+import { GenerationMethod, WebsiteRepositoryCreationMethod } from './enums';
 
 // DTOs
 export interface CompanyDto {

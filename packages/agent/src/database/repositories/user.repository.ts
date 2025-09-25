@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { FindOneOptions, Repository } from 'typeorm';
-import { User } from '../entities/user.entity';
-import { config } from '../config';
+import { User } from '../../entities/user.entity';
+import { config } from '../../config';
 import { randomUUID } from 'node:crypto';
 
 @Injectable()

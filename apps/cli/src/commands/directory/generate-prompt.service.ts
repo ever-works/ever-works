@@ -26,7 +26,6 @@ export enum GenerationMethod {
 
 export enum WebsiteRepositoryCreationMethod {
     DUPLICATE = 'duplicate',
-    FORK = 'fork',
     CREATE_USING_TEMPLATE = 'create-using-template',
 }
 
@@ -77,8 +76,10 @@ export class GeneratePromptService extends BasePromptService {
         options.website_repository_creation_method = await this.promptSelect(
             'Website repository creation method:',
             [
-                { name: 'Duplicate', value: WebsiteRepositoryCreationMethod.DUPLICATE },
-                { name: 'Fork', value: WebsiteRepositoryCreationMethod.FORK },
+                {
+                    name: 'Duplicate (recommended)',
+                    value: WebsiteRepositoryCreationMethod.DUPLICATE,
+                },
                 {
                     name: 'Create using template',
                     value: WebsiteRepositoryCreationMethod.CREATE_USING_TEMPLATE,
@@ -179,7 +180,7 @@ export class GeneratePromptService extends BasePromptService {
             max_search_queries: 10,
             max_results_per_query: 20,
             max_pages_to_process: 100,
-            relevance_threshold_content: 0.85,
+            relevance_threshold_content: 0.5,
             min_content_length_for_extraction: 300,
             ai_first_generation_enabled: true,
             content_filtering_enabled: true,
