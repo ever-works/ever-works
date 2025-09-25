@@ -1023,6 +1023,10 @@
                 "deleteFailed": "Failed to delete account",
                 "deleteDisabled": "Account deletion is disabled in demo"
             }
+        },
+        "deploy": {
+            "deployVercelFailed": "Failed to deploy to Vercel",
+            "updateRepositoryFailed": "Failed to update repository"
         }
     },
     "validation": {

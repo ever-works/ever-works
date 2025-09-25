@@ -13,6 +13,7 @@ export async function deployToVercel(directoryId: string) {
         redirect(ROUTES.AUTH_LOGIN);
     }
 
+    const t = await getTranslations('actions.deploy');
     const tDirectories = await getTranslations('actions.directories');
 
     try {
@@ -42,7 +43,7 @@ export async function deployToVercel(directoryId: string) {
         return {
             success: false,
             data: null,
-            error: error instanceof Error ? error.message : 'Failed to deploy to Vercel',
+            error: error instanceof Error ? error.message : t('deployVercelFailed'),
         };
     }
 }
@@ -52,6 +53,8 @@ export async function updateWebsiteRepository(directoryId: string) {
     if (!user) {
         redirect(ROUTES.AUTH_LOGIN);
     }
+
+    const t = await getTranslations('actions.deploy');
 
     try {
         const response = await websiteAPI.updateRepository(directoryId);
@@ -65,7 +68,7 @@ export async function updateWebsiteRepository(directoryId: string) {
         return {
             success: false,
             data: null,
-            error: error instanceof Error ? error.message : 'Failed to update repository',
+            error: error instanceof Error ? error.message : t('updateRepositoryFailed'),
         };
     }
 }
