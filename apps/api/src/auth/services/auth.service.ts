@@ -14,7 +14,7 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { RegisterDto, UpdatePasswordDto } from '../dto/auth.dto';
 import { randomBytes, randomUUID } from 'crypto';
-import { jwtConstants, authConstants, AuthProviders, config } from '../../config/constants';
+import { jwtConstants, authConstants, AuthProvider, config } from '../../config/constants';
 import { User } from '@packages/agent/entities';
 import { JwtPayload, TokenResponse } from '../types/jwt.types';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -78,7 +78,7 @@ export class AuthService {
             username,
             email,
             password: hashedPassword,
-            registrationProvider: AuthProviders.LOCAL,
+            registrationProvider: AuthProvider.LOCAL,
             emailVerified: false,
             isActive: true,
         });
@@ -94,7 +94,7 @@ export class AuthService {
         user = await this.userRepository.update(user.id, {
             lastLoginAt: new Date(),
             lastLoginIp: ipAddress,
-            registrationProvider: AuthProviders.LOCAL,
+            registrationProvider: AuthProvider.LOCAL,
         });
 
         const { password, ...result } = user;
@@ -169,7 +169,7 @@ export class AuthService {
                 username: profile.username || profile.displayName,
                 email: email,
                 password: hashedPassword,
-                registrationProvider: AuthProviders.GITHUB,
+                registrationProvider: AuthProvider.GITHUB,
                 avatar: profile.photos?.[0]?.value,
                 emailVerified: true, // GitHub emails are pre-verified
                 isActive: true,
@@ -182,7 +182,7 @@ export class AuthService {
             user = await this.userRepository.update(user.id, {
                 username: profile.username || profile.displayName,
                 avatar: profile.photos?.[0]?.value || user.avatar,
-                registrationProvider: AuthProviders.GITHUB,
+                registrationProvider: AuthProvider.GITHUB,
                 lastLoginAt: new Date(),
             });
         }
@@ -191,7 +191,7 @@ export class AuthService {
         await this.oauthTokenRepository.upsert({
             userId: user.id,
             username: profile.username,
-            provider: AuthProviders.GITHUB,
+            provider: AuthProvider.GITHUB,
             accessToken: accessToken,
             refreshToken: refreshToken,
             tokenType: 'Bearer',
@@ -223,7 +223,7 @@ export class AuthService {
                 username: displayName,
                 email: email,
                 password: hashedPassword,
-                registrationProvider: AuthProviders.GOOGLE,
+                registrationProvider: AuthProvider.GOOGLE,
                 avatar: profile.photos?.[0]?.value,
                 emailVerified: true, // Google emails are pre-verified
                 isActive: true,
@@ -235,7 +235,7 @@ export class AuthService {
             // Update user info if exists
             user = await this.userRepository.update(user.id, {
                 username: displayName,
-                registrationProvider: AuthProviders.GOOGLE,
+                registrationProvider: AuthProvider.GOOGLE,
                 avatar: profile.photos?.[0]?.value || user.avatar,
                 lastLoginAt: new Date(),
             });
@@ -244,7 +244,7 @@ export class AuthService {
         // Store OAuth tokens separately
         await this.oauthTokenRepository.upsert({
             userId: user.id,
-            provider: AuthProviders.GOOGLE,
+            provider: AuthProvider.GOOGLE,
             accessToken: accessToken,
             refreshToken: refreshToken,
             tokenType: 'Bearer',

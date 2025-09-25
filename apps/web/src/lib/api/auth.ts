@@ -85,6 +85,23 @@ export interface TokenValidationResponse {
     expiresAt?: Date;
 }
 
+// Github
+
+export interface GitHubOrganization {
+    login: string;
+    id: number;
+    node_id: string;
+    url: string;
+    repos_url: string;
+    events_url: string;
+    hooks_url: string;
+    issues_url: string;
+    members_url: string;
+    public_members_url: string;
+    avatar_url: string;
+    description: string;
+}
+
 export const authAPI = {
     // Authentication
     register: async (data: RegisterDto) => {
@@ -281,6 +298,10 @@ export const authAPI = {
             });
         },
 
+        ensureConnection: async (provider: `${OAuthProvider}`) => {
+            return serverFetch<{ connected: boolean }>(`/auth/connections/${provider}/ensure`);
+        },
+
         disconnect: async (provider: OAuthProvider) => {
             return serverMutation<void>({
                 endpoint: `/auth/connections/${provider}`,
@@ -291,12 +312,8 @@ export const authAPI = {
         },
 
         // GitHub specific
-        getGitHubRepositories: async () => {
-            return serverFetch<any[]>('/auth/connections/github/repositories');
-        },
-
         getGitHubOrgs: async () => {
-            return serverFetch<any[]>('/auth/connections/github/orgs');
+            return serverFetch<GitHubOrganization[]>('/auth/connections/github/orgs');
         },
 
         checkGitHubScopes: async (requiredScopes: string[]) => {

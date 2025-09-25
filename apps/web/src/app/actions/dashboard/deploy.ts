@@ -1,9 +1,11 @@
 'use server';
 
-import { websiteAPI } from '@/lib/api';
+import { authAPI, directoryAPI, websiteAPI } from '@/lib/api';
 import { getAuthFromCookie } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { ROUTES } from '@/lib/constants';
+import { getTranslations } from 'next-intl/server';
+import { checkOAuthConnection } from './oauth';
 
 export async function deployToVercel(directoryId: string) {
     const user = await getAuthFromCookie();
@@ -11,7 +13,24 @@ export async function deployToVercel(directoryId: string) {
         redirect(ROUTES.AUTH_LOGIN);
     }
 
+    const tDirectories = await getTranslations('actions.directories');
+
     try {
+        const { directory } = await directoryAPI.get(directoryId);
+
+        // We need to ensure that oauth connection is valid or revoke it if not
+        await authAPI.oauth_connections.ensureConnection(directory.repoProvider);
+
+        // Check GitHub connection first
+        const oauthCheck = await checkOAuthConnection(directory.repoProvider);
+        if (!oauthCheck.connected) {
+            return {
+                success: false,
+                error: tDirectories('oauthRequired', { provider: directory.repoProvider }),
+                requiresGitHub: true,
+            };
+        }
+
         const response = await websiteAPI.deployToVercel(directoryId, {});
         return {
             success: response.status === 'success' || response.status === 'pending',

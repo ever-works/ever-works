@@ -1,10 +1,18 @@
 'use server';
 
-import { itemsGeneratorAPI, CreateItemsGeneratorDto, UpdateItemsGeneratorDto } from '@/lib/api';
+import {
+    itemsGeneratorAPI,
+    CreateItemsGeneratorDto,
+    UpdateItemsGeneratorDto,
+    directoryAPI,
+    authAPI,
+} from '@/lib/api';
 import { getTranslations } from 'next-intl/server';
+import { checkOAuthConnection } from './oauth';
 
 export async function generateItems(directoryId: string, data: CreateItemsGeneratorDto) {
     const t = await getTranslations('actions.generator');
+    const tDirectories = await getTranslations('actions.directories');
 
     try {
         // Validate required fields
@@ -19,6 +27,21 @@ export async function generateItems(directoryId: string, data: CreateItemsGenera
             return {
                 success: false,
                 error: t('nameRequired'),
+            };
+        }
+
+        const { directory } = await directoryAPI.get(directoryId);
+
+        // We need to ensure that oauth connection is valid or revoke it if not
+        await authAPI.oauth_connections.ensureConnection(directory.repoProvider);
+
+        // Check GitHub connection first
+        const oauthCheck = await checkOAuthConnection(directory.repoProvider);
+        if (!oauthCheck.connected) {
+            return {
+                success: false,
+                error: tDirectories('oauthRequired', { provider: directory.repoProvider }),
+                requiresGitHub: true,
             };
         }
 

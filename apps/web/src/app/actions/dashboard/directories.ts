@@ -8,6 +8,7 @@ import {
     UpdateDirectoryDto,
     ConnectionInfo,
     DeleteDirectoryDto,
+    authAPI,
 } from '@/lib/api';
 import { checkOAuthConnection } from './oauth';
 import { RepoProvider } from '@/lib/api/enums';
@@ -106,6 +107,9 @@ export async function createDirectory(data: CreateDirectoryDto) {
             };
         }
 
+        // We need to ensure that oauth connection is valid or revoke it if not
+        await authAPI.oauth_connections.ensureConnection(validation.data.repoProvider);
+
         // Check GitHub connection first
         const oauthCheck = await checkOAuthConnection(validation.data.repoProvider);
         if (!oauthCheck.connected) {
@@ -170,12 +174,17 @@ export async function createDirectoryWithAI(request: AIDirectoryOptions) {
             };
         }
 
+        const repoProvider = validation.data.repoProvider;
+
+        // We need to ensure that oauth connection is valid or revoke it if not
+        await authAPI.oauth_connections.ensureConnection(repoProvider);
+
         // Check GitHub connection first
-        const oauthCheck = await checkOAuthConnection(validation.data.repoProvider);
+        const oauthCheck = await checkOAuthConnection(repoProvider);
         if (!oauthCheck.connected) {
             return {
                 success: false,
-                error: t('githubRequired'),
+                error: t('oauthRequired', { provider: repoProvider }),
                 requiresGitHub: true,
             };
         }
@@ -194,7 +203,7 @@ export async function createDirectoryWithAI(request: AIDirectoryOptions) {
             description: directoryDetails.description,
             organization,
             owner,
-            repoProvider: validation.data.repoProvider,
+            repoProvider,
         };
 
         // Validate the generated directory data

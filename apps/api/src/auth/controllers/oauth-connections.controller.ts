@@ -16,7 +16,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { OAuthConnectionService } from '../services/oauth-connection.service';
 import { OAuthUrlService } from '../services/oauth-url.service';
-import { AuthProviders, config } from '../../config/constants';
+import { AuthProvider, config } from '../../config/constants';
 
 @Controller('api/auth/connections')
 @UseGuards(JwtAuthGuard)
@@ -48,7 +48,7 @@ export class OAuthConnectionsController {
     @Get(':provider/connect/url')
     async getConnectUrl(
         @Request() req,
-        @Param('provider') provider: AuthProviders,
+        @Param('provider') provider: AuthProvider,
         @Query('callbackUrl') callbackUrl?: string,
         @Query('state') state?: string,
     ) {
@@ -57,7 +57,7 @@ export class OAuthConnectionsController {
         this.oauthConnectionService.storeState(finalState, req.user.userId);
 
         let url: string;
-        switch (provider.toLowerCase() as AuthProviders) {
+        switch (provider.toLowerCase() as AuthProvider) {
             case 'github':
                 // Use connect callback URL for connections
                 const githubCallbackUrl = callbackUrl || config.github.connectCallbackUrl();
@@ -140,6 +140,16 @@ export class OAuthConnectionsController {
     @HttpCode(HttpStatus.NO_CONTENT)
     async disconnectProvider(@Request() req, @Param('provider') provider: string) {
         await this.oauthConnectionService.disconnectProvider(req.user.userId, provider);
+    }
+
+    @Get(':provider/ensure')
+    async ensureConnection(@Request() req, @Param('provider') provider: string) {
+        const connected = await this.oauthConnectionService.ensureOAuthConnection(
+            req.user.userId,
+            provider as AuthProvider,
+        );
+
+        return { connected };
     }
 
     /**

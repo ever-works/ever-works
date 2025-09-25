@@ -21,7 +21,7 @@ export const authConstants = {
     refreshTokenCleanupDays: 30,
 };
 
-export enum AuthProviders {
+export enum AuthProvider {
     LOCAL = 'local',
     GITHUB = 'github',
     GOOGLE = 'google',

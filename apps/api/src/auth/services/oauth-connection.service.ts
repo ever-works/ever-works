@@ -4,7 +4,7 @@ import { OAuthTokenRepository } from '@packages/agent/database';
 import { OAuthTokenService } from './oauth-token.service';
 import { firstValueFrom } from 'rxjs';
 import { randomBytes } from 'crypto';
-import { AuthProviders, config } from '../../config/constants';
+import { AuthProvider, config } from '../../config/constants';
 import { GitHubScopePresets, hasRequiredAgentScopes } from '../config/github-scopes.config';
 
 interface ConnectionInfo {
@@ -52,13 +52,13 @@ export class OAuthConnectionService {
 
         const connections: ConnectionInfo[] = [
             {
-                provider: AuthProviders.GITHUB,
+                provider: AuthProvider.GITHUB,
                 connected: false,
                 email: null,
                 username: null,
             },
             {
-                provider: AuthProviders.GOOGLE,
+                provider: AuthProvider.GOOGLE,
                 connected: false,
                 email: null,
                 username: null,
@@ -108,9 +108,9 @@ export class OAuthConnectionService {
         const state = this.generateState(userId);
 
         switch (provider) {
-            case AuthProviders.GITHUB:
+            case AuthProvider.GITHUB:
                 return this.getGitHubAuthUrl(state, additionalScopes);
-            case AuthProviders.GOOGLE:
+            case AuthProvider.GOOGLE:
                 return this.getGoogleAuthUrl(state, additionalScopes);
             default:
                 throw new BadRequestException(`Unsupported provider: ${provider}`);
@@ -160,9 +160,9 @@ export class OAuthConnectionService {
         code: string,
     ): Promise<ConnectionInfo> {
         switch (provider) {
-            case AuthProviders.GITHUB:
+            case AuthProvider.GITHUB:
                 return this.handleGitHubCallback(userId, code);
-            case AuthProviders.GOOGLE:
+            case AuthProvider.GOOGLE:
                 return this.handleGoogleCallback(userId, code);
             default:
                 throw new BadRequestException(`Unsupported provider: ${provider}`);
@@ -202,7 +202,7 @@ export class OAuthConnectionService {
         // Store token
         await this.oauthTokenRepository.upsert({
             userId,
-            provider: AuthProviders.GITHUB,
+            provider: AuthProvider.GITHUB,
             accessToken: access_token,
             tokenType: token_type,
             email: userResponse.data.email || null,
@@ -216,7 +216,7 @@ export class OAuthConnectionService {
         });
 
         return {
-            provider: AuthProviders.GITHUB,
+            provider: AuthProvider.GITHUB,
             connected: true,
             scopes: scope?.split(' ') || [],
             connectedAt: new Date(),
@@ -226,6 +226,19 @@ export class OAuthConnectionService {
                 username: userResponse.data.login,
             },
         };
+    }
+
+    private async getGithubUser(token: string) {
+        const userResponse = await firstValueFrom(
+            this.httpService.get('https://api.github.com/user', {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    Accept: 'application/vnd.github+json',
+                },
+            }),
+        );
+
+        return userResponse.data;
     }
 
     private async handleGoogleCallback(userId: string, code: string): Promise<ConnectionInfo> {
@@ -257,7 +270,7 @@ export class OAuthConnectionService {
         // Store token
         await this.oauthTokenRepository.upsert({
             userId,
-            provider: AuthProviders.GOOGLE,
+            provider: AuthProvider.GOOGLE,
             accessToken: access_token,
             refreshToken: refresh_token,
             tokenType: token_type,
@@ -272,7 +285,7 @@ export class OAuthConnectionService {
         });
 
         return {
-            provider: AuthProviders.GOOGLE,
+            provider: AuthProvider.GOOGLE,
             connected: true,
             scopes: scope?.split(' ') || [],
             connectedAt: new Date(),
@@ -282,6 +295,18 @@ export class OAuthConnectionService {
                 email: userResponse.data.email,
             },
         };
+    }
+
+    private async getGoogleUser(token: string) {
+        const userResponse = await firstValueFrom(
+            this.httpService.get('https://www.googleapis.com/oauth2/v2/userinfo', {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+            }),
+        );
+
+        return userResponse.data;
     }
 
     /**
@@ -314,6 +339,32 @@ export class OAuthConnectionService {
         ]);
 
         return { authUrl };
+    }
+
+    public async ensureOAuthConnection(userId: string, provider: AuthProvider): Promise<boolean> {
+        const token = await this.oauthTokenRepository.findByUserAndProvider(userId, provider);
+        const verifyUser = () => {
+            switch (provider) {
+                case AuthProvider.GITHUB:
+                    return this.getGithubUser(token.accessToken);
+                case AuthProvider.GOOGLE:
+                    return this.getGoogleUser(token.accessToken);
+                default:
+                    throw new BadRequestException(`Unsupported provider: ${provider}`);
+            }
+        };
+
+        try {
+            await verifyUser();
+            return true;
+        } catch (error) {
+            // remove token
+            await this.oauthTokenRepository
+                .deleteByUserAndProvider(userId, provider)
+                .catch(() => {});
+
+            return false;
+        }
     }
 
     /**
@@ -393,7 +444,7 @@ export class OAuthConnectionService {
         missingScopes: string[];
         hasAgentScopes: boolean;
     }> {
-        const connection = await this.checkConnection(userId, AuthProviders.GITHUB);
+        const connection = await this.checkConnection(userId, AuthProvider.GITHUB);
 
         if (!connection.connected) {
             const agentCheck = hasRequiredAgentScopes([]);
