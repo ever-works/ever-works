@@ -463,6 +463,7 @@
                 "deleteSuccess": "Item deleted successfully",
                 "deleteFailed": "Failed to delete item",
                 "deleteError": "An error occurred while deleting the item",
+                "loadingMore": "Loading more... ({current} of {total})",
                 "addModal": {
                     "title": "Add New Item",
                     "sourceUrl": "Source URL",
@@ -490,6 +491,7 @@
                     "adding": "Adding...",
                     "addItem": "Add Item",
                     "success": "Item added successfully",
+                    "successDescription": "The item has been added to your directory",
                     "failed": "Failed to add item",
                     "error": "An error occurred while adding the item",
                     "errors": {

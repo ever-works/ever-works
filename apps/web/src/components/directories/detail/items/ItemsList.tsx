@@ -183,6 +183,7 @@ function VirtualizedList({
     visibleRange,
     setVisibleRange,
 }: VirtualizedListProps) {
+    const t = useTranslations('dashboard.directoryDetail.items');
     const loadMoreRef = useRef<HTMLDivElement>(null);
     const ITEMS_PER_PAGE = 30; // Items to load at a time
 
@@ -245,7 +246,7 @@ function VirtualizedList({
                     <div className="inline-flex items-center gap-2">
                         <div className="w-4 h-4 border-2 border-primary dark:border-primary-dark border-t-transparent rounded-full animate-spin" />
                         <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
-                            Loading more... ({visibleRange.end} of {items.length})
+                            {t('loadingMore', { current: visibleRange.end, total: items.length })}
                         </p>
                     </div>
                 </div>

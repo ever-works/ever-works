@@ -24,7 +24,7 @@ export function ItemsPageClient({ items, directoryId }: ItemsPageClientProps) {
     const categories = Array.from(new Set(items.map((item) => item.category).filter(Boolean)));
 
     // If no categories exist, provide some defaults
-    const finalCategories = categories.length > 0 ? categories : ['General', 'Tools', 'Resources'];
+    const finalCategories = categories.length > 0 ? categories : [];
 
     const handleAddSuccess = () => {
         // Refresh the page to show new item
