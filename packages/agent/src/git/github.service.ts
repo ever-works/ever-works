@@ -206,7 +206,7 @@ export class GithubService extends GitProvider {
         await this.remoteAdd(originalDir, 'origin', origin);
         await this.push(originalDir, token, forcePush);
 
-        await this.enableWorkflows(duplicated.owner.login, duplicated.name, token);
+        this.enableWorkflows(duplicated.owner.login, duplicated.name, token);
 
         return originalDir;
     }
@@ -242,13 +242,15 @@ export class GithubService extends GitProvider {
         await this.remoteAdd(originalDir, 'origin', origin);
         await this.push(originalDir, token);
 
-        await this.enableWorkflows(duplicated.owner.login, duplicated.name, token);
+        this.enableWorkflows(duplicated.owner.login, duplicated.name, token);
 
         return originalDir;
     }
 
     private async enableWorkflows(owner: string, repo: string, token: string) {
         const octokit = new Octokit({ auth: token });
+
+        await new Promise((resolve) => setTimeout(resolve, 10000));
 
         const {
             data: { workflows },
@@ -257,15 +259,31 @@ export class GithubService extends GitProvider {
             repo,
         });
 
-        await Promise.allSettled(
-            workflows.map((workflow) => {
-                return octokit.rest.actions.enableWorkflow({
-                    owner,
-                    repo,
-                    workflow_id: workflow.id,
-                });
+        const promises = workflows.map((workflow) => {
+            return octokit.rest.actions.enableWorkflow({
+                owner,
+                repo,
+                workflow_id: workflow.id,
+            });
+        });
+
+        promises.push(
+            octokit.rest.actions.setAllowedActionsRepository({
+                owner,
+                repo,
+                github_owned_allowed: true,
+            }),
+            octokit.rest.actions.setGithubActionsPermissionsRepository({
+                owner,
+                repo,
+                enabled: true,
+                allowed_actions: 'all',
             }),
         );
+
+        await Promise.allSettled(promises);
+
+        this.logger.log(`Enabled workflows for ${owner}/${repo}`);
     }
 
     async createRepoFromTemplate(
