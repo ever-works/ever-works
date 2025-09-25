@@ -1,6 +1,6 @@
 import { directoryAPI } from '@/lib/api';
 import type { ItemData } from '@/lib/api/types-only';
-import { ItemsList } from '@/components/directories/detail/items/ItemsList';
+import { ItemsPageClient } from '@/components/directories/detail/items/ItemsPageClient';
 import { ItemsEmptyState } from '@/components/directories/detail/items/ItemsEmptyState';
 
 type Params = { params: Promise<{ id: string }> };
@@ -31,5 +31,5 @@ export default async function DirectoryItemsPage({ params }: Params) {
         return <ItemsEmptyState directoryId={id} />;
     }
 
-    return <ItemsList items={items} directoryId={id} />;
+    return <ItemsPageClient items={items} directoryId={id} />;
 }
