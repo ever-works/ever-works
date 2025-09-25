@@ -1,0 +1,291 @@
+'use client';
+
+import React, { useState, useCallback, memo } from 'react';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { cn } from '@/lib/utils/cn';
+import { useTranslations } from 'next-intl';
+import { Loader2, Link2, Plus, X } from 'lucide-react';
+import { extractItemDetails } from '@/app/actions/dashboard/items';
+import { toast } from 'sonner';
+
+export interface ItemFormData {
+    name: string;
+    description: string;
+    source_url: string;
+    category: string;
+    tags: string[];
+    featured: boolean;
+    pay_and_publish_now: boolean;
+    slug: string;
+}
+
+interface AddItemFormProps {
+    categories: string[];
+    formData: ItemFormData;
+    setFormData: (data: ItemFormData) => void;
+    updateWithPR: boolean;
+    setUpdateWithPR: (value: boolean) => void;
+    isPending: boolean;
+}
+
+export const AddItemForm = memo(function AddItemForm({
+    categories,
+    formData,
+    setFormData,
+    updateWithPR,
+    setUpdateWithPR,
+    isPending,
+}: AddItemFormProps) {
+    const t = useTranslations('dashboard.directoryDetail.items.addModal');
+    const [isExtracting, setIsExtracting] = useState(false);
+    const [tagInput, setTagInput] = useState('');
+
+    const handleExtractFromUrl = async () => {
+        if (!formData.source_url) {
+            toast.error(t('errors.urlRequired'));
+            return;
+        }
+
+        setIsExtracting(true);
+        try {
+            const result = await extractItemDetails(formData.source_url);
+
+            if (result.success && result.data) {
+                setFormData({
+                    ...formData,
+                    name: result.data.title || formData.name,
+                    description: result.data.description || formData.description,
+                    tags: result.data.tags || formData.tags,
+                });
+                toast.success(t('extractSuccess'));
+            } else {
+                toast.error(result.error || t('extractFailed'));
+            }
+        } catch (error) {
+            toast.error(t('extractError'));
+        } finally {
+            setIsExtracting(false);
+        }
+    };
+
+    const handleAddTag = () => {
+        if (tagInput.trim() && !formData.tags.includes(tagInput.trim())) {
+            setFormData({
+                ...formData,
+                tags: [...formData.tags, tagInput.trim()],
+            });
+            setTagInput('');
+        }
+    };
+
+    const handleRemoveTag = (tag: string) => {
+        setFormData({
+            ...formData,
+            tags: formData.tags.filter((t) => t !== tag),
+        });
+    };
+
+    return (
+        <div className="space-y-4">
+            {/* Source URL with Extract Button */}
+            <div className="space-y-2">
+                <label className="text-sm font-medium text-text dark:text-text-dark">
+                    {t('sourceUrl')} *
+                </label>
+                <div className="flex gap-2">
+                    <Input
+                        type="url"
+                        value={formData.source_url}
+                        onChange={(e) => setFormData({ ...formData, source_url: e.target.value })}
+                        placeholder={t('sourceUrlPlaceholder')}
+                        variant="form"
+                        className="flex-1"
+                        disabled={isPending}
+                    />
+                    <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={handleExtractFromUrl}
+                        disabled={isPending || isExtracting || !formData.source_url}
+                        className="shrink-0"
+                    >
+                        {isExtracting ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                            <Link2 className="w-4 h-4" />
+                        )}
+                        <span className="ml-2">{t('extract')}</span>
+                    </Button>
+                </div>
+                <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                    {t('sourceUrlHelp')}
+                </p>
+            </div>
+
+            {/* Name */}
+            <Input
+                label={`${t('name')} *`}
+                type="text"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder={t('namePlaceholder')}
+                variant="form"
+                disabled={isPending}
+            />
+
+            {/* Description */}
+            <Textarea
+                label={`${t('description')} *`}
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                placeholder={t('descriptionPlaceholder')}
+                rows={3}
+                variant="form"
+                disabled={isPending}
+            />
+
+            {/* Category */}
+            <div className="space-y-2">
+                <label className="text-sm font-medium text-text dark:text-text-dark">
+                    {t('category')} *
+                </label>
+                <select
+                    value={formData.category}
+                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                    className={cn(
+                        'w-full px-4 py-2 rounded-lg',
+                        'bg-surface dark:bg-surface-dark',
+                        'border border-border dark:border-border-dark',
+                        'text-text dark:text-text-dark',
+                        'focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-primary-dark',
+                        'disabled:opacity-50 disabled:cursor-not-allowed',
+                    )}
+                    disabled={isPending}
+                >
+                    {categories.map((cat) => (
+                        <option key={cat} value={cat}>
+                            {cat}
+                        </option>
+                    ))}
+                </select>
+            </div>
+
+            {/* Tags */}
+            <TagsField
+                tags={formData.tags}
+                tagInput={tagInput}
+                setTagInput={setTagInput}
+                onAddTag={handleAddTag}
+                onRemoveTag={handleRemoveTag}
+                isPending={isPending}
+            />
+
+            {/* Slug (optional) */}
+            <div className="space-y-2">
+                <Input
+                    label={t('slug')}
+                    type="text"
+                    value={formData.slug}
+                    onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
+                    placeholder={t('slugPlaceholder')}
+                    variant="form"
+                    disabled={isPending}
+                />
+                <p className="text-xs text-text-muted dark:text-text-muted-dark">{t('slugHelp')}</p>
+            </div>
+
+            {/* Options */}
+            <div className="space-y-3">
+                <Checkbox
+                    checked={formData.featured}
+                    onChange={(e) => setFormData({ ...formData, featured: e.target.checked })}
+                    label={t('featured')}
+                    description={t('featuredHelp')}
+                    variant="form"
+                    disabled={isPending}
+                />
+
+                <Checkbox
+                    checked={updateWithPR}
+                    onChange={(e) => setUpdateWithPR(e.target.checked)}
+                    label={t('updateWithPR')}
+                    description={t('updateWithPRHelp')}
+                    variant="form"
+                    disabled={isPending}
+                />
+            </div>
+        </div>
+    );
+});
+
+interface TagsFieldProps {
+    tags: string[];
+    tagInput: string;
+    setTagInput: (value: string) => void;
+    onAddTag: () => void;
+    onRemoveTag: (tag: string) => void;
+    isPending: boolean;
+}
+
+const TagsField = memo(function TagsField({
+    tags,
+    tagInput,
+    setTagInput,
+    onAddTag,
+    onRemoveTag,
+    isPending,
+}: TagsFieldProps) {
+    const t = useTranslations('dashboard.directoryDetail.items.addModal');
+
+    return (
+        <div className="space-y-2">
+            <label className="text-sm font-medium text-text dark:text-text-dark">{t('tags')}</label>
+            <div className="flex gap-2">
+                <Input
+                    type="text"
+                    value={tagInput}
+                    onChange={(e) => setTagInput(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), onAddTag())}
+                    placeholder={t('tagPlaceholder')}
+                    variant="form"
+                    className="flex-1"
+                    disabled={isPending}
+                />
+                <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={onAddTag}
+                    disabled={isPending || !tagInput.trim()}
+                >
+                    <Plus className="w-4 h-4" />
+                </Button>
+            </div>
+            {tags.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-2">
+                    {tags.map((tag) => (
+                        <span
+                            key={tag}
+                            className={cn(
+                                'inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs',
+                                'bg-primary/10 dark:bg-primary-dark/10',
+                                'text-primary dark:text-primary-dark',
+                            )}
+                        >
+                            {tag}
+                            <button
+                                type="button"
+                                onClick={() => onRemoveTag(tag)}
+                                className="hover:opacity-70"
+                            >
+                                <X className="w-3 h-3" />
+                            </button>
+                        </span>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+});

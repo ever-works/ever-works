@@ -446,6 +446,8 @@
                 "justNow": "Just now"
             },
             "items": {
+                "title": "Directory Items",
+                "subtitle": "Manage and organize the items in your directory",
                 "noItemsTitle": "No Items Yet",
                 "noItemsDescription": "Your directory doesn't have any items yet. Generate items to populate your directory with content.",
                 "generateItems": "Generate Items",
@@ -453,7 +455,48 @@
                 "allCategories": "All Categories",
                 "showing": "Showing {current} of {total} items",
                 "noMatch": "No items match your search criteria",
-                "source": "Source"
+                "source": "Source",
+                "addItem": "Add Item",
+                "delete": "Delete",
+                "deleteWithPR": "Delete with Pull Request",
+                "deleteConfirm": "Are you sure you want to delete \"{name}\"?",
+                "deleteSuccess": "Item deleted successfully",
+                "deleteFailed": "Failed to delete item",
+                "deleteError": "An error occurred while deleting the item",
+                "addModal": {
+                    "title": "Add New Item",
+                    "sourceUrl": "Source URL",
+                    "sourceUrlPlaceholder": "https://example.com/product",
+                    "sourceUrlHelp": "Click 'Extract' to automatically fetch item details from the URL",
+                    "extract": "Extract",
+                    "extractSuccess": "Item details extracted successfully",
+                    "extractFailed": "Failed to extract item details",
+                    "extractError": "An error occurred while extracting details",
+                    "name": "Name",
+                    "namePlaceholder": "Enter item name",
+                    "description": "Description",
+                    "descriptionPlaceholder": "Enter a brief description of the item",
+                    "category": "Category",
+                    "tags": "Tags",
+                    "tagPlaceholder": "Add a tag and press Enter",
+                    "slug": "Slug (Optional)",
+                    "slugPlaceholder": "custom-item-slug",
+                    "slugHelp": "URL-friendly identifier. Will be auto-generated if left empty",
+                    "featured": "Featured Item",
+                    "featuredHelp": "Mark this item as featured in the directory",
+                    "updateWithPR": "Create Pull Request",
+                    "updateWithPRHelp": "Submit changes as a pull request instead of direct commit",
+                    "cancel": "Cancel",
+                    "adding": "Adding...",
+                    "addItem": "Add Item",
+                    "success": "Item added successfully",
+                    "failed": "Failed to add item",
+                    "error": "An error occurred while adding the item",
+                    "errors": {
+                        "urlRequired": "Source URL is required for extraction",
+                        "requiredFields": "Please fill in all required fields"
+                    }
+                }
             },
             "generator": {
                 "regenerationWarning": "Regeneration Warning",

@@ -10,6 +10,7 @@
         "format": "prettier --write \"**/*.{ts,tsx,jsx,json,css,md}\""
     },
     "dependencies": {
+        "@headlessui/react": "^2.2.9",
         "clsx": "^2.1.1",
         "deepmerge": "^4.3.1",
         "iron-session": "^8.0.4",
