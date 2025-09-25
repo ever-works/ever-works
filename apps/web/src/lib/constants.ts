@@ -30,6 +30,10 @@ export const ROUTES = {
     DASHBOARD_DIRECTORIES: '/directories',
     DASHBOARD_DIRECTORIES_NEW: '/directories/new',
     DASHBOARD_DIRECTORY: (id: string) => `/directories/${id}`,
+    DASHBOARD_DIRECTORY_ITEMS: (id: string) => `/directories/${id}/items`,
+    DASHBOARD_DIRECTORY_GENERATOR: (id: string) => `/directories/${id}/generator`,
+    DASHBOARD_DIRECTORY_DEPLOY: (id: string) => `/directories/${id}/deploy`,
+    DASHBOARD_DIRECTORY_SETTINGS: (id: string) => `/directories/${id}/settings`,
     // Settings
     DASHBOARD_SETTINGS: '/settings',
     DASHBOARD_SETTINGS_PROFILE: '/settings',

@@ -13,6 +13,8 @@ import {
 import { checkOAuthConnection } from './oauth';
 import { RepoProvider } from '@/lib/api/enums';
 import { getTranslations } from 'next-intl/server';
+import { revalidatePath } from 'next/cache';
+import { ROUTES } from '@/lib/constants';
 
 const readmeConfigSchema = z.object({
     header: z.string().optional(),
@@ -24,35 +26,21 @@ const readmeConfigSchema = z.object({
 const getCreateDirectorySchema = async () => {
     const t = await getTranslations('actions.directories');
 
-    const createDirectorySchema = z
-        .object({
-            slug: z
-                .string()
-                .min(1, t('slug.required'))
-                .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, t('slug.format')),
-            name: z.string().min(1, t('name.required')).max(100, t('name.maxLength')),
-            description: z
-                .string()
-                .min(1, t('description.required'))
-                .max(500, t('description.maxLength')),
-            owner: z.string().optional(),
-            organization: z.boolean(),
-            repoProvider: z.nativeEnum(RepoProvider).optional().default(RepoProvider.GITHUB),
-            readmeConfig: readmeConfigSchema.optional(),
-        })
-        .refine(
-            (data) => {
-                // If owner is provided and not empty, organization should be true
-                if (data.owner && data.owner.trim() !== '' && !data.organization) {
-                    return false;
-                }
-                return true;
-            },
-            {
-                message: t('organization.requiredWhenOwnerProvided'),
-                path: ['organization'],
-            },
-        );
+    const createDirectorySchema = z.object({
+        slug: z
+            .string()
+            .min(1, t('slug.required'))
+            .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, t('slug.format')),
+        name: z.string().min(1, t('name.required')).max(100, t('name.maxLength')),
+        description: z
+            .string()
+            .min(1, t('description.required'))
+            .max(500, t('description.maxLength')),
+        owner: z.string().optional(),
+        organization: z.boolean(),
+        repoProvider: z.nativeEnum(RepoProvider).optional().default(RepoProvider.GITHUB),
+        readmeConfig: readmeConfigSchema.optional(),
+    });
 
     return createDirectorySchema;
 };
@@ -241,30 +229,16 @@ export async function createDirectoryWithAI(request: AIDirectoryOptions) {
 export async function updateDirectory(directoryId: string, data: UpdateDirectoryDto) {
     const t = await getTranslations('actions.directories');
 
-    const updateDirectorySchema = z
-        .object({
-            name: z.string().min(1, t('name.required')).max(100, t('name.maxLength')),
-            description: z
-                .string()
-                .min(1, t('description.required'))
-                .max(500, t('description.maxLength')),
-            owner: z.string().optional(),
-            organization: z.boolean().optional(),
-            readmeConfig: readmeConfigSchema.optional(),
-        })
-        .refine(
-            (data) => {
-                // If owner is provided and not empty, organization should be true
-                if (data.owner && data.owner.trim() !== '' && !data.organization) {
-                    return false;
-                }
-                return true;
-            },
-            {
-                message: t('organization.requiredWhenOwnerProvided'),
-                path: ['organization'],
-            },
-        );
+    const updateDirectorySchema = z.object({
+        name: z.string().min(1, t('name.required')).max(100, t('name.maxLength')),
+        description: z
+            .string()
+            .min(1, t('description.required'))
+            .max(500, t('description.maxLength')),
+        owner: z.string().optional(),
+        organization: z.boolean().optional(),
+        readmeConfig: readmeConfigSchema.optional(),
+    });
 
     try {
         // Validate input data
@@ -287,6 +261,8 @@ export async function updateDirectory(directoryId: string, data: UpdateDirectory
         validation.data.owner = owner;
 
         await directoryAPI.update(directoryId, validation.data);
+
+        revalidatePath(ROUTES.DASHBOARD_DIRECTORY_SETTINGS(directoryId));
 
         return {
             success: true,
