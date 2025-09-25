@@ -11,13 +11,14 @@ import { useTranslations } from 'next-intl';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Checkbox } from '@/components/ui/checkbox';
+import { OrganizationSelector } from './OrganizationSelector';
+import { ChevronDown, Lightbulb, Check } from 'lucide-react';
 
 interface DirectoryAICreatorProps {
     user: AuthUser;
 }
 
-export function DirectoryAICreator(_: DirectoryAICreatorProps) {
+export function DirectoryAICreator({ user }: DirectoryAICreatorProps) {
     const [prompt, setPrompt] = useState('');
     const [directoryName, setDirectoryName] = useState('');
     const [organization, setOrganization] = useState(false);
@@ -126,61 +127,27 @@ export function DirectoryAICreator(_: DirectoryAICreatorProps) {
                                 {t('advancedSubtitle')}
                             </p>
                         </div>
-                        <svg
+                        <ChevronDown
                             className={cn(
                                 'w-5 h-5 text-text-secondary dark:text-text-secondary-dark transition-transform',
                                 showAdvanced && 'rotate-180',
                             )}
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M19 9l-7 7-7-7"
-                            />
-                        </svg>
+                        />
                     </Button>
 
                     {/* Advanced Fields */}
                     {showAdvanced && (
                         <div className="space-y-4 p-4 rounded-lg bg-surface dark:bg-surface-dark border border-border dark:border-border-dark">
-                            {/* Organization */}
-                            <Checkbox
-                                checked={organization}
-                                onChange={(e) => {
-                                    const isOrganization = e.target.checked;
+                            {/* Organization Selector */}
+                            <OrganizationSelector
+                                value={owner}
+                                authId={user.sub}
+                                onChange={(value, isOrganization) => {
+                                    setOwner(value);
                                     setOrganization(isOrganization);
-                                    // Clear owner if organization is unchecked
-                                    if (!isOrganization) {
-                                        setOwner('');
-                                    }
                                 }}
-                                label={t('organizationLabel')}
-                                description={t('organizationHelp')}
-                                variant="form"
+                                disabled={isPending}
                             />
-
-                            {/* Owner */}
-                            {organization && (
-                                <Input
-                                    label={t('organizationNameLabel')}
-                                    type="text"
-                                    value={owner}
-                                    onChange={(e) => {
-                                        const ownerValue = e.target.value;
-                                        setOwner(ownerValue);
-                                        // Automatically set organization to true if owner is provided
-                                        if (ownerValue.trim() !== '' && !organization) {
-                                            setOrganization(true);
-                                        }
-                                    }}
-                                    placeholder={t('organizationNamePlaceholder')}
-                                    variant="form"
-                                />
-                            )}
                         </div>
                     )}
 
@@ -203,67 +170,19 @@ export function DirectoryAICreator(_: DirectoryAICreatorProps) {
                         </h4>
                         <ul className="space-y-1 text-sm text-text-secondary dark:text-text-secondary-dark">
                             <li className="flex items-start gap-2">
-                                <svg
-                                    className="w-4 h-4 text-primary mt-0.5 flex-shrink-0"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={2}
-                                        d="M5 13l4 4L19 7"
-                                    />
-                                </svg>
+                                <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
                                 <span>{t('features.0')}</span>
                             </li>
                             <li className="flex items-start gap-2">
-                                <svg
-                                    className="w-4 h-4 text-primary mt-0.5 flex-shrink-0"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={2}
-                                        d="M5 13l4 4L19 7"
-                                    />
-                                </svg>
+                                <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
                                 <span>{t('features.1')}</span>
                             </li>
                             <li className="flex items-start gap-2">
-                                <svg
-                                    className="w-4 h-4 text-primary mt-0.5 flex-shrink-0"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={2}
-                                        d="M5 13l4 4L19 7"
-                                    />
-                                </svg>
+                                <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
                                 <span>{t('features.2')}</span>
                             </li>
                             <li className="flex items-start gap-2">
-                                <svg
-                                    className="w-4 h-4 text-primary mt-0.5 flex-shrink-0"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={2}
-                                        d="M5 13l4 4L19 7"
-                                    />
-                                </svg>
+                                <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
                                 <span>{t('features.3')}</span>
                             </li>
                         </ul>
@@ -283,19 +202,7 @@ export function DirectoryAICreator(_: DirectoryAICreatorProps) {
                                 t('generatingButton')
                             ) : (
                                 <>
-                                    <svg
-                                        className="w-5 h-5"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
-                                    >
-                                        <path
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            strokeWidth={2}
-                                            d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
-                                        />
-                                    </svg>
+                                    <Lightbulb className="w-5 h-5" />
                                     {t('generateButton')}
                                 </>
                             )}

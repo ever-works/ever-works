@@ -633,6 +633,15 @@
             "title": "Create New Directory",
             "subtitle": "Choose how you'd like to create your directory",
             "backToOptions": "Back to options",
+            "organizationSelector": {
+                "label": "Repository Owner",
+                "loading": "Loading organizations...",
+                "personal": "Personal Account",
+                "personalAccount": "Repository will be created under your personal account",
+                "organizations": "Organizations",
+                "personalHelp": "The repository will be created under your personal GitHub account",
+                "organizationHelp": "The repository will be created under the {org} organization"
+            },
             "ai": {
                 "title": "Create with AI",
                 "subtitle": "Describe your directory idea in natural language and let AI handle the setup",
