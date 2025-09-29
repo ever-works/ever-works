@@ -1,7 +1,7 @@
 import { BadgeType, BadgeValue } from './enums';
 
 export type APIResponse<T> = {
-    status: 'success' | 'error';
+    status: 'success' | 'error' | 'pending';
 } & T;
 
 export interface MessageResponse {
