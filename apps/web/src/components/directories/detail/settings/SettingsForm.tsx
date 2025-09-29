@@ -13,12 +13,15 @@ import { useRouter } from '@/i18n/navigation';
 import { updateDirectory, deleteDirectory } from '@/app/actions/dashboard/directories';
 import { ROUTES } from '@/lib/constants';
 import { useTranslations } from 'next-intl';
+import { AuthUser } from '@/lib/auth';
+import { OrganizationSelector } from '../../OrganizationSelector';
 
 interface SettingsFormProps {
     directory: Directory;
+    user: AuthUser;
 }
 
-export function SettingsForm({ directory }: SettingsFormProps) {
+export function SettingsForm({ directory, user }: SettingsFormProps) {
     const router = useRouter();
     const t = useTranslations('dashboard.directoryDetail.settings');
     const [isPending, startTransition] = useTransition();
@@ -92,36 +95,18 @@ export function SettingsForm({ directory }: SettingsFormProps) {
                     {/* Organization fields */}
                     {(directory.organization || canEditOrganization || formData.organization) && (
                         <>
-                            <Checkbox
-                                checked={formData.organization || false}
-                                onChange={(e) => {
-                                    const isOrg = e.target.checked;
+                            <OrganizationSelector
+                                value={formData.owner || ''}
+                                authId={user.sub}
+                                onChange={(value, isOrganization) => {
                                     setFormData({
                                         ...formData,
-                                        organization: isOrg,
-                                        owner: isOrg ? formData.owner : '',
+                                        owner: value,
+                                        organization: isOrganization,
                                     });
                                 }}
-                                label={t('organizationRepository')}
-                                description={t('organizationHelp')}
-                                variant="form"
-                                disabled={!canEditOrganization}
+                                disabled={isPending || !canEditOrganization}
                             />
-
-                            {formData.organization && (
-                                <Input
-                                    label={t('organizationName')}
-                                    type="text"
-                                    value={formData.owner || ''}
-                                    onChange={(e) =>
-                                        setFormData({ ...formData, owner: e.target.value })
-                                    }
-                                    placeholder={t('organizationNamePlaceholder')}
-                                    variant="form"
-                                    disabled={!canEditOrganization}
-                                    required={formData.organization}
-                                />
-                            )}
                         </>
                     )}
 
