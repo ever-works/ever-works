@@ -71,8 +71,10 @@ export interface DirectoriesResponse {
 }
 
 export interface DeleteDirectoryResponse {
-    success: boolean;
+    status: 'success' | 'error' | 'pending';
+    slug: string;
     message: string;
+    deleted_repositories?: string[];
 }
 
 export type APIResponse<T> = {
