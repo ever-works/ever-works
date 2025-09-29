@@ -74,8 +74,8 @@ export const updateWebsiteCommand = new Command('update-website')
                     console.log(chalk.gray('Message:'), chalk.white(response.message));
                 }
 
-                if (response.repository_url) {
-                    console.log(chalk.blue('\nRepository:'), chalk.white(response.repository_url));
+                if (response.repository) {
+                    console.log(chalk.blue('\nRepository:'), chalk.white(response.repository));
                 }
 
                 if (response.status !== 'error') {

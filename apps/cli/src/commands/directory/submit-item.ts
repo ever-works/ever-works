@@ -132,10 +132,10 @@ export const submitItemCommand = new Command('submit-item')
                     console.log(chalk.gray('Message:'), chalk.white(response.message));
                 }
 
-                if (response.item) {
+                if (response.item_name) {
                     console.log(chalk.cyan('\nItem Details:'));
-                    console.log(chalk.gray('Name:'), chalk.white(response.item.name));
-                    console.log(chalk.gray('Category:'), chalk.white(response.item.category));
+                    console.log(chalk.gray('Slug:'), chalk.white(response.slug));
+                    console.log(chalk.gray('Name:'), chalk.white(response.item_name));
                 }
             } catch (error) {
                 spinner.fail('Item submission failed');

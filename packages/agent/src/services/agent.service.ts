@@ -469,7 +469,10 @@ export class AgentService {
                 throw new BadRequestException(result);
             }
 
-            return result;
+            return {
+                ...result,
+                status: 'success',
+            };
         } catch (error) {
             if (error instanceof HttpException) {
                 throw error;
@@ -519,7 +522,10 @@ export class AgentService {
                 throw new BadRequestException(result);
             }
 
-            return result;
+            return {
+                ...result,
+                status: 'success',
+            };
         } catch (error) {
             if (error instanceof HttpException) {
                 throw error;
