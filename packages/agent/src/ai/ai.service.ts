@@ -448,6 +448,26 @@ export class AiService {
         return this.getLlmByProvider(selectedProvider);
     }
 
+    async testDefaultProvider(): Promise<{
+        success: boolean;
+        provider: string;
+        model: string;
+        responseTime: number;
+        error?: string;
+        response?: string;
+    }> {
+        const defaultProvider = this.config.defaultProvider;
+        const defaultModel = this.config.providers[defaultProvider].modelName;
+
+        return this.testProvider({
+            type: defaultProvider,
+            apiKey: this.config.providers[defaultProvider].apiKey,
+            modelName: defaultModel,
+            temperature: 0.7,
+            maxTokens: 100,
+        });
+    }
+
     /**
      * Test a specific AI provider configuration
      */

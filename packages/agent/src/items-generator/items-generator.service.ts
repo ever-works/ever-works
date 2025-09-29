@@ -19,12 +19,14 @@ import { IDataConfig } from '../data-generator/data-repository';
 import { WebPageData } from './interfaces/items-generator.interfaces';
 import { Directory } from '../entities';
 import { ItemsGeneratorStep } from './constants/steps';
+import { AiService } from '../ai';
 
 @Injectable()
 export class ItemsGeneratorService {
     private readonly logger = new Logger(ItemsGeneratorService.name);
 
     constructor(
+        private readonly aiService: AiService,
         private readonly promptComparisonService: PromptComparisonService,
         private readonly promptProcessingService: PromptProcessingService,
         private readonly aiItemGenerationService: AiItemGenerationService,
@@ -92,6 +94,12 @@ export class ItemsGeneratorService {
                 this.logger.log(
                     `Loaded ${existingTags.length} existing tags for directory: ${directorySlug}`,
                 );
+            }
+
+            // Test AI configuration
+            const aiTestResult = await this.aiService.testDefaultProvider();
+            if (!aiTestResult.success) {
+                throw new Error(`AI failed: ${aiTestResult.error}`);
             }
 
             // 1.0. Prompt Comparison
