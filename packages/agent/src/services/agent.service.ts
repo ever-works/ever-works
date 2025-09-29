@@ -236,9 +236,17 @@ export class AgentService {
 
             this.logger.error('Failed to get directory items:', error);
 
+            const errMessage = this.clearMessageError(error);
+            if (errMessage.includes('Repository not found')) {
+                return {
+                    status: 'success',
+                    items: [],
+                };
+            }
+
             throw new BadRequestException({
                 status: 'error',
-                message: this.clearMessageError(error),
+                message: errMessage,
             });
         }
     }
@@ -257,7 +265,83 @@ export class AgentService {
                 throw error;
             }
 
+            const errMessage = this.clearMessageError(error);
+            if (errMessage.includes('Repository not found')) {
+                return {
+                    status: 'success',
+                    config: null,
+                };
+            }
+
             this.logger.error('Failed to get directory config:', error);
+
+            throw new BadRequestException({
+                status: 'error',
+                message: errMessage,
+            });
+        }
+    }
+
+    async directoryCount(directoryId: string, user: User) {
+        const directory = await this.validateDirectoryOwnership(directoryId, user.id);
+
+        try {
+            const count = await this.dataGenerator.count(directory, user);
+            return {
+                status: 'success',
+                ...count,
+            };
+        } catch (error) {
+            if (error instanceof HttpException) {
+                throw error;
+            }
+
+            const errMessage = this.clearMessageError(error);
+            if (errMessage.includes('Repository not found')) {
+                return {
+                    status: 'success',
+                    items: 0,
+                    categories: 0,
+                    tags: 0,
+                };
+            }
+
+            this.logger.error('Failed to get directory count:', error);
+
+            throw new BadRequestException({
+                status: 'error',
+                message: errMessage,
+            });
+        }
+    }
+
+    async directoryCategoriesTags(directoryId: string, user: User) {
+        const directory = await this.validateDirectoryOwnership(directoryId, user.id);
+
+        try {
+            const { categories, tags } = await this.dataGenerator.getCategoriesTags(
+                directory,
+                user,
+            );
+            return {
+                status: 'success',
+                categories,
+                tags,
+            };
+        } catch (error) {
+            if (error instanceof HttpException) {
+                throw error;
+            }
+
+            if (error.message.includes('Repository not found')) {
+                return {
+                    status: 'success',
+                    categories: [],
+                    tags: [],
+                };
+            }
+
+            this.logger.error('Failed to get directory categories and tags:', error);
 
             throw new BadRequestException({
                 status: 'error',
@@ -298,56 +382,6 @@ export class AgentService {
             parameters: createItemsGeneratorDto,
             message: `Processing request for '${createItemsGeneratorDto.name}'. Check logs or data directory for updates.`,
         };
-    }
-
-    async directoryCount(directoryId: string, user: User) {
-        const directory = await this.validateDirectoryOwnership(directoryId, user.id);
-
-        try {
-            const count = await this.dataGenerator.count(directory, user);
-            return {
-                status: 'success',
-                ...count,
-            };
-        } catch (error) {
-            if (error instanceof HttpException) {
-                throw error;
-            }
-
-            this.logger.error('Failed to get directory count:', error);
-
-            throw new BadRequestException({
-                status: 'error',
-                message: this.clearMessageError(error),
-            });
-        }
-    }
-
-    async directoryCategoriesTags(directoryId: string, user: User) {
-        const directory = await this.validateDirectoryOwnership(directoryId, user.id);
-
-        try {
-            const { categories, tags } = await this.dataGenerator.getCategoriesTags(
-                directory,
-                user,
-            );
-            return {
-                status: 'success',
-                categories,
-                tags,
-            };
-        } catch (error) {
-            if (error instanceof HttpException) {
-                throw error;
-            }
-
-            this.logger.error('Failed to get directory categories and tags:', error);
-
-            throw new BadRequestException({
-                status: 'error',
-                message: this.clearMessageError(error),
-            });
-        }
     }
 
     async updateItemsGenerator(

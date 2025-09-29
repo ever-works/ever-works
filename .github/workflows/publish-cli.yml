@@ -21,6 +21,12 @@ on:
         type: boolean
         default: false
 
+      do_version_bump:
+        description: 'Bump package version before publishing'
+        required: false
+        type: boolean
+        default: false
+
       version_bump:
         description: 'Version bump type (patch, minor, major)'
         required: false
@@ -31,13 +37,12 @@ on:
           - major
         default: patch
 
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        node-version: [20.x]
 
     steps:
       - name: Checkout repository
@@ -50,10 +55,10 @@ jobs:
         with:
           version: 10.13.1
 
-      - name: Setup Node.js ${{ matrix.node-version }}
+      - name: Setup Node.js 20.x
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node-version }}
+          node-version: 20.x
           cache: 'pnpm'
 
       - name: Install dependencies
@@ -87,13 +92,13 @@ jobs:
       - name: Upload Internal CLI artifact
         uses: actions/upload-artifact@v4
         with:
-          name: internal-cli-dist-node-${{ matrix.node-version }}
+          name: internal-cli-dist
           path: apps/internal-cli/dist/
 
       - name: Upload External CLI artifact
         uses: actions/upload-artifact@v4
         with:
-          name: external-cli-dist-node-${{ matrix.node-version }}
+          name: external-cli-dist
           path: apps/cli/dist/
 
   publish-internal-cli:
@@ -107,11 +112,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v3
-        with:
-          version: 10.13.1
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -121,7 +121,7 @@ jobs:
       - name: Download Internal CLI artifact
         uses: actions/download-artifact@v4
         with:
-          name: internal-cli-dist-node-20.x
+          name: internal-cli-dist
           path: apps/internal-cli/dist/
 
       - name: Configure npm for private package
@@ -132,7 +132,7 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Bump version if requested
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.version_bump
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.do_version_bump == 'true'
         working-directory: apps/internal-cli
         run: |
           npm version ${{ github.event.inputs.version_bump }} --no-git-tag-version
@@ -162,11 +162,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v3
-        with:
-          version: 10.13.1
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -176,7 +171,7 @@ jobs:
       - name: Download External CLI artifact
         uses: actions/download-artifact@v4
         with:
-          name: external-cli-dist-node-20.x
+          name: external-cli-dist
           path: apps/cli/dist/
 
       - name: Configure npm
@@ -185,7 +180,7 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Bump version if requested
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.version_bump
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.do_version_bump == 'true'
         working-directory: apps/cli
         run: |
           npm version ${{ github.event.inputs.version_bump }} --no-git-tag-version
@@ -204,30 +199,113 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-  create-release:
-    needs: [publish-internal-cli, publish-external-cli]
+  create-release-internal:
+    needs: publish-internal-cli
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
-
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/internal-cli-v')
+    permissions:
+      contents: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+      - name: Setup Node.js for version extraction
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+      - name: Extract internal CLI version
+        id: version
+        run: |
+          INTERNAL_VERSION=$(node -p "require('./apps/internal-cli/package.json').version")
+          echo "internal_version=$INTERNAL_VERSION" >> $GITHUB_OUTPUT
+      - name: Create GitHub Release (internal)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Internal CLI Release ${{ github.ref_name }}
+          body: |
+            ## Ever Works Internal CLI Release
 
-      - name: Extract version
+            ### Published Package:
+            - **Internal CLI (private)**: `@ever-works/cli@${{ steps.version.outputs.internal_version }}`
+
+            ### Installation:
+            ```bash
+            npm install -g @ever-works/cli
+            # or
+            pnpm install -g @ever-works/cli
+            ```
+
+            ### Changes:
+            See [commit history](https://github.com/ever-works/ever-works/commits/develop) for details.
+          draft: false
+          prerelease: false
+
+  create-release-external:
+    needs: publish-external-cli
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/cli-v')
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Setup Node.js for version extraction
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+      - name: Extract external CLI version
+        id: version
+        run: |
+          EXTERNAL_VERSION=$(node -p "require('./apps/cli/package.json').version")
+          echo "external_version=$EXTERNAL_VERSION" >> $GITHUB_OUTPUT
+      - name: Create GitHub Release (external)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: External CLI Release ${{ github.ref_name }}
+          body: |
+            ## Ever Works External CLI Release
+
+            ### Published Package:
+            - **External CLI (public)**: `ever-works-cli@${{ steps.version.outputs.external_version }}`
+
+            ### Installation:
+            ```bash
+            npm install -g ever-works-cli
+            # or
+            pnpm install -g ever-works-cli
+            ```
+
+            ### Changes:
+            See [commit history](https://github.com/ever-works/ever-works/commits/develop) for details.
+          draft: false
+          prerelease: false
+
+  create-release-combined:
+    needs: [publish-internal-cli, publish-external-cli]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Setup Node.js for version extraction
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+      - name: Extract versions
         id: version
         run: |
           INTERNAL_VERSION=$(node -p "require('./apps/internal-cli/package.json').version")
           EXTERNAL_VERSION=$(node -p "require('./apps/cli/package.json').version")
           echo "internal_version=$INTERNAL_VERSION" >> $GITHUB_OUTPUT
           echo "external_version=$EXTERNAL_VERSION" >> $GITHUB_OUTPUT
-
-      - name: Create GitHub Release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create GitHub Release (combined)
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          release_name: CLI Release ${{ github.ref_name }}
+          name: CLI Release ${{ github.ref_name }}
           body: |
             ## Ever Works CLI Release
 
@@ -247,11 +325,11 @@ jobs:
             **Internal CLI (Direct access)**:
             ```bash
             npm install -g @ever-works/cli
-            # or  
+            # or
             pnpm install -g @ever-works/cli
             ```
 
             ### Changes:
-            See [commit history](https://github.com/ever-works/ever-works/commits/main) for details.
+            See [commit history](https://github.com/ever-works/ever-works/commits/develop) for details.
           draft: false
           prerelease: false

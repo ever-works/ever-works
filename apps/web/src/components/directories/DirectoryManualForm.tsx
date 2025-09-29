@@ -98,7 +98,7 @@ export function DirectoryManualForm({ user }: DirectoryManualFormProps) {
                 </p>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <form onSubmit={handleSubmit} className="space-y-6" autoComplete="off">
                 {/* Basic Fields */}
                 <div
                     className={cn(
