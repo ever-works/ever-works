@@ -1,7 +1,7 @@
 import 'server-only';
 import { serverFetch, serverMutation } from './server-api';
 import { GenerateStatusType, GenerationMethod, ItemsGeneratorStep, RepoProvider } from './enums';
-import { ItemData } from './types';
+import { APIResponse, ItemData } from './types';
 import { CreateItemsGeneratorDto } from './items-generator';
 
 export interface MarkdownReadmeConfig {
@@ -76,10 +76,6 @@ export interface DeleteDirectoryResponse {
     message: string;
     deleted_repositories?: string[];
 }
-
-export type APIResponse<T> = {
-    status: 'success' | 'error';
-} & T;
 
 export interface DirectoryDetails {
     name: string;

@@ -64,7 +64,7 @@ export const AddItemModal = memo(function AddItemModal({
 
                     const result = await addItem(directoryId, submitData);
 
-                    if (result.success) {
+                    if (result.status === 'success') {
                         toast.success(result.message || t('success'));
                         onSuccess?.();
                         onClose();

@@ -28,7 +28,6 @@ export type {
     Directory,
     DirectoriesResponse,
     DeleteDirectoryResponse,
-    APIResponse,
     DirectoryDetails,
     DirectoryConfig,
     PRUpdate,
@@ -44,8 +43,6 @@ export type {
     RemoveItemDto,
     ExtractItemDetailsDto,
     ItemsGeneratorResponse,
-    SubmitItemResponse,
-    RemoveItemResponse,
     ExtractItemDetailsResponse,
     RegenerateMarkdownResponse,
 } from './items-generator';
