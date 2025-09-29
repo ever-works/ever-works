@@ -99,7 +99,7 @@ export class ItemsGeneratorService {
             // Test AI configuration
             const aiTestResult = await this.aiService.testDefaultProvider();
             if (!aiTestResult.success) {
-                throw new Error(`AI failed: ${aiTestResult.error}`);
+                throw new Error(`${aiTestResult.provider} Test failed: ${aiTestResult.error}`);
             }
 
             // 1.0. Prompt Comparison
