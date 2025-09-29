@@ -269,7 +269,7 @@ export class AgentService {
             if (errMessage.includes('Repository not found')) {
                 return {
                     status: 'success',
-                    config: {},
+                    config: null,
                 };
             }
 
