@@ -153,6 +153,10 @@ spec:
             - containerPort: 3100
               protocol: TCP
 
+          volumeMounts:
+            - name: git-repos
+              mountPath: /tmp/ever-works-repos
+
           resources:
             requests:
               memory: "512Mi"
@@ -160,6 +164,11 @@ spec:
             limits:
               memory: "2Gi"
               cpu: "2"
+
+      volumes:
+        - name: git-repos
+          emptyDir:
+            sizeLimit: 5Gi
 
 ---
 apiVersion: apps/v1

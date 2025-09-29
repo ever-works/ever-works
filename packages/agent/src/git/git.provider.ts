@@ -67,7 +67,7 @@ export abstract class GitProvider {
             }
         }
 
-        await fs.promises.mkdir(path.dirname(dir), { recursive: true });
+        await fs.promises.mkdir(dir, { recursive: true });
 
         await git.clone({
             onAuth: () => auth,

@@ -160,6 +160,15 @@ spec:
           ports:
             - containerPort: 3100
               protocol: TCP
+
+          volumeMounts:
+            - name: git-repos
+              mountPath: /tmp/ever-works-repos
+
+      volumes:
+        - name: git-repos
+          emptyDir:
+            sizeLimit: 5Gi
 ---
 apiVersion: apps/v1
 kind: Deployment
