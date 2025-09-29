@@ -759,7 +759,7 @@ export class AgentService {
         const lowerMessage = message.toLowerCase();
 
         // Repository not found
-        if (lowerMessage.includes('Repository not found')) {
+        if (lowerMessage.includes('not found')) {
             return 'Repository not found. Please verify the repository exists and try again.';
         }
 

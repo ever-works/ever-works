@@ -115,6 +115,7 @@ export const submitItemCommand = new Command('submit-item')
                               .filter((tag: string) => tag.length > 0)
                         : undefined,
                     featured: answers.featured || false,
+                    pay_and_publish_now: true,
                 };
 
                 const response = await apiService.submitItem(directory.id, submitDto);

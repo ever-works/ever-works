@@ -5,6 +5,7 @@ import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { useTranslations, useLocale } from 'next-intl';
 import type { Directory } from '@/lib/api/directory';
+import { GenerateStatusType } from '@/lib/api/enums';
 
 interface DirectoryCardProps {
     directory: Directory;
@@ -21,6 +22,9 @@ const formatDate = (date: string, locale: string) => {
 export function DirectoryCard({ directory }: DirectoryCardProps) {
     const t = useTranslations('dashboard.directoryCard');
     const locale = useLocale();
+
+    const status = directory.generateStatus?.status;
+
     return (
         <Link
             href={ROUTES.DASHBOARD_DIRECTORY(directory.id)}
@@ -47,10 +51,16 @@ export function DirectoryCard({ directory }: DirectoryCardProps) {
                 <div
                     className={cn(
                         'px-2 py-1 rounded-full text-xs font-medium',
-                        'bg-success/10 text-success',
+                        status === GenerateStatusType.ERROR && 'bg-danger/20 text-danger',
+                        status === GenerateStatusType.GENERATING && 'bg-info/20 text-info',
+                        status === GenerateStatusType.GENERATED && 'bg-success/20 text-success',
+                        !status && 'bg-gray-200 text-gray-700',
                     )}
                 >
-                    {t('status.active')}
+                    {status === GenerateStatusType.ERROR && t('status.error')}
+                    {status === GenerateStatusType.GENERATING && t('status.generating')}
+                    {status === GenerateStatusType.GENERATED && t('status.generated')}
+                    {!status && t('status.idle')}
                 </div>
             </div>
 

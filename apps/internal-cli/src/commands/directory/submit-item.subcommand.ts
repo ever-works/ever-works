@@ -59,7 +59,7 @@ export class SubmitItemSubCommand extends CommandRunner {
             }
             console.log(chalk.gray('Featured:'), chalk.white(itemData.featured ? 'Yes' : 'No'));
             console.log(
-                chalk.gray('Pay and Publish Now:'),
+                chalk.gray('Push to main without PR:'),
                 chalk.white(itemData.pay_and_publish_now ? 'Yes' : 'No'),
             );
 
@@ -204,7 +204,7 @@ export class SubmitItemSubCommand extends CommandRunner {
                 type: 'confirm',
                 name: 'pay_and_publish_now',
                 message: 'Pay and publish now?',
-                default: false,
+                default: true,
             },
         ]);
 
