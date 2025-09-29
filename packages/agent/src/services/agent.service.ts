@@ -759,17 +759,8 @@ export class AgentService {
         const lowerMessage = message.toLowerCase();
 
         // Repository not found
-        if (lowerMessage.includes('404') || lowerMessage.includes('not found')) {
+        if (lowerMessage.includes('Repository not found')) {
             return 'Repository not found. Please verify the repository exists and try again.';
-        }
-
-        // Authentication errors
-        if (lowerMessage.includes('401') || lowerMessage.includes('unauthorized')) {
-            return 'Authentication expired. Please reconnect your account.';
-        }
-
-        if (lowerMessage.includes('403') || lowerMessage.includes('forbidden')) {
-            return "You don't have access to this repository. Please check permissions.";
         }
 
         // Network errors
