@@ -300,11 +300,9 @@ export class AgentService {
             if (errMessage.includes('Repository not found')) {
                 return {
                     status: 'success',
-                    count: {
-                        items: 0,
-                        categories: 0,
-                        tags: 0,
-                    },
+                    items: 0,
+                    categories: 0,
+                    tags: 0,
                 };
             }
 
