@@ -8,9 +8,8 @@ import { directoryCommand } from './commands/directory';
 // Load environment variables
 dotenv.config({ debug: false, quiet: true });
 
-// Get package version
 const packageJson = JSON.parse(
-    fs.readFileSync(path.join(__dirname, '../package.json'), { encoding: 'utf-8' }),
+    fs.readFileSync(path.join(__dirname, 'package.json'), { encoding: 'utf-8' }),
 );
 
 program

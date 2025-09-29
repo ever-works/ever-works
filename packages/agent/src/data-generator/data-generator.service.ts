@@ -53,14 +53,14 @@ export class DataGeneratorService {
         const existed = existingData.existingItems.length > 0;
 
         // Generate items, the items generator will always to generate new items
-        const generatedItems = await this.itemsGeneratorService
-            .generateItems(directory, createItemsGeneratorDto, existingData, (step) => {
+        const generatedItems = await this.itemsGeneratorService.generateItems(
+            directory,
+            createItemsGeneratorDto,
+            existingData,
+            (step) => {
                 this.onGenerationProgress(step, directory);
-            })
-            .catch((err) => {
-                this.logger.error('Failed to generate items from ItemsGeneratorService.', err);
-                return null;
-            });
+            },
+        );
 
         // If no items were generated, we don't need to do anything else
         if (!generatedItems || generatedItems.items.length === 0) {
