@@ -35,7 +35,7 @@ export const AddItemModal = memo(function AddItemModal({
         category: categories[0] || '',
         tags: [],
         featured: false,
-        pay_and_publish_now: false,
+        pay_and_publish_now: true,
         slug: '',
     });
 
@@ -77,7 +77,7 @@ export const AddItemModal = memo(function AddItemModal({
                             category: categories[0] || '',
                             tags: [],
                             featured: false,
-                            pay_and_publish_now: false,
+                            pay_and_publish_now: true,
                             slug: '',
                         });
                     } else {

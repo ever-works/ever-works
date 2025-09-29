@@ -60,6 +60,7 @@ export interface Directory {
     generateStatus?: GenerateStatus;
     createdAt: string;
     updatedAt: string;
+    itemsCount?: number;
     lastPullRequest?: { main?: PRUpdate; data?: PRUpdate };
 }
 

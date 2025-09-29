@@ -156,9 +156,14 @@ export class AgentService {
             // Update generate status if repository is already existing
             const items = await this.dataGenerator.getItems(dir, user).catch(() => []);
             if (items.length > 0) {
-                await this.directoryRepository.updateGenerateStatus(dir.id, {
-                    status: GenerateStatusType.GENERATED,
-                });
+                await Promise.all([
+                    this.directoryRepository.updateGenerateStatus(dir.id, {
+                        status: GenerateStatusType.GENERATED,
+                    }),
+                    this.directoryRepository.update(dir.id, {
+                        itemsCount: items.length,
+                    }),
+                ]);
             }
 
             return {
@@ -759,7 +764,7 @@ export class AgentService {
         const lowerMessage = message.toLowerCase();
 
         // Repository not found
-        if (lowerMessage.includes('Repository not found')) {
+        if (lowerMessage.includes('not found')) {
             return 'Repository not found. Please verify the repository exists and try again.';
         }
 

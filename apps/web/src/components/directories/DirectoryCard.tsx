@@ -5,6 +5,7 @@ import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { useTranslations, useLocale } from 'next-intl';
 import type { Directory } from '@/lib/api/directory';
+import { GenerateStatusType } from '@/lib/api/enums';
 
 interface DirectoryCardProps {
     directory: Directory;
@@ -21,6 +22,9 @@ const formatDate = (date: string, locale: string) => {
 export function DirectoryCard({ directory }: DirectoryCardProps) {
     const t = useTranslations('dashboard.directoryCard');
     const locale = useLocale();
+
+    const status = directory.generateStatus?.status;
+
     return (
         <Link
             href={ROUTES.DASHBOARD_DIRECTORY(directory.id)}
@@ -47,10 +51,16 @@ export function DirectoryCard({ directory }: DirectoryCardProps) {
                 <div
                     className={cn(
                         'px-2 py-1 rounded-full text-xs font-medium',
-                        'bg-success/10 text-success',
+                        status === GenerateStatusType.ERROR && 'bg-danger/20 text-danger',
+                        status === GenerateStatusType.GENERATING && 'bg-info/20 text-info',
+                        status === GenerateStatusType.GENERATED && 'bg-success/20 text-success',
+                        !status && 'bg-gray-200 text-gray-700',
                     )}
                 >
-                    {t('status.active')}
+                    {status === GenerateStatusType.ERROR && t('status.error')}
+                    {status === GenerateStatusType.GENERATING && t('status.generating')}
+                    {status === GenerateStatusType.GENERATED && t('status.generated')}
+                    {!status && t('status.idle')}
                 </div>
             </div>
 
@@ -74,24 +84,7 @@ export function DirectoryCard({ directory }: DirectoryCardProps) {
                             d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                         />
                     </svg>
-                    {t('items', { count: 0 })}
-                </span>
-                <span className="flex items-center gap-1">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                        />
-                        <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                        />
-                    </svg>
-                    {t('views', { count: 0 })}
+                    {t('items', { count: directory.itemsCount || 0 })}
                 </span>
             </div>
 

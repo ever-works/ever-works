@@ -1,12 +1,14 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useRouter } from '@/i18n/navigation';
 import { ConnectionInfo, Directory } from '@/lib/api/types-only';
 import { DirectoryHeader } from './DirectoryHeader';
 import { DirectoryTabs } from './DirectoryTabs';
 import { GenerateStatusType, RepoProvider } from '@/lib/api/enums';
 import { DirectoryDetailProvider } from './DirectoryDetailContext';
+import { useTranslations } from 'next-intl';
+import { toast } from 'sonner';
 
 interface DirectoryLayoutClientProps {
     directory: Directory;
@@ -20,7 +22,22 @@ export function DirectoryLayoutClient({
     children,
 }: DirectoryLayoutClientProps) {
     const router = useRouter();
+    const t = useTranslations('dashboard.directoryDetail');
     const isGenerating = directory.generateStatus?.status === GenerateStatusType.GENERATING;
+    const lastGenerateStatus = useRef(directory.generateStatus);
+
+    useEffect(() => {
+        const lastStatus = lastGenerateStatus.current?.status;
+        const currentStatus = directory.generateStatus?.status;
+
+        if (lastStatus !== currentStatus && currentStatus === GenerateStatusType.ERROR) {
+            toast.error(t('failedToGenerateItems'), {
+                id: 'failed-to-generate-items',
+            });
+        }
+
+        lastGenerateStatus.current = directory.generateStatus;
+    }, [directory.generateStatus]);
 
     useEffect(() => {
         if (isGenerating) {

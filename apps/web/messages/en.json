@@ -346,7 +346,12 @@
         },
         "directoryCard": {
             "status": {
-                "active": "Active"
+                "active": "Active",
+                "notStarted": "Not Started",
+                "generating": "Generating",
+                "generated": "Generated",
+                "error": "Error",
+                "idle": "Idle"
             },
             "noDescription": "No description provided",
             "items": "{count} items",
@@ -359,6 +364,7 @@
             "createButton": "Create Directory"
         },
         "directoryDetail": {
+            "failedToGenerateItems": "Failed to generate items. Please try again.",
             "status": {
                 "notStarted": "Not Started",
                 "generating": "Generating",
