@@ -18,21 +18,22 @@ export async function addItem(directoryId: string, data: SubmitItemDto) {
     try {
         const response = await itemsGeneratorAPI.submitItem(directoryId, data);
 
-        if (response.success) {
+        if (response.status === 'success') {
             // Revalidate the directory items page to show the new item
             revalidatePath(`/directories/${directoryId}/items`);
             revalidatePath(`/directories/${directoryId}`);
         }
 
         return {
-            success: response.success,
-            message: response.message || (response.success ? t('success') : t('failed')),
-            item: response.item,
+            status: response.status,
+            message:
+                response.message || (response.status === 'success' ? t('success') : t('failed')),
+            item: response,
         };
     } catch (error) {
         console.error('Add item error:', error);
         return {
-            success: false,
+            status: 'error',
             message: error instanceof Error ? error.message : t('error'),
         };
     }
@@ -52,21 +53,22 @@ export async function removeItem(directoryId: string, itemSlug: string, reason?:
             reason,
         });
 
-        if (response.success) {
+        if (response.status) {
             // Revalidate the directory items page to remove the item from the list
             revalidatePath(`/directories/${directoryId}/items`);
             revalidatePath(`/directories/${directoryId}`);
         }
 
         return {
-            success: response.success,
+            status: response.status,
             message:
-                response.message || (response.success ? t('deleteSuccess') : t('deleteFailed')),
+                response.message ||
+                (response.status === 'success' ? t('deleteSuccess') : t('deleteFailed')),
         };
     } catch (error) {
         console.error('Remove item error:', error);
         return {
-            success: false,
+            status: 'error',
             message: error instanceof Error ? error.message : t('deleteError'),
         };
     }
@@ -98,7 +100,7 @@ export async function extractItemDetails(url: string) {
     } catch (error) {
         console.error('Extract item details error:', error);
         return {
-            success: false,
+            status: 'error',
             error: error instanceof Error ? error.message : t('extractError'),
         };
     }

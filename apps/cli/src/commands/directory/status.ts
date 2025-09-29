@@ -65,7 +65,9 @@ export const statusCommand = new Command('status')
                         return;
                     }
 
-                    const freshDirectory = await apiService.getDirectory(directory.id);
+                    const { directory: freshDirectory } = await apiService.getDirectory(
+                        directory.id,
+                    );
 
                     if (freshDirectory.generateStatus?.status === GenerateStatusType.GENERATED) {
                         spinner.succeed('\n✓ Generation process finished!');

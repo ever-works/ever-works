@@ -1,5 +1,9 @@
 import { BadgeType, BadgeValue } from './enums';
 
+export type APIResponse<T> = {
+    status: 'success' | 'error' | 'pending';
+} & T;
+
 export interface MessageResponse {
     success: boolean;
     message?: string;

@@ -40,7 +40,7 @@ export const ItemCard = memo(function ItemCard({
         startTransition(async () => {
             try {
                 const result = await removeItem(directoryId, item.slug!);
-                if (result.success) {
+                if (result.status === 'success') {
                     toast.success(result.message || t('deleteSuccess'));
                     onDelete?.();
                 } else {

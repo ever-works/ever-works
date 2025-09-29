@@ -35,7 +35,7 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
     const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
 
     // Check if directory has been generated before
-    const isGenerated = directory.generateStatus !== null && directory.generateStatus !== undefined;
+    const isGenerated = !!config?.metadata;
     const initialPrompt = config?.metadata?.initial_prompt || '';
     const lastRequestData = config?.metadata?.last_request_data;
 

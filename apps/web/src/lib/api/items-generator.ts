@@ -1,6 +1,7 @@
 import 'server-only';
 import { serverMutation } from './server-api';
 import { GenerationMethod, WebsiteRepositoryCreationMethod } from './enums';
+import { APIResponse } from './types';
 
 // DTOs
 export interface CompanyDto {
@@ -68,20 +69,17 @@ export interface ItemsGeneratorResponse {
     message?: string;
 }
 
-export interface SubmitItemResponse {
-    success: boolean;
+export interface ItemResponse {
+    status: 'success' | 'error' | 'pending';
+    slug: string;
+    item_name: string;
     message: string;
-    item?: {
-        id: string;
-        name: string;
-        slug: string;
-        category: string;
-    };
-}
-
-export interface RemoveItemResponse {
-    success: boolean;
-    message: string;
+    pr_number?: number;
+    pr_url?: string;
+    pr_title?: string;
+    pr_body?: string;
+    pr_branch_name?: string;
+    auto_merged?: boolean;
 }
 
 export interface ExtractItemDetailsResponse {
@@ -120,7 +118,7 @@ export const itemsGeneratorAPI = {
 
     // Submit new item
     submitItem: async (directoryId: string, data: SubmitItemDto) => {
-        return serverMutation<SubmitItemResponse>({
+        return serverMutation<ItemResponse>({
             endpoint: `/directories/${directoryId}/submit-item`,
             data,
             method: 'POST',
@@ -130,7 +128,7 @@ export const itemsGeneratorAPI = {
 
     // Remove item
     removeItem: async (directoryId: string, data: RemoveItemDto) => {
-        return serverMutation<RemoveItemResponse>({
+        return serverMutation<ItemResponse>({
             endpoint: `/directories/${directoryId}/remove-item`,
             data,
             method: 'POST',
@@ -150,7 +148,7 @@ export const itemsGeneratorAPI = {
 
     // Regenerate markdown
     regenerateMarkdown: async (directoryId: string) => {
-        return serverMutation<RegenerateMarkdownResponse>({
+        return serverMutation<APIResponse<{ message?: string }>>({
             endpoint: `/directories/${directoryId}/regenerate-markdown`,
             data: {},
             method: 'POST',
