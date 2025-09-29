@@ -70,7 +70,7 @@ const checkOrganization = (
     if (owner && oauthUsername && owner !== oauthUsername) {
         return {
             organization: true,
-            owner: oauthUsername || null,
+            owner: owner || null,
         };
     }
 
@@ -115,6 +115,8 @@ export async function createDirectory(data: CreateDirectoryDto) {
 
         validation.data.organization = organization;
         validation.data.owner = owner;
+
+        console.log('Creating directory:', validation.data);
 
         // Create the directory with validated data
         const { directory } = await directoryAPI.create(validation.data);
