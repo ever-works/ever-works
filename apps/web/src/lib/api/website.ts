@@ -1,24 +1,23 @@
 import 'server-only';
 import { serverMutation } from './server-api';
+import { APIResponse } from './types';
 
 // Response Types
-export interface UpdateWebsiteRepositoryResponse {
-    status: 'success' | 'error';
+export type UpdateWebsiteRepositoryResponse = APIResponse<{
     slug: string;
     owner: string;
     repository: string;
     message: string;
     method_used?: string;
-}
+}>;
 
-export interface DeployWebsiteResponseDto {
-    status: 'success' | 'error' | 'pending';
+export type DeployWebsiteResponseDto = APIResponse<{
     slug: string;
     owner: string;
     repository: string;
     message: string;
     deployment_url?: string;
-}
+}>;
 
 export interface DeployWebsiteDto {}
 
