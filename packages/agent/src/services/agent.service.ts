@@ -156,9 +156,14 @@ export class AgentService {
             // Update generate status if repository is already existing
             const items = await this.dataGenerator.getItems(dir, user).catch(() => []);
             if (items.length > 0) {
-                await this.directoryRepository.updateGenerateStatus(dir.id, {
-                    status: GenerateStatusType.GENERATED,
-                });
+                await Promise.all([
+                    this.directoryRepository.updateGenerateStatus(dir.id, {
+                        status: GenerateStatusType.GENERATED,
+                    }),
+                    this.directoryRepository.update(dir.id, {
+                        itemsCount: items.length,
+                    }),
+                ]);
             }
 
             return {

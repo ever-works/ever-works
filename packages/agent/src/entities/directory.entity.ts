@@ -54,6 +54,9 @@ export class Directory {
     @Column('simple-json', { nullable: true })
     lastPullRequest?: { main?: PRUpdate; data?: PRUpdate };
 
+    @Column({ nullable: true })
+    itemsCount?: number;
+
     @CreateDateColumn()
     createdAt: Date;
 

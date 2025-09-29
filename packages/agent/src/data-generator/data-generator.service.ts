@@ -68,6 +68,11 @@ export class DataGeneratorService {
             return;
         }
 
+        // Update directory items count
+        this.directoryRepository.update(directory.id, {
+            itemsCount: generatedItems.items.length + existingData.existingItems.length,
+        });
+
         const { categories: newCategories, items: newItems, tags: newTags } = generatedItems;
         const { existingCategories, existingTags } = existingData;
 
