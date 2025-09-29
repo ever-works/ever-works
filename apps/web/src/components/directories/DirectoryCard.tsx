@@ -37,7 +37,7 @@ export function DirectoryCard({ directory }: DirectoryCardProps) {
                 'cursor-pointer',
             )}
         >
-            <div className="flex items-start justify-between mb-3">
+            <div className="flex items-start justify-between mb-3 gap-1">
                 <div className="flex-1 min-w-0">
                     <h3 className="text-lg font-semibold text-text dark:text-text-dark">
                         {directory.name}
