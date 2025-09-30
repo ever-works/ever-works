@@ -1041,7 +1041,8 @@
             "failedToGenerateItems": "Failed to generate items",
             "failedToUpdateItems": "Failed to update items",
             "markdownRegeneratedSuccessfully": "Markdown regenerated successfully",
-            "failedToRegenerateMarkdown": "Failed to regenerate markdown"
+            "failedToRegenerateMarkdown": "Failed to regenerate markdown",
+            "notAuthorizedToAccessOrganization": "You are not authorized to access this organization. Please contact the owner ({owner}) for assistance."
         },
         "settings": {
             "profile": {

@@ -68,11 +68,6 @@ export class DataGeneratorService {
             return;
         }
 
-        // Update directory items count
-        this.directoryRepository.update(directory.id, {
-            itemsCount: generatedItems.items.length + existingData.existingItems.length,
-        });
-
         const { categories: newCategories, items: newItems, tags: newTags } = generatedItems;
         const { existingCategories, existingTags } = existingData;
 
@@ -250,6 +245,11 @@ export class DataGeneratorService {
             // Push changes
             await this.githubService.push(dest, token);
             this.logger.log(`All processed and pushed to ${directory.getRepoOwner()}/${repo}`);
+
+            // Update directory items count
+            this.directoryRepository.update(directory.id, {
+                itemsCount: generatedItems.items.length + existingData.existingItems.length,
+            });
 
             let prUpdate: PRUpdate | null = null;
 

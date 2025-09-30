@@ -6,6 +6,7 @@ import {
     UpdateItemsGeneratorDto,
     directoryAPI,
     authAPI,
+    ConnectionInfo,
 } from '@/lib/api';
 import { getTranslations } from 'next-intl/server';
 import { checkOAuthConnection } from './oauth';
@@ -43,6 +44,20 @@ export async function generateItems(directoryId: string, data: CreateItemsGenera
                 error: tDirectories('oauthRequired', { provider: directory.repoProvider }),
                 requiresGitHub: true,
             };
+        }
+
+        const oauthInfo = oauthCheck as ConnectionInfo;
+
+        // Get organizations
+        const orgs = await authAPI.oauth_connections.getGitHubOrgs();
+
+        if (directory.owner && oauthInfo.username !== directory.owner) {
+            if (!orgs.some((org) => org.login === directory.owner)) {
+                return {
+                    success: false,
+                    error: t('notAuthorizedToAccessOrganization', { owner: directory.owner }),
+                };
+            }
         }
 
         // Call the API to generate items

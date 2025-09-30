@@ -405,6 +405,14 @@ export class GithubService extends GitProvider {
         return data;
     }
 
+    async getOrganizations(token: string) {
+        const octokit = new Octokit({ auth: token });
+
+        const { data } = await octokit.rest.orgs.listForAuthenticatedUser();
+
+        return data;
+    }
+
     async dispatchAction(
         data: {
             workflow: string;

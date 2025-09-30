@@ -457,14 +457,15 @@ export class AiService {
         response?: string;
     }> {
         const defaultProvider = this.config.defaultProvider;
-        const defaultModel = this.config.providers[defaultProvider].modelName;
+        const providerConfig = this.config.providers[defaultProvider];
 
         return this.testProvider({
             type: defaultProvider,
-            apiKey: this.config.providers[defaultProvider].apiKey,
-            modelName: defaultModel,
-            temperature: 0.7,
-            maxTokens: 100,
+            apiKey: providerConfig.apiKey,
+            modelName: providerConfig.modelName,
+            temperature: providerConfig.temperature || 0.7,
+            maxTokens: providerConfig.maxTokens || 100,
+            baseURL: providerConfig.baseURL,
         });
     }
 

@@ -47,10 +47,25 @@ export class CreateSubCommand extends CommandRunner {
 
             const ghOwner = await this.githubService.getUser(token);
 
+            const orgs = await this.githubService
+                .getOrganizations(token)
+                .then((orgs) => {
+                    const values: { name: string; value: string | null }[] = orgs.map((org) => ({
+                        name: org.login,
+                        value: org.login,
+                    }));
+                    values.unshift({ name: 'Personal Account', value: null });
+                    return values;
+                })
+                .catch(() => [{ name: 'Personal Account', value: null }]);
+
             loadingSpinner.stop();
 
             // Collect directory information
-            const directoryData = await this.directoryPrompt.promptDirectoryCreation(ghOwner.login);
+            const directoryData = await this.directoryPrompt.promptDirectoryCreation(
+                ghOwner.login,
+                orgs,
+            );
 
             // Determine owner
             const owner = directoryData.owner || ghOwner.login;
