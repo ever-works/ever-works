@@ -1,9 +1,5 @@
 # @packages/monitoring
 
-[![npm version](https://img.shields.io/npm/v/@packages/monitoring.svg)](https://www.npmjs.com/package/@packages/monitoring)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.8+-blue.svg)](https://www.typescriptlang.org/)
-
 A comprehensive monitoring package for NestJS applications that provides seamless integration with **Sentry** for error tracking and **PostHog** for analytics and user behavior tracking.
 
 ## ✨ Features
@@ -424,37 +420,6 @@ Automatically captures errors and sends them to Sentry.
 
 Automatically tracks API requests and sends them to PostHog.
 
-**Features:**
-- Request/response tracking
-- Performance metrics
-- User identification
-- Custom event properties
-
-## 🔒 Security
-
-- All sensitive data is properly sanitized before sending to external services
-- DSN and API keys are validated on module initialization
-- No sensitive information is logged in development mode
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🆘 Support
-
-If you encounter any issues or have questions:
-
-1. Check the [documentation](https://github.com/your-org/monitoring-package)
-2. Search [existing issues](https://github.com/your-org/monitoring-package/issues)
-3. Create a [new issue](https://github.com/your-org/monitoring-package/issues/new)
 
 ## 🙏 Acknowledgments
 
