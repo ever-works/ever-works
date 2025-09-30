@@ -32,7 +32,12 @@ kind: Deployment
 metadata:
   name: ever-works-api
 spec:
-  replicas: 1
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
   selector:
     matchLabels:
       app: ever-works-api
@@ -161,6 +166,24 @@ spec:
             - containerPort: 3100
               protocol: TCP
 
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 3100
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 3100
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+
           volumeMounts:
             - name: git-repos
               mountPath: /tmp/ever-works-repos
@@ -175,7 +198,12 @@ kind: Deployment
 metadata:
   name: ever-works-web
 spec:
-  replicas: 1
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
   selector:
     matchLabels:
       app: ever-works-web
@@ -198,6 +226,24 @@ spec:
           ports:
             - containerPort: 3000
               protocol: TCP
+
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
 
           resources:
             requests:
