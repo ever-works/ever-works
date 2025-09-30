@@ -1,6 +1,5 @@
 import 'server-only';
 import { serverMutation, serverFetch } from './server-api';
-import { MessageResponse } from './types';
 
 // DTOs
 export interface UpdateVercelTokenDto {

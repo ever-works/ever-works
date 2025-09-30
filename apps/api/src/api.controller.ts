@@ -8,4 +8,10 @@ export class APIController {
     home() {
         return { status: 'success', message: 'API is up and running' };
     }
+
+    @Public()
+    @Get('api/health')
+    healthCheck() {
+        return this.home();
+    }
 }
