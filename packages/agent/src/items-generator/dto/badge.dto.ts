@@ -36,15 +36,15 @@ export interface BadgeEvaluationResult {
 
 /**
  * Badge evaluation criteria:
- * 
+ *
  * SECURITY:
  * - "A" indicates that the server does not have known security vulnerabilities
  * - "F" indicates that the server has known security vulnerabilities
- * 
+ *
  * LICENSE:
  * - "A" indicates that the server has a permissive license
  * - "F" indicates that the server either has a restrictive license or no license
- * 
+ *
  * QUALITY:
  * - "A" indicates that we were able to successfully run the server
  * - "F" indicates that we were not able to successfully start the server

@@ -78,13 +78,13 @@ export class AiUsageExamplesService {
         // Creative task - high temperature
         const creativeLlm = this.aiService.createLlmWithTemperature(0.9);
         const creativeResponse = await creativeLlm.invoke([
-            new HumanMessage('Write a creative story about AI')
+            new HumanMessage('Write a creative story about AI'),
         ]);
 
         // Analytical task - low temperature
         const analyticalLlm = this.aiService.createLlmWithTemperature(0.1);
         const analyticalResponse = await analyticalLlm.invoke([
-            new HumanMessage('Analyze the pros and cons of renewable energy')
+            new HumanMessage('Analyze the pros and cons of renewable energy'),
         ]);
 
         return {
@@ -96,7 +96,10 @@ export class AiUsageExamplesService {
     /**
      * Example: Provider fallback handling
      */
-    async useWithFallback(prompt: string, preferredProvider: AiProviderType): Promise<{
+    async useWithFallback(
+        prompt: string,
+        preferredProvider: AiProviderType,
+    ): Promise<{
         response: string;
         usedProvider: string;
     }> {
@@ -111,7 +114,9 @@ export class AiUsageExamplesService {
                 };
             }
         } catch (error) {
-            this.logger.warn(`Failed to use preferred provider ${preferredProvider}: ${error.message}`);
+            this.logger.warn(
+                `Failed to use preferred provider ${preferredProvider}: ${error.message}`,
+            );
         }
 
         // Fallback to default
@@ -129,8 +134,8 @@ export class AiUsageExamplesService {
     getProviderInfo() {
         const availableProviders = this.aiService.getAvailableProviders();
         const config = this.aiService.getServiceConfig();
-        
-        const providerInfo = availableProviders.map(provider => ({
+
+        const providerInfo = availableProviders.map((provider) => ({
             type: provider,
             config: this.aiService.getProviderConfig(provider),
             capabilities: this.aiService.getProviderCapabilities(provider),
@@ -152,36 +157,38 @@ export class AiUsageExamplesService {
     /**
      * Example: Batch processing with different providers
      */
-    async batchProcessWithOptimalProviders(tasks: Array<{
-        prompt: string;
-        type: 'creative' | 'analytical' | 'fast' | 'cost-effective';
-    }>) {
+    async batchProcessWithOptimalProviders(
+        tasks: Array<{
+            prompt: string;
+            type: 'creative' | 'analytical' | 'fast' | 'cost-effective';
+        }>,
+    ) {
         const results = [];
 
         for (const task of tasks) {
             let llm;
-            
+
             switch (task.type) {
                 case 'creative':
-                    llm = this.aiService.createLlmWithCriteria({ 
+                    llm = this.aiService.createLlmWithCriteria({
                         temperature: 0.9,
-                        preferHighContext: true 
+                        preferHighContext: true,
                     });
                     break;
                 case 'analytical':
-                    llm = this.aiService.createLlmWithCriteria({ 
+                    llm = this.aiService.createLlmWithCriteria({
                         temperature: 0.1,
-                        preferHighContext: true 
+                        preferHighContext: true,
                     });
                     break;
                 case 'fast':
-                    llm = this.aiService.createLlmWithCriteria({ 
-                        preferFast: true 
+                    llm = this.aiService.createLlmWithCriteria({
+                        preferFast: true,
                     });
                     break;
                 case 'cost-effective':
-                    llm = this.aiService.createLlmWithCriteria({ 
-                        preferCostEffective: true 
+                    llm = this.aiService.createLlmWithCriteria({
+                        preferCostEffective: true,
                     });
                     break;
                 default:

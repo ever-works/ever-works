@@ -204,8 +204,7 @@ export class SetSubCommand extends CommandRunner {
         const keyInfo: Record<string, string> = {
             AI_DEFAULT_PROVIDER:
                 'This sets your primary AI provider. Make sure the corresponding API key is configured.',
-            GH_APIKEY:
-                'Used for GitHub API access. Get from: https://github.com/settings/tokens',
+            GH_APIKEY: 'Used for GitHub API access. Get from: https://github.com/settings/tokens',
             VERCEL_TOKEN:
                 'Used for Vercel deployments. Get from: https://vercel.com/account/tokens',
             TAVILY_API_KEY:
@@ -217,12 +216,7 @@ export class SetSubCommand extends CommandRunner {
         }
 
         // Suggest testing after setting important keys
-        const testableKeys = [
-            'AI_DEFAULT_PROVIDER',
-            'GH_APIKEY',
-            'VERCEL_TOKEN',
-            'TAVILY_API_KEY',
-        ];
+        const testableKeys = ['AI_DEFAULT_PROVIDER', 'GH_APIKEY', 'VERCEL_TOKEN', 'TAVILY_API_KEY'];
         if (testableKeys.includes(key)) {
             console.log(
                 chalk.gray('Run ') +

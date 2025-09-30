@@ -8,12 +8,23 @@ import { DirectoriesModule } from './directories/directories.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { MailModule } from './mail/mail.module';
 import { LoggingInterceptor } from './logging.interceptor';
+import { MonitoringModule, SentryInterceptor, PostHogInterceptor } from '@packages/monitoring';
 import { APIController } from './api.controller';
 
 @Module({
     imports: [
         ThrottlerModule.forRoot(throttlerConfig),
         EventEmitterModule.forRoot(),
+        MonitoringModule.forRoot({
+            sentry: {
+                dsn: process.env.SENTRY_DSN,
+                environment: process.env.NODE_ENV || 'development',
+            },
+            posthog: {
+                apiKey: process.env.POSTHOG_API_KEY,
+                host: process.env.POSTHOG_HOST || 'https://app.posthog.com',
+            },
+        }),
         AuthModule,
         DirectoriesModule,
         MailModule,
@@ -30,6 +41,14 @@ import { APIController } from './api.controller';
         {
             provide: APP_INTERCEPTOR,
             useClass: LoggingInterceptor,
+        },
+        {
+            provide: APP_INTERCEPTOR,
+            useClass: SentryInterceptor,
+        },
+        {
+            provide: APP_INTERCEPTOR,
+            useClass: PostHogInterceptor,
         },
     ],
     controllers: [APIController],

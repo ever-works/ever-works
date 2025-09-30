@@ -7,8 +7,8 @@
 		"email": "ever@ever.co",
 		"url": "https://ever.co"
 	},
-        "license": "MIT",
-	"main": "dist/index.js",	
+	"license": "MIT",
+	"main": "dist/index.js",
 	"types": "dist/index.d.ts",
 	"scripts": {
 		"build": "tsc",

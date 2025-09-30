@@ -1,5 +1,5 @@
-import { slugifyText } from "src/items-generator/utils/text.utils";
-import { ItemData } from "../agent/types";
+import { slugifyText } from 'src/items-generator/utils/text.utils';
+import { ItemData } from '../agent/types';
 
 export class ReadmeBuilder {
     private content: string = '';
@@ -60,7 +60,7 @@ export class ReadmeBuilder {
         }
 
         if (item.tags && item.tags.length > 0) {
-            const tags = item.tags.map(tag => `\`${tag.name}\``).join(' ');
+            const tags = item.tags.map((tag) => `\`${tag.name}\``).join(' ');
             this.content += ` ${tags}`;
         }
         this.content += '\n';
@@ -69,7 +69,7 @@ export class ReadmeBuilder {
 
     build(): string {
         let result = this.header + '\n';
-        
+
         if (this.isTocEnabled) {
             result += this.generateToC();
             result += '\n';
