@@ -318,6 +318,8 @@ export class GithubService extends GitProvider {
                 private: isPrivate,
                 include_all_branches: false,
             });
+
+            this.enableWorkflows(targetOwner, newName, token);
         } catch (err) {
             this.logger.error(
                 `Failed to create repository ${targetOwner}/${newName} from template ${templateOwner}/${templateRepo}.`,
