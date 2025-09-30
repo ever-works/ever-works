@@ -10,12 +10,6 @@ export class APIController {
     }
 
     @Public()
-    @Get('api')
-    health() {
-        return this.home();
-    }
-
-    @Public()
     @Get('api/health')
     healthCheck() {
         return this.home();

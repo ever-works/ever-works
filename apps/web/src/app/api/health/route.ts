@@ -5,6 +5,8 @@ export async function GET() {
     try {
         await healthAPI.check();
     } catch (error) {
+        console.error('Health check error:', error);
+
         return NextResponse.json(
             {
                 status: 'ERROR',
