@@ -94,7 +94,7 @@ export class DirectoryPromptService extends BasePromptService {
 
 		if (wantsOptionalFields) {
 			if (orgs) {
-				owner = await this.promptSelect('Owner (username/organization) GitHub?', orgs, ownerDefault);
+				owner = await this.promptSelect('GitHub Owner (username/organization)?', orgs, ownerDefault);
 			} else {
 				owner = await this.promptOptionalText('Owner (leave empty to use default GitHub user):');
 			}

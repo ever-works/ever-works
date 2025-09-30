@@ -208,9 +208,9 @@ export class GenerateSubCommand extends CommandRunner {
                         const stepText = getStepText(step);
                         const progress = getStepProgress(step);
 
-                        spinner.text = `Generating ${timeStr}: ${stepText} - ${progress}%\n\n`;
+                        spinner.text = `Generating ${timeStr}: ${stepText} - ${progress}%`;
                     } else {
-                        spinner.text = `Generating ${timeStr}...\n\n`;
+                        spinner.text = `Generating ${timeStr}...`;
                     }
 
                     // Poll again after interval

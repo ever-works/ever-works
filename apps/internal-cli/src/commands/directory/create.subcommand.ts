@@ -50,7 +50,7 @@ export class CreateSubCommand extends CommandRunner {
             const orgs = await this.githubService
                 .getOrganizations(token)
                 .then((orgs) => {
-                    const values: { name: string; value: any }[] = orgs.map((org) => ({
+                    const values: { name: string; value: string | null }[] = orgs.map((org) => ({
                         name: org.login,
                         value: org.login,
                     }));

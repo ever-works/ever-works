@@ -272,7 +272,7 @@ export class ApiService {
     }
 
     async checkConnection(provider: string): Promise<ConnectionInfo> {
-        const response = await this.httpClient.get<any>(`/auth/connections/${provider}`);
+        const response = await this.httpClient.get<ConnectionInfo>(`/auth/connections/${provider}`);
         return response.data;
     }
 
