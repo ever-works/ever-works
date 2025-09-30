@@ -45,6 +45,7 @@ export class OAuthUrlService {
             client_id: clientId,
             redirect_uri: callbackUrl || defaultCallbackUrl,
             scope: GitHubScopePresets.AGENT.join(' '),
+            prompt: 'consent',
             ...(state && { state }),
         });
 

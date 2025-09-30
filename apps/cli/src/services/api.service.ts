@@ -138,6 +138,31 @@ export interface DeployWebsiteResponse {
     deployment_url?: string;
 }
 
+export interface ConnectionInfo {
+    provider: string;
+    connected: boolean;
+    email?: string;
+    username?: string;
+    scopes?: string[];
+    connectedAt?: Date;
+    metadata?: Record<string, any>;
+}
+
+export interface GitHubOrganization {
+    login: string;
+    id: number;
+    node_id: string;
+    url: string;
+    repos_url: string;
+    events_url: string;
+    hooks_url: string;
+    issues_url: string;
+    members_url: string;
+    public_members_url: string;
+    avatar_url: string;
+    description: string;
+}
+
 /**
  * Centralized API service for all directory-related operations
  */
@@ -246,8 +271,15 @@ export class ApiService {
         return response.data;
     }
 
-    async checkConnection(provider: string): Promise<{ connected: boolean; scopes?: string[] }> {
+    async checkConnection(provider: string): Promise<ConnectionInfo> {
         const response = await this.httpClient.get<any>(`/auth/connections/${provider}`);
+        return response.data;
+    }
+
+    async getGitHubOrgs(): Promise<GitHubOrganization[]> {
+        const response = await this.httpClient.get<GitHubOrganization[]>(
+            '/auth/connections/github/orgs',
+        );
         return response.data;
     }
 }

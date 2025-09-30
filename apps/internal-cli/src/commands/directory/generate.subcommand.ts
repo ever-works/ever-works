@@ -47,6 +47,13 @@ export class GenerateSubCommand extends CommandRunner {
             // Check configuration first
             await this.configCheck.requireConfiguration();
 
+            // Get user information
+            const user = await this.userRepository.createOrGetLocalUser();
+            const token = user.getGitToken();
+            if (!token) {
+                throw new Error('GitHub token is required');
+            }
+
             // Select directory
             const { directory, cancelled } = await this.directoryPrompt.promptDirectorySelection(
                 this.directoryRepository,
@@ -201,9 +208,9 @@ export class GenerateSubCommand extends CommandRunner {
                         const stepText = getStepText(step);
                         const progress = getStepProgress(step);
 
-                        spinner.text = `Generating ${timeStr}: ${stepText} - ${progress}%`;
+                        spinner.text = `Generating ${timeStr}: ${stepText} - ${progress}%\n\n`;
                     } else {
-                        spinner.text = `Generating ${timeStr}...`;
+                        spinner.text = `Generating ${timeStr}...\n\n`;
                     }
 
                     // Poll again after interval

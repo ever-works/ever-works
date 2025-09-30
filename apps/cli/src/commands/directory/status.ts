@@ -93,9 +93,9 @@ export const statusCommand = new Command('status')
                             const stepText = getStepText(step);
                             const progress = getStepProgress(step);
 
-                            spinner.text = `Generating ${timeStr}: ${stepText} - ${progress}%`;
+                            spinner.text = `Generating ${timeStr}: ${stepText} - ${progress}%\n\n`;
                         } else {
-                            spinner.text = `Generating ${timeStr}...`;
+                            spinner.text = `Generating ${timeStr}...\n\n`;
                         }
                     }
                 } catch (error) {

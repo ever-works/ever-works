@@ -26,7 +26,10 @@ export interface DirectorySelection {
 
 @Injectable()
 export class DirectoryPromptService extends BasePromptService {
-    async promptDirectoryCreation(ownerDefault?: string): Promise<DirectoryInputData> {
+    async promptDirectoryCreation(
+        ownerDefault?: string,
+        orgs?: { name: string; value: any }[],
+    ): Promise<DirectoryInputData> {
         this.displaySectionHeader('Directory Creation');
         this.displayInfo('Please provide the following information to create a new directory:');
 
@@ -58,10 +61,18 @@ export class DirectoryPromptService extends BasePromptService {
         let readmeConfig: MarkdownReadmeConfigDto | undefined;
 
         if (wantsOptionalFields) {
-            owner = await this.promptOptionalText(
-                'Owner (leave empty to use default GitHub user):',
-                ownerDefault,
-            );
+            if (orgs) {
+                owner = await this.promptSelect(
+                    'Owner (username/organization) GitHub?',
+                    orgs,
+                    ownerDefault,
+                );
+            } else {
+                owner = await this.promptOptionalText(
+                    'Owner (username/organization) (leave empty to use default GitHub user):',
+                    ownerDefault,
+                );
+            }
 
             const wantsReadmeConfig = await this.promptConfirm(
                 'Do you want to configure custom README header/footer?',

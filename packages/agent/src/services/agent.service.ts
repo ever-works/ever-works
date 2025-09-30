@@ -785,46 +785,6 @@ export class AgentService {
             return 'Please reconnect your Git account to continue.';
         }
 
-        if (lowerMessage.includes('token') || lowerMessage.includes('oauth')) {
-            return 'Access token invalid. Please reconnect your account.';
-        }
-
-        // Git operation errors
-        if (lowerMessage.includes('merge conflict') || lowerMessage.includes('conflict')) {
-            return 'Sync conflict detected. Please resolve conflicts to continue.';
-        }
-
-        if (lowerMessage.includes('already exists') && lowerMessage.includes('empty')) {
-            return 'Workspace already initialized. Please refresh the page.';
-        }
-
-        if (lowerMessage.includes('no such ref') || lowerMessage.includes("couldn't find ref")) {
-            return 'Branch not found. Please select a valid branch.';
-        }
-
-        if (lowerMessage.includes('shallow') && lowerMessage.includes('unrelated')) {
-            return 'Cannot sync unrelated repositories.';
-        }
-
-        if (lowerMessage.includes('lock') || lowerMessage.includes('locked')) {
-            return 'Another operation in progress. Please wait and try again.';
-        }
-
-        // Certificate/SSL errors
-        if (lowerMessage.includes('certificate') || lowerMessage.includes('ssl')) {
-            return 'Secure connection failed. Please contact support.';
-        }
-
-        // Rate limiting
-        if (lowerMessage.includes('rate limit') || lowerMessage.includes('429')) {
-            return 'Too many requests. Please wait a moment and try again.';
-        }
-
-        // Empty repository
-        if (lowerMessage.includes('empty repository') || lowerMessage.includes('no commits')) {
-            return 'Repository is empty. Please add content first.';
-        }
-
         // Return original message if no pattern matches
         return message;
     }

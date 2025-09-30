@@ -3,7 +3,7 @@ export const jwtConstants = {
     accessTokenExpiration: () => {
         const expiration = process.env.JWT_ACCESS_TOKEN_EXPIRATION;
         // Return undefined to disable expiration
-        return expiration === 'never' ? undefined : expiration || '1d';
+        return expiration === 'never' ? undefined : expiration || '7d';
     },
     refreshTokenExpiration: () => {
         const days = process.env.JWT_REFRESH_TOKEN_EXPIRATION_DAYS;
