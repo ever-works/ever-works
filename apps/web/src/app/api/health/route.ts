@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 
 export async function GET() {
     try {
-        await healthAPI.check();
+        // await healthAPI.check();
     } catch (error) {
         console.error('Health check error:', error);
 

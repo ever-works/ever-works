@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, ILike } from 'typeorm';
+import { Repository, ILike, LessThan, IsNull } from 'typeorm';
 import { Directory } from '../../entities/directory.entity';
 import { User } from '../../entities';
 import { prepareLikeSearchTerm } from '../utils';
@@ -204,5 +204,29 @@ export class DirectoryRepository {
                 ...lastPullRequest,
             },
         });
+    }
+
+    async recordGenerationStartTime(id: string, startedAt: Date): Promise<void> {
+        await this.repository.update(id, {
+            generationStartedAt: startedAt,
+            generationFinishedAt: null,
+        });
+    }
+
+    async recordGenerationFinishTime(id: string, finishedAt: Date): Promise<void> {
+        await this.repository.update(id, {
+            generationFinishedAt: finishedAt,
+        });
+    }
+
+    async getUnfinishedGenerations(olderThan: Date): Promise<Directory[]> {
+        const stalledDirectories = await this.repository.find({
+            where: {
+                generationStartedAt: LessThan(olderThan),
+                generationFinishedAt: IsNull(),
+            },
+        });
+
+        return stalledDirectories;
     }
 }

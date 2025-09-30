@@ -797,9 +797,13 @@ export class AgentService {
         const startTime = new Date();
         console.log(`Generation started at: ${startTime.toISOString()}`);
 
-        await this.directoryRepository.updateGenerateStatus(directory.id, {
-            status: GenerateStatusType.GENERATING,
-        });
+        // Record start time and update status
+        await Promise.all([
+            this.directoryRepository.recordGenerationStartTime(directory.id, startTime),
+            this.directoryRepository.updateGenerateStatus(directory.id, {
+                status: GenerateStatusType.GENERATING,
+            }),
+        ]);
 
         let hasError = false;
 
@@ -820,10 +824,13 @@ export class AgentService {
                 dto.website_repository_creation_method,
             );
         } catch (error) {
-            await this.directoryRepository.updateGenerateStatus(directory.id, {
-                status: GenerateStatusType.ERROR,
-                error: this.clearMessageError(error),
-            });
+            await Promise.all([
+                this.directoryRepository.recordGenerationFinishTime(directory.id, new Date()),
+                this.directoryRepository.updateGenerateStatus(directory.id, {
+                    status: GenerateStatusType.ERROR,
+                    error: this.clearMessageError(error),
+                }),
+            ]);
 
             if (error instanceof HttpException) {
                 throw error;
@@ -835,10 +842,13 @@ export class AgentService {
         }
 
         if (!hasError) {
-            await this.directoryRepository.updateGenerateStatus(directory.id, {
-                status: GenerateStatusType.GENERATED,
-                step: null,
-            });
+            await Promise.all([
+                this.directoryRepository.recordGenerationFinishTime(directory.id, new Date()),
+                this.directoryRepository.updateGenerateStatus(directory.id, {
+                    status: GenerateStatusType.GENERATED,
+                    step: null,
+                }),
+            ]);
         }
 
         const endTime = new Date();

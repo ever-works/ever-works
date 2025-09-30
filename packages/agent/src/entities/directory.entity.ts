@@ -57,6 +57,12 @@ export class Directory {
     @Column({ nullable: true })
     itemsCount?: number;
 
+    @Column({ type: 'timestamp', nullable: true })
+    generationStartedAt?: Date;
+
+    @Column({ type: 'timestamp', nullable: true })
+    generationFinishedAt?: Date;
+
     @CreateDateColumn()
     createdAt: Date;
 

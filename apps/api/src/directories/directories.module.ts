@@ -7,6 +7,8 @@ import { DatabaseModule } from '@packages/agent/database';
 import { AuthModule } from '@src/auth';
 import { AiModule } from '@packages/agent/ai';
 import { CacheFactory } from '@packages/agent/cache';
+import { ScheduleModule } from '@nestjs/schedule';
+import { DirectoryCleanupService } from './tasks/directory-cleanup.service';
 
 @Module({
     imports: [
@@ -15,8 +17,10 @@ import { CacheFactory } from '@packages/agent/cache';
         DatabaseModule,
         AuthModule,
         AiModule,
+        ScheduleModule.forRoot(),
         CacheFactory.TypeORM(),
     ],
+    providers: [DirectoryCleanupService],
     controllers: [DirectoriesController, DeployController],
 })
 export class DirectoriesModule {}
