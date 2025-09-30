@@ -8,7 +8,7 @@ export const jwtConstants = {
     refreshTokenExpiration: () => {
         const days = process.env.JWT_REFRESH_TOKEN_EXPIRATION_DAYS;
         // Return -1 to indicate no expiration
-        return days === 'never' ? -1 : parseInt(days || '7', 10);
+        return days === 'never' ? -1 : parseInt(days || '14', 10);
     },
     isTokenExpirationDisabled: () => {
         return process.env.JWT_DISABLE_EXPIRATION === 'true';
