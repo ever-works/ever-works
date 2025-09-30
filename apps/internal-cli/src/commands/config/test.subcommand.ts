@@ -257,10 +257,10 @@ export class TestSubCommand extends CommandRunner {
 
     private getDefaultModel(provider: string): string {
         const defaults: Record<string, string> = {
-            openai: 'gpt-4.1',
+            openai: 'gpt-4o',
             google: 'gemini-2.5-flash',
             anthropic: 'claude-3-5-sonnet-20241022',
-            openrouter: 'openai/gpt-4.1',
+            openrouter: 'openai/gpt-4o',
             ollama: 'llama2',
             mistral: 'mistral-large-latest',
             deepseek: 'deepseek-chat',

@@ -69,7 +69,7 @@ export const config = {
         // OpenAI
         openAi: {
             getModel() {
-                return process.env.OPENAI_MODEL || 'gpt-4.1';
+                return process.env.OPENAI_MODEL || 'gpt-4o';
             },
             getKey() {
                 return process.env.OPENAI_API_KEY;
@@ -85,7 +85,7 @@ export const config = {
         // OpenRouter
         openRouter: {
             getModel() {
-                return process.env.OPENROUTER_MODEL || 'gpt-4.1';
+                return process.env.OPENROUTER_MODEL || 'gpt-4o';
             },
             getKey() {
                 return process.env.OPENROUTER_API_KEY;

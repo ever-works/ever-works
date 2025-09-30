@@ -365,6 +365,7 @@
         },
         "directoryDetail": {
             "failedToGenerateItems": "Failed to generate items. Please try again.",
+            "generationCompleted": "Generation completed successfully",
             "status": {
                 "notStarted": "Not Started",
                 "generating": "Generating",

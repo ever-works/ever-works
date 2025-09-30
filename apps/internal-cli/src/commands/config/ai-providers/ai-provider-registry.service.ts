@@ -16,12 +16,12 @@ export class AiProviderRegistryService {
             displayName: 'OpenAI',
             description: 'OpenAI GPT models (GPT-4, GPT-3.5, etc.)',
             defaults: {
-                model: 'gpt-4.1',
+                model: 'gpt-4o',
                 temperature: 0.7,
                 maxTokens: 8192,
             },
             requiresApiKey: true,
-            models: ['gpt-5', 'gpt-5-mini', 'gpt-4.1', 'gpt-4.1-mini', 'gpt-4o', 'gpt-4o-mini'],
+            models: ['gpt-5', 'gpt-5-mini', 'gpt-4o', 'gpt-4o-mini', 'gpt-4.1', 'gpt-4.1-mini'],
             websiteUrl: 'https://openai.com',
             docsUrl: 'https://platform.openai.com/docs',
         });
@@ -69,7 +69,7 @@ export class AiProviderRegistryService {
             displayName: 'OpenRouter',
             description: 'Access to multiple AI models through OpenRouter',
             defaults: {
-                model: 'openai/gpt-4.1',
+                model: 'openai/gpt-4o',
                 temperature: 0.7,
                 maxTokens: 8192,
             },
@@ -77,7 +77,7 @@ export class AiProviderRegistryService {
             models: [
                 'openai/gpt-5',
                 'openai/gpt-5-mini',
-                'openai/gpt-4.1',
+                'openai/gpt-4o',
                 'openai/gpt-4o',
                 'anthropic/claude-3-5-sonnet',
                 'google/gemini-2.5-flash',

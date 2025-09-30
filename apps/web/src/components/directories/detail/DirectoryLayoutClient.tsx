@@ -36,6 +36,12 @@ export function DirectoryLayoutClient({
             });
         }
 
+        if (lastStatus !== currentStatus && currentStatus === GenerateStatusType.GENERATED) {
+            toast.success(t('generationCompleted'), {
+                id: 'generation-complete',
+            });
+        }
+
         lastGenerateStatus.current = directory.generateStatus;
     }, [directory.generateStatus]);
 
