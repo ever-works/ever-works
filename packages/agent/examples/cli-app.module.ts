@@ -11,21 +11,21 @@ import { DatabaseModule, DatabaseConfigurations } from '@packages/agent';
  * CLI apps typically use persistent SQLite files stored in the user's home directory.
  */
 @Module({
-  imports: [
-    // Global configuration
-    ConfigModule.forRoot({
-      isGlobal: true,
-      envFilePath: ['.env.local', '.env'],
-    }),
+    imports: [
+        // Global configuration
+        ConfigModule.forRoot({
+            isGlobal: true,
+            envFilePath: ['.env.local', '.env'],
+        }),
 
-    // Option 1: Use the default DatabaseModule (uses environment variables)
-    // DatabaseModule,
+        // Option 1: Use the default DatabaseModule (uses environment variables)
+        // DatabaseModule,
 
-    // Option 2: Use the factory configuration (RECOMMENDED)
-    DatabaseConfigurations.cli(),
+        // Option 2: Use the factory configuration (RECOMMENDED)
+        DatabaseConfigurations.cli(),
 
-    // Your other modules here
-  ],
+        // Your other modules here
+    ],
 })
 export class CliAppModule {}
 
@@ -41,9 +41,9 @@ export class CliAppModule {}
 
 /**
  * To use this configuration, set the following environment variables:
- * 
+ *
  * APP_TYPE=cli
- * 
+ *
  * Optional overrides:
  * DATABASE_PATH=/custom/path/to/database.db
  * DATABASE_LOGGING=true

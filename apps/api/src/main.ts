@@ -3,9 +3,16 @@ import { configDotenv } from 'dotenv';
 import { ValidationPipe } from '@nestjs/common';
 import { ApiModule } from './api.module';
 import helmet from 'helmet';
+import { initSentry, initPostHog } from '@packages/monitoring';
+import * as path from 'path';
 
 async function bootstrap() {
-    configDotenv();
+    // Load environment variables from .env file
+    configDotenv({ path: path.resolve(process.cwd(), '.env') });
+
+    // Initialize Sentry and PostHog
+    initSentry();
+    initPostHog();
 
     const app = await NestFactory.create(ApiModule);
 

@@ -1,8 +1,11 @@
-import { ItemData } from "./types";
+import { ItemData } from './types';
 
 type GeneratedItemWithSlug = Partial<ItemData>;
 
-export function deduplicateByField(items: GeneratedItemWithSlug[], field: keyof GeneratedItemWithSlug) {
+export function deduplicateByField(
+    items: GeneratedItemWithSlug[],
+    field: keyof GeneratedItemWithSlug,
+) {
     const map = new Map<string, GeneratedItemWithSlug>();
     for (const item of items) {
         map.set(item[field] as string, item);
@@ -19,6 +22,6 @@ export function deduplicateByField(items: GeneratedItemWithSlug[], field: keyof 
  * @returns An array of excluded items.
  */
 export function arrayDiff<T extends object>(bigger: Array<T>, smaller: Array<T>, key: keyof T) {
-    const smallerSet = new Set(smaller.map(item => item[key]));
-    return bigger.filter(item => !smallerSet.has(item[key]));
+    const smallerSet = new Set(smaller.map((item) => item[key]));
+    return bigger.filter((item) => !smallerSet.has(item[key]));
 }
