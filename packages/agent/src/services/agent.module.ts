@@ -9,6 +9,7 @@ import { DatabaseModule } from '../database/database.module';
 import { AiModule } from '../ai/ai.module';
 import { AgentService } from './agent.service';
 import { DirectoryDetailService } from './directory-detail.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 @Module({
     imports: [
@@ -21,7 +22,7 @@ import { DirectoryDetailService } from './directory-detail.service';
         DeployModule,
         AiModule,
     ],
-    providers: [AgentService, DirectoryDetailService],
+    providers: [AgentService, DirectoryDetailService, EventEmitter2],
     exports: [AgentService, DirectoryDetailService],
 })
 export class AgentModule {}
