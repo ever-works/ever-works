@@ -18,6 +18,13 @@ export class VercelService implements IDeployService {
         const token = user.getGitToken();
         const publicKey = await this.githubService.repositoryPublickey(owner, repo, token);
 
+        await this.githubService.enableWorkflows({
+            owner,
+            repo,
+            token,
+            withDelay: false,
+        });
+
         const promises = [
             this.githubService.setActionVariable(
                 {
@@ -96,10 +103,12 @@ export class VercelService implements IDeployService {
         for (const tryFn of tries) {
             try {
                 await tryFn();
-                return;
+                return true;
             } catch (error) {
                 console.warn('Failed to deploy:', error);
             }
         }
+
+        return false;
     }
 }

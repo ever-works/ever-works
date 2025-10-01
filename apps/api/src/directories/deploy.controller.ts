@@ -56,7 +56,7 @@ export class DeployController {
         }
 
         // Deploy
-        await this.vercelService.deploy(
+        const deploymentInitiated = await this.vercelService.deploy(
             {
                 owner: directory.getRepoOwner(),
                 repo: directory.getWebsiteRepo(),
@@ -70,7 +70,9 @@ export class DeployController {
             user,
         );
 
-        this.vercelDeploymentVerifierService.startVerification(directory, vercelToken);
+        if (deploymentInitiated) {
+            this.vercelDeploymentVerifierService.startVerification(directory, vercelToken);
+        }
 
         return {
             status: 'pending',

@@ -213,7 +213,11 @@ export class GithubService extends GitProvider {
         await this.remoteAdd(originalDir, 'origin', origin);
         await this.push(originalDir, token, forcePush);
 
-        this.enableWorkflows(duplicated.owner.login, duplicated.name, token);
+        this.enableWorkflows({
+            owner: duplicated.owner.login,
+            repo: duplicated.name,
+            token,
+        });
 
         return originalDir;
     }
@@ -253,15 +257,31 @@ export class GithubService extends GitProvider {
         await this.remoteAdd(originalDir, 'origin', origin);
         await this.push(originalDir, token);
 
-        this.enableWorkflows(duplicated.owner.login, duplicated.name, token);
+        this.enableWorkflows({
+            owner: duplicated.owner.login,
+            repo: duplicated.name,
+            token,
+        });
 
         return originalDir;
     }
 
-    private async enableWorkflows(owner: string, repo: string, token: string) {
+    public async enableWorkflows({
+        owner,
+        repo,
+        token,
+        withDelay = true,
+    }: {
+        owner: string;
+        repo: string;
+        token: string;
+        withDelay?: boolean;
+    }) {
         const octokit = new Octokit({ auth: token });
 
-        await new Promise((resolve) => setTimeout(resolve, 7 * 1000));
+        if (withDelay) {
+            await new Promise((resolve) => setTimeout(resolve, 7 * 1000));
+        }
 
         await Promise.allSettled([
             octokit.rest.actions.setAllowedActionsRepository({
@@ -276,8 +296,6 @@ export class GithubService extends GitProvider {
                 allowed_actions: 'all',
             }),
         ]);
-
-        await new Promise((resolve) => setTimeout(resolve, 3 * 1000));
 
         const {
             data: { workflows },
@@ -345,7 +363,11 @@ export class GithubService extends GitProvider {
                 include_all_branches: false,
             });
 
-            this.enableWorkflows(targetOwner, newName, token);
+            this.enableWorkflows({
+                owner: targetOwner,
+                repo: newName,
+                token,
+            });
         } catch (err) {
             this.logger.error(
                 `Failed to create repository ${targetOwner}/${newName} from template ${templateOwner}/${templateRepo}.`,

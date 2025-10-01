@@ -19,5 +19,5 @@ export type DeployInput = VercelInput;
 export type DeployProvider = DeployInput['provider'];
 
 export interface IDeployService {
-    deploy: (input: DeployInput, directory: Directory, user: User) => Promise<void>;
+    deploy: (input: DeployInput, directory: Directory, user: User) => Promise<boolean>;
 }
