@@ -110,9 +110,9 @@ export class TypeORMKeyvAdapter extends EventEmitter {
         }
     }
 
-    async deleteEntriesLike(like: string): Promise<void> {
+    async deleteUnscopedEntriesLike(likeTerm: string): Promise<void> {
         try {
-            await this.repository.delete({ key: Like(`%${like}%`) });
+            await this.repository.delete({ key: Like(`%${likeTerm}%`) });
         } catch (error) {
             this.emit('error', error);
         }

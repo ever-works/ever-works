@@ -45,7 +45,7 @@ export class DirectoryCleanupService {
     @OnEvent(DirectoryGenerationCompletedEvent.EVENT_NAME)
     clearDirectoryCache(data: DirectoryGenerationCompletedEvent) {
         this.cacheRepository.typeormAdapter
-            .deleteEntriesLike(data.directory.id)
+            .deleteUnscopedEntriesLike(data.directory.id)
             .then(() => {
                 this.logger.log(`Cache cleared for directory ${data.directory.id}`);
             })
