@@ -110,11 +110,11 @@ export function ConfigFields({
                         'text-text dark:text-text-dark',
                     )}
                 >
-                    <option value={WebsiteRepositoryCreationMethod.DUPLICATE}>
-                        {t('methodDuplicate')} ({t('recommended')})
-                    </option>
                     <option value={WebsiteRepositoryCreationMethod.CREATE_USING_TEMPLATE}>
-                        {t('methodCreateFromTemplate')}
+                        {t('methodCreateFromTemplate')} ({t('recommended')})
+                    </option>
+                    <option value={WebsiteRepositoryCreationMethod.DUPLICATE}>
+                        {t('methodDuplicate')}
                     </option>
                 </select>
             </div>

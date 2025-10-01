@@ -135,7 +135,7 @@ export class CreateItemsGeneratorDto {
     @IsOptional()
     @IsEnum(WebsiteRepositoryCreationMethod)
     website_repository_creation_method?: WebsiteRepositoryCreationMethod =
-        WebsiteRepositoryCreationMethod.DUPLICATE;
+        WebsiteRepositoryCreationMethod.CREATE_USING_TEMPLATE;
 }
 
 export class UpdateItemsGeneratorDto {

@@ -53,7 +53,7 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
         badge_evaluation_enabled: lastRequestData?.badge_evaluation_enabled || false,
         website_repository_creation_method:
             lastRequestData?.website_repository_creation_method ||
-            WebsiteRepositoryCreationMethod.DUPLICATE,
+            WebsiteRepositoryCreationMethod.CREATE_USING_TEMPLATE,
         config: lastRequestData?.config || DEFAULT_CONFIG,
     });
 
