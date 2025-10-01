@@ -634,7 +634,7 @@ export class AgentService {
                 status: 'success',
                 slug: directory.slug,
                 owner: directory.getRepoOwner(),
-                repository: `${directory.getRepoOwner()}/${directory.slug}-website`,
+                repository: `${directory.getRepoOwner()}/${directory.getWebsiteRepo()}`,
                 message: result.message,
                 method_used: result.method,
             };

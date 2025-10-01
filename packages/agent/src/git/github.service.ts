@@ -179,28 +179,32 @@ export class GithubService extends GitProvider {
     }
 
     async duplicate({
-        owner,
-        repo,
-        name,
+        originalRepoOwner,
+        originalRepoName,
+        targetRepoName,
         token,
         committer,
         forcePush,
     }: {
-        owner: string;
-        repo: string;
-        name: string;
+        originalRepoOwner: string;
+        originalRepoName: string;
+        targetRepoName: string;
         token: string;
         committer: ICommitter;
         forcePush?: boolean;
     }) {
-        const duplicated = await this.createEmptyRepo(name, '', token);
+        const duplicated = await this.createEmptyRepo(targetRepoName, '', token);
         const origin = duplicated.clone_url;
 
-        this.logger.log(`Duplicated ${owner}/${repo} to ${duplicated.owner.login}/${name}`);
+        this.logger.log(
+            `Duplicated ${originalRepoOwner}/${originalRepoName} to ${duplicated.owner.login}/${targetRepoName}`,
+        );
+
+        await this.removeDir(originalRepoOwner, originalRepoName);
 
         const originalDir = await this.cloneOrPull({
-            owner,
-            repo,
+            owner: originalRepoOwner,
+            repo: originalRepoName,
             token,
             committer: this.getCommitter(committer),
         });
@@ -215,28 +219,32 @@ export class GithubService extends GitProvider {
     }
 
     async duplicateAsOrg({
-        owner,
-        repo,
-        org,
-        name,
+        originalRepoOwner,
+        originalRepoName,
+        targetOrg,
+        targetRepoName,
         token,
         committer,
     }: {
-        owner: string;
-        repo: string;
-        org: string;
-        name: string;
+        originalRepoOwner: string;
+        originalRepoName: string;
+        targetOrg: string;
+        targetRepoName: string;
         token: string;
         committer: ICommitter;
     }) {
-        const duplicated = await this.createEmptyRepoAsOrg(org, name, '', token);
+        const duplicated = await this.createEmptyRepoAsOrg(targetOrg, targetRepoName, '', token);
         const origin = duplicated.clone_url;
 
-        this.logger.log(`Duplicated ${owner}/${repo} to ${duplicated.owner.login}/${name}`);
+        this.logger.log(
+            `Duplicated ${originalRepoOwner}/${originalRepoName} to ${duplicated.owner.login}/${targetRepoName}`,
+        );
+
+        await this.removeDir(originalRepoOwner, originalRepoName);
 
         const originalDir = await this.cloneOrPull({
-            owner,
-            repo,
+            owner: originalRepoOwner,
+            repo: originalRepoName,
             token,
             committer: this.getCommitter(committer),
         });
