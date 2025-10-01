@@ -24,7 +24,8 @@ export function DeployForm({ directory, isDeploying }: DeployFormProps) {
 
     useEffect(() => {
         if (isDeploying) {
-            return pageIntervalRefresh(router);
+            const cleanup = pageIntervalRefresh(router);
+            return cleanup;
         }
     }, [isDeploying, router]);
 
@@ -36,10 +37,7 @@ export function DeployForm({ directory, isDeploying }: DeployFormProps) {
                 if (result.success && result.data) {
                     if (result.data.status === 'pending') {
                         toast.info(t('form.messages.deployPending'));
-
-                        setTimeout(() => {
-                            router.refresh();
-                        }, 5000);
+                        setTimeout(() => router.refresh(), 3000);
                     } else if (result.data.status === 'success') {
                         toast.success(t('form.messages.deploySuccess'));
                     }

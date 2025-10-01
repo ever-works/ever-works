@@ -9,7 +9,7 @@ export class DirectoryCleanupService {
 
     constructor(private readonly repository: DirectoryRepository) {}
 
-    // Runs every 5 minutes
+    // Runs every 10 minutes
     @Cron(CronExpression.EVERY_10_MINUTES)
     async handleStalledGenerations() {
         try {

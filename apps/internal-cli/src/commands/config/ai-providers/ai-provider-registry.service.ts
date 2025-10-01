@@ -78,7 +78,6 @@ export class AiProviderRegistryService {
                 'openai/gpt-5',
                 'openai/gpt-5-mini',
                 'openai/gpt-4o',
-                'openai/gpt-4o',
                 'anthropic/claude-3-5-sonnet',
                 'google/gemini-2.5-flash',
             ],

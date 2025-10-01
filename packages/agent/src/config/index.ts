@@ -17,7 +17,10 @@ export const config = {
     // Database configuration
     database: {
         getType() {
-            return (process.env.DATABASE_TYPE as DatabaseType) || undefined;
+            return (process.env.DATABASE_TYPE as DatabaseType) || 'better-sqlite3';
+        },
+        isSqlite() {
+            return Boolean(config.database.getType()?.includes('sqlite'));
         },
         getUrl() {
             return process.env.DATABASE_URL;

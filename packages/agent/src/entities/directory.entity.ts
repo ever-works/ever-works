@@ -9,6 +9,7 @@ import {
 import { User } from './user.entity';
 import { ClassToObject, GenerateStatus } from './types';
 import type { PRUpdate } from '@src/data-generator';
+import { datetimeType } from './_types';
 
 @Entity({ name: 'directories' })
 export class Directory {
@@ -52,17 +53,17 @@ export class Directory {
     @Column('simple-json', { nullable: true })
     generateStatus?: GenerateStatus;
 
-    @Column({ type: 'timestamp', nullable: true })
+    @Column({ type: datetimeType, nullable: true })
     generationStartedAt?: Date;
 
-    @Column({ type: 'timestamp', nullable: true })
+    @Column({ type: datetimeType, nullable: true })
     generationFinishedAt?: Date;
 
     // Deployment FIELDS
     @Column({ nullable: true })
     deploymentState?: string;
 
-    @Column({ type: 'timestamp', nullable: true })
+    @Column({ type: datetimeType, nullable: true })
     deploymentStartedAt?: Date;
 
     // Repository FIELDS

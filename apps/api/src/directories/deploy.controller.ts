@@ -2,6 +2,7 @@ import {
     BadRequestException,
     Body,
     Controller,
+    ForbiddenException,
     NotFoundException,
     Param,
     Post,
@@ -94,7 +95,7 @@ export class DeployController {
         }
 
         if (directory.userId !== userId) {
-            throw new BadRequestException({
+            throw new ForbiddenException({
                 status: 'error',
                 message: 'You do not have permission to access this directory',
             });

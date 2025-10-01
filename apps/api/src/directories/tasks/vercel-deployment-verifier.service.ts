@@ -46,9 +46,9 @@ export class VercelDeploymentVerifierService {
     private async verifyDeployment(directory: Directory, vercelToken: string) {
         const vercel = await this.createVercelSDK(vercelToken);
 
-        const FETCH_LIMIT = 18; // 2 minutes (POLL_INTERVAL * FETCH_LIMIT)
+        const FETCH_LIMIT = 18; // 3 minutes (POLL_INTERVAL * FETCH_LIMIT)
         const POLL_INTERVAL = 10 * 1000; // 10 seconds
-        const TIMEOUT = 13 * 60 * 1000; // 12 minutes
+        const TIMEOUT = 13 * 60 * 1000; // 13 minutes
 
         const startedAt = Date.now();
         const intervalId = { value: null as NodeJS.Timeout | null };
@@ -94,7 +94,9 @@ export class VercelDeploymentVerifierService {
                 });
 
                 // Find the project
-                const project = response.projects.find((p) => p.name.includes(directory.slug));
+                const project = response.projects.find((p) =>
+                    p.name.includes(directory.getWebsiteRepo()),
+                );
                 if (!project) {
                     getProjectTries++;
                     if (getProjectTries > FETCH_LIMIT) {
