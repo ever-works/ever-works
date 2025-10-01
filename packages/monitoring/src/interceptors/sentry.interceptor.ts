@@ -28,9 +28,6 @@ export class SentryInterceptor implements NestInterceptor {
         Sentry.setTag('transaction', `${method} ${originalUrl}`);
 
         return next.handle().pipe(
-            tap(() => {
-                console.log('Success response - no additional action needed for Sentry');
-            }),
             catchError((error) => {
                 Sentry.captureException(error, {
                     tags: {
