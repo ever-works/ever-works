@@ -1,7 +1,7 @@
 'use client';
 
 import { GenerateStatusType } from '@/lib/api/enums';
-import { Directory } from '@/lib/api/types-only';
+import { Directory, DirectoryConfig } from '@/lib/api/types-only';
 import { useMounted } from '@/lib/hooks/use-mounted';
 import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
@@ -10,9 +10,10 @@ import { Link } from '@/i18n/navigation';
 
 interface DirectoryInfoProps {
     directory: Directory;
+    config: DirectoryConfig | null;
 }
 
-export function DirectoryInfo({ directory }: DirectoryInfoProps) {
+export function DirectoryInfo({ directory, config }: DirectoryInfoProps) {
     const t = useTranslations('dashboard.directoryDetail.info');
     const { repoLinks } = useDirectoryDetail();
 
@@ -61,8 +62,7 @@ export function DirectoryInfo({ directory }: DirectoryInfoProps) {
         },
         {
             label: t('repositories'),
-            active:
-                !!repoLinks && directory.generateStatus?.status === GenerateStatusType.GENERATED,
+            active: Boolean(repoLinks && config),
             value: (
                 <ul className="flex gap-2 flex-col list-inside">
                     <li>

@@ -852,14 +852,15 @@ export class AgentService {
                     step: null,
                 }),
             ]);
-
-            // dispatch event
-            this.eventEmitter.emit(
-                DirectoryGenerationCompletedEvent.EVENT_NAME,
-                new DirectoryGenerationCompletedEvent(directory),
-            );
         }
 
+        // dispatch event
+        this.eventEmitter.emit(
+            DirectoryGenerationCompletedEvent.EVENT_NAME,
+            new DirectoryGenerationCompletedEvent(directory),
+        );
+
+        // Log total time taken
         const endTime = new Date();
         console.log(`Generation finished at: ${endTime.toISOString()}`);
         const duration = (endTime.getTime() - startTime.getTime()) / 1000;
