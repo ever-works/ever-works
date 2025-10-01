@@ -250,4 +250,24 @@ export const config = {
             return process.env.TAVILY_API_KEY;
         },
     },
+
+    // Sentry configuration
+    sentry: {
+        getDsn() {
+            return process.env.SENTRY_DSN;
+        },
+        getProjectId() {
+            return process.env.SENTRY_PROJECT_ID;
+        },
+    },
+
+    // PostHog configuration
+    posthog: {
+        getApiKey() {
+            return process.env.POSTHOG_API_KEY;
+        },
+        getHost() {
+            return process.env.POSTHOG_HOST;
+        },
+    },
 };

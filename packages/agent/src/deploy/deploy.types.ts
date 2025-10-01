@@ -1,5 +1,5 @@
-import { User } from "src/entities/user.entity";
-import { Directory } from "../entities/directory.entity";
+import { User } from 'src/entities/user.entity';
+import { Directory } from '../entities/directory.entity';
 
 export interface BaseInput {
     owner: string;
@@ -11,12 +11,12 @@ export interface VercelInput extends BaseInput {
     data: {
         vercelToken: string;
         ghToken?: string;
-    }
+    };
 }
 
 export type DeployInput = VercelInput;
 
-export type DeployProvider = DeployInput['provider']
+export type DeployProvider = DeployInput['provider'];
 
 export interface IDeployService {
     deploy: (input: DeployInput, directory: Directory, user: User) => Promise<void>;

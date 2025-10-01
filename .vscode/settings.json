@@ -1,14 +1,14 @@
 {
-    "cSpell.words": [
-        "APIKEY",
-        "Deduplicator",
-        "DEEPSEEK",
-        "GROQ",
-        "langchain",
-        "OLLAMA",
-        "OPENROUTER",
-        "Tavily",
-        "VERCEL"
-    ],
-    "biome.enabled": false
+	"cSpell.words": [
+		"APIKEY",
+		"Deduplicator",
+		"DEEPSEEK",
+		"GROQ",
+		"langchain",
+		"OLLAMA",
+		"OPENROUTER",
+		"Tavily",
+		"VERCEL"
+	],
+	"biome.enabled": false
 }

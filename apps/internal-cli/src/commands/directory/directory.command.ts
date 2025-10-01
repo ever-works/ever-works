@@ -31,7 +31,9 @@ export class DirectoryCommand extends CommandRunner {
         console.log('Available directory commands:');
         console.log('  create              - Create a new directory');
         console.log('  list                - List all directories');
-        console.log('  generate            - Generate data and create a GitHub repository for a directory');
+        console.log(
+            '  generate            - Generate data and create a GitHub repository for a directory',
+        );
         console.log('  update              - Update a directory and its GitHub repository');
         console.log('  submit-item         - Submit an item to a directory');
         console.log('  remove-item         - Remove an item from a directory');

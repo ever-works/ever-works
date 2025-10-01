@@ -17,9 +17,7 @@ export class BadgeProcessingService {
 
         try {
             // Filter items that are eligible for badge evaluation (repository URLs)
-            const eligibleItems = items.filter(item => 
-                this.isEligibleForBadgeEvaluation(item)
-            );
+            const eligibleItems = items.filter((item) => this.isEligibleForBadgeEvaluation(item));
 
             if (eligibleItems.length === 0) {
                 this.logger.log('No items eligible for badge evaluation');
@@ -29,10 +27,11 @@ export class BadgeProcessingService {
             this.logger.log(`${eligibleItems.length} items eligible for badge evaluation`);
 
             // Evaluate badges for eligible items
-            const badgeResults = await this.badgeEvaluationService.evaluateItemsBadges(eligibleItems);
+            const badgeResults =
+                await this.badgeEvaluationService.evaluateItemsBadges(eligibleItems);
 
             // Apply badge results to items
-            const processedItems = items.map(item => {
+            const processedItems = items.map((item) => {
                 const badgeResult = badgeResults.get(item.source_url);
                 if (badgeResult) {
                     return {
@@ -43,11 +42,14 @@ export class BadgeProcessingService {
                 return item;
             });
 
-            const itemsWithBadges = processedItems.filter(item => item.badges && Object.keys(item.badges).length > 0);
-            this.logger.log(`Badge processing completed. ${itemsWithBadges.length} items now have badges`);
+            const itemsWithBadges = processedItems.filter(
+                (item) => item.badges && Object.keys(item.badges).length > 0,
+            );
+            this.logger.log(
+                `Badge processing completed. ${itemsWithBadges.length} items now have badges`,
+            );
 
             return processedItems;
-
         } catch (error) {
             this.logger.error('Failed to process badges:', error);
             // Return original items if badge processing fails
@@ -68,7 +70,7 @@ export class BadgeProcessingService {
             }
 
             const badgeResult = await this.badgeEvaluationService.evaluateItemBadges(item);
-            
+
             if (badgeResult) {
                 return {
                     ...item,
@@ -77,7 +79,6 @@ export class BadgeProcessingService {
             }
 
             return item;
-
         } catch (error) {
             this.logger.error(`Failed to process badges for item ${item.name}:`, error);
             return item;
@@ -102,7 +103,7 @@ export class BadgeProcessingService {
             /sourceforge\.net\/projects\/[^\/]+/i,
         ];
 
-        return repositoryPatterns.some(pattern => pattern.test(item.source_url));
+        return repositoryPatterns.some((pattern) => pattern.test(item.source_url));
     }
 
     /**
@@ -123,7 +124,7 @@ export class BadgeProcessingService {
             quality_badges: { A: 0, F: 0 },
         };
 
-        items.forEach(item => {
+        items.forEach((item) => {
             if (item.badges && Object.keys(item.badges).length > 0) {
                 stats.items_with_badges++;
 

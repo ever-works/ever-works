@@ -4,44 +4,44 @@
 import { type ChatOpenAI } from '@langchain/openai';
 
 export type AiProviderType =
-	| 'openai'
-	| 'google'
-	| 'anthropic'
-	| 'mistral'
-	| 'groq'
-	| 'deepseek'
-	| 'openrouter'
-	| 'ollama';
+    | 'openai'
+    | 'google'
+    | 'anthropic'
+    | 'mistral'
+    | 'groq'
+    | 'deepseek'
+    | 'openrouter'
+    | 'ollama';
 
 export type BaseChatModel = ChatOpenAI;
 
 // | ChatAnthropic | ChatMistralAI | ChatGroq
 
 export interface AiProviderConfig {
-	type: AiProviderType;
-	apiKey?: string;
-	modelName?: string;
-	temperature?: number;
-	enabled?: boolean;
-	maxTokens?: number;
-	baseURL?: string;
+    type: AiProviderType;
+    apiKey?: string;
+    modelName?: string;
+    temperature?: number;
+    enabled?: boolean;
+    maxTokens?: number;
+    baseURL?: string;
 }
 
 export interface AiServiceConfig {
-	defaultProvider: AiProviderType;
-	providers: Record<AiProviderType, AiProviderConfig>;
-	fallbackProviders?: AiProviderType[];
+    defaultProvider: AiProviderType;
+    providers: Record<AiProviderType, AiProviderConfig>;
+    fallbackProviders?: AiProviderType[];
 }
 
 export interface AiProviderCapabilities {
-	supportsStructuredOutput: boolean;
-	supportsStreaming: boolean;
-	supportsToolCalling: boolean;
-	maxContextLength: number;
-	costPerToken?: {
-		input: number;
-		output: number;
-	};
+    supportsStructuredOutput: boolean;
+    supportsStreaming: boolean;
+    supportsToolCalling: boolean;
+    maxContextLength: number;
+    costPerToken?: {
+        input: number;
+        output: number;
+    };
 }
 
 // CLI-specific interfaces for setup and configuration
@@ -79,84 +79,84 @@ export interface AiProviderConfiguration {
 }
 
 export const AI_PROVIDER_CAPABILITIES: Record<AiProviderType, AiProviderCapabilities> = {
-	openai: {
-		supportsStructuredOutput: true,
-		supportsStreaming: true,
-		supportsToolCalling: true,
-		maxContextLength: 128000,
-		costPerToken: {
-			input: 0.0025,
-			output: 0.01
-		}
-	},
-	openrouter: {
-		supportsStructuredOutput: true,
-		supportsStreaming: true,
-		supportsToolCalling: true,
-		maxContextLength: 128000,
-		costPerToken: {
-			input: 0.0025,
-			output: 0.01
-		}
-	},
-	ollama: {
-		supportsStructuredOutput: true,
-		supportsStreaming: true,
-		supportsToolCalling: true,
-		maxContextLength: 128000,
-		costPerToken: {
-			input: 0.0025,
-			output: 0.01
-		}
-	},
-	google: {
-		supportsStructuredOutput: true,
-		supportsStreaming: true,
-		supportsToolCalling: true,
-		maxContextLength: 1000000,
-		costPerToken: {
-			input: 0.00125,
-			output: 0.005
-		}
-	},
-	anthropic: {
-		supportsStructuredOutput: true,
-		supportsStreaming: true,
-		supportsToolCalling: true,
-		maxContextLength: 200000,
-		costPerToken: {
-			input: 0.003,
-			output: 0.015
-		}
-	},
-	mistral: {
-		supportsStructuredOutput: true,
-		supportsStreaming: true,
-		supportsToolCalling: true,
-		maxContextLength: 32000,
-		costPerToken: {
-			input: 0.002,
-			output: 0.006
-		}
-	},
-	groq: {
-		supportsStructuredOutput: true,
-		supportsStreaming: true,
-		supportsToolCalling: true,
-		maxContextLength: 32000,
-		costPerToken: {
-			input: 0.0001,
-			output: 0.0001
-		}
-	},
-	deepseek: {
-		supportsStructuredOutput: true,
-		supportsStreaming: true,
-		supportsToolCalling: true,
-		maxContextLength: 32000,
-		costPerToken: {
-			input: 0.00014,
-			output: 0.00028
-		}
-	}
+    openai: {
+        supportsStructuredOutput: true,
+        supportsStreaming: true,
+        supportsToolCalling: true,
+        maxContextLength: 128000,
+        costPerToken: {
+            input: 0.0025,
+            output: 0.01,
+        },
+    },
+    openrouter: {
+        supportsStructuredOutput: true,
+        supportsStreaming: true,
+        supportsToolCalling: true,
+        maxContextLength: 128000,
+        costPerToken: {
+            input: 0.0025,
+            output: 0.01,
+        },
+    },
+    ollama: {
+        supportsStructuredOutput: true,
+        supportsStreaming: true,
+        supportsToolCalling: true,
+        maxContextLength: 128000,
+        costPerToken: {
+            input: 0.0025,
+            output: 0.01,
+        },
+    },
+    google: {
+        supportsStructuredOutput: true,
+        supportsStreaming: true,
+        supportsToolCalling: true,
+        maxContextLength: 1000000,
+        costPerToken: {
+            input: 0.00125,
+            output: 0.005,
+        },
+    },
+    anthropic: {
+        supportsStructuredOutput: true,
+        supportsStreaming: true,
+        supportsToolCalling: true,
+        maxContextLength: 200000,
+        costPerToken: {
+            input: 0.003,
+            output: 0.015,
+        },
+    },
+    mistral: {
+        supportsStructuredOutput: true,
+        supportsStreaming: true,
+        supportsToolCalling: true,
+        maxContextLength: 32000,
+        costPerToken: {
+            input: 0.002,
+            output: 0.006,
+        },
+    },
+    groq: {
+        supportsStructuredOutput: true,
+        supportsStreaming: true,
+        supportsToolCalling: true,
+        maxContextLength: 32000,
+        costPerToken: {
+            input: 0.0001,
+            output: 0.0001,
+        },
+    },
+    deepseek: {
+        supportsStructuredOutput: true,
+        supportsStreaming: true,
+        supportsToolCalling: true,
+        maxContextLength: 32000,
+        costPerToken: {
+            input: 0.00014,
+            output: 0.00028,
+        },
+    },
 };
