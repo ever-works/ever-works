@@ -39,5 +39,17 @@ export default async function DeployPage({ params }: DeployPageParams) {
         return <VercelTokenAlert />;
     }
 
-    return <DeployForm directory={directory} />;
+    return <DeployForm directory={directory} isDeploying={isDeploying(directory)} />;
+}
+
+function isDeploying(directory: Directory) {
+    const hasDeploymentState = ['INITIALIZING', 'QUEUED', 'BUILDING'].includes(
+        directory.deploymentState as any,
+    );
+
+    const hasStartedAt =
+        directory.deploymentStartedAt &&
+        new Date(directory.deploymentStartedAt) > new Date(Date.now() - 10 * 60 * 1000); // 10 minutes ago
+
+    return Boolean(hasDeploymentState && hasStartedAt);
 }

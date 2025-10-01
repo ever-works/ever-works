@@ -46,6 +46,15 @@ export type GenerateStatus = {
     error?: string;
 };
 
+export type GetProjectsReadyState =
+    | 'BUILDING'
+    | 'ERROR'
+    | 'INITIALIZING'
+    | 'QUEUED'
+    | 'READY'
+    | 'CANCELED'
+    | 'TIMEOUT';
+
 // Response Types
 export interface Directory {
     id: string;
@@ -62,6 +71,8 @@ export interface Directory {
     updatedAt: string;
     itemsCount?: number;
     lastPullRequest?: { main?: PRUpdate; data?: PRUpdate };
+    deploymentState?: GetProjectsReadyState;
+    deploymentStartedAt?: string;
 }
 
 export interface DirectoriesResponse {

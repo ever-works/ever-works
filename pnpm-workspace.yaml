@@ -4,6 +4,7 @@ packages:
 
 onlyBuiltDependencies:
   - '@nestjs/core'
+  - '@sentry-internal/node-cpu-profiler'
   - '@swc/core'
   - '@tailwindcss/oxide'
   - bcrypt

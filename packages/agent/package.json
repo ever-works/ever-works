@@ -149,7 +149,7 @@
         "slugify": "^1.6.6",
         "string-similarity": "^4.0.4",
         "turndown": "^7.2.0",
-        "typeorm": "^0.3.25",
+        "typeorm": "^0.3.27",
         "unified": "^11.0.5",
         "yaml": "^2.8.0",
         "zod": "^3.25.73"

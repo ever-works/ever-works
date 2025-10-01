@@ -6,6 +6,9 @@ import * as fs from 'node:fs';
 import * as http from 'isomorphic-git/http/node';
 import git from 'isomorphic-git';
 
+export const ACTIVE_WORKFLOW_NAMES = ['Vercel Deployment'];
+export const ACTIVE_WORKFLOW_FILES = ['deploy_vercel.yaml'];
+
 @Injectable()
 export class GithubService extends GitProvider {
     protected readonly logger = new Logger(GithubService.name);
@@ -176,28 +179,32 @@ export class GithubService extends GitProvider {
     }
 
     async duplicate({
-        owner,
-        repo,
-        name,
+        originalRepoOwner,
+        originalRepoName,
+        targetRepoName,
         token,
         committer,
         forcePush,
     }: {
-        owner: string;
-        repo: string;
-        name: string;
+        originalRepoOwner: string;
+        originalRepoName: string;
+        targetRepoName: string;
         token: string;
         committer: ICommitter;
         forcePush?: boolean;
     }) {
-        const duplicated = await this.createEmptyRepo(name, '', token);
+        const duplicated = await this.createEmptyRepo(targetRepoName, '', token);
         const origin = duplicated.clone_url;
 
-        this.logger.log(`Duplicated ${owner}/${repo} to ${duplicated.owner.login}/${name}`);
+        this.logger.log(
+            `Duplicated ${originalRepoOwner}/${originalRepoName} to ${duplicated.owner.login}/${targetRepoName}`,
+        );
+
+        await this.removeDir(originalRepoOwner, originalRepoName);
 
         const originalDir = await this.cloneOrPull({
-            owner,
-            repo,
+            owner: originalRepoOwner,
+            repo: originalRepoName,
             token,
             committer: this.getCommitter(committer),
         });
@@ -212,28 +219,32 @@ export class GithubService extends GitProvider {
     }
 
     async duplicateAsOrg({
-        owner,
-        repo,
-        org,
-        name,
+        originalRepoOwner,
+        originalRepoName,
+        targetOrg,
+        targetRepoName,
         token,
         committer,
     }: {
-        owner: string;
-        repo: string;
-        org: string;
-        name: string;
+        originalRepoOwner: string;
+        originalRepoName: string;
+        targetOrg: string;
+        targetRepoName: string;
         token: string;
         committer: ICommitter;
     }) {
-        const duplicated = await this.createEmptyRepoAsOrg(org, name, '', token);
+        const duplicated = await this.createEmptyRepoAsOrg(targetOrg, targetRepoName, '', token);
         const origin = duplicated.clone_url;
 
-        this.logger.log(`Duplicated ${owner}/${repo} to ${duplicated.owner.login}/${name}`);
+        this.logger.log(
+            `Duplicated ${originalRepoOwner}/${originalRepoName} to ${duplicated.owner.login}/${targetRepoName}`,
+        );
+
+        await this.removeDir(originalRepoOwner, originalRepoName);
 
         const originalDir = await this.cloneOrPull({
-            owner,
-            repo,
+            owner: originalRepoOwner,
+            repo: originalRepoName,
             token,
             committer: this.getCommitter(committer),
         });
@@ -260,7 +271,18 @@ export class GithubService extends GitProvider {
         });
 
         const promises = workflows.map((workflow) => {
-            return octokit.rest.actions.enableWorkflow({
+            if (
+                ACTIVE_WORKFLOW_NAMES.includes(workflow.name) ||
+                ACTIVE_WORKFLOW_FILES.includes(workflow.path)
+            ) {
+                return octokit.rest.actions.enableWorkflow({
+                    owner,
+                    repo,
+                    workflow_id: workflow.id,
+                });
+            }
+
+            return octokit.rest.actions.disableWorkflow({
                 owner,
                 repo,
                 workflow_id: workflow.id,
@@ -318,6 +340,8 @@ export class GithubService extends GitProvider {
                 private: isPrivate,
                 include_all_branches: false,
             });
+
+            this.enableWorkflows(targetOwner, newName, token);
         } catch (err) {
             this.logger.error(
                 `Failed to create repository ${targetOwner}/${newName} from template ${templateOwner}/${templateRepo}.`,

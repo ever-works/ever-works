@@ -7,6 +7,9 @@ import { DatabaseModule } from '@packages/agent/database';
 import { AuthModule } from '@src/auth';
 import { AiModule } from '@packages/agent/ai';
 import { CacheFactory } from '@packages/agent/cache';
+import { ScheduleModule } from '@nestjs/schedule';
+import { DirectoryCleanupService } from './tasks/directory-cleanup.service';
+import { VercelDeploymentVerifierService } from './tasks/vercel-deployment-verifier.service';
 
 @Module({
     imports: [
@@ -15,8 +18,10 @@ import { CacheFactory } from '@packages/agent/cache';
         DatabaseModule,
         AuthModule,
         AiModule,
+        ScheduleModule.forRoot(),
         CacheFactory.TypeORM(),
     ],
+    providers: [DirectoryCleanupService, VercelDeploymentVerifierService],
     controllers: [DirectoriesController, DeployController],
 })
 export class DirectoriesModule {}

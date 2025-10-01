@@ -113,6 +113,11 @@ export class WebsiteUpdateService {
         const token = user.getGitToken();
         const websiteRepo = directory.getWebsiteRepo();
 
+        await this.githubService.removeDir(
+            WEBSITE_TEMPLATE_CONFIG.owner,
+            WEBSITE_TEMPLATE_CONFIG.repo,
+        );
+
         // Clone the original template repository
         const originalDir = await this.githubService.cloneOrPull({
             owner: WEBSITE_TEMPLATE_CONFIG.owner,

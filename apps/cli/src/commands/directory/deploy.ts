@@ -4,7 +4,7 @@ import ora from 'ora';
 import inquirer from 'inquirer';
 import { requireAuth } from '../auth';
 import { getApiService } from '../../services/api.service';
-import { DirectoryPromptService } from './directory-prompt.service';
+import { Directory, DirectoryPromptService } from './directory-prompt.service';
 import { handleCliError } from '../../utils/error';
 
 interface DeployDto {
@@ -34,30 +34,11 @@ export const deployCommand = new Command('deploy')
             const directory = selection.directory;
             console.log(chalk.green(`\n✓ Selected directory: ${directory.slug}`));
 
-            // Prompt for deployment options
-            const deployOptions = await inquirer.prompt([
-                {
-                    type: 'password',
-                    name: 'VERCEL_TOKEN',
-                    message:
-                        'Vercel Token (optional, will use environment variable if not provided):',
-                    mask: '*',
-                },
-                {
-                    type: 'password',
-                    name: 'GITHUB_TOKEN',
-                    message:
-                        'GitHub Token (optional, will use environment variable if not provided):',
-                    mask: '*',
-                },
-            ]);
-
             // Show information about what will happen
             console.log(chalk.cyan('\n--- Deployment Process ---'));
             console.log(chalk.gray('This will:'));
-            console.log(chalk.gray('  • Deploy the website to Vercel'));
-            console.log(chalk.gray('  • Update the website repository if needed'));
             console.log(chalk.gray('  • Trigger the deployment workflow'));
+            console.log(chalk.gray('  • Deploy the website to Vercel'));
 
             const websiteRepo = `${directory.slug}-website`;
             console.log(
@@ -81,35 +62,64 @@ export const deployCommand = new Command('deploy')
 
             // Deploy website
             const spinner = ora('Deploying website...').start();
+            let timeoutId: NodeJS.Timeout | null = null;
 
             try {
-                const deployDto: DeployDto = {};
-
-                if (deployOptions.VERCEL_TOKEN) {
-                    deployDto.VERCEL_TOKEN = deployOptions.VERCEL_TOKEN;
-                }
-
-                if (deployOptions.GITHUB_TOKEN) {
-                    deployDto.GITHUB_TOKEN = deployOptions.GITHUB_TOKEN;
-                }
-
-                await apiService.deployWebsite(directory.id, deployDto);
-
-                spinner.succeed('Deployment started successfully');
+                await apiService.deployWebsite(directory.id);
 
                 console.log(chalk.green('\n✓ Deployment started successfully!'));
-                console.log(chalk.gray('The deployment process has been initiated.'));
 
-                console.log(chalk.cyan('\nNext Steps:'));
-                console.log(
-                    chalk.gray('  • Monitor the deployment progress in your Vercel dashboard'),
-                );
-                console.log(chalk.gray('  • Check the GitHub Actions for deployment status'));
-                console.log(chalk.gray('  • Visit your website once deployment is complete'));
+                const watchDeployment = async () => {
+                    const { directory: freshDirectory } = await apiService.getDirectory(
+                        directory.id,
+                    );
 
-                if (directory.website) {
-                    console.log(chalk.blue('\nWebsite URL:'), chalk.white(directory.website));
-                }
+                    if (isDeploying(freshDirectory)) {
+                        spinner.text = `Deployment state: ${freshDirectory.deploymentState}`;
+
+                        timeoutId = setTimeout(watchDeployment, 5000);
+                    } else {
+                        switch (freshDirectory.deploymentState) {
+                            case 'READY':
+                                spinner.succeed('Deployment completed successfully');
+                                break;
+                            case 'ERROR':
+                                spinner.fail('Deployment failed');
+                                break;
+                            case 'CANCELED':
+                                spinner.warn('Deployment cancelled');
+                                break;
+                            case 'TIMEOUT':
+                                spinner.fail('Deployment timed out');
+                                break;
+                            case 'QUEUED':
+                                spinner.text = 'Deployment queued...';
+                                break;
+                            case 'BUILDING':
+                                spinner.text = 'Deployment in progress...';
+                                break;
+
+                            default:
+                                spinner.stop();
+                                break;
+                        }
+
+                        if (timeoutId) {
+                            clearTimeout(timeoutId);
+                        }
+
+                        const STOP_STEPS = ['READY', 'ERROR', 'CANCELED', 'TIMEOUT'];
+                        if (STOP_STEPS.includes(freshDirectory.deploymentState as any)) {
+                            console.log(
+                                chalk.blue('\nWebsite URL:'),
+                                chalk.white(directory.website),
+                            );
+                            return;
+                        }
+                    }
+                };
+
+                watchDeployment();
             } catch (error) {
                 spinner.fail('Deployment failed');
                 throw error;
@@ -128,3 +138,15 @@ export const deployCommand = new Command('deploy')
             process.exit(1);
         }
     });
+
+function isDeploying(directory: Directory) {
+    const hasDeploymentState = ['INITIALIZING', 'QUEUED', 'BUILDING'].includes(
+        directory.deploymentState as any,
+    );
+
+    const hasStartedAt =
+        directory.deploymentStartedAt &&
+        new Date(directory.deploymentStartedAt) > new Date(Date.now() - 10 * 60 * 1000); // 10 minutes ago
+
+    return Boolean(hasDeploymentState && hasStartedAt);
+}

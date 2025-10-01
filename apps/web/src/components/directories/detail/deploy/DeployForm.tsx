@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useEffect, useTransition } from 'react';
 import { Directory } from '@/lib/api';
 import { cn } from '@/lib/utils/cn';
 import { toast } from 'sonner';
@@ -10,41 +10,41 @@ import { deployToVercel, updateWebsiteRepository } from '@/app/actions/dashboard
 import { RefreshCw, Info, Loader2, Triangle } from 'lucide-react';
 import { useDirectoryDetail } from '../DirectoryDetailContext';
 import { Button } from '@/components/ui/button';
+import { pageIntervalRefresh } from '@/lib/utils';
 
 interface DeployFormProps {
     directory: Directory;
+    isDeploying?: boolean;
 }
 
-export function DeployForm({ directory }: DeployFormProps) {
+export function DeployForm({ directory, isDeploying }: DeployFormProps) {
     const t = useTranslations('dashboard.directoryDetail.deploy');
     const [isPending, startTransition] = useTransition();
-    const [deploymentStatus, setDeploymentStatus] = useState<
-        'idle' | 'deploying' | 'success' | 'error'
-    >('idle');
+    const router = useRouter();
 
-    const [deploymentUrl, setDeploymentUrl] = useState<string>('');
+    useEffect(() => {
+        if (isDeploying) {
+            const cleanup = pageIntervalRefresh(router);
+            return cleanup;
+        }
+    }, [isDeploying, router]);
 
     const handleDeploy = () => {
         startTransition(async () => {
             try {
-                setDeploymentStatus('deploying');
                 const result = await deployToVercel(directory.id);
 
                 if (result.success && result.data) {
-                    if (result.data.status === 'success') {
-                        setDeploymentStatus('success');
-                        setDeploymentUrl(result.data.deployment_url || '');
-                        toast.success(t('form.messages.deploySuccess'));
-                    } else if (result.data.status === 'pending') {
-                        setDeploymentStatus('success');
+                    if (result.data.status === 'pending') {
                         toast.info(t('form.messages.deployPending'));
+                        setTimeout(() => router.refresh(), 3000);
+                    } else if (result.data.status === 'success') {
+                        toast.success(t('form.messages.deploySuccess'));
                     }
                 } else {
-                    setDeploymentStatus('error');
                     toast.error(result.error || t('form.messages.deployFailed'));
                 }
             } catch (error) {
-                setDeploymentStatus('error');
                 console.error('Deployment failed:', error);
                 toast.error(t('form.messages.deployError'));
             }
@@ -72,31 +72,36 @@ export function DeployForm({ directory }: DeployFormProps) {
                             {t('form.deployToVercel.description')}
                         </p>
 
-                        {deploymentStatus === 'success' && deploymentUrl && (
+                        {directory.website && (
                             <div className="mb-4 p-4 rounded-lg bg-success/10 dark:bg-success-dark/10 border border-success/20 dark:border-success-dark/20">
-                                <p className="text-sm text-success dark:text-success-dark mb-2">
-                                    {t('form.deployToVercel.successMessage')}
-                                </p>
+                                {directory.deploymentState === 'READY' && (
+                                    <p className="text-sm text-success dark:text-success-dark mb-2">
+                                        {t('form.deployToVercel.successMessage')}
+                                    </p>
+                                )}
+
                                 <a
-                                    href={deploymentUrl}
+                                    href={directory.website}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="text-sm text-primary dark:text-primary-dark hover:underline break-all"
                                 >
-                                    {deploymentUrl}
+                                    {directory.website}
                                 </a>
                             </div>
                         )}
 
                         <Button
                             onClick={handleDeploy}
-                            disabled={isPending || deploymentStatus === 'deploying'}
+                            disabled={isPending || isDeploying}
                             size="lg"
                         >
-                            {deploymentStatus === 'deploying' ? (
-                                <span className="flex items-center gap-2">
+                            {isDeploying ? (
+                                <span className="flex items-center gap-2 capitalize">
                                     <Loader2 className="animate-spin h-4 w-4" />
-                                    {t('form.deployToVercel.deployingButton')}
+                                    {t('form.deployToVercel.deployingStateButton', {
+                                        state: directory.deploymentState || 'INITIALIZING',
+                                    })}
                                 </span>
                             ) : (
                                 t('form.deployToVercel.deployButton')

@@ -45,7 +45,7 @@ export const ENTITIES = [
 export const databaseConfig = registerAs('database', (): DatabaseConfig => {
     const environment = config.getEnvironment() || 'development';
     const appType = config.getAppType() || 'api';
-    let dbType = config.database.getType() || 'better-sqlite3';
+    let dbType = config.database.getType();
 
     const baseConfig: any = {
         entities: ENTITIES,

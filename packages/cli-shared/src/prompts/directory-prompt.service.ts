@@ -44,6 +44,8 @@ type GenerateStatus = {
 	error?: string;
 };
 
+export type GetProjectsReadyState = 'BUILDING' | 'ERROR' | 'INITIALIZING' | 'QUEUED' | 'READY' | 'CANCELED' | 'TIMEOUT';
+
 export interface Directory {
 	id: string;
 	name: string;
@@ -55,6 +57,8 @@ export interface Directory {
 	description: string;
 	readmeConfig?: MarkdownReadmeConfigDto;
 	generateStatus?: GenerateStatus;
+	deploymentState?: GetProjectsReadyState;
+	deploymentStartedAt?: string;
 }
 
 export class DirectoryPromptService extends BasePromptService {

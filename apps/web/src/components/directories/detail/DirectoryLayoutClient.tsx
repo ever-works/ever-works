@@ -5,10 +5,11 @@ import { useRouter } from '@/i18n/navigation';
 import { ConnectionInfo, Directory } from '@/lib/api/types-only';
 import { DirectoryHeader } from './DirectoryHeader';
 import { DirectoryTabs } from './DirectoryTabs';
-import { GenerateStatusType, RepoProvider } from '@/lib/api/enums';
+import { GenerateStatusType } from '@/lib/api/enums';
 import { DirectoryDetailProvider } from './DirectoryDetailContext';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
+import { pageIntervalRefresh } from '@/lib/utils';
 
 interface DirectoryLayoutClientProps {
     directory: Directory;
@@ -36,26 +37,19 @@ export function DirectoryLayoutClient({
             });
         }
 
+        if (lastStatus !== currentStatus && currentStatus === GenerateStatusType.GENERATED) {
+            toast.success(t('generationCompleted'), {
+                id: 'generation-complete',
+            });
+        }
+
         lastGenerateStatus.current = directory.generateStatus;
     }, [directory.generateStatus]);
 
     useEffect(() => {
         if (isGenerating) {
-            const interval = setInterval(() => {
-                // Save current scroll position
-                const scrollY = window.scrollY;
-                const scrollX = window.scrollX;
-
-                // Refresh the page
-                router.refresh();
-
-                // Restore scroll position after a small delay
-                requestAnimationFrame(() => {
-                    window.scrollTo(scrollX, scrollY);
-                });
-            }, 10 * 1000); // Refresh every 10 seconds
-
-            return () => clearInterval(interval);
+            const cleanup = pageIntervalRefresh(router);
+            return cleanup;
         }
     }, [isGenerating, router]);
 

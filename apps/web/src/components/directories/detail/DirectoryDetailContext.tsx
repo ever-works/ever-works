@@ -64,7 +64,7 @@ function repoLink(directory: Directory, oauthConnection: ConnectionInfo | null) 
             return null;
     }
 
-    const username = oauthConnection.username || oauthConnection.metadata?.login;
+    const username = directory.owner || oauthConnection.username || oauthConnection.metadata?.login;
     if (!username) {
         return null;
     }

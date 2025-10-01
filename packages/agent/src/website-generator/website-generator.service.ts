@@ -14,21 +14,23 @@ export class WebsiteGeneratorService {
         const token = user.getGitToken();
         const committer = user.asCommitter();
 
+        await this.cleanup(directory);
+
         if (directory.organization) {
             return this.githubService.duplicateAsOrg({
-                owner: WEBSITE_TEMPLATE_CONFIG.owner,
-                repo: WEBSITE_TEMPLATE_CONFIG.repo,
-                org: directory.getRepoOwner(),
-                name: directory.getWebsiteRepo(),
+                originalRepoOwner: WEBSITE_TEMPLATE_CONFIG.owner,
+                originalRepoName: WEBSITE_TEMPLATE_CONFIG.repo,
+                targetOrg: directory.getRepoOwner(),
+                targetRepoName: directory.getWebsiteRepo(),
                 token,
                 committer,
             });
         }
 
         return this.githubService.duplicate({
-            owner: WEBSITE_TEMPLATE_CONFIG.owner,
-            repo: WEBSITE_TEMPLATE_CONFIG.repo,
-            name: directory.getWebsiteRepo(),
+            originalRepoOwner: WEBSITE_TEMPLATE_CONFIG.owner,
+            originalRepoName: WEBSITE_TEMPLATE_CONFIG.repo,
+            targetRepoName: directory.getWebsiteRepo(),
             token,
             committer,
             forcePush: true,

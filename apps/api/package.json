@@ -30,6 +30,7 @@
         "@nestjs/schedule": "^6.0.0",
         "@nestjs/throttler": "^6.4.0",
         "@packages/agent": "workspace:*",
+        "@vercel/sdk": "^1.11.4",
         "@packages/monitoring": "workspace:*",
         "axios": "^1.12.2",
         "bcrypt": "^6.0.0",

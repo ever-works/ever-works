@@ -162,6 +162,10 @@ export abstract class GitProvider {
         }
     }
 
+    removeDir(owner: string, repo: string) {
+        return fs.promises.rm(this.getDir(owner, repo), { recursive: true, force: true });
+    }
+
     commit(dir: string, message: string, committer: ICommitter = {}) {
         committer = this.getCommitter(committer);
 

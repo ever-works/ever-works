@@ -5,9 +5,10 @@ import { cn } from '@/lib/utils/cn';
 import { Button } from '@/components/ui/button';
 import { useTranslations } from 'next-intl';
 import { GenerateStatusType } from '@/lib/api/enums';
-import { Link } from 'lucide-react';
+import { Link as IconLink } from 'lucide-react';
 import { useDirectoryDetail } from './DirectoryDetailContext';
 import { getStepText } from '@/lib/utils/generator-steps';
+import { Link } from '@/i18n/navigation';
 
 interface DirectoryHeaderProps {
     directory: Directory;
@@ -222,9 +223,9 @@ export function DirectoryHeader({ directory }: DirectoryHeaderProps) {
 
                 {directory.website && (
                     <div className="ml-6">
-                        <Button href={directory.website} variant="ghost" size="sm">
-                            <Link className="w-4 h-4" />
-                        </Button>
+                        <Link href={directory.website} target="_blank" rel="noopener noreferrer">
+                            <IconLink className="w-4 h-4" />
+                        </Link>
                     </div>
                 )}
             </div>
