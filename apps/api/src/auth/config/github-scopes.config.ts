@@ -9,7 +9,7 @@ export const GitHubScopes = {
 
     // Repository permissions
     REPO_READ: ['public_repo'],
-    REPO_FULL: ['repo'], // Full control of private repositories
+    REPO_FULL: ['repo', 'delete_repo'], // Full control of private repositories
 
     // Repository sub-permissions
     REPO_STATUS: ['repo:status'], // Commit statuses
@@ -89,6 +89,7 @@ export const GitHubScopePresets = {
         'user:email',
         'read:user',
         'repo', // Full control of private repositories
+        'delete_repo', // Delete repositories
         'workflow', // Update GitHub Action workflows
         'write:repo_hook', // Create webhooks
         'read:org', // Read org membership
