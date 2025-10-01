@@ -5,6 +5,7 @@ import {
     Logger,
     NotFoundException,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DataGeneratorService } from '../data-generator/data-generator.service';
 import { MarkdownGeneratorService } from '../markdown-generator/markdown-generator.service';
 import { WebsiteGeneratorService } from '../website-generator/website-generator.service';
@@ -28,6 +29,7 @@ import {
     DeleteDirectoryDto,
     DeleteDirectoryResponseDto,
 } from '../items-generator/dto';
+import { DirectoryGenerationCompletedEvent } from '../events';
 import { CreateDirectoryDto } from '../dto/create-directory.dto';
 import { UpdateWebsiteRepositoryResponseDto } from '../website-generator/dto/update-website-repository.dto';
 import { ItemSubmissionService } from '../items-generator/item-submission.service';
@@ -47,6 +49,7 @@ export class AgentService {
         private readonly itemSubmissionService: ItemSubmissionService,
         private readonly itemsGeneratorService: ItemsGeneratorService,
         private readonly directoryRepository: DirectoryRepository,
+        private readonly eventEmitter: EventEmitter2,
     ) {}
 
     async getDirectories(
@@ -849,6 +852,12 @@ export class AgentService {
                     step: null,
                 }),
             ]);
+
+            // dispatch event
+            this.eventEmitter.emit(
+                DirectoryGenerationCompletedEvent.EVENT_NAME,
+                new DirectoryGenerationCompletedEvent(directory),
+            );
         }
 
         const endTime = new Date();

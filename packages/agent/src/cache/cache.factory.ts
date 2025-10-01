@@ -16,11 +16,11 @@ export const CacheFactory = {
     },
 
     TypeORM(options?: CacheOptions) {
-        return CacheModule.registerAsync({
+        return CacheModule.register({
             imports: [TypeOrmModule.forFeature([CacheEntry])],
             inject: [DataSource],
             isGlobal: options?.isGlobal,
-            useFactory: async (dataSource: DataSource) => {
+            useFactory: (dataSource: DataSource) => {
                 const repository = dataSource.getRepository(CacheEntry);
 
                 // Create the TypeORM adapter

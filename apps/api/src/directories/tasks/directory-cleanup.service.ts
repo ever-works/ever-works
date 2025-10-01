@@ -1,13 +1,19 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { OnEvent } from '@nestjs/event-emitter';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { CacheRepository } from '@packages/agent/cache';
 import { DirectoryRepository } from '@packages/agent/database';
 import { Directory, GenerateStatusType } from '@packages/agent/entities';
+import { DirectoryGenerationCompletedEvent } from '@packages/agent/events';
 
 @Injectable()
 export class DirectoryCleanupService {
     private readonly logger = new Logger(DirectoryCleanupService.name);
 
-    constructor(private readonly repository: DirectoryRepository) {}
+    constructor(
+        private readonly repository: DirectoryRepository,
+        private readonly cacheRepository: CacheRepository,
+    ) {}
 
     // Runs every 10 minutes
     @Cron(CronExpression.EVERY_10_MINUTES)
@@ -33,6 +39,19 @@ export class DirectoryCleanupService {
         } catch (error) {
             this.logger.error('Error checking stalled generations', error.stack);
         }
+    }
+
+    // Clear cache for generated directory
+    @OnEvent(DirectoryGenerationCompletedEvent.EVENT_NAME)
+    clearDirectoryCache(data: DirectoryGenerationCompletedEvent) {
+        this.cacheRepository.typeormAdapter
+            .deleteEntriesLike(data.directory.id)
+            .then(() => {
+                this.logger.log(`Cache cleared for directory ${data.directory.id}`);
+            })
+            .catch((err) => {
+                this.logger.error('Failed to clear cache:', err);
+            });
     }
 
     private async handleStalledDirectory(directory: Directory) {

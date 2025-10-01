@@ -7,7 +7,7 @@ import * as http from 'isomorphic-git/http/node';
 import git from 'isomorphic-git';
 
 export const ACTIVE_WORKFLOW_NAMES = ['Vercel Deployment'];
-export const ACTIVE_WORKFLOW_FILES = ['deploy_vercel.yaml'];
+export const ACTIVE_WORKFLOW_FILES = ['.github/workflows/deploy_vercel.yaml'];
 
 @Injectable()
 export class GithubService extends GitProvider {
@@ -261,7 +261,23 @@ export class GithubService extends GitProvider {
     private async enableWorkflows(owner: string, repo: string, token: string) {
         const octokit = new Octokit({ auth: token });
 
-        await new Promise((resolve) => setTimeout(resolve, 10000));
+        await new Promise((resolve) => setTimeout(resolve, 7 * 1000));
+
+        await Promise.allSettled([
+            octokit.rest.actions.setAllowedActionsRepository({
+                owner,
+                repo,
+                github_owned_allowed: true,
+            }),
+            octokit.rest.actions.setGithubActionsPermissionsRepository({
+                owner,
+                repo,
+                enabled: true,
+                allowed_actions: 'all',
+            }),
+        ]);
+
+        await new Promise((resolve) => setTimeout(resolve, 3 * 1000));
 
         const {
             data: { workflows },
@@ -275,6 +291,7 @@ export class GithubService extends GitProvider {
                 ACTIVE_WORKFLOW_NAMES.includes(workflow.name) ||
                 ACTIVE_WORKFLOW_FILES.includes(workflow.path)
             ) {
+                this.logger.log(`Enabling workflow ${workflow.name} for ${owner}/${repo}`);
                 return octokit.rest.actions.enableWorkflow({
                     owner,
                     repo,
@@ -282,26 +299,13 @@ export class GithubService extends GitProvider {
                 });
             }
 
+            this.logger.log(`Disabling workflow ${workflow.name} for ${owner}/${repo}`);
             return octokit.rest.actions.disableWorkflow({
                 owner,
                 repo,
                 workflow_id: workflow.id,
             });
         });
-
-        promises.push(
-            octokit.rest.actions.setAllowedActionsRepository({
-                owner,
-                repo,
-                github_owned_allowed: true,
-            }),
-            octokit.rest.actions.setGithubActionsPermissionsRepository({
-                owner,
-                repo,
-                enabled: true,
-                allowed_actions: 'all',
-            }),
-        );
 
         await Promise.allSettled(promises);
 
