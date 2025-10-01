@@ -329,15 +329,15 @@ export class GenerateSubCommand extends CommandRunner {
             'Select website repository creation method:',
             [
                 {
-                    name: 'Duplicate (recommended)',
-                    value: WebsiteRepositoryCreationMethod.DUPLICATE,
-                },
-                {
-                    name: 'Create using template',
+                    name: 'Create using template (recommended)',
                     value: WebsiteRepositoryCreationMethod.CREATE_USING_TEMPLATE,
                 },
+                {
+                    name: 'Duplicate',
+                    value: WebsiteRepositoryCreationMethod.DUPLICATE,
+                },
             ],
-            WebsiteRepositoryCreationMethod.DUPLICATE,
+            WebsiteRepositoryCreationMethod.CREATE_USING_TEMPLATE,
         );
         options.website_repository_creation_method = websiteMethod;
 

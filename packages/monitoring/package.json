@@ -41,11 +41,11 @@
         "test:cov": "jest --coverage"
     },
     "peerDependencies": {
-        "@nestjs/common": "*",
-        "@nestjs/core": "*",
-        "@nestjs/platform-express": "*",
-        "reflect-metadata": "*",
-        "rxjs": "*"
+        "@nestjs/common": "^11.1",
+        "@nestjs/core": "^11.1",
+        "@nestjs/platform-express": "^11.1",
+        "reflect-metadata": "^0.2",
+        "rxjs": "^7.8"
     },
     "dependencies": {
         "@sentry/nestjs": "^10.17.0",

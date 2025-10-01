@@ -146,12 +146,12 @@ To generate data and create a GitHub repository for the directory, send a POST r
     "generation_method": "create-update",
     "update_with_pull_request": true,
     "badge_evaluation_enabled": false,
-    "website_repository_creation_method": "duplicate",
+    "website_repository_creation_method": "create-using-template",
     "repository_description": "A curated list of the best time tracking software and tools for businesses.",
     "config": {
-        "max_search_queries": 15,
+        "max_search_queries": 10,
         "max_results_per_query": 25,
-        "max_pages_to_process": 150,
+        "max_pages_to_process": 10,
         "relevance_threshold_content": 0.5,
         "min_content_length_for_extraction": 300,
         "prompt_comparison_confidence_threshold": 0.6,
@@ -163,21 +163,21 @@ To generate data and create a GitHub repository for the directory, send a POST r
 
 **Request Parameters:**
 
-| Field                                | Type     | Required   | Default         | Description                                                                                               |
-| ------------------------------------ | -------- | ---------- | --------------- | --------------------------------------------------------------------------------------------------------- |
-| `name`                               | string   | `required` | -               | Display name for the directory                                                                            |
-| `prompt`                             | string   | `required` | -               | Description/prompt for item generation. URLs mentioned here will be automatically extracted and processed |
-| `company`                            | object   | `optional` | -               | Company information (see Company Object below)                                                            |
-| `repository_description`             | string   | `optional` | -               | Description for the generated github repository                                                           |
-| `target_keywords`                    | string[] | `optional` | `[]`            | Keywords to focus the search and generation                                                               |
-| `initial_categories`                 | string[] | `optional` | `[]`            | Initial categories to assign to generated items                                                           |
-| `priority_categories`                | string[] | `optional` | `[]`            | Categories that should appear first in the final output (can also be extracted from prompt)               |
-| `source_urls`                        | string[] | `optional` | `[]`            | Additional URLs to process for content extraction                                                         |
-| `generation_method`                  | enum     | `optional` | `create-update` | Generation method: `create-update` or `recreate` (see Generation Methods below)                           |
-| `update_with_pull_request`           | boolean  | `optional` | `true`          | Whether to update the repository with a pull request or directly commit the changes to main branch.       |
-| `website_repository_creation_method` | enum     | `optional` | `duplicate`     | Method for creating the website repository: `duplicate` or `create-using-template` (see below)            |
-| `badge_evaluation_enabled`           | boolean  | `optional` | `false`         | Whether to evaluate badges for the generated items                                                        |
-| `config`                             | object   | `optional` | -               | Advanced configuration options                                                                            |
+| Field                                | Type     | Required   | Default                 | Description                                                                                               |
+| ------------------------------------ | -------- | ---------- | ----------------------- | --------------------------------------------------------------------------------------------------------- |
+| `name`                               | string   | `required` | -                       | Display name for the directory                                                                            |
+| `prompt`                             | string   | `required` | -                       | Description/prompt for item generation. URLs mentioned here will be automatically extracted and processed |
+| `company`                            | object   | `optional` | -                       | Company information (see Company Object below)                                                            |
+| `repository_description`             | string   | `optional` | -                       | Description for the generated github repository                                                           |
+| `target_keywords`                    | string[] | `optional` | `[]`                    | Keywords to focus the search and generation                                                               |
+| `initial_categories`                 | string[] | `optional` | `[]`                    | Initial categories to assign to generated items                                                           |
+| `priority_categories`                | string[] | `optional` | `[]`                    | Categories that should appear first in the final output (can also be extracted from prompt)               |
+| `source_urls`                        | string[] | `optional` | `[]`                    | Additional URLs to process for content extraction                                                         |
+| `generation_method`                  | enum     | `optional` | `create-update`         | Generation method: `create-update` or `recreate` (see Generation Methods below)                           |
+| `update_with_pull_request`           | boolean  | `optional` | `true`                  | Whether to update the repository with a pull request or directly commit the changes to main branch.       |
+| `website_repository_creation_method` | enum     | `optional` | `create-using-template` | Method for creating the website repository: `duplicate` or `create-using-template` (see below)            |
+| `badge_evaluation_enabled`           | boolean  | `optional` | `false`                 | Whether to evaluate badges for the generated items                                                        |
+| `config`                             | object   | `optional` | -                       | Advanced configuration options                                                                            |
 
 **Company Object:**
 
@@ -191,8 +191,8 @@ To generate data and create a GitHub repository for the directory, send a POST r
 | Field                                    | Type    | Default    | Range    | Description                                                                                       |
 | ---------------------------------------- | ------- | ---------- | -------- | ------------------------------------------------------------------------------------------------- |
 | `max_search_queries`                     | number  | 10         | 1-100    | Maximum number of search queries to execute                                                       |
-| `max_results_per_query`                  | number  | 20         | 1-100    | Maximum results to process per search query                                                       |
-| `max_pages_to_process`                   | number  | 100        | 1-1000   | Maximum web pages to process for content extraction                                               |
+| `max_results_per_query`                  | number  | 10         | 1-100    | Maximum results to process per search query                                                       |
+| `max_pages_to_process`                   | number  | 10         | 1-1000   | Maximum web pages to process for content extraction                                               |
 | `relevance_threshold_content`            | number  | 0.5        | 0.01-1.0 | Minimum relevance score for content filtering                                                     |
 | `min_content_length_for_extraction`      | number  | 300        | 0+       | Minimum content length required for item extraction                                               |
 | `content_filtering_enabled`              | boolean | `optional` | `true`   | Whether to enable content filtering based on relevance and quality                                |

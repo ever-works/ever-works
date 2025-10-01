@@ -73,7 +73,11 @@ export class WebsiteGeneratorService {
             if (operation === WebsiteRepositoryCreationMethod.DUPLICATE) {
                 path = await this.duplicate(directory, user);
             } else if (operation === WebsiteRepositoryCreationMethod.CREATE_USING_TEMPLATE) {
-                path = await this.createUsingTemplate(directory, user);
+                try {
+                    path = await this.createUsingTemplate(directory, user);
+                } catch {
+                    path = await this.duplicate(directory, user);
+                }
             } else {
                 // Default to duplicate if an unknown operation is somehow passed
                 path = await this.duplicate(directory, user);

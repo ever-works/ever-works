@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { DatabaseConfigurations, DatabaseInitService } from '@packages/agent/database';
 import { AiModule } from '@packages/agent/ai';
 import { AgentModule } from '@packages/agent/services';
@@ -19,6 +20,7 @@ import { ServeCommands } from './commands/serve';
 @Module({
     imports: [
         DatabaseConfigurations.cli(),
+        EventEmitterModule.forRoot(),
         ConfigModule,
         AiModule,
         DatabaseModule,

@@ -77,15 +77,15 @@ export class GeneratePromptService extends BasePromptService {
             'Website repository creation method:',
             [
                 {
-                    name: 'Duplicate (recommended)',
-                    value: WebsiteRepositoryCreationMethod.DUPLICATE,
-                },
-                {
-                    name: 'Create using template',
+                    name: 'Create using template (recommended)',
                     value: WebsiteRepositoryCreationMethod.CREATE_USING_TEMPLATE,
                 },
+                {
+                    name: 'Duplicate',
+                    value: WebsiteRepositoryCreationMethod.DUPLICATE,
+                },
             ],
-            WebsiteRepositoryCreationMethod.DUPLICATE,
+            WebsiteRepositoryCreationMethod.CREATE_USING_TEMPLATE,
         );
 
         // Repository description
@@ -179,7 +179,7 @@ export class GeneratePromptService extends BasePromptService {
         const config: ConfigDto = {
             max_search_queries: 10,
             max_results_per_query: 20,
-            max_pages_to_process: 100,
+            max_pages_to_process: 10,
             relevance_threshold_content: 0.5,
             min_content_length_for_extraction: 300,
             ai_first_generation_enabled: true,

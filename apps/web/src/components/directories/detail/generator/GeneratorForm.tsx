@@ -12,7 +12,7 @@ import { UpdateItemsFields } from './UpdateItemsFields';
 import { CompanyFields } from './CompanyFields';
 import { CategoriesFields } from './CategoriesFields';
 import { SourceFields } from './SourceFields';
-import { ConfigFields } from './ConfigFields';
+import { ConfigFields, DEFAULT_CONFIG } from './ConfigFields';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils/cn';
 import { toast } from 'sonner';
@@ -53,17 +53,8 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
         badge_evaluation_enabled: lastRequestData?.badge_evaluation_enabled || false,
         website_repository_creation_method:
             lastRequestData?.website_repository_creation_method ||
-            WebsiteRepositoryCreationMethod.DUPLICATE,
-        config: lastRequestData?.config || {
-            max_search_queries: 10,
-            max_results_per_query: 5,
-            max_pages_to_process: 10,
-            relevance_threshold_content: 0.5,
-            min_content_length_for_extraction: 100,
-            ai_first_generation_enabled: false,
-            content_filtering_enabled: false,
-            prompt_comparison_confidence_threshold: 0.8,
-        },
+            WebsiteRepositoryCreationMethod.CREATE_USING_TEMPLATE,
+        config: lastRequestData?.config || DEFAULT_CONFIG,
     });
 
     const toggleSection = (section: string) => {
