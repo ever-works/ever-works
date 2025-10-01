@@ -149,9 +149,9 @@ To generate data and create a GitHub repository for the directory, send a POST r
     "website_repository_creation_method": "duplicate",
     "repository_description": "A curated list of the best time tracking software and tools for businesses.",
     "config": {
-        "max_search_queries": 15,
+        "max_search_queries": 10,
         "max_results_per_query": 25,
-        "max_pages_to_process": 150,
+        "max_pages_to_process": 10,
         "relevance_threshold_content": 0.5,
         "min_content_length_for_extraction": 300,
         "prompt_comparison_confidence_threshold": 0.6,
@@ -191,8 +191,8 @@ To generate data and create a GitHub repository for the directory, send a POST r
 | Field                                    | Type    | Default    | Range    | Description                                                                                       |
 | ---------------------------------------- | ------- | ---------- | -------- | ------------------------------------------------------------------------------------------------- |
 | `max_search_queries`                     | number  | 10         | 1-100    | Maximum number of search queries to execute                                                       |
-| `max_results_per_query`                  | number  | 20         | 1-100    | Maximum results to process per search query                                                       |
-| `max_pages_to_process`                   | number  | 100        | 1-1000   | Maximum web pages to process for content extraction                                               |
+| `max_results_per_query`                  | number  | 10         | 1-100    | Maximum results to process per search query                                                       |
+| `max_pages_to_process`                   | number  | 10         | 1-1000   | Maximum web pages to process for content extraction                                               |
 | `relevance_threshold_content`            | number  | 0.5        | 0.01-1.0 | Minimum relevance score for content filtering                                                     |
 | `min_content_length_for_extraction`      | number  | 300        | 0+       | Minimum content length required for item extraction                                               |
 | `content_filtering_enabled`              | boolean | `optional` | `true`   | Whether to enable content filtering based on relevance and quality                                |

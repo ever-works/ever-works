@@ -50,7 +50,7 @@ export class ConfigDto {
     @IsInt()
     @Min(1)
     @Max(1000) // Sensible upper limit
-    max_pages_to_process: number = 100;
+    max_pages_to_process: number = 10;
 
     @IsOptional()
     @Min(0.01)

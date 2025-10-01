@@ -24,6 +24,17 @@ interface ConfigFieldsProps {
     ) => void;
 }
 
+export const DEFAULT_CONFIG: ConfigDto = {
+    max_search_queries: 10,
+    max_results_per_query: 5,
+    max_pages_to_process: 10,
+    relevance_threshold_content: 0.5,
+    min_content_length_for_extraction: 100,
+    ai_first_generation_enabled: false,
+    content_filtering_enabled: false,
+    prompt_comparison_confidence_threshold: 0.8,
+};
+
 export function ConfigFields({
     config,
     generationMethod,
@@ -118,12 +129,14 @@ export function ConfigFields({
                     <Input
                         label={t('maxSearchQueries')}
                         type="number"
-                        value={config?.max_search_queries || 10}
+                        value={config?.max_search_queries || DEFAULT_CONFIG.max_search_queries}
                         onChange={(e) =>
                             onChange({
                                 config: {
                                     ...config,
-                                    max_search_queries: parseInt(e.target.value) || 10,
+                                    max_search_queries:
+                                        parseInt(e.target.value) ||
+                                        DEFAULT_CONFIG.max_search_queries,
                                 },
                             })
                         }
@@ -135,12 +148,16 @@ export function ConfigFields({
                     <Input
                         label={t('resultsPerQuery')}
                         type="number"
-                        value={config?.max_results_per_query || 5}
+                        value={
+                            config?.max_results_per_query || DEFAULT_CONFIG.max_results_per_query
+                        }
                         onChange={(e) =>
                             onChange({
                                 config: {
                                     ...config,
-                                    max_results_per_query: parseInt(e.target.value) || 5,
+                                    max_results_per_query:
+                                        parseInt(e.target.value) ||
+                                        DEFAULT_CONFIG.max_results_per_query,
                                 },
                             })
                         }
@@ -152,12 +169,14 @@ export function ConfigFields({
                     <Input
                         label={t('maxPagesToProcess')}
                         type="number"
-                        value={config?.max_pages_to_process || 10}
+                        value={config?.max_pages_to_process || DEFAULT_CONFIG.max_pages_to_process}
                         onChange={(e) =>
                             onChange({
                                 config: {
                                     ...config,
-                                    max_pages_to_process: parseInt(e.target.value) || 10,
+                                    max_pages_to_process:
+                                        parseInt(e.target.value) ||
+                                        DEFAULT_CONFIG.max_pages_to_process,
                                 },
                             })
                         }
@@ -170,12 +189,17 @@ export function ConfigFields({
                         label={t('relevanceThreshold')}
                         type="number"
                         step="0.1"
-                        value={config?.relevance_threshold_content || 0.5}
+                        value={
+                            config?.relevance_threshold_content ||
+                            DEFAULT_CONFIG.relevance_threshold_content
+                        }
                         onChange={(e) =>
                             onChange({
                                 config: {
                                     ...config,
-                                    relevance_threshold_content: parseFloat(e.target.value) || 0.5,
+                                    relevance_threshold_content:
+                                        parseFloat(e.target.value) ||
+                                        DEFAULT_CONFIG.relevance_threshold_content,
                                 },
                             })
                         }
