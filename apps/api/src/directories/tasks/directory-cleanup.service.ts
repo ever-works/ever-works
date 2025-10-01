@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { CacheRepository } from '@packages/agent/cache';
+import { CacheEntryRepository } from '@packages/agent/cache';
 import { DirectoryRepository } from '@packages/agent/database';
 import { Directory, GenerateStatusType } from '@packages/agent/entities';
 import { DirectoryGenerationCompletedEvent } from '@packages/agent/events';
@@ -12,7 +12,7 @@ export class DirectoryCleanupService {
 
     constructor(
         private readonly repository: DirectoryRepository,
-        private readonly cacheRepository: CacheRepository,
+        private readonly cacheRepository: CacheEntryRepository,
     ) {}
 
     // Runs every 10 minutes

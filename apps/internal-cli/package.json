@@ -20,6 +20,7 @@
     "dependencies": {
         "@nestjs/common": "^11.0.1",
         "@nestjs/core": "^11.0.1",
+        "@nestjs/event-emitter": "^3.0.1",
         "@packages/agent": "workspace:*",
         "@packages/cli-shared": "workspace:*",
         "better-sqlite3": "^12.2.0",

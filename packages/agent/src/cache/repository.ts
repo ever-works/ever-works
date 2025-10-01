@@ -5,7 +5,7 @@ import { Repository } from 'typeorm';
 import { TypeORMKeyvAdapter } from './typeorm-keyv.adapter';
 
 @Injectable()
-export class CacheRepository {
+export class CacheEntryRepository {
     public readonly typeormAdapter: TypeORMKeyvAdapter;
 
     constructor(@InjectRepository(CacheEntry) repository: Repository<CacheEntry>) {
