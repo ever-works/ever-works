@@ -248,7 +248,7 @@ export class ApiService {
         return response.data;
     }
 
-    async deployWebsite(directoryId: string, data?: DeployDto) {
+    async deployWebsite(directoryId: string, data: DeployDto = {}) {
         const response = await this.httpClient.post<ApiResponse<DeployWebsiteResponse>>(
             `/deploy/directories/${directoryId}/vercel`,
             data,

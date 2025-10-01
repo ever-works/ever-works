@@ -1,3 +1,12 @@
-import { config } from '@src/config';
+import { Column } from 'typeorm';
 
-export const datetimeType = config.database.isSqlite() ? 'datetime' : 'timestamp';
+export const TimestampColumn = ({ nullable = false }: { nullable?: boolean } = {}) => {
+    return Column({
+        type: 'bigint',
+        nullable,
+        transformer: {
+            to: (value?: Date) => (value ? value.getTime() : null),
+            from: (value?: string | number) => (value ? new Date(Number(value)) : null),
+        },
+    });
+};
