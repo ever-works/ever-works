@@ -48,14 +48,9 @@ export class Directory {
     @Column('simple-json', { nullable: true })
     readmeConfig: MarkdownReadmeConfig;
 
+    // Generation FIELDS
     @Column('simple-json', { nullable: true })
     generateStatus?: GenerateStatus;
-
-    @Column('simple-json', { nullable: true })
-    lastPullRequest?: { main?: PRUpdate; data?: PRUpdate };
-
-    @Column({ nullable: true })
-    itemsCount?: number;
 
     @Column({ type: 'timestamp', nullable: true })
     generationStartedAt?: Date;
@@ -63,6 +58,21 @@ export class Directory {
     @Column({ type: 'timestamp', nullable: true })
     generationFinishedAt?: Date;
 
+    // Deployment FIELDS
+    @Column({ nullable: true })
+    deploymentState?: string;
+
+    @Column({ type: 'timestamp', nullable: true })
+    deploymentStartedAt?: Date;
+
+    // Repository FIELDS
+    @Column('simple-json', { nullable: true })
+    lastPullRequest?: { main?: PRUpdate; data?: PRUpdate };
+
+    @Column({ nullable: true })
+    itemsCount?: number;
+
+    // Timestamps
     @CreateDateColumn()
     createdAt: Date;
 

@@ -16,7 +16,6 @@ export type DeployWebsiteResponseDto = APIResponse<{
     owner: string;
     repository: string;
     message: string;
-    deployment_url?: string;
 }>;
 
 export interface DeployWebsiteDto {}

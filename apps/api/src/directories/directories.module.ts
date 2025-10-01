@@ -9,6 +9,7 @@ import { AiModule } from '@packages/agent/ai';
 import { CacheFactory } from '@packages/agent/cache';
 import { ScheduleModule } from '@nestjs/schedule';
 import { DirectoryCleanupService } from './tasks/directory-cleanup.service';
+import { VercelDeploymentVerifierService } from './tasks/vercel-deployment-verifier.service';
 
 @Module({
     imports: [
@@ -20,7 +21,7 @@ import { DirectoryCleanupService } from './tasks/directory-cleanup.service';
         ScheduleModule.forRoot(),
         CacheFactory.TypeORM(),
     ],
-    providers: [DirectoryCleanupService],
+    providers: [DirectoryCleanupService, VercelDeploymentVerifierService],
     controllers: [DirectoriesController, DeployController],
 })
 export class DirectoriesModule {}

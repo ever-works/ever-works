@@ -46,6 +46,9 @@ spec:
           image: registry.digitalocean.com/ever/ever-works-api:latest
           imagePullPolicy: Always
           env:
+            - name: TZ
+              value: "UTC"
+
             - name: WEB_URL
               value: https://appdev.ever.works
             - name: API_URL
@@ -190,6 +193,8 @@ spec:
           image: registry.digitalocean.com/ever/ever-works-web:latest
           imagePullPolicy: Always
           env:
+            - name: TZ
+              value: "UTC"
             - name: AUTH_SECRET
               value: "$AUTH_SECRET"
             - name: API_URL

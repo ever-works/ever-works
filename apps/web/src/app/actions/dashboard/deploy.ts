@@ -6,6 +6,7 @@ import { redirect } from 'next/navigation';
 import { ROUTES } from '@/lib/constants';
 import { getTranslations } from 'next-intl/server';
 import { checkOAuthConnection } from './oauth';
+import { revalidatePath } from 'next/cache';
 
 export async function deployToVercel(directoryId: string) {
     const user = await getAuthFromCookie();
@@ -33,6 +34,9 @@ export async function deployToVercel(directoryId: string) {
         }
 
         const response = await websiteAPI.deployToVercel(directoryId, {});
+
+        revalidatePath(ROUTES.DASHBOARD_DIRECTORY_DEPLOY(directoryId));
+
         return {
             success: response.status === 'success' || response.status === 'pending',
             data: response,

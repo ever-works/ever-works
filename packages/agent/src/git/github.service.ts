@@ -6,6 +6,9 @@ import * as fs from 'node:fs';
 import * as http from 'isomorphic-git/http/node';
 import git from 'isomorphic-git';
 
+export const ACTIVE_WORKFLOW_NAMES = ['Vercel Deployment'];
+export const ACTIVE_WORKFLOW_FILES = ['deploy_vercel.yaml'];
+
 @Injectable()
 export class GithubService extends GitProvider {
     protected readonly logger = new Logger(GithubService.name);
@@ -260,7 +263,18 @@ export class GithubService extends GitProvider {
         });
 
         const promises = workflows.map((workflow) => {
-            return octokit.rest.actions.enableWorkflow({
+            if (
+                ACTIVE_WORKFLOW_NAMES.includes(workflow.name) ||
+                ACTIVE_WORKFLOW_FILES.includes(workflow.path)
+            ) {
+                return octokit.rest.actions.enableWorkflow({
+                    owner,
+                    repo,
+                    workflow_id: workflow.id,
+                });
+            }
+
+            return octokit.rest.actions.disableWorkflow({
                 owner,
                 repo,
                 workflow_id: workflow.id,

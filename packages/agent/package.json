@@ -132,7 +132,6 @@
         "@types/cheerio": "^1.0.0",
         "@types/fs-extra": "^11.0.4",
         "@types/string-similarity": "^4.0.2",
-        "@vercel/sdk": "^1.11.4",
         "axios": "^1.12.2",
         "bullmq": "^5.56.1",
         "cache-manager": "^7.2.0",
