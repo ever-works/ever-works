@@ -4,7 +4,7 @@ import { AuthUser } from '@/lib/auth';
 import { DirectoryList } from '@/components/directories/DirectoryList';
 import { StatsOverview } from '@/components/dashboard/StatsOverview';
 import { EmptyState } from '@/components/common/EmptyState';
-import { ROUTES } from '@/lib/constants';
+import { GET_DIRECTORY_LIST_LIMIT, ROUTES } from '@/lib/constants';
 import { Link, useRouter } from '@/i18n/navigation';
 import { useTranslations } from 'next-intl';
 import type { Directory } from '@/lib/api';
@@ -54,7 +54,10 @@ export default function DashboardClient({
                                     </Link>
                                 )}
                             </div>
-                            <DirectoryList initialDirectories={initialDirectories} showLimit={5} />
+                            <DirectoryList
+                                initialDirectories={initialDirectories}
+                                showLimit={GET_DIRECTORY_LIST_LIMIT}
+                            />
                         </>
                     ) : (
                         <EmptyState

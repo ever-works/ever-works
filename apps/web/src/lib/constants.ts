@@ -14,6 +14,8 @@ export const ALLOWED_REDIRECT_URLS = (process.env.ALLOWED_REDIRECT_URLS || 'loca
     .split(',')
     .map((url) => url.trim());
 
+export const GET_DIRECTORY_LIST_LIMIT = 6;
+
 // App URL
 export const WEB_URL = process.env.NEXT_PUBLIC_WEB_URL || 'http://localhost:3000';
 

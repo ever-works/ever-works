@@ -86,7 +86,7 @@ export function ItemsList({ items: initialItems, directoryId }: ItemsListProps) 
                         <option value="">{t('allCategories')}</option>
                         {categories.map((cat) => (
                             <option key={cat} value={cat}>
-                                {cat}
+                                {UnSlug(cat)}
                             </option>
                         ))}
                     </select>
@@ -253,4 +253,11 @@ function VirtualizedList({
             )}
         </div>
     );
+}
+
+function UnSlug(name: string) {
+    return name
+        .replace(/-/g, ' ')
+        .replace(/\b\w/g, (char) => char.toUpperCase())
+        .trim();
 }

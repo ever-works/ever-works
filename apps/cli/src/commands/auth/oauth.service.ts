@@ -127,13 +127,15 @@ export async function startOAuthServer(port: number): Promise<string> {
 export async function openBrowser(url: string): Promise<void> {
     const platform = process.platform;
     let command: string;
+    const escapedUrl = url.replace(/"/g, '\\"');
 
     if (platform === 'darwin') {
-        command = `open "${url}"`;
+        command = `open "${escapedUrl}"`;
     } else if (platform === 'win32') {
-        command = `start "${url}"`;
+        // Pass empty title argument to avoid spawning a new console window instead of the browser
+        command = `start "" "${escapedUrl}"`;
     } else {
-        command = `xdg-open "${url}"`;
+        command = `xdg-open "${escapedUrl}"`;
     }
 
     try {

@@ -1,5 +1,5 @@
 import 'server-only';
-import { API_URL } from '../constants';
+import { API_URL, WEB_URL } from '../constants';
 import { headers } from 'next/headers';
 import { getAuthAccessCookie } from '../auth/cookies';
 import { getTranslations } from 'next-intl/server';
@@ -29,7 +29,7 @@ export async function getFrontendUrl(): Promise<string> {
     }
 
     // Fallback to environment variable or localhost
-    return process.env.NEXT_PUBLIC_WEB_URL || 'http://localhost:3000';
+    return WEB_URL;
 }
 
 interface ServerFetchOptions extends RequestInit {
