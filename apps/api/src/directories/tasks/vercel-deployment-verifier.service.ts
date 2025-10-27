@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DirectoryRepository } from '@packages/agent/database';
+import { VercelService } from '@packages/agent/deploy';
 import { Directory } from '@packages/agent/entities';
 
 type CancelVerification = () => void;
@@ -18,7 +19,10 @@ export class VercelDeploymentVerifierService {
     private readonly logger = new Logger(VercelDeploymentVerifierService.name);
     private queue: Map<string, CancelVerification> = new Map();
 
-    constructor(private readonly repository: DirectoryRepository) {}
+    constructor(
+        private readonly repository: DirectoryRepository,
+        private readonly vercelService: VercelService,
+    ) {}
 
     async startVerification(directory: Directory, vercelToken: string) {
         this.logger.log(`Starting verification for directory ${directory.id}`);
@@ -28,23 +32,13 @@ export class VercelDeploymentVerifierService {
         this.queue.set(directory.id, await this.verifyDeployment(directory, vercelToken));
     }
 
-    async validateToken(vercelToken: string) {
-        const vercel = await this.createVercelSDK(vercelToken);
-        try {
-            await vercel.user.getAuthUser();
-            return true;
-        } catch (error) {
-            return false;
-        }
-    }
-
     private cancelVerification(directoryId: string) {
         const cancelVerification = this.queue.get(directoryId);
         cancelVerification?.();
     }
 
     private async verifyDeployment(directory: Directory, vercelToken: string) {
-        const vercel = await this.createVercelSDK(vercelToken);
+        const vercel = await this.vercelService.createVercelSDK(vercelToken);
 
         const FETCH_LIMIT = 18; // 3 minutes (POLL_INTERVAL * FETCH_LIMIT)
         const POLL_INTERVAL = 10 * 1000; // 10 seconds
@@ -162,11 +156,5 @@ export class VercelDeploymentVerifierService {
         }, POLL_INTERVAL);
 
         return () => cleanup('CANCELED');
-    }
-
-    private async createVercelSDK(token: string) {
-        const { Vercel } = await import('@vercel/sdk');
-
-        return new Vercel({ bearerToken: token });
     }
 }

@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsOptional, IsString } from 'class-validator';
 
 export class DeployVercelDto {
     @IsOptional()
@@ -8,4 +8,8 @@ export class DeployVercelDto {
     @IsOptional()
     @IsString()
     GITHUB_TOKEN?: string;
+
+    @IsOptional()
+    @IsString()
+    vercelTeamId?: string;
 }

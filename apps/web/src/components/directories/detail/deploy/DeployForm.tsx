@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useTransition } from 'react';
-import { Directory } from '@/lib/api';
+import type { Directory, VercelTeam } from '@/lib/api';
 import { cn } from '@/lib/utils/cn';
 import { toast } from 'sonner';
 import { useTranslations } from 'next-intl';
@@ -15,6 +15,7 @@ import { pageIntervalRefresh } from '@/lib/utils';
 interface DeployFormProps {
     directory: Directory;
     isDeploying?: boolean;
+    vercelTeams?: VercelTeam[];
 }
 
 export function DeployForm({ directory, isDeploying }: DeployFormProps) {
@@ -64,6 +65,7 @@ export function DeployForm({ directory, isDeploying }: DeployFormProps) {
                     >
                         <Triangle className="w-5 h-5 text-primary dark:text-primary-dark fill-current" />
                     </div>
+
                     <div className="flex-1">
                         <h3 className="text-lg font-semibold text-text dark:text-text-dark mb-2">
                             {t('form.deployToVercel.title')}
