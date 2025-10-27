@@ -97,7 +97,7 @@ export interface RemoveItemDto {
 export interface DeployDto {
     VERCEL_TOKEN?: string;
     GITHUB_TOKEN?: string;
-    vercelTeamId?: string;
+    vercelTeamScope?: string;
 }
 
 export interface DeleteDirectoryDto {

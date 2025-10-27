@@ -33,10 +33,10 @@ export function DeployForm({ directory, isDeploying, vercelTeams = [] }: DeployF
         }
     }, [isDeploying, router]);
 
-    const runDeploy = (teamId?: string) => {
+    const runDeploy = (teamScope?: string) => {
         startTransition(async () => {
             try {
-                const result = await deployToVercel(directory.id, teamId);
+                const result = await deployToVercel(directory.id, teamScope);
 
                 if (result.success && result.data) {
                     if (result.data.status === 'pending') {
@@ -68,9 +68,9 @@ export function DeployForm({ directory, isDeploying, vercelTeams = [] }: DeployF
         setIsTeamDialogOpen(true);
     };
 
-    const handleConfirmDeploy = (teamId: string) => {
+    const handleConfirmDeploy = (teamScope: string) => {
         setIsTeamDialogOpen(false);
-        runDeploy(teamId);
+        runDeploy(teamScope);
     };
 
     return (

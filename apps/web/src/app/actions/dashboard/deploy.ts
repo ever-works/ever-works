@@ -9,7 +9,7 @@ import { checkOAuthConnection } from './oauth';
 import { revalidatePath } from 'next/cache';
 import { deployAPI } from '@/lib/api';
 
-export async function deployToVercel(directoryId: string, vercelTeamId?: string) {
+export async function deployToVercel(directoryId: string, vercelTeamScope?: string) {
     const user = await getAuthFromCookie();
     if (!user) {
         redirect(ROUTES.AUTH_LOGIN);
@@ -35,7 +35,7 @@ export async function deployToVercel(directoryId: string, vercelTeamId?: string)
         }
 
         const response = await deployAPI.deployToVercel(directoryId, {
-            vercelTeamId,
+            vercelTeamScope,
         });
 
         revalidatePath(ROUTES.DASHBOARD_DIRECTORY_DEPLOY(directoryId));

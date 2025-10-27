@@ -31,7 +31,7 @@ export const deployCommand = new Command('deploy')
 
             // Attempt to fetch Vercel teams (optional)
             let vercelTeams: VercelTeam[] = [];
-            let vercelTeamId: string | undefined;
+            let vercelTeamScope: string | undefined;
             try {
                 const teamResponse = await apiService.getVercelTeams();
                 if (teamResponse.status === 'success' && Array.isArray(teamResponse.teams)) {
@@ -58,25 +58,22 @@ export const deployCommand = new Command('deploy')
                 console.log(chalk.cyan('\n--- Vercel Team Selection ---'));
                 const choices = vercelTeams.map((team) => ({
                     name: team.name ? `${team.name} (${team.slug})` : team.slug,
-                    value: team.id,
+                    value: team.slug,
                 }));
 
-                const { selectedTeam } = await inquirer.prompt([
+                const { selectedTeamScope } = await inquirer.prompt([
                     {
                         type: 'list',
-                        name: 'selectedTeam',
+                        name: 'selectedTeamScope',
                         message: 'Select the Vercel team to deploy to:',
                         choices,
                         loop: false,
                     },
                 ]);
 
-                vercelTeamId = selectedTeam;
-                console.log(
-                    chalk.green(
-                        `\n✓ Selected Vercel team: ${choices.find((c) => c.value === vercelTeamId)?.name}`,
-                    ),
-                );
+                vercelTeamScope = selectedTeamScope;
+                const selectedChoice = choices.find((c) => c.value === vercelTeamScope);
+                console.log(chalk.green(`\n✓ Selected Vercel team: ${selectedChoice?.name || vercelTeamScope}`));
             }
 
             // Show information about what will happen
@@ -111,7 +108,7 @@ export const deployCommand = new Command('deploy')
 
             try {
                 const response = await apiService.deployWebsite(directory.id, {
-                    vercelTeamId,
+                    vercelTeamScope,
                 });
 
                 if (response.status === 'error') {
@@ -129,11 +126,10 @@ export const deployCommand = new Command('deploy')
                 }
 
                 console.log(chalk.green('\n✓ Deployment request accepted!'));
-                if (vercelTeamId) {
+                if (vercelTeamScope) {
                     const teamLabel =
-                        vercelTeams.find((team) => team.id === vercelTeamId)?.name ||
-                        vercelTeams.find((team) => team.id === vercelTeamId)?.slug ||
-                        vercelTeamId;
+                        vercelTeams.find((team) => team.slug === vercelTeamScope)?.name ||
+                        vercelTeamScope;
                     console.log(chalk.gray('Vercel team:'), chalk.white(teamLabel));
                 }
 

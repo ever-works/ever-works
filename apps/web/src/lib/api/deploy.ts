@@ -31,7 +31,7 @@ export type VercelTeamResponse = APIResponse<{
 }>;
 
 export interface DeployWebsiteVercelDto {
-    vercelTeamId?: string;
+    vercelTeamScope?: string;
 }
 
 export const deployAPI = {

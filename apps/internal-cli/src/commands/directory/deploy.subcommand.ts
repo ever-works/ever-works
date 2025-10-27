@@ -96,7 +96,7 @@ export class DeploySubCommand extends CommandRunner {
                         repo: directory.getWebsiteRepo(),
                         provider: 'vercel',
                         data: {
-                            vercelTeamId: vercelTeam?.id,
+                            vercelTeamScope: vercelTeam?.scope,
                             vercelToken: deployOptions.VERCEL_TOKEN || process.env.VERCEL_TOKEN,
                             ghToken: deployOptions.GITHUB_TOKEN || process.env.GH_APIKEY,
                         },
@@ -159,7 +159,7 @@ export class DeploySubCommand extends CommandRunner {
 
     private async promptVercelTeamSelection(
         tokenFromInput?: string,
-    ): Promise<{ id: string; label: string } | undefined> {
+    ): Promise<{ scope: string; label: string } | undefined> {
         const token = tokenFromInput || process.env.VERCEL_TOKEN;
         if (!token) {
             return undefined;
@@ -175,25 +175,25 @@ export class DeploySubCommand extends CommandRunner {
 
             const choices = teams.map((team: any) => ({
                 name: team.name ? `${team.name} (${team.slug})` : team.slug,
-                value: team.id,
+                value: team.slug,
             }));
 
-            const { vercelTeamId } = await inquirer.prompt([
+            const { vercelTeamScope } = await inquirer.prompt([
                 {
                     type: 'list',
-                    name: 'vercelTeamId',
+                    name: 'vercelTeamScope',
                     message: 'Select the Vercel team to deploy to:',
                     choices,
                     loop: false,
                 },
             ]);
 
-            const selected = choices.find((choice) => choice.value === vercelTeamId);
-            console.log(chalk.green(`\n✓ Selected Vercel team: ${selected?.name || vercelTeamId}`));
+            const selected = choices.find((choice) => choice.value === vercelTeamScope);
+            console.log(chalk.green(`\n✓ Selected Vercel team: ${selected?.name || vercelTeamScope}`));
 
             return {
-                id: vercelTeamId,
-                label: selected?.name || vercelTeamId,
+                scope: vercelTeamScope,
+                label: selected?.name || vercelTeamScope,
             };
         } catch (error: any) {
             this.logger.warn(`Unable to fetch Vercel teams: ${error?.message || error}`);

@@ -33,7 +33,7 @@ export class DeployController {
         @Body() deployVercel: DeployVercelDto,
         @Param('id') id: string,
     ) {
-        const { VERCEL_TOKEN, GITHUB_TOKEN, vercelTeamId } = deployVercel;
+        const { VERCEL_TOKEN, GITHUB_TOKEN, vercelTeamScope } = deployVercel;
 
         const user = await this.authService.getUser(auth.userId);
         const directory = await this.validateDirectoryOwnership(id, user.id);
@@ -64,7 +64,7 @@ export class DeployController {
                 repo: directory.getWebsiteRepo(),
                 provider: 'vercel',
                 data: {
-                    vercelTeamId,
+                    vercelTeamScope,
                     vercelToken,
                     ghToken,
                 },

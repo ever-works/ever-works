@@ -20,7 +20,7 @@ interface VercelTeamSelectionDialogProps {
     open: boolean;
     teams: VercelTeam[];
     isSubmitting?: boolean;
-    onConfirm: (teamId: string) => void;
+    onConfirm: (teamScope: string) => void;
     onCancel: () => void;
 }
 
@@ -32,23 +32,23 @@ export function VercelTeamSelectionDialog({
     onCancel,
 }: VercelTeamSelectionDialogProps) {
     const t = useTranslations('dashboard.directoryDetail.deploy');
-    const [selectedTeamId, setSelectedTeamId] = useState<string>('');
+    const [selectedTeamScope, setSelectedTeamScope] = useState<string>('');
 
     const options = useMemo(() => teams ?? [], [teams]);
 
     useEffect(() => {
         if (open) {
-            setSelectedTeamId(options[0]?.id ?? '');
+            setSelectedTeamScope(options[0]?.slug ?? '');
         } else {
-            setSelectedTeamId('');
+            setSelectedTeamScope('');
         }
     }, [open, options]);
 
     const handleConfirm = () => {
-        if (!selectedTeamId) {
+        if (!selectedTeamScope) {
             return;
         }
-        onConfirm(selectedTeamId);
+        onConfirm(selectedTeamScope);
     };
 
     const handleOpenChange = (nextOpen: boolean) => {
@@ -71,16 +71,16 @@ export function VercelTeamSelectionDialog({
                 <div className="space-y-4">
                     <Select
                         label={t('form.deployToVercel.teamSelection.label')}
-                        value={selectedTeamId}
-                        onChange={(event) => setSelectedTeamId(event.target.value)}
+                        value={selectedTeamScope}
+                        onChange={(event) => setSelectedTeamScope(event.target.value)}
                         variant="form"
                     >
                         <option value="" disabled>
                             {t('form.deployToVercel.teamSelection.placeholder')}
                         </option>
                         {options.map((team) => (
-                            <option key={team.id} value={team.id}>
-                                {team.name ? `${team.name}` : team.slug}
+                            <option key={team.id} value={team.slug}>
+                                {team.name ? `${team.name} (${team.slug})` : team.slug}
                             </option>
                         ))}
                     </Select>
@@ -93,7 +93,7 @@ export function VercelTeamSelectionDialog({
                     <Button
                         type="button"
                         onClick={handleConfirm}
-                        disabled={!selectedTeamId || isSubmitting}
+                        disabled={!selectedTeamScope || isSubmitting}
                     >
                         {isSubmitting ? (
                             <span className="flex items-center gap-2">

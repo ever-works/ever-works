@@ -11,5 +11,5 @@ export class DeployVercelDto {
 
     @IsOptional()
     @IsString()
-    vercelTeamId?: string;
+    vercelTeamScope?: string;
 }

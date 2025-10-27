@@ -61,12 +61,12 @@ export class VercelService {
             ),
         ];
 
-        if (vercelInput.data.vercelTeamId) {
+        if (vercelInput.data.vercelTeamScope) {
             promises.push(
                 this.githubService.setActionSecret(
                     {
-                        key: 'VERCEL_TEAM',
-                        value: vercelInput.data.vercelTeamId,
+                        key: 'VERCEL_TEAM_SCOPE',
+                        value: vercelInput.data.vercelTeamScope,
                         owner: vercelInput.owner,
                         repo: vercelInput.repo,
                     },
