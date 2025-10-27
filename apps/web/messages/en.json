@@ -660,7 +660,15 @@
                         "deployButton": "Deploy Now",
                         "deployingButton": "Deploying...",
                         "deployingStateButton": "Deploying ({state})...",
-                        "successMessage": "Your website has been successfully deployed!"
+                        "successMessage": "Your website has been successfully deployed!",
+                        "teamSelection": {
+                            "title": "Select Vercel Team",
+                            "description": "Choose the Vercel team to deploy this directory to.",
+                            "label": "Team",
+                            "placeholder": "Select a team",
+                            "confirmButton": "Deploy to team",
+                            "cancelButton": "Cancel"
+                        }
                     },
                     "updateRepository": {
                         "title": "Update Website Repository",

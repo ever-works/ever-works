@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useTransition } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import type { Directory, VercelTeam } from '@/lib/api';
 import { cn } from '@/lib/utils/cn';
 import { toast } from 'sonner';
@@ -11,6 +11,7 @@ import { RefreshCw, Info, Loader2, Triangle } from 'lucide-react';
 import { useDirectoryDetail } from '../DirectoryDetailContext';
 import { Button } from '@/components/ui/button';
 import { pageIntervalRefresh } from '@/lib/utils';
+import { VercelTeamSelectionDialog } from './VercelTeamSelectionDialog';
 
 interface DeployFormProps {
     directory: Directory;
@@ -18,10 +19,12 @@ interface DeployFormProps {
     vercelTeams?: VercelTeam[];
 }
 
-export function DeployForm({ directory, isDeploying }: DeployFormProps) {
+export function DeployForm({ directory, isDeploying, vercelTeams = [] }: DeployFormProps) {
     const t = useTranslations('dashboard.directoryDetail.deploy');
     const [isPending, startTransition] = useTransition();
     const router = useRouter();
+    const [isTeamDialogOpen, setIsTeamDialogOpen] = useState(false);
+    const hasVercelTeams = vercelTeams.length > 0;
 
     useEffect(() => {
         if (isDeploying) {
@@ -30,10 +33,10 @@ export function DeployForm({ directory, isDeploying }: DeployFormProps) {
         }
     }, [isDeploying, router]);
 
-    const handleDeploy = () => {
+    const runDeploy = (teamId?: string) => {
         startTransition(async () => {
             try {
-                const result = await deployToVercel(directory.id);
+                const result = await deployToVercel(directory.id, teamId);
 
                 if (result.success && result.data) {
                     if (result.data.status === 'pending') {
@@ -52,8 +55,34 @@ export function DeployForm({ directory, isDeploying }: DeployFormProps) {
         });
     };
 
+    const handleDeployClick = () => {
+        if (isPending || isDeploying) {
+            return;
+        }
+
+        if (!hasVercelTeams) {
+            runDeploy();
+            return;
+        }
+
+        setIsTeamDialogOpen(true);
+    };
+
+    const handleConfirmDeploy = (teamId: string) => {
+        setIsTeamDialogOpen(false);
+        runDeploy(teamId);
+    };
+
     return (
         <div className="space-y-6">
+            <VercelTeamSelectionDialog
+                open={isTeamDialogOpen}
+                teams={vercelTeams}
+                isSubmitting={isPending || isDeploying}
+                onConfirm={handleConfirmDeploy}
+                onCancel={() => setIsTeamDialogOpen(false)}
+            />
+
             {/* Deploy to Vercel Section */}
             <div className="rounded-lg bg-surface dark:bg-surface-dark border border-border dark:border-border-dark p-6">
                 <div className="flex items-start gap-4">
@@ -94,7 +123,7 @@ export function DeployForm({ directory, isDeploying }: DeployFormProps) {
                         )}
 
                         <Button
-                            onClick={handleDeploy}
+                            onClick={handleDeployClick}
                             disabled={isPending || isDeploying}
                             size="lg"
                         >
