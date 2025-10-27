@@ -115,10 +115,11 @@ export function ChatInterface() {
         },
     });
 
-    const scrollToBottom = useCallback(() => {
-        if (endRef.current) {
-            endRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
-        }
+    const scrollToBottom = useCallback((behavior: ScrollBehavior = 'auto') => {
+        if (!endRef.current) return;
+        requestAnimationFrame(() => {
+            endRef.current?.scrollIntoView({ behavior, block: 'end' });
+        });
     }, []);
 
     const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -149,7 +150,7 @@ export function ChatInterface() {
 
         setMessages((prev) => [...prev, userMessage, assistantMessage]);
 
-        scrollToBottom();
+        scrollToBottom('auto');
 
         const activeSessionId = ensureSessionId();
 
@@ -195,8 +196,8 @@ export function ChatInterface() {
     }, []);
 
     useEffect(() => {
-        scrollToBottom();
-    }, [messages, scrollToBottom]);
+        scrollToBottom(isStreaming ? 'auto' : 'smooth');
+    }, [messages, isStreaming, scrollToBottom]);
 
     return (
         <div className="flex flex-col h-full min-h-0">
