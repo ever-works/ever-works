@@ -10,6 +10,7 @@ import { MailModule } from './mail/mail.module';
 import { LoggingInterceptor } from './logging.interceptor';
 import { MonitoringModule, SentryInterceptor, PostHogInterceptor } from '@packages/monitoring';
 import { APIController } from './api.controller';
+import { AiConversationModule } from './ai-conversation/ai-conversation.module';
 
 @Module({
     imports: [
@@ -26,6 +27,7 @@ import { APIController } from './api.controller';
             },
         }),
         AuthModule,
+        AiConversationModule,
         DirectoriesModule,
         MailModule,
     ],

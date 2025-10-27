@@ -18,7 +18,7 @@ export async function nextApiResponseStreaming(
                         // If chunk indicates completion, close the stream
                         if (chunk.done) {
                             controller.close();
-                            break;
+                            return;
                         }
                     }
                     controller.close();

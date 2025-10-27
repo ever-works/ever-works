@@ -72,8 +72,8 @@
     "peerDependencies": {
         "@nestjs/common": "^11.1",
         "@nestjs/core": "^11.1",
-        "@nestjs/platform-express": "^11.1",
         "@nestjs/event-emitter": "^3.0",
+        "@nestjs/platform-express": "^11.1",
         "better-sqlite3": "^12.2",
         "mysql2": "^3.14",
         "pg": "^8.16",
@@ -134,6 +134,8 @@
         "@nestjs/typeorm": "^11.0.0",
         "@supabase/supabase-js": "^2.50.3",
         "@tavily/core": "^0.3.7",
+        "@trigger.dev/build": "^4.0.4",
+        "@trigger.dev/sdk": "4.0.4",
         "@types/cheerio": "^1.0.0",
         "@types/fs-extra": "^11.0.4",
         "@types/string-similarity": "^4.0.2",
