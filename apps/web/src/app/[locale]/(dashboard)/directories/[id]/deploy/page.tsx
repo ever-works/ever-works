@@ -1,4 +1,4 @@
-import { authAPI, Directory, directoryAPI } from '@/lib/api';
+import { authAPI, deployAPI, Directory, directoryAPI } from '@/lib/api';
 import { notFound, redirect } from 'next/navigation';
 import { ROUTES } from '@/lib/constants';
 import { DeployForm } from '@/components/directories/detail/deploy/DeployForm';
@@ -39,7 +39,16 @@ export default async function DeployPage({ params }: DeployPageParams) {
         return <VercelTokenAlert />;
     }
 
-    return <DeployForm directory={directory} isDeploying={isDeploying(directory)} />;
+    // Get vercel teams
+    const vercelTeamsResponse = await deployAPI.getVercelTeams().catch(() => null);
+
+    return (
+        <DeployForm
+            directory={directory}
+            isDeploying={isDeploying(directory)}
+            vercelTeams={vercelTeamsResponse?.teams || []}
+        />
+    );
 }
 
 function isDeploying(directory: Directory) {

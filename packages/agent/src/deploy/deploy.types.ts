@@ -9,6 +9,7 @@ export interface BaseInput {
 export interface VercelInput extends BaseInput {
     provider: 'vercel';
     data: {
+        vercelTeamScope?: string;
         vercelToken: string;
         ghToken?: string;
     };

@@ -3,6 +3,7 @@ import {
     Body,
     Controller,
     ForbiddenException,
+    HttpException,
     NotFoundException,
     Param,
     Post,
@@ -14,6 +15,7 @@ import { AuthService, CurrentUser, JwtAuthGuard } from '../auth';
 import { AuthenticatedUser } from '../auth/types/jwt.types';
 import { VercelDeploymentVerifierService } from './tasks/vercel-deployment-verifier.service';
 import { Directory } from '@packages/agent/entities';
+import { VercelTokenDto } from './dto/deploy.dto';
 
 @Controller('api/deploy')
 @UseGuards(JwtAuthGuard)
@@ -31,7 +33,7 @@ export class DeployController {
         @Body() deployVercel: DeployVercelDto,
         @Param('id') id: string,
     ) {
-        const { VERCEL_TOKEN, GITHUB_TOKEN } = deployVercel;
+        const { VERCEL_TOKEN, GITHUB_TOKEN, vercelTeamScope } = deployVercel;
 
         const user = await this.authService.getUser(auth.userId);
         const directory = await this.validateDirectoryOwnership(id, user.id);
@@ -47,7 +49,7 @@ export class DeployController {
             });
         }
 
-        const valid = await this.vercelDeploymentVerifierService.validateToken(vercelToken);
+        const valid = await this.vercelService.validateToken(vercelToken);
         if (!valid) {
             throw new BadRequestException({
                 status: 'error',
@@ -62,8 +64,9 @@ export class DeployController {
                 repo: directory.getWebsiteRepo(),
                 provider: 'vercel',
                 data: {
-                    vercelToken: vercelToken,
-                    ghToken: ghToken,
+                    vercelTeamScope,
+                    vercelToken,
+                    ghToken,
                 },
             },
             directory,
@@ -71,7 +74,11 @@ export class DeployController {
         );
 
         if (deploymentInitiated) {
-            this.vercelDeploymentVerifierService.startVerification(directory, vercelToken);
+            this.vercelDeploymentVerifierService.startVerification(
+                directory,
+                vercelToken,
+                vercelTeamScope,
+            );
         }
 
         return {
@@ -81,6 +88,39 @@ export class DeployController {
             repository: `${directory.getRepoOwner()}/${directory.getWebsiteRepo()}`,
             message: 'Deployment started',
         };
+    }
+
+    @Post('/vercel/validate-token')
+    async validateToken(@Body() deployToken: VercelTokenDto) {
+        const userInfo = await this.vercelService.validateToken(deployToken.token);
+
+        return {
+            status: userInfo ? 'success' : 'error',
+            valid: Boolean(userInfo),
+            userInfo: userInfo || null,
+        };
+    }
+
+    @Post('/vercel/teams')
+    async getVercelTeams(@CurrentUser() auth: AuthenticatedUser) {
+        try {
+            const user = await this.authService.getUser(auth.userId);
+            if (!user.vercelToken) {
+                throw new Error('You need to configure the Vercel token first.');
+            }
+
+            const teams = await this.vercelService.getAccountTeams(user.vercelToken);
+
+            return {
+                status: 'success',
+                teams,
+            };
+        } catch (error) {
+            throw new BadRequestException({
+                status: 'error',
+                message: error?.message,
+            });
+        }
     }
 
     private async validateDirectoryOwnership(

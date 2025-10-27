@@ -3,7 +3,7 @@ import chalk from 'chalk';
 import ora from 'ora';
 import { requireAuth } from '../auth';
 import { getApiService } from '../../services/api.service';
-import { DirectoryPromptService } from './directory-prompt.service';
+import { DirectoryPromptService, Directory } from './directory-prompt.service';
 import { handleCliError } from '../../utils/error';
 import {
     GenerateStatusType,
@@ -69,22 +69,26 @@ export const statusCommand = new Command('status')
                         directory.id,
                     );
 
-                    if (freshDirectory.generateStatus?.status === GenerateStatusType.GENERATED) {
+                    const status = freshDirectory.generateStatus?.status;
+
+                    if (status === GenerateStatusType.GENERATED) {
                         spinner.succeed('\n✓ Generation process finished!');
                         cleanup();
+                        printDirectorySummary(freshDirectory);
+                        return;
+                    }
 
-                        // Show additional info if available
-                        console.log(chalk.cyan('\n--- Generation Complete ---'));
-                        console.log(chalk.gray('  • Directory is ready for use'));
-                    } else if (freshDirectory.generateStatus?.status === GenerateStatusType.ERROR) {
+                    if (status === GenerateStatusType.ERROR) {
                         spinner.fail('\n✗ Generation failed');
-
                         if (freshDirectory.generateStatus?.error) {
                             console.log(chalk.red(`Error: ${freshDirectory.generateStatus.error}`));
                         }
                         cleanup();
-                    } else {
-                        // Update spinner text with current step
+                        printDirectorySummary(freshDirectory);
+                        return;
+                    }
+
+                    if (status === GenerateStatusType.GENERATING) {
                         const elapsed = Math.floor((Date.now() - startTime) / 1000);
                         const timeStr = `[${Math.floor(elapsed / 60)}m ${elapsed % 60}s]`;
 
@@ -97,7 +101,12 @@ export const statusCommand = new Command('status')
                         } else {
                             spinner.text = `Generating ${timeStr}...`;
                         }
+                        return;
                     }
+
+                    cleanup();
+                    console.log(chalk.yellow('\n⚠ No active generation detected.'));
+                    printDirectorySummary(freshDirectory);
                 } catch (error) {
                     spinner.fail('Failed to fetch directory status');
                     console.error(chalk.red('Error details:'), error);
@@ -115,3 +124,46 @@ export const statusCommand = new Command('status')
             process.exit(1);
         }
     });
+
+function formatStatus(status?: string) {
+    if (!status) {
+        return 'not started';
+    }
+    return status.toLowerCase();
+}
+
+function printDirectorySummary(directory: Directory) {
+    console.log(chalk.cyan('\n--- Directory Status ---'));
+    console.log(chalk.gray('Name:'), chalk.white(directory.name));
+    console.log(
+        chalk.gray('Generation status:'),
+        chalk.white(formatStatus(directory.generateStatus?.status)),
+    );
+
+    if (directory.generateStatus?.error) {
+        console.log(chalk.red(`Generation error: ${directory.generateStatus.error}`));
+    }
+
+    if (directory.generateStatus?.step) {
+        const step = directory.generateStatus.step as ItemsGeneratorStep;
+        console.log(chalk.gray('Last step:'), chalk.white(getStepText(step)));
+    }
+
+    console.log(
+        chalk.gray('Deployment status:'),
+        chalk.white(
+            directory.deploymentState ? directory.deploymentState.toLowerCase() : 'unknown',
+        ),
+    );
+
+    if (directory.deploymentStartedAt) {
+        console.log(
+            chalk.gray('Last deployment:'),
+            chalk.white(new Date(directory.deploymentStartedAt).toLocaleString()),
+        );
+    }
+
+    if (directory.website) {
+        console.log(chalk.gray('Website URL:'), chalk.white(directory.website));
+    }
+}

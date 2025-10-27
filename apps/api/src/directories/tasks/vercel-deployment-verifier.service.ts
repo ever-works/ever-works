@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DirectoryRepository } from '@packages/agent/database';
+import { VercelService } from '@packages/agent/deploy';
 import { Directory } from '@packages/agent/entities';
 
 type CancelVerification = () => void;
@@ -18,24 +19,20 @@ export class VercelDeploymentVerifierService {
     private readonly logger = new Logger(VercelDeploymentVerifierService.name);
     private queue: Map<string, CancelVerification> = new Map();
 
-    constructor(private readonly repository: DirectoryRepository) {}
+    constructor(
+        private readonly repository: DirectoryRepository,
+        private readonly vercelService: VercelService,
+    ) {}
 
-    async startVerification(directory: Directory, vercelToken: string) {
+    async startVerification(directory: Directory, vercelToken: string, vercelTeamScope?: string) {
         this.logger.log(`Starting verification for directory ${directory.id}`);
 
         this.cancelVerification(directory.id);
 
-        this.queue.set(directory.id, await this.verifyDeployment(directory, vercelToken));
-    }
-
-    async validateToken(vercelToken: string) {
-        const vercel = await this.createVercelSDK(vercelToken);
-        try {
-            await vercel.user.getAuthUser();
-            return true;
-        } catch (error) {
-            return false;
-        }
+        this.queue.set(
+            directory.id,
+            await this.verifyDeployment(directory, vercelToken, vercelTeamScope),
+        );
     }
 
     private cancelVerification(directoryId: string) {
@@ -43,8 +40,12 @@ export class VercelDeploymentVerifierService {
         cancelVerification?.();
     }
 
-    private async verifyDeployment(directory: Directory, vercelToken: string) {
-        const vercel = await this.createVercelSDK(vercelToken);
+    private async verifyDeployment(
+        directory: Directory,
+        vercelToken: string,
+        vercelTeamScope?: string,
+    ) {
+        const vercel = await this.vercelService.createVercelSDK(vercelToken);
 
         const FETCH_LIMIT = 18; // 3 minutes (POLL_INTERVAL * FETCH_LIMIT)
         const POLL_INTERVAL = 10 * 1000; // 10 seconds
@@ -91,6 +92,7 @@ export class VercelDeploymentVerifierService {
                 const response = await vercel.projects.getProjects({
                     limit: '100',
                     search: directory.slug,
+                    slug: vercelTeamScope,
                 });
 
                 // Find the project
@@ -107,6 +109,7 @@ export class VercelDeploymentVerifierService {
 
                 const projectDomains = await vercel.projects.getProjectDomains({
                     idOrName: project.id,
+                    slug: vercelTeamScope,
                 });
 
                 const customDomain =
@@ -162,11 +165,5 @@ export class VercelDeploymentVerifierService {
         }, POLL_INTERVAL);
 
         return () => cleanup('CANCELED');
-    }
-
-    private async createVercelSDK(token: string) {
-        const { Vercel } = await import('@vercel/sdk');
-
-        return new Vercel({ bearerToken: token });
     }
 }

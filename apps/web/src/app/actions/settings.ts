@@ -2,13 +2,13 @@
 
 import { z } from 'zod';
 import { authAPI } from '@/lib/api/auth';
-import { settingsAPI } from '@/lib/api/settings';
 import { getAuthFromCookie } from '@/lib/auth';
 import { revalidatePath } from 'next/cache';
 import { ROUTES } from '@/lib/constants';
 import { getTranslations } from 'next-intl/server';
 import { VALIDATION_RULES } from './validation';
 import { OAuthProvider } from '@/lib/api/enums';
+import { deployAPI } from '@/lib/api/deploy';
 
 // Note: Validation schemas are now created inside each function with translations
 
@@ -120,6 +120,15 @@ export async function updateVercelToken(token: string) {
             return {
                 success: false,
                 error: validation.error.errors[0].message,
+            };
+        }
+
+        const validationResponse = await deployAPI.validateVercelToken(validation.data.token);
+
+        if (validationResponse.status !== 'success' || !validationResponse.valid) {
+            return {
+                success: false,
+                error: t('validationFailed'),
             };
         }
 

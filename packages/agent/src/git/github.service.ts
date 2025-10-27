@@ -6,8 +6,11 @@ import * as fs from 'node:fs';
 import * as http from 'isomorphic-git/http/node';
 import git from 'isomorphic-git';
 
-export const ACTIVE_WORKFLOW_NAMES = ['Vercel Deployment'];
-export const ACTIVE_WORKFLOW_FILES = ['.github/workflows/deploy_vercel.yaml'];
+export const ACTIVE_WORKFLOW_NAMES = ['Vercel Deployment', 'Production deployment'];
+export const ACTIVE_WORKFLOW_FILES = [
+    '.github/workflows/deploy_vercel.yaml',
+    '.github/workflows/deploy_prod.yaml',
+];
 
 @Injectable()
 export class GithubService extends GitProvider {

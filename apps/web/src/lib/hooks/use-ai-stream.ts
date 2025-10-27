@@ -46,6 +46,33 @@ export function useAIStream(options?: UseAIStreamOptions) {
                 let buffer = '';
                 let fullContent = '';
 
+                const parseStreamLine = (line: string): StreamChunk | null => {
+                    const trimmed = line.trim();
+                    if (!trimmed) {
+                        return null;
+                    }
+
+                    const candidates: string[] = [trimmed];
+
+                    if (!(trimmed.startsWith('{') && trimmed.endsWith('}'))) {
+                        const start = trimmed.indexOf('{');
+                        const end = trimmed.lastIndexOf('}');
+                        if (start !== -1 && end !== -1 && end >= start) {
+                            candidates.push(trimmed.slice(start, end + 1));
+                        }
+                    }
+
+                    for (const candidate of candidates) {
+                        try {
+                            return JSON.parse(candidate);
+                        } catch {
+                            continue;
+                        }
+                    }
+
+                    return null;
+                };
+
                 while (true) {
                     const { done, value } = await reader.read();
 
@@ -53,7 +80,11 @@ export function useAIStream(options?: UseAIStreamOptions) {
                         // Process any remaining buffer
                         if (buffer.trim()) {
                             try {
-                                const chunk = JSON.parse(buffer);
+                                const chunk = parseStreamLine(buffer);
+                                if (!chunk) {
+                                    console.error('Failed to parse final buffer:', buffer);
+                                    break;
+                                }
                                 if (chunk.content) {
                                     fullContent += chunk.content;
                                     setContent(fullContent);
@@ -74,27 +105,27 @@ export function useAIStream(options?: UseAIStreamOptions) {
 
                     for (const line of lines) {
                         if (line.trim()) {
-                            try {
-                                const chunk: StreamChunk = JSON.parse(line);
-
-                                if (chunk.error) {
-                                    throw new Error(chunk.error);
-                                }
-
-                                if (chunk.content) {
-                                    fullContent += chunk.content;
-                                    setContent(fullContent);
-                                }
-
-                                options?.onChunk?.(chunk);
-
-                                if (chunk.done) {
-                                    options?.onComplete?.(fullContent);
-                                    setIsStreaming(false);
-                                    return fullContent;
-                                }
-                            } catch (e) {
+                            const chunk = parseStreamLine(line);
+                            if (!chunk) {
                                 console.error('Failed to parse line:', line);
+                                continue;
+                            }
+
+                            if (chunk.error) {
+                                throw new Error(chunk.error);
+                            }
+
+                            if (chunk.content) {
+                                fullContent += chunk.content;
+                                setContent(fullContent);
+                            }
+
+                            options?.onChunk?.(chunk);
+
+                            if (chunk.done) {
+                                options?.onComplete?.(fullContent);
+                                setIsStreaming(false);
+                                return fullContent;
                             }
                         }
                     }

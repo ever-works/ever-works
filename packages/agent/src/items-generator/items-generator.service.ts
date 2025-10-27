@@ -21,6 +21,13 @@ import { Directory } from '../entities';
 import { ItemsGeneratorStep } from './constants/steps';
 import { AiService } from '../ai';
 
+export type ExistingItems = {
+    existingItems?: ItemData[];
+    existingCategories?: Category[];
+    existingTags?: Tag[];
+    existingConfig?: IDataConfig;
+};
+
 @Injectable()
 export class ItemsGeneratorService {
     private readonly logger = new Logger(ItemsGeneratorService.name);
@@ -51,12 +58,7 @@ export class ItemsGeneratorService {
     async generateItems(
         directory: Directory,
         createItemsGeneratorDto: CreateItemsGeneratorDto,
-        existing: {
-            existingItems?: ItemData[];
-            existingCategories?: Category[];
-            existingTags?: Tag[];
-            existingConfig?: IDataConfig;
-        } = {},
+        existing: ExistingItems = {},
         onProgress?: (step: string) => void,
     ) {
         // Make a copy of the DTO to avoid mutating the original

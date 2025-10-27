@@ -1,12 +1,12 @@
 import { Injectable } from '@nestjs/common';
-import { DeployProvider, IDeployService, VercelInput } from './deploy.types';
+import { DeployProvider, VercelInput } from './deploy.types';
 import { GithubService } from '../git/github.service';
 import { Directory } from '../entities/directory.entity';
 import { User } from '../entities/user.entity';
 import { WebsiteUpdateService } from '../website-generator/website-update.service';
 
 @Injectable()
-export class VercelService implements IDeployService {
+export class VercelService {
     private readonly PROVIDER_ID: DeployProvider = 'vercel';
 
     constructor(
@@ -14,13 +14,17 @@ export class VercelService implements IDeployService {
         private readonly websiteUpdateService: WebsiteUpdateService,
     ) {}
 
-    async deploy({ data, owner, repo }: VercelInput, directory: Directory, user: User) {
+    async deploy(vercelInput: VercelInput, directory: Directory, user: User) {
         const token = user.getGitToken();
-        const publicKey = await this.githubService.repositoryPublickey(owner, repo, token);
+        const publicKey = await this.githubService.repositoryPublickey(
+            vercelInput.owner,
+            vercelInput.repo,
+            token,
+        );
 
         await this.githubService.enableWorkflows({
-            owner,
-            repo,
+            owner: vercelInput.owner,
+            repo: vercelInput.repo,
             token,
             withDelay: false,
         });
@@ -30,8 +34,8 @@ export class VercelService implements IDeployService {
                 {
                     key: 'DEPLOY_PROVIDER',
                     value: this.PROVIDER_ID,
-                    owner,
-                    repo,
+                    owner: vercelInput.owner,
+                    repo: vercelInput.repo,
                 },
                 token,
             ),
@@ -39,8 +43,8 @@ export class VercelService implements IDeployService {
                 {
                     key: 'DATA_REPOSITORY',
                     value: `${directory.slug}-data`,
-                    owner,
-                    repo,
+                    owner: vercelInput.owner,
+                    repo: vercelInput.repo,
                 },
                 publicKey,
                 token,
@@ -48,23 +52,38 @@ export class VercelService implements IDeployService {
             this.githubService.setActionSecret(
                 {
                     key: 'VERCEL_TOKEN',
-                    value: data.vercelToken,
-                    owner,
-                    repo,
+                    value: vercelInput.data.vercelToken,
+                    owner: vercelInput.owner,
+                    repo: vercelInput.repo,
                 },
                 publicKey,
                 token,
             ),
         ];
 
-        if (data.ghToken) {
+        if (vercelInput.data.vercelTeamScope) {
+            promises.push(
+                this.githubService.setActionSecret(
+                    {
+                        key: 'VERCEL_TEAM_SCOPE',
+                        value: vercelInput.data.vercelTeamScope,
+                        owner: vercelInput.owner,
+                        repo: vercelInput.repo,
+                    },
+                    publicKey,
+                    token,
+                ),
+            );
+        }
+
+        if (vercelInput.data.ghToken) {
             promises.push(
                 this.githubService.setActionSecret(
                     {
                         key: 'GH_TOKEN',
-                        value: data.ghToken,
-                        owner,
-                        repo,
+                        value: vercelInput.data.ghToken,
+                        owner: vercelInput.owner,
+                        repo: vercelInput.repo,
                     },
                     publicKey,
                     token,
@@ -82,8 +101,8 @@ export class VercelService implements IDeployService {
                         environment: 'production',
                     },
                     branch: 'develop', // for now
-                    owner,
-                    repo,
+                    owner: vercelInput.owner,
+                    repo: vercelInput.repo,
                 },
                 token,
             );
@@ -110,5 +129,27 @@ export class VercelService implements IDeployService {
         }
 
         return false;
+    }
+
+    async getAccountTeams(vercelToken: string) {
+        const vercel = await this.createVercelSDK(vercelToken);
+        const teamsPromise = await vercel.teams.getTeams({});
+
+        return teamsPromise.teams;
+    }
+
+    async validateToken(vercelToken: string) {
+        const vercel = await this.createVercelSDK(vercelToken);
+        try {
+            const vercelUser = await vercel.user.getAuthUser();
+            return vercelUser;
+        } catch (error) {
+            return false;
+        }
+    }
+
+    async createVercelSDK(token: string) {
+        const { Vercel } = await import('@vercel/sdk');
+        return new Vercel({ bearerToken: token });
     }
 }

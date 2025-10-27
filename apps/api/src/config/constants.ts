@@ -1,6 +1,6 @@
 export const jwtConstants = {
     secret: () => process.env.JWT_SECRET || 'aesh4Dai_secret_key_here',
-    accessTokenExpiration: () => {
+    accessTokenExpiration: (): any => {
         const expiration = process.env.JWT_ACCESS_TOKEN_EXPIRATION;
         // Return undefined to disable expiration
         return expiration === 'never' ? undefined : expiration || '7d';
