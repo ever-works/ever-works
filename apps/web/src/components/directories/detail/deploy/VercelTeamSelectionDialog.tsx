@@ -80,7 +80,7 @@ export function VercelTeamSelectionDialog({
                         </option>
                         {options.map((team) => (
                             <option key={team.id} value={team.id}>
-                                {team.name ? `${team.name} (${team.slug})` : team.slug}
+                                {team.name ? `${team.name}` : team.slug}
                             </option>
                         ))}
                     </Select>

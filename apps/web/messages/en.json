@@ -1079,6 +1079,7 @@
                 "invalidFormat": "Invalid Vercel token format",
                 "saveFailed": "Failed to save Vercel token",
                 "saveSuccess": "Vercel token saved successfully",
+                "validationFailed": "The provided Vercel token is invalid. Please double-check and try again.",
                 "removeFailed": "Failed to remove Vercel token",
                 "removeSuccess": "Vercel token removed successfully"
             },

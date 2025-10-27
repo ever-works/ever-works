@@ -65,7 +65,7 @@ export class VercelService {
             promises.push(
                 this.githubService.setActionSecret(
                     {
-                        key: 'VERCEL_ORG',
+                        key: 'VERCEL_TEAM',
                         value: vercelInput.data.vercelTeamId,
                         owner: vercelInput.owner,
                         repo: vercelInput.repo,
@@ -141,7 +141,8 @@ export class VercelService {
     async validateToken(vercelToken: string) {
         const vercel = await this.createVercelSDK(vercelToken);
         try {
-            return vercel.user.getAuthUser();
+            const vercelUser = await vercel.user.getAuthUser();
+            return vercelUser;
         } catch (error) {
             return false;
         }
