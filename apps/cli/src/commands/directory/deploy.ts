@@ -3,14 +3,9 @@ import chalk from 'chalk';
 import ora from 'ora';
 import inquirer from 'inquirer';
 import { requireAuth } from '../auth';
-import { getApiService } from '../../services/api.service';
+import { getApiService, VercelTeam } from '../../services/api.service';
 import { Directory, DirectoryPromptService } from './directory-prompt.service';
 import { handleCliError } from '../../utils/error';
-
-interface DeployDto {
-    VERCEL_TOKEN?: string;
-    GITHUB_TOKEN?: string;
-}
 
 export const deployCommand = new Command('deploy')
     .description('Deploy the website for a directory')
@@ -33,6 +28,56 @@ export const deployCommand = new Command('deploy')
 
             const directory = selection.directory;
             console.log(chalk.green(`\n✓ Selected directory: ${directory.slug}`));
+
+            // Attempt to fetch Vercel teams (optional)
+            let vercelTeams: VercelTeam[] = [];
+            let vercelTeamId: string | undefined;
+            try {
+                const teamResponse = await apiService.getVercelTeams();
+                if (teamResponse.status === 'success' && Array.isArray(teamResponse.teams)) {
+                    vercelTeams = teamResponse.teams;
+                }
+            } catch (error: any) {
+                const message = error?.response?.data?.message || error?.message;
+                if (message) {
+                    console.log(
+                        chalk.yellow(
+                            `\n⚠ Could not retrieve Vercel teams (${message}). Continuing without team selection.`,
+                        ),
+                    );
+                } else {
+                    console.log(
+                        chalk.yellow(
+                            '\n⚠ Could not retrieve Vercel teams. Continuing without team selection.',
+                        ),
+                    );
+                }
+            }
+
+            if (vercelTeams.length > 0) {
+                console.log(chalk.cyan('\n--- Vercel Team Selection ---'));
+                const choices = vercelTeams.map((team) => ({
+                    name: team.name ? `${team.name} (${team.slug})` : team.slug,
+                    value: team.id,
+                }));
+
+                const { selectedTeam } = await inquirer.prompt([
+                    {
+                        type: 'list',
+                        name: 'selectedTeam',
+                        message: 'Select the Vercel team to deploy to:',
+                        choices,
+                        loop: false,
+                    },
+                ]);
+
+                vercelTeamId = selectedTeam;
+                console.log(
+                    chalk.green(
+                        `\n✓ Selected Vercel team: ${choices.find((c) => c.value === vercelTeamId)?.name}`,
+                    ),
+                );
+            }
 
             // Show information about what will happen
             console.log(chalk.cyan('\n--- Deployment Process ---'));
@@ -65,9 +110,32 @@ export const deployCommand = new Command('deploy')
             let timeoutId: NodeJS.Timeout | null = null;
 
             try {
-                await apiService.deployWebsite(directory.id);
+                const response = await apiService.deployWebsite(directory.id, {
+                    vercelTeamId,
+                });
 
-                console.log(chalk.green('\n✓ Deployment started successfully!'));
+                if (response.status === 'error') {
+                    spinner.fail('Deployment failed to start');
+                    const message = response.message || 'The API returned an error status.';
+                    console.log(chalk.red(`\n✗ ${message}`));
+                    if (response.message?.toLowerCase().includes('token')) {
+                        console.log(
+                            chalk.gray(
+                                'Hint: ensure your Vercel token is configured (`ever-works auth tokens`).',
+                            ),
+                        );
+                    }
+                    return;
+                }
+
+                console.log(chalk.green('\n✓ Deployment request accepted!'));
+                if (vercelTeamId) {
+                    const teamLabel =
+                        vercelTeams.find((team) => team.id === vercelTeamId)?.name ||
+                        vercelTeams.find((team) => team.id === vercelTeamId)?.slug ||
+                        vercelTeamId;
+                    console.log(chalk.gray('Vercel team:'), chalk.white(teamLabel));
+                }
 
                 const watchDeployment = async () => {
                     const { directory: freshDirectory } = await apiService.getDirectory(
@@ -85,6 +153,11 @@ export const deployCommand = new Command('deploy')
                                 break;
                             case 'ERROR':
                                 spinner.fail('Deployment failed');
+                                if (freshDirectory.generateStatus?.error) {
+                                    console.log(
+                                        chalk.red(`\n✗ ${freshDirectory.generateStatus.error}`),
+                                    );
+                                }
                                 break;
                             case 'CANCELED':
                                 spinner.warn('Deployment cancelled');
@@ -112,7 +185,7 @@ export const deployCommand = new Command('deploy')
                         if (STOP_STEPS.includes(freshDirectory.deploymentState as any)) {
                             console.log(
                                 chalk.blue('\nWebsite URL:'),
-                                chalk.white(directory.website),
+                                chalk.white(freshDirectory.website || directory.website || 'N/A'),
                             );
                             return;
                         }
@@ -130,9 +203,13 @@ export const deployCommand = new Command('deploy')
             if (error.response?.status === 400) {
                 console.log(
                     chalk.yellow(
-                        '\n⚠ Invalid deployment configuration. Please check your tokens and try again.',
+                        '\n⚠ Deployment failed. Please verify your Vercel setup and try again.',
                     ),
                 );
+                const message = error.response?.data?.message;
+                if (message) {
+                    console.log(chalk.gray(`Details: ${message}`));
+                }
             }
 
             process.exit(1);

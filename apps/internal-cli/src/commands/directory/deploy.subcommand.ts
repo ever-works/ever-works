@@ -47,6 +47,9 @@ export class DeploySubCommand extends CommandRunner {
 
             // Prompt for deployment options
             const deployOptions = await this.promptDeployOptions();
+            const vercelTeam = await this.promptVercelTeamSelection(
+                deployOptions.VERCEL_TOKEN || process.env.VERCEL_TOKEN,
+            );
 
             // Show information about what will happen
             console.log(chalk.cyan('\n--- Deployment Process ---'));
@@ -60,6 +63,10 @@ export class DeploySubCommand extends CommandRunner {
                 chalk.gray('\nSource repository:'),
                 chalk.white(`${directory.getRepoOwner()}/${websiteRepo}`),
             );
+
+            if (vercelTeam) {
+                console.log(chalk.gray('Vercel team:'), chalk.white(vercelTeam.label));
+            }
 
             const confirmed = await inquirer.prompt([
                 {
@@ -89,6 +96,7 @@ export class DeploySubCommand extends CommandRunner {
                         repo: directory.getWebsiteRepo(),
                         provider: 'vercel',
                         data: {
+                            vercelTeamId: vercelTeam?.id,
                             vercelToken: deployOptions.VERCEL_TOKEN || process.env.VERCEL_TOKEN,
                             ghToken: deployOptions.GITHUB_TOKEN || process.env.GH_APIKEY,
                         },
@@ -147,5 +155,54 @@ export class DeploySubCommand extends CommandRunner {
             VERCEL_TOKEN: VERCEL_TOKEN.trim() || undefined,
             GITHUB_TOKEN: GITHUB_TOKEN.trim() || undefined,
         };
+    }
+
+    private async promptVercelTeamSelection(
+        tokenFromInput?: string,
+    ): Promise<{ id: string; label: string } | undefined> {
+        const token = tokenFromInput || process.env.VERCEL_TOKEN;
+        if (!token) {
+            return undefined;
+        }
+
+        try {
+            const teams = await this.vercelService.getAccountTeams(token);
+            if (!Array.isArray(teams) || teams.length === 0) {
+                return undefined;
+            }
+
+            console.log(chalk.cyan('\n--- Vercel Team Selection ---'));
+
+            const choices = teams.map((team: any) => ({
+                name: team.name ? `${team.name} (${team.slug})` : team.slug,
+                value: team.id,
+            }));
+
+            const { vercelTeamId } = await inquirer.prompt([
+                {
+                    type: 'list',
+                    name: 'vercelTeamId',
+                    message: 'Select the Vercel team to deploy to:',
+                    choices,
+                    loop: false,
+                },
+            ]);
+
+            const selected = choices.find((choice) => choice.value === vercelTeamId);
+            console.log(chalk.green(`\n✓ Selected Vercel team: ${selected?.name || vercelTeamId}`));
+
+            return {
+                id: vercelTeamId,
+                label: selected?.name || vercelTeamId,
+            };
+        } catch (error: any) {
+            this.logger.warn(`Unable to fetch Vercel teams: ${error?.message || error}`);
+            console.log(
+                chalk.yellow(
+                    '\n⚠ Could not retrieve Vercel teams. Continuing without team selection.',
+                ),
+            );
+            return undefined;
+        }
     }
 }
