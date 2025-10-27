@@ -74,7 +74,11 @@ export class DeployController {
         );
 
         if (deploymentInitiated) {
-            this.vercelDeploymentVerifierService.startVerification(directory, vercelToken);
+            this.vercelDeploymentVerifierService.startVerification(
+                directory,
+                vercelToken,
+                vercelTeamScope,
+            );
         }
 
         return {

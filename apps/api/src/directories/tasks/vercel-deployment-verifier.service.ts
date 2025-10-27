@@ -24,12 +24,15 @@ export class VercelDeploymentVerifierService {
         private readonly vercelService: VercelService,
     ) {}
 
-    async startVerification(directory: Directory, vercelToken: string) {
+    async startVerification(directory: Directory, vercelToken: string, vercelTeamScope?: string) {
         this.logger.log(`Starting verification for directory ${directory.id}`);
 
         this.cancelVerification(directory.id);
 
-        this.queue.set(directory.id, await this.verifyDeployment(directory, vercelToken));
+        this.queue.set(
+            directory.id,
+            await this.verifyDeployment(directory, vercelToken, vercelTeamScope),
+        );
     }
 
     private cancelVerification(directoryId: string) {
@@ -37,7 +40,11 @@ export class VercelDeploymentVerifierService {
         cancelVerification?.();
     }
 
-    private async verifyDeployment(directory: Directory, vercelToken: string) {
+    private async verifyDeployment(
+        directory: Directory,
+        vercelToken: string,
+        vercelTeamScope?: string,
+    ) {
         const vercel = await this.vercelService.createVercelSDK(vercelToken);
 
         const FETCH_LIMIT = 18; // 3 minutes (POLL_INTERVAL * FETCH_LIMIT)
@@ -85,6 +92,7 @@ export class VercelDeploymentVerifierService {
                 const response = await vercel.projects.getProjects({
                     limit: '100',
                     search: directory.slug,
+                    slug: vercelTeamScope,
                 });
 
                 // Find the project
@@ -101,6 +109,7 @@ export class VercelDeploymentVerifierService {
 
                 const projectDomains = await vercel.projects.getProjectDomains({
                     idOrName: project.id,
+                    slug: vercelTeamScope,
                 });
 
                 const customDomain =
