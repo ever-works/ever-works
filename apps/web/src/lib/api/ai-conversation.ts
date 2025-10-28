@@ -25,15 +25,25 @@ export interface ConversationStartResponse {
     message: string;
 }
 
+export type ConversationMessage = {
+    role: 'user' | 'assistant' | 'system' | 'tool' | 'function';
+    content: string;
+    timestamp: string | null;
+};
+
 export interface ConversationHistoryResponse {
     sessionId: string;
     context: Record<string, any>;
     totalMessages: number;
-    messages: {
-        role: string;
-        content: string;
-        timestamp: string;
-    }[];
+    messages: ConversationMessage[];
+}
+
+export interface ConversationSummary {
+    sessionId: string;
+    title?: string;
+    createdAt: string | null;
+    updatedAt: string | null;
+    messageCount: number;
 }
 
 export interface StreamChunk {
@@ -94,6 +104,15 @@ export const aiConversationAPI = {
 
     getConversationHistory: async (sessionId: string) => {
         return serverFetch<ConversationHistoryResponse>(`/ai-conversations/${sessionId}/history`);
+    },
+
+    getRecentConversations: async (limit?: number) => {
+        const params = new URLSearchParams();
+        if (limit !== undefined) {
+            params.set('limit', limit.toString());
+        }
+        const query = params.toString() ? `?${params.toString()}` : '';
+        return serverFetch<ConversationSummary[]>(`/ai-conversations/recent${query}`);
     },
 
     // Send a message (non-streaming)

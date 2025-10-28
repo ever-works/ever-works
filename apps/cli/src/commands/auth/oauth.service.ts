@@ -21,7 +21,7 @@ const renderOAuthPage = (state: OAuthPageState, message?: string) => {
     const palette = {
         success: {
             heading: 'Authentication Successful',
-            closingScript: '<script>window.setTimeout(() => window.close(), 30 * 1000);</script>',
+            closingScript: '<script>window.setTimeout(() => window.close(), 15 * 1000);</script>',
             detail: 'You can close this window and return to the terminal. This tab will close automatically in a few seconds.',
             svg: `<svg class="icon-svg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
