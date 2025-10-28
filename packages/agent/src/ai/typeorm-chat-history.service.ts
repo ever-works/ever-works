@@ -113,6 +113,11 @@ export class TypeORMChatMessageHistory extends BaseListChatMessageHistory {
                 additional_kwargs: msg.additionalKwargs || {},
             };
 
+            baseProps.additional_kwargs.timestamp = msg.createdAt.toISOString();
+            baseProps.additional_kwargs.created_at = msg.createdAt.toISOString();
+            baseProps.additional_kwargs.createdAt = msg.createdAt.toISOString();
+            baseProps.additional_kwargs.time = msg.createdAt.toISOString();
+
             // Add function_call and tool_calls to additional_kwargs for AI messages
             if (msg.role === 'assistant') {
                 if (msg.functionCall) {
