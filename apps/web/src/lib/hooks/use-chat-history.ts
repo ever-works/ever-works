@@ -26,7 +26,9 @@ export interface UseChatHistoryValue {
 const INITIAL_ASSISTANT_MESSAGE =
     'Hi! I can help you create directories using natural language. Ask something like "Create a directory for AI tools" or describe what you need.';
 
-const generateMessageId = () => `msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+export const generateMessageId = () =>
+    `msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
 export const generateSessionId = () =>
     `session_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
 

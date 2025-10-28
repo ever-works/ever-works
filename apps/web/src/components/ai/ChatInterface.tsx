@@ -3,7 +3,8 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils/cn';
 import { useAIStream } from '@/lib/hooks/use-ai-stream';
-import { useChatHistory, ChatMessage, generateSessionId } from '@/lib/hooks/use-chat-history';
+import { useChatContext } from '@/components/ai/ChatProvider';
+import { ChatMessage, generateMessageId } from '@/lib/hooks/use-chat-history';
 import { ROUTES, routeWithParams } from '@/lib/constants';
 
 export function ChatInterface() {
@@ -16,7 +17,7 @@ export function ChatInterface() {
         markSessionId,
         loadHistory,
         resetHistory,
-    } = useChatHistory();
+    } = useChatContext();
 
     const [input, setInput] = useState('');
     const [errorMessage, setErrorMessage] = useState<string | null>(historyError);
@@ -116,14 +117,14 @@ export function ChatInterface() {
         const now = new Date().toISOString();
 
         const userMessage: ChatMessage = {
-            id: generateSessionId(),
+            id: generateMessageId(),
             role: 'user',
             content: trimmed,
             timestamp: now,
         };
 
         const assistantMessage: ChatMessage = {
-            id: generateSessionId(),
+            id: generateMessageId(),
             role: 'assistant',
             content: '',
             timestamp: now,
@@ -210,59 +211,61 @@ export function ChatInterface() {
                     </div>
                 ) : (
                     messages.map((message) => {
-                    const isUser = message.role === 'user';
-                    return (
-                        <div
-                            key={message.id}
-                            className={cn('flex', isUser ? 'justify-end' : 'justify-start')}
-                        >
+                        const isUser = message.role === 'user';
+                        return (
                             <div
-                                className={cn(
-                                    'max-w-[90%] rounded-lg px-3 py-2 motion-safe:animate-fade-in',
-                                    isUser
-                                        ? 'bg-primary text-white'
-                                        : 'bg-surface-tertiary dark:bg-surface-tertiary-dark text-text dark:text-text-dark',
-                                    message.error &&
-                                        'border border-danger/60 text-danger dark:text-danger',
-                                )}
+                                key={message.id}
+                                className={cn('flex', isUser ? 'justify-end' : 'justify-start')}
                             >
-                                {message.content && (
-                                    <p className="text-xs leading-relaxed whitespace-pre-wrap">
-                                        {message.content}
-                                    </p>
-                                )}
-
-                                {message.isStreaming && !message.content && (
-                                    <div className="flex space-x-1 py-1">
-                                        <span className="w-1.5 h-1.5 bg-text-muted dark:bg-text-muted-dark rounded-full animate-bounce" />
-                                        <span
-                                            className="w-1.5 h-1.5 bg-text-muted dark:bg-text-muted-dark rounded-full animate-bounce"
-                                            style={{ animationDelay: '150ms' }}
-                                        />
-                                        <span
-                                            className="w-1.5 h-1.5 bg-text-muted dark:bg-text-muted-dark rounded-full animate-bounce"
-                                            style={{ animationDelay: '300ms' }}
-                                        />
-                                    </div>
-                                )}
-
-                                {message.error && (
-                                    <p className="text-[11px] mt-1 text-danger">{message.error}</p>
-                                )}
-
-                                <p
+                                <div
                                     className={cn(
-                                        'text-[10px] mt-1',
+                                        'max-w-[90%] rounded-lg px-3 py-2 motion-safe:animate-fade-in',
                                         isUser
-                                            ? 'text-white/70'
-                                            : 'text-text-muted dark:text-text-muted-dark',
+                                            ? 'bg-primary text-white'
+                                            : 'bg-surface-tertiary dark:bg-surface-tertiary-dark text-text dark:text-text-dark',
+                                        message.error &&
+                                            'border border-danger/60 text-danger dark:text-danger',
                                     )}
                                 >
-                                    {formatTimestamp(message.timestamp)}
-                                </p>
+                                    {message.content && (
+                                        <p className="text-xs leading-relaxed whitespace-pre-wrap">
+                                            {message.content}
+                                        </p>
+                                    )}
+
+                                    {message.isStreaming && !message.content && (
+                                        <div className="flex space-x-1 py-1">
+                                            <span className="w-1.5 h-1.5 bg-text-muted dark:bg-text-muted-dark rounded-full animate-bounce" />
+                                            <span
+                                                className="w-1.5 h-1.5 bg-text-muted dark:bg-text-muted-dark rounded-full animate-bounce"
+                                                style={{ animationDelay: '150ms' }}
+                                            />
+                                            <span
+                                                className="w-1.5 h-1.5 bg-text-muted dark:bg-text-muted-dark rounded-full animate-bounce"
+                                                style={{ animationDelay: '300ms' }}
+                                            />
+                                        </div>
+                                    )}
+
+                                    {message.error && (
+                                        <p className="text-[11px] mt-1 text-danger">
+                                            {message.error}
+                                        </p>
+                                    )}
+
+                                    <p
+                                        className={cn(
+                                            'text-[10px] mt-1',
+                                            isUser
+                                                ? 'text-white/70'
+                                                : 'text-text-muted dark:text-text-muted-dark',
+                                        )}
+                                    >
+                                        {formatTimestamp(message.timestamp)}
+                                    </p>
+                                </div>
                             </div>
-                        </div>
-                    );
+                        );
                     })
                 )}
                 <div ref={endRef} />
