@@ -21,7 +21,7 @@ function redirect(locale: string, to: string, req: NextRequest) {
     return NextResponse.redirect(new URL(url, req.url));
 }
 
-export default async function middleware(req: NextRequest) {
+export default async function proxy(req: NextRequest) {
     const originalPathname = req.nextUrl.pathname;
 
     const intlResponse = await nextIntlMiddleware(req);
