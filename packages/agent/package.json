@@ -33,6 +33,14 @@
             "types": "./dist/git/index.d.ts",
             "default": "./dist/git/index.js"
         },
+        "./directory": {
+            "types": "./dist/directory/index.d.ts",
+            "default": "./dist/directory/index.js"
+        },
+        "./trigger": {
+            "types": "./dist/trigger/index.d.ts",
+            "default": "./dist/trigger/index.js"
+        },
         "./items-generator": {
             "types": "./dist/items-generator/index.d.ts",
             "default": "./dist/items-generator/index.js"

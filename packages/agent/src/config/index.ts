@@ -14,6 +14,31 @@ export const config = {
         return this.getAppType() === 'cli';
     },
 
+    trigger: {
+        isEnabled() {
+            return process.env.TRIGGER_ENABLED === 'true';
+        },
+        getSecretKey() {
+            return process.env.TRIGGER_SECRET_KEY;
+        },
+        getApiUrl() {
+            return process.env.TRIGGER_API_URL;
+        },
+        getInternalBaseUrl() {
+            return process.env.TRIGGER_INTERNAL_API_URL;
+        },
+        getInternalSecret() {
+            return process.env.TRIGGER_INTERNAL_SECRET;
+        },
+        shouldUseTrigger() {
+            return (
+                this.isEnabled() &&
+                Boolean(this.getInternalBaseUrl()) &&
+                Boolean(this.getInternalSecret())
+            );
+        },
+    },
+
     // Database configuration
     database: {
         getType() {

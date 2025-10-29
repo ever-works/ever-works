@@ -36,6 +36,12 @@ import { ItemSubmissionService } from '../items-generator/item-submission.servic
 import { ItemsGeneratorService } from '../items-generator/items-generator.service';
 import { GenerateStatusType } from '../entities/types';
 import { UpdateDirectoryDto } from '../dto';
+import { TriggerService } from '@src/trigger';
+import {
+    DIRECTORY_GENERATION_MODE,
+    DirectoryGenerationMode,
+    DirectoryGenerationPayload,
+} from '@src/tasks/trigger/directory-generation.task';
 
 @Injectable()
 export class AgentService {
@@ -50,6 +56,7 @@ export class AgentService {
         private readonly itemsGeneratorService: ItemsGeneratorService,
         private readonly directoryRepository: DirectoryRepository,
         private readonly eventEmitter: EventEmitter2,
+        private readonly triggerService: TriggerService,
     ) {}
 
     async getDirectories(
@@ -381,7 +388,12 @@ export class AgentService {
                 });
             }
         } else {
-            void this.processGeneration(directory, user, createItemsGeneratorDto);
+            await this.dispatchGenerationTask(
+                DIRECTORY_GENERATION_MODE.CREATE,
+                directory,
+                user,
+                createItemsGeneratorDto,
+            );
         }
 
         return {
@@ -432,7 +444,12 @@ export class AgentService {
                 });
             }
         } else {
-            void this.processGeneration(directory, user, lastRequestData);
+            await this.dispatchGenerationTask(
+                DIRECTORY_GENERATION_MODE.UPDATE,
+                directory,
+                user,
+                lastRequestData,
+            );
         }
 
         return {
@@ -790,6 +807,30 @@ export class AgentService {
 
         // Return original message if no pattern matches
         return message;
+    }
+
+    private async dispatchGenerationTask(
+        mode: DirectoryGenerationMode,
+        directory: Directory,
+        user: User,
+        dto: CreateItemsGeneratorDto,
+    ) {
+        const payload: DirectoryGenerationPayload = {
+            directoryId: directory.id,
+            userId: user.id,
+            mode,
+            dto,
+        };
+
+        const dispatched = await this.triggerService.dispatchDirectoryGeneration(payload);
+
+        if (!dispatched) {
+            this.logger.warn(
+                `Trigger dispatch failed, falling back to in-process generation for directory ${directory.id} (${mode})`,
+            );
+
+            void this.processGeneration(directory, user, dto);
+        }
     }
 
     private async processGeneration(

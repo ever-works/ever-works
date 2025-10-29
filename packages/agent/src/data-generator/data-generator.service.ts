@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject } from '@nestjs/common';
 import { GithubService } from '../git/github.service';
 import { Directory } from '../entities/directory.entity';
 import { User } from '../entities/user.entity';
@@ -13,10 +13,10 @@ import {
     CompanyDto,
 } from '../items-generator/dto';
 import { format } from 'date-fns';
-import { DirectoryRepository } from '../database';
 import { GenerateStatusType } from '../entities/types';
 import { LEGAL_NOTICE, LICENSE_TEXT } from './texts';
 import { ItemsGeneratorStep } from '../items-generator/constants/steps';
+import { DIRECTORY_OPERATIONS, DirectoryOperations } from '@src/directory';
 
 @Injectable()
 export class DataGeneratorService {
@@ -25,7 +25,8 @@ export class DataGeneratorService {
     constructor(
         private readonly githubService: GithubService,
         private readonly itemsGeneratorService: ItemsGeneratorService,
-        private readonly directoryRepository: DirectoryRepository,
+        @Inject(DIRECTORY_OPERATIONS)
+        private readonly directoryOperations: DirectoryOperations,
     ) {}
 
     async initialize(
@@ -247,7 +248,7 @@ export class DataGeneratorService {
             this.logger.log(`All processed and pushed to ${directory.getRepoOwner()}/${repo}`);
 
             // Update directory items count
-            this.directoryRepository.update(directory.id, {
+            await this.directoryOperations.updateDirectory(directory.id, {
                 itemsCount: generatedItems.items.length + existingData.existingItems.length,
             });
 
@@ -276,7 +277,7 @@ export class DataGeneratorService {
                 };
 
                 // Save PR details to the directory
-                await this.directoryRepository.updateLastPullRequest(directory.id, {
+                await this.directoryOperations.updateLastPullRequest(directory.id, {
                     data: {
                         branch: newBranchName,
                         title: prTitle,
@@ -408,7 +409,7 @@ export class DataGeneratorService {
      * Callback for generation progress
      */
     private async onGenerationProgress(step: string, directory: Directory) {
-        await this.directoryRepository.updateGenerateStatus(directory.id, {
+        await this.directoryOperations.updateGenerateStatus(directory.id, {
             status: GenerateStatusType.GENERATING,
             step,
         });

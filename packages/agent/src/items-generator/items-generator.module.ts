@@ -19,43 +19,44 @@ import {
     NewItemsExtractorService,
     AiDeduplicatorService,
 } from './steps/data-aggregation';
-import { GithubService } from '../git/github.service';
 import { AiModule } from '../ai';
+import { GitModule } from '../git';
+
+export const STEP_SERVICES = [
+    // Shared services
+    SearchService,
+    NotionService,
+    BadgeEvaluationService,
+
+    // Data aggregation shared services
+    SharedUtilsService,
+    NewItemsExtractorService,
+    AiDeduplicatorService,
+
+    // Main service
+    ItemsGeneratorService,
+    ItemSubmissionService,
+
+    // Step services
+    PromptComparisonService,
+    PromptProcessingService,
+    AiItemGenerationService,
+    SearchQueryGenerationService,
+    WebPageRetrievalService,
+    ContentFilteringService,
+    ItemExtractionService,
+    SourceValidationService,
+    DataAggregationService,
+    CategoryProcessingService,
+    MarkdownGenerationService,
+    BadgeProcessingService,
+];
+
+export const STEP_SERVICES_EXPORTS = [ItemsGeneratorService, ItemSubmissionService];
 
 @Module({
-    imports: [AiModule],
-    providers: [
-        // Shared services
-        SearchService,
-        NotionService,
-        BadgeEvaluationService,
-
-        // Data aggregation shared services
-        SharedUtilsService,
-        NewItemsExtractorService,
-        AiDeduplicatorService,
-
-        // External services
-        GithubService,
-
-        // Main service
-        ItemsGeneratorService,
-        ItemSubmissionService,
-
-        // Step services
-        PromptComparisonService,
-        PromptProcessingService,
-        AiItemGenerationService,
-        SearchQueryGenerationService,
-        WebPageRetrievalService,
-        ContentFilteringService,
-        ItemExtractionService,
-        SourceValidationService,
-        DataAggregationService,
-        CategoryProcessingService,
-        MarkdownGenerationService,
-        BadgeProcessingService,
-    ],
-    exports: [ItemsGeneratorService, ItemSubmissionService],
+    imports: [AiModule, GitModule],
+    providers: STEP_SERVICES,
+    exports: STEP_SERVICES_EXPORTS,
 })
 export class ItemsGeneratorModule {}

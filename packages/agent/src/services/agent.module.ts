@@ -9,6 +9,7 @@ import { DatabaseModule } from '../database/database.module';
 import { AiModule } from '../ai/ai.module';
 import { AgentService } from './agent.service';
 import { DirectoryDetailService } from './directory-detail.service';
+import { TriggerModule } from '@src/trigger';
 
 @Module({
     imports: [
@@ -20,6 +21,7 @@ import { DirectoryDetailService } from './directory-detail.service';
         WebsiteGeneratorModule,
         DeployModule,
         AiModule,
+        TriggerModule,
     ],
     providers: [AgentService, DirectoryDetailService],
     exports: [AgentService, DirectoryDetailService],

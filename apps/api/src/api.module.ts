@@ -11,6 +11,7 @@ import { LoggingInterceptor } from './logging.interceptor';
 import { MonitoringModule, SentryInterceptor, PostHogInterceptor } from '@packages/monitoring';
 import { APIController } from './api.controller';
 import { AiConversationModule } from './ai-conversation/ai-conversation.module';
+import { TriggerInternalModule } from './trigger/trigger-internal.module';
 
 @Module({
     imports: [
@@ -30,6 +31,7 @@ import { AiConversationModule } from './ai-conversation/ai-conversation.module';
         AiConversationModule,
         DirectoriesModule,
         MailModule,
+        TriggerInternalModule,
     ],
     providers: [
         {
