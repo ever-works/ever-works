@@ -80,7 +80,7 @@ export function RecentActivity() {
                     <div className="space-y-4">
                         {activities.map((activity) => (
                             <div key={activity.id} className="flex gap-4">
-                                <div className="flex-shrink-0 mt-1">
+                                <div className="shrink-0 mt-1">
                                     {getActivityIcon(activity.type)}
                                 </div>
                                 <div className="flex-1 min-w-0">

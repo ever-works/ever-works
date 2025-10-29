@@ -170,19 +170,19 @@ export function DirectoryAICreator({ user }: DirectoryAICreatorProps) {
                         </h4>
                         <ul className="space-y-1 text-sm text-text-secondary dark:text-text-secondary-dark">
                             <li className="flex items-start gap-2">
-                                <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+                                <Check className="w-4 h-4 text-primary mt-0.5 shrink-0" />
                                 <span>{t('features.0')}</span>
                             </li>
                             <li className="flex items-start gap-2">
-                                <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+                                <Check className="w-4 h-4 text-primary mt-0.5 shrink-0" />
                                 <span>{t('features.1')}</span>
                             </li>
                             <li className="flex items-start gap-2">
-                                <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+                                <Check className="w-4 h-4 text-primary mt-0.5 shrink-0" />
                                 <span>{t('features.2')}</span>
                             </li>
                             <li className="flex items-start gap-2">
-                                <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+                                <Check className="w-4 h-4 text-primary mt-0.5 shrink-0" />
                                 <span>{t('features.3')}</span>
                             </li>
                         </ul>

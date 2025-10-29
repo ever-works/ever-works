@@ -37,7 +37,7 @@ export default function ForgotPasswordPage() {
                 <div className="space-y-6">
                     <div className="bg-success/10 border border-success/20 rounded-lg p-6">
                         <div className="flex items-start gap-3">
-                            <div className="w-8 h-8 bg-success/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                            <div className="w-8 h-8 bg-success/20 rounded-lg flex items-center justify-center shrink-0">
                                 <svg
                                     className="w-5 h-5 text-success"
                                     fill="none"
