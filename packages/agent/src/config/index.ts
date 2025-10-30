@@ -22,7 +22,10 @@ export const config = {
             return process.env.TRIGGER_SECRET_KEY;
         },
         getApiUrl() {
-            return process.env.TRIGGER_API_URL;
+            return process.env.TRIGGER_API_URL || 'https://api.trigger.dev';
+        },
+        getMachine() {
+            return process.env.TRIGGER_MACHINE || undefined;
         },
         getInternalBaseUrl() {
             return process.env.TRIGGER_INTERNAL_API_URL;

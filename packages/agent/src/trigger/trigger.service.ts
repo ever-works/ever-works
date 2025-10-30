@@ -11,6 +11,16 @@ export class TriggerService {
     private readonly logger = new Logger(TriggerService.name);
     private configured = false;
 
+    private supportedMachines = [
+        'medium-1x',
+        'micro',
+        'small-1x',
+        'small-2x',
+        'medium-2x',
+        'large-1x',
+        'large-2x',
+    ];
+
     private ensureConfigured(): boolean {
         if (!config.trigger.shouldUseTrigger()) {
             return false;
@@ -33,15 +43,25 @@ export class TriggerService {
         return true;
     }
 
+    private machine() {
+        if (this.supportedMachines.includes(config.trigger.getMachine())) {
+            return config.trigger.getMachine();
+        }
+
+        return undefined;
+    }
+
     async dispatchDirectoryGeneration(payload: DirectoryGenerationPayload): Promise<boolean> {
         if (!this.ensureConfigured()) {
             return false;
         }
 
         try {
-            await tasks.trigger(directoryGenerationTask.id, payload, {
+            await directoryGenerationTask.trigger(payload, {
                 tags: ['directory-generation', payload.mode, payload.directoryId],
+                machine: this.machine() as any,
             });
+
             return true;
         } catch (error) {
             this.logger.error('Failed to dispatch directory-generation task', error as Error);

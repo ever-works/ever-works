@@ -20,6 +20,7 @@ export default defineConfig({
         },
     },
     dirs: ['./src/tasks/trigger'],
+    machine: 'medium-1x',
     build: {
         external: [
             // NestJS optional peer dependencies that we don't use
