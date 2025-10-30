@@ -49,7 +49,9 @@ async function testIntegrations() {
     }
 
     console.log('\n🎉 Integration tests completed!');
-    console.log('\n📝 Note: Check your Sentry and PostHog dashboards to verify events are being received.');
+    console.log(
+        '\n📝 Note: Check your Sentry and PostHog dashboards to verify events are being received.',
+    );
 }
 
 // Run tests if this file is executed directly

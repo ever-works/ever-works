@@ -7,7 +7,7 @@ import { initPostHog } from './posthog.config';
 export class PostHogModule {
     static forRoot(config?: PostHogConfig) {
         const isInitialized = initPostHog(config);
-        
+
         return {
             module: PostHogModule,
             global: true,

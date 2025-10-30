@@ -13,7 +13,8 @@ export const DIRECTORY_GENERATION_MODE = {
     UPDATE: 'update',
 } as const;
 
-export type DirectoryGenerationMode = (typeof DIRECTORY_GENERATION_MODE)[keyof typeof DIRECTORY_GENERATION_MODE];
+export type DirectoryGenerationMode =
+    (typeof DIRECTORY_GENERATION_MODE)[keyof typeof DIRECTORY_GENERATION_MODE];
 
 export type DirectoryGenerationPayload = {
     directoryId: string;
@@ -32,7 +33,10 @@ export const directoryGenerationTask = task({
 
         try {
             const apiClient = appContext.get(TriggerInternalApiClient);
-            const context = await apiClient.fetchDirectoryContext(payload.directoryId, payload.userId);
+            const context = await apiClient.fetchDirectoryContext(
+                payload.directoryId,
+                payload.userId,
+            );
 
             const directory = plainToInstance(Directory, context.directory);
             const user = plainToInstance(User, context.user);

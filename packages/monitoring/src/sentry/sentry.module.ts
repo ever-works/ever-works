@@ -7,7 +7,7 @@ import { initSentry } from './sentry.config';
 export class SentryModule {
     static forRoot(config?: SentryConfig) {
         const isInitialized = initSentry(config);
-        
+
         return {
             module: SentryModule,
             global: true,

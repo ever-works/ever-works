@@ -5,13 +5,7 @@ import {
     setUserProperties,
     getPostHogClient,
 } from '../posthog/posthog.config';
-import {
-    AnalyticsEvent,
-    UserProperties,
-    ApiUsageEvent,
-    AuthEvent,
-    BusinessEvent,
-} from '../types';
+import { AnalyticsEvent, UserProperties, ApiUsageEvent, AuthEvent, BusinessEvent } from '../types';
 
 @Injectable()
 export class AnalyticsService {
