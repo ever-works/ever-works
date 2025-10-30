@@ -7,7 +7,7 @@ import {
     Index,
 } from 'typeorm';
 import { User } from './user.entity';
-import { ClassToObject } from './types';
+import type { ClassToObject } from './types';
 
 @Entity({ name: 'refresh_tokens' })
 @Index(['token'], { unique: true })

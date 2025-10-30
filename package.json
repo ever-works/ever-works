@@ -20,6 +20,8 @@
 		"dev": "turbo dev",
 		"dev:api": "turbo dev --filter=ever-works-api",
 		"dev:web": "turbo dev --filter=ever-works-web",
+		"dev:trigger": "turbo dev:trigger --filter=@packages/agent",
+		"deploy:trigger": "turbo deploy:trigger --filter=@packages/agent",
 		"build": "turbo build",
 		"prepare:husky": "npx husky install .husky",
 		"prepare": "husky",

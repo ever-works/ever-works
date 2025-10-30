@@ -7,7 +7,7 @@ import {
     Index,
 } from 'typeorm';
 import { ChatHistory } from './chat-history.entity';
-import { ClassToObject } from './types';
+import type { ClassToObject } from './types';
 
 export type MessageRole = 'user' | 'assistant' | 'system' | 'function' | 'tool';
 

@@ -7,7 +7,7 @@ import {
     UpdateDateColumn,
 } from 'typeorm';
 import { User } from './user.entity';
-import { ClassToObject, GenerateStatus } from './types';
+import type { ClassToObject, GenerateStatus } from './types';
 import type { PRUpdate } from '@src/data-generator';
 import { TimestampColumn } from './_types';
 

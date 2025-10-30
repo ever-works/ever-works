@@ -12,6 +12,6 @@ import { DIRECTORY_OPERATIONS } from './directory-operations.interface';
             useExisting: DatabaseDirectoryOperationsService,
         },
     ],
-    exports: [DIRECTORY_OPERATIONS],
+    exports: [DIRECTORY_OPERATIONS, DatabaseModule],
 })
 export class DirectoryOperationsModule {}

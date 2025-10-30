@@ -1,7 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { configure, tasks } from '@trigger.dev/sdk';
 import { config } from '@src/config';
-import { DirectoryGenerationPayload } from '@src/tasks/trigger/directory-generation.task';
+import {
+    DirectoryGenerationPayload,
+    directoryGenerationTask,
+} from '@src/tasks/trigger/directory-generation.task';
 
 @Injectable()
 export class TriggerService {
@@ -36,7 +39,7 @@ export class TriggerService {
         }
 
         try {
-            await tasks.trigger('directory-generation', payload, {
+            await tasks.trigger(directoryGenerationTask.id, payload, {
                 tags: ['directory-generation', payload.mode, payload.directoryId],
             });
             return true;
