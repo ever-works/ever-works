@@ -16,11 +16,26 @@ import { DirectoryRepository } from '@packages/agent/database';
 import { Directory } from '@packages/agent/entities';
 import { DirectoryCommandDto } from './dto/directory-command.dto';
 import { DIRECTORY_OPERATIONS, DirectoryOperations } from '@packages/agent/directory';
-import { DirectoryCommandAction } from '@packages/agent/trigger';
+import { DirectoryCommandAction, DirectoryCommandPayloads } from '@packages/agent/trigger';
 
 type DirectoryContextResponse = {
     directory: Directory;
     user: any;
+};
+
+type CommandHandlerContext = {
+    directoryId: string;
+    directory: Directory;
+    operations: DirectoryOperations;
+};
+
+type CommandDefinitions = {
+    [K in DirectoryCommandAction]: DirectoryCommandDefinition<K>;
+};
+
+type DirectoryCommandDefinition<K extends DirectoryCommandAction> = {
+    requiredKeys: readonly (keyof DirectoryCommandPayloads[K])[];
+    handler: (payload: DirectoryCommandPayloads[K], ctx: CommandHandlerContext) => Promise<void>;
 };
 
 @Controller('internal/trigger')
@@ -75,44 +90,14 @@ export class TriggerInternalController {
             throw new BadRequestException('Directory not found');
         }
 
-        switch (command.action) {
-            case DirectoryCommandAction.UPDATE:
-                await this.directoryOperations.updateDirectory(
-                    directoryId,
-                    (command.payload as any)?.data ?? {},
-                );
-                break;
-            case DirectoryCommandAction.UPDATE_GENERATE_STATUS:
-                await this.directoryOperations.updateGenerateStatus(
-                    directoryId,
-                    (command.payload as any)?.status,
-                );
-                break;
-            case DirectoryCommandAction.UPDATE_LAST_PULL_REQUEST:
-                await this.directoryOperations.updateLastPullRequest(
-                    directoryId,
-                    (command.payload as any)?.lastPullRequest,
-                );
-                break;
-            case DirectoryCommandAction.RECORD_GENERATION_START:
-                await this.directoryOperations.recordGenerationStartTime(
-                    directoryId,
-                    new Date((command.payload as any)?.startedAt ?? new Date().toISOString()),
-                );
-                break;
-            case DirectoryCommandAction.RECORD_GENERATION_FINISH:
-                await this.directoryOperations.recordGenerationFinishTime(
-                    directoryId,
-                    new Date((command.payload as any)?.finishedAt ?? new Date().toISOString()),
-                );
-                break;
-            case DirectoryCommandAction.EMIT_GENERATION_COMPLETED: {
-                await this.directoryOperations.emitGenerationCompleted(directory);
-                break;
-            }
-            default:
-                throw new BadRequestException('Unknown directory command');
-        }
+        const definition = getCommandDefinition(command.action);
+        const payload = ensurePayload(command.payload, definition, command.action);
+
+        await definition.handler(payload, {
+            directoryId,
+            directory,
+            operations: this.directoryOperations,
+        });
 
         return { status: 'ok' };
     }
@@ -142,4 +127,79 @@ export class TriggerInternalController {
         const { user, ...rest } = directory;
         return JSON.parse(JSON.stringify(rest));
     }
+}
+
+const directoryCommandDefinitions: CommandDefinitions = {
+    [DirectoryCommandAction.UPDATE]: {
+        requiredKeys: ['data'],
+        handler: async (payload, ctx) => {
+            await ctx.operations.updateDirectory(ctx.directoryId, payload.data);
+        },
+    },
+    [DirectoryCommandAction.UPDATE_GENERATE_STATUS]: {
+        requiredKeys: ['status'],
+        handler: async (payload, ctx) => {
+            await ctx.operations.updateGenerateStatus(ctx.directoryId, payload.status);
+        },
+    },
+    [DirectoryCommandAction.UPDATE_LAST_PULL_REQUEST]: {
+        requiredKeys: ['lastPullRequest'],
+        handler: async (payload, ctx) => {
+            await ctx.operations.updateLastPullRequest(ctx.directoryId, payload.lastPullRequest);
+        },
+    },
+    [DirectoryCommandAction.RECORD_GENERATION_START]: {
+        requiredKeys: ['startedAt'],
+        handler: async (payload, ctx) => {
+            const date = payload.startedAt ? new Date(payload.startedAt) : new Date();
+
+            if (Number.isNaN(date.getTime())) {
+                throw new BadRequestException('Invalid generation start timestamp');
+            }
+
+            await ctx.operations.recordGenerationStartTime(ctx.directoryId, date);
+        },
+    },
+    [DirectoryCommandAction.RECORD_GENERATION_FINISH]: {
+        requiredKeys: ['finishedAt'],
+        handler: async (payload, ctx) => {
+            const date = payload.finishedAt ? new Date(payload.finishedAt) : new Date();
+
+            if (Number.isNaN(date.getTime())) {
+                throw new BadRequestException('Invalid generation finish timestamp');
+            }
+
+            await ctx.operations.recordGenerationFinishTime(ctx.directoryId, date);
+        },
+    },
+    [DirectoryCommandAction.EMIT_GENERATION_COMPLETED]: {
+        requiredKeys: [],
+        handler: async (_payload, ctx) => {
+            await ctx.operations.emitGenerationCompleted(ctx.directory);
+        },
+    },
+};
+
+function getCommandDefinition<K extends DirectoryCommandAction>(
+    action: K,
+): DirectoryCommandDefinition<K> {
+    return directoryCommandDefinitions[action];
+}
+
+function ensurePayload<K extends DirectoryCommandAction>(
+    payload: DirectoryCommandDto['payload'],
+    definition: DirectoryCommandDefinition<K>,
+    action: K,
+): DirectoryCommandPayloads[K] {
+    if (!payload || typeof payload !== 'object') {
+        throw new BadRequestException(`Invalid payload for command ${action}`);
+    }
+
+    for (const key of definition.requiredKeys) {
+        if (!(key in payload)) {
+            throw new BadRequestException(`Missing '${String(key)}' for command ${action}`);
+        }
+    }
+
+    return payload as DirectoryCommandPayloads[K];
 }
