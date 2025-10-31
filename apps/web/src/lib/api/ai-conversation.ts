@@ -8,14 +8,23 @@ export interface StartConversationDto {
     metadata?: Record<string, any>;
 }
 
+export interface ConversationOptionsDto {
+    model?: string;
+    temperature?: number;
+    maxTokens?: number;
+    role?: string;
+    systemPrompt?: string;
+    context?: string;
+    rules?: string[];
+    useDefaultSystemPrompt?: boolean;
+    messageLimit?: number;
+    metadata?: Record<string, any>;
+    [key: string]: any;
+}
+
 export interface SendMessageDto {
     message: string;
-    options?: {
-        model?: string;
-        temperature?: number;
-        maxTokens?: number;
-        [key: string]: any;
-    };
+    options?: ConversationOptionsDto;
 }
 
 // Response Types
