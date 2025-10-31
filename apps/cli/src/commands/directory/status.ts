@@ -37,14 +37,18 @@ export const statusCommand = new Command('status')
             const POLL_INTERVAL = 5000;
             const MAX_POLL_TIME = 30 * 60 * 1000; // 30 minutes max
             const startTime = Date.now();
-            let intervalId: NodeJS.Timeout;
+            let intervalId: NodeJS.Timeout | undefined;
+            let pollingComplete = false;
 
             // Setup cleanup on process termination
             const cleanup = () => {
                 if (intervalId) {
                     clearInterval(intervalId);
+                    intervalId = undefined;
                 }
-                spinner.stop();
+                if (spinner.isSpinning) {
+                    spinner.stop();
+                }
             };
 
             // Handle Ctrl+C gracefully
@@ -61,6 +65,7 @@ export const statusCommand = new Command('status')
                     // Check if we've exceeded max polling time
                     if (Date.now() - startTime > MAX_POLL_TIME) {
                         spinner.warn('\n⚠ Status check timed out after 30 minutes');
+                        pollingComplete = true;
                         cleanup();
                         return;
                     }
@@ -73,6 +78,7 @@ export const statusCommand = new Command('status')
 
                     if (status === GenerateStatusType.GENERATED) {
                         spinner.succeed('\n✓ Generation process finished!');
+                        pollingComplete = true;
                         cleanup();
                         printDirectorySummary(freshDirectory);
                         return;
@@ -83,6 +89,7 @@ export const statusCommand = new Command('status')
                         if (freshDirectory.generateStatus?.error) {
                             console.log(chalk.red(`Error: ${freshDirectory.generateStatus.error}`));
                         }
+                        pollingComplete = true;
                         cleanup();
                         printDirectorySummary(freshDirectory);
                         return;
@@ -104,12 +111,14 @@ export const statusCommand = new Command('status')
                         return;
                     }
 
+                    pollingComplete = true;
                     cleanup();
                     console.log(chalk.yellow('\n⚠ No active generation detected.'));
                     printDirectorySummary(freshDirectory);
                 } catch (error) {
                     spinner.fail('Failed to fetch directory status');
                     console.error(chalk.red('Error details:'), error);
+                    pollingComplete = true;
                     cleanup();
                 }
             };
@@ -118,7 +127,15 @@ export const statusCommand = new Command('status')
             await checkStatus();
 
             // Set up interval for subsequent checks
-            intervalId = setInterval(checkStatus, POLL_INTERVAL);
+            if (!pollingComplete) {
+                intervalId = setInterval(async () => {
+                    await checkStatus();
+                    if (pollingComplete && intervalId) {
+                        clearInterval(intervalId);
+                        intervalId = undefined;
+                    }
+                }, POLL_INTERVAL);
+            }
         } catch (error) {
             handleCliError(error);
             process.exit(1);

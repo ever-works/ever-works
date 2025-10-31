@@ -180,7 +180,7 @@ export function DirectoryStatusCard({ directory }: DirectoryStatusCardProps) {
                 <div className="flex items-start gap-4">
                     <div
                         className={cn(
-                            'w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0',
+                            'w-10 h-10 rounded-lg flex items-center justify-center shrink-0',
                             config.iconBg,
                             config.iconColor,
                         )}

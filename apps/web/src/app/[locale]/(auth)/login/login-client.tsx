@@ -18,7 +18,7 @@ function PasswordResetSuccessMessage() {
     return (
         <div className="bg-success/10 border border-success/20 px-4 py-3 rounded-lg">
             <div className="flex items-start gap-3">
-                <div className="w-5 h-5 bg-success/20 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                <div className="w-5 h-5 bg-success/20 rounded-full flex items-center justify-center shrink-0 mt-0.5">
                     <svg
                         className="w-3 h-3 text-success"
                         fill="none"

@@ -21,7 +21,7 @@ export function VercelTokenAlert() {
                 <div className="flex items-start gap-4">
                     <div
                         className={cn(
-                            'flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center',
+                            'shrink-0 w-10 h-10 rounded-full flex items-center justify-center',
                             'bg-warning/10 dark:bg-warning-dark/10',
                         )}
                     >

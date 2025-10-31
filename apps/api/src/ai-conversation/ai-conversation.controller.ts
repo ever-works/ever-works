@@ -9,6 +9,7 @@ import {
     Res,
     Header,
     Get,
+    Query,
 } from '@nestjs/common';
 import { AiConversationService } from '@packages/agent/ai';
 import { CurrentUser, JwtAuthGuard } from '../auth';
@@ -50,6 +51,25 @@ export class AiConversationController {
     }
 
     /**
+     * List recent conversations for the authenticated user
+     */
+    @Get('recent')
+    async listRecentConversations(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Query('limit') limit?: string,
+    ) {
+        const parsedLimit = limit ? parseInt(limit, 10) : undefined;
+
+        if (parsedLimit !== undefined && (Number.isNaN(parsedLimit) || parsedLimit <= 0)) {
+            throw new BadRequestException(
+                'The "limit" query parameter must be a positive integer.',
+            );
+        }
+
+        return this.conversationService.listUserConversations(auth.userId, parsedLimit);
+    }
+
+    /**
      * Get conversation history
      */
     @Get(':sessionId/history')
@@ -57,13 +77,11 @@ export class AiConversationController {
         @Param('sessionId') sessionId: string,
         @CurrentUser() auth: AuthenticatedUser,
     ) {
-        const history = await this.conversationService.getConversationHistory(
+        return this.conversationService.getConversationHistory(
             sessionId,
             auth.userId,
             LIMIT_MESSAGE * 2,
         );
-
-        return history;
     }
 
     /**

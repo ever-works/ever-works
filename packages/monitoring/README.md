@@ -48,19 +48,19 @@ import { Module } from '@nestjs/common';
 import { MonitoringModule } from '@packages/monitoring';
 
 @Module({
-  imports: [
-    MonitoringModule.forRoot({
-      sentry: {
-        dsn: process.env.SENTRY_DSN,
-        environment: process.env.NODE_ENV,
-        tracesSampleRate: 0.1,
-      },
-      posthog: {
-        apiKey: process.env.POSTHOG_API_KEY,
-        host: process.env.POSTHOG_HOST,
-      },
-    }),
-  ],
+    imports: [
+        MonitoringModule.forRoot({
+            sentry: {
+                dsn: process.env.SENTRY_DSN,
+                environment: process.env.NODE_ENV,
+                tracesSampleRate: 0.1,
+            },
+            posthog: {
+                apiKey: process.env.POSTHOG_API_KEY,
+                host: process.env.POSTHOG_HOST,
+            },
+        }),
+    ],
 })
 export class AppModule {}
 ```
@@ -70,24 +70,20 @@ export class AppModule {}
 ```typescript
 import { Module } from '@nestjs/common';
 import { APP_INTERCEPTOR } from '@nestjs/core';
-import { 
-  MonitoringModule, 
-  SentryInterceptor, 
-  PostHogInterceptor 
-} from '@packages/monitoring';
+import { MonitoringModule, SentryInterceptor, PostHogInterceptor } from '@packages/monitoring';
 
 @Module({
-  imports: [MonitoringModule.forRoot()],
-  providers: [
-    {
-      provide: APP_INTERCEPTOR,
-      useClass: SentryInterceptor,
-    },
-    {
-      provide: APP_INTERCEPTOR,
-      useClass: PostHogInterceptor,
-    },
-  ],
+    imports: [MonitoringModule.forRoot()],
+    providers: [
+        {
+            provide: APP_INTERCEPTOR,
+            useClass: SentryInterceptor,
+        },
+        {
+            provide: APP_INTERCEPTOR,
+            useClass: PostHogInterceptor,
+        },
+    ],
 })
 export class AppModule {}
 ```
@@ -100,26 +96,26 @@ export class AppModule {}
 import { MonitoringModule } from '@packages/monitoring';
 
 @Module({
-  imports: [
-    MonitoringModule.forRoot({
-      sentry: {
-        dsn: process.env.SENTRY_DSN,
-        environment: process.env.NODE_ENV || 'development',
-        tracesSampleRate: 0.1,
-        debug: process.env.NODE_ENV === 'development',
-        beforeSend(event) {
-          // Custom filtering logic
-          return event;
-        },
-      },
-      posthog: {
-        apiKey: process.env.POSTHOG_API_KEY,
-        host: process.env.POSTHOG_HOST || 'https://app.posthog.com',
-        flushAt: 20,
-        flushInterval: 10000,
-      },
-    }),
-  ],
+    imports: [
+        MonitoringModule.forRoot({
+            sentry: {
+                dsn: process.env.SENTRY_DSN,
+                environment: process.env.NODE_ENV || 'development',
+                tracesSampleRate: 0.1,
+                debug: process.env.NODE_ENV === 'development',
+                beforeSend(event) {
+                    // Custom filtering logic
+                    return event;
+                },
+            },
+            posthog: {
+                apiKey: process.env.POSTHOG_API_KEY,
+                host: process.env.POSTHOG_HOST || 'https://app.posthog.com',
+                flushAt: 20,
+                flushInterval: 10000,
+            },
+        }),
+    ],
 })
 export class AppModule {}
 ```
@@ -132,13 +128,13 @@ export class AppModule {}
 import { SentryModule } from '@packages/monitoring/sentry';
 
 @Module({
-  imports: [
-    SentryModule.forRoot({
-      dsn: process.env.SENTRY_DSN,
-      environment: process.env.NODE_ENV,
-      tracesSampleRate: 0.1,
-    }),
-  ],
+    imports: [
+        SentryModule.forRoot({
+            dsn: process.env.SENTRY_DSN,
+            environment: process.env.NODE_ENV,
+            tracesSampleRate: 0.1,
+        }),
+    ],
 })
 export class AppModule {}
 ```
@@ -149,12 +145,12 @@ export class AppModule {}
 import { PostHogModule } from '@packages/monitoring/posthog';
 
 @Module({
-  imports: [
-    PostHogModule.forRoot({
-      apiKey: process.env.POSTHOG_API_KEY,
-      host: process.env.POSTHOG_HOST,
-    }),
-  ],
+    imports: [
+        PostHogModule.forRoot({
+            apiKey: process.env.POSTHOG_API_KEY,
+            host: process.env.POSTHOG_HOST,
+        }),
+    ],
 })
 export class AppModule {}
 ```
@@ -171,35 +167,35 @@ import { AnalyticsService } from '@packages/monitoring';
 
 @Controller('api')
 export class ApiController {
-  constructor(private readonly analytics: AnalyticsService) {}
+    constructor(private readonly analytics: AnalyticsService) {}
 
-  @Get('users')
-  async getUsers() {
-    // Track custom event
-    this.analytics.track('user123', 'users_fetched', {
-      count: 10,
-      filter: 'active',
-      source: 'api',
-    });
+    @Get('users')
+    async getUsers() {
+        // Track custom event
+        this.analytics.track('user123', 'users_fetched', {
+            count: 10,
+            filter: 'active',
+            source: 'api',
+        });
 
-    // Track API usage
-    this.analytics.trackApiUsage('user123', '/api/users', 'GET', 200, 150);
+        // Track API usage
+        this.analytics.trackApiUsage('user123', '/api/users', 'GET', 200, 150);
 
-    // Track authentication event
-    this.analytics.trackAuth('user123', 'login', {
-      provider: 'google',
-      method: 'oauth',
-    });
+        // Track authentication event
+        this.analytics.trackAuth('user123', 'login', {
+            provider: 'google',
+            method: 'oauth',
+        });
 
-    // Track business event
-    this.analytics.trackBusinessEvent('user123', 'purchase', {
-      amount: 99.99,
-      currency: 'USD',
-      product: 'premium_plan',
-    });
+        // Track business event
+        this.analytics.trackBusinessEvent('user123', 'purchase', {
+            amount: 99.99,
+            currency: 'USD',
+            product: 'premium_plan',
+        });
 
-    return { users: [] };
-  }
+        return { users: [] };
+    }
 }
 ```
 
@@ -211,27 +207,27 @@ import { SentryService } from '@packages/monitoring/sentry';
 
 @Injectable()
 export class UserService {
-  constructor(private readonly sentry: SentryService) {}
+    constructor(private readonly sentry: SentryService) {}
 
-  async createUser(userData: any) {
-    try {
-      // Your business logic
-      return await this.userRepository.save(userData);
-    } catch (error) {
-      // Manual error capture with context
-      this.sentry.captureException(error, {
-        tags: {
-          section: 'user_creation',
-          userId: userData.id,
-        },
-        extra: {
-          userData,
-          timestamp: new Date().toISOString(),
-        },
-      });
-      throw error;
+    async createUser(userData: any) {
+        try {
+            // Your business logic
+            return await this.userRepository.save(userData);
+        } catch (error) {
+            // Manual error capture with context
+            this.sentry.captureException(error, {
+                tags: {
+                    section: 'user_creation',
+                    userId: userData.id,
+                },
+                extra: {
+                    userData,
+                    timestamp: new Date().toISOString(),
+                },
+            });
+            throw error;
+        }
     }
-  }
 }
 ```
 
@@ -243,18 +239,18 @@ import { PostHogService } from '@packages/monitoring/posthog';
 
 @Injectable()
 export class EventService {
-  constructor(private readonly posthog: PostHogService) {}
+    constructor(private readonly posthog: PostHogService) {}
 
-  async trackCustomEvent(userId: string, event: string, properties: any) {
-    this.posthog.capture({
-      distinctId: userId,
-      event,
-      properties: {
-        ...properties,
-        timestamp: new Date().toISOString(),
-      },
-    });
-  }
+    async trackCustomEvent(userId: string, event: string, properties: any) {
+        this.posthog.capture({
+            distinctId: userId,
+            event,
+            properties: {
+                ...properties,
+                timestamp: new Date().toISOString(),
+            },
+        });
+    }
 }
 ```
 
@@ -271,11 +267,11 @@ import { SentryInterceptor } from '@packages/monitoring/interceptors';
 @Controller('api')
 @UseInterceptors(SentryInterceptor)
 export class ApiController {
-  @Get('error-prone')
-  async errorProneEndpoint() {
-    // Any error thrown here will be automatically captured by Sentry
-    throw new Error('Something went wrong!');
-  }
+    @Get('error-prone')
+    async errorProneEndpoint() {
+        // Any error thrown here will be automatically captured by Sentry
+        throw new Error('Something went wrong!');
+    }
 }
 ```
 
@@ -290,11 +286,11 @@ import { PostHogInterceptor } from '@packages/monitoring/interceptors';
 @Controller('api')
 @UseInterceptors(PostHogInterceptor)
 export class ApiController {
-  @Get('tracked')
-  async trackedEndpoint() {
-    // This request will be automatically tracked by PostHog
-    return { message: 'This request is being tracked!' };
-  }
+    @Get('tracked')
+    async trackedEndpoint() {
+        // This request will be automatically tracked by PostHog
+        return { message: 'This request is being tracked!' };
+    }
 }
 ```
 
@@ -304,26 +300,26 @@ The package provides comprehensive TypeScript definitions:
 
 ```typescript
 import {
-  MonitoringConfig,
-  SentryConfig,
-  PostHogConfig,
-  AnalyticsEvent,
-  UserProperties,
-  ApiUsageEvent,
-  AuthEvent,
-  BusinessEvent,
-  MonitoringModuleOptions,
+    MonitoringConfig,
+    SentryConfig,
+    PostHogConfig,
+    AnalyticsEvent,
+    UserProperties,
+    ApiUsageEvent,
+    AuthEvent,
+    BusinessEvent,
+    MonitoringModuleOptions,
 } from '@packages/monitoring/types';
 
 // Example usage with types
 const config: MonitoringConfig = {
-  sentry: {
-    dsn: process.env.SENTRY_DSN!,
-    environment: 'production',
-  },
-  posthog: {
-    apiKey: process.env.POSTHOG_API_KEY!,
-  },
+    sentry: {
+        dsn: process.env.SENTRY_DSN!,
+        environment: 'production',
+    },
+    posthog: {
+        apiKey: process.env.POSTHOG_API_KEY!,
+    },
 };
 ```
 
@@ -365,6 +361,7 @@ pnpm build:types
 Configures both Sentry and PostHog modules.
 
 **Parameters:**
+
 - `config` (optional): Configuration object for Sentry and PostHog
 
 **Returns:** `DynamicModule`
@@ -376,6 +373,7 @@ Configures both Sentry and PostHog modules.
 Tracks a custom event.
 
 **Parameters:**
+
 - `distinctId`: Unique identifier for the user
 - `event`: Event name
 - `properties`: Optional event properties
@@ -386,6 +384,7 @@ Tracks a custom event.
 Tracks API usage metrics.
 
 **Parameters:**
+
 - `distinctId`: User identifier
 - `endpoint`: API endpoint path
 - `method`: HTTP method
@@ -411,6 +410,7 @@ Checks if PostHog is available and properly configured.
 Automatically captures errors and sends them to Sentry.
 
 **Features:**
+
 - Automatic error capture
 - Request context inclusion
 - User information attachment
@@ -419,7 +419,6 @@ Automatically captures errors and sends them to Sentry.
 #### `PostHogInterceptor`
 
 Automatically tracks API requests and sends them to PostHog.
-
 
 ## 🙏 Acknowledgments
 

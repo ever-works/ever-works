@@ -17,6 +17,9 @@
 		"dev": {
 			"outputs": []
 		},
+		"dev:trigger": {
+			"outputs": []
+		},
 		"lint": {
 			"outputs": []
 		},

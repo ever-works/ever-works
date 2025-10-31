@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject } from '@nestjs/common';
 import * as fs from 'node:fs/promises';
 import { GithubService } from '../git/github.service';
 import type { Identifiable, ItemData, Tag } from '../agent/types';
@@ -9,7 +9,8 @@ import { DataRepository, PRUpdate } from '../data-generator/data-repository';
 import { ReadmeBuilder } from './readme-builder';
 import { MarkdownRepository } from './markdown-repository';
 import { GenerationMethod } from '../items-generator/dto';
-import { DirectoryRepository } from '../database';
+import { DIRECTORY_OPERATIONS } from '@src/directory';
+import type { DirectoryOperations } from '@src/directory';
 
 type InitializeOptions = {
     repository_description?: string;
@@ -24,7 +25,8 @@ export class MarkdownGeneratorService {
 
     constructor(
         private readonly githubService: GithubService,
-        private readonly directoryRepository: DirectoryRepository,
+        @Inject(DIRECTORY_OPERATIONS)
+        private readonly directoryOperations: DirectoryOperations,
     ) {}
 
     async initialize(directory: Directory, user: User, options: InitializeOptions = {}) {
@@ -187,7 +189,7 @@ export class MarkdownGeneratorService {
                     });
 
                 if (pr) {
-                    await this.directoryRepository.updateLastPullRequest(directory.id, {
+                    await this.directoryOperations.updateLastPullRequest(directory.id, {
                         main: {
                             branch: pr_update.branch,
                             title: pr_update.title,

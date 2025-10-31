@@ -88,7 +88,7 @@ export function DeployForm({ directory, isDeploying, vercelTeams = [] }: DeployF
                 <div className="flex items-start gap-4">
                     <div
                         className={cn(
-                            'flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center',
+                            'shrink-0 w-10 h-10 rounded-full flex items-center justify-center',
                             'bg-primary/10 dark:bg-primary-dark/10',
                         )}
                     >
@@ -148,7 +148,7 @@ export function DeployForm({ directory, isDeploying, vercelTeams = [] }: DeployF
             {/* Info Section */}
             <div className="p-6 rounded-lg bg-info/5 dark:bg-info-dark/5 border border-info/20 dark:border-info-dark/20">
                 <div className="flex gap-3">
-                    <Info className="flex-shrink-0 w-5 h-5 text-info dark:text-info-dark mt-0.5" />
+                    <Info className="shrink-0 w-5 h-5 text-info dark:text-info-dark mt-0.5" />
                     <div className="space-y-2 text-sm text-text-secondary dark:text-text-secondary-dark">
                         <p>{t('form.info.deployInfo')}</p>
                         <p>{t('form.info.updateInfo')}</p>
@@ -188,7 +188,7 @@ function UpdateWebsiteRepository({ directory }: DeployFormProps) {
             <div className="flex items-start gap-4">
                 <div
                     className={cn(
-                        'flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center',
+                        'shrink-0 w-10 h-10 rounded-full flex items-center justify-center',
                         'bg-info/10 dark:bg-info-dark/10',
                     )}
                 >

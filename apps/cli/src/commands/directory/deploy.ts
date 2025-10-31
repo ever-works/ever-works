@@ -73,7 +73,11 @@ export const deployCommand = new Command('deploy')
 
                 vercelTeamScope = selectedTeamScope;
                 const selectedChoice = choices.find((c) => c.value === vercelTeamScope);
-                console.log(chalk.green(`\n✓ Selected Vercel team: ${selectedChoice?.name || vercelTeamScope}`));
+                console.log(
+                    chalk.green(
+                        `\n✓ Selected Vercel team: ${selectedChoice?.name || vercelTeamScope}`,
+                    ),
+                );
             }
 
             // Show information about what will happen

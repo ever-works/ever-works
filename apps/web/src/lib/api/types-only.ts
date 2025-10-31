@@ -66,6 +66,8 @@ export type {
     SendMessageDto,
     ConversationStartResponse,
     ConversationHistoryResponse,
+    ConversationSummary,
+    ConversationMessage,
     StreamChunk,
 } from './ai-conversation';
 

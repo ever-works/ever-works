@@ -3,9 +3,10 @@ import { MarkdownGeneratorService } from './markdown-generator.service';
 import { DataGeneratorModule } from '../data-generator/data-generator.module';
 import { GitModule } from '../git/git.module';
 import { DatabaseModule } from '../database';
+import { DirectoryOperationsModule } from '@src/directory';
 
 @Module({
-    imports: [DataGeneratorModule, GitModule, DatabaseModule],
+    imports: [DataGeneratorModule, GitModule, DatabaseModule, DirectoryOperationsModule],
     providers: [MarkdownGeneratorService],
     exports: [MarkdownGeneratorService],
 })

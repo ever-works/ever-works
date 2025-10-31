@@ -36,7 +36,7 @@ export function GitHubStatusSidebar({ user, githubConnection }: GitHubStatusSide
     const githubUsername = githubConnection?.username || user.username;
 
     return (
-        <aside className="w-80 flex-shrink-0">
+        <aside className="w-80 shrink-0">
             <div
                 className={cn(
                     'sticky top-8 p-6 rounded-lg',

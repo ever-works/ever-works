@@ -3,32 +3,32 @@ name: Build and Publish CLIs
 on:
   push:
     tags:
-      - 'v*'
-      - 'cli-v*'
-      - 'internal-cli-v*'
+      - "v*"
+      - "cli-v*"
+      - "internal-cli-v*"
 
   workflow_dispatch:
     inputs:
       publish_internal_cli:
-        description: 'Publish internal CLI to npm (private)'
+        description: "Publish internal CLI to npm (private)"
         required: true
         type: boolean
         default: false
 
       publish_external_cli:
-        description: 'Publish external CLI to npm (public)'
+        description: "Publish external CLI to npm (public)"
         required: true
         type: boolean
         default: false
 
       do_version_bump:
-        description: 'Bump package version before publishing'
+        description: "Bump package version before publishing"
         required: false
         type: boolean
         default: false
 
       version_bump:
-        description: 'Version bump type (patch, minor, major)'
+        description: "Version bump type (patch, minor, major)"
         required: false
         type: choice
         options:
@@ -59,7 +59,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20.x
-          cache: 'pnpm'
+          cache: "pnpm"
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -116,7 +116,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20.x
-          registry-url: 'https://registry.npmjs.org'
+          registry-url: "https://registry.npmjs.org"
 
       - name: Download Internal CLI artifact
         uses: actions/download-artifact@v4
@@ -166,7 +166,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20.x
-          registry-url: 'https://registry.npmjs.org'
+          registry-url: "https://registry.npmjs.org"
 
       - name: Download External CLI artifact
         uses: actions/download-artifact@v4

@@ -2,7 +2,7 @@ name: Deploy to DO Prod
 
 on:
   workflow_run:
-    workflows: ['Build and Publish Docker Images Prod']
+    workflows: ["Build and Publish Docker Images Prod"]
     branches: [main, develop]
     types:
       - completed
@@ -31,7 +31,7 @@ jobs:
         run: |
           echo "$DB_CA_CERT" | base64 --decode > ${HOME}/ca-certificate.crt
         env:
-          DB_CA_CERT: '${{ secrets.DATABASE_CA_CERT }}'
+          DB_CA_CERT: "${{ secrets.DATABASE_CA_CERT }}"
 
       - name: Generate TLS Secrets
         run: |
@@ -54,35 +54,51 @@ jobs:
           WEB_URL: https://app.ever.works
           ALLOWED_ORIGINS: https://app.ever.works,https://api.ever.works
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
+
           # Github
           GH_APIKEY: ${{ secrets.GH_APIKEY }}
           GH_OWNER: ${{ secrets.GH_OWNER }}
+
           # Git
           GIT_NAME: ${{ secrets.GIT_NAME }}
           GIT_EMAIL: ${{ secrets.GIT_EMAIL }}
+
+          # Trigger.dev
+          TRIGGER_ENABLED: ${{ secrets.TRIGGER_ENABLED }}
+          TRIGGER_SECRET_KEY: ${{ secrets.TRIGGER_SECRET_KEY }}
+          TRIGGER_INTERNAL_SECRET: ${{ secrets.TRIGGER_INTERNAL_SECRET }}
+
           # Vercel
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+
           # GitHub Auth
           GH_CLIENT_ID: ${{ secrets.GH_CLIENT_ID }}
           GH_CLIENT_SECRET: ${{ secrets.GH_CLIENT_SECRET }}
           GH_CALLBACK_URL: https://app.ever.works/api/auth/github/callback
+
           # Google Auth
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
           GOOGLE_CALLBACK_URL: https://app.ever.works/api/auth/google/callback
+
           # AI Configuration
           AI_DEFAULT_PROVIDER: ${{ secrets.AI_DEFAULT_PROVIDER }}
+
           # OpenAI
           OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
           # OpenRouter
           OPENROUTER_MODEL: ${{ secrets.OPENROUTER_MODEL }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+
           # Tavily
           TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+
           # SEARCH SERVICES
           EXTRACT_CONTENT_SERVICE: ${{ secrets.EXTRACT_CONTENT_SERVICE }}
           WEB_SEARCH_SERVICE: ${{ secrets.WEB_SEARCH_SERVICE }}
+
           # Database
           DATABASE_TYPE: ${{ secrets.DATABASE_TYPE }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
@@ -91,9 +107,11 @@ jobs:
           DATABASE_USERNAME: ${{ secrets.DATABASE_USERNAME }}
           DATABASE_PASSWORD: ${{ secrets.DATABASE_PASSWORD }}
           DATABASE_NAME: ${{ secrets.DATABASE_NAME }}
+
           # Enable SSL/TLS for database connections (true/false)
           DATABASE_SSL_MODE: ${{ secrets.DATABASE_SSL_MODE }}
           DATABASE_CA_CERT: ${{ secrets.DATABASE_CA_CERT }}
+
           # Mail
           MAILER_PROVIDER: ${{ secrets.MAILER_PROVIDER }}
           SMTP_HOST: ${{ secrets.SMTP_HOST }}

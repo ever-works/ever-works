@@ -1,1 +1,1 @@
-export * from './item-generator';
+export * from './directory-generation.task';

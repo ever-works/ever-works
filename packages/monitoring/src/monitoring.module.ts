@@ -11,10 +11,7 @@ export class MonitoringModule {
         return {
             module: MonitoringModule,
             global: true,
-            imports: [
-                SentryModule.forRoot(config?.sentry),
-                PostHogModule.forRoot(config?.posthog),
-            ],
+            imports: [SentryModule.forRoot(config?.sentry), PostHogModule.forRoot(config?.posthog)],
             providers: [AnalyticsService],
             exports: [AnalyticsService],
         };

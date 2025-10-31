@@ -189,7 +189,9 @@ export class DeploySubCommand extends CommandRunner {
             ]);
 
             const selected = choices.find((choice) => choice.value === vercelTeamScope);
-            console.log(chalk.green(`\n✓ Selected Vercel team: ${selected?.name || vercelTeamScope}`));
+            console.log(
+                chalk.green(`\n✓ Selected Vercel team: ${selected?.name || vercelTeamScope}`),
+            );
 
             return {
                 scope: vercelTeamScope,

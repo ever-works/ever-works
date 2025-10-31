@@ -1,4 +1,5 @@
 import { defineConfig } from '@trigger.dev/sdk';
+import { emitDecoratorMetadata } from '@trigger.dev/build/extensions/typescript';
 
 export default defineConfig({
     project: 'proj_uevrbfmpvojzzazvhffy',
@@ -19,4 +20,24 @@ export default defineConfig({
         },
     },
     dirs: ['./src/tasks/trigger'],
+    machine: 'medium-1x',
+    build: {
+        external: [
+            // NestJS optional peer dependencies that we don't use
+            '@nestjs/websockets',
+            '@nestjs/websockets/socket-module',
+            '@nestjs/microservices',
+            '@grpc/grpc-js',
+            '@grpc/proto-loader',
+            'kafkajs',
+            'mqtt',
+            'nats',
+            'amqplib',
+            'amqp-connection-manager',
+        ],
+        extensions: [
+            // Enable TypeScript decorator metadata for TypeORM
+            emitDecoratorMetadata(),
+        ],
+    },
 });

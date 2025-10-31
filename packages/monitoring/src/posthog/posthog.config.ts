@@ -17,7 +17,7 @@ export const initPostHog = (config?: PostHogConfig) => {
         });
         return true;
     }
-    
+
     return false;
 };
 

@@ -8,14 +8,23 @@ export interface StartConversationDto {
     metadata?: Record<string, any>;
 }
 
+export interface ConversationOptionsDto {
+    model?: string;
+    temperature?: number;
+    maxTokens?: number;
+    role?: string;
+    systemPrompt?: string;
+    context?: string;
+    rules?: string[];
+    useDefaultSystemPrompt?: boolean;
+    messageLimit?: number;
+    metadata?: Record<string, any>;
+    [key: string]: any;
+}
+
 export interface SendMessageDto {
     message: string;
-    options?: {
-        model?: string;
-        temperature?: number;
-        maxTokens?: number;
-        [key: string]: any;
-    };
+    options?: ConversationOptionsDto;
 }
 
 // Response Types
@@ -25,15 +34,25 @@ export interface ConversationStartResponse {
     message: string;
 }
 
+export type ConversationMessage = {
+    role: 'user' | 'assistant' | 'system' | 'tool' | 'function';
+    content: string;
+    timestamp: string | null;
+};
+
 export interface ConversationHistoryResponse {
     sessionId: string;
     context: Record<string, any>;
     totalMessages: number;
-    messages: {
-        role: string;
-        content: string;
-        timestamp: string;
-    }[];
+    messages: ConversationMessage[];
+}
+
+export interface ConversationSummary {
+    sessionId: string;
+    title?: string;
+    createdAt: string | null;
+    updatedAt: string | null;
+    messageCount: number;
 }
 
 export interface StreamChunk {
@@ -94,6 +113,15 @@ export const aiConversationAPI = {
 
     getConversationHistory: async (sessionId: string) => {
         return serverFetch<ConversationHistoryResponse>(`/ai-conversations/${sessionId}/history`);
+    },
+
+    getRecentConversations: async (limit?: number) => {
+        const params = new URLSearchParams();
+        if (limit !== undefined) {
+            params.set('limit', limit.toString());
+        }
+        const query = params.toString() ? `?${params.toString()}` : '';
+        return serverFetch<ConversationSummary[]>(`/ai-conversations/recent${query}`);
     },
 
     // Send a message (non-streaming)

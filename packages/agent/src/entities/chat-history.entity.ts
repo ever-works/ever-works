@@ -10,7 +10,7 @@ import {
 } from 'typeorm';
 import { User } from './user.entity';
 import { ChatMessage } from './chat-message.entity';
-import { ClassToObject } from './types';
+import type { ClassToObject } from './types';
 
 @Entity({ name: 'chat_histories' })
 @Index(['sessionId', 'userId'])

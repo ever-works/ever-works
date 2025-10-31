@@ -31,12 +31,12 @@ export const createSentryConfig = (config?: SentryConfig): any => {
 
 export const initSentry = (config?: SentryConfig) => {
     const sentryConfig = createSentryConfig(config);
-    
+
     if (sentryConfig.dsn) {
         Sentry.init(sentryConfig);
         return true;
     }
-    
+
     return false;
 };
 

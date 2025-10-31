@@ -39,6 +39,12 @@ export interface StreamChunk {
     metadata?: Record<string, any>;
 }
 
+export interface SerializedMessage {
+    role: 'user' | 'assistant' | 'system' | 'tool' | 'function';
+    content: string;
+    timestamp: string | null;
+}
+
 @Injectable()
 export class AiConversationService {
     private readonly logger = new Logger(AiConversationService.name);
@@ -371,6 +377,124 @@ Core principles:
         return parts.join('\n\n');
     }
 
+    private mapMessageRole(message: BaseMessage): SerializedMessage['role'] {
+        const type = message.getType?.() ?? message._getType?.();
+        switch (type) {
+            case 'human':
+                return 'user';
+            case 'ai':
+                return 'assistant';
+            case 'system':
+                return 'system';
+            case 'tool':
+                return 'tool';
+            case 'function':
+                return 'function';
+            default:
+                return 'assistant';
+        }
+    }
+
+    private normalizeTimestamp(value: unknown): string | null {
+        if (!value) {
+            return null;
+        }
+
+        if (value instanceof Date) {
+            return Number.isNaN(value.getTime()) ? null : value.toISOString();
+        }
+
+        if (typeof value === 'number') {
+            const fromNumber = new Date(value);
+            return Number.isNaN(fromNumber.getTime()) ? null : fromNumber.toISOString();
+        }
+
+        if (typeof value === 'string') {
+            const fromString = new Date(value);
+            return Number.isNaN(fromString.getTime()) ? null : fromString.toISOString();
+        }
+
+        return null;
+    }
+
+    private extractTimestamp(message: BaseMessage): string | null {
+        const additional = message.additional_kwargs ?? {};
+        const responseMetadata = message.response_metadata ?? {};
+
+        const candidates: unknown[] = [
+            additional.timestamp,
+            additional.created_at,
+            additional.createdAt,
+            additional.time,
+            responseMetadata.timestamp,
+            responseMetadata.created_at,
+            responseMetadata.createdAt,
+        ];
+
+        for (const candidate of candidates) {
+            const normalized = this.normalizeTimestamp(candidate);
+            if (normalized) {
+                return normalized;
+            }
+        }
+
+        return null;
+    }
+
+    private extractContent(message: BaseMessage): string {
+        const { content } = message;
+
+        if (typeof content === 'string') {
+            return content;
+        }
+
+        if (Array.isArray(content)) {
+            return content
+                .map((part) => {
+                    if (typeof part === 'string') {
+                        return part;
+                    }
+
+                    if (part && typeof part === 'object') {
+                        if ('text' in part && typeof (part as any).text === 'string') {
+                            return (part as any).text;
+                        }
+
+                        try {
+                            return JSON.stringify(part);
+                        } catch {
+                            return '';
+                        }
+                    }
+
+                    return '';
+                })
+                .join('');
+        }
+
+        if (content && typeof content === 'object') {
+            if ('text' in (content as any) && typeof (content as any).text === 'string') {
+                return (content as any).text;
+            }
+
+            try {
+                return JSON.stringify(content);
+            } catch {
+                return String(content);
+            }
+        }
+
+        return content !== undefined && content !== null ? String(content) : '';
+    }
+
+    private serializeMessage(message: BaseMessage): SerializedMessage {
+        return {
+            role: this.mapMessageRole(message),
+            content: this.extractContent(message).trim(),
+            timestamp: this.extractTimestamp(message),
+        };
+    }
+
     /**
      * Get conversation history with message limit
      */
@@ -380,7 +504,7 @@ Core principles:
         limit?: number,
     ): Promise<{
         sessionId: string;
-        messages: BaseMessage[];
+        messages: SerializedMessage[];
         context: Record<string, any>;
         totalMessages: number;
     }> {
@@ -395,8 +519,8 @@ Core principles:
 
         return {
             sessionId,
-            messages,
             context,
+            messages: messages.map((message) => this.serializeMessage(message)),
             totalMessages: allMessages.length,
         };
     }

@@ -6,9 +6,7 @@
         "declarationDir": "./dist",
         "emitDeclarationOnly": true,
         "declarationMap": true,
-        "incremental": false,
+        "incremental": false
     },
-    "include": [
-        "src/**/*.ts"
-    ]
+    "include": ["src/**/*.ts"]
 }
