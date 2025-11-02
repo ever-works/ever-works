@@ -12,9 +12,11 @@ import { MonitoringModule, SentryInterceptor, PostHogInterceptor } from '@packag
 import { APIController } from './api.controller';
 import { AiConversationModule } from './ai-conversation/ai-conversation.module';
 import { TriggerInternalModule } from './trigger/trigger-internal.module';
+import { TwentyCrmModule } from './integrations';
 
 @Module({
     imports: [
+        TwentyCrmModule.forRoot(),
         ThrottlerModule.forRoot(throttlerConfig),
         EventEmitterModule.forRoot(),
         MonitoringModule.forRoot({

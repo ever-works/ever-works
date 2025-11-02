@@ -532,7 +532,6 @@ export class AuthService {
             expiresIn: jwtConstants.accessTokenExpiration(),
             secret: jwtConstants.secret(),
         });
-
         const refreshToken = await this.generateRefreshToken(
             user.id,
             userAgent,
