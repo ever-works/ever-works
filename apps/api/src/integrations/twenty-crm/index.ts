@@ -1,1 +1,11 @@
-
+export * from './controllers/companies.service';
+export * from './controllers/people.controler';
+export * from './services/crm-tenant.service';
+export * from './services/twenty-crm.service';
+export * from './types/twenty-crm.types';
+export * from './guards/crm-sync.guard';
+export * from './decorators/index';
+export * from './config/crm-config.service';
+export * from './services/client.service';
+export * from './config/crm-config.service';
+export * from './twenty-crm.module';
