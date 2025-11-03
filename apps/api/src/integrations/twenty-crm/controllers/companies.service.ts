@@ -1,7 +1,7 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from "@nestjs/common";
-import { ClientService } from "../services/client.service";
-import { JwtAuthGuard } from "@src/auth/guards/jwt-auth.guard";
-import { TwentyOrganization } from "../types/twenty-crm.types";
+import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { ClientService } from '../services/client.service';
+import { JwtAuthGuard } from '@src/auth/guards/jwt-auth.guard';
+import { TwentyOrganization } from '../types/twenty-crm.types';
 
 @Controller('api/twenty-crm/companies')
 @UseGuards(JwtAuthGuard)

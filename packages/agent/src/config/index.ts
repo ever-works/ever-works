@@ -34,11 +34,7 @@ export const config = {
             return process.env.TRIGGER_INTERNAL_SECRET;
         },
         shouldUseTrigger() {
-            return (
-                this.isEnabled() &&
-                Boolean(this.getInternalBaseUrl()) &&
-                Boolean(this.getInternalSecret())
-            );
+            return this.isEnabled() && Boolean(this.getInternalSecret());
         },
     },
 

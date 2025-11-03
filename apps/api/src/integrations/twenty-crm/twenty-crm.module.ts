@@ -36,12 +36,7 @@ export class TwentyCrmModule {
                 },
             ],
             controllers: [CompaniesController],
-            exports: [
-                TwentyCrmService,
-                ClientService,
-                CrmTenantService,
-                CrmConfigService,
-            ],
+            exports: [TwentyCrmService, ClientService, CrmTenantService, CrmConfigService],
         };
     }
 
@@ -71,12 +66,7 @@ export class TwentyCrmModule {
                 },
             ],
             controllers: [CompaniesController],
-            exports: [
-                TwentyCrmService,
-                ClientService,
-                CrmTenantService,
-                CrmConfigService,
-            ],
+            exports: [TwentyCrmService, ClientService, CrmTenantService, CrmConfigService],
         };
     }
 }

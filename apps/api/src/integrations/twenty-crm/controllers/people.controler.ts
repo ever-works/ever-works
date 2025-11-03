@@ -1,6 +1,6 @@
-import { Body, Delete, Get, Param, Patch, Post } from "@nestjs/common";
-import { ClientService } from "../services/client.service";
-import { TwentyContact } from "../types/twenty-crm.types";
+import { Body, Delete, Get, Param, Patch, Post } from '@nestjs/common';
+import { ClientService } from '../services/client.service';
+import { TwentyContact } from '../types/twenty-crm.types';
 
 export class PeopleController {
     constructor(private readonly clientService: ClientService) {}

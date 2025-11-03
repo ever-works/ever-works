@@ -51,7 +51,6 @@ RUN cd apps/web && pnpm prune --prod
 # Build
 FROM node:22-alpine
 
-USER node
 WORKDIR /app
 
 ENV NODE_ENV=production
@@ -61,8 +60,13 @@ COPY --from=installer --chown=node:node /app/apps/web/.next/static ./apps/web/.n
 COPY --from=installer --chown=node:node /app/apps/web/public ./apps/web/public
 COPY --from=installer --chown=node:node /app/apps/web/messages ./apps/web/messages
 
+# Create cache directory with proper permissions for node user
+RUN mkdir -p /app/apps/web/.next/cache/images && \
+    chown -R node:node /app/apps/web/.next/cache
+
 VOLUME /app/apps/web/.next/cache
 
+USER node
 WORKDIR /app/apps/web
 
 ENV PORT=3000

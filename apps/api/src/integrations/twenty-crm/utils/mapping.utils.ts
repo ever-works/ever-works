@@ -1,5 +1,10 @@
 import { EverWorksClient, EverWorksCompany, EverWorksItem } from '../types/mapping.types';
-import { TwentyContact, TwentyOrganization, TwentyProduct, TwentyDeal } from '../types/twenty-crm.types';
+import {
+    TwentyContact,
+    TwentyOrganization,
+    TwentyProduct,
+    TwentyDeal,
+} from '../types/twenty-crm.types';
 
 /**
  * Utility functions for mapping Ever Works entities to Twenty CRM entities
@@ -66,7 +71,7 @@ export class MappingUtils {
      */
     private static extractDomainFromWebsite(website?: string): string | undefined {
         if (!website) return undefined;
-        
+
         try {
             const url = new URL(website.startsWith('http') ? website : `https://${website}`);
             return url.hostname;
@@ -80,15 +85,15 @@ export class MappingUtils {
      */
     static validateContactData(contact: TwentyContact): string[] {
         const errors: string[] = [];
-        
+
         if (!contact.firstName && !contact.lastName) {
             errors.push('Either firstName or lastName is required');
         }
-        
+
         if (!contact.email) {
             errors.push('Email is required');
         }
-        
+
         return errors;
     }
 
@@ -97,11 +102,11 @@ export class MappingUtils {
      */
     static validateOrganizationData(organization: TwentyOrganization): string[] {
         const errors: string[] = [];
-        
+
         if (!organization.name) {
             errors.push('Organization name is required');
         }
-        
+
         return errors;
     }
 
@@ -110,11 +115,11 @@ export class MappingUtils {
      */
     static validateProductData(product: TwentyProduct): string[] {
         const errors: string[] = [];
-        
+
         if (!product.name) {
             errors.push('Product name is required');
         }
-        
+
         return errors;
     }
 
@@ -123,11 +128,11 @@ export class MappingUtils {
      */
     static validateDealData(deal: TwentyDeal): string[] {
         const errors: string[] = [];
-        
+
         if (!deal.title) {
             errors.push('Deal title is required');
         }
-        
+
         return errors;
     }
 }

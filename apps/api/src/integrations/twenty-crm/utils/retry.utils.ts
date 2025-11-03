@@ -12,22 +12,22 @@ export class RetryUtils {
         backoffMultiplier: number = 2,
     ): Promise<T> {
         let lastError: Error;
-        
+
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
             try {
                 return await fn();
             } catch (error) {
                 lastError = error as Error;
-                
+
                 if (attempt === maxAttempts) {
                     throw lastError;
                 }
-                
+
                 const delay = delayMs * Math.pow(backoffMultiplier, attempt - 1);
                 await this.sleep(delay);
             }
         }
-        
+
         throw lastError!;
     }
 
@@ -35,7 +35,7 @@ export class RetryUtils {
      * Sleep for specified milliseconds
      */
     private static sleep(ms: number): Promise<void> {
-        return new Promise(resolve => setTimeout(resolve, ms));
+        return new Promise((resolve) => setTimeout(resolve, ms));
     }
 
     /**
@@ -43,21 +43,23 @@ export class RetryUtils {
      */
     static isRetryableError(error: any): boolean {
         // Network errors, timeouts, and 5xx status codes are retryable
-        if (error.code === 'ECONNRESET' || 
-            error.code === 'ETIMEDOUT' || 
-            error.code === 'ENOTFOUND') {
+        if (
+            error.code === 'ECONNRESET' ||
+            error.code === 'ETIMEDOUT' ||
+            error.code === 'ENOTFOUND'
+        ) {
             return true;
         }
-        
+
         if (error.response?.status >= 500) {
             return true;
         }
-        
+
         // Rate limiting (429) is retryable
         if (error.response?.status === 429) {
             return true;
         }
-        
+
         return false;
     }
 
