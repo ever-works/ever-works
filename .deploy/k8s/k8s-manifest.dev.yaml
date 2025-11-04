@@ -32,7 +32,7 @@ kind: Deployment
 metadata:
   name: ever-works-api-dev
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: ever-works-api-dev
@@ -189,7 +189,7 @@ kind: Deployment
 metadata:
   name: ever-works-web-dev
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: ever-works-web-dev
