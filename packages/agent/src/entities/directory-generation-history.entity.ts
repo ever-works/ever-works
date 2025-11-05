@@ -42,10 +42,10 @@ export class DirectoryGenerationHistory {
     })
     user?: ClassToObject<User> | null;
 
-    @Column({ type: 'enum', enum: GenerationMethod, nullable: true })
+    @Column({ type: 'varchar', nullable: true })
     generationMethod?: GenerationMethod | null;
 
-    @Column({ type: 'enum', enum: GenerateStatusType, default: GenerateStatusType.GENERATING })
+    @Column({ type: 'varchar', default: GenerateStatusType.GENERATING })
     status: GenerateStatusType;
 
     @Column({ type: 'json', nullable: true })
