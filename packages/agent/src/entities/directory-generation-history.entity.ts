@@ -11,6 +11,7 @@ import { User } from './user.entity';
 import { ClassToObject } from './types';
 import { GenerationMethod } from '@src/items-generator/dto/create-items-generator.dto';
 import { GenerateStatusType } from './types';
+import { TimestampColumn } from './_types';
 
 export type GenerationMetrics = {
     urls_scanned?: number;
@@ -63,10 +64,10 @@ export class DirectoryGenerationHistory {
     @Column({ type: 'int', default: 0 })
     totalItemsCount: number;
 
-    @Column({ type: 'timestamp', nullable: true })
+    @TimestampColumn({ nullable: true })
     startedAt?: Date | null;
 
-    @Column({ type: 'timestamp', nullable: true })
+    @TimestampColumn({ nullable: true })
     finishedAt?: Date | null;
 
     @Column({ type: 'int', nullable: true })
