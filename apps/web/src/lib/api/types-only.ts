@@ -31,6 +31,8 @@ export type {
     DirectoryDetails,
     DirectoryConfig,
     PRUpdate,
+    DirectoryGenerationHistoryEntry,
+    DirectoryGenerationHistoryResponse,
 } from './directory';
 
 export type {

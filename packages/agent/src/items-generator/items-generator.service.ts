@@ -382,10 +382,16 @@ export class ItemsGeneratorService {
                 );
             }
 
+            const finalMetrics = {
+                ...metrics,
+                total_items_in_store: validatedItems.length,
+            };
+
             return {
                 items: validatedItems,
                 categories: categories,
                 tags: tags,
+                metrics: finalMetrics,
             };
         } catch (error: any) {
             this.logger.error(

@@ -3,12 +3,14 @@ import {
     Column,
     PrimaryGeneratedColumn,
     ManyToOne,
+    OneToMany,
     CreateDateColumn,
     UpdateDateColumn,
 } from 'typeorm';
 import { User } from './user.entity';
 import type { ClassToObject, GenerateStatus } from './types';
 import type { PRUpdate } from '@src/data-generator';
+import { DirectoryGenerationHistory } from './directory-generation-history.entity';
 import { TimestampColumn } from './_types';
 
 @Entity({ name: 'directories' })
@@ -27,6 +29,11 @@ export class Directory {
 
     @ManyToOne(() => User, (user) => user.directories, { onDelete: 'CASCADE', eager: true })
     user: ClassToObject<User>;
+
+    @OneToMany(() => DirectoryGenerationHistory, (history) => history.directory, {
+        cascade: false,
+    })
+    generationHistory?: ClassToObject<DirectoryGenerationHistory>[];
 
     @Column({ nullable: true })
     owner?: string;

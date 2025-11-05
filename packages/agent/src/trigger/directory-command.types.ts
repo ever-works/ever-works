@@ -1,4 +1,5 @@
 import { Directory } from '@src/entities/directory.entity';
+import { GenerationHistoryUpdateInput } from '@src/directory';
 
 export enum DirectoryCommandAction {
     UPDATE = 'update',
@@ -7,6 +8,7 @@ export enum DirectoryCommandAction {
     RECORD_GENERATION_START = 'recordGenerationStartTime',
     RECORD_GENERATION_FINISH = 'recordGenerationFinishTime',
     EMIT_GENERATION_COMPLETED = 'emitGenerationCompleted',
+    UPDATE_GENERATION_HISTORY = 'updateGenerationHistory',
 }
 
 export type DirectoryCommandPayloads = {
@@ -24,6 +26,10 @@ export type DirectoryCommandPayloads = {
         finishedAt: string;
     };
     [DirectoryCommandAction.EMIT_GENERATION_COMPLETED]: Record<string, never>;
+    [DirectoryCommandAction.UPDATE_GENERATION_HISTORY]: {
+        historyId: string;
+        updates: GenerationHistoryUpdateInput;
+    };
 };
 
 export type DirectoryCommand<A extends DirectoryCommandAction = DirectoryCommandAction> = {

@@ -13,12 +13,16 @@ import { WebsiteUpdateService } from '../website-generator/website-update.servic
 import { Directory } from '../entities/directory.entity';
 import { User } from '../entities/user.entity';
 import { DirectoryRepository } from '../database/repositories/directory.repository';
+import { DirectoryGenerationHistoryRepository } from '../database/repositories/directory-generation-history.repository';
 import {
     CreateItemsGeneratorDto,
     GenerationMethod,
     UpdateItemsGeneratorDto,
 } from '../items-generator/dto/create-items-generator.dto';
-import { ItemsGeneratorResponseDto } from '../items-generator/dto/items-generator-response.dto';
+import {
+    ItemsGeneratorMetrics,
+    ItemsGeneratorResponseDto,
+} from '../items-generator/dto/items-generator-response.dto';
 import {
     SubmitItemDto,
     SubmitItemResponseDto,
@@ -42,6 +46,18 @@ import {
     DirectoryGenerationMode,
     DirectoryGenerationPayload,
 } from '@src/tasks/trigger/directory-generation.task';
+import { DirectoryGenerationHistory } from '../entities/directory-generation-history.entity';
+import {
+    DirectoryGenerationHistoryDto,
+    DirectoryGenerationHistoryListDto,
+} from '../dto/directory-generation-history.dto';
+
+type GenerationStats = {
+    newItemsCount: number;
+    updatedItemsCount: number;
+    totalItemsCount: number;
+    metrics?: ItemsGeneratorMetrics;
+};
 
 @Injectable()
 export class AgentService {
@@ -57,6 +73,7 @@ export class AgentService {
         private readonly directoryRepository: DirectoryRepository,
         private readonly eventEmitter: EventEmitter2,
         private readonly triggerService: TriggerService,
+        private readonly generationHistoryRepository: DirectoryGenerationHistoryRepository,
     ) {}
 
     async getDirectories(
@@ -365,6 +382,29 @@ export class AgentService {
         }
     }
 
+    async directoryGenerationHistory(
+        directoryId: string,
+        user: User,
+        options: { limit?: number; offset?: number } = {},
+    ): Promise<DirectoryGenerationHistoryListDto> {
+        const directory = await this.validateDirectoryOwnership(directoryId, user.id);
+
+        const limit = Math.min(Math.max(options.limit ?? 20, 1), 100);
+        const offset = Math.max(options.offset ?? 0, 0);
+
+        const [history, total] = await Promise.all([
+            this.generationHistoryRepository.findByDirectory(directory.id, limit, offset),
+            this.generationHistoryRepository.countByDirectory(directory.id),
+        ]);
+
+        return {
+            history: history.map((record) => this.toGenerationHistoryDto(record)),
+            total,
+            limit,
+            offset,
+        };
+    }
+
     async generateItems(
         directoryId: string,
         createItemsGeneratorDto: CreateItemsGeneratorDto,
@@ -373,9 +413,15 @@ export class AgentService {
     ): Promise<ItemsGeneratorResponseDto> {
         const directory = await this.validateDirectoryOwnership(directoryId, user.id);
 
+        const history = await this.createGenerationHistoryRecord(
+            directory,
+            user,
+            createItemsGeneratorDto,
+        );
+
         if (awaitCompletion) {
             try {
-                await this.processGeneration(directory, user, createItemsGeneratorDto);
+                await this.processGeneration(directory, user, createItemsGeneratorDto, history);
             } catch (error) {
                 if (error instanceof HttpException) {
                     throw error;
@@ -393,6 +439,8 @@ export class AgentService {
                 directory,
                 user,
                 createItemsGeneratorDto,
+                history.id,
+                history,
             );
         }
 
@@ -401,6 +449,7 @@ export class AgentService {
             slug: directory.slug,
             parameters: createItemsGeneratorDto,
             message: `Processing request for '${createItemsGeneratorDto.name}'. Check logs or data directory for updates.`,
+            historyId: history.id,
         };
     }
 
@@ -429,9 +478,11 @@ export class AgentService {
             ...updateItemsGeneratorDto,
         };
 
+        const history = await this.createGenerationHistoryRecord(directory, user, lastRequestData);
+
         if (awaitCompletion) {
             try {
-                await this.processGeneration(directory, user, lastRequestData);
+                await this.processGeneration(directory, user, lastRequestData, history);
             } catch (error) {
                 if (error instanceof HttpException) {
                     throw error;
@@ -449,6 +500,8 @@ export class AgentService {
                 directory,
                 user,
                 lastRequestData,
+                history.id,
+                history,
             );
         }
 
@@ -457,6 +510,7 @@ export class AgentService {
             status: 'pending',
             parameters: lastRequestData,
             message: `Processing update for '${directory.name}'. Check logs or data directory for updates.`,
+            historyId: history.id,
         };
     }
 
@@ -809,17 +863,58 @@ export class AgentService {
         return message;
     }
 
+    private toGenerationHistoryDto(
+        record: DirectoryGenerationHistory,
+    ): DirectoryGenerationHistoryDto {
+        return {
+            id: record.id,
+            status: record.status,
+            generationMethod: record.generationMethod ?? null,
+            startedAt: record.startedAt ? record.startedAt.toISOString() : null,
+            finishedAt: record.finishedAt ? record.finishedAt.toISOString() : null,
+            durationInSeconds: record.durationInSeconds ?? null,
+            newItemsCount: record.newItemsCount,
+            updatedItemsCount: record.updatedItemsCount,
+            totalItemsCount: record.totalItemsCount,
+            metrics: record.metrics ?? null,
+            errorMessage: record.errorMessage ?? null,
+            parameters: record.parameters ?? null,
+            createdAt: record.createdAt.toISOString(),
+            updatedAt: record.updatedAt.toISOString(),
+        };
+    }
+
+    private async createGenerationHistoryRecord(
+        directory: Directory,
+        user: User,
+        dto: CreateItemsGeneratorDto,
+    ): Promise<DirectoryGenerationHistory> {
+        const parameters = dto ? JSON.parse(JSON.stringify(dto)) : undefined;
+
+        return this.generationHistoryRepository.createEntry({
+            directoryId: directory.id,
+            userId: user.id,
+            generationMethod: dto?.generation_method ?? null,
+            parameters,
+            status: GenerateStatusType.GENERATING,
+            startedAt: new Date(),
+        });
+    }
+
     private async dispatchGenerationTask(
         mode: DirectoryGenerationMode,
         directory: Directory,
         user: User,
         dto: CreateItemsGeneratorDto,
+        historyId: string,
+        history: DirectoryGenerationHistory,
     ) {
         const payload: DirectoryGenerationPayload = {
             directoryId: directory.id,
             userId: user.id,
             mode,
             dto,
+            historyId,
         };
 
         const dispatched = await this.triggerService.dispatchDirectoryGeneration(payload);
@@ -829,7 +924,7 @@ export class AgentService {
                 `Trigger dispatch failed, falling back to in-process generation for directory ${directory.id} (${mode})`,
             );
 
-            void this.processGeneration(directory, user, dto);
+            void this.processGeneration(directory, user, dto, history);
         }
     }
 
@@ -837,6 +932,7 @@ export class AgentService {
         directory: Directory,
         user: User,
         dto: CreateItemsGeneratorDto,
+        history?: DirectoryGenerationHistory,
     ) {
         const startTime = new Date();
         console.log(`Generation started at: ${startTime.toISOString()}`);
@@ -849,12 +945,24 @@ export class AgentService {
             }),
         ]);
 
+        if (history) {
+            await this.generationHistoryRepository.updateEntry(history.id, {
+                startedAt: startTime,
+                status: GenerateStatusType.GENERATING,
+            });
+        }
+
         let hasError = false;
+        let generationStats: GenerationStats | null = null;
 
         try {
             const generated = await this.dataGenerator.initialize(directory, user, dto);
 
-            if (generated) {
+            if (generated !== false && generated?.stats) {
+                generationStats = generated.stats;
+            }
+
+            if (generated !== false && (generated.stats?.totalItemsCount ?? 0) > 0) {
                 await this.markdownGenerator.initialize(directory, user, {
                     repository_description: dto.repository_description,
                     generation_method: generated.generation_method,
@@ -867,6 +975,15 @@ export class AgentService {
                 user,
                 dto.website_repository_creation_method,
             );
+
+            if (history) {
+                await this.generationHistoryRepository.updateEntry(history.id, {
+                    newItemsCount: generationStats?.newItemsCount ?? 0,
+                    updatedItemsCount: generationStats?.updatedItemsCount ?? 0,
+                    totalItemsCount: generationStats?.totalItemsCount ?? 0,
+                    metrics: generationStats?.metrics,
+                });
+            }
         } catch (error) {
             await Promise.all([
                 this.directoryRepository.recordGenerationFinishTime(directory.id, new Date()),
@@ -875,6 +992,21 @@ export class AgentService {
                     error: this.clearMessageError(error),
                 }),
             ]);
+
+            if (history) {
+                const endTime = new Date();
+                const duration = Math.round((endTime.getTime() - startTime.getTime()) / 1000);
+                await this.generationHistoryRepository.updateEntry(history.id, {
+                    status: GenerateStatusType.ERROR,
+                    finishedAt: endTime,
+                    durationInSeconds: duration,
+                    errorMessage: this.clearMessageError(error),
+                    newItemsCount: generationStats?.newItemsCount ?? 0,
+                    updatedItemsCount: generationStats?.updatedItemsCount ?? 0,
+                    totalItemsCount: generationStats?.totalItemsCount ?? 0,
+                    metrics: generationStats?.metrics,
+                });
+            }
 
             if (error instanceof HttpException) {
                 throw error;
@@ -893,6 +1025,20 @@ export class AgentService {
                     step: null,
                 }),
             ]);
+
+            if (history) {
+                const endTime = new Date();
+                const duration = Math.round((endTime.getTime() - startTime.getTime()) / 1000);
+                await this.generationHistoryRepository.updateEntry(history.id, {
+                    status: GenerateStatusType.GENERATED,
+                    finishedAt: endTime,
+                    durationInSeconds: duration,
+                    newItemsCount: generationStats?.newItemsCount ?? 0,
+                    updatedItemsCount: generationStats?.updatedItemsCount ?? 0,
+                    totalItemsCount: generationStats?.totalItemsCount ?? 0,
+                    metrics: generationStats?.metrics,
+                });
+            }
         }
 
         // dispatch event

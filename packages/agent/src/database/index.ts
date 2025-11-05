@@ -5,4 +5,5 @@ export * from './repositories/directory.repository';
 export * from './repositories/user.repository';
 export * from './repositories/refresh-token.repository';
 export * from './repositories/oauth-token.repository';
+export * from './repositories/directory-generation-history.repository';
 export * from './database-init.service';

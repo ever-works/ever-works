@@ -15,7 +15,11 @@ import { config } from '@packages/agent/config';
 import { DirectoryRepository } from '@packages/agent/database';
 import { Directory } from '@packages/agent/entities';
 import { DirectoryCommandDto } from './dto/directory-command.dto';
-import { DIRECTORY_OPERATIONS, DirectoryOperations } from '@packages/agent/directory';
+import {
+    DIRECTORY_OPERATIONS,
+    DirectoryOperations,
+    GenerationHistoryUpdateInput,
+} from '@packages/agent/directory';
 import { DirectoryCommandAction, DirectoryCommandPayloads } from '@packages/agent/trigger';
 
 type DirectoryContextResponse = {
@@ -176,6 +180,30 @@ const directoryCommandDefinitions: CommandDefinitions = {
         requiredKeys: [],
         handler: async (_payload, ctx) => {
             await ctx.operations.emitGenerationCompleted(ctx.directory);
+        },
+    },
+    [DirectoryCommandAction.UPDATE_GENERATION_HISTORY]: {
+        requiredKeys: ['historyId', 'updates'],
+        handler: async (payload, ctx) => {
+            if (!payload.historyId) {
+                throw new BadRequestException('Missing historyId for generation history update');
+            }
+
+            const updates = { ...payload.updates } as GenerationHistoryUpdateInput;
+
+            if (updates.startedAt && typeof updates.startedAt === 'string') {
+                updates.startedAt = new Date(updates.startedAt);
+            }
+
+            if (updates.finishedAt && typeof updates.finishedAt === 'string') {
+                updates.finishedAt = new Date(updates.finishedAt);
+            }
+
+            await ctx.operations.updateGenerationHistory(
+                ctx.directoryId,
+                payload.historyId,
+                updates,
+            );
         },
     },
 };

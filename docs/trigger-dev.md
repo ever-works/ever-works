@@ -63,6 +63,7 @@ Client → API (AgentService) → TriggerService ──▶ Trigger.dev task
 | `TRIGGER_API_URL`          | Optional override of the Trigger.dev API base URL (defaults to the hosted service).                               |
 | `TRIGGER_INTERNAL_API_URL` | Base URL the worker can reach for the API instance (`http(s)://host[:port]/internal/trigger`). No trailing slash. |
 | `TRIGGER_INTERNAL_SECRET`  | Shared secret for the internal controller. Set the same value in the API environment and the worker environment.  |
+| `TRIGGER_MACHINE`          | Optional machine preset (e.g. `standard-2x`, `large-1x`). Leave unset to use Trigger.dev's default dev preset.    |
 
 **Where to configure:**
 
@@ -98,5 +99,6 @@ If you want to bypass Trigger.dev during development, either set `TRIGGER_ENABLE
 - API logs show inbound webhook calls in `TriggerInternalController`. Failures there usually mean the worker secret is misconfigured or the payload shape drifted.
 - If a task is dispatched but never starts, double-check the project ID in `trigger.config.ts` and the `TRIGGER_SECRET_KEY` supplied to the worker.
 - If the worker succeeds but the directory state remains unchanged, ensure the internal API base URL is reachable from the worker environment and that the controller is returning HTTP 200 for command requests.
+- Review the **History** tab in the dashboard (Directories → Detail → History) to confirm each run produces metrics and to compare local vs. Trigger.dev executions.
 
 Keeping this separation (Trigger.dev for long-running compute, API for persistence) lets us scale the heavy work off the API without relaxing our database access rules. When extending the system, continue funnelling all stateful operations through the internal controller and use strongly-typed payloads to guard against malformed requests.
