@@ -15,6 +15,8 @@ const statusColor: Record<string, string> = {
     error: 'bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-200',
 };
 
+const tdClass = 'px-4 py-4 text-sm text-text dark:text-text-dark align-top';
+
 const formatterCache = new Map<string, Intl.DateTimeFormat>();
 
 function formatDate(value: string | undefined | null, locale: string) {
@@ -111,21 +113,15 @@ export function HistoryTable({ entries, locale }: HistoryTableProps) {
                                         {getStatusLabel(statusKey, t)}
                                     </span>
                                 </td>
-                                <td className="px-4 py-4 text-sm text-text dark:text-text-dark align-top">
+                                <td className={tdClass}>
                                     {formatDate(entry.startedAt ?? entry.createdAt, locale)}
                                 </td>
-                                <td className="px-4 py-4 text-sm text-text dark:text-text-dark align-top">
+                                <td className={tdClass}>
                                     {formatDuration(entry.durationInSeconds)}
                                 </td>
-                                <td className="px-4 py-4 text-sm text-text dark:text-text-dark align-top">
-                                    {entry.newItemsCount}
-                                </td>
-                                <td className="px-4 py-4 text-sm text-text dark:text-text-dark align-top">
-                                    {entry.updatedItemsCount}
-                                </td>
-                                <td className="px-4 py-4 text-sm text-text dark:text-text-dark align-top">
-                                    {entry.totalItemsCount}
-                                </td>
+                                <td className={tdClass}>{entry.newItemsCount}</td>
+                                <td className={tdClass}>{entry.updatedItemsCount}</td>
+                                <td className={tdClass}>{entry.totalItemsCount}</td>
                             </tr>
                         );
                     })}

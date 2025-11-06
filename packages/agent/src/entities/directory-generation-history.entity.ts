@@ -8,7 +8,7 @@ import {
 } from 'typeorm';
 import { Directory } from './directory.entity';
 import { User } from './user.entity';
-import { ClassToObject } from './types';
+import type { ClassToObject } from './types';
 import { GenerationMethod } from '@src/items-generator/dto/create-items-generator.dto';
 import { GenerateStatusType } from './types';
 import { TimestampColumn } from './_types';
