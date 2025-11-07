@@ -95,12 +95,6 @@ export function DirectoryHistoryPageClient({
                     </Button>
                 </div>
             )}
-
-            {!hasMore && entries.length > 0 && (
-                <p className="text-center text-sm text-text-secondary dark:text-text-secondary-dark">
-                    {t('noMore')}
-                </p>
-            )}
         </div>
     );
 }

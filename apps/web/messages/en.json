@@ -988,6 +988,14 @@
                 "deleteFailed": "Failed to delete account",
                 "unexpectedError": "An unexpected error occurred"
             }
+        },
+        "aiChat": {
+            "title": "AI Assistant",
+            "subtitle": "Create directories with natural language",
+            "newChat": "New chat",
+            "loadingConversation": "Loading conversation…",
+            "inputPlaceholder": "Describe the directory you want to create...",
+            "sendButton": "Send"
         }
     },
     "layout": {
