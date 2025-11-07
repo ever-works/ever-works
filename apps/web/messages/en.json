@@ -376,6 +376,7 @@
                 "overview": "Overview",
                 "items": "Items",
                 "generator": "Generator",
+                "history": "History",
                 "deploy": "Deploy",
                 "settings": "Settings"
             },
@@ -407,6 +408,32 @@
                 "categories": "Categories",
                 "generationStatus": "Generation Status",
                 "daysActive": "Days Active"
+            },
+            "history": {
+                "title": "Generation History",
+                "subtitle": "Track past generation runs, items created, and execution details.",
+                "error": "Failed to load more entries",
+                "empty": {
+                    "title": "No history yet",
+                    "description": "Request a generation to see progress and outcomes here."
+                },
+                "status": {
+                    "generating": "In progress",
+                    "generated": "Completed",
+                    "error": "Failed"
+                },
+                "table": {
+                    "run": "Run",
+                    "status": "Status",
+                    "newItems": "New Items",
+                    "updatedItems": "Updated",
+                    "totalItems": "Total",
+                    "duration": "Duration",
+                    "startedAt": "Started"
+                },
+                "loadMore": "Load more",
+                "noMore": "No more records",
+                "unknown": "Unknown"
             },
             "info": {
                 "title": "Directory Information",
@@ -961,6 +988,14 @@
                 "deleteFailed": "Failed to delete account",
                 "unexpectedError": "An unexpected error occurred"
             }
+        },
+        "aiChat": {
+            "title": "AI Assistant",
+            "subtitle": "Create directories with natural language",
+            "newChat": "New chat",
+            "loadingConversation": "Loading conversation…",
+            "inputPlaceholder": "Describe the directory you want to create...",
+            "sendButton": "Send"
         }
     },
     "layout": {

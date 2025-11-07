@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils/cn';
 import { useAIStream } from '@/lib/hooks/use-ai-stream';
 import { useChatContext } from '@/components/ai/ChatProvider';
@@ -8,6 +9,7 @@ import { ChatMessage, generateMessageId } from '@/lib/hooks/use-chat-history';
 import { ROUTES, routeWithParams } from '@/lib/constants';
 
 export function ChatInterface() {
+    const t = useTranslations('dashboard.aiChat');
     const {
         messages,
         error: historyError,
@@ -184,10 +186,10 @@ export function ChatInterface() {
             <div className="flex items-start justify-between gap-3 px-4 py-3 border-b border-border dark:border-border-dark">
                 <div>
                     <h2 className="text-base font-semibold text-text dark:text-text-dark">
-                        AI Assistant
+                        {t('title')}
                     </h2>
                     <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                        Create directories with natural language
+                        {t('subtitle')}
                     </p>
                 </div>
                 <button
@@ -200,14 +202,14 @@ export function ChatInterface() {
                         'disabled:opacity-50 disabled:cursor-not-allowed',
                     )}
                 >
-                    New chat
+                    {t('newChat')}
                 </button>
             </div>
 
             <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3 min-h-0">
                 {isLoading && messages.length === 0 ? (
                     <div className="flex h-full min-h-[120px] items-center justify-center text-xs text-text-muted dark:text-text-muted-dark">
-                        Loading conversation…
+                        {t('loadingConversation')}
                     </div>
                 ) : (
                     messages.map((message) => {
@@ -279,7 +281,7 @@ export function ChatInterface() {
                         type="text"
                         value={input}
                         onChange={(event) => setInput(event.target.value)}
-                        placeholder="Describe the directory you want to create..."
+                        placeholder={t('inputPlaceholder')}
                         className={cn(
                             'flex-1 px-3 py-2 text-sm rounded-lg transition-colors',
                             'bg-surface-tertiary dark:bg-surface-tertiary-dark',

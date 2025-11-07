@@ -11,6 +11,7 @@ import { ClassToObject } from './types';
 import { config } from '@src/config';
 import { Directory } from './directory.entity';
 import { RepoProvider } from '@src/dto';
+import { DirectoryGenerationHistory } from './directory-generation-history.entity';
 
 @Entity({ name: 'users' })
 export class User {
@@ -76,6 +77,9 @@ export class User {
 
     @OneToMany(() => Directory, (directory) => directory.user, { lazy: true })
     directories: Promise<ClassToObject<Directory>[]>;
+
+    @OneToMany(() => DirectoryGenerationHistory, (history) => history.user, { lazy: true })
+    generationHistory?: Promise<ClassToObject<DirectoryGenerationHistory>[]>;
 
     local: boolean = false;
 

@@ -133,6 +133,30 @@ export interface DirectoryCategoriesTags {
     tags: string[];
 }
 
+export interface DirectoryGenerationHistoryEntry {
+    id: string;
+    status: GenerateStatusType;
+    generationMethod?: GenerationMethod | null;
+    startedAt?: string | null;
+    finishedAt?: string | null;
+    durationInSeconds?: number | null;
+    newItemsCount: number;
+    updatedItemsCount: number;
+    totalItemsCount: number;
+    metrics?: Record<string, number | undefined> | null;
+    errorMessage?: string | null;
+    parameters?: CreateItemsGeneratorDto | null;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface DirectoryGenerationHistoryResponse {
+    history: DirectoryGenerationHistoryEntry[];
+    total: number;
+    limit: number;
+    offset: number;
+}
+
 export const directoryAPI = {
     // Get all directories with pagination and search
     getAll: async (options?: { limit?: number; offset?: number; search?: string }) => {
@@ -199,6 +223,18 @@ export const directoryAPI = {
     getCategoriesTags: async (id: string) => {
         return serverFetch<APIResponse<DirectoryCategoriesTags>>(
             `/directories/${id}/categories-tags`,
+        );
+    },
+
+    // Get directory generation history
+    getHistory: async (id: string, options?: { limit?: number; offset?: number }) => {
+        const params = new URLSearchParams();
+        if (options?.limit !== undefined) params.append('limit', String(options.limit));
+        if (options?.offset !== undefined) params.append('offset', String(options.offset));
+        const query = params.toString() ? `?${params.toString()}` : '';
+
+        return serverFetch<APIResponse<DirectoryGenerationHistoryResponse>>(
+            `/directories/${id}/history${query}`,
         );
     },
 

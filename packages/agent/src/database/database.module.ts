@@ -8,6 +8,7 @@ import { databaseConfig, ENTITIES } from './database.config';
 import { UserRepository } from './repositories/user.repository';
 import { UserGitHubService } from './user-github.service';
 import { ChatHistoryRepository } from './repositories/chat-history.repository';
+import { DirectoryGenerationHistoryRepository } from './repositories/directory-generation-history.repository';
 
 @Module({
     imports: [
@@ -31,6 +32,7 @@ import { ChatHistoryRepository } from './repositories/chat-history.repository';
         UserRepository,
         OAuthTokenRepository,
         ChatHistoryRepository,
+        DirectoryGenerationHistoryRepository,
     ],
     exports: [
         TypeOrmModule,
@@ -40,6 +42,7 @@ import { ChatHistoryRepository } from './repositories/chat-history.repository';
         RefreshTokenRepository,
         OAuthTokenRepository,
         ChatHistoryRepository,
+        DirectoryGenerationHistoryRepository,
     ],
 })
 export class DatabaseModule {}

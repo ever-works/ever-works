@@ -1,7 +1,15 @@
 import { registerAs } from '@nestjs/config';
 import { TypeOrmModuleOptions } from '@nestjs/typeorm';
 import { CacheEntry } from '../entities/cache.entity';
-import { RefreshToken, OAuthToken, ChatHistory, ChatMessage, User, Directory } from '../entities';
+import {
+    RefreshToken,
+    OAuthToken,
+    ChatHistory,
+    ChatMessage,
+    User,
+    Directory,
+    DirectoryGenerationHistory,
+} from '../entities';
 import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs';
@@ -40,6 +48,7 @@ export const ENTITIES = [
     ChatHistory,
     ChatMessage,
     CacheEntry,
+    DirectoryGenerationHistory,
 ];
 
 export const databaseConfig = registerAs('database', (): DatabaseConfig => {

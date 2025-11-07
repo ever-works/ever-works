@@ -158,6 +158,30 @@ export class DirectoriesController {
         );
     }
 
+    @Get('directories/:id/history')
+    @HttpCode(HttpStatus.OK)
+    async getDirectoryHistory(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') id: string,
+        @Query('limit') limit?: string,
+        @Query('offset') offset?: string,
+    ) {
+        const user = await this.authService.getUser(auth.userId);
+
+        const parsedLimit = limit !== undefined ? Number(limit) : undefined;
+        const parsedOffset = offset !== undefined ? Number(offset) : undefined;
+
+        const result = await this.agentService.directoryGenerationHistory(id, user, {
+            limit: parsedLimit && !isNaN(parsedLimit) ? parsedLimit : undefined,
+            offset: parsedOffset && !isNaN(parsedOffset) ? parsedOffset : undefined,
+        });
+
+        return {
+            status: 'success',
+            ...result,
+        };
+    }
+
     @Post('directories/generate-details')
     @HttpCode(HttpStatus.OK)
     async generateDirectoryDetails(

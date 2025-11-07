@@ -21,6 +21,7 @@ export type DirectoryGenerationPayload = {
     userId: string;
     mode: DirectoryGenerationMode;
     dto: CreateItemsGeneratorDto;
+    historyId: string;
 };
 
 export const directoryGenerationTask = task({
@@ -28,7 +29,7 @@ export const directoryGenerationTask = task({
     maxDuration: 3600,
     run: async (payload: DirectoryGenerationPayload) => {
         const appContext = await NestFactory.createApplicationContext(TriggerWorkerModule, {
-            logger: false,
+            logger: ['debug', 'log', 'warn', 'error', 'fatal'],
         });
 
         try {
@@ -49,6 +50,7 @@ export const directoryGenerationTask = task({
                 directory,
                 user,
                 dto: payload.dto,
+                historyId: payload.historyId,
             });
 
             return {

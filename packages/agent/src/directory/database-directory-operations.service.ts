@@ -1,7 +1,10 @@
 import { Injectable, Optional } from '@nestjs/common';
-import { DirectoryRepository } from '@src/database';
+import { DirectoryGenerationHistoryRepository, DirectoryRepository } from '@src/database';
 import { Directory } from '@src/entities/directory.entity';
-import { DirectoryOperations } from './directory-operations.interface';
+import {
+    DirectoryOperations,
+    GenerationHistoryUpdateInput,
+} from './directory-operations.interface';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DirectoryGenerationCompletedEvent } from '@src/events';
 
@@ -9,6 +12,7 @@ import { DirectoryGenerationCompletedEvent } from '@src/events';
 export class DatabaseDirectoryOperationsService implements DirectoryOperations {
     constructor(
         private readonly directoryRepository: DirectoryRepository,
+        private readonly generationHistoryRepository: DirectoryGenerationHistoryRepository,
         @Optional() private readonly eventEmitter?: EventEmitter2,
     ) {}
 
@@ -41,5 +45,13 @@ export class DatabaseDirectoryOperationsService implements DirectoryOperations {
             DirectoryGenerationCompletedEvent.EVENT_NAME,
             new DirectoryGenerationCompletedEvent(directory),
         );
+    }
+
+    async updateGenerationHistory(
+        _directoryId: string,
+        historyId: string,
+        updates: GenerationHistoryUpdateInput,
+    ): Promise<void> {
+        await this.generationHistoryRepository.updateEntry(historyId, updates);
     }
 }

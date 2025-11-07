@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Directory } from '@src/entities/directory.entity';
-import type { DirectoryOperations } from '@src/directory';
+import type { DirectoryOperations, GenerationHistoryUpdateInput } from '@src/directory';
 import { TriggerInternalApiClient } from './trigger-internal-api.client';
 import { DirectoryCommandAction, DirectoryCommandPayloads } from './directory-command.types';
 
@@ -52,6 +52,20 @@ export class RemoteDirectoryOperationsService implements DirectoryOperations {
             action: DirectoryCommandAction.EMIT_GENERATION_COMPLETED,
             payload:
                 {} as DirectoryCommandPayloads[DirectoryCommandAction.EMIT_GENERATION_COMPLETED],
+        });
+    }
+
+    async updateGenerationHistory(
+        directoryId: string,
+        historyId: string,
+        updates: GenerationHistoryUpdateInput,
+    ) {
+        await this.apiClient.sendDirectoryCommand(directoryId, {
+            action: DirectoryCommandAction.UPDATE_GENERATION_HISTORY,
+            payload: {
+                historyId,
+                updates,
+            },
         });
     }
 }

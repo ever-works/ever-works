@@ -11,6 +11,7 @@ import {
     ItemData,
     GenerationMethod,
     CompanyDto,
+    ItemsGeneratorMetrics,
 } from '../items-generator/dto';
 import { format } from 'date-fns';
 import { GenerateStatusType } from '../entities/types';
@@ -18,6 +19,21 @@ import { LEGAL_NOTICE, LICENSE_TEXT } from './texts';
 import { ItemsGeneratorStep } from '../items-generator/constants/steps';
 import { DIRECTORY_OPERATIONS } from '@src/directory';
 import type { DirectoryOperations } from '@src/directory';
+
+type GenerationStats = {
+    newItemsCount: number;
+    updatedItemsCount: number;
+    totalItemsCount: number;
+    metrics?: ItemsGeneratorMetrics;
+};
+
+type TInitialize =
+    | {
+          prUpdate: PRUpdate | null;
+          generation_method?: GenerationMethod;
+          stats: GenerationStats;
+      }
+    | false;
 
 @Injectable()
 export class DataGeneratorService {
@@ -34,7 +50,7 @@ export class DataGeneratorService {
         directory: Directory,
         user: User,
         createItemsGeneratorDto: CreateItemsGeneratorDto,
-    ) {
+    ): Promise<TInitialize> {
         this.logger.debug(
             `Initializing data repository for directory: ${JSON.stringify(createItemsGeneratorDto)}`,
         );
@@ -66,8 +82,18 @@ export class DataGeneratorService {
 
         // If no items were generated, we don't need to do anything else
         if (!generatedItems || generatedItems.items.length === 0) {
-            // We could call data.cleanup() here but it's not necessary
-            return;
+            const stats: GenerationStats = {
+                newItemsCount: 0,
+                updatedItemsCount: 0,
+                totalItemsCount: 0,
+                metrics: generatedItems?.metrics,
+            };
+
+            return {
+                prUpdate: null,
+                generation_method: createItemsGeneratorDto.generation_method,
+                stats,
+            };
         }
 
         const { categories: newCategories, items: newItems, tags: newTags } = generatedItems;
@@ -237,8 +263,22 @@ export class DataGeneratorService {
             const itemsWithMarkdown =
                 await this.itemsGeneratorService.generateMarkdownForItems(newItems);
 
+            const existingSlugSet = new Set(
+                (existingData.existingItems || []).map((item) =>
+                    slugifyText(item.slug || item.name),
+                ),
+            );
+
+            let newItemsCount = 0;
+            let updatedItemsCount = 0;
+
             for (const item of itemsWithMarkdown) {
                 item.slug = slugifyText(item.slug || item.name);
+                if (existingSlugSet.has(item.slug)) {
+                    updatedItemsCount++;
+                } else {
+                    newItemsCount++;
+                }
                 await this.processItem(data, item, user).catch((err) => {
                     this.logger.error('Failed to process item', err);
                 });
@@ -252,6 +292,13 @@ export class DataGeneratorService {
             await this.directoryOperations.updateDirectory(directory.id, {
                 itemsCount: generatedItems.items.length + existingData.existingItems.length,
             });
+
+            const stats: GenerationStats = {
+                newItemsCount,
+                updatedItemsCount,
+                totalItemsCount: itemsWithMarkdown.length,
+                metrics: generatedItems.metrics,
+            };
 
             let prUpdate: PRUpdate | null = null;
 
@@ -300,6 +347,7 @@ export class DataGeneratorService {
             return {
                 prUpdate,
                 generation_method: createItemsGeneratorDto.generation_method,
+                stats,
             };
         } catch (err) {
             this.logger.error('Failed to initialize data repository', err);

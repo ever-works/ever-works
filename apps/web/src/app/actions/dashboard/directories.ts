@@ -10,11 +10,13 @@ import {
     DeleteDirectoryDto,
     authAPI,
 } from '@/lib/api';
+import { getAuthFromCookie } from '@/lib/auth';
 import { checkOAuthConnection } from './oauth';
 import { RepoProvider } from '@/lib/api/enums';
 import { getTranslations } from 'next-intl/server';
 import { revalidatePath } from 'next/cache';
 import { ROUTES } from '@/lib/constants';
+import { redirect } from 'next/navigation';
 
 const readmeConfigSchema = z.object({
     header: z.string().optional(),
@@ -224,6 +226,30 @@ export async function createDirectoryWithAI(request: AIDirectoryOptions) {
         return {
             success: false,
             error: error instanceof Error ? error.message : t('createFailed'),
+        };
+    }
+}
+
+export async function fetchDirectoryGenerationHistory(
+    directoryId: string,
+    options: { limit?: number; offset?: number } = {},
+) {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    try {
+        const response = await directoryAPI.getHistory(directoryId, options);
+        return {
+            success: true,
+            data: response,
+        };
+    } catch (error) {
+        console.error('Failed to fetch directory generation history:', error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Unknown error',
         };
     }
 }

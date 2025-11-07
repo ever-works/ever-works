@@ -16,4 +16,5 @@ export interface ItemsGeneratorResponseDto {
     message: string;
     metrics?: ItemsGeneratorMetrics;
     parameters?: CreateItemsGeneratorDto;
+    historyId?: string;
 }
