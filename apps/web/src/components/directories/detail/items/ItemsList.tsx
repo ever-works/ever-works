@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { useTranslations } from 'next-intl';
 import { Grid as GridIcon, List as ListIcon } from 'lucide-react';
 import { ItemCard } from './ItemCard';
+import { getCategoryName } from '@/lib/utils/items';
 
 interface ItemsListProps {
     items: ItemData[];
@@ -27,10 +28,12 @@ export function ItemsList({ items: initialItems, directoryId }: ItemsListProps) 
     const [visibleRange, setVisibleRange] = useState({ start: 0, end: INITIAL_LOAD });
 
     // Memoize categories to prevent recalculation
-    const categories = useMemo(
-        () => Array.from(new Set(items.map((item) => item.category).filter(Boolean))),
-        [items],
-    );
+    const categories = useMemo(() => {
+        const names = items
+            .map((item) => getCategoryName(item.category))
+            .filter((category): category is string => Boolean(category));
+        return Array.from(new Set(names));
+    }, [items]);
 
     // Memoize filtered items to prevent unnecessary recalculations
     const filteredItems = useMemo(() => {
@@ -41,7 +44,8 @@ export function ItemsList({ items: initialItems, directoryId }: ItemsListProps) 
                 item.name.toLowerCase().includes(query) ||
                 item.description?.toLowerCase().includes(query);
 
-            const matchesCategory = !selectedCategory || item.category === selectedCategory;
+            const matchesCategory =
+                !selectedCategory || getCategoryName(item.category) === selectedCategory;
 
             return matchesSearch && matchesCategory;
         });

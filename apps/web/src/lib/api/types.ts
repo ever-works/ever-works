@@ -65,7 +65,7 @@ export interface ItemData {
     description: string;
     featured?: boolean;
     source_url: string;
-    category: string;
+    category: string | Category;
     slug?: string;
     tags: string[] | Tag[];
     markdown?: string;

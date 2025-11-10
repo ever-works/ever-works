@@ -74,7 +74,7 @@ export async function removeItem(directoryId: string, itemSlug: string, reason?:
     }
 }
 
-export async function extractItemDetails(url: string) {
+export async function extractItemDetails(sourceUrl: string, existingCategories?: string[]) {
     const user = await getAuthFromCookie();
     if (!user) {
         redirect(ROUTES.AUTH_LOGIN);
@@ -83,24 +83,44 @@ export async function extractItemDetails(url: string) {
     const t = await getTranslations('dashboard.directoryDetail.items.addModal');
 
     try {
-        const response = await itemsGeneratorAPI.extractItemDetails({ url });
+        const response = await itemsGeneratorAPI.extractItemDetails({
+            source_url: sourceUrl,
+            existing_categories:
+                existingCategories && existingCategories.length > 0
+                    ? existingCategories
+                    : undefined,
+        });
+
+        if (response.status !== 'success' || !response.item) {
+            return {
+                success: false,
+                error: response.message || t('extractFailed'),
+            };
+        }
+
+        const normalizedCategory =
+            typeof response.item.category === 'string'
+                ? response.item.category
+                : response.item.category?.name;
+
+        const normalizedTags = (response.item.tags || []).map((tag) =>
+            typeof tag === 'string' ? tag : tag.name,
+        );
 
         return {
-            success: !response.error,
-            data: response.error
-                ? null
-                : {
-                      title: response.title,
-                      description: response.description,
-                      keywords: response.keywords,
-                      tags: response.tags,
-                  },
-            error: response.error || undefined,
+            success: true,
+            data: {
+                name: response.item.name,
+                description: response.item.description,
+                category: normalizedCategory,
+                tags: normalizedTags,
+            },
+            message: response.message,
         };
     } catch (error) {
         console.error('Extract item details error:', error);
         return {
-            status: 'error',
+            success: false,
             error: error instanceof Error ? error.message : t('extractError'),
         };
     }

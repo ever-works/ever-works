@@ -3,6 +3,7 @@
 import { Button } from '@/components/ui/button';
 import { useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
+import { useTranslations } from 'next-intl';
 
 interface ItemsEmptyStateProps {
     directoryId: string;
@@ -10,6 +11,7 @@ interface ItemsEmptyStateProps {
 
 export function ItemsEmptyState({ directoryId }: ItemsEmptyStateProps) {
     const router = useRouter();
+    const t = useTranslations('dashboard.directoryDetail.items');
 
     return (
         <div className="flex flex-col items-center justify-center py-16">
@@ -29,11 +31,10 @@ export function ItemsEmptyState({ directoryId }: ItemsEmptyStateProps) {
                 </svg>
             </div>
             <h3 className="text-xl font-semibold text-text dark:text-text-dark mb-2">
-                No Items Yet
+                {t('noItemsTitle')}
             </h3>
             <p className="text-text-secondary dark:text-text-secondary-dark text-center max-w-md mb-6">
-                Your directory doesn't have any items yet. Generate items to populate your directory
-                with content.
+                {t('noItemsDescription')}
             </p>
             <Button
                 onClick={() => router.push(`${ROUTES.DASHBOARD_DIRECTORY(directoryId)}/generator`)}
@@ -48,7 +49,7 @@ export function ItemsEmptyState({ directoryId }: ItemsEmptyStateProps) {
                         d="M13 10V3L4 14h7v7l9-11h-7z"
                     />
                 </svg>
-                Generate Items
+                {t('generateItems')}
             </Button>
         </div>
     );

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback, memo } from 'react';
+import React, { useState, useCallback, memo, Dispatch, SetStateAction } from 'react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
@@ -25,7 +25,7 @@ export interface ItemFormData {
 interface AddItemFormProps {
     categories: string[];
     formData: ItemFormData;
-    setFormData: (data: ItemFormData) => void;
+    setFormData: Dispatch<SetStateAction<ItemFormData>>;
     updateWithPR: boolean;
     setUpdateWithPR: (value: boolean) => void;
     isPending: boolean;
@@ -43,28 +43,53 @@ export const AddItemForm = memo(function AddItemForm({
     const [isExtracting, setIsExtracting] = useState(false);
     const [tagInput, setTagInput] = useState('');
 
+    const isValidHttpUrl = useCallback((value: string) => {
+        try {
+            const url = new URL(value);
+            return url.protocol === 'http:' || url.protocol === 'https:';
+        } catch {
+            return false;
+        }
+    }, []);
+
     const handleExtractFromUrl = async () => {
         if (!formData.source_url) {
             toast.error(t('errors.urlRequired'));
             return;
         }
 
+        if (!isValidHttpUrl(formData.source_url)) {
+            toast.error(t('errors.invalidUrl'));
+            return;
+        }
+
         setIsExtracting(true);
         try {
-            const result = await extractItemDetails(formData.source_url);
+            const result = await extractItemDetails(formData.source_url, categories);
 
             if (result.success && result.data) {
-                setFormData({
-                    ...formData,
-                    name: result.data.title || formData.name,
-                    description: result.data.description || formData.description,
-                    tags: result.data.tags || formData.tags,
+                setFormData((prev) => {
+                    const shouldUpdateCategory =
+                        result.data?.category &&
+                        (categories.length === 0 || categories.includes(result.data.category));
+
+                    return {
+                        ...prev,
+                        name: result.data.name || prev.name,
+                        description: result.data.description || prev.description,
+                        tags:
+                            result.data.tags && result.data.tags.length > 0
+                                ? result.data.tags
+                                : prev.tags,
+                        category: shouldUpdateCategory ? result.data.category! : prev.category,
+                    };
                 });
-                toast.success(t('extractSuccess'));
+                toast.success(result.message || t('extractSuccess'));
             } else {
                 toast.error(result.error || t('extractFailed'));
             }
         } catch (error) {
+            console.error(error);
             toast.error(t('extractError'));
         } finally {
             setIsExtracting(false);

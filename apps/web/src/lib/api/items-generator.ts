@@ -1,7 +1,7 @@
 import 'server-only';
 import { serverMutation } from './server-api';
 import { GenerationMethod, WebsiteRepositoryCreationMethod } from './enums';
-import { APIResponse } from './types';
+import { APIResponse, ItemData } from './types';
 
 // DTOs
 export interface CompanyDto {
@@ -58,7 +58,8 @@ export interface RemoveItemDto {
 }
 
 export interface ExtractItemDetailsDto {
-    url: string;
+    source_url: string;
+    existing_categories?: string[];
 }
 
 // Response Types
@@ -83,11 +84,10 @@ export interface ItemResponse {
 }
 
 export interface ExtractItemDetailsResponse {
-    title?: string;
-    description?: string;
-    keywords?: string[];
-    tags?: string[];
-    error?: string;
+    status: 'success' | 'error';
+    source_url: string;
+    message: string;
+    item?: ItemData;
 }
 
 export interface RegenerateMarkdownResponse {

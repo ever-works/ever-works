@@ -530,6 +530,7 @@
                     "error": "An error occurred while adding the item",
                     "errors": {
                         "urlRequired": "Source URL is required for extraction",
+                        "invalidUrl": "Please enter a valid URL that includes http:// or https://",
                         "requiredFields": "Please fill in all required fields"
                     }
                 }
