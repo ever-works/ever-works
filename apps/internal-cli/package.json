@@ -18,34 +18,34 @@
         "test:cli": "cd dist && npm install && node cli.js --help"
     },
     "dependencies": {
-        "@nestjs/common": "^11.1.7",
-        "@nestjs/core": "^11.1.7",
+        "@nestjs/common": "^11.1.8",
+        "@nestjs/core": "^11.1.8",
         "@nestjs/event-emitter": "^3.0.1",
         "@packages/agent": "workspace:*",
         "@packages/cli-shared": "workspace:*",
-        "better-sqlite3": "^12.2.0",
+        "better-sqlite3": "^12.4.1",
         "chalk": "^4.1.2",
-        "fs-extra": "^11.3.0",
-        "inquirer": "^12.7.0",
-        "nest-commander": "^3.17.0",
+        "fs-extra": "^11.3.2",
+        "inquirer": "^12.11.0",
+        "nest-commander": "^3.20.1",
         "ora": "^5.4.1",
         "reflect-metadata": "^0.2.2",
-        "rxjs": "^7.8.1"
+        "rxjs": "^7.8.2"
     },
     "devDependencies": {
-        "@nestjs/cli": "^11.0.7",
-        "@nestjs/schematics": "^11.0.5",
+        "@nestjs/cli": "^11.0.10",
+        "@nestjs/schematics": "^11.0.9",
         "@swc/cli": "^0.6.0",
-        "@swc/core": "^1.12.9",
+        "@swc/core": "^1.15.1",
         "@types/fs-extra": "^11.0.4",
-        "@types/inquirer": "^9.0.8",
-        "@types/node": "^22.16.0",
-        "esbuild": "^0.25.6",
-        "globals": "^16.3.0",
+        "@types/inquirer": "^9.0.9",
+        "@types/node": "^22.19.0",
+        "esbuild": "^0.25.12",
+        "globals": "^16.5.0",
         "source-map-support": "^0.5.21",
-        "ts-loader": "^9.5.2",
+        "ts-loader": "^9.5.4",
         "ts-node": "^10.9.2",
         "tsconfig-paths": "^4.2.0",
-        "typescript": "^5.8.3"
+        "typescript": "^5.9.3"
     }
 }
