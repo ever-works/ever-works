@@ -150,4 +150,35 @@ export class TriggerGenerationOrchestrator {
 
         return parsed;
     }
+
+    async handleCancellation({
+        directory,
+        historyId,
+        historyStartedAt,
+    }: TriggerGenerationOptions): Promise<void> {
+        const finishedAt = new Date();
+        const startTime = this.resolveStartTime(historyStartedAt);
+        const duration = Math.max(
+            0,
+            Math.round((finishedAt.getTime() - startTime.getTime()) / 1000),
+        );
+        const message = 'Generation cancelled';
+
+        await Promise.all([
+            this.directoryOperations.recordGenerationFinishTime(directory.id, finishedAt),
+            this.directoryOperations.updateGenerateStatus(directory.id, {
+                status: GenerateStatusType.CANCELLED,
+                error: message,
+                step: null,
+            }),
+            this.directoryOperations.updateGenerationHistory(directory.id, historyId, {
+                status: GenerateStatusType.CANCELLED,
+                finishedAt,
+                durationInSeconds: duration,
+                errorMessage: message,
+            }),
+        ]);
+
+        await this.directoryOperations.emitGenerationCompleted(directory);
+    }
 }

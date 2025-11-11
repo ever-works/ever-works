@@ -167,6 +167,32 @@ export function DirectoryStatusCard({ directory }: DirectoryStatusCardProps) {
                     </Button>
                 ),
             },
+            [GenerateStatusType.CANCELLED]: {
+                title: t('cancelled.title'),
+                description: generateStatus.error || t('cancelled.description'),
+                color: 'border-border dark:border-border-dark bg-gray-50 dark:bg-gray-900/40',
+                iconBg: 'bg-gray-200 dark:bg-gray-800',
+                iconColor: 'text-gray-600 dark:text-gray-200',
+                icon: (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M12 9v4m0 4h.01M10.29 3.86l-7.4 12.84a1 1 0 00.86 1.5h14.8a1 1 0 00.86-1.5l-7.4-12.84a1 1 0 00-1.72 0z"
+                        />
+                    </svg>
+                ),
+                action: (
+                    <Button
+                        href={`${ROUTES.DASHBOARD_DIRECTORY(directory.id)}/generator`}
+                        variant="primary"
+                        size="sm"
+                    >
+                        {t('cancelled.restart')}
+                    </Button>
+                ),
+            },
         };
 
         return configs[generateStatus.status];

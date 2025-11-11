@@ -43,6 +43,12 @@ export function DirectoryLayoutClient({
             });
         }
 
+        if (lastStatus !== currentStatus && currentStatus === GenerateStatusType.CANCELLED) {
+            toast.info(t('generationCancelled'), {
+                id: 'generation-cancelled',
+            });
+        }
+
         lastGenerateStatus.current = directory.generateStatus;
     }, [directory.generateStatus]);
 

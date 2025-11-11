@@ -54,12 +54,15 @@ export function DirectoryCard({ directory }: DirectoryCardProps) {
                         status === GenerateStatusType.ERROR && 'bg-danger/20 text-danger',
                         status === GenerateStatusType.GENERATING && 'bg-info/20 text-info',
                         status === GenerateStatusType.GENERATED && 'bg-success/20 text-success',
+                        status === GenerateStatusType.CANCELLED &&
+                            'bg-gray-200 text-gray-700 dark:bg-gray-800 dark:text-gray-200',
                         !status && 'bg-gray-200 text-gray-700',
                     )}
                 >
                     {status === GenerateStatusType.ERROR && t('status.error')}
                     {status === GenerateStatusType.GENERATING && t('status.generating')}
                     {status === GenerateStatusType.GENERATED && t('status.generated')}
+                    {status === GenerateStatusType.CANCELLED && t('status.cancelled')}
                     {!status && t('status.idle')}
                 </div>
             </div>

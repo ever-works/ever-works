@@ -198,6 +198,13 @@ export class GenerateSubCommand extends CommandRunner {
                         console.log(chalk.red(`Error: ${freshDirectory.generateStatus.error}`));
                     }
                     spinner.stop();
+                } else if (freshDirectory.generateStatus?.status === GenerateStatusType.CANCELLED) {
+                    spinner.warn('\n⚠ Generation cancelled');
+
+                    if (freshDirectory.generateStatus?.error) {
+                        console.log(chalk.yellow(freshDirectory.generateStatus.error));
+                    }
+                    spinner.stop();
                 } else {
                     // Update spinner text with current step
                     const elapsed = Math.floor((Date.now() - startTime) / 1000);

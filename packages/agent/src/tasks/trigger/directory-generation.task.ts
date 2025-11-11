@@ -50,7 +50,29 @@ async function createContext(
 export const directoryGenerationTask = task({
     id: 'directory-generation',
     maxDuration: 3600,
-    onCancel: (context) => {},
+    onCancel: async ({ payload }) => {
+        if (!payload) {
+            return;
+        }
+
+        const appContext = await NestFactory.createApplicationContext(TriggerWorkerModule, {
+            logger: ['error', 'fatal', 'warn'],
+        });
+
+        try {
+            const { orchestrator, directory, user } = await createContext(appContext, payload);
+
+            await orchestrator.handleCancellation({
+                directory,
+                user,
+                dto: payload.dto,
+                historyId: payload.historyId,
+                historyStartedAt: payload.historyStartedAt,
+            });
+        } finally {
+            await appContext.close();
+        }
+    },
     run: async (payload: DirectoryGenerationPayload) => {
         const appContext = await NestFactory.createApplicationContext(TriggerWorkerModule, {
             logger: ['debug', 'log', 'warn', 'error', 'fatal'],

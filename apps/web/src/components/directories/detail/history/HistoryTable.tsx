@@ -14,6 +14,7 @@ const statusColor: Record<string, string> = {
     generating: 'bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-200',
     generated: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-200',
     error: 'bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-200',
+    cancelled: 'bg-gray-200 text-gray-800 dark:bg-gray-800 dark:text-gray-200',
 };
 
 const tdClass = 'px-4 py-4 text-sm text-text dark:text-text-dark align-top';
@@ -64,6 +65,8 @@ function getStatusLabel(status: string, t: ReturnType<typeof useTranslations>) {
             return t('status.generated');
         case 'error':
             return t('status.error');
+        case 'cancelled':
+            return t('status.cancelled');
         default:
             return t('unknown');
     }

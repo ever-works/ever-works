@@ -35,7 +35,8 @@ export interface DirectorySelection {
 export enum GenerateStatusType {
 	GENERATING = 'generating',
 	GENERATED = 'generated',
-	ERROR = 'error'
+	ERROR = 'error',
+	CANCELLED = 'cancelled'
 }
 
 type GenerateStatus = {
