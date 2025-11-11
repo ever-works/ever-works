@@ -915,6 +915,10 @@ export class AgentService {
             mode,
             dto,
             historyId,
+            historyStartedAt:
+                history?.startedAt?.toISOString() ??
+                history?.createdAt?.toISOString() ??
+                new Date().toISOString(),
         };
 
         const dispatched = await this.triggerService.dispatchDirectoryGeneration(payload);

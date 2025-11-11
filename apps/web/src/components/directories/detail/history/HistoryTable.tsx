@@ -3,6 +3,7 @@
 import { DirectoryGenerationHistoryEntry } from '@/lib/api/types-only';
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils/cn';
+import { useMounted } from '@/lib/hooks/use-mounted';
 
 interface HistoryTableProps {
     entries: DirectoryGenerationHistoryEntry[];
@@ -113,9 +114,10 @@ export function HistoryTable({ entries, locale }: HistoryTableProps) {
                                         {getStatusLabel(statusKey, t)}
                                     </span>
                                 </td>
-                                <td className={tdClass}>
-                                    {formatDate(entry.startedAt ?? entry.createdAt, locale)}
-                                </td>
+                                <ShowDateTime
+                                    value={entry.startedAt ?? entry.createdAt}
+                                    locale={locale}
+                                />
                                 <td className={tdClass}>
                                     {formatDuration(entry.durationInSeconds)}
                                 </td>
@@ -129,4 +131,14 @@ export function HistoryTable({ entries, locale }: HistoryTableProps) {
             </table>
         </div>
     );
+}
+
+function ShowDateTime({ value, locale }: { value?: string | null; locale: string }) {
+    const mounted = useMounted();
+
+    if (!mounted) {
+        return null;
+    }
+
+    return <td className={tdClass}>{formatDate(value, locale)}</td>;
 }
