@@ -25,13 +25,19 @@ import {
     SubmitItemResponseDto,
     UpdateItemsGeneratorDto,
 } from '@packages/agent/items-generator';
-import { AgentService } from '@packages/agent/services';
+import {
+    DirectoryGenerationService,
+    DirectoryLifecycleService,
+    DirectoryQueryService,
+} from '@packages/agent/services';
 import { UpdateWebsiteRepositoryResponseDto } from '@packages/agent/website-generator';
 
 @Controller('api')
 export class DirectoriesController {
     constructor(
-        private readonly agentService: AgentService,
+        private readonly directoryQueryService: DirectoryQueryService,
+        private readonly directoryLifecycleService: DirectoryLifecycleService,
+        private readonly directoryGenerationService: DirectoryGenerationService,
         private readonly vercelService: VercelService,
         private readonly directoryRepository: DirectoryRepository,
         private readonly userRepository: UserRepository,
@@ -45,7 +51,7 @@ export class DirectoriesController {
 
         const user = await this.userRepository.createOrGetLocalUser();
 
-        return this.agentService.getDirectories(
+        return this.directoryQueryService.getDirectories(
             {
                 limit: parsedLimit && !isNaN(parsedLimit) ? parsedLimit : undefined,
                 offset: parsedOffset && !isNaN(parsedOffset) ? parsedOffset : undefined,
@@ -58,7 +64,7 @@ export class DirectoriesController {
     @HttpCode(HttpStatus.OK)
     async createDirectory(@Body() createDirectoryDto: CreateDirectoryDto) {
         const user = await this.userRepository.createOrGetLocalUser();
-        return this.agentService.createDirectory(createDirectoryDto, user);
+        return this.directoryLifecycleService.createDirectory(createDirectoryDto, user);
     }
 
     @Post('directories/:id/generate')
@@ -69,7 +75,12 @@ export class DirectoriesController {
     ): Promise<ItemsGeneratorResponseDto> {
         const user = await this.userRepository.createOrGetLocalUser();
         // We don't await completion here, as the request can take a long time
-        return this.agentService.generateItems(id, createItemsGeneratorDto, user, false);
+        return this.directoryGenerationService.generateItems(
+            id,
+            createItemsGeneratorDto,
+            user,
+            false,
+        );
     }
 
     @Post('directories/:id/update')
@@ -81,7 +92,12 @@ export class DirectoriesController {
         const user = await this.userRepository.createOrGetLocalUser();
 
         // We don't await completion here, as the request can take a long time
-        return this.agentService.updateItemsGenerator(id, updateItemsGeneratorDto, user, false);
+        return this.directoryGenerationService.updateItemsGenerator(
+            id,
+            updateItemsGeneratorDto,
+            user,
+            false,
+        );
     }
 
     @Post('directories/:id/submit-item')
@@ -92,7 +108,7 @@ export class DirectoriesController {
     ): Promise<SubmitItemResponseDto> {
         const user = await this.userRepository.createOrGetLocalUser();
 
-        return this.agentService.submitItem(id, submitItemDto, user);
+        return this.directoryGenerationService.submitItem(id, submitItemDto, user);
     }
 
     @Post('directories/:id/remove-item')
@@ -103,7 +119,7 @@ export class DirectoriesController {
     ): Promise<RemoveItemResponseDto> {
         const user = await this.userRepository.createOrGetLocalUser();
 
-        return this.agentService.removeItem(id, removeItemDto, user);
+        return this.directoryGenerationService.removeItem(id, removeItemDto, user);
     }
 
     @Post('extract-item-details')
@@ -111,7 +127,7 @@ export class DirectoriesController {
     async extractItemDetails(
         @Body() extractItemDetailsDto: ExtractItemDetailsDto,
     ): Promise<ExtractItemDetailsResponseDto> {
-        return this.agentService.extractItemDetails(extractItemDetailsDto);
+        return this.directoryGenerationService.extractItemDetails(extractItemDetailsDto);
     }
 
     @Post('directories/:id/regenerate-markdown')
@@ -119,7 +135,7 @@ export class DirectoriesController {
     async regenerateMarkdown(@Param('id') id: string) {
         const user = await this.userRepository.createOrGetLocalUser();
 
-        return this.agentService.regenerateMarkdown(id, user);
+        return this.directoryGenerationService.regenerateMarkdown(id, user);
     }
 
     @Post('directories/:id/update-website')
@@ -129,7 +145,7 @@ export class DirectoriesController {
     ): Promise<UpdateWebsiteRepositoryResponseDto> {
         const user = await this.userRepository.createOrGetLocalUser();
 
-        return this.agentService.updateWebsiteRepository(id, user);
+        return this.directoryGenerationService.updateWebsiteRepository(id, user);
     }
 
     @Post('directories/:id/delete')
@@ -140,7 +156,7 @@ export class DirectoriesController {
     ): Promise<DeleteDirectoryResponseDto> {
         const user = await this.userRepository.createOrGetLocalUser();
 
-        return this.agentService.deleteDirectory(id, deleteDirectoryDto, user);
+        return this.directoryLifecycleService.deleteDirectory(id, deleteDirectoryDto, user);
     }
 
     @Post('deploy/directories/:id/vercel')

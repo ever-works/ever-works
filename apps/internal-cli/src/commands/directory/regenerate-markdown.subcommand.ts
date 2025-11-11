@@ -4,7 +4,7 @@ import chalk from 'chalk';
 import ora from 'ora';
 import inquirer from 'inquirer';
 import { DirectoryRepository, UserRepository } from '@packages/agent/database';
-import { AgentService } from '@packages/agent/services';
+import { DirectoryGenerationService } from '@packages/agent/services';
 import { DirectoryPromptService } from './directory-prompt.service';
 import { ConfigCheckService } from './config-check.service';
 import { handleCliError } from './error';
@@ -20,7 +20,7 @@ export class RegenerateMarkdownSubCommand extends CommandRunner {
         private readonly directoryRepository: DirectoryRepository,
         private readonly directoryPrompt: DirectoryPromptService,
         private readonly configCheck: ConfigCheckService,
-        private readonly agentService: AgentService,
+        private readonly directoryGenerationService: DirectoryGenerationService,
         private readonly userRepository: UserRepository,
     ) {
         super();
@@ -74,22 +74,19 @@ export class RegenerateMarkdownSubCommand extends CommandRunner {
                 const user = await this.userRepository.createOrGetLocalUser();
 
                 // Call the agent service method directly
-                const result = await this.agentService.regenerateMarkdown(directory.id, user);
+                const result = await this.directoryGenerationService.regenerateMarkdown(
+                    directory.id,
+                    user,
+                );
 
-                if (result.status === 'success') {
-                    spinner.stop();
-                    console.log(chalk.green('\n✓ Markdown regeneration completed successfully!'));
-                    console.log(chalk.gray('Status:'), chalk.white(result.status));
+                spinner.stop();
+                console.log(chalk.green('\n✓ Markdown regeneration completed successfully!'));
+                console.log(chalk.gray('Status:'), chalk.white(result.status));
 
-                    console.log(chalk.cyan('\n--- Next Steps ---'));
-                    console.log(chalk.gray('  • Check your repository for updated files'));
-                    console.log(chalk.gray('  • Review the generated markdown content'));
-                    console.log(chalk.gray('  • The changes have been committed automatically'));
-                } else if (result.status === 'error' && result.message) {
-                    spinner.fail();
-                    console.log(chalk.red('\n--- Error Details ---'));
-                    console.log(result.message);
-                }
+                console.log(chalk.cyan('\n--- Next Steps ---'));
+                console.log(chalk.gray('  • Check your repository for updated files'));
+                console.log(chalk.gray('  • Review the generated markdown content'));
+                console.log(chalk.gray('  • The changes have been committed automatically'));
             } catch (error) {
                 spinner.stop();
                 throw error;

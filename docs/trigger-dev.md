@@ -4,7 +4,7 @@ This document explains how long-running directory generation is delegated to Tri
 
 ## Runtime Architecture Overview
 
-1. **API request enters `AgentService`.** When a user kicks off a generation via the API (`packages/agent/src/services/agent.service.ts`), the service calls `dispatchGenerationTask()`.
+1. **API request enters `DirectoryGenerationService`.** When a user kicks off a generation via the API (`packages/agent/src/services/directory-generation.service.ts`), the service calls `dispatchGenerationTask()`.
 2. **Optional Trigger.dev dispatch.** `TriggerService` (`packages/agent/src/trigger/trigger.service.ts`) checks `config.trigger.shouldUseTrigger()`. If the feature flag is enabled and credentials are present, it calls `tasks.trigger()` for the `directory-generation` task. Otherwise it falls back to the in-process `processGeneration()` path.
 3. **Trigger task fetches execution context.** The task definition (`packages/agent/src/tasks/trigger/directory-generation.task.ts`) boots a Nest application using `TriggerWorkerModule`, fetches the directory + user context through the internal API, and runs the orchestrator.
 4. **Worker performs generation locally.** `TriggerGenerationOrchestrator` (`packages/agent/src/trigger/trigger-generation.orchestrator.ts`) drives `DataGeneratorService`, `MarkdownGeneratorService`, and `WebsiteGeneratorService` inside the worker, updating state via the remote directory operations gateway instead of hitting the database directly.
@@ -13,7 +13,7 @@ This document explains how long-running directory generation is delegated to Tri
 The diagram below summarizes the happy path:
 
 ```
-Client → API (AgentService) → TriggerService ──▶ Trigger.dev task
+Client → API (DirectoryGenerationService) → TriggerService ──▶ Trigger.dev task
                                          ▲          │
                                          │          ▼
                                fallback generation   Trigger worker (Nest)
@@ -38,7 +38,7 @@ Client → API (AgentService) → TriggerService ──▶ Trigger.dev task
 
 - **`directory-generation.task.ts`** creates a Nest application context per run, fetches the latest directory + user snapshot using `TriggerInternalApiClient.fetchDirectoryContext()`, and then calls `TriggerGenerationOrchestrator.run()`.
 
-- **`TriggerGenerationOrchestrator`** mirrors the in-process `AgentService.processGeneration()` logic, but replaces direct repository calls with `DirectoryOperations` methods that the remote service implements. That lets us reuse the same generator services without letting the worker touch TypeORM directly.
+- **`TriggerGenerationOrchestrator`** mirrors the in-process `DirectoryGenerationService.processGeneration()` logic, but replaces direct repository calls with `DirectoryOperations` methods that the remote service implements. That lets us reuse the same generator services without letting the worker touch TypeORM directly.
 
 ### API ↔ worker bridge
 
@@ -52,7 +52,7 @@ Client → API (AgentService) → TriggerService ──▶ Trigger.dev task
 
 ### Agent service integration
 
-- `AgentService.dispatchGenerationTask()` builds a `DirectoryGenerationPayload` and calls `TriggerService.dispatchDirectoryGeneration()`. When dispatching succeeds, the method returns immediately and lets Trigger.dev complete the work asynchronously. If dispatch fails (feature disabled or Trigger.dev unavailable) it logs a warning and reverts to `processGeneration()` so users are not blocked.
+- `DirectoryGenerationService.dispatchGenerationTask()` builds a `DirectoryGenerationPayload` and calls `TriggerService.dispatchDirectoryGeneration()`. When dispatching succeeds, the method returns immediately and lets Trigger.dev complete the work asynchronously. If dispatch fails (feature disabled or Trigger.dev unavailable) it logs a warning and reverts to `processGeneration()` so users are not blocked.
 
 ## Environment Variables
 

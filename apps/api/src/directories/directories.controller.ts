@@ -25,7 +25,12 @@ import {
     SubmitItemResponseDto,
     UpdateItemsGeneratorDto,
 } from '@packages/agent/items-generator';
-import { AgentService, DirectoryDetailService } from '@packages/agent/services';
+import {
+    DirectoryDetailService,
+    DirectoryGenerationService,
+    DirectoryLifecycleService,
+    DirectoryQueryService,
+} from '@packages/agent/services';
 import { UpdateWebsiteRepositoryResponseDto } from '@packages/agent/website-generator';
 import { AuthService, CurrentUser, JwtAuthGuard } from '../auth';
 import { AuthenticatedUser } from '@src/auth/types/jwt.types';
@@ -39,7 +44,9 @@ let CACHE_TTL = 1000 * 60 * 5; // 5 minutes
 export class DirectoriesController {
     constructor(
         @Inject(CACHE_MANAGER) private cacheManager: Cache,
-        private readonly agentService: AgentService,
+        private readonly directoryQueryService: DirectoryQueryService,
+        private readonly directoryLifecycleService: DirectoryLifecycleService,
+        private readonly directoryGenerationService: DirectoryGenerationService,
         private readonly authService: AuthService,
         private readonly directoryDetailService: DirectoryDetailService,
     ) {}
@@ -57,7 +64,7 @@ export class DirectoriesController {
 
         const user = await this.authService.getUser(auth.userId);
 
-        return this.agentService.getDirectories(
+        return this.directoryQueryService.getDirectories(
             {
                 limit: parsedLimit && !isNaN(parsedLimit) ? parsedLimit : undefined,
                 offset: parsedOffset && !isNaN(parsedOffset) ? parsedOffset : undefined,
@@ -74,14 +81,14 @@ export class DirectoriesController {
         @Body() createDirectoryDto: CreateDirectoryDto,
     ) {
         const user = await this.authService.getUser(auth.userId);
-        return this.agentService.createDirectory(createDirectoryDto, user);
+        return this.directoryLifecycleService.createDirectory(createDirectoryDto, user);
     }
 
     @Get('directories/:id')
     @HttpCode(HttpStatus.OK)
     async getDirectory(@CurrentUser() auth: AuthenticatedUser, @Param('id') id: string) {
         const user = await this.authService.getUser(auth.userId);
-        return this.agentService.getDirectory(id, user);
+        return this.directoryQueryService.getDirectory(id, user);
     }
 
     @Put('directories/:id')
@@ -92,7 +99,7 @@ export class DirectoriesController {
         @Body() updateDirectoryDto: UpdateDirectoryDto,
     ) {
         const user = await this.authService.getUser(auth.userId);
-        return this.agentService.updateDirectory(id, updateDirectoryDto, user);
+        return this.directoryLifecycleService.updateDirectory(id, updateDirectoryDto, user);
     }
 
     @Get('directories/:id/items')
@@ -104,7 +111,7 @@ export class DirectoriesController {
             cacheKey,
             async () => {
                 const user = await this.authService.getUser(auth.userId);
-                return this.agentService.directoryItems(id, user);
+                return this.directoryQueryService.directoryItems(id, user);
             },
             CACHE_TTL,
         );
@@ -119,7 +126,7 @@ export class DirectoriesController {
             cacheKey,
             async () => {
                 const user = await this.authService.getUser(auth.userId);
-                return this.agentService.directoryConfig(id, user);
+                return this.directoryQueryService.directoryConfig(id, user);
             },
             CACHE_TTL,
         );
@@ -134,7 +141,7 @@ export class DirectoriesController {
             cacheKey,
             async () => {
                 const user = await this.authService.getUser(auth.userId);
-                return this.agentService.directoryCount(id, user);
+                return this.directoryQueryService.directoryCount(id, user);
             },
             CACHE_TTL,
         );
@@ -152,7 +159,7 @@ export class DirectoriesController {
             cacheKey,
             async () => {
                 const user = await this.authService.getUser(auth.userId);
-                return this.agentService.directoryCategoriesTags(id, user);
+                return this.directoryQueryService.directoryCategoriesTags(id, user);
             },
             CACHE_TTL,
         );
@@ -171,7 +178,7 @@ export class DirectoriesController {
         const parsedLimit = limit !== undefined ? Number(limit) : undefined;
         const parsedOffset = offset !== undefined ? Number(offset) : undefined;
 
-        const result = await this.agentService.directoryGenerationHistory(id, user, {
+        const result = await this.directoryQueryService.directoryGenerationHistory(id, user, {
             limit: parsedLimit && !isNaN(parsedLimit) ? parsedLimit : undefined,
             offset: parsedOffset && !isNaN(parsedOffset) ? parsedOffset : undefined,
         });
@@ -206,7 +213,12 @@ export class DirectoriesController {
         const user = await this.authService.getUser(auth.userId);
 
         // We don't await completion here, as the request can take a long time
-        return this.agentService.generateItems(id, createItemsGeneratorDto, user, false);
+        return this.directoryGenerationService.generateItems(
+            id,
+            createItemsGeneratorDto,
+            user,
+            false,
+        );
     }
 
     @Post('directories/:id/update')
@@ -219,7 +231,12 @@ export class DirectoriesController {
         const user = await this.authService.getUser(auth.userId);
 
         // We don't await completion here, as the request can take a long time
-        return this.agentService.updateItemsGenerator(id, updateItemsGeneratorDto, user, false);
+        return this.directoryGenerationService.updateItemsGenerator(
+            id,
+            updateItemsGeneratorDto,
+            user,
+            false,
+        );
     }
 
     @Post('directories/:id/submit-item')
@@ -231,7 +248,7 @@ export class DirectoriesController {
     ): Promise<SubmitItemResponseDto> {
         const user = await this.authService.getUser(auth.userId);
 
-        return this.agentService.submitItem(id, submitItemDto, user);
+        return this.directoryGenerationService.submitItem(id, submitItemDto, user);
     }
 
     @Post('directories/:id/remove-item')
@@ -243,7 +260,7 @@ export class DirectoriesController {
     ): Promise<RemoveItemResponseDto> {
         const user = await this.authService.getUser(auth.userId);
 
-        return this.agentService.removeItem(id, removeItemDto, user);
+        return this.directoryGenerationService.removeItem(id, removeItemDto, user);
     }
 
     @Post('extract-item-details')
@@ -251,7 +268,7 @@ export class DirectoriesController {
     async extractItemDetails(
         @Body() extractItemDetailsDto: ExtractItemDetailsDto,
     ): Promise<ExtractItemDetailsResponseDto> {
-        return this.agentService.extractItemDetails(extractItemDetailsDto);
+        return this.directoryGenerationService.extractItemDetails(extractItemDetailsDto);
     }
 
     @Post('directories/:id/regenerate-markdown')
@@ -259,7 +276,7 @@ export class DirectoriesController {
     async regenerateMarkdown(@CurrentUser() auth: AuthenticatedUser, @Param('id') id: string) {
         const user = await this.authService.getUser(auth.userId);
 
-        return this.agentService.regenerateMarkdown(id, user);
+        return this.directoryGenerationService.regenerateMarkdown(id, user);
     }
 
     @Post('directories/:id/update-website')
@@ -270,7 +287,7 @@ export class DirectoriesController {
     ): Promise<UpdateWebsiteRepositoryResponseDto> {
         const user = await this.authService.getUser(auth.userId);
 
-        return this.agentService.updateWebsiteRepository(id, user);
+        return this.directoryGenerationService.updateWebsiteRepository(id, user);
     }
 
     @Post('directories/:id/delete')
@@ -282,6 +299,6 @@ export class DirectoriesController {
     ): Promise<DeleteDirectoryResponseDto> {
         const user = await this.authService.getUser(auth.userId);
 
-        return this.agentService.deleteDirectory(id, deleteDirectoryDto, user);
+        return this.directoryLifecycleService.deleteDirectory(id, deleteDirectoryDto, user);
     }
 }
