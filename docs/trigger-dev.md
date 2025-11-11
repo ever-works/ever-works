@@ -42,7 +42,7 @@ Client → API (DirectoryGenerationService) → TriggerService ──▶ Trigger
 
 ### API ↔ worker bridge
 
-- **`DirectoryOperations` interface (`packages/agent/src/directory/directory-operations.interface.ts`)** abstracts mutating operations on the `directories` table. There is a database-backed implementation (`DatabaseDirectoryOperationsService`) used inside the API and CLI, and a remote implementation (`RemoteDirectoryOperationsService`) used inside the worker.
+- **`DirectoryOperations` interface (`packages/agent/src/directory-operations/directory-operations.interface.ts`)** abstracts mutating operations on the `directories` table. There is a database-backed implementation (`DatabaseDirectoryOperationsService`) used inside the API and CLI, and a remote implementation (`RemoteDirectoryOperationsService`) used inside the worker.
 
 - **`TriggerInternalController` (`apps/api/src/trigger/trigger-internal.controller.ts`)** provides two signed routes:
     - `GET /internal/trigger/directories/:id/context` returns a serialized directory plus its owner (including OAuth tokens for Git access).

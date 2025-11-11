@@ -1,9 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { tavily, TavilyClient } from '@tavily/core';
 import { ConfigDto } from '../dto/create-items-generator.dto';
-// @ts-ignore
 import { search, OrganicResult, DictionaryResult, OrganicResultNode } from 'google-sr';
-
 import * as cheerio from 'cheerio';
 import TurndownService from 'turndown';
 import axios from 'axios';
@@ -112,12 +110,7 @@ export class SearchService {
     ): Promise<SearchResult[]> {
         let results = await search({
             query,
-            resultTypes: [OrganicResult, DictionaryResult],
-            requestConfig: {
-                params: {
-                    safe: 'active',
-                },
-            },
+            parsers: [DictionaryResult, OrganicResult],
         });
 
         results = results.slice(0, config?.max_results_per_query || 20);

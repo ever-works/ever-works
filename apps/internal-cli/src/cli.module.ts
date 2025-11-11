@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { DatabaseConfigurations, DatabaseInitService } from '@packages/agent/database';
 import { AiModule } from '@packages/agent/ai';
-import { AgentModule } from '@packages/agent/services';
+import { DirectoryModule } from '@packages/agent/services';
 import { GitModule } from '@packages/agent/git';
 import { DatabaseModule } from '@packages/agent/database';
 import { DataGeneratorModule } from '@packages/agent/data-generator';
@@ -30,7 +30,7 @@ import { ServeCommands } from './commands/serve';
         MarkdownGeneratorModule,
         WebsiteGeneratorModule,
         DeployModule,
-        AgentModule,
+        DirectoryModule,
     ],
     providers: [
         DatabaseInitService,

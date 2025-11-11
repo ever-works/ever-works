@@ -647,6 +647,7 @@
                 "customHeaderPlaceholder": "Add custom content to the README header",
                 "overwriteDefaultHeader": "Overwrite default header",
                 "customFooter": "Custom Footer",
+                "cantDeleteWhileGenerating": "Cannot delete the directory while items are being generated.",
                 "customFooterPlaceholder": "Add custom content to the README footer",
                 "overwriteDefaultFooter": "Overwrite default footer",
                 "dangerZone": "Danger Zone",

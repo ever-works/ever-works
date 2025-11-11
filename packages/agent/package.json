@@ -33,9 +33,9 @@
             "types": "./dist/git/index.d.ts",
             "default": "./dist/git/index.js"
         },
-        "./directory": {
-            "types": "./dist/directory/index.d.ts",
-            "default": "./dist/directory/index.js"
+        "./directory-operations": {
+            "types": "./dist/directory-operations/index.d.ts",
+            "default": "./dist/directory-operations/index.js"
         },
         "./trigger": {
             "types": "./dist/trigger/index.d.ts",
@@ -158,7 +158,7 @@
         "class-validator": "^0.14.2",
         "date-fns": "^4.1.0",
         "deepmerge": "^4.3.1",
-        "google-sr": "^5.0.0",
+        "google-sr": "^6.0.0",
         "import-in-the-middle": "^2.0.0",
         "isomorphic-git": "^1.35.0",
         "langchain": "^0.3.36",

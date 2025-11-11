@@ -478,8 +478,8 @@ importers:
         specifier: ^4.3.1
         version: 4.3.1
       google-sr:
-        specifier: ^5.0.0
-        version: 5.0.0
+        specifier: ^6.0.0
+        version: 6.0.0
       import-in-the-middle:
         specifier: ^2.0.0
         version: 2.0.0
@@ -4000,6 +4000,10 @@ packages:
     resolution: {integrity: sha512-VqR8m68vM46BNnuZ5NtnGBKIE/DfN0cRIzg9n40EIq9NOv90ayxLBXA8fXC5gquFRGJSTRqBq25Jt2ECLR431Q==}
     engines: {node: '>= 6'}
 
+  cheerio@1.1.0:
+    resolution: {integrity: sha512-+0hMx9eYhJvWbgpKV9hN7jg0JcwydpopZE4hgi+KvQtByZXPp04NiCWU0LzcAbP63abZckIHkTQaXVF52mX3xQ==}
+    engines: {node: '>=18.17'}
+
   cheerio@1.1.2:
     resolution: {integrity: sha512-IkxPpb5rS/d1IiLbHMgfPuS0FgiWTtFIm/Nj+2woXDLTZ7fOT2eqzgYbdMlLweqlHbsZjxEChoVK+7iph7jyQg==}
     engines: {node: '>=20.18.1'}
@@ -5097,11 +5101,13 @@ packages:
     resolution: {integrity: sha512-jhIXaOzy1sb8IyocaruWSn1TjmnBVs8Ayhcy83rmxNJ8q2uWKCAj3CnJY+KpGSXCueAPc0i05kVvVKtP1t9S3g==}
     engines: {node: '>=10'}
 
-  google-sr-selectors@2.0.0:
-    resolution: {integrity: sha512-F4wugHiBWu+TEs52ruliMQ0kTm70KVxC9om3GzKZVDR0mAEgAstVFfVPFo3peo64eVLeY1l+doGhVuckf7bw/w==}
+  google-sr-selectors@3.0.0:
+    resolution: {integrity: sha512-8duGEpfQ9O93YYRZvfWXJYyGhQ5/Zf3+Ejb100X4JD6RZr/YQcI+YANH+Ppuk5+ZiPZfqwLyHtBU1aiLgoqqgQ==}
+    engines: {node: '>=20.0.0', pnpm: '>=10.13.1'}
 
-  google-sr@5.0.0:
-    resolution: {integrity: sha512-I3Wj6QIT73P9lJ5jfuga/NS2KdNz11nCj+84ZIS5qHQI8vPkwfqsEbhOqzGhodIwtHZfMGNQG86+0EzKG6ZtHg==}
+  google-sr@6.0.0:
+    resolution: {integrity: sha512-C2Oo36ycwCuKAMCQB/Gij09UlP/nuf4Tu9+gCcW6/ILuj6BSQI9WcEA23CgPcTr3IAUUbEj1KtzKri/ocLOm1Q==}
+    engines: {node: '>=20.0.0', pnpm: '>=10.13.1'}
 
   gopd@1.2.0:
     resolution: {integrity: sha512-ZUKRh6/kUFoAiTAtTYPZJ3hw9wNxx+BIBOijnlG9PnrJsCcSjs1wyyD6vJpaYtgnzDrKYRSqf3OO6Rfa93xsRg==}
@@ -12027,6 +12033,21 @@ snapshots:
       htmlparser2: 8.0.2
       parse5: 7.3.0
       parse5-htmlparser2-tree-adapter: 7.1.0
+    optional: true
+
+  cheerio@1.1.0:
+    dependencies:
+      cheerio-select: 2.1.0
+      dom-serializer: 2.0.0
+      domhandler: 5.0.3
+      domutils: 3.2.2
+      encoding-sniffer: 0.2.1
+      htmlparser2: 10.0.0
+      parse5: 7.3.0
+      parse5-htmlparser2-tree-adapter: 7.1.0
+      parse5-parser-stream: 7.1.2
+      undici: 7.16.0
+      whatwg-mimetype: 4.0.0
 
   cheerio@1.1.2:
     dependencies:
@@ -13280,15 +13301,12 @@ snapshots:
       merge2: 1.4.1
       slash: 3.0.0
 
-  google-sr-selectors@2.0.0: {}
+  google-sr-selectors@3.0.0: {}
 
-  google-sr@5.0.0:
+  google-sr@6.0.0:
     dependencies:
-      axios: 1.13.2
-      cheerio: 1.0.0-rc.12
-      google-sr-selectors: 2.0.0
-    transitivePeerDependencies:
-      - debug
+      cheerio: 1.1.0
+      google-sr-selectors: 3.0.0
 
   gopd@1.2.0: {}
 
@@ -13399,6 +13417,7 @@ snapshots:
       domhandler: 5.0.3
       domutils: 3.2.2
       entities: 4.5.0
+    optional: true
 
   htmlparser2@9.1.0:
     dependencies:

@@ -1,6 +1,6 @@
 {
     "compilerOptions": {
-        "module": "commonjs",
+        "module": "Node16",
         "declaration": true,
         "removeComments": true,
         "emitDecoratorMetadata": true,
@@ -18,8 +18,14 @@
         "forceConsistentCasingInFileNames": false,
         "noFallthroughCasesInSwitch": false,
         "paths": {
-            "@src/*": ["./src/*"]
+            "@src/*": [
+                "./src/*"
+            ]
         }
     },
-    "exclude": ["examples/**/*", "dist/**/*", "**/*.d.ts"]
+    "exclude": [
+        "examples/**/*",
+        "dist/**/*",
+        "**/*.d.ts"
+    ]
 }

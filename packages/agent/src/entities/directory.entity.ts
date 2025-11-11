@@ -64,6 +64,9 @@ export class Directory {
     generationStartedAt?: Date;
 
     @TimestampColumn({ nullable: true })
+    generationProgressedAt?: Date;
+
+    @TimestampColumn({ nullable: true })
     generationFinishedAt?: Date;
 
     // Deployment FIELDS

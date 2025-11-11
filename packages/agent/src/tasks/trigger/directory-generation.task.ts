@@ -49,7 +49,6 @@ async function createContext(
 
 export const directoryGenerationTask = task({
     id: 'directory-generation',
-    maxDuration: 3600,
     onCancel: async ({ payload }) => {
         if (!payload) {
             return;

@@ -213,12 +213,17 @@ export class DirectoriesController {
         const user = await this.authService.getUser(auth.userId);
 
         // We don't await completion here, as the request can take a long time
-        return this.directoryGenerationService.generateItems(
+        const response = await this.directoryGenerationService.generateItems(
             id,
             createItemsGeneratorDto,
             user,
             false,
         );
+
+        // Wait a little while to ensure the process has started.
+        await this.wait(2);
+
+        return response;
     }
 
     @Post('directories/:id/update')
@@ -231,12 +236,17 @@ export class DirectoriesController {
         const user = await this.authService.getUser(auth.userId);
 
         // We don't await completion here, as the request can take a long time
-        return this.directoryGenerationService.updateItemsGenerator(
+        const response = await this.directoryGenerationService.updateItemsGenerator(
             id,
             updateItemsGeneratorDto,
             user,
             false,
         );
+
+        // Wait a little while to ensure the process has started.
+        await this.wait(2);
+
+        return response;
     }
 
     @Post('directories/:id/submit-item')
@@ -300,5 +310,9 @@ export class DirectoriesController {
         const user = await this.authService.getUser(auth.userId);
 
         return this.directoryLifecycleService.deleteDirectory(id, deleteDirectoryDto, user);
+    }
+
+    private wait(sec = 2) {
+        return new Promise((resolve) => setTimeout(resolve, sec * 1000));
     }
 }

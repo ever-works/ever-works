@@ -18,6 +18,7 @@ import {
     DialogFooter,
     DialogClose,
 } from '@/components/ui/dialog';
+import { GenerateStatusType } from '@/lib/api/enums';
 
 export function DeleteComponent({ directory }: { directory: Directory }) {
     const t = useTranslations('dashboard.directoryDetail.settings');
@@ -64,6 +65,8 @@ export function DeleteComponent({ directory }: { directory: Directory }) {
     };
 
     const isDeleteDisabled = confirmationName !== directory.name || isPending;
+    const isGenerating = directory.generateStatus?.status === GenerateStatusType.GENERATING;
+
     return (
         <>
             <div
@@ -84,6 +87,8 @@ export function DeleteComponent({ directory }: { directory: Directory }) {
                     onClick={handleOpenDialog}
                     variant="danger"
                     className="bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800"
+                    title={isGenerating ? t('cantDeleteWhileGenerating') : undefined}
+                    disabled={isPending || isGenerating}
                 >
                     {t('deleteButton')}
                 </Button>

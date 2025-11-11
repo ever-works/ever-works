@@ -5,8 +5,8 @@ import { WebsiteGeneratorService } from '@src/website-generator/website-generato
 import { Directory } from '@src/entities/directory.entity';
 import { User } from '@src/entities/user.entity';
 import { CreateItemsGeneratorDto } from '@src/items-generator/dto';
-import { DIRECTORY_OPERATIONS } from '@src/directory';
-import type { DirectoryOperations } from '@src/directory';
+import { DIRECTORY_OPERATIONS } from '@src/directory-operations';
+import type { DirectoryOperations } from '@src/directory-operations';
 import { GenerateStatusType } from '@src/entities/types';
 import { ItemsGeneratorMetrics } from '@src/items-generator/dto/items-generator-response.dto';
 

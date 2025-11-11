@@ -41,4 +41,4 @@ import { DirectoryGenerationService } from './directory-generation.service';
         DirectoryDetailService,
     ],
 })
-export class AgentModule {}
+export class DirectoryModule {}

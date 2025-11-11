@@ -185,13 +185,6 @@ export class DirectoryRepository {
         return await this.repository.find({ where: { userId } });
     }
 
-    async updateGenerateStatus(
-        id: string,
-        generateStatus: Directory['generateStatus'],
-    ): Promise<void> {
-        await this.repository.update(id, { generateStatus });
-    }
-
     async updateLastPullRequest(
         id: string,
         lastPullRequest: Directory['lastPullRequest'],
@@ -206,9 +199,17 @@ export class DirectoryRepository {
         });
     }
 
+    async updateGenerateStatus(
+        id: string,
+        generateStatus: Directory['generateStatus'],
+    ): Promise<void> {
+        await this.repository.update(id, { generateStatus, generationProgressedAt: new Date() });
+    }
+
     async recordGenerationStartTime(id: string, startedAt: Date): Promise<void> {
         await this.repository.update(id, {
             generationStartedAt: startedAt,
+            generationProgressedAt: startedAt,
             generationFinishedAt: null,
         });
     }
@@ -222,7 +223,7 @@ export class DirectoryRepository {
     async getUnfinishedGenerations(olderThan: Date): Promise<Directory[]> {
         const stalledDirectories = await this.repository.find({
             where: {
-                generationStartedAt: LessThan(olderThan),
+                generationProgressedAt: LessThan(olderThan),
                 generationFinishedAt: IsNull(),
             },
         });

@@ -3,7 +3,7 @@ import { MarkdownGeneratorService } from './markdown-generator.service';
 import { DataGeneratorModule } from '../data-generator/data-generator.module';
 import { GitModule } from '../git/git.module';
 import { DatabaseModule } from '../database';
-import { DirectoryOperationsModule } from '@src/directory';
+import { DirectoryOperationsModule } from '@src/directory-operations';
 
 @Module({
     imports: [DataGeneratorModule, GitModule, DatabaseModule, DirectoryOperationsModule],

@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TriggerInternalController } from './trigger-internal.controller';
-import { DirectoryOperationsModule } from '@packages/agent/directory';
+import { DirectoryOperationsModule } from '@packages/agent/directory-operations';
 
 @Module({
     imports: [DirectoryOperationsModule],
