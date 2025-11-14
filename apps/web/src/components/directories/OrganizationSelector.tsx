@@ -11,7 +11,7 @@ interface OrganizationSelectorProps {
     value: string;
     onChange: (value: string, isOrganization: boolean) => void;
     disabled?: boolean;
-    authId?: string;
+    authId: string | null;
 }
 
 const LOADED_ORGS = new Map<string, GitHubOrganization[]>();

@@ -3,6 +3,7 @@
 import { DirectoryGenerationHistoryEntry } from '@/lib/api/types-only';
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils/cn';
+import { useMounted } from '@/lib/hooks/use-mounted';
 
 interface HistoryTableProps {
     entries: DirectoryGenerationHistoryEntry[];
@@ -13,6 +14,7 @@ const statusColor: Record<string, string> = {
     generating: 'bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-200',
     generated: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-200',
     error: 'bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-200',
+    cancelled: 'bg-gray-200 text-gray-800 dark:bg-gray-800 dark:text-gray-200',
 };
 
 const tdClass = 'px-4 py-4 text-sm text-text dark:text-text-dark align-top';
@@ -63,6 +65,8 @@ function getStatusLabel(status: string, t: ReturnType<typeof useTranslations>) {
             return t('status.generated');
         case 'error':
             return t('status.error');
+        case 'cancelled':
+            return t('status.cancelled');
         default:
             return t('unknown');
     }
@@ -113,9 +117,10 @@ export function HistoryTable({ entries, locale }: HistoryTableProps) {
                                         {getStatusLabel(statusKey, t)}
                                     </span>
                                 </td>
-                                <td className={tdClass}>
-                                    {formatDate(entry.startedAt ?? entry.createdAt, locale)}
-                                </td>
+                                <ShowDateTime
+                                    value={entry.startedAt ?? entry.createdAt}
+                                    locale={locale}
+                                />
                                 <td className={tdClass}>
                                     {formatDuration(entry.durationInSeconds)}
                                 </td>
@@ -129,4 +134,14 @@ export function HistoryTable({ entries, locale }: HistoryTableProps) {
             </table>
         </div>
     );
+}
+
+function ShowDateTime({ value, locale }: { value?: string | null; locale: string }) {
+    const mounted = useMounted();
+
+    if (!mounted) {
+        return null;
+    }
+
+    return <td className={tdClass}>{formatDate(value, locale)}</td>;
 }

@@ -9,8 +9,8 @@ import { DataRepository, PRUpdate } from '../data-generator/data-repository';
 import { ReadmeBuilder } from './readme-builder';
 import { MarkdownRepository } from './markdown-repository';
 import { GenerationMethod } from '../items-generator/dto';
-import { DIRECTORY_OPERATIONS } from '@src/directory';
-import type { DirectoryOperations } from '@src/directory';
+import { DIRECTORY_OPERATIONS } from '@src/directory-operations';
+import type { DirectoryOperations } from '@src/directory-operations';
 
 type InitializeOptions = {
     repository_description?: string;

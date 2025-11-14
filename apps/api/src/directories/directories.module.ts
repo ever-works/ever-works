@@ -1,6 +1,6 @@
 import { ScheduleModule } from '@nestjs/schedule';
 import { Module } from '@nestjs/common';
-import { AgentModule } from '@packages/agent/services';
+import { DirectoryModule } from '@packages/agent/services';
 import { DeployModule } from '@packages/agent/deploy';
 import { DatabaseModule } from '@packages/agent/database';
 import { AuthModule } from '@src/auth';
@@ -17,7 +17,7 @@ import { VercelDeploymentVerifierService } from './tasks/vercel-deployment-verif
 
 @Module({
     imports: [
-        AgentModule,
+        DirectoryModule,
         DeployModule,
         DatabaseModule,
         AuthModule,

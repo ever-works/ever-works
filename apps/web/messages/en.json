@@ -351,6 +351,7 @@
                 "generating": "Generating",
                 "generated": "Generated",
                 "error": "Error",
+                "cancelled": "Cancelled",
                 "idle": "Idle"
             },
             "noDescription": "No description provided",
@@ -366,11 +367,13 @@
         "directoryDetail": {
             "failedToGenerateItems": "Failed to generate items. Please try again.",
             "generationCompleted": "Generation completed successfully",
+            "generationCancelled": "Generation was cancelled",
             "status": {
                 "notStarted": "Not Started",
                 "generating": "Generating",
                 "generated": "Generated",
-                "error": "Error"
+                "error": "Error",
+                "cancelled": "Cancelled"
             },
             "tabs": {
                 "overview": "Overview",
@@ -401,6 +404,11 @@
                     "title": "Generation Failed",
                     "description": "An error occurred during generation.",
                     "retry": "Retry Generation"
+                },
+                "cancelled": {
+                    "title": "Generation Cancelled",
+                    "description": "The previous generation was stopped before completion.",
+                    "restart": "Restart Generation"
                 }
             },
             "stats": {
@@ -420,7 +428,8 @@
                 "status": {
                     "generating": "In progress",
                     "generated": "Completed",
-                    "error": "Failed"
+                    "error": "Failed",
+                    "cancelled": "Cancelled"
                 },
                 "table": {
                     "run": "Run",
@@ -530,6 +539,7 @@
                     "error": "An error occurred while adding the item",
                     "errors": {
                         "urlRequired": "Source URL is required for extraction",
+                        "invalidUrl": "Please enter a valid URL that includes http:// or https://",
                         "requiredFields": "Please fill in all required fields"
                     }
                 }
@@ -637,6 +647,7 @@
                 "customHeaderPlaceholder": "Add custom content to the README header",
                 "overwriteDefaultHeader": "Overwrite default header",
                 "customFooter": "Custom Footer",
+                "cantDeleteWhileGenerating": "Cannot delete the directory while items are being generated.",
                 "customFooterPlaceholder": "Add custom content to the README footer",
                 "overwriteDefaultFooter": "Overwrite default footer",
                 "dangerZone": "Danger Zone",

@@ -54,6 +54,10 @@ export const extractedItemsSchema = z.object({
     items: z.array(itemDataSchema),
 });
 
+export const extractedItemsSchemaWithTags = z.object({
+    items: z.array(itemDataWithCategoriesAndTagsSchema),
+});
+
 // Zod schema for AI's assessment of prompt understanding
 export const promptUnderstandingAssessmentSchema = z.object({
     can_proceed: z

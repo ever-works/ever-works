@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
 import { Plus } from 'lucide-react';
 import { useRouter } from '@/i18n/navigation';
+import { getCategoryName } from '@/lib/utils/items';
 
 interface ItemsPageClientProps {
     items: ItemData[];
@@ -21,7 +22,13 @@ export function ItemsPageClient({ items, directoryId }: ItemsPageClientProps) {
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
     // Get unique categories from existing items
-    const categories = Array.from(new Set(items.map((item) => item.category).filter(Boolean)));
+    const categories = Array.from(
+        new Set(
+            items
+                .map((item) => getCategoryName(item.category))
+                .filter((category): category is string => Boolean(category)),
+        ),
+    );
 
     // If no categories exist, provide some defaults
     const finalCategories = categories.length > 0 ? categories : [];

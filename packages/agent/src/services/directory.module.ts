@@ -7,9 +7,12 @@ import { WebsiteGeneratorModule } from '../website-generator/website-generator.m
 import { DeployModule } from '../deploy/deploy.module';
 import { DatabaseModule } from '../database/database.module';
 import { AiModule } from '../ai/ai.module';
-import { AgentService } from './agent.service';
 import { DirectoryDetailService } from './directory-detail.service';
 import { TriggerModule } from '@src/trigger';
+import { DirectoryOwnershipService } from './directory-ownership.service';
+import { DirectoryQueryService } from './directory-query.service';
+import { DirectoryLifecycleService } from './directory-lifecycle.service';
+import { DirectoryGenerationService } from './directory-generation.service';
 
 @Module({
     imports: [
@@ -23,7 +26,19 @@ import { TriggerModule } from '@src/trigger';
         AiModule,
         TriggerModule,
     ],
-    providers: [AgentService, DirectoryDetailService],
-    exports: [AgentService, DirectoryDetailService],
+    providers: [
+        DirectoryOwnershipService,
+        DirectoryQueryService,
+        DirectoryLifecycleService,
+        DirectoryGenerationService,
+        DirectoryDetailService,
+    ],
+    exports: [
+        DirectoryOwnershipService,
+        DirectoryQueryService,
+        DirectoryLifecycleService,
+        DirectoryGenerationService,
+        DirectoryDetailService,
+    ],
 })
-export class AgentModule {}
+export class DirectoryModule {}

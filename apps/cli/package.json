@@ -21,19 +21,19 @@
     "packageManager": "pnpm@10.13.1",
     "devDependencies": {
         "@types/fs-extra": "^11.0.4",
-        "@types/inquirer": "^9.0.8",
-        "@types/node": "^22.16.3",
-        "esbuild": "^0.25.6",
-        "typescript": "^5.8.3"
+        "@types/inquirer": "^9.0.9",
+        "@types/node": "^22.19.0",
+        "esbuild": "^0.25.12",
+        "typescript": "^5.9.3"
     },
     "dependencies": {
-        "axios": "^1.12.2",
+        "@packages/cli-shared": "workspace:*",
+        "axios": "^1.13.2",
         "chalk": "^4.1.2",
-        "commander": "^14.0.0",
-        "dotenv": "^17.2.0",
-        "fs-extra": "^11.3.0",
-        "inquirer": "^12.7.0",
-        "ora": "^5.4.1",
-        "@packages/cli-shared": "workspace:*"
+        "commander": "^14.0.2",
+        "dotenv": "^17.2.3",
+        "fs-extra": "^11.3.2",
+        "inquirer": "^12.11.0",
+        "ora": "^5.4.1"
     }
 }

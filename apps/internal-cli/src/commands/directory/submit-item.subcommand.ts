@@ -4,7 +4,7 @@ import chalk from 'chalk';
 import ora from 'ora';
 import inquirer from 'inquirer';
 import { DirectoryRepository, UserRepository } from '@packages/agent/database';
-import { AgentService } from '@packages/agent/services';
+import { DirectoryGenerationService } from '@packages/agent/services';
 import { DirectoryPromptService } from './directory-prompt.service';
 import { ConfigCheckService } from './config-check.service';
 import { handleCliError } from './error';
@@ -20,7 +20,7 @@ export class SubmitItemSubCommand extends CommandRunner {
         private readonly directoryRepository: DirectoryRepository,
         private readonly directoryPrompt: DirectoryPromptService,
         private readonly configCheck: ConfigCheckService,
-        private readonly agentService: AgentService,
+        private readonly directoryGenerationService: DirectoryGenerationService,
         private readonly userRepository: UserRepository,
     ) {
         super();
@@ -84,7 +84,11 @@ export class SubmitItemSubCommand extends CommandRunner {
                 const user = await this.userRepository.createOrGetLocalUser();
 
                 // Call the agent service method directly
-                const result = await this.agentService.submitItem(directory.id, itemData, user);
+                const result = await this.directoryGenerationService.submitItem(
+                    directory.id,
+                    itemData,
+                    user,
+                );
 
                 spinner.stop();
 

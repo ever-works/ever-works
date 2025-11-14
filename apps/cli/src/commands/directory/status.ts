@@ -95,6 +95,17 @@ export const statusCommand = new Command('status')
                         return;
                     }
 
+                    if (status === GenerateStatusType.CANCELLED) {
+                        spinner.warn('\n⚠ Generation cancelled');
+                        if (freshDirectory.generateStatus?.error) {
+                            console.log(chalk.yellow(freshDirectory.generateStatus.error));
+                        }
+                        pollingComplete = true;
+                        cleanup();
+                        printDirectorySummary(freshDirectory);
+                        return;
+                    }
+
                     if (status === GenerateStatusType.GENERATING) {
                         const elapsed = Math.floor((Date.now() - startTime) / 1000);
                         const timeStr = `[${Math.floor(elapsed / 60)}m ${elapsed % 60}s]`;

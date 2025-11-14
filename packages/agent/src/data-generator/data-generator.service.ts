@@ -17,8 +17,8 @@ import { format } from 'date-fns';
 import { GenerateStatusType } from '../entities/types';
 import { LEGAL_NOTICE, LICENSE_TEXT } from './texts';
 import { ItemsGeneratorStep } from '../items-generator/constants/steps';
-import { DIRECTORY_OPERATIONS } from '@src/directory';
-import type { DirectoryOperations } from '@src/directory';
+import { DIRECTORY_OPERATIONS } from '@src/directory-operations';
+import type { DirectoryOperations } from '@src/directory-operations';
 
 type GenerationStats = {
     newItemsCount: number;

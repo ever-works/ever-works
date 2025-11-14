@@ -15,6 +15,7 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { getCategoryName } from '@/lib/utils/items';
 
 interface ItemCardProps {
     item: ItemData;
@@ -85,9 +86,9 @@ const ItemCardList = memo(function ItemCardList({ item, onDelete, isPending }: I
                     </p>
                 )}
             </div>
-            {item.category && (
+            {getCategoryName(item.category) && (
                 <span className="px-2 py-1 text-xs rounded-full bg-primary/10 text-primary">
-                    {item.category}
+                    {getCategoryName(item.category)}
                 </span>
             )}
 
@@ -134,9 +135,9 @@ const ItemCardGrid = memo(function ItemCardGrid({ item, onDelete, isPending }: I
             )}
 
             <div className="flex items-center justify-between">
-                {item.category && (
+                {getCategoryName(item.category) && (
                     <span className="px-2 py-1 text-xs rounded-full bg-primary/10 text-primary">
-                        {item.category}
+                        {getCategoryName(item.category)}
                     </span>
                 )}
                 {item.source_url && (

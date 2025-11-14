@@ -32,4 +32,4 @@ jobs:
         working-directory: packages/agent
         env:
           TRIGGER_ACCESS_TOKEN: ${{ secrets.TRIGGER_ACCESS_TOKEN }}
-        run: npx trigger.dev@4.0.6 deploy
+        run: npx trigger.dev@4.0.7 deploy

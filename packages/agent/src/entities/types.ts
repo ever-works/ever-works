@@ -6,6 +6,7 @@ export enum GenerateStatusType {
     GENERATING = 'generating',
     GENERATED = 'generated',
     ERROR = 'error',
+    CANCELLED = 'cancelled',
 }
 
 export type GenerateStatus = {

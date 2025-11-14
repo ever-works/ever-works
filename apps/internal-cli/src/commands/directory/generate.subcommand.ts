@@ -4,7 +4,7 @@ import chalk from 'chalk';
 import ora from 'ora';
 import inquirer from 'inquirer';
 import { DirectoryRepository, UserRepository } from '@packages/agent/database';
-import { AgentService } from '@packages/agent/services';
+import { DirectoryGenerationService, DirectoryQueryService } from '@packages/agent/services';
 import {
     CreateItemsGeneratorDto,
     CompanyDto,
@@ -27,7 +27,8 @@ export class GenerateSubCommand extends CommandRunner {
 
     constructor(
         private readonly directoryRepository: DirectoryRepository,
-        private readonly agentService: AgentService,
+        private readonly directoryGenerationService: DirectoryGenerationService,
+        private readonly directoryQueryService: DirectoryQueryService,
         private readonly directoryPrompt: DirectoryPromptService,
         private readonly configCheck: ConfigCheckService,
         private readonly userRepository: UserRepository,
@@ -121,7 +122,7 @@ export class GenerateSubCommand extends CommandRunner {
             try {
                 const user = await this.userRepository.createOrGetLocalUser();
 
-                const generatorPromise = this.agentService.generateItems(
+                const generatorPromise = this.directoryGenerationService.generateItems(
                     directory.id,
                     createDto,
                     user,
@@ -179,7 +180,7 @@ export class GenerateSubCommand extends CommandRunner {
                     return;
                 }
 
-                const { directory: freshDirectory } = await this.agentService.getDirectory(
+                const { directory: freshDirectory } = await this.directoryQueryService.getDirectory(
                     directory.id,
                     user,
                 );
@@ -196,6 +197,13 @@ export class GenerateSubCommand extends CommandRunner {
 
                     if (freshDirectory.generateStatus?.error) {
                         console.log(chalk.red(`Error: ${freshDirectory.generateStatus.error}`));
+                    }
+                    spinner.stop();
+                } else if (freshDirectory.generateStatus?.status === GenerateStatusType.CANCELLED) {
+                    spinner.warn('\n⚠ Generation cancelled');
+
+                    if (freshDirectory.generateStatus?.error) {
+                        console.log(chalk.yellow(freshDirectory.generateStatus.error));
                     }
                     spinner.stop();
                 } else {

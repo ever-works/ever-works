@@ -5,8 +5,8 @@ import { WebsiteGeneratorService } from '@src/website-generator/website-generato
 import { Directory } from '@src/entities/directory.entity';
 import { User } from '@src/entities/user.entity';
 import { CreateItemsGeneratorDto } from '@src/items-generator/dto';
-import { DIRECTORY_OPERATIONS } from '@src/directory';
-import type { DirectoryOperations } from '@src/directory';
+import { DIRECTORY_OPERATIONS } from '@src/directory-operations';
+import type { DirectoryOperations } from '@src/directory-operations';
 import { GenerateStatusType } from '@src/entities/types';
 import { ItemsGeneratorMetrics } from '@src/items-generator/dto/items-generator-response.dto';
 
@@ -22,6 +22,7 @@ export type TriggerGenerationOptions = {
     user: User;
     dto: CreateItemsGeneratorDto;
     historyId: string;
+    historyStartedAt?: string;
 };
 
 @Injectable()
@@ -36,20 +37,19 @@ export class TriggerGenerationOrchestrator {
         private readonly directoryOperations: DirectoryOperations,
     ) {}
 
-    async run({ directory, user, dto, historyId }: TriggerGenerationOptions) {
-        const startTime = new Date();
+    async run({ directory, user, dto, historyId, historyStartedAt }: TriggerGenerationOptions) {
+        const startTime = this.resolveStartTime(historyStartedAt);
 
         await Promise.all([
             this.directoryOperations.recordGenerationStartTime(directory.id, startTime),
             this.directoryOperations.updateGenerateStatus(directory.id, {
                 status: GenerateStatusType.GENERATING,
             }),
+            this.directoryOperations.updateGenerationHistory(directory.id, historyId, {
+                status: GenerateStatusType.GENERATING,
+                startedAt: startTime,
+            }),
         ]);
-
-        await this.directoryOperations.updateGenerationHistory(directory.id, historyId, {
-            startedAt: startTime,
-            status: GenerateStatusType.GENERATING,
-        });
 
         let hasError = false;
         let generationStats: GenerationStats | null = null;
@@ -132,5 +132,53 @@ export class TriggerGenerationOrchestrator {
 
             await this.directoryOperations.emitGenerationCompleted(directory);
         }
+    }
+
+    private resolveStartTime(historyStartedAt?: string): Date {
+        if (!historyStartedAt) {
+            return new Date();
+        }
+
+        const parsed = new Date(historyStartedAt);
+
+        if (Number.isNaN(parsed.getTime())) {
+            this.logger.warn(
+                `Invalid historyStartedAt provided (${historyStartedAt}), falling back to current time`,
+            );
+            return new Date();
+        }
+
+        return parsed;
+    }
+
+    async handleCancellation({
+        directory,
+        historyId,
+        historyStartedAt,
+    }: TriggerGenerationOptions): Promise<void> {
+        const finishedAt = new Date();
+        const startTime = this.resolveStartTime(historyStartedAt);
+        const duration = Math.max(
+            0,
+            Math.round((finishedAt.getTime() - startTime.getTime()) / 1000),
+        );
+        const message = 'Generation cancelled';
+
+        await Promise.all([
+            this.directoryOperations.recordGenerationFinishTime(directory.id, finishedAt),
+            this.directoryOperations.updateGenerateStatus(directory.id, {
+                status: GenerateStatusType.CANCELLED,
+                error: message,
+                step: null,
+            }),
+            this.directoryOperations.updateGenerationHistory(directory.id, historyId, {
+                status: GenerateStatusType.CANCELLED,
+                finishedAt,
+                durationInSeconds: duration,
+                errorMessage: message,
+            }),
+        ]);
+
+        await this.directoryOperations.emitGenerationCompleted(directory);
     }
 }

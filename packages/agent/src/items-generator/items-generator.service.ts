@@ -535,6 +535,7 @@ export class ItemsGeneratorService {
                 },
                 [webPage],
                 [], // No featured hints for single item extraction
+                true, // we want to include category and tags
             );
 
             if (!extractedItems || extractedItems.length === 0) {
@@ -551,11 +552,12 @@ export class ItemsGeneratorService {
             // Ensure featured is always false for extracted items
             item.featured = false;
 
-            // 5. Generate markdown for the item
-            item = await this.generateMarkdownForItem(item);
-
-            // 6. Process badges for the item
-            item = await this.processSingleItemBadges(item);
+            // We don't need to generate it at this stage;
+            // we can do so, for example, during submitItem.
+            // // 5. Generate markdown for the item
+            // item = await this.generateMarkdownForItem(item);
+            // // 6. Process badges for the item
+            // item = await this.processSingleItemBadges(item);
 
             this.logger.log(`Successfully extracted item: ${item.name} from ${sourceUrl}`);
             return item;

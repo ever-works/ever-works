@@ -7,7 +7,7 @@ import { GithubService } from '@packages/agent/git';
 import { DirectoryPromptService } from './directory-prompt.service';
 import { ConfigCheckService } from './config-check.service';
 import { handleCliError } from './error';
-import { AgentService } from '@packages/agent/services';
+import { DirectoryLifecycleService } from '@packages/agent/services';
 import { RepoProvider } from '@packages/agent/dto';
 
 @SubCommand({
@@ -18,7 +18,7 @@ export class CreateSubCommand extends CommandRunner {
     private readonly logger = new Logger(CreateSubCommand.name);
 
     constructor(
-        private readonly agentService: AgentService,
+        private readonly directoryLifecycleService: DirectoryLifecycleService,
         private readonly directoryRepository: DirectoryRepository,
         private readonly githubService: GithubService,
         private readonly directoryPrompt: DirectoryPromptService,
@@ -90,7 +90,10 @@ export class CreateSubCommand extends CommandRunner {
                 repoProvider: RepoProvider.GITHUB,
             };
 
-            const { directory } = await this.agentService.createDirectory(finalDirectoryData, user);
+            const { directory } = await this.directoryLifecycleService.createDirectory(
+                finalDirectoryData,
+                user,
+            );
 
             createSpinner.stop();
 

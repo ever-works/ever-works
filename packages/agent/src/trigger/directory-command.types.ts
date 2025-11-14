@@ -1,5 +1,5 @@
 import { Directory } from '@src/entities/directory.entity';
-import { GenerationHistoryUpdateInput } from '@src/directory';
+import { GenerationHistoryUpdateInput } from '@src/directory-operations';
 
 export enum DirectoryCommandAction {
     UPDATE = 'update',

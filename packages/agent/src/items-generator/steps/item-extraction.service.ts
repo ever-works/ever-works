@@ -6,7 +6,12 @@ import { WebPageData } from '../interfaces/items-generator.interfaces';
 import { slugifyText } from '../utils/text.utils';
 import { AiService, BaseChatModel } from 'src/ai';
 import { ItemData } from '../dto';
-import { extractedItemsSchema, itemDataSchema } from '../schemas/item-extraction.schemas';
+import {
+    extractedItemsSchema,
+    extractedItemsSchemaWithTags,
+    itemDataSchema,
+    itemDataWithCategoriesAndTagsSchema,
+} from '../schemas/item-extraction.schemas';
 
 const ITEMS_EXTRACTION_PROMPT =
     `You are an expert data extractor and technical writer for directory websites.
@@ -99,6 +104,7 @@ export class ItemExtractionService {
         createItemsGeneratorDto: CreateItemsGeneratorDto,
         relevantPages: WebPageData[],
         featuredItemHints: string[] = [],
+        withTags = false,
     ): Promise<ItemData[]> {
         const { name: topicName, prompt: topicDescription, config } = createItemsGeneratorDto;
 
@@ -140,9 +146,9 @@ export class ItemExtractionService {
                 const promptTemplate =
                     HumanMessagePromptTemplate.fromTemplate(ITEMS_EXTRACTION_PROMPT);
 
-                const extractionChain = promptTemplate.pipe(
-                    this.llm.withStructuredOutput(extractedItemsSchema),
-                );
+                const schema = withTags ? extractedItemsSchemaWithTags : extractedItemsSchema;
+                const extractionChain = promptTemplate.pipe(this.llm.withStructuredOutput(schema));
+
                 // Check if content is large enough to require chunking
                 if (page.raw_content && page.raw_content.length > this.MAX_CHUNK_SIZE) {
                     this.logger.log(
@@ -192,9 +198,11 @@ export class ItemExtractionService {
                         const validatedItems: ItemData[] = [];
                         for (const extractedItem of allExtractedItems) {
                             try {
-                                const validatedItem = itemDataSchema.parse(
-                                    extractedItem,
-                                ) as ItemData;
+                                const schema = withTags
+                                    ? itemDataWithCategoriesAndTagsSchema
+                                    : itemDataSchema;
+
+                                const validatedItem = schema.parse(extractedItem) as ItemData;
 
                                 // Auto-generate slug if not provided or to ensure consistency
                                 validatedItem.slug = slugifyText(validatedItem.name);
@@ -242,9 +250,11 @@ export class ItemExtractionService {
                         const validatedItems: ItemData[] = [];
                         for (const extractedItem of extractionResult.items) {
                             try {
-                                const validatedItem = itemDataSchema.parse(
-                                    extractedItem,
-                                ) as ItemData;
+                                const schema = withTags
+                                    ? itemDataWithCategoriesAndTagsSchema
+                                    : itemDataSchema;
+
+                                const validatedItem = schema.parse(extractedItem) as ItemData;
 
                                 // Auto-generate slug if not provided or to ensure consistency
                                 validatedItem.slug = slugifyText(validatedItem.name);

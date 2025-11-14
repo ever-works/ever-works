@@ -19,8 +19,9 @@ import {
     DIRECTORY_OPERATIONS,
     DirectoryOperations,
     GenerationHistoryUpdateInput,
-} from '@packages/agent/directory';
+} from '@packages/agent/directory-operations';
 import { DirectoryCommandAction, DirectoryCommandPayloads } from '@packages/agent/trigger';
+import { SkipThrottle } from '@nestjs/throttler';
 
 type DirectoryContextResponse = {
     directory: Directory;
@@ -42,6 +43,7 @@ type DirectoryCommandDefinition<K extends DirectoryCommandAction> = {
     handler: (payload: DirectoryCommandPayloads[K], ctx: CommandHandlerContext) => Promise<void>;
 };
 
+@SkipThrottle()
 @Controller('internal/trigger')
 export class TriggerInternalController {
     constructor(

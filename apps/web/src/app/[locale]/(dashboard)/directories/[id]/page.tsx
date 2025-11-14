@@ -22,7 +22,8 @@ export default async function DirectoryOverviewPage({ params }: Params) {
     const showStatusCard =
         !directory.generateStatus?.status ||
         directory.generateStatus?.status === GenerateStatusType.ERROR ||
-        directory.generateStatus?.status === GenerateStatusType.GENERATING;
+        directory.generateStatus?.status === GenerateStatusType.GENERATING ||
+        directory.generateStatus?.status === GenerateStatusType.CANCELLED;
 
     return (
         <div className="space-y-6">
