@@ -5,6 +5,7 @@ A comprehensive monitoring package for NestJS applications that provides seamles
 ## ✨ Features
 
 - 🔍 **Sentry Integration**: Real-time error monitoring and performance tracking
+- 📝 **Sentry Logs**: Structured logging with automatic context and querying capabilities
 - 📊 **PostHog Analytics**: User behavior tracking and event analytics
 - 🛡️ **Automatic Interceptors**: Seamless request/response monitoring
 - 🎯 **Analytics Service**: Simplified API for custom event tracking
@@ -102,6 +103,7 @@ import { MonitoringModule } from '@packages/monitoring';
                 dsn: process.env.SENTRY_DSN,
                 environment: process.env.NODE_ENV || 'development',
                 tracesSampleRate: 0.1,
+                enableLogs: true, // Enable Sentry Logs (enabled by default)
                 debug: process.env.NODE_ENV === 'development',
                 beforeSend(event) {
                     // Custom filtering logic
@@ -199,11 +201,60 @@ export class ApiController {
 }
 ```
 
+### Sentry Logs
+
+Sentry Logs allow you to send structured logs to Sentry, providing valuable context alongside errors and performance data. Logs are automatically enabled by default.
+
+```typescript
+import { Injectable } from '@nestjs/common';
+import { SentryService } from '@packages/monitoring';
+
+@Injectable()
+export class UserService {
+    constructor(private readonly sentry: SentryService) {}
+
+    async processUser(userId: string) {
+        // Log informational messages
+        this.sentry.info('Processing user', { userId, timestamp: new Date().toISOString() });
+
+        try {
+            // Your business logic
+            const result = await this.userRepository.find(userId);
+            
+            // Log success
+            this.sentry.debug('User found', { userId, resultId: result.id });
+            
+            return result;
+        } catch (error) {
+            // Log error with context
+            this.sentry.error('Failed to process user', { 
+                userId, 
+                error: error.message,
+                stack: error.stack 
+            });
+            throw error;
+        }
+    }
+
+    // You can also use the logger directly for more control
+    async advancedLogging() {
+        const logger = this.sentry.getLogger();
+        
+        logger.trace('Detailed trace information', { step: 'initialization' });
+        logger.debug('Debug information', { state: 'processing' });
+        logger.info('User action completed', { action: 'login' });
+        logger.warn('Potential issue detected', { issue: 'rate_limit_approaching' });
+        logger.error('Error occurred', { error: 'validation_failed' });
+        logger.fatal('Critical failure', { system: 'payment_processor' });
+    }
+}
+```
+
 ### Manual Error Tracking
 
 ```typescript
 import { Injectable } from '@nestjs/common';
-import { SentryService } from '@packages/monitoring/sentry';
+import { SentryService } from '@packages/monitoring';
 
 @Injectable()
 export class UserService {
@@ -402,6 +453,117 @@ Tracks business-specific events.
 #### `isAvailable(): boolean`
 
 Checks if PostHog is available and properly configured.
+
+### SentryService
+
+Provides access to Sentry's logging and error tracking capabilities.
+
+#### `getLogger()`
+
+Returns the Sentry logger instance for direct access to logging methods.
+
+**Returns:** `Sentry.Logger`
+
+#### `trace(message: string, context?: Record<string, any>)`
+
+Logs a trace-level message.
+
+**Parameters:**
+- `message`: Log message
+- `context`: Optional context data
+
+#### `debug(message: string, context?: Record<string, any>)`
+
+Logs a debug-level message.
+
+**Parameters:**
+- `message`: Log message
+- `context`: Optional context data
+
+#### `info(message: string, context?: Record<string, any>)`
+
+Logs an info-level message.
+
+**Parameters:**
+- `message`: Log message
+- `context`: Optional context data
+
+#### `warn(message: string, context?: Record<string, any>)`
+
+Logs a warning-level message.
+
+**Parameters:**
+- `message`: Log message
+- `context`: Optional context data
+
+#### `error(message: string, context?: Record<string, any>)`
+
+Logs an error-level message.
+
+**Parameters:**
+- `message`: Log message
+- `context`: Optional context data
+
+#### `fatal(message: string, context?: Record<string, any>)`
+
+Logs a fatal-level message.
+
+**Parameters:**
+- `message`: Log message
+- `context`: Optional context data
+
+#### `captureException(exception: any, context?: any)`
+
+Captures an exception and sends it to Sentry.
+
+**Parameters:**
+- `exception`: The exception to capture
+- `context`: Optional context data (tags, extra, etc.)
+
+#### `captureMessage(message: string, level?: any, context?: any)`
+
+Captures a message and sends it to Sentry.
+
+**Parameters:**
+- `message`: The message to capture
+- `level`: Optional severity level
+- `context`: Optional context data
+
+#### `setUser(user: { id?: string; email?: string; username?: string; [key: string]: any })`
+
+Sets the user context for Sentry events.
+
+**Parameters:**
+- `user`: User information object
+
+#### `setContext(name: string, context: Record<string, any>)`
+
+Sets additional context for Sentry events.
+
+**Parameters:**
+- `name`: Context name
+- `context`: Context data
+
+#### `setTag(key: string, value: string)`
+
+Sets a tag for Sentry events.
+
+**Parameters:**
+- `key`: Tag key
+- `value`: Tag value
+
+#### `setTags(tags: Record<string, string>)`
+
+Sets multiple tags for Sentry events.
+
+**Parameters:**
+- `tags`: Object with tag key-value pairs
+
+#### `isInitialized(): boolean`
+
+Checks if Sentry is initialized and available.
+
+**Returns:** `boolean`
 
 ### Interceptors
 
