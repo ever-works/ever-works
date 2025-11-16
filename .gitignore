@@ -50,3 +50,9 @@ Thumbs.db
 
 # API
 apps/api/data
+
+# Cache
+apps/**/.cache
+packages/**/.cache
+.cache
+.pnpm-debug.log
