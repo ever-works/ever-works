@@ -3,6 +3,7 @@ export interface SentryConfig {
     environment?: string;
     tracesSampleRate?: number;
     profilesSampleRate?: number;
+    enableLogs?: boolean;
     beforeSend?: (event: any) => any | null;
     beforeSendTransaction?: (event: any) => any | null;
 }
