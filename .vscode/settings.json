@@ -10,5 +10,6 @@
 		"Tavily",
 		"VERCEL"
 	],
-	"biome.enabled": false
+	"biome.enabled": false,
+	"deepscan.enable": true
 }
