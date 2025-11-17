@@ -1,0 +1,1177 @@
+{
+    "auth": {
+        "error": {
+            "title": "认证错误",
+            "subtitle": "我们在您的认证过程中遇到了问题",
+            "errorOccurred": "发生错误",
+            "somethingWentWrong": "出现了问题",
+            "generic": "发生意外错误。请稍后再试。",
+            "invalidCredentials": "您输入的邮箱或密码不正确。",
+            "emailNotVerified": "请先验证您的邮箱地址再登录。",
+            "accountLocked": "您的账户因安全原因已被锁定。",
+            "sessionExpired": "您的会话已过期。请重新登录。",
+            "networkError": "无法连接。请检查您的网络连接。",
+            "oauth": {
+                "missingCode": "缺少授权代码。请重新尝试登录。",
+                "invalidState": "授权状态无效。请重新尝试登录。",
+                "unsupportedProvider": "不支持此认证提供商。",
+                "callbackFailed": "完成认证失败。请重试。"
+            },
+            "resetPassword": {
+                "missingToken": "重置密码链接无效。缺少验证令牌。",
+                "invalidToken": "重置密码链接无效或已被篡改。",
+                "expiredToken": "重置密码链接已过期。请申请新的链接。",
+                "failed": "重置密码失败。请重试或申请新的重置链接。"
+            },
+            "verifyEmail": {
+                "missingToken": "邮箱验证链接无效。缺少验证令牌。",
+                "invalidToken": "邮箱验证链接无效或已被使用。",
+                "expiredToken": "邮箱验证链接已过期。请申请新的链接。",
+                "failed": "验证邮箱失败。请重试或申请新的验证链接。"
+            },
+            "authorize": {
+                "invalidRedirectUrl": "重定向 URL 无效或不被允许。如果您认为这是错误，请联系支持。"
+            },
+            "actions": {
+                "backToLogin": "返回登录",
+                "tryRegister": "尝试注册",
+                "resendVerification": "重新发送验证邮件",
+                "contactSupport": "联系支持",
+                "requestNewReset": "申请新的重置链接"
+            },
+            "helpText": "如果您继续遇到问题，请查看下面的帮助资源。",
+            "links": {
+                "help": "帮助中心",
+                "systemStatus": "系统状态"
+            }
+        },
+        "login": {
+            "title": "欢迎回来",
+            "subtitle": "登录您的账户以继续",
+            "form": {
+                "email": {
+                    "label": "邮箱地址",
+                    "placeholder": "you@example.com"
+                },
+                "password": {
+                    "label": "密码",
+                    "placeholder": "输入您的密码"
+                },
+                "forgotPassword": "忘记密码？",
+                "rememberMe": "记住我 30 天",
+                "submit": "登录",
+                "submitting": "正在登录..."
+            },
+            "socialLogin": {
+                "divider": "或使用以下方式继续",
+                "google": "Google",
+                "github": "GitHub"
+            },
+            "signUp": {
+                "text": "还没有账户？",
+                "link": "注册"
+            },
+            "errors": {
+                "invalidCredentials": "邮箱或密码无效"
+            },
+            "passwordReset": {
+                "success": "密码重置成功！",
+                "canLogin": "您现在可以使用新密码登录了。"
+            }
+        },
+        "forgotPassword": {
+            "title": "忘记密码？",
+            "subtitle": "别担心，我们会向您发送重置说明",
+            "successTitle": "请查看您的邮箱",
+            "successSubtitle": "我们已向您发送密码重置说明",
+            "form": {
+                "email": {
+                    "label": "邮箱地址",
+                    "placeholder": "输入您的邮箱"
+                },
+                "submit": "发送重置链接",
+                "submitting": "正在发送..."
+            },
+            "success": {
+                "title": "邮件发送成功",
+                "message": "我们已向 {email} 发送密码重置说明",
+                "checkSpam": "如果您没有收到邮件，请检查垃圾邮件文件夹。"
+            },
+            "errors": {
+                "failed": "发送重置邮件失败。请重试。"
+            },
+            "backToLogin": "返回登录",
+            "noAccount": {
+                "text": "还没有账户？",
+                "link": "注册"
+            }
+        },
+        "resetPassword": {
+            "title": "重置您的密码",
+            "subtitle": "请在下方输入您的新密码",
+            "successTitle": "密码重置成功",
+            "successSubtitle": "您的密码已更新",
+            "form": {
+                "password": {
+                    "label": "新密码",
+                    "placeholder": "输入您的新密码",
+                    "helperText": "至少 6 个字符，包含小写字母和数字/特殊字符",
+                    "errors": {
+                        "minLength": "密码至少需要 6 个字符",
+                        "lowercase": "密码必须包含至少一个小写字母",
+                        "numberOrSpecial": "密码必须包含至少一个数字或特殊字符",
+                        "cannotStartWith": "密码不能以点或换行符开头"
+                    }
+                },
+                "confirmPassword": {
+                    "label": "确认新密码",
+                    "placeholder": "确认您的新密码",
+                    "errors": {
+                        "noMatch": "密码不匹配"
+                    }
+                },
+                "submit": "重置密码",
+                "submitting": "正在重置..."
+            },
+            "success": {
+                "title": "密码重置成功",
+                "message": "您的密码已成功更新。您现在可以使用新密码登录。",
+                "loginButton": "前往登录"
+            },
+            "errors": {
+                "failed": "重置密码失败。请重试或申请新的重置链接。",
+                "noToken": "重置链接无效",
+                "invalidLink": "重置链接无效",
+                "missingTokenMessage": "密码重置链接无效或不完整。请申请新的密码重置。",
+                "requestNewLink": "申请新的重置链接"
+            },
+            "backToLogin": "返回登录"
+        },
+        "register": {
+            "title": "创建您的账户",
+            "subtitle": "立即开始构建精彩的目录",
+            "form": {
+                "name": {
+                    "label": "全名",
+                    "placeholder": "John Doe"
+                },
+                "email": {
+                    "label": "邮箱地址",
+                    "placeholder": "you@example.com"
+                },
+                "password": {
+                    "label": "密码",
+                    "placeholder": "创建强密码",
+                    "hint": "至少 8 个字符"
+                },
+                "confirmPassword": {
+                    "label": "确认密码",
+                    "placeholder": "确认您的密码"
+                },
+                "terms": {
+                    "text": "我同意",
+                    "termsLink": "服务条款",
+                    "and": "和",
+                    "privacyLink": "隐私政策"
+                },
+                "submit": "创建账户",
+                "submitting": "正在创建账户..."
+            },
+            "socialSignUp": {
+                "divider": "或使用以下方式注册",
+                "google": "Google",
+                "github": "GitHub"
+            },
+            "signIn": {
+                "text": "已有账户？",
+                "link": "登录"
+            },
+            "errors": {
+                "passwordsDoNotMatch": "密码不匹配",
+                "passwordTooShort": "密码至少需要 8 个字符",
+                "generic": "发生错误。请重试。"
+            }
+        }
+    },
+    "dashboard": {
+        "title": "仪表板",
+        "toasts": {
+            "newUser": {
+                "title": "欢迎使用 Ever Works！🎉",
+                "description": "您的账户已成功创建。请查看您的邮箱以验证账户。"
+            },
+            "emailVerification": {
+                "title": "验证您的邮箱",
+                "description": "我们已向您的邮箱地址发送验证链接。请查看您的收件箱和垃圾邮件文件夹。",
+                "action": "重新发送邮件"
+            },
+            "verified": {
+                "title": "邮箱验证成功！✅",
+                "description": "您的邮箱地址已通过验证。您现在可以完全访问所有功能。"
+            },
+            "oauthConnected": {
+                "title": "账户已连接到 GitHub",
+                "description": "您的账户已成功连接到 GitHub。"
+            }
+        },
+        "header": {
+            "welcome": "欢迎回来，{username}！",
+            "subtitle": "管理您的 AI 驱动目录并跟踪其性能",
+            "notifications": {
+                "title": "通知",
+                "empty": "没有新通知"
+            }
+        },
+        "directories": {
+            "title": "目录",
+            "subtitle": "管理和组织您的 AI 驱动目录",
+            "recent": "最近目录",
+            "viewAll": "查看全部 ({count})",
+            "search": "搜索目录...",
+            "create": "创建目录",
+            "showing": "显示 {current} / {total} 个目录",
+            "pagination": {
+                "previous": "上一页",
+                "next": "下一页"
+            },
+            "empty": {
+                "title": "还没有目录",
+                "description": "创建您的第一个 AI 驱动目录，开始组织和展示您的内容。",
+                "action": "创建您的第一个目录",
+                "notFound": {
+                    "title": "未找到目录",
+                    "withSearch": "尝试调整您的搜索词",
+                    "withoutSearch": "创建您的第一个 AI 驱动目录以开始"
+                }
+            }
+        },
+        "settings": {
+            "title": "设置",
+            "subtitle": "管理您的账户设置和偏好",
+            "tabs": {
+                "profile": "个人资料",
+                "security": "安全",
+                "apiTokens": "API 和令牌",
+                "oauth": "已连接账户",
+                "notifications": "通知",
+                "dangerZone": "危险区域"
+            },
+            "profile": {
+                "title": "个人资料设置",
+                "subtitle": "更新您的个人资料信息和头像",
+                "fields": {
+                    "name": "姓名",
+                    "username": "用户名",
+                    "email": "邮箱",
+                    "emailHelperText": "邮箱无法更改"
+                },
+                "placeholders": {
+                    "name": "输入您的姓名",
+                    "username": "输入您的用户名"
+                },
+                "actions": {
+                    "save": "保存更改"
+                },
+                "messages": {
+                    "success": "个人资料更新成功",
+                    "usernameRequired": "用户名是必需的",
+                    "error": "更新个人资料失败",
+                    "unexpectedError": "发生意外错误"
+                }
+            },
+            "security": {
+                "title": "安全设置",
+                "subtitle": "管理您的账户安全和认证",
+                "changePassword": {
+                    "title": "修改密码",
+                    "currentPassword": "当前密码",
+                    "newPassword": "新密码",
+                    "confirmPassword": "确认新密码",
+                    "showPasswords": "显示密码",
+                    "placeholders": {
+                        "current": "输入当前密码",
+                        "new": "输入新密码（至少 8 个字符）",
+                        "confirm": "确认新密码"
+                    },
+                    "actions": {
+                        "update": "更新密码"
+                    },
+                    "messages": {
+                        "success": "密码更新成功",
+                        "fillAllFields": "请填写所有密码字段",
+                        "minLength": "新密码必须至少 8 个字符",
+                        "mismatch": "新密码不匹配",
+                        "sameAsCurrent": "新密码必须与当前密码不同",
+                        "error": "更新密码失败",
+                        "unexpectedError": "发生意外错误"
+                    }
+                },
+                "twoFactor": {
+                    "title": "双因素认证",
+                    "subtitle": "为您的账户添加额外的安全层",
+                    "action": "即将推出"
+                },
+                "sessions": {
+                    "title": "活动会话",
+                    "subtitle": "管理您在不同设备上的活动会话",
+                    "action": "查看会话（即将推出）"
+                }
+            },
+            "oauth": {
+                "title": "已连接账户",
+                "subtitle": "连接您的外部账户以增强功能",
+                "github": {
+                    "name": "GitHub",
+                    "connected": "使用 GitHub 仓库创建和管理目录",
+                    "disconnected": "连接以从仓库创建目录",
+                    "scopes": "权限范围",
+                    "actions": {
+                        "connect": "连接",
+                        "disconnect": "断开连接",
+                        "confirmDisconnect": "您确定要断开 GitHub 账户连接吗？"
+                    },
+                    "messages": {
+                        "disconnected": "GitHub 账户已断开连接",
+                        "connectError": "连接 GitHub 失败",
+                        "disconnectError": "断开 GitHub 连接失败"
+                    }
+                }
+            }
+        },
+        "stats": {
+            "totalDirectories": "总目录数",
+            "totalItems": "总项目数",
+            "activeWebsites": "活跃网站",
+            "fromLastMonth": "较上月"
+        },
+        "directoryCard": {
+            "status": {
+                "active": "活跃",
+                "notStarted": "未开始",
+                "generating": "生成中",
+                "generated": "已生成",
+                "error": "错误",
+                "cancelled": "已取消",
+                "idle": "空闲"
+            },
+            "noDescription": "未提供描述",
+            "items": "{count} 个项目",
+            "views": "{count} 次查看",
+            "updated": "更新于 {date}",
+            "viewAction": "查看 →"
+        },
+        "directoryList": {
+            "title": "您的目录",
+            "createButton": "创建目录"
+        },
+        "directoryDetail": {
+            "failedToGenerateItems": "生成项目失败。请重试。",
+            "generationCompleted": "生成成功完成",
+            "generationCancelled": "生成已取消",
+            "status": {
+                "notStarted": "未开始",
+                "generating": "生成中",
+                "generated": "已生成",
+                "error": "错误",
+                "cancelled": "已取消"
+            },
+            "tabs": {
+                "overview": "概览",
+                "items": "项目",
+                "generator": "生成器",
+                "history": "历史",
+                "deploy": "部署",
+                "settings": "设置"
+            },
+            "statusCard": {
+                "notStarted": {
+                    "title": "生成未开始",
+                    "description": "开始为您的目录生成项目以填充内容。",
+                    "action": "开始生成"
+                },
+                "generating": {
+                    "title": "生成进行中",
+                    "description": "正在处理您的请求...",
+                    "processing": "处理中..."
+                },
+                "generated": {
+                    "title": "生成完成",
+                    "description": "您的目录已成功填充项目。",
+                    "viewItems": "查看项目",
+                    "regenerate": "重新生成"
+                },
+                "error": {
+                    "title": "生成失败",
+                    "description": "生成过程中发生错误。",
+                    "retry": "重试生成"
+                },
+                "cancelled": {
+                    "title": "生成已取消",
+                    "description": "之前的生成在完成前被停止。",
+                    "restart": "重新开始生成"
+                }
+            },
+            "stats": {
+                "totalItems": "总项目数",
+                "categories": "分类",
+                "generationStatus": "生成状态",
+                "daysActive": "活跃天数"
+            },
+            "history": {
+                "title": "生成历史",
+                "subtitle": "跟踪过去的生成运行、创建的项目和执行详情。",
+                "error": "加载更多条目失败",
+                "empty": {
+                    "title": "还没有历史记录",
+                    "description": "请求生成以在此处查看进度和结果。"
+                },
+                "status": {
+                    "generating": "进行中",
+                    "generated": "已完成",
+                    "error": "失败",
+                    "cancelled": "已取消"
+                },
+                "table": {
+                    "run": "运行",
+                    "status": "状态",
+                    "newItems": "新项目",
+                    "updatedItems": "已更新",
+                    "totalItems": "总计",
+                    "duration": "持续时间",
+                    "startedAt": "开始时间"
+                },
+                "loadMore": "加载更多",
+                "noMore": "没有更多记录",
+                "unknown": "未知"
+            },
+            "info": {
+                "title": "目录信息",
+                "slug": "标识符",
+                "repositories": "仓库",
+                "dataRepo": "数据仓库",
+                "websiteRepo": "网站仓库",
+                "mainRepo": "主仓库",
+                "repoProvider": "仓库提供商",
+                "organization": "组织",
+                "created": "创建时间",
+                "lastUpdated": "最后更新",
+                "readmeHeader": "README 头部",
+                "readmeFooter": "README 底部",
+                "custom": "自定义",
+                "customOverwrite": "自定义（覆盖）",
+                "yes": "是",
+                "no": "否"
+            },
+            "config": {
+                "title": "配置详情",
+                "initialPrompt": "初始生成提示",
+                "companyDetails": "公司信息",
+                "companyName": "公司名称",
+                "companyWebsite": "网站",
+                "generationSettings": "生成设置",
+                "generationMethod": "生成方法",
+                "autoApproval": "自动批准",
+                "pagingMode": "分页模式",
+                "contentTable": "内容表格",
+                "enabled": "已启用",
+                "disabled": "已禁用",
+                "pullRequestUpdate": "拉取请求详情",
+                "branch": "分支",
+                "prTitle": "PR 标题",
+                "mainRepository": "主仓库",
+                "dataRepository": "数据仓库"
+            },
+            "activity": {
+                "title": "最近活动",
+                "noActivity": "还没有活动",
+                "created": "目录已创建",
+                "directoryCreated": "目录已成功创建",
+                "justNow": "刚刚"
+            },
+            "items": {
+                "title": "目录项目",
+                "subtitle": "管理和组织您目录中的项目",
+                "noItemsTitle": "还没有项目",
+                "noItemsDescription": "您的目录还没有任何项目。生成项目以填充您目录的内容。",
+                "generateItems": "生成项目",
+                "searchPlaceholder": "搜索项目...",
+                "allCategories": "所有分类",
+                "showing": "显示 {current} / {total} 个项目",
+                "noMatch": "没有项目匹配您的搜索条件",
+                "source": "来源",
+                "addItem": "添加项目",
+                "delete": "删除",
+                "deleteWithPR": "通过拉取请求删除",
+                "deleteConfirm": "您确定要删除 \"{name}\" 吗？",
+                "deleteSuccess": "项目删除成功",
+                "deleteFailed": "删除项目失败",
+                "deleteError": "删除项目时发生错误",
+                "loadingMore": "加载更多... ({current} / {total})",
+                "addModal": {
+                    "title": "添加新项目",
+                    "sourceUrl": "来源 URL",
+                    "sourceUrlPlaceholder": "https://example.com/product",
+                    "sourceUrlHelp": "点击 '提取' 以自动从 URL 获取项目详情",
+                    "extract": "提取",
+                    "extractSuccess": "项目详情提取成功",
+                    "extractFailed": "提取项目详情失败",
+                    "extractError": "提取详情时发生错误",
+                    "name": "名称",
+                    "namePlaceholder": "输入项目名称",
+                    "description": "描述",
+                    "descriptionPlaceholder": "输入项目的简要描述",
+                    "category": "分类",
+                    "tags": "标签",
+                    "tagPlaceholder": "添加标签并按 Enter",
+                    "slug": "标识符（可选）",
+                    "slugPlaceholder": "custom-item-slug",
+                    "slugHelp": "URL 友好的标识符。如果留空将自动生成",
+                    "featured": "精选项目",
+                    "featuredHelp": "将此项目标记为目录中的精选项目",
+                    "updateWithPR": "创建拉取请求",
+                    "updateWithPRHelp": "以拉取请求方式提交更改，而不是直接提交",
+                    "cancel": "取消",
+                    "adding": "添加中...",
+                    "addItem": "添加项目",
+                    "success": "项目添加成功",
+                    "successDescription": "项目已添加到您的目录",
+                    "failed": "添加项目失败",
+                    "error": "添加项目时发生错误",
+                    "errors": {
+                        "urlRequired": "提取需要来源 URL",
+                        "invalidUrl": "请输入包含 http:// 或 https:// 的有效 URL",
+                        "requiredFields": "请填写所有必填字段"
+                    }
+                }
+            },
+            "generator": {
+                "regenerationWarning": "重新生成警告",
+                "regenerationWarningDescription": "此目录已生成。开始新的生成将替换现有项目。",
+                "requiredInfo": "必需信息",
+                "updateConfiguration": "更新配置",
+                "promptRequired": "提示是必需的",
+                "operationStartedSuccessfully": "操作成功启动",
+                "failedToStartOperation": "启动操作失败",
+                "directoryName": "目录名称",
+                "generationPrompt": "生成提示",
+                "recommended": "推荐",
+                "promptPlaceholder": "描述应该为此目录生成哪些项目...",
+                "promptHelperText": "请具体说明您要生成的内容类型",
+                "repositoryDescription": "仓库描述",
+                "repositoryPlaceholder": "仓库的简要描述（可选）",
+                "startGeneration": "开始生成",
+                "regenerateItems": "重新生成项目",
+                "updateItems": "更新项目",
+                "recreateDirectory": "重新创建目录",
+                "showAdvancedOptions": "显示高级选项",
+                "hideAdvancedOptions": "隐藏高级选项",
+                "cancel": "取消",
+                "companyInformation": "公司信息",
+                "companyInfoDescription": "用于品牌内容的可选公司详情",
+                "companyName": "公司名称",
+                "companyNamePlaceholder": "输入公司名称",
+                "companyWebsite": "公司网站",
+                "companyWebsitePlaceholder": "https://example.com",
+                "categoriesKeywords": "分类和关键词",
+                "categoriesDescription": "定义用于内容组织的分类和关键词",
+                "initialCategories": "初始分类",
+                "priorityCategories": "优先分类",
+                "targetKeywords": "目标关键词",
+                "addCategoryPlaceholder": "添加分类",
+                "addPriorityCategoryPlaceholder": "添加优先分类",
+                "addKeywordPlaceholder": "添加关键词",
+                "add": "添加",
+                "sourceUrls": "来源 URL",
+                "sourceUrlsDescription": "添加要从中提取内容的特定 URL",
+                "sourceUrlPlaceholder": "https://example.com/page",
+                "addUrl": "添加 URL",
+                "noSourceUrlsMessage": "未添加来源 URL。生成器将使用搜索来查找内容。",
+                "advancedConfig": "高级配置",
+                "advancedConfigDescription": "微调生成参数和行为",
+                "generationMethod": "生成方法",
+                "methodCreateUpdate": "创建或更新",
+                "methodRecreate": "重新创建（替换全部）",
+                "updateWithPullRequest": "通过拉取请求更新",
+                "updateWithPullRequestDescription": "创建拉取请求而不是直接提交",
+                "enableBadgeEvaluation": "启用徽章评估",
+                "enableBadgeEvaluationDescription": "评估并为项目添加质量徽章",
+                "websiteRepositoryCreationMethod": "网站仓库创建方法",
+                "methodDuplicate": "复制",
+                "methodFork": "分叉",
+                "directoryNamePlaceholder": "输入目录名称",
+                "methodCreateFromTemplate": "从模板创建",
+                "aiProcessingConfiguration": "AI 处理配置",
+                "maxSearchQueries": "最大搜索查询数",
+                "resultsPerQuery": "每次查询结果数",
+                "maxPagesToProcess": "最大处理页面数",
+                "relevanceThreshold": "相关性阈值",
+                "aiFirstGeneration": "AI 优先生成",
+                "aiFirstGenerationDescription": "在网页搜索之前启用 AI 生成初始项目。",
+                "contentFiltering": "内容过滤",
+                "contentFilteringDescription": "启用内容质量过滤"
+            },
+            "progress": {
+                "title": "生成进行中",
+                "processingRequest": "正在处理您的请求...",
+                "steps": {
+                    "promptComparison": "比较提示",
+                    "promptProcessing": "处理您的提示",
+                    "aiFirstItemsGeneration": "生成初始 AI 项目",
+                    "searchQueriesGeneration": "创建搜索查询",
+                    "webSearch": "搜索网络",
+                    "contentRetrieval": "检索内容",
+                    "contentFiltering": "过滤相关内容",
+                    "itemsExtraction": "从内容中提取项目",
+                    "deduplicationDataAggregation": "去重并聚合数据",
+                    "categoriesTagsProcessing": "处理分类和标签",
+                    "sourcesValidation": "验证来源",
+                    "badgesProcessing": "处理质量徽章",
+                    "itemsProcessing": "完成项目",
+                    "processing": "处理中..."
+                },
+                "progress": "进度",
+                "closeNote": "这可能需要几分钟。您可以关闭此页面稍后再回来。"
+            },
+            "settings": {
+                "generalSettings": "常规设置",
+                "generalTitle": "常规设置",
+                "directoryName": "目录名称",
+                "description": "描述",
+                "organizationRepository": "组织仓库",
+                "organizationHelp": "在组织下创建仓库，而不是您的个人账户",
+                "organizationName": "组织名称",
+                "organizationNamePlaceholder": "输入组织名称",
+                "readmeConfiguration": "README 配置",
+                "readmeTitle": "README 配置",
+                "customHeader": "自定义头部",
+                "customHeaderPlaceholder": "在 README 头部添加自定义内容",
+                "overwriteDefaultHeader": "覆盖默认头部",
+                "customFooter": "自定义底部",
+                "cantDeleteWhileGenerating": "在生成项目时无法删除目录。",
+                "customFooterPlaceholder": "在 README 底部添加自定义内容",
+                "overwriteDefaultFooter": "覆盖默认底部",
+                "dangerZone": "危险区域",
+                "dangerTitle": "危险区域",
+                "deleteWarning": "一旦删除目录，将无法恢复。请确认。",
+                "dangerDescription": "一旦删除目录，将无法恢复。请确认。",
+                "deleteOptions": "选择要删除的内容：",
+                "deleteDataRepository": "删除数据仓库",
+                "deleteDataRepositoryDescription": "从 GitHub 删除 JSON 数据仓库",
+                "deleteMarkdownRepository": "删除 Markdown 仓库",
+                "deleteMarkdownRepositoryDescription": "删除包含 README 的 Markdown 仓库",
+                "deleteWebsiteRepository": "删除网站仓库",
+                "deleteWebsiteRepositoryDescription": "删除已部署的网站仓库",
+                "deleteConfirm": "您确定吗？",
+                "deleteConfirmDetail": "此操作无法撤销。目录和选定的仓库将被永久删除。",
+                "confirmDirectoryName": "输入目录名称以确认",
+                "confirmDirectoryNameDescription": "输入 \"{name}\" 以确认删除",
+                "deleteNameMismatch": "目录名称不匹配",
+                "deleteButton": "删除目录",
+                "deleteConfirmButton": "是的，删除",
+                "deleteSuccess": "目录删除成功",
+                "deleteFailed": "删除目录失败",
+                "yesDelete": "是的，删除",
+                "cancel": "取消",
+                "saveChanges": "保存更改",
+                "updateReadme": "更新 README",
+                "updateSuccess": "设置更新成功",
+                "updateFailed": "更新设置失败"
+            },
+            "deploy": {
+                "noTokenAlert": {
+                    "title": "需要 Vercel 令牌",
+                    "description": "要将您的目录部署到 Vercel，您需要在账户设置中配置 Vercel API 令牌。",
+                    "configureButton": "前往 API 令牌设置",
+                    "getTokenButton": "获取 Vercel 令牌",
+                    "howTo": {
+                        "title": "如何配置您的 Vercel 令牌：",
+                        "step1": "点击 '获取 Vercel 令牌' 打开 Vercel 仪表板",
+                        "step2": "创建具有部署权限的新令牌",
+                        "step3": "复制生成的令牌",
+                        "step4": "前往 API 令牌设置，并将您的令牌粘贴到 Vercel 部分"
+                    }
+                },
+                "form": {
+                    "deployToVercel": {
+                        "title": "部署到 Vercel",
+                        "description": "在 Vercel 上部署您的目录网站仓库。",
+                        "deployButton": "立即部署",
+                        "deployingButton": "部署中...",
+                        "deployingStateButton": "部署中 ({state})...",
+                        "successMessage": "您的网站已成功部署！",
+                        "teamSelection": {
+                            "title": "选择 Vercel 团队",
+                            "description": "选择要部署此目录的 Vercel 团队。",
+                            "label": "团队",
+                            "placeholder": "选择一个团队",
+                            "confirmButton": "部署到团队",
+                            "cancelButton": "取消"
+                        }
+                    },
+                    "updateRepository": {
+                        "title": "更新网站仓库",
+                        "description": "将模板的最新更改同步到",
+                        "websiteRepository": "网站仓库",
+                        "updateButton": "更新仓库",
+                        "updatingButton": "更新中..."
+                    },
+                    "messages": {
+                        "deploySuccess": "部署成功启动",
+                        "deployPending": "部署已排队，将很快开始",
+                        "deployFailed": "部署到 Vercel 失败",
+                        "deployError": "部署过程中发生错误",
+                        "updateSuccess": "仓库更新成功",
+                        "updateFailed": "更新仓库失败",
+                        "updateError": "更新仓库时发生错误"
+                    },
+                    "info": {
+                        "deployInfo": "部署通常需要 1-3 分钟。完成后您将收到一个 URL。",
+                        "updateInfo": "更新会将您的目录内容同步到网站仓库，以便下次部署。"
+                    }
+                }
+            }
+        },
+        "directoryCreation": {
+            "title": "创建新目录",
+            "subtitle": "选择您想要创建目录的方式",
+            "backToOptions": "返回选项",
+            "organizationSelector": {
+                "label": "仓库所有者",
+                "loading": "加载组织中...",
+                "personal": "个人账户",
+                "personalAccount": "仓库将在您的个人账户下创建",
+                "organizations": "组织",
+                "personalHelp": "仓库将在您的个人 GitHub 账户下创建",
+                "organizationHelp": "仓库将在 {org} 组织下创建"
+            },
+            "ai": {
+                "title": "使用 AI 创建",
+                "subtitle": "用自然语言描述您的目录想法，让 AI 处理设置",
+                "getStarted": "开始",
+                "formTitle": "使用 AI 创建目录",
+                "formSubtitle": "描述您的目录想法，让 AI 处理设置和初始内容生成",
+                "directoryNameLabel": "目录名称",
+                "directoryNamePlaceholder": "例如：Awesome AI Tools",
+                "directoryNameHelp": "如果留空，AI 将建议一个名称",
+                "promptLabel": "描述您的目录",
+                "githubRequired": "请先连接您的 GitHub 账户。",
+                "promptPlaceholder": "描述您想要创建什么样的目录，它应该包含哪些项目，以及任何特定要求...",
+                "inspirationText": "需要灵感？试试这些：",
+                "examplePrompts": {
+                    "0": {
+                        "name": "AI 开发者工具",
+                        "prompt": "创建一个面向开发者的最佳 AI 工具目录"
+                    },
+                    "1": {
+                        "name": "React 组件中心",
+                        "prompt": "构建一个精选的开源 React 组件列表"
+                    },
+                    "2": {
+                        "name": "远程团队工具",
+                        "prompt": "生成一个面向远程团队的生产力应用目录"
+                    },
+                    "3": {
+                        "name": "可持续时尚",
+                        "prompt": "制作一个可持续时尚品牌集合"
+                    }
+                },
+                "featuresTitle": "AI 将为您做什么：",
+                "features": {
+                    "0": "生成合适的名称和描述",
+                    "1": "创建初始分类和结构",
+                    "2": "自动查找并添加相关项目",
+                    "3": "设置带有适当文档的 GitHub 仓库"
+                },
+                "generateButton": "使用 AI 生成",
+                "generatingButton": "生成目录中...",
+                "cancelButton": "取消",
+                "noteTitle": "注意：",
+                "noteText": "AI 生成通常需要 2-5 分钟，具体取决于您请求的复杂性。目录准备好时您会收到通知。",
+                "errors": {
+                    "promptRequired": "请描述您想要创建什么样的目录",
+                    "nameRequired": "目录名称是必需的",
+                    "slugRequired": "目录标识符是必需的",
+                    "descriptionRequired": "目录描述是必需的"
+                },
+                "success": {
+                    "started": "目录创建已启动！",
+                    "generating": "AI 正在生成内容。这可能需要几分钟...",
+                    "created": "目录创建成功！"
+                },
+                "advancedSettings": "高级设置",
+                "advancedSubtitle": "配置组织和仓库设置",
+                "organizationLabel": "组织仓库",
+                "organizationHelp": "在组织下创建仓库，而不是您的个人账户",
+                "organizationNameLabel": "组织名称",
+                "organizationNamePlaceholder": "输入组织名称"
+            },
+            "manual": {
+                "title": "手动创建",
+                "subtitle": "完全控制每个设置和选项来配置您的目录",
+                "configureNow": "立即配置",
+                "formTitle": "手动创建目录",
+                "formSubtitle": "完全控制每个设置来配置您的目录",
+                "basicInfo": "基本信息",
+                "nameLabel": "目录名称 *",
+                "namePlaceholder": "例如：Awesome AI Tools",
+                "slugLabel": "目录标识符 *",
+                "slugPlaceholder": "awesome-ai-tools",
+                "githubRequired": "请先连接您的 GitHub 账户。",
+                "slugHelp": "URL 友好的标识符（仅小写字母、数字和连字符）",
+                "descriptionLabel": "描述 *",
+                "descriptionPlaceholder": "面向开发者的最佳 AI 工具和资源精选列表",
+                "advancedSettings": "高级设置",
+                "advancedSubtitle": "组织、自定义头部等",
+                "organizationLabel": "在组织下创建",
+                "organizationHelp": "在 GitHub 组织下创建此目录，而不是您的个人账户",
+                "organizationNameLabel": "组织名称",
+                "organizationNamePlaceholder": "my-organization",
+                "headerLabel": "自定义 README 头部",
+                "headerPlaceholder": "在 README 文件顶部添加自定义内容",
+                "headerOverwrite": "完全替换默认头部",
+                "footerLabel": "自定义 README 底部",
+                "footerPlaceholder": "在 README 文件底部添加自定义内容",
+                "footerOverwrite": "完全替换默认底部",
+                "createButton": "创建目录",
+                "creatingButton": "创建目录中...",
+                "cancelButton": "取消",
+                "nameRequired": "目录名称是必需的",
+                "slugRequired": "目录标识符是必需的",
+                "descriptionRequired": "目录描述是必需的",
+                "success": {
+                    "created": "目录创建成功！"
+                }
+            }
+        },
+        "github": {
+            "connection": {
+                "alert": {
+                    "title": "GitHub 未连接",
+                    "subtitle": "连接您的 GitHub 账户以创建和管理目录",
+                    "connectButton": "连接 GitHub",
+                    "connectingButton": "连接中..."
+                },
+                "status": {
+                    "title": "GitHub 状态",
+                    "connected": "已连接",
+                    "notConnected": "未连接",
+                    "connectedDescription": "您的目录将作为 GitHub 仓库存储在您的账户中。",
+                    "notConnectedDescription": "连接您的 GitHub 账户以创建和管理目录。",
+                    "connectedAccount": "已连接账户：",
+                    "requiredNote": "创建目录需要",
+                    "connectButton": "连接 GitHub",
+                    "connectingButton": "连接中...",
+                    "failedToConnect": "连接 GitHub 失败"
+                }
+            }
+        },
+        "apiTokens": {
+            "title": "API 和令牌",
+            "subtitle": "管理您的 API 密钥和第三方集成",
+            "vercel": {
+                "title": "Vercel 集成",
+                "subtitle": "连接您的 Vercel 账户以将目录部署为网站",
+                "connected": "已连接",
+                "notConnected": "未连接",
+                "connectedMessage": "您的 Vercel 账户已连接。您现在可以将目录部署到 Vercel。",
+                "disconnect": "断开 Vercel",
+                "disconnecting": "移除中...",
+                "apiTokenLabel": "Vercel API 令牌",
+                "placeholder": "vc_...",
+                "showToken": "显示",
+                "hideToken": "隐藏",
+                "getTokenHelp": "您可以从以下位置获取 API 令牌",
+                "vercelDashboard": "Vercel 仪表板",
+                "save": "保存令牌",
+                "saving": "保存中...",
+                "messages": {
+                    "tokenRequired": "请输入有效的 Vercel 令牌",
+                    "saveSuccess": "Vercel 令牌保存成功",
+                    "saveFailed": "保存 Vercel 令牌失败",
+                    "removeSuccess": "Vercel 令牌移除成功",
+                    "removeFailed": "移除 Vercel 令牌失败",
+                    "unexpectedError": "发生意外错误"
+                }
+            },
+            "apiKeys": {
+                "title": "API 密钥",
+                "subtitle": "生成和管理用于程序化访问的 API 密钥",
+                "generate": "生成 API 密钥（即将推出）"
+            },
+            "webhooks": {
+                "title": "Webhooks",
+                "subtitle": "配置 webhooks 以接收实时更新",
+                "configure": "配置 Webhooks（即将推出）"
+            }
+        },
+        "notifications": {
+            "title": "通知偏好",
+            "subtitle": "选择您希望如何接收重要更新的通知",
+            "email": {
+                "title": "邮件通知",
+                "directoryUpdates": {
+                    "label": "目录更新",
+                    "description": "接收关于您目录的重要更新通知"
+                },
+                "newItems": {
+                    "label": "新项目",
+                    "description": "当新项目添加到您的目录时接收通知"
+                },
+                "weeklyDigest": {
+                    "label": "每周摘要",
+                    "description": "接收您目录活动的每周摘要"
+                },
+                "marketing": {
+                    "label": "营销和促销",
+                    "description": "接收关于新功能和优惠的更新"
+                }
+            },
+            "app": {
+                "title": "应用内通知",
+                "newItems": {
+                    "label": "新项目",
+                    "description": "显示新目录项目的通知"
+                },
+                "comments": {
+                    "label": "评论",
+                    "description": "接收关于您目录评论的通知"
+                },
+                "mentions": {
+                    "label": "提及",
+                    "description": "当有人提及您时接收通知"
+                },
+                "systemUpdates": {
+                    "label": "系统更新",
+                    "description": "重要的系统通知和维护提醒"
+                }
+            },
+            "actions": {
+                "save": "保存偏好",
+                "saving": "保存中..."
+            },
+            "messages": {
+                "success": "通知偏好已更新",
+                "error": "更新偏好失败",
+                "unexpectedError": "发生意外错误"
+            }
+        },
+        "sidebar": {
+            "menu": "菜单",
+            "aiChat": "AI 聊天",
+            "newDirectory": "新建目录",
+            "navigation": {
+                "dashboard": "仪表板",
+                "directories": "目录",
+                "settings": "设置"
+            },
+            "signOut": "退出登录",
+            "signingOut": "退出中..."
+        },
+        "dangerZone": {
+            "title": "危险区域",
+            "subtitle": "不可逆和破坏性操作",
+            "export": {
+                "title": "导出您的数据",
+                "subtitle": "下载您的所有目录、项目和设置",
+                "action": "导出数据（即将推出）"
+            },
+            "delete": {
+                "title": "删除账户",
+                "subtitle": "永久删除您的账户和所有关联数据。此操作无法撤销。",
+                "button": "删除我的账户",
+                "confirmTitle": "⚠️ 这将永久删除：",
+                "confirmItems": [
+                    "您的账户和个人资料",
+                    "您的所有目录",
+                    "所有目录项目和数据",
+                    "API 密钥和集成",
+                    "所有关联网站"
+                ],
+                "confirmLabel": "输入您的邮箱 {email} 以确认",
+                "confirmPlaceholder": "输入您的邮箱",
+                "confirmButton": "是的，删除我的账户",
+                "deleting": "删除中...",
+                "cancel": "取消"
+            },
+            "messages": {
+                "confirmEmail": "请正确输入您的邮箱以确认",
+                "deleteSuccess": "账户删除成功",
+                "deleteFailed": "删除账户失败",
+                "unexpectedError": "发生意外错误"
+            }
+        },
+        "aiChat": {
+            "title": "AI 助手",
+            "subtitle": "使用自然语言创建目录",
+            "newChat": "新聊天",
+            "loadingConversation": "加载对话中…",
+            "inputPlaceholder": "描述您想要创建的目录...",
+            "sendButton": "发送"
+        }
+    },
+    "layout": {
+        "auth": {
+            "backToHome": "返回首页",
+            "feature": {
+                "title": "使用 AI 构建目录",
+                "subtitle": "使用自然语言在几分钟内创建美观、可搜索的目录。无需编码。",
+                "benefits": {
+                    "ai": {
+                        "title": "AI 驱动创建",
+                        "description": "描述您想要的，让 AI 来完成工作"
+                    },
+                    "templates": {
+                        "title": "专业模板",
+                        "description": "从美观、可自定义的设计开始"
+                    },
+                    "management": {
+                        "title": "轻松管理",
+                        "description": "轻松更新和组织您的内容"
+                    }
+                }
+            }
+        }
+    },
+    "errors": {
+        "global": {
+            "title": "出现了问题！",
+            "tryAgain": "重试"
+        }
+    },
+    "metadata": {
+        "title": "Ever Works - 目录构建器",
+        "description": "用于构建和管理目录的 SaaS 平台"
+    },
+    "api": {
+        "errors": {
+            "unauthorized": "您无权执行此操作",
+            "unauthorizedLogin": "未授权：请重新登录。",
+            "forbidden": "禁止：您没有执行此操作的权限。",
+            "serverError": "服务器错误：{message}",
+            "unexpected": "发生意外服务器错误。",
+            "apiError": "API 错误：{status} {statusText}",
+            "loginFailed": "登录失败",
+            "registerFailed": "注册失败",
+            "unsupportedProvider": "不支持的提供商",
+            "providerConnectFailed": "连接提供商失败",
+            "forgotPasswordFailed": "发送密码重置邮件失败",
+            "resetPasswordFailed": "重置密码失败"
+        }
+    },
+    "actions": {
+        "directories": {
+            "slug": {
+                "required": "标识符是必需的",
+                "format": "标识符只能包含小写字母、数字和连字符"
+            },
+            "name": {
+                "required": "名称是必需的",
+                "maxLength": "名称必须少于 100 个字符"
+            },
+            "description": {
+                "required": "描述是必需的",
+                "maxLength": "描述必须少于 500 个字符"
+            },
+            "prompt": {
+                "minLength": "提示必须至少 10 个字符",
+                "maxLength": "提示必须少于 1000 个字符"
+            },
+            "oauthRequired": "需要 OAuth 连接。请先连接您的 {provider} 账户。",
+            "githubRequired": "需要 GitHub 连接。请先连接您的 GitHub 账户。",
+            "createSuccess": "目录创建成功！",
+            "createFailed": "创建目录失败",
+            "updateSuccess": "目录更新成功！",
+            "updateFailed": "更新目录失败",
+            "invalidGeneratedData": "生成有效目录数据失败",
+            "aiGenerationStarted": "目录创建已启动！AI 正在生成内容...",
+            "invalidId": "无效的目录 ID",
+            "deleteSuccess": "目录删除成功",
+            "deleteFailed": "删除目录失败",
+            "fetchFailed": "获取目录失败",
+            "organization": {
+                "requiredWhenOwnerProvided": "提供所有者时必须启用组织"
+            }
+        },
+        "generator": {
+            "promptRequired": "提示是必需的",
+            "nameRequired": "名称是必需的",
+            "generationStartedSuccessfully": "生成成功启动",
+            "updateStartedSuccessfully": "更新成功启动",
+            "failedToGenerateItems": "生成项目失败",
+            "failedToUpdateItems": "更新项目失败",
+            "markdownRegeneratedSuccessfully": "Markdown 重新生成成功",
+            "failedToRegenerateMarkdown": "重新生成 Markdown 失败",
+            "notAuthorizedToAccessOrganization": "您无权访问此组织。请联系所有者 ({owner}) 寻求帮助。"
+        },
+        "settings": {
+            "profile": {
+                "usernameRequired": "用户名是必需的",
+                "usernameMaxLength": "用户名必须少于 50 个字符",
+                "usernameFormat": "用户名只能包含字母、数字、破折号和下划线",
+                "updateFailed": "更新个人资料失败",
+                "notAuthenticated": "未认证"
+            },
+            "password": {
+                "currentRequired": "当前密码是必需的",
+                "newMinLength": "密码必须至少 8 个字符",
+                "newMaxLength": "密码必须少于 100 个字符",
+                "updateFailed": "更新密码失败",
+                "updateSuccess": "密码更新成功",
+                "notAuthenticated": "未认证"
+            },
+            "vercel": {
+                "notAuthenticated": "未认证",
+                "tokenRequired": "令牌是必需的",
+                "invalidFormat": "无效的 Vercel 令牌格式",
+                "saveFailed": "保存 Vercel 令牌失败",
+                "saveSuccess": "Vercel 令牌保存成功",
+                "validationFailed": "提供的 Vercel 令牌无效。请仔细检查并重试。",
+                "removeFailed": "移除 Vercel 令牌失败",
+                "removeSuccess": "Vercel 令牌移除成功"
+            },
+            "github": {
+                "notAuthenticated": "未认证",
+                "disconnectFailed": "断开 GitHub 连接失败",
+                "disconnectSuccess": "GitHub 账户断开连接成功"
+            },
+            "notifications": {
+                "notAuthenticated": "未认证",
+                "updateFailed": "更新偏好失败",
+                "updateSuccess": "通知偏好更新成功"
+            },
+            "danger": {
+                "notAuthenticated": "未认证",
+                "deleteFailed": "删除账户失败",
+                "deleteDisabled": "在演示中禁用账户删除"
+            }
+        },
+        "deploy": {
+            "deployVercelFailed": "部署到 Vercel 失败",
+            "updateRepositoryFailed": "更新仓库失败"
+        }
+    },
+    "validation": {
+        "auth": {
+            "invalidCredentials": "无效的邮箱或密码",
+            "account": {
+                "suspended": "账户已被暂停"
+            },
+            "email": {
+                "required": "邮箱不能为空",
+                "invalid": "无效的邮箱",
+                "emailAlreadyRegistered": "邮箱已被注册"
+            },
+            "password": {
+                "required": "密码不能为空",
+                "minLength": "密码必须至少 {length} 个字符",
+                "lowercase": "密码必须包含至少一个小写字母",
+                "numberOrSpecial": "密码必须包含至少一个数字或特殊字符",
+                "cannotStartWith": "密码不能以点或换行符开头",
+                "digit": "密码必须包含至少一个数字"
+            },
+            "username": {
+                "minLength": "用户名必须包含至少 {length} 个字符"
+            }
+        }
+    }
+}

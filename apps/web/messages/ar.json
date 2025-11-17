@@ -1,0 +1,1177 @@
+{
+    "auth": {
+        "error": {
+            "title": "خطأ في المصادقة",
+            "subtitle": "واجهنا مشكلة في مصادقتك",
+            "errorOccurred": "حدث خطأ",
+            "somethingWentWrong": "حدث خطأ ما",
+            "generic": "حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى لاحقاً.",
+            "invalidCredentials": "البريد الإلكتروني أو كلمة المرور التي أدخلتها غير صحيحة.",
+            "emailNotVerified": "يرجى التحقق من عنوان بريدك الإلكتروني قبل تسجيل الدخول.",
+            "accountLocked": "تم قفل حسابك لأسباب أمنية.",
+            "sessionExpired": "انتهت صلاحية جلستك. يرجى تسجيل الدخول مرة أخرى.",
+            "networkError": "تعذر الاتصال. يرجى التحقق من اتصالك بالإنترنت.",
+            "oauth": {
+                "missingCode": "رمز التفويض مفقود. يرجى محاولة تسجيل الدخول مرة أخرى.",
+                "invalidState": "حالة التفويض غير صالحة. يرجى محاولة تسجيل الدخول مرة أخرى.",
+                "unsupportedProvider": "مزود المصادقة هذا غير مدعوم.",
+                "callbackFailed": "فشل إكمال المصادقة. يرجى المحاولة مرة أخرى."
+            },
+            "resetPassword": {
+                "missingToken": "رابط إعادة تعيين كلمة المرور غير صالح. رمز التحقق مفقود.",
+                "invalidToken": "رابط إعادة تعيين كلمة المرور غير صالح أو تم العبث به.",
+                "expiredToken": "انتهت صلاحية رابط إعادة تعيين كلمة المرور. يرجى طلب رابط جديد.",
+                "failed": "فشل إعادة تعيين كلمة المرور. يرجى المحاولة مرة أخرى أو طلب رابط إعادة تعيين جديد."
+            },
+            "verifyEmail": {
+                "missingToken": "رابط التحقق من البريد الإلكتروني غير صالح. رمز التحقق مفقود.",
+                "invalidToken": "رابط التحقق من البريد الإلكتروني غير صالح أو تم استخدامه بالفعل.",
+                "expiredToken": "انتهت صلاحية رابط التحقق من البريد الإلكتروني. يرجى طلب رابط جديد.",
+                "failed": "فشل التحقق من البريد الإلكتروني. يرجى المحاولة مرة أخرى أو طلب رابط تحقق جديد."
+            },
+            "authorize": {
+                "invalidRedirectUrl": "عنوان URL لإعادة التوجيه غير صالح أو غير مسموح به. يرجى الاتصال بالدعم إذا كنت تعتقد أن هذا خطأ."
+            },
+            "actions": {
+                "backToLogin": "العودة إلى تسجيل الدخول",
+                "tryRegister": "حاول التسجيل",
+                "resendVerification": "إعادة إرسال بريد التحقق",
+                "contactSupport": "اتصل بالدعم",
+                "requestNewReset": "طلب رابط إعادة تعيين جديد"
+            },
+            "helpText": "إذا استمرت المشاكل، يرجى التحقق من موارد المساعدة أدناه.",
+            "links": {
+                "help": "مركز المساعدة",
+                "systemStatus": "حالة النظام"
+            }
+        },
+        "login": {
+            "title": "مرحباً بعودتك",
+            "subtitle": "سجل الدخول إلى حسابك للمتابعة",
+            "form": {
+                "email": {
+                    "label": "عنوان البريد الإلكتروني",
+                    "placeholder": "you@example.com"
+                },
+                "password": {
+                    "label": "كلمة المرور",
+                    "placeholder": "أدخل كلمة المرور"
+                },
+                "forgotPassword": "نسيت كلمة المرور؟",
+                "rememberMe": "تذكرني لمدة 30 يوماً",
+                "submit": "تسجيل الدخول",
+                "submitting": "جارٍ تسجيل الدخول..."
+            },
+            "socialLogin": {
+                "divider": "أو تابع مع",
+                "google": "Google",
+                "github": "GitHub"
+            },
+            "signUp": {
+                "text": "ليس لديك حساب؟",
+                "link": "سجل الآن"
+            },
+            "errors": {
+                "invalidCredentials": "البريد الإلكتروني أو كلمة المرور غير صحيحة"
+            },
+            "passwordReset": {
+                "success": "تم إعادة تعيين كلمة المرور بنجاح!",
+                "canLogin": "يمكنك الآن تسجيل الدخول بكلمة المرور الجديدة."
+            }
+        },
+        "forgotPassword": {
+            "title": "نسيت كلمة المرور؟",
+            "subtitle": "لا تقلق، سنرسل لك تعليمات إعادة التعيين",
+            "successTitle": "تحقق من بريدك الإلكتروني",
+            "successSubtitle": "لقد أرسلنا لك تعليمات إعادة تعيين كلمة المرور",
+            "form": {
+                "email": {
+                    "label": "عنوان البريد الإلكتروني",
+                    "placeholder": "أدخل بريدك الإلكتروني"
+                },
+                "submit": "إرسال رابط الإعادة",
+                "submitting": "جارٍ الإرسال..."
+            },
+            "success": {
+                "title": "تم إرسال البريد الإلكتروني بنجاح",
+                "message": "لقد أرسلنا تعليمات إعادة تعيين كلمة المرور إلى {email}",
+                "checkSpam": "إذا لم تر البريد الإلكتروني، تحقق من مجلد الرسائل غير المرغوب فيها."
+            },
+            "errors": {
+                "failed": "فشل إرسال بريد إعادة التعيين. يرجى المحاولة مرة أخرى."
+            },
+            "backToLogin": "العودة إلى تسجيل الدخول",
+            "noAccount": {
+                "text": "ليس لديك حساب؟",
+                "link": "سجل الآن"
+            }
+        },
+        "resetPassword": {
+            "title": "إعادة تعيين كلمة المرور",
+            "subtitle": "أدخل كلمة المرور الجديدة أدناه",
+            "successTitle": "تم إعادة تعيين كلمة المرور بنجاح",
+            "successSubtitle": "تم تحديث كلمة المرور الخاصة بك",
+            "form": {
+                "password": {
+                    "label": "كلمة المرور الجديدة",
+                    "placeholder": "أدخل كلمة المرور الجديدة",
+                    "helperText": "يجب أن تكون 6 أحرف على الأقل مع حرف صغير ورقم/حرف خاص",
+                    "errors": {
+                        "minLength": "يجب أن تكون كلمة المرور 6 أحرف على الأقل",
+                        "lowercase": "يجب أن تحتوي كلمة المرور على حرف صغير واحد على الأقل",
+                        "numberOrSpecial": "يجب أن تحتوي كلمة المرور على رقم واحد أو حرف خاص على الأقل",
+                        "cannotStartWith": "لا يمكن أن تبدأ كلمة المرور بنقطة أو سطر جديد"
+                    }
+                },
+                "confirmPassword": {
+                    "label": "تأكيد كلمة المرور الجديدة",
+                    "placeholder": "أكد كلمة المرور الجديدة",
+                    "errors": {
+                        "noMatch": "كلمات المرور غير متطابقة"
+                    }
+                },
+                "submit": "إعادة تعيين كلمة المرور",
+                "submitting": "جارٍ إعادة التعيين..."
+            },
+            "success": {
+                "title": "تم إعادة تعيين كلمة المرور بنجاح",
+                "message": "تم تحديث كلمة المرور الخاصة بك بنجاح. يمكنك الآن تسجيل الدخول بكلمة المرور الجديدة.",
+                "loginButton": "الذهاب إلى تسجيل الدخول"
+            },
+            "errors": {
+                "failed": "فشل إعادة تعيين كلمة المرور. يرجى المحاولة مرة أخرى أو طلب رابط إعادة تعيين جديد.",
+                "noToken": "رابط إعادة التعيين غير صالح",
+                "invalidLink": "رابط إعادة التعيين غير صالح",
+                "missingTokenMessage": "رابط إعادة تعيين كلمة المرور غير صالح أو غير مكتمل. يرجى طلب إعادة تعيين كلمة مرور جديدة.",
+                "requestNewLink": "طلب رابط إعادة تعيين جديد"
+            },
+            "backToLogin": "العودة إلى تسجيل الدخول"
+        },
+        "register": {
+            "title": "إنشاء حسابك",
+            "subtitle": "ابدأ بناء أدلة رائعة اليوم",
+            "form": {
+                "name": {
+                    "label": "الاسم الكامل",
+                    "placeholder": "John Doe"
+                },
+                "email": {
+                    "label": "عنوان البريد الإلكتروني",
+                    "placeholder": "you@example.com"
+                },
+                "password": {
+                    "label": "كلمة المرور",
+                    "placeholder": "أنشئ كلمة مرور قوية",
+                    "hint": "يجب أن تكون 8 أحرف على الأقل"
+                },
+                "confirmPassword": {
+                    "label": "تأكيد كلمة المرور",
+                    "placeholder": "أكد كلمة المرور"
+                },
+                "terms": {
+                    "text": "أوافق على",
+                    "termsLink": "شروط الخدمة",
+                    "and": "و",
+                    "privacyLink": "سياسة الخصوصية"
+                },
+                "submit": "إنشاء حساب",
+                "submitting": "جارٍ إنشاء الحساب..."
+            },
+            "socialSignUp": {
+                "divider": "أو سجل مع",
+                "google": "Google",
+                "github": "GitHub"
+            },
+            "signIn": {
+                "text": "لديك حساب بالفعل؟",
+                "link": "تسجيل الدخول"
+            },
+            "errors": {
+                "passwordsDoNotMatch": "كلمات المرور غير متطابقة",
+                "passwordTooShort": "يجب أن تكون كلمة المرور 8 أحرف على الأقل",
+                "generic": "حدث خطأ. يرجى المحاولة مرة أخرى."
+            }
+        }
+    },
+    "dashboard": {
+        "title": "لوحة التحكم",
+        "toasts": {
+            "newUser": {
+                "title": "مرحباً بك في Ever Works! 🎉",
+                "description": "تم إنشاء حسابك بنجاح. يرجى التحقق من بريدك الإلكتروني للتحقق من حسابك."
+            },
+            "emailVerification": {
+                "title": "تحقق من بريدك الإلكتروني",
+                "description": "لقد أرسلنا رابط التحقق إلى عنوان بريدك الإلكتروني. يرجى التحقق من صندوق الوارد ومجلد الرسائل غير المرغوب فيها.",
+                "action": "إعادة إرسال البريد"
+            },
+            "verified": {
+                "title": "تم التحقق من البريد الإلكتروني بنجاح! ✅",
+                "description": "تم التحقق من عنوان بريدك الإلكتروني. لديك الآن وصول كامل لجميع الميزات."
+            },
+            "oauthConnected": {
+                "title": "تم ربط الحساب بـ GitHub",
+                "description": "تم ربط حسابك بـ GitHub بنجاح."
+            }
+        },
+        "header": {
+            "welcome": "مرحباً بعودتك، {username}!",
+            "subtitle": "إدارة أدلتك المدعومة بالذكاء الاصطناعي وتتبع أدائها",
+            "notifications": {
+                "title": "الإشعارات",
+                "empty": "لا توجد إشعارات جديدة"
+            }
+        },
+        "directories": {
+            "title": "الأدلة",
+            "subtitle": "إدارة وتنظيم أدلتك المدعومة بالذكاء الاصطناعي",
+            "recent": "الأدلة الأخيرة",
+            "viewAll": "عرض الكل ({count})",
+            "search": "البحث في الأدلة...",
+            "create": "إنشاء دليل",
+            "showing": "عرض {current} من {total} دليل",
+            "pagination": {
+                "previous": "السابق",
+                "next": "التالي"
+            },
+            "empty": {
+                "title": "لا توجد أدلة بعد",
+                "description": "أنشئ أول دليل مدعوم بالذكاء الاصطناعي لبدء تنظيم وعرض محتواك.",
+                "action": "إنشاء أول دليل لك",
+                "notFound": {
+                    "title": "لم يتم العثور على أدلة",
+                    "withSearch": "حاول تعديل مصطلحات البحث",
+                    "withoutSearch": "أنشئ أول دليل مدعوم بالذكاء الاصطناعي للبدء"
+                }
+            }
+        },
+        "settings": {
+            "title": "الإعدادات",
+            "subtitle": "إدارة إعدادات حسابك وتفضيلاتك",
+            "tabs": {
+                "profile": "الملف الشخصي",
+                "security": "الأمان",
+                "apiTokens": "واجهات برمجة التطبيقات والرموز",
+                "oauth": "الحسابات المتصلة",
+                "notifications": "الإشعارات",
+                "dangerZone": "منطقة الخطر"
+            },
+            "profile": {
+                "title": "إعدادات الملف الشخصي",
+                "subtitle": "تحديث معلومات ملفك الشخصي والصورة الرمزية",
+                "fields": {
+                    "name": "الاسم",
+                    "username": "اسم المستخدم",
+                    "email": "البريد الإلكتروني",
+                    "emailHelperText": "لا يمكن تغيير البريد الإلكتروني"
+                },
+                "placeholders": {
+                    "name": "أدخل اسمك",
+                    "username": "أدخل اسم المستخدم"
+                },
+                "actions": {
+                    "save": "حفظ التغييرات"
+                },
+                "messages": {
+                    "success": "تم تحديث الملف الشخصي بنجاح",
+                    "usernameRequired": "اسم المستخدم مطلوب",
+                    "error": "فشل تحديث الملف الشخصي",
+                    "unexpectedError": "حدث خطأ غير متوقع"
+                }
+            },
+            "security": {
+                "title": "إعدادات الأمان",
+                "subtitle": "إدارة أمان حسابك والمصادقة",
+                "changePassword": {
+                    "title": "تغيير كلمة المرور",
+                    "currentPassword": "كلمة المرور الحالية",
+                    "newPassword": "كلمة المرور الجديدة",
+                    "confirmPassword": "تأكيد كلمة المرور الجديدة",
+                    "showPasswords": "إظهار كلمات المرور",
+                    "placeholders": {
+                        "current": "أدخل كلمة المرور الحالية",
+                        "new": "أدخل كلمة المرور الجديدة (8 أحرف على الأقل)",
+                        "confirm": "أكد كلمة المرور الجديدة"
+                    },
+                    "actions": {
+                        "update": "تحديث كلمة المرور"
+                    },
+                    "messages": {
+                        "success": "تم تحديث كلمة المرور بنجاح",
+                        "fillAllFields": "يرجى ملء جميع حقول كلمة المرور",
+                        "minLength": "يجب أن تكون كلمة المرور الجديدة 8 أحرف على الأقل",
+                        "mismatch": "كلمات المرور الجديدة غير متطابقة",
+                        "sameAsCurrent": "يجب أن تكون كلمة المرور الجديدة مختلفة عن كلمة المرور الحالية",
+                        "error": "فشل تحديث كلمة المرور",
+                        "unexpectedError": "حدث خطأ غير متوقع"
+                    }
+                },
+                "twoFactor": {
+                    "title": "المصادقة الثنائية",
+                    "subtitle": "إضافة طبقة أمان إضافية لحسابك",
+                    "action": "قريباً"
+                },
+                "sessions": {
+                    "title": "الجلسات النشطة",
+                    "subtitle": "إدارة جلساتك النشطة عبر الأجهزة",
+                    "action": "عرض الجلسات (قريباً)"
+                }
+            },
+            "oauth": {
+                "title": "الحسابات المتصلة",
+                "subtitle": "ربط حساباتك الخارجية لتحسين الوظائف",
+                "github": {
+                    "name": "GitHub",
+                    "connected": "إنشاء وإدارة الأدلة مع مستودعات GitHub",
+                    "disconnected": "الاتصال لإنشاء أدلة من المستودعات",
+                    "scopes": "النطاقات",
+                    "actions": {
+                        "connect": "اتصال",
+                        "disconnect": "قطع الاتصال",
+                        "confirmDisconnect": "هل أنت متأكد أنك تريد قطع اتصال حساب GitHub الخاص بك؟"
+                    },
+                    "messages": {
+                        "disconnected": "تم قطع اتصال حساب GitHub",
+                        "connectError": "فشل الاتصال بـ GitHub",
+                        "disconnectError": "فشل قطع الاتصال بـ GitHub"
+                    }
+                }
+            }
+        },
+        "stats": {
+            "totalDirectories": "إجمالي الأدلة",
+            "totalItems": "إجمالي العناصر",
+            "activeWebsites": "المواقع النشطة",
+            "fromLastMonth": "من الشهر الماضي"
+        },
+        "directoryCard": {
+            "status": {
+                "active": "نشط",
+                "notStarted": "لم يبدأ",
+                "generating": "قيد الإنشاء",
+                "generated": "تم الإنشاء",
+                "error": "خطأ",
+                "cancelled": "ملغي",
+                "idle": "خامل"
+            },
+            "noDescription": "لا يوجد وصف",
+            "items": "{count} عنصر",
+            "views": "{count} مشاهدة",
+            "updated": "تم التحديث {date}",
+            "viewAction": "عرض →"
+        },
+        "directoryList": {
+            "title": "أدلتك",
+            "createButton": "إنشاء دليل"
+        },
+        "directoryDetail": {
+            "failedToGenerateItems": "فشل إنشاء العناصر. يرجى المحاولة مرة أخرى.",
+            "generationCompleted": "تم الإنشاء بنجاح",
+            "generationCancelled": "تم إلغاء الإنشاء",
+            "status": {
+                "notStarted": "لم يبدأ",
+                "generating": "قيد الإنشاء",
+                "generated": "تم الإنشاء",
+                "error": "خطأ",
+                "cancelled": "ملغي"
+            },
+            "tabs": {
+                "overview": "نظرة عامة",
+                "items": "العناصر",
+                "generator": "المولد",
+                "history": "السجل",
+                "deploy": "النشر",
+                "settings": "الإعدادات"
+            },
+            "statusCard": {
+                "notStarted": {
+                    "title": "لم يبدأ الإنشاء",
+                    "description": "ابدأ إنشاء العناصر لدليلك لتعبئته بالمحتوى.",
+                    "action": "بدء الإنشاء"
+                },
+                "generating": {
+                    "title": "الإنشاء قيد التنفيذ",
+                    "description": "جارٍ معالجة طلبك...",
+                    "processing": "جارٍ المعالجة..."
+                },
+                "generated": {
+                    "title": "اكتمل الإنشاء",
+                    "description": "تم تعبئة دليلك بالعناصر بنجاح.",
+                    "viewItems": "عرض العناصر",
+                    "regenerate": "إعادة الإنشاء"
+                },
+                "error": {
+                    "title": "فشل الإنشاء",
+                    "description": "حدث خطأ أثناء الإنشاء.",
+                    "retry": "إعادة محاولة الإنشاء"
+                },
+                "cancelled": {
+                    "title": "تم إلغاء الإنشاء",
+                    "description": "تم إيقاف الإنشاء السابق قبل اكتماله.",
+                    "restart": "إعادة بدء الإنشاء"
+                }
+            },
+            "stats": {
+                "totalItems": "إجمالي العناصر",
+                "categories": "الفئات",
+                "generationStatus": "حالة الإنشاء",
+                "daysActive": "الأيام النشطة"
+            },
+            "history": {
+                "title": "سجل الإنشاء",
+                "subtitle": "تتبع عمليات الإنشاء السابقة والعناصر المُنشأة وتفاصيل التنفيذ.",
+                "error": "فشل تحميل المزيد من الإدخالات",
+                "empty": {
+                    "title": "لا يوجد سجل بعد",
+                    "description": "اطلب إنشاء لرؤية التقدم والنتائج هنا."
+                },
+                "status": {
+                    "generating": "قيد التنفيذ",
+                    "generated": "مكتمل",
+                    "error": "فشل",
+                    "cancelled": "ملغي"
+                },
+                "table": {
+                    "run": "التشغيل",
+                    "status": "الحالة",
+                    "newItems": "عناصر جديدة",
+                    "updatedItems": "محدث",
+                    "totalItems": "الإجمالي",
+                    "duration": "المدة",
+                    "startedAt": "بدأ"
+                },
+                "loadMore": "تحميل المزيد",
+                "noMore": "لا توجد سجلات أخرى",
+                "unknown": "غير معروف"
+            },
+            "info": {
+                "title": "معلومات الدليل",
+                "slug": "المعرف",
+                "repositories": "المستودعات",
+                "dataRepo": "مستودع البيانات",
+                "websiteRepo": "مستودع الموقع",
+                "mainRepo": "المستودع الرئيسي",
+                "repoProvider": "مزود المستودع",
+                "organization": "المنظمة",
+                "created": "تم الإنشاء",
+                "lastUpdated": "آخر تحديث",
+                "readmeHeader": "رأس README",
+                "readmeFooter": "تذييل README",
+                "custom": "مخصص",
+                "customOverwrite": "مخصص (الكتابة فوق)",
+                "yes": "نعم",
+                "no": "لا"
+            },
+            "config": {
+                "title": "تفاصيل التكوين",
+                "initialPrompt": "موجه الإنشاء الأولي",
+                "companyDetails": "معلومات الشركة",
+                "companyName": "اسم الشركة",
+                "companyWebsite": "الموقع الإلكتروني",
+                "generationSettings": "إعدادات الإنشاء",
+                "generationMethod": "طريقة الإنشاء",
+                "autoApproval": "الموافقة التلقائية",
+                "pagingMode": "وضع التصفح",
+                "contentTable": "جدول المحتوى",
+                "enabled": "مفعل",
+                "disabled": "معطل",
+                "pullRequestUpdate": "تفاصيل طلب السحب",
+                "branch": "الفرع",
+                "prTitle": "عنوان طلب السحب",
+                "mainRepository": "المستودع الرئيسي",
+                "dataRepository": "مستودع البيانات"
+            },
+            "activity": {
+                "title": "النشاط الأخير",
+                "noActivity": "لا يوجد نشاط بعد",
+                "created": "تم إنشاء الدليل",
+                "directoryCreated": "تم إنشاء الدليل بنجاح",
+                "justNow": "الآن"
+            },
+            "items": {
+                "title": "عناصر الدليل",
+                "subtitle": "إدارة وتنظيم العناصر في دليلك",
+                "noItemsTitle": "لا توجد عناصر بعد",
+                "noItemsDescription": "دليلك لا يحتوي على أي عناصر بعد. أنشئ عناصر لتعبئة دليلك بالمحتوى.",
+                "generateItems": "إنشاء العناصر",
+                "searchPlaceholder": "البحث في العناصر...",
+                "allCategories": "جميع الفئات",
+                "showing": "عرض {current} من {total} عنصر",
+                "noMatch": "لا توجد عناصر تطابق معايير البحث",
+                "source": "المصدر",
+                "addItem": "إضافة عنصر",
+                "delete": "حذف",
+                "deleteWithPR": "حذف مع طلب السحب",
+                "deleteConfirm": "هل أنت متأكد أنك تريد حذف \"{name}\"?",
+                "deleteSuccess": "تم حذف العنصر بنجاح",
+                "deleteFailed": "فشل حذف العنصر",
+                "deleteError": "حدث خطأ أثناء حذف العنصر",
+                "loadingMore": "جارٍ تحميل المزيد... ({current} من {total})",
+                "addModal": {
+                    "title": "إضافة عنصر جديد",
+                    "sourceUrl": "رابط المصدر",
+                    "sourceUrlPlaceholder": "https://example.com/product",
+                    "sourceUrlHelp": "انقر على 'استخراج' لجلب تفاصيل العنصر تلقائياً من الرابط",
+                    "extract": "استخراج",
+                    "extractSuccess": "تم استخراج تفاصيل العنصر بنجاح",
+                    "extractFailed": "فشل استخراج تفاصيل العنصر",
+                    "extractError": "حدث خطأ أثناء استخراج التفاصيل",
+                    "name": "الاسم",
+                    "namePlaceholder": "أدخل اسم العنصر",
+                    "description": "الوصف",
+                    "descriptionPlaceholder": "أدخل وصفاً موجزاً للعنصر",
+                    "category": "الفئة",
+                    "tags": "العلامات",
+                    "tagPlaceholder": "أضف علامة واضغط Enter",
+                    "slug": "المعرف (اختياري)",
+                    "slugPlaceholder": "custom-item-slug",
+                    "slugHelp": "معرف مناسب للرابط. سيتم إنشاؤه تلقائياً إذا تركت فارغاً",
+                    "featured": "عنصر مميز",
+                    "featuredHelp": "ضع علامة على هذا العنصر كمميز في الدليل",
+                    "updateWithPR": "إنشاء طلب سحب",
+                    "updateWithPRHelp": "إرسال التغييرات كطلب سحب بدلاً من الالتزام المباشر",
+                    "cancel": "إلغاء",
+                    "adding": "جارٍ الإضافة...",
+                    "addItem": "إضافة عنصر",
+                    "success": "تم إضافة العنصر بنجاح",
+                    "successDescription": "تم إضافة العنصر إلى دليلك",
+                    "failed": "فشل إضافة العنصر",
+                    "error": "حدث خطأ أثناء إضافة العنصر",
+                    "errors": {
+                        "urlRequired": "رابط المصدر مطلوب للاستخراج",
+                        "invalidUrl": "يرجى إدخال رابط صالح يتضمن http:// أو https://",
+                        "requiredFields": "يرجى ملء جميع الحقول المطلوبة"
+                    }
+                }
+            },
+            "generator": {
+                "regenerationWarning": "تحذير إعادة الإنشاء",
+                "regenerationWarningDescription": "تم إنشاء هذا الدليل بالفعل. بدء إنشاء جديد سيستبدل العناصر الموجودة.",
+                "requiredInfo": "المعلومات المطلوبة",
+                "updateConfiguration": "تحديث التكوين",
+                "promptRequired": "الموجه مطلوب",
+                "operationStartedSuccessfully": "تم بدء العملية بنجاح",
+                "failedToStartOperation": "فشل بدء العملية",
+                "directoryName": "اسم الدليل",
+                "generationPrompt": "موجه الإنشاء",
+                "recommended": "موصى به",
+                "promptPlaceholder": "اوصف العناصر التي يجب إنشاؤها لهذا الدليل...",
+                "promptHelperText": "كن محدداً بشأن نوع المحتوى الذي تريد إنشاؤه",
+                "repositoryDescription": "وصف المستودع",
+                "repositoryPlaceholder": "وصف موجز للمستودع (اختياري)",
+                "startGeneration": "بدء الإنشاء",
+                "regenerateItems": "إعادة إنشاء العناصر",
+                "updateItems": "تحديث العناصر",
+                "recreateDirectory": "إعادة إنشاء الدليل",
+                "showAdvancedOptions": "إظهار الخيارات المتقدمة",
+                "hideAdvancedOptions": "إخفاء الخيارات المتقدمة",
+                "cancel": "إلغاء",
+                "companyInformation": "معلومات الشركة",
+                "companyInfoDescription": "تفاصيل الشركة الاختيارية للمحتوى المميز",
+                "companyName": "اسم الشركة",
+                "companyNamePlaceholder": "أدخل اسم الشركة",
+                "companyWebsite": "موقع الشركة",
+                "companyWebsitePlaceholder": "https://example.com",
+                "categoriesKeywords": "الفئات والكلمات المفتاحية",
+                "categoriesDescription": "تحديد الفئات والكلمات المفتاحية لتنظيم المحتوى",
+                "initialCategories": "الفئات الأولية",
+                "priorityCategories": "الفئات ذات الأولوية",
+                "targetKeywords": "الكلمات المفتاحية المستهدفة",
+                "addCategoryPlaceholder": "إضافة فئة",
+                "addPriorityCategoryPlaceholder": "إضافة فئة ذات أولوية",
+                "addKeywordPlaceholder": "إضافة كلمة مفتاحية",
+                "add": "إضافة",
+                "sourceUrls": "روابط المصادر",
+                "sourceUrlsDescription": "إضافة روابط محددة لاستخراج المحتوى منها",
+                "sourceUrlPlaceholder": "https://example.com/page",
+                "addUrl": "إضافة رابط",
+                "noSourceUrlsMessage": "لم تتم إضافة روابط مصادر. سيستخدم المولد البحث للعثور على المحتوى.",
+                "advancedConfig": "التكوين المتقدم",
+                "advancedConfigDescription": "ضبط معاملات وسلوك الإنشاء بدقة",
+                "generationMethod": "طريقة الإنشاء",
+                "methodCreateUpdate": "إنشاء أو تحديث",
+                "methodRecreate": "إعادة إنشاء (استبدال الكل)",
+                "updateWithPullRequest": "تحديث مع طلب السحب",
+                "updateWithPullRequestDescription": "إنشاء طلب سحب بدلاً من الالتزامات المباشرة",
+                "enableBadgeEvaluation": "تفعيل تقييم الشارات",
+                "enableBadgeEvaluationDescription": "تقييم وإضافة شارات الجودة للعناصر",
+                "websiteRepositoryCreationMethod": "طريقة إنشاء مستودع الموقع",
+                "methodDuplicate": "نسخ",
+                "methodFork": "Fork",
+                "directoryNamePlaceholder": "أدخل اسم الدليل",
+                "methodCreateFromTemplate": "إنشاء من قالب",
+                "aiProcessingConfiguration": "تكوين معالجة الذكاء الاصطناعي",
+                "maxSearchQueries": "الحد الأقصى لاستعلامات البحث",
+                "resultsPerQuery": "النتائج لكل استعلام",
+                "maxPagesToProcess": "الحد الأقصى للصفحات للمعالجة",
+                "relevanceThreshold": "عتبة الصلة",
+                "aiFirstGeneration": "الإنشاء بالذكاء الاصطناعي أولاً",
+                "aiFirstGenerationDescription": "تفعيل إنشاء العناصر الأولية بالذكاء الاصطناعي قبل البحث على الويب.",
+                "contentFiltering": "تصفية المحتوى",
+                "contentFilteringDescription": "تفعيل تصفية جودة المحتوى"
+            },
+            "progress": {
+                "title": "الإنشاء قيد التنفيذ",
+                "processingRequest": "جارٍ معالجة طلبك...",
+                "steps": {
+                    "promptComparison": "مقارنة الموجهات",
+                    "promptProcessing": "معالجة الموجه الخاص بك",
+                    "aiFirstItemsGeneration": "إنشاء عناصر الذكاء الاصطناعي الأولية",
+                    "searchQueriesGeneration": "إنشاء استعلامات البحث",
+                    "webSearch": "البحث على الويب",
+                    "contentRetrieval": "استرجاع المحتوى",
+                    "contentFiltering": "تصفية المحتوى ذي الصلة",
+                    "itemsExtraction": "استخراج العناصر من المحتوى",
+                    "deduplicationDataAggregation": "إزالة التكرارات وتجميع البيانات",
+                    "categoriesTagsProcessing": "معالجة الفئات والعلامات",
+                    "sourcesValidation": "التحقق من المصادر",
+                    "badgesProcessing": "معالجة شارات الجودة",
+                    "itemsProcessing": "إنهاء العناصر",
+                    "processing": "جارٍ المعالجة..."
+                },
+                "progress": "التقدم",
+                "closeNote": "قد يستغرق هذا بضع دقائق. يمكنك إغلاق هذه الصفحة والعودة لاحقاً."
+            },
+            "settings": {
+                "generalSettings": "الإعدادات العامة",
+                "generalTitle": "الإعدادات العامة",
+                "directoryName": "اسم الدليل",
+                "description": "الوصف",
+                "organizationRepository": "مستودع المنظمة",
+                "organizationHelp": "إنشاء المستودعات تحت منظمة بدلاً من حسابك الشخصي",
+                "organizationName": "اسم المنظمة",
+                "organizationNamePlaceholder": "أدخل اسم المنظمة",
+                "readmeConfiguration": "تكوين README",
+                "readmeTitle": "تكوين README",
+                "customHeader": "رأس مخصص",
+                "customHeaderPlaceholder": "إضافة محتوى مخصص إلى رأس README",
+                "overwriteDefaultHeader": "الكتابة فوق الرأس الافتراضي",
+                "customFooter": "تذييل مخصص",
+                "cantDeleteWhileGenerating": "لا يمكن حذف الدليل أثناء إنشاء العناصر.",
+                "customFooterPlaceholder": "إضافة محتوى مخصص إلى تذييل README",
+                "overwriteDefaultFooter": "الكتابة فوق التذييل الافتراضي",
+                "dangerZone": "منطقة الخطر",
+                "dangerTitle": "منطقة الخطر",
+                "deleteWarning": "بمجرد حذف الدليل، لا يمكن التراجع. يرجى التأكد.",
+                "dangerDescription": "بمجرد حذف الدليل، لا يمكن التراجع. يرجى التأكد.",
+                "deleteOptions": "اختر ما تريد حذفه:",
+                "deleteDataRepository": "حذف مستودع البيانات",
+                "deleteDataRepositoryDescription": "إزالة مستودع بيانات JSON من GitHub",
+                "deleteMarkdownRepository": "حذف مستودع Markdown",
+                "deleteMarkdownRepositoryDescription": "إزالة مستودع Markdown الذي يحتوي على README",
+                "deleteWebsiteRepository": "حذف مستودع الموقع",
+                "deleteWebsiteRepositoryDescription": "إزالة مستودع الموقع المنشور",
+                "deleteConfirm": "هل أنت متأكد تماماً؟",
+                "deleteConfirmDetail": "لا يمكن التراجع عن هذا الإجراء. سيتم حذف الدليل والمستودعات المحددة نهائياً.",
+                "confirmDirectoryName": "اكتب اسم الدليل للتأكيد",
+                "confirmDirectoryNameDescription": "اكتب \"{name}\" لتأكيد الحذف",
+                "deleteNameMismatch": "اسم الدليل غير متطابق",
+                "deleteButton": "حذف الدليل",
+                "deleteConfirmButton": "نعم، احذف",
+                "deleteSuccess": "تم حذف الدليل بنجاح",
+                "deleteFailed": "فشل حذف الدليل",
+                "yesDelete": "نعم، احذف",
+                "cancel": "إلغاء",
+                "saveChanges": "حفظ التغييرات",
+                "updateReadme": "تحديث README",
+                "updateSuccess": "تم تحديث الإعدادات بنجاح",
+                "updateFailed": "فشل تحديث الإعدادات"
+            },
+            "deploy": {
+                "noTokenAlert": {
+                    "title": "رمز Vercel مطلوب",
+                    "description": "لنشر دليلك على Vercel، تحتاج إلى تكوين رمز Vercel API في إعدادات حسابك.",
+                    "configureButton": "الذهاب إلى إعدادات رموز API",
+                    "getTokenButton": "الحصول على رمز Vercel",
+                    "howTo": {
+                        "title": "كيفية تكوين رمز Vercel الخاص بك:",
+                        "step1": "انقر على 'الحصول على رمز Vercel' لفتح لوحة تحكم Vercel",
+                        "step2": "إنشاء رمز جديد بأذونات النشر",
+                        "step3": "نسخ الرمز المُنشأ",
+                        "step4": "الذهاب إلى إعدادات رموز API والصق رمزك في قسم Vercel"
+                    }
+                },
+                "form": {
+                    "deployToVercel": {
+                        "title": "النشر على Vercel",
+                        "description": "انشر مستودع موقع دليلك على Vercel.",
+                        "deployButton": "النشر الآن",
+                        "deployingButton": "جارٍ النشر...",
+                        "deployingStateButton": "جارٍ النشر ({state})...",
+                        "successMessage": "تم نشر موقعك بنجاح!",
+                        "teamSelection": {
+                            "title": "اختر فريق Vercel",
+                            "description": "اختر فريق Vercel لنشر هذا الدليل عليه.",
+                            "label": "الفريق",
+                            "placeholder": "اختر فريقاً",
+                            "confirmButton": "النشر على الفريق",
+                            "cancelButton": "إلغاء"
+                        }
+                    },
+                    "updateRepository": {
+                        "title": "تحديث مستودع الموقع",
+                        "description": "مزامنة أحدث التغييرات من القالب إلى",
+                        "websiteRepository": "مستودع الموقع",
+                        "updateButton": "تحديث المستودع",
+                        "updatingButton": "جارٍ التحديث..."
+                    },
+                    "messages": {
+                        "deploySuccess": "تم بدء النشر بنجاح",
+                        "deployPending": "النشر في قائمة الانتظار وسيبدأ قريباً",
+                        "deployFailed": "فشل النشر على Vercel",
+                        "deployError": "حدث خطأ أثناء النشر",
+                        "updateSuccess": "تم تحديث المستودع بنجاح",
+                        "updateFailed": "فشل تحديث المستودع",
+                        "updateError": "حدث خطأ أثناء تحديث المستودع"
+                    },
+                    "info": {
+                        "deployInfo": "عادة ما يستغرق النشر 1-3 دقائق. ستحصل على رابط عند اكتماله.",
+                        "updateInfo": "تزامن التحديثات محتوى دليلك مع مستودع الموقع للنشر التالي."
+                    }
+                }
+            }
+        },
+        "directoryCreation": {
+            "title": "إنشاء دليل جديد",
+            "subtitle": "اختر كيف تريد إنشاء دليلك",
+            "backToOptions": "العودة إلى الخيارات",
+            "organizationSelector": {
+                "label": "مالك المستودع",
+                "loading": "جارٍ تحميل المنظمات...",
+                "personal": "الحساب الشخصي",
+                "personalAccount": "سيتم إنشاء المستودع تحت حسابك الشخصي",
+                "organizations": "المنظمات",
+                "personalHelp": "سيتم إنشاء المستودع تحت حساب GitHub الشخصي الخاص بك",
+                "organizationHelp": "سيتم إنشاء المستودع تحت منظمة {org}"
+            },
+            "ai": {
+                "title": "إنشاء بالذكاء الاصطناعي",
+                "subtitle": "اوصف فكرة دليلك بلغة طبيعية ودع الذكاء الاصطناعي يتولى الإعداد",
+                "getStarted": "ابدأ",
+                "formTitle": "إنشاء دليل بالذكاء الاصطناعي",
+                "formSubtitle": "اوصف فكرة دليلك ودع الذكاء الاصطناعي يتولى الإعداد وإنشاء المحتوى الأولي",
+                "directoryNameLabel": "اسم الدليل",
+                "directoryNamePlaceholder": "مثلاً، أدوات الذكاء الاصطناعي الرائعة",
+                "directoryNameHelp": "سيقترح الذكاء الاصطناعي اسماً إذا تركت هذا فارغاً",
+                "promptLabel": "اوصف دليلك",
+                "githubRequired": "يرجى ربط حساب GitHub الخاص بك أولاً.",
+                "promptPlaceholder": "اوصف نوع الدليل الذي تريد إنشاءه، والعناصر التي يجب أن يحتويها، وأي متطلبات محددة...",
+                "inspirationText": "تحتاج إلهاماً؟ جرب أحد هذه:",
+                "examplePrompts": {
+                    "0": {
+                        "name": "أدوات مطوري الذكاء الاصطناعي",
+                        "prompt": "إنشاء دليل لأفضل أدوات الذكاء الاصطناعي للمطورين"
+                    },
+                    "1": {
+                        "name": "مركز مكونات React",
+                        "prompt": "بناء قائمة مختارة لمكونات React مفتوحة المصدر"
+                    },
+                    "2": {
+                        "name": "أدوات الفريق البعيد",
+                        "prompt": "إنشاء دليل لتطبيقات الإنتاجية للفرق البعيدة"
+                    },
+                    "3": {
+                        "name": "الأزياء المستدامة",
+                        "prompt": "إنشاء مجموعة من علامات الأزياء المستدامة"
+                    }
+                },
+                "featuresTitle": "ماذا سيفعل الذكاء الاصطناعي لك:",
+                "features": {
+                    "0": "إنشاء اسم ووصف مناسبين",
+                    "1": "إنشاء الفئات والهيكل الأولي",
+                    "2": "العثور على العناصر ذات الصلة وإضافتها تلقائياً",
+                    "3": "إعداد مستودع GitHub مع التوثيق المناسب"
+                },
+                "generateButton": "إنشاء بالذكاء الاصطناعي",
+                "generatingButton": "جارٍ إنشاء الدليل...",
+                "cancelButton": "إلغاء",
+                "noteTitle": "ملاحظة:",
+                "noteText": "عادة ما يستغرق إنشاء الذكاء الاصطناعي 2-5 دقائق اعتماداً على تعقيد طلبك. سيتم إشعارك عندما يكون دليلك جاهزاً.",
+                "errors": {
+                    "promptRequired": "يرجى وصف نوع الدليل الذي تريد إنشاءه",
+                    "nameRequired": "اسم الدليل مطلوب",
+                    "slugRequired": "معرف الدليل مطلوب",
+                    "descriptionRequired": "وصف الدليل مطلوب"
+                },
+                "success": {
+                    "started": "بدأ إنشاء الدليل!",
+                    "generating": "الذكاء الاصطناعي ينشئ المحتوى. قد يستغرق هذا بضع دقائق...",
+                    "created": "تم إنشاء الدليل بنجاح!"
+                },
+                "advancedSettings": "الإعدادات المتقدمة",
+                "advancedSubtitle": "تكوين إعدادات المنظمة والمستودع",
+                "organizationLabel": "مستودع المنظمة",
+                "organizationHelp": "إنشاء المستودعات تحت منظمة بدلاً من حسابك الشخصي",
+                "organizationNameLabel": "اسم المنظمة",
+                "organizationNamePlaceholder": "أدخل اسم المنظمة"
+            },
+            "manual": {
+                "title": "إنشاء يدوياً",
+                "subtitle": "تكوين دليلك مع التحكم الكامل في كل إعداد وخيار",
+                "configureNow": "التكوين الآن",
+                "formTitle": "إنشاء دليل يدوياً",
+                "formSubtitle": "تكوين دليلك مع التحكم الكامل في كل إعداد",
+                "basicInfo": "المعلومات الأساسية",
+                "nameLabel": "اسم الدليل *",
+                "namePlaceholder": "مثلاً، أدوات الذكاء الاصطناعي الرائعة",
+                "slugLabel": "معرف الدليل *",
+                "slugPlaceholder": "awesome-ai-tools",
+                "githubRequired": "يرجى ربط حساب GitHub الخاص بك أولاً.",
+                "slugHelp": "معرف مناسب للرابط (أحرف صغيرة وأرقام وشرطات فقط)",
+                "descriptionLabel": "الوصف *",
+                "descriptionPlaceholder": "قائمة مختارة لأفضل أدوات وموارد الذكاء الاصطناعي للمطورين",
+                "advancedSettings": "الإعدادات المتقدمة",
+                "advancedSubtitle": "المنظمة، الرؤوس المخصصة، والمزيد",
+                "organizationLabel": "إنشاء تحت منظمة",
+                "organizationHelp": "إنشاء هذا الدليل تحت منظمة GitHub بدلاً من حسابك الشخصي",
+                "organizationNameLabel": "اسم المنظمة",
+                "organizationNamePlaceholder": "my-organization",
+                "headerLabel": "رأس README مخصص",
+                "headerPlaceholder": "إضافة محتوى مخصص إلى أعلى ملف README الخاص بك",
+                "headerOverwrite": "استبدال الرأس الافتراضي بالكامل",
+                "footerLabel": "تذييل README مخصص",
+                "footerPlaceholder": "إضافة محتوى مخصص إلى أسفل ملف README الخاص بك",
+                "footerOverwrite": "استبدال التذييل الافتراضي بالكامل",
+                "createButton": "إنشاء الدليل",
+                "creatingButton": "جارٍ إنشاء الدليل...",
+                "cancelButton": "إلغاء",
+                "nameRequired": "اسم الدليل مطلوب",
+                "slugRequired": "معرف الدليل مطلوب",
+                "descriptionRequired": "وصف الدليل مطلوب",
+                "success": {
+                    "created": "تم إنشاء الدليل بنجاح!"
+                }
+            }
+        },
+        "github": {
+            "connection": {
+                "alert": {
+                    "title": "GitHub غير متصل",
+                    "subtitle": "اربط حساب GitHub الخاص بك لإنشاء وإدارة الأدلة",
+                    "connectButton": "ربط GitHub",
+                    "connectingButton": "جارٍ الاتصال..."
+                },
+                "status": {
+                    "title": "حالة GitHub",
+                    "connected": "متصل",
+                    "notConnected": "غير متصل",
+                    "connectedDescription": "سيتم تخزين أدلتك كمستودعات GitHub في حسابك.",
+                    "notConnectedDescription": "اربط حساب GitHub الخاص بك لإنشاء وإدارة الأدلة.",
+                    "connectedAccount": "الحساب المتصل:",
+                    "requiredNote": "مطلوب لإنشاء الأدلة",
+                    "connectButton": "ربط GitHub",
+                    "connectingButton": "جارٍ الاتصال...",
+                    "failedToConnect": "فشل الاتصال بـ GitHub"
+                }
+            }
+        },
+        "apiTokens": {
+            "title": "واجهات برمجة التطبيقات والرموز",
+            "subtitle": "إدارة مفاتيح API والتكاملات الخارجية",
+            "vercel": {
+                "title": "تكامل Vercel",
+                "subtitle": "اربط حساب Vercel الخاص بك لنشر الأدلة كمواقع",
+                "connected": "متصل",
+                "notConnected": "غير متصل",
+                "connectedMessage": "حساب Vercel الخاص بك متصل. يمكنك الآن نشر الأدلة على Vercel.",
+                "disconnect": "قطع الاتصال بـ Vercel",
+                "disconnecting": "جارٍ الإزالة...",
+                "apiTokenLabel": "رمز Vercel API",
+                "placeholder": "vc_...",
+                "showToken": "إظهار",
+                "hideToken": "إخفاء",
+                "getTokenHelp": "يمكنك الحصول على رمز API من",
+                "vercelDashboard": "لوحة تحكم Vercel",
+                "save": "حفظ الرمز",
+                "saving": "جارٍ الحفظ...",
+                "messages": {
+                    "tokenRequired": "يرجى إدخال رمز Vercel صالح",
+                    "saveSuccess": "تم حفظ رمز Vercel بنجاح",
+                    "saveFailed": "فشل حفظ رمز Vercel",
+                    "removeSuccess": "تم إزالة رمز Vercel بنجاح",
+                    "removeFailed": "فشل إزالة رمز Vercel",
+                    "unexpectedError": "حدث خطأ غير متوقع"
+                }
+            },
+            "apiKeys": {
+                "title": "مفاتيح API",
+                "subtitle": "إنشاء وإدارة مفاتيح API للوصول البرمجي",
+                "generate": "إنشاء مفتاح API (قريباً)"
+            },
+            "webhooks": {
+                "title": "Webhooks",
+                "subtitle": "تكوين webhooks لتلقي التحديثات في الوقت الفعلي",
+                "configure": "تكوين Webhooks (قريباً)"
+            }
+        },
+        "notifications": {
+            "title": "تفضيلات الإشعارات",
+            "subtitle": "اختر كيف تريد أن يتم إشعارك بالتحديثات المهمة",
+            "email": {
+                "title": "إشعارات البريد الإلكتروني",
+                "directoryUpdates": {
+                    "label": "تحديثات الدليل",
+                    "description": "احصل على إشعارات حول التحديثات المهمة لأدلتك"
+                },
+                "newItems": {
+                    "label": "عناصر جديدة",
+                    "description": "احصل على إشعارات عند إضافة عناصر جديدة لأدلتك"
+                },
+                "weeklyDigest": {
+                    "label": "ملخص أسبوعي",
+                    "description": "تلقي ملخص أسبوعي لنشاط دليلك"
+                },
+                "marketing": {
+                    "label": "التسويق والعروض",
+                    "description": "تلقي تحديثات حول الميزات والعروض الجديدة"
+                }
+            },
+            "app": {
+                "title": "الإشعارات داخل التطبيق",
+                "newItems": {
+                    "label": "عناصر جديدة",
+                    "description": "إظهار إشعارات للعناصر الجديدة في الدليل"
+                },
+                "comments": {
+                    "label": "التعليقات",
+                    "description": "احصل على إشعارات حول التعليقات على أدلتك"
+                },
+                "mentions": {
+                    "label": "الإشارات",
+                    "description": "احصل على إشعارات عندما يذكرك شخص ما"
+                },
+                "systemUpdates": {
+                    "label": "تحديثات النظام",
+                    "description": "إشعارات النظام المهمة وتنبيهات الصيانة"
+                }
+            },
+            "actions": {
+                "save": "حفظ التفضيلات",
+                "saving": "جارٍ الحفظ..."
+            },
+            "messages": {
+                "success": "تم تحديث تفضيلات الإشعارات",
+                "error": "فشل تحديث التفضيلات",
+                "unexpectedError": "حدث خطأ غير متوقع"
+            }
+        },
+        "sidebar": {
+            "menu": "القائمة",
+            "aiChat": "محادثة الذكاء الاصطناعي",
+            "newDirectory": "دليل جديد",
+            "navigation": {
+                "dashboard": "لوحة التحكم",
+                "directories": "الأدلة",
+                "settings": "الإعدادات"
+            },
+            "signOut": "تسجيل الخروج",
+            "signingOut": "جارٍ تسجيل الخروج..."
+        },
+        "dangerZone": {
+            "title": "منطقة الخطر",
+            "subtitle": "إجراءات لا رجعة فيها ومدمرة",
+            "export": {
+                "title": "تصدير بياناتك",
+                "subtitle": "تنزيل جميع أدلتك وعناصرك وإعداداتك",
+                "action": "تصدير البيانات (قريباً)"
+            },
+            "delete": {
+                "title": "حذف الحساب",
+                "subtitle": "حذف حسابك وجميع البيانات المرتبطة به نهائياً. لا يمكن التراجع عن هذا الإجراء.",
+                "button": "حذف حسابي",
+                "confirmTitle": "⚠️ سيتم حذف ما يلي نهائياً:",
+                "confirmItems": [
+                    "حسابك وملفك الشخصي",
+                    "جميع أدلتك",
+                    "جميع عناصر وبيانات الدليل",
+                    "مفاتيح API والتكاملات",
+                    "جميع المواقع المرتبطة"
+                ],
+                "confirmLabel": "اكتب بريدك الإلكتروني {email} للتأكيد",
+                "confirmPlaceholder": "أدخل بريدك الإلكتروني",
+                "confirmButton": "نعم، احذف حسابي",
+                "deleting": "جارٍ الحذف...",
+                "cancel": "إلغاء"
+            },
+            "messages": {
+                "confirmEmail": "يرجى إدخال بريدك الإلكتروني بشكل صحيح للتأكيد",
+                "deleteSuccess": "تم حذف الحساب بنجاح",
+                "deleteFailed": "فشل حذف الحساب",
+                "unexpectedError": "حدث خطأ غير متوقع"
+            }
+        },
+        "aiChat": {
+            "title": "مساعد الذكاء الاصطناعي",
+            "subtitle": "إنشاء الأدلة بلغة طبيعية",
+            "newChat": "محادثة جديدة",
+            "loadingConversation": "جارٍ تحميل المحادثة…",
+            "inputPlaceholder": "اوصف الدليل الذي تريد إنشاءه...",
+            "sendButton": "إرسال"
+        }
+    },
+    "layout": {
+        "auth": {
+            "backToHome": "العودة إلى الصفحة الرئيسية",
+            "feature": {
+                "title": "بناء الأدلة بالذكاء الاصطناعي",
+                "subtitle": "أنشئ أدلة جميلة وقابلة للبحث في دقائق باستخدام اللغة الطبيعية. لا حاجة للبرمجة.",
+                "benefits": {
+                    "ai": {
+                        "title": "الإنشاء بالذكاء الاصطناعي",
+                        "description": "اوصف ما تريده ودع الذكاء الاصطناعي يقوم بالعمل"
+                    },
+                    "templates": {
+                        "title": "قوالب احترافية",
+                        "description": "ابدأ بتصاميم جميلة وقابلة للتخصيص"
+                    },
+                    "management": {
+                        "title": "إدارة سهلة",
+                        "description": "حدّث ونظّم محتواك بسهولة"
+                    }
+                }
+            }
+        }
+    },
+    "errors": {
+        "global": {
+            "title": "حدث خطأ ما!",
+            "tryAgain": "حاول مرة أخرى"
+        }
+    },
+    "metadata": {
+        "title": "Ever Works - منشئ الأدلة",
+        "description": "منصة SaaS لبناء وإدارة الأدلة"
+    },
+    "api": {
+        "errors": {
+            "unauthorized": "أنت غير مخول لتنفيذ هذا الإجراء",
+            "unauthorizedLogin": "غير مخول: يرجى تسجيل الدخول مرة أخرى.",
+            "forbidden": "محظور: ليس لديك إذن لتنفيذ هذا الإجراء.",
+            "serverError": "خطأ في الخادم: {message}",
+            "unexpected": "حدث خطأ غير متوقع في الخادم.",
+            "apiError": "خطأ في API: {status} {statusText}",
+            "loginFailed": "فشل تسجيل الدخول",
+            "registerFailed": "فشل التسجيل",
+            "unsupportedProvider": "مزود غير مدعوم",
+            "providerConnectFailed": "فشل الاتصال بالمزود",
+            "forgotPasswordFailed": "فشل إرسال بريد إعادة تعيين كلمة المرور",
+            "resetPasswordFailed": "فشل إعادة تعيين كلمة المرور"
+        }
+    },
+    "actions": {
+        "directories": {
+            "slug": {
+                "required": "المعرف مطلوب",
+                "format": "يجب أن يحتوي المعرف على أحرف صغيرة وأرقام وشرطات فقط"
+            },
+            "name": {
+                "required": "الاسم مطلوب",
+                "maxLength": "يجب أن يكون الاسم أقل من 100 حرف"
+            },
+            "description": {
+                "required": "الوصف مطلوب",
+                "maxLength": "يجب أن يكون الوصف أقل من 500 حرف"
+            },
+            "prompt": {
+                "minLength": "يجب أن يكون الموجه 10 أحرف على الأقل",
+                "maxLength": "يجب أن يكون الموجه أقل من 1000 حرف"
+            },
+            "oauthRequired": "اتصال OAuth مطلوب. يرجى ربط حساب {provider} الخاص بك أولاً.",
+            "githubRequired": "اتصال GitHub مطلوب. يرجى ربط حساب GitHub الخاص بك أولاً.",
+            "createSuccess": "تم إنشاء الدليل بنجاح!",
+            "createFailed": "فشل إنشاء الدليل",
+            "updateSuccess": "تم تحديث الدليل بنجاح!",
+            "updateFailed": "فشل تحديث الدليل",
+            "invalidGeneratedData": "فشل إنشاء بيانات دليل صالحة",
+            "aiGenerationStarted": "بدأ إنشاء الدليل! الذكاء الاصطناعي ينشئ المحتوى...",
+            "invalidId": "معرف الدليل غير صالح",
+            "deleteSuccess": "تم حذف الدليل بنجاح",
+            "deleteFailed": "فشل حذف الدليل",
+            "fetchFailed": "فشل جلب الأدلة",
+            "organization": {
+                "requiredWhenOwnerProvided": "يجب تفعيل المنظمة عند توفير المالك"
+            }
+        },
+        "generator": {
+            "promptRequired": "الموجه مطلوب",
+            "nameRequired": "الاسم مطلوب",
+            "generationStartedSuccessfully": "تم بدء الإنشاء بنجاح",
+            "updateStartedSuccessfully": "تم بدء التحديث بنجاح",
+            "failedToGenerateItems": "فشل إنشاء العناصر",
+            "failedToUpdateItems": "فشل تحديث العناصر",
+            "markdownRegeneratedSuccessfully": "تم إعادة إنشاء Markdown بنجاح",
+            "failedToRegenerateMarkdown": "فشل إعادة إنشاء Markdown",
+            "notAuthorizedToAccessOrganization": "أنت غير مخول للوصول إلى هذه المنظمة. يرجى الاتصال بالمالك ({owner}) للحصول على المساعدة."
+        },
+        "settings": {
+            "profile": {
+                "usernameRequired": "اسم المستخدم مطلوب",
+                "usernameMaxLength": "يجب أن يكون اسم المستخدم أقل من 50 حرف",
+                "usernameFormat": "يمكن أن يحتوي اسم المستخدم على أحرف وأرقام وشرطات وشرطات سفلية فقط",
+                "updateFailed": "فشل تحديث الملف الشخصي",
+                "notAuthenticated": "غير مصادق"
+            },
+            "password": {
+                "currentRequired": "كلمة المرور الحالية مطلوبة",
+                "newMinLength": "يجب أن تكون كلمة المرور 8 أحرف على الأقل",
+                "newMaxLength": "يجب أن تكون كلمة المرور أقل من 100 حرف",
+                "updateFailed": "فشل تحديث كلمة المرور",
+                "updateSuccess": "تم تحديث كلمة المرور بنجاح",
+                "notAuthenticated": "غير مصادق"
+            },
+            "vercel": {
+                "notAuthenticated": "غير مصادق",
+                "tokenRequired": "الرمز مطلوب",
+                "invalidFormat": "تنسيق رمز Vercel غير صالح",
+                "saveFailed": "فشل حفظ رمز Vercel",
+                "saveSuccess": "تم حفظ رمز Vercel بنجاح",
+                "validationFailed": "رمز Vercel المقدم غير صالح. يرجى التحقق مرة أخرى والمحاولة.",
+                "removeFailed": "فشل إزالة رمز Vercel",
+                "removeSuccess": "تم إزالة رمز Vercel بنجاح"
+            },
+            "github": {
+                "notAuthenticated": "غير مصادق",
+                "disconnectFailed": "فشل قطع الاتصال بـ GitHub",
+                "disconnectSuccess": "تم قطع اتصال حساب GitHub بنجاح"
+            },
+            "notifications": {
+                "notAuthenticated": "غير مصادق",
+                "updateFailed": "فشل تحديث التفضيلات",
+                "updateSuccess": "تم تحديث تفضيلات الإشعارات بنجاح"
+            },
+            "danger": {
+                "notAuthenticated": "غير مصادق",
+                "deleteFailed": "فشل حذف الحساب",
+                "deleteDisabled": "حذف الحساب معطل في العرض التوضيحي"
+            }
+        },
+        "deploy": {
+            "deployVercelFailed": "فشل النشر على Vercel",
+            "updateRepositoryFailed": "فشل تحديث المستودع"
+        }
+    },
+    "validation": {
+        "auth": {
+            "invalidCredentials": "البريد الإلكتروني أو كلمة المرور غير صحيحة",
+            "account": {
+                "suspended": "الحساب معلق"
+            },
+            "email": {
+                "required": "البريد الإلكتروني لا يمكن أن يكون فارغاً",
+                "invalid": "بريد إلكتروني غير صالح",
+                "emailAlreadyRegistered": "البريد الإلكتروني مسجل بالفعل"
+            },
+            "password": {
+                "required": "كلمة المرور لا يمكن أن تكون فارغة",
+                "minLength": "يجب أن تكون كلمة المرور {length} أحرف على الأقل",
+                "lowercase": "يجب أن تحتوي كلمة المرور على حرف صغير واحد على الأقل",
+                "numberOrSpecial": "يجب أن تحتوي كلمة المرور على رقم واحد أو حرف خاص على الأقل",
+                "cannotStartWith": "لا يمكن أن تبدأ كلمة المرور بنقطة أو سطر جديد",
+                "digit": "يجب أن تحتوي كلمة المرور على رقم واحد على الأقل"
+            },
+            "username": {
+                "minLength": "يجب أن يحتوي اسم المستخدم على {length} أحرف على الأقل"
+            }
+        }
+    }
+}
