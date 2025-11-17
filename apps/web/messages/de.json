@@ -1,0 +1,1177 @@
+{
+    "auth": {
+        "error": {
+            "title": "Authentifizierungsfehler",
+            "subtitle": "Es gab ein Problem mit Ihrer Authentifizierung",
+            "errorOccurred": "Ein Fehler ist aufgetreten",
+            "somethingWentWrong": "Etwas ist schiefgelaufen",
+            "generic": "Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es später erneut.",
+            "invalidCredentials": "Die eingegebene E-Mail-Adresse oder das Passwort ist falsch.",
+            "emailNotVerified": "Bitte verifizieren Sie Ihre E-Mail-Adresse, bevor Sie sich anmelden.",
+            "accountLocked": "Ihr Konto wurde aus Sicherheitsgründen gesperrt.",
+            "sessionExpired": "Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.",
+            "networkError": "Verbindung nicht möglich. Bitte überprüfen Sie Ihre Internetverbindung.",
+            "oauth": {
+                "missingCode": "Autorisierungscode fehlt. Bitte versuchen Sie sich erneut anzumelden.",
+                "invalidState": "Ungültiger Autorisierungsstatus. Bitte versuchen Sie sich erneut anzumelden.",
+                "unsupportedProvider": "Dieser Authentifizierungsanbieter wird nicht unterstützt.",
+                "callbackFailed": "Authentifizierung konnte nicht abgeschlossen werden. Bitte versuchen Sie es erneut."
+            },
+            "resetPassword": {
+                "missingToken": "Link zum Zurücksetzen des Passworts ist ungültig. Verifizierungstoken fehlt.",
+                "invalidToken": "Link zum Zurücksetzen des Passworts ist ungültig oder wurde manipuliert.",
+                "expiredToken": "Link zum Zurücksetzen des Passworts ist abgelaufen. Bitte fordern Sie einen neuen an.",
+                "failed": "Passwort konnte nicht zurückgesetzt werden. Bitte versuchen Sie es erneut oder fordern Sie einen neuen Reset-Link an."
+            },
+            "verifyEmail": {
+                "missingToken": "E-Mail-Verifizierungslink ist ungültig. Verifizierungstoken fehlt.",
+                "invalidToken": "E-Mail-Verifizierungslink ist ungültig oder wurde bereits verwendet.",
+                "expiredToken": "E-Mail-Verifizierungslink ist abgelaufen. Bitte fordern Sie einen neuen an.",
+                "failed": "E-Mail konnte nicht verifiziert werden. Bitte versuchen Sie es erneut oder fordern Sie einen neuen Verifizierungslink an."
+            },
+            "authorize": {
+                "invalidRedirectUrl": "Die Weiterleitungs-URL ist ungültig oder nicht erlaubt. Bitte kontaktieren Sie den Support, wenn Sie glauben, dass dies ein Fehler ist."
+            },
+            "actions": {
+                "backToLogin": "Zurück zur Anmeldung",
+                "tryRegister": "Registrierung versuchen",
+                "resendVerification": "Verifizierungs-E-Mail erneut senden",
+                "contactSupport": "Support kontaktieren",
+                "requestNewReset": "Neuen Reset-Link anfordern"
+            },
+            "helpText": "Wenn Sie weiterhin Probleme haben, überprüfen Sie bitte unsere Hilfe-Ressourcen unten.",
+            "links": {
+                "help": "Hilfezentrum",
+                "systemStatus": "Systemstatus"
+            }
+        },
+        "login": {
+            "title": "Willkommen zurück",
+            "subtitle": "Melden Sie sich in Ihrem Konto an, um fortzufahren",
+            "form": {
+                "email": {
+                    "label": "E-Mail-Adresse",
+                    "placeholder": "sie@beispiel.de"
+                },
+                "password": {
+                    "label": "Passwort",
+                    "placeholder": "Geben Sie Ihr Passwort ein"
+                },
+                "forgotPassword": "Passwort vergessen?",
+                "rememberMe": "30 Tage lang angemeldet bleiben",
+                "submit": "Anmelden",
+                "submitting": "Wird angemeldet..."
+            },
+            "socialLogin": {
+                "divider": "Oder fortfahren mit",
+                "google": "Google",
+                "github": "GitHub"
+            },
+            "signUp": {
+                "text": "Noch kein Konto?",
+                "link": "Registrieren"
+            },
+            "errors": {
+                "invalidCredentials": "Ungültige E-Mail-Adresse oder Passwort"
+            },
+            "passwordReset": {
+                "success": "Passwort erfolgreich zurückgesetzt!",
+                "canLogin": "Sie können sich jetzt mit Ihrem neuen Passwort anmelden."
+            }
+        },
+        "forgotPassword": {
+            "title": "Passwort vergessen?",
+            "subtitle": "Keine Sorge, wir senden Ihnen Anweisungen zum Zurücksetzen",
+            "successTitle": "Überprüfen Sie Ihre E-Mails",
+            "successSubtitle": "Wir haben Ihnen Anweisungen zum Zurücksetzen des Passworts gesendet",
+            "form": {
+                "email": {
+                    "label": "E-Mail-Adresse",
+                    "placeholder": "Geben Sie Ihre E-Mail-Adresse ein"
+                },
+                "submit": "Reset-Link senden",
+                "submitting": "Wird gesendet..."
+            },
+            "success": {
+                "title": "E-Mail erfolgreich gesendet",
+                "message": "Wir haben Anweisungen zum Zurücksetzen des Passworts an {email} gesendet",
+                "checkSpam": "Wenn Sie die E-Mail nicht sehen, überprüfen Sie Ihren Spam-Ordner."
+            },
+            "errors": {
+                "failed": "Reset-E-Mail konnte nicht gesendet werden. Bitte versuchen Sie es erneut."
+            },
+            "backToLogin": "Zurück zur Anmeldung",
+            "noAccount": {
+                "text": "Noch kein Konto?",
+                "link": "Registrieren"
+            }
+        },
+        "resetPassword": {
+            "title": "Passwort zurücksetzen",
+            "subtitle": "Geben Sie unten Ihr neues Passwort ein",
+            "successTitle": "Passwort erfolgreich zurückgesetzt",
+            "successSubtitle": "Ihr Passwort wurde aktualisiert",
+            "form": {
+                "password": {
+                    "label": "Neues Passwort",
+                    "placeholder": "Geben Sie Ihr neues Passwort ein",
+                    "helperText": "Muss mindestens 6 Zeichen lang sein mit Kleinbuchstaben und Zahl/Sonderzeichen",
+                    "errors": {
+                        "minLength": "Passwort muss mindestens 6 Zeichen lang sein",
+                        "lowercase": "Passwort muss mindestens einen Kleinbuchstaben enthalten",
+                        "numberOrSpecial": "Passwort muss mindestens eine Zahl oder ein Sonderzeichen enthalten",
+                        "cannotStartWith": "Passwort darf nicht mit einem Punkt oder Zeilenumbruch beginnen"
+                    }
+                },
+                "confirmPassword": {
+                    "label": "Neues Passwort bestätigen",
+                    "placeholder": "Bestätigen Sie Ihr neues Passwort",
+                    "errors": {
+                        "noMatch": "Passwörter stimmen nicht überein"
+                    }
+                },
+                "submit": "Passwort zurücksetzen",
+                "submitting": "Wird zurückgesetzt..."
+            },
+            "success": {
+                "title": "Passwort erfolgreich zurückgesetzt",
+                "message": "Ihr Passwort wurde erfolgreich aktualisiert. Sie können sich jetzt mit Ihrem neuen Passwort anmelden.",
+                "loginButton": "Zur Anmeldung"
+            },
+            "errors": {
+                "failed": "Passwort konnte nicht zurückgesetzt werden. Bitte versuchen Sie es erneut oder fordern Sie einen neuen Reset-Link an.",
+                "noToken": "Ungültiger Reset-Link",
+                "invalidLink": "Ungültiger Reset-Link",
+                "missingTokenMessage": "Der Link zum Zurücksetzen des Passworts ist ungültig oder unvollständig. Bitte fordern Sie eine neue Passwort-Zurücksetzung an.",
+                "requestNewLink": "Neuen Reset-Link anfordern"
+            },
+            "backToLogin": "Zurück zur Anmeldung"
+        },
+        "register": {
+            "title": "Konto erstellen",
+            "subtitle": "Beginnen Sie noch heute mit dem Erstellen großartiger Verzeichnisse",
+            "form": {
+                "name": {
+                    "label": "Vollständiger Name",
+                    "placeholder": "Max Mustermann"
+                },
+                "email": {
+                    "label": "E-Mail-Adresse",
+                    "placeholder": "sie@beispiel.de"
+                },
+                "password": {
+                    "label": "Passwort",
+                    "placeholder": "Erstellen Sie ein sicheres Passwort",
+                    "hint": "Muss mindestens 8 Zeichen lang sein"
+                },
+                "confirmPassword": {
+                    "label": "Passwort bestätigen",
+                    "placeholder": "Bestätigen Sie Ihr Passwort"
+                },
+                "terms": {
+                    "text": "Ich stimme den",
+                    "termsLink": "Nutzungsbedingungen",
+                    "and": "und der",
+                    "privacyLink": "Datenschutzerklärung"
+                },
+                "submit": "Konto erstellen",
+                "submitting": "Konto wird erstellt..."
+            },
+            "socialSignUp": {
+                "divider": "Oder registrieren Sie sich mit",
+                "google": "Google",
+                "github": "GitHub"
+            },
+            "signIn": {
+                "text": "Bereits ein Konto?",
+                "link": "Anmelden"
+            },
+            "errors": {
+                "passwordsDoNotMatch": "Passwörter stimmen nicht überein",
+                "passwordTooShort": "Passwort muss mindestens 8 Zeichen lang sein",
+                "generic": "Ein Fehler ist aufgetreten. Bitte versuchen Sie es erneut."
+            }
+        }
+    },
+    "dashboard": {
+        "title": "Dashboard",
+        "toasts": {
+            "newUser": {
+                "title": "Willkommen bei Ever Works! 🎉",
+                "description": "Ihr Konto wurde erfolgreich erstellt. Bitte überprüfen Sie Ihre E-Mails, um Ihr Konto zu verifizieren."
+            },
+            "emailVerification": {
+                "title": "E-Mail verifizieren",
+                "description": "Wir haben einen Verifizierungslink an Ihre E-Mail-Adresse gesendet. Bitte überprüfen Sie Ihren Posteingang und Spam-Ordner.",
+                "action": "E-Mail erneut senden"
+            },
+            "verified": {
+                "title": "E-Mail erfolgreich verifiziert! ✅",
+                "description": "Ihre E-Mail-Adresse wurde verifiziert. Sie haben jetzt vollen Zugriff auf alle Funktionen."
+            },
+            "oauthConnected": {
+                "title": "Konto mit GitHub verbunden",
+                "description": "Ihr Konto wurde erfolgreich mit GitHub verbunden."
+            }
+        },
+        "header": {
+            "welcome": "Willkommen zurück, {username}!",
+            "subtitle": "Verwalten Sie Ihre KI-gestützten Verzeichnisse und verfolgen Sie deren Leistung",
+            "notifications": {
+                "title": "Benachrichtigungen",
+                "empty": "Keine neuen Benachrichtigungen"
+            }
+        },
+        "directories": {
+            "title": "Verzeichnisse",
+            "subtitle": "Verwalten und organisieren Sie Ihre KI-gestützten Verzeichnisse",
+            "recent": "Kürzliche Verzeichnisse",
+            "viewAll": "Alle anzeigen ({count})",
+            "search": "Verzeichnisse durchsuchen...",
+            "create": "Verzeichnis erstellen",
+            "showing": "Zeige {current} von {total} Verzeichnissen",
+            "pagination": {
+                "previous": "Zurück",
+                "next": "Weiter"
+            },
+            "empty": {
+                "title": "Noch keine Verzeichnisse",
+                "description": "Erstellen Sie Ihr erstes KI-gestütztes Verzeichnis, um mit der Organisation und Präsentation Ihrer Inhalte zu beginnen.",
+                "action": "Ihr erstes Verzeichnis erstellen",
+                "notFound": {
+                    "title": "Keine Verzeichnisse gefunden",
+                    "withSearch": "Versuchen Sie, Ihre Suchbegriffe anzupassen",
+                    "withoutSearch": "Erstellen Sie Ihr erstes KI-gestütztes Verzeichnis, um zu beginnen"
+                }
+            }
+        },
+        "settings": {
+            "title": "Einstellungen",
+            "subtitle": "Verwalten Sie Ihre Kontoeinstellungen und Präferenzen",
+            "tabs": {
+                "profile": "Profil",
+                "security": "Sicherheit",
+                "apiTokens": "API & Tokens",
+                "oauth": "Verbundene Konten",
+                "notifications": "Benachrichtigungen",
+                "dangerZone": "Gefahrenzone"
+            },
+            "profile": {
+                "title": "Profileinstellungen",
+                "subtitle": "Aktualisieren Sie Ihre Profilinformationen und Ihr Avatar",
+                "fields": {
+                    "name": "Name",
+                    "username": "Benutzername",
+                    "email": "E-Mail",
+                    "emailHelperText": "E-Mail kann nicht geändert werden"
+                },
+                "placeholders": {
+                    "name": "Geben Sie Ihren Namen ein",
+                    "username": "Geben Sie Ihren Benutzernamen ein"
+                },
+                "actions": {
+                    "save": "Änderungen speichern"
+                },
+                "messages": {
+                    "success": "Profil erfolgreich aktualisiert",
+                    "usernameRequired": "Benutzername ist erforderlich",
+                    "error": "Profil konnte nicht aktualisiert werden",
+                    "unexpectedError": "Ein unerwarteter Fehler ist aufgetreten"
+                }
+            },
+            "security": {
+                "title": "Sicherheitseinstellungen",
+                "subtitle": "Verwalten Sie Ihre Kontosicherheit und Authentifizierung",
+                "changePassword": {
+                    "title": "Passwort ändern",
+                    "currentPassword": "Aktuelles Passwort",
+                    "newPassword": "Neues Passwort",
+                    "confirmPassword": "Neues Passwort bestätigen",
+                    "showPasswords": "Passwörter anzeigen",
+                    "placeholders": {
+                        "current": "Geben Sie das aktuelle Passwort ein",
+                        "new": "Geben Sie ein neues Passwort ein (min. 8 Zeichen)",
+                        "confirm": "Bestätigen Sie das neue Passwort"
+                    },
+                    "actions": {
+                        "update": "Passwort aktualisieren"
+                    },
+                    "messages": {
+                        "success": "Passwort erfolgreich aktualisiert",
+                        "fillAllFields": "Bitte füllen Sie alle Passwortfelder aus",
+                        "minLength": "Neues Passwort muss mindestens 8 Zeichen lang sein",
+                        "mismatch": "Neue Passwörter stimmen nicht überein",
+                        "sameAsCurrent": "Neues Passwort muss sich vom aktuellen Passwort unterscheiden",
+                        "error": "Passwort konnte nicht aktualisiert werden",
+                        "unexpectedError": "Ein unerwarteter Fehler ist aufgetreten"
+                    }
+                },
+                "twoFactor": {
+                    "title": "Zwei-Faktor-Authentifizierung",
+                    "subtitle": "Fügen Sie eine zusätzliche Sicherheitsebene zu Ihrem Konto hinzu",
+                    "action": "Demnächst verfügbar"
+                },
+                "sessions": {
+                    "title": "Aktive Sitzungen",
+                    "subtitle": "Verwalten Sie Ihre aktiven Sitzungen auf verschiedenen Geräten",
+                    "action": "Sitzungen anzeigen (Demnächst verfügbar)"
+                }
+            },
+            "oauth": {
+                "title": "Verbundene Konten",
+                "subtitle": "Verbinden Sie Ihre externen Konten für erweiterte Funktionalität",
+                "github": {
+                    "name": "GitHub",
+                    "connected": "Erstellen und verwalten Sie Verzeichnisse mit GitHub-Repositories",
+                    "disconnected": "Verbinden, um Verzeichnisse aus Repositories zu erstellen",
+                    "scopes": "Berechtigungen",
+                    "actions": {
+                        "connect": "Verbinden",
+                        "disconnect": "Trennen",
+                        "confirmDisconnect": "Möchten Sie Ihr GitHub-Konto wirklich trennen?"
+                    },
+                    "messages": {
+                        "disconnected": "GitHub-Konto getrennt",
+                        "connectError": "GitHub-Verbindung fehlgeschlagen",
+                        "disconnectError": "GitHub-Trennung fehlgeschlagen"
+                    }
+                }
+            }
+        },
+        "stats": {
+            "totalDirectories": "Verzeichnisse gesamt",
+            "totalItems": "Einträge gesamt",
+            "activeWebsites": "Aktive Websites",
+            "fromLastMonth": "vom letzten Monat"
+        },
+        "directoryCard": {
+            "status": {
+                "active": "Aktiv",
+                "notStarted": "Nicht gestartet",
+                "generating": "Wird generiert",
+                "generated": "Generiert",
+                "error": "Fehler",
+                "cancelled": "Abgebrochen",
+                "idle": "Inaktiv"
+            },
+            "noDescription": "Keine Beschreibung vorhanden",
+            "items": "{count} Einträge",
+            "views": "{count} Aufrufe",
+            "updated": "Aktualisiert {date}",
+            "viewAction": "Anzeigen →"
+        },
+        "directoryList": {
+            "title": "Ihre Verzeichnisse",
+            "createButton": "Verzeichnis erstellen"
+        },
+        "directoryDetail": {
+            "failedToGenerateItems": "Einträge konnten nicht generiert werden. Bitte versuchen Sie es erneut.",
+            "generationCompleted": "Generierung erfolgreich abgeschlossen",
+            "generationCancelled": "Generierung wurde abgebrochen",
+            "status": {
+                "notStarted": "Nicht gestartet",
+                "generating": "Wird generiert",
+                "generated": "Generiert",
+                "error": "Fehler",
+                "cancelled": "Abgebrochen"
+            },
+            "tabs": {
+                "overview": "Übersicht",
+                "items": "Einträge",
+                "generator": "Generator",
+                "history": "Verlauf",
+                "deploy": "Bereitstellen",
+                "settings": "Einstellungen"
+            },
+            "statusCard": {
+                "notStarted": {
+                    "title": "Generierung nicht gestartet",
+                    "description": "Starten Sie die Generierung von Einträgen für Ihr Verzeichnis, um es mit Inhalten zu füllen.",
+                    "action": "Generierung starten"
+                },
+                "generating": {
+                    "title": "Generierung läuft",
+                    "description": "Ihre Anfrage wird verarbeitet...",
+                    "processing": "Wird verarbeitet..."
+                },
+                "generated": {
+                    "title": "Generierung abgeschlossen",
+                    "description": "Ihr Verzeichnis wurde erfolgreich mit Einträgen gefüllt.",
+                    "viewItems": "Einträge anzeigen",
+                    "regenerate": "Neu generieren"
+                },
+                "error": {
+                    "title": "Generierung fehlgeschlagen",
+                    "description": "Während der Generierung ist ein Fehler aufgetreten.",
+                    "retry": "Generierung wiederholen"
+                },
+                "cancelled": {
+                    "title": "Generierung abgebrochen",
+                    "description": "Die vorherige Generierung wurde vor dem Abschluss gestoppt.",
+                    "restart": "Generierung neu starten"
+                }
+            },
+            "stats": {
+                "totalItems": "Einträge gesamt",
+                "categories": "Kategorien",
+                "generationStatus": "Generierungsstatus",
+                "daysActive": "Tage aktiv"
+            },
+            "history": {
+                "title": "Generierungsverlauf",
+                "subtitle": "Verfolgen Sie vergangene Generierungsläufe, erstellte Einträge und Ausführungsdetails.",
+                "error": "Weitere Einträge konnten nicht geladen werden",
+                "empty": {
+                    "title": "Noch kein Verlauf",
+                    "description": "Fordern Sie eine Generierung an, um hier Fortschritt und Ergebnisse zu sehen."
+                },
+                "status": {
+                    "generating": "Läuft",
+                    "generated": "Abgeschlossen",
+                    "error": "Fehlgeschlagen",
+                    "cancelled": "Abgebrochen"
+                },
+                "table": {
+                    "run": "Lauf",
+                    "status": "Status",
+                    "newItems": "Neue Einträge",
+                    "updatedItems": "Aktualisiert",
+                    "totalItems": "Gesamt",
+                    "duration": "Dauer",
+                    "startedAt": "Gestartet"
+                },
+                "loadMore": "Mehr laden",
+                "noMore": "Keine weiteren Einträge",
+                "unknown": "Unbekannt"
+            },
+            "info": {
+                "title": "Verzeichnisinformationen",
+                "slug": "Slug",
+                "repositories": "Repositories",
+                "dataRepo": "Daten-Repository",
+                "websiteRepo": "Website-Repository",
+                "mainRepo": "Haupt-Repository",
+                "repoProvider": "Repository-Anbieter",
+                "organization": "Organisation",
+                "created": "Erstellt",
+                "lastUpdated": "Zuletzt aktualisiert",
+                "readmeHeader": "README-Header",
+                "readmeFooter": "README-Footer",
+                "custom": "Benutzerdefiniert",
+                "customOverwrite": "Benutzerdefiniert (Überschreiben)",
+                "yes": "Ja",
+                "no": "Nein"
+            },
+            "config": {
+                "title": "Konfigurationsdetails",
+                "initialPrompt": "Anfänglicher Generierungs-Prompt",
+                "companyDetails": "Firmeninformationen",
+                "companyName": "Firmenname",
+                "companyWebsite": "Website",
+                "generationSettings": "Generierungseinstellungen",
+                "generationMethod": "Generierungsmethode",
+                "autoApproval": "Automatische Genehmigung",
+                "pagingMode": "Seitenmodus",
+                "contentTable": "Inhaltstabelle",
+                "enabled": "Aktiviert",
+                "disabled": "Deaktiviert",
+                "pullRequestUpdate": "Pull-Request-Details",
+                "branch": "Branch",
+                "prTitle": "PR-Titel",
+                "mainRepository": "Haupt-Repository",
+                "dataRepository": "Daten-Repository"
+            },
+            "activity": {
+                "title": "Letzte Aktivität",
+                "noActivity": "Noch keine Aktivität",
+                "created": "Verzeichnis erstellt",
+                "directoryCreated": "Verzeichnis wurde erfolgreich erstellt",
+                "justNow": "Gerade eben"
+            },
+            "items": {
+                "title": "Verzeichniseinträge",
+                "subtitle": "Verwalten und organisieren Sie die Einträge in Ihrem Verzeichnis",
+                "noItemsTitle": "Noch keine Einträge",
+                "noItemsDescription": "Ihr Verzeichnis hat noch keine Einträge. Generieren Sie Einträge, um Ihr Verzeichnis mit Inhalten zu füllen.",
+                "generateItems": "Einträge generieren",
+                "searchPlaceholder": "Einträge durchsuchen...",
+                "allCategories": "Alle Kategorien",
+                "showing": "Zeige {current} von {total} Einträgen",
+                "noMatch": "Keine Einträge entsprechen Ihren Suchkriterien",
+                "source": "Quelle",
+                "addItem": "Eintrag hinzufügen",
+                "delete": "Löschen",
+                "deleteWithPR": "Mit Pull Request löschen",
+                "deleteConfirm": "Möchten Sie \"{name}\" wirklich löschen?",
+                "deleteSuccess": "Eintrag erfolgreich gelöscht",
+                "deleteFailed": "Eintrag konnte nicht gelöscht werden",
+                "deleteError": "Beim Löschen des Eintrags ist ein Fehler aufgetreten",
+                "loadingMore": "Lade weitere... ({current} von {total})",
+                "addModal": {
+                    "title": "Neuen Eintrag hinzufügen",
+                    "sourceUrl": "Quell-URL",
+                    "sourceUrlPlaceholder": "https://example.com/product",
+                    "sourceUrlHelp": "Klicken Sie auf 'Extrahieren', um automatisch Eintragsdetails von der URL abzurufen",
+                    "extract": "Extrahieren",
+                    "extractSuccess": "Eintragsdetails erfolgreich extrahiert",
+                    "extractFailed": "Eintragsdetails konnten nicht extrahiert werden",
+                    "extractError": "Beim Extrahieren der Details ist ein Fehler aufgetreten",
+                    "name": "Name",
+                    "namePlaceholder": "Eintragsname eingeben",
+                    "description": "Beschreibung",
+                    "descriptionPlaceholder": "Geben Sie eine kurze Beschreibung des Eintrags ein",
+                    "category": "Kategorie",
+                    "tags": "Tags",
+                    "tagPlaceholder": "Tag hinzufügen und Enter drücken",
+                    "slug": "Slug (Optional)",
+                    "slugPlaceholder": "benutzerdefinierter-eintrag-slug",
+                    "slugHelp": "URL-freundlicher Bezeichner. Wird automatisch generiert, wenn leer gelassen",
+                    "featured": "Hervorgehobener Eintrag",
+                    "featuredHelp": "Diesen Eintrag als hervorgehoben im Verzeichnis markieren",
+                    "updateWithPR": "Pull Request erstellen",
+                    "updateWithPRHelp": "Änderungen als Pull Request statt direktem Commit einreichen",
+                    "cancel": "Abbrechen",
+                    "adding": "Wird hinzugefügt...",
+                    "addItem": "Eintrag hinzufügen",
+                    "success": "Eintrag erfolgreich hinzugefügt",
+                    "successDescription": "Der Eintrag wurde zu Ihrem Verzeichnis hinzugefügt",
+                    "failed": "Eintrag konnte nicht hinzugefügt werden",
+                    "error": "Beim Hinzufügen des Eintrags ist ein Fehler aufgetreten",
+                    "errors": {
+                        "urlRequired": "Quell-URL ist für die Extraktion erforderlich",
+                        "invalidUrl": "Bitte geben Sie eine gültige URL ein, die http:// oder https:// enthält",
+                        "requiredFields": "Bitte füllen Sie alle erforderlichen Felder aus"
+                    }
+                }
+            },
+            "generator": {
+                "regenerationWarning": "Warnung zur Neugenerierung",
+                "regenerationWarningDescription": "Dieses Verzeichnis wurde bereits generiert. Das Starten einer neuen Generierung ersetzt vorhandene Einträge.",
+                "requiredInfo": "Erforderliche Informationen",
+                "updateConfiguration": "Konfiguration aktualisieren",
+                "promptRequired": "Prompt ist erforderlich",
+                "operationStartedSuccessfully": "Vorgang erfolgreich gestartet",
+                "failedToStartOperation": "Vorgang konnte nicht gestartet werden",
+                "directoryName": "Verzeichnisname",
+                "generationPrompt": "Generierungs-Prompt",
+                "recommended": "Empfohlen",
+                "promptPlaceholder": "Beschreiben Sie, welche Einträge für dieses Verzeichnis generiert werden sollen...",
+                "promptHelperText": "Seien Sie spezifisch bezüglich der Art der Inhalte, die Sie generieren möchten",
+                "repositoryDescription": "Repository-Beschreibung",
+                "repositoryPlaceholder": "Kurze Beschreibung des Repositories (optional)",
+                "startGeneration": "Generierung starten",
+                "regenerateItems": "Einträge neu generieren",
+                "updateItems": "Einträge aktualisieren",
+                "recreateDirectory": "Verzeichnis neu erstellen",
+                "showAdvancedOptions": "Erweiterte Optionen anzeigen",
+                "hideAdvancedOptions": "Erweiterte Optionen ausblenden",
+                "cancel": "Abbrechen",
+                "companyInformation": "Firmeninformationen",
+                "companyInfoDescription": "Optionale Firmendetails für gebrandete Inhalte",
+                "companyName": "Firmenname",
+                "companyNamePlaceholder": "Firmenname eingeben",
+                "companyWebsite": "Firmenwebsite",
+                "companyWebsitePlaceholder": "https://example.com",
+                "categoriesKeywords": "Kategorien & Schlüsselwörter",
+                "categoriesDescription": "Definieren Sie Kategorien und Schlüsselwörter für die Inhaltsorganisation",
+                "initialCategories": "Anfängliche Kategorien",
+                "priorityCategories": "Prioritätskategorien",
+                "targetKeywords": "Ziel-Schlüsselwörter",
+                "addCategoryPlaceholder": "Kategorie hinzufügen",
+                "addPriorityCategoryPlaceholder": "Prioritätskategorie hinzufügen",
+                "addKeywordPlaceholder": "Schlüsselwort hinzufügen",
+                "add": "Hinzufügen",
+                "sourceUrls": "Quell-URLs",
+                "sourceUrlsDescription": "Fügen Sie spezifische URLs hinzu, um Inhalte daraus zu extrahieren",
+                "sourceUrlPlaceholder": "https://example.com/page",
+                "addUrl": "URL hinzufügen",
+                "noSourceUrlsMessage": "Keine Quell-URLs hinzugefügt. Der Generator verwendet die Suche, um Inhalte zu finden.",
+                "advancedConfig": "Erweiterte Konfiguration",
+                "advancedConfigDescription": "Feinabstimmung der Generierungsparameter und des Verhaltens",
+                "generationMethod": "Generierungsmethode",
+                "methodCreateUpdate": "Erstellen oder Aktualisieren",
+                "methodRecreate": "Neu erstellen (Alle ersetzen)",
+                "updateWithPullRequest": "Mit Pull Request aktualisieren",
+                "updateWithPullRequestDescription": "Erstellen Sie einen Pull Request statt direkter Commits",
+                "enableBadgeEvaluation": "Badge-Bewertung aktivieren",
+                "enableBadgeEvaluationDescription": "Bewerten und Qualitäts-Badges zu Einträgen hinzufügen",
+                "websiteRepositoryCreationMethod": "Website-Repository-Erstellungsmethode",
+                "methodDuplicate": "Duplizieren",
+                "methodFork": "Forken",
+                "directoryNamePlaceholder": "Verzeichnisname eingeben",
+                "methodCreateFromTemplate": "Aus Vorlage erstellen",
+                "aiProcessingConfiguration": "KI-Verarbeitungskonfiguration",
+                "maxSearchQueries": "Max. Suchanfragen",
+                "resultsPerQuery": "Ergebnisse pro Anfrage",
+                "maxPagesToProcess": "Max. zu verarbeitende Seiten",
+                "relevanceThreshold": "Relevanzschwelle",
+                "aiFirstGeneration": "KI-First-Generierung",
+                "aiFirstGenerationDescription": "KI-Generierung von anfänglichen Einträgen vor der Websuche aktivieren.",
+                "contentFiltering": "Inhaltsfilterung",
+                "contentFilteringDescription": "Inhaltsqualitätsfilterung aktivieren"
+            },
+            "progress": {
+                "title": "Generierung läuft",
+                "processingRequest": "Ihre Anfrage wird verarbeitet...",
+                "steps": {
+                    "promptComparison": "Prompts vergleichen",
+                    "promptProcessing": "Ihren Prompt verarbeiten",
+                    "aiFirstItemsGeneration": "Anfängliche KI-Einträge generieren",
+                    "searchQueriesGeneration": "Suchanfragen erstellen",
+                    "webSearch": "Das Web durchsuchen",
+                    "contentRetrieval": "Inhalte abrufen",
+                    "contentFiltering": "Relevante Inhalte filtern",
+                    "itemsExtraction": "Einträge aus Inhalten extrahieren",
+                    "deduplicationDataAggregation": "Duplikate entfernen und Daten aggregieren",
+                    "categoriesTagsProcessing": "Kategorien und Tags verarbeiten",
+                    "sourcesValidation": "Quellen validieren",
+                    "badgesProcessing": "Qualitäts-Badges verarbeiten",
+                    "itemsProcessing": "Einträge finalisieren",
+                    "processing": "Wird verarbeitet..."
+                },
+                "progress": "Fortschritt",
+                "closeNote": "Dies kann einige Minuten dauern. Sie können diese Seite schließen und später zurückkommen."
+            },
+            "settings": {
+                "generalSettings": "Allgemeine Einstellungen",
+                "generalTitle": "Allgemeine Einstellungen",
+                "directoryName": "Verzeichnisname",
+                "description": "Beschreibung",
+                "organizationRepository": "Organisations-Repository",
+                "organizationHelp": "Erstellen Sie Repositories unter einer Organisation statt unter Ihrem persönlichen Konto",
+                "organizationName": "Organisationsname",
+                "organizationNamePlaceholder": "Organisationsname eingeben",
+                "readmeConfiguration": "README-Konfiguration",
+                "readmeTitle": "README-Konfiguration",
+                "customHeader": "Benutzerdefinierter Header",
+                "customHeaderPlaceholder": "Fügen Sie benutzerdefinierten Inhalt zum README-Header hinzu",
+                "overwriteDefaultHeader": "Standard-Header überschreiben",
+                "customFooter": "Benutzerdefinierter Footer",
+                "cantDeleteWhileGenerating": "Das Verzeichnis kann nicht gelöscht werden, während Einträge generiert werden.",
+                "customFooterPlaceholder": "Fügen Sie benutzerdefinierten Inhalt zum README-Footer hinzu",
+                "overwriteDefaultFooter": "Standard-Footer überschreiben",
+                "dangerZone": "Gefahrenzone",
+                "dangerTitle": "Gefahrenzone",
+                "deleteWarning": "Sobald Sie ein Verzeichnis löschen, gibt es kein Zurück mehr. Bitte seien Sie sicher.",
+                "dangerDescription": "Sobald Sie ein Verzeichnis löschen, gibt es kein Zurück mehr. Bitte seien Sie sicher.",
+                "deleteOptions": "Wählen Sie aus, was gelöscht werden soll:",
+                "deleteDataRepository": "Daten-Repository löschen",
+                "deleteDataRepositoryDescription": "Entfernen Sie das JSON-Daten-Repository von GitHub",
+                "deleteMarkdownRepository": "Markdown-Repository löschen",
+                "deleteMarkdownRepositoryDescription": "Entfernen Sie das Markdown-Repository, das das README enthält",
+                "deleteWebsiteRepository": "Website-Repository löschen",
+                "deleteWebsiteRepositoryDescription": "Entfernen Sie das bereitgestellte Website-Repository",
+                "deleteConfirm": "Sind Sie sich absolut sicher?",
+                "deleteConfirmDetail": "Diese Aktion kann nicht rückgängig gemacht werden. Das Verzeichnis und die ausgewählten Repositories werden dauerhaft gelöscht.",
+                "confirmDirectoryName": "Geben Sie den Verzeichnisnamen zur Bestätigung ein",
+                "confirmDirectoryNameDescription": "Geben Sie \"{name}\" ein, um die Löschung zu bestätigen",
+                "deleteNameMismatch": "Verzeichnisname stimmt nicht überein",
+                "deleteButton": "Verzeichnis löschen",
+                "deleteConfirmButton": "Ja, löschen",
+                "deleteSuccess": "Verzeichnis erfolgreich gelöscht",
+                "deleteFailed": "Verzeichnis konnte nicht gelöscht werden",
+                "yesDelete": "Ja, löschen",
+                "cancel": "Abbrechen",
+                "saveChanges": "Änderungen speichern",
+                "updateReadme": "README aktualisieren",
+                "updateSuccess": "Einstellungen erfolgreich aktualisiert",
+                "updateFailed": "Einstellungen konnten nicht aktualisiert werden"
+            },
+            "deploy": {
+                "noTokenAlert": {
+                    "title": "Vercel-Token erforderlich",
+                    "description": "Um Ihr Verzeichnis auf Vercel bereitzustellen, müssen Sie Ihren Vercel-API-Token in Ihren Kontoeinstellungen konfigurieren.",
+                    "configureButton": "Zu API-Token-Einstellungen gehen",
+                    "getTokenButton": "Vercel-Token abrufen",
+                    "howTo": {
+                        "title": "So konfigurieren Sie Ihren Vercel-Token:",
+                        "step1": "Klicken Sie auf 'Vercel-Token abrufen', um das Vercel-Dashboard zu öffnen",
+                        "step2": "Erstellen Sie einen neuen Token mit Bereitstellungsberechtigungen",
+                        "step3": "Kopieren Sie den generierten Token",
+                        "step4": "Gehen Sie zu API-Token-Einstellungen und fügen Sie Ihren Token im Vercel-Bereich ein"
+                    }
+                },
+                "form": {
+                    "deployToVercel": {
+                        "title": "Auf Vercel bereitstellen",
+                        "description": "Stellen Sie Ihr Verzeichnis-Website-Repository auf Vercel bereit.",
+                        "deployButton": "Jetzt bereitstellen",
+                        "deployingButton": "Wird bereitgestellt...",
+                        "deployingStateButton": "Wird bereitgestellt ({state})...",
+                        "successMessage": "Ihre Website wurde erfolgreich bereitgestellt!",
+                        "teamSelection": {
+                            "title": "Vercel-Team auswählen",
+                            "description": "Wählen Sie das Vercel-Team aus, auf dem dieses Verzeichnis bereitgestellt werden soll.",
+                            "label": "Team",
+                            "placeholder": "Team auswählen",
+                            "confirmButton": "Auf Team bereitstellen",
+                            "cancelButton": "Abbrechen"
+                        }
+                    },
+                    "updateRepository": {
+                        "title": "Website-Repository aktualisieren",
+                        "description": "Synchronisieren Sie die neuesten Änderungen von der Vorlage zum",
+                        "websiteRepository": "Website-Repository",
+                        "updateButton": "Repository aktualisieren",
+                        "updatingButton": "Wird aktualisiert..."
+                    },
+                    "messages": {
+                        "deploySuccess": "Bereitstellung erfolgreich gestartet",
+                        "deployPending": "Bereitstellung ist in der Warteschlange und wird in Kürze gestartet",
+                        "deployFailed": "Bereitstellung auf Vercel fehlgeschlagen",
+                        "deployError": "Während der Bereitstellung ist ein Fehler aufgetreten",
+                        "updateSuccess": "Repository erfolgreich aktualisiert",
+                        "updateFailed": "Repository konnte nicht aktualisiert werden",
+                        "updateError": "Beim Aktualisieren des Repositories ist ein Fehler aufgetreten"
+                    },
+                    "info": {
+                        "deployInfo": "Die Bereitstellung dauert normalerweise 1-3 Minuten. Sie erhalten eine URL, sobald sie abgeschlossen ist.",
+                        "updateInfo": "Updates synchronisieren Ihre Verzeichnisinhalte zum Website-Repository für die nächste Bereitstellung."
+                    }
+                }
+            }
+        },
+        "directoryCreation": {
+            "title": "Neues Verzeichnis erstellen",
+            "subtitle": "Wählen Sie, wie Sie Ihr Verzeichnis erstellen möchten",
+            "backToOptions": "Zurück zu den Optionen",
+            "organizationSelector": {
+                "label": "Repository-Besitzer",
+                "loading": "Organisationen werden geladen...",
+                "personal": "Persönliches Konto",
+                "personalAccount": "Repository wird unter Ihrem persönlichen Konto erstellt",
+                "organizations": "Organisationen",
+                "personalHelp": "Das Repository wird unter Ihrem persönlichen GitHub-Konto erstellt",
+                "organizationHelp": "Das Repository wird unter der {org} Organisation erstellt"
+            },
+            "ai": {
+                "title": "Mit KI erstellen",
+                "subtitle": "Beschreiben Sie Ihre Verzeichnisidee in natürlicher Sprache und lassen Sie die KI die Einrichtung übernehmen",
+                "getStarted": "Loslegen",
+                "formTitle": "Verzeichnis mit KI erstellen",
+                "formSubtitle": "Beschreiben Sie Ihre Verzeichnisidee und lassen Sie die KI die Einrichtung und anfängliche Inhaltsgenerierung übernehmen",
+                "directoryNameLabel": "Verzeichnisname",
+                "directoryNamePlaceholder": "z.B. Awesome AI Tools",
+                "directoryNameHelp": "Die KI schlägt einen Namen vor, wenn Sie dies leer lassen",
+                "promptLabel": "Beschreiben Sie Ihr Verzeichnis",
+                "githubRequired": "Bitte verbinden Sie zuerst Ihr GitHub-Konto.",
+                "promptPlaceholder": "Beschreiben Sie, welche Art von Verzeichnis Sie erstellen möchten, welche Einträge es enthalten soll und alle spezifischen Anforderungen...",
+                "inspirationText": "Brauchen Sie Inspiration? Probieren Sie eines davon:",
+                "examplePrompts": {
+                    "0": {
+                        "name": "KI-Entwicklertools",
+                        "prompt": "Erstellen Sie ein Verzeichnis der besten KI-Tools für Entwickler"
+                    },
+                    "1": {
+                        "name": "React-Komponenten-Hub",
+                        "prompt": "Erstellen Sie eine kuratierte Liste von Open-Source-React-Komponenten"
+                    },
+                    "2": {
+                        "name": "Remote-Team-Tools",
+                        "prompt": "Generieren Sie ein Verzeichnis von Produktivitäts-Apps für Remote-Teams"
+                    },
+                    "3": {
+                        "name": "Nachhaltige Mode",
+                        "prompt": "Erstellen Sie eine Sammlung nachhaltiger Modemarken"
+                    }
+                },
+                "featuresTitle": "Was die KI für Sie tun wird:",
+                "features": {
+                    "0": "Einen passenden Namen und eine Beschreibung generieren",
+                    "1": "Anfängliche Kategorien und Struktur erstellen",
+                    "2": "Relevante Einträge automatisch finden und hinzufügen",
+                    "3": "GitHub-Repository mit ordentlicher Dokumentation einrichten"
+                },
+                "generateButton": "Mit KI generieren",
+                "generatingButton": "Verzeichnis wird generiert...",
+                "cancelButton": "Abbrechen",
+                "noteTitle": "Hinweis:",
+                "noteText": "Die KI-Generierung dauert normalerweise 2-5 Minuten, abhängig von der Komplexität Ihrer Anfrage. Sie werden benachrichtigt, wenn Ihr Verzeichnis bereit ist.",
+                "errors": {
+                    "promptRequired": "Bitte beschreiben Sie, welche Art von Verzeichnis Sie erstellen möchten",
+                    "nameRequired": "Verzeichnisname ist erforderlich",
+                    "slugRequired": "Verzeichnis-Slug ist erforderlich",
+                    "descriptionRequired": "Verzeichnisbeschreibung ist erforderlich"
+                },
+                "success": {
+                    "started": "Verzeichniserstellung gestartet!",
+                    "generating": "Die KI generiert Inhalte. Dies kann einige Minuten dauern...",
+                    "created": "Verzeichnis erfolgreich erstellt!"
+                },
+                "advancedSettings": "Erweiterte Einstellungen",
+                "advancedSubtitle": "Organisations- und Repository-Einstellungen konfigurieren",
+                "organizationLabel": "Organisations-Repository",
+                "organizationHelp": "Erstellen Sie Repositories unter einer Organisation statt unter Ihrem persönlichen Konto",
+                "organizationNameLabel": "Organisationsname",
+                "organizationNamePlaceholder": "Organisationsname eingeben"
+            },
+            "manual": {
+                "title": "Manuell erstellen",
+                "subtitle": "Konfigurieren Sie Ihr Verzeichnis mit vollständiger Kontrolle über jede Einstellung und Option",
+                "configureNow": "Jetzt konfigurieren",
+                "formTitle": "Verzeichnis manuell erstellen",
+                "formSubtitle": "Konfigurieren Sie Ihr Verzeichnis mit vollständiger Kontrolle über jede Einstellung",
+                "basicInfo": "Grundinformationen",
+                "nameLabel": "Verzeichnisname *",
+                "namePlaceholder": "z.B. Awesome AI Tools",
+                "slugLabel": "Verzeichnis-Slug *",
+                "slugPlaceholder": "awesome-ai-tools",
+                "githubRequired": "Bitte verbinden Sie zuerst Ihr GitHub-Konto.",
+                "slugHelp": "URL-freundlicher Bezeichner (nur Kleinbuchstaben, Zahlen und Bindestriche)",
+                "descriptionLabel": "Beschreibung *",
+                "descriptionPlaceholder": "Eine kuratierte Liste der besten KI-Tools und Ressourcen für Entwickler",
+                "advancedSettings": "Erweiterte Einstellungen",
+                "advancedSubtitle": "Organisation, benutzerdefinierte Header und mehr",
+                "organizationLabel": "Unter Organisation erstellen",
+                "organizationHelp": "Erstellen Sie dieses Verzeichnis unter einer GitHub-Organisation statt unter Ihrem persönlichen Konto",
+                "organizationNameLabel": "Organisationsname",
+                "organizationNamePlaceholder": "meine-organisation",
+                "headerLabel": "Benutzerdefinierter README-Header",
+                "headerPlaceholder": "Fügen Sie benutzerdefinierten Inhalt oben in Ihre README-Datei ein",
+                "headerOverwrite": "Standard-Header vollständig ersetzen",
+                "footerLabel": "Benutzerdefinierter README-Footer",
+                "footerPlaceholder": "Fügen Sie benutzerdefinierten Inhalt unten in Ihre README-Datei ein",
+                "footerOverwrite": "Standard-Footer vollständig ersetzen",
+                "createButton": "Verzeichnis erstellen",
+                "creatingButton": "Verzeichnis wird erstellt...",
+                "cancelButton": "Abbrechen",
+                "nameRequired": "Verzeichnisname ist erforderlich",
+                "slugRequired": "Verzeichnis-Slug ist erforderlich",
+                "descriptionRequired": "Verzeichnisbeschreibung ist erforderlich",
+                "success": {
+                    "created": "Verzeichnis erfolgreich erstellt!"
+                }
+            }
+        },
+        "github": {
+            "connection": {
+                "alert": {
+                    "title": "GitHub nicht verbunden",
+                    "subtitle": "Verbinden Sie Ihr GitHub-Konto, um Verzeichnisse zu erstellen und zu verwalten",
+                    "connectButton": "GitHub verbinden",
+                    "connectingButton": "Wird verbunden..."
+                },
+                "status": {
+                    "title": "GitHub-Status",
+                    "connected": "Verbunden",
+                    "notConnected": "Nicht verbunden",
+                    "connectedDescription": "Ihre Verzeichnisse werden als GitHub-Repositories in Ihrem Konto gespeichert.",
+                    "notConnectedDescription": "Verbinden Sie Ihr GitHub-Konto, um Verzeichnisse zu erstellen und zu verwalten.",
+                    "connectedAccount": "Verbundenes Konto:",
+                    "requiredNote": "Erforderlich zum Erstellen von Verzeichnissen",
+                    "connectButton": "GitHub verbinden",
+                    "connectingButton": "Wird verbunden...",
+                    "failedToConnect": "GitHub-Verbindung fehlgeschlagen"
+                }
+            }
+        },
+        "apiTokens": {
+            "title": "API & Tokens",
+            "subtitle": "Verwalten Sie Ihre API-Schlüssel und Drittanbieter-Integrationen",
+            "vercel": {
+                "title": "Vercel-Integration",
+                "subtitle": "Verbinden Sie Ihr Vercel-Konto, um Verzeichnisse als Websites bereitzustellen",
+                "connected": "Verbunden",
+                "notConnected": "Nicht verbunden",
+                "connectedMessage": "Ihr Vercel-Konto ist verbunden. Sie können jetzt Verzeichnisse auf Vercel bereitstellen.",
+                "disconnect": "Vercel trennen",
+                "disconnecting": "Wird entfernt...",
+                "apiTokenLabel": "Vercel-API-Token",
+                "placeholder": "vc_...",
+                "showToken": "Anzeigen",
+                "hideToken": "Ausblenden",
+                "getTokenHelp": "Sie können Ihren API-Token von",
+                "vercelDashboard": "Vercel-Dashboard",
+                "save": "Token speichern",
+                "saving": "Wird gespeichert...",
+                "messages": {
+                    "tokenRequired": "Bitte geben Sie einen gültigen Vercel-Token ein",
+                    "saveSuccess": "Vercel-Token erfolgreich gespeichert",
+                    "saveFailed": "Vercel-Token konnte nicht gespeichert werden",
+                    "removeSuccess": "Vercel-Token erfolgreich entfernt",
+                    "removeFailed": "Vercel-Token konnte nicht entfernt werden",
+                    "unexpectedError": "Ein unerwarteter Fehler ist aufgetreten"
+                }
+            },
+            "apiKeys": {
+                "title": "API-Schlüssel",
+                "subtitle": "Generieren und verwalten Sie API-Schlüssel für programmatischen Zugriff",
+                "generate": "API-Schlüssel generieren (Demnächst verfügbar)"
+            },
+            "webhooks": {
+                "title": "Webhooks",
+                "subtitle": "Konfigurieren Sie Webhooks, um Echtzeit-Updates zu erhalten",
+                "configure": "Webhooks konfigurieren (Demnächst verfügbar)"
+            }
+        },
+        "notifications": {
+            "title": "Benachrichtigungseinstellungen",
+            "subtitle": "Wählen Sie, wie Sie über wichtige Updates benachrichtigt werden möchten",
+            "email": {
+                "title": "E-Mail-Benachrichtigungen",
+                "directoryUpdates": {
+                    "label": "Verzeichnis-Updates",
+                    "description": "Erhalten Sie Benachrichtigungen über wichtige Updates zu Ihren Verzeichnissen"
+                },
+                "newItems": {
+                    "label": "Neue Einträge",
+                    "description": "Erhalten Sie Benachrichtigungen, wenn neue Einträge zu Ihren Verzeichnissen hinzugefügt werden"
+                },
+                "weeklyDigest": {
+                    "label": "Wöchentliche Zusammenfassung",
+                    "description": "Erhalten Sie eine wöchentliche Zusammenfassung Ihrer Verzeichnisaktivität"
+                },
+                "marketing": {
+                    "label": "Marketing & Werbeaktionen",
+                    "description": "Erhalten Sie Updates über neue Funktionen und Angebote"
+                }
+            },
+            "app": {
+                "title": "In-App-Benachrichtigungen",
+                "newItems": {
+                    "label": "Neue Einträge",
+                    "description": "Benachrichtigungen für neue Verzeichniseinträge anzeigen"
+                },
+                "comments": {
+                    "label": "Kommentare",
+                    "description": "Erhalten Sie Benachrichtigungen über Kommentare zu Ihren Verzeichnissen"
+                },
+                "mentions": {
+                    "label": "Erwähnungen",
+                    "description": "Erhalten Sie Benachrichtigungen, wenn jemand Sie erwähnt"
+                },
+                "systemUpdates": {
+                    "label": "System-Updates",
+                    "description": "Wichtige Systembenachrichtigungen und Wartungshinweise"
+                }
+            },
+            "actions": {
+                "save": "Einstellungen speichern",
+                "saving": "Wird gespeichert..."
+            },
+            "messages": {
+                "success": "Benachrichtigungseinstellungen aktualisiert",
+                "error": "Einstellungen konnten nicht aktualisiert werden",
+                "unexpectedError": "Ein unerwarteter Fehler ist aufgetreten"
+            }
+        },
+        "sidebar": {
+            "menu": "Menü",
+            "aiChat": "KI-Chat",
+            "newDirectory": "Neues Verzeichnis",
+            "navigation": {
+                "dashboard": "Dashboard",
+                "directories": "Verzeichnisse",
+                "settings": "Einstellungen"
+            },
+            "signOut": "Abmelden",
+            "signingOut": "Wird abgemeldet..."
+        },
+        "dangerZone": {
+            "title": "Gefahrenzone",
+            "subtitle": "Unwiderrufliche und zerstörerische Aktionen",
+            "export": {
+                "title": "Ihre Daten exportieren",
+                "subtitle": "Laden Sie alle Ihre Verzeichnisse, Einträge und Einstellungen herunter",
+                "action": "Daten exportieren (Demnächst verfügbar)"
+            },
+            "delete": {
+                "title": "Konto löschen",
+                "subtitle": "Löschen Sie Ihr Konto und alle zugehörigen Daten dauerhaft. Diese Aktion kann nicht rückgängig gemacht werden.",
+                "button": "Mein Konto löschen",
+                "confirmTitle": "⚠️ Dies wird dauerhaft gelöscht:",
+                "confirmItems": [
+                    "Ihr Konto und Profil",
+                    "Alle Ihre Verzeichnisse",
+                    "Alle Verzeichniseinträge und Daten",
+                    "API-Schlüssel und Integrationen",
+                    "Alle zugehörigen Websites"
+                ],
+                "confirmLabel": "Geben Sie Ihre E-Mail {email} zur Bestätigung ein",
+                "confirmPlaceholder": "Geben Sie Ihre E-Mail ein",
+                "confirmButton": "Ja, mein Konto löschen",
+                "deleting": "Wird gelöscht...",
+                "cancel": "Abbrechen"
+            },
+            "messages": {
+                "confirmEmail": "Bitte geben Sie Ihre E-Mail korrekt ein, um zu bestätigen",
+                "deleteSuccess": "Konto erfolgreich gelöscht",
+                "deleteFailed": "Konto konnte nicht gelöscht werden",
+                "unexpectedError": "Ein unerwarteter Fehler ist aufgetreten"
+            }
+        },
+        "aiChat": {
+            "title": "KI-Assistent",
+            "subtitle": "Erstellen Sie Verzeichnisse mit natürlicher Sprache",
+            "newChat": "Neuer Chat",
+            "loadingConversation": "Konversation wird geladen…",
+            "inputPlaceholder": "Beschreiben Sie das Verzeichnis, das Sie erstellen möchten...",
+            "sendButton": "Senden"
+        }
+    },
+    "layout": {
+        "auth": {
+            "backToHome": "Zurück zur Startseite",
+            "feature": {
+                "title": "Verzeichnisse mit KI erstellen",
+                "subtitle": "Erstellen Sie in Minuten schöne, durchsuchbare Verzeichnisse mit natürlicher Sprache. Keine Programmierung erforderlich.",
+                "benefits": {
+                    "ai": {
+                        "title": "KI-gestützte Erstellung",
+                        "description": "Beschreiben Sie, was Sie möchten, und lassen Sie die KI die Arbeit erledigen"
+                    },
+                    "templates": {
+                        "title": "Professionelle Vorlagen",
+                        "description": "Beginnen Sie mit schönen, anpassbaren Designs"
+                    },
+                    "management": {
+                        "title": "Einfache Verwaltung",
+                        "description": "Aktualisieren und organisieren Sie Ihre Inhalte mühelos"
+                    }
+                }
+            }
+        }
+    },
+    "errors": {
+        "global": {
+            "title": "Etwas ist schiefgelaufen!",
+            "tryAgain": "Erneut versuchen"
+        }
+    },
+    "metadata": {
+        "title": "Ever Works - Verzeichnis-Builder",
+        "description": "Eine SaaS-Plattform zum Erstellen und Verwalten von Verzeichnissen"
+    },
+    "api": {
+        "errors": {
+            "unauthorized": "Sie sind nicht berechtigt, diese Aktion auszuführen",
+            "unauthorizedLogin": "Nicht autorisiert: Bitte melden Sie sich erneut an.",
+            "forbidden": "Verboten: Sie haben keine Berechtigung, diese Aktion auszuführen.",
+            "serverError": "Serverfehler: {message}",
+            "unexpected": "Ein unerwarteter Serverfehler ist aufgetreten.",
+            "apiError": "API-Fehler: {status} {statusText}",
+            "loginFailed": "Anmeldung fehlgeschlagen",
+            "registerFailed": "Registrierung fehlgeschlagen",
+            "unsupportedProvider": "Nicht unterstützter Anbieter",
+            "providerConnectFailed": "Verbindung zum Anbieter fehlgeschlagen",
+            "forgotPasswordFailed": "E-Mail zum Zurücksetzen des Passworts konnte nicht gesendet werden",
+            "resetPasswordFailed": "Passwort konnte nicht zurückgesetzt werden"
+        }
+    },
+    "actions": {
+        "directories": {
+            "slug": {
+                "required": "Slug ist erforderlich",
+                "format": "Slug darf nur Kleinbuchstaben, Zahlen und Bindestriche enthalten"
+            },
+            "name": {
+                "required": "Name ist erforderlich",
+                "maxLength": "Name muss weniger als 100 Zeichen lang sein"
+            },
+            "description": {
+                "required": "Beschreibung ist erforderlich",
+                "maxLength": "Beschreibung muss weniger als 500 Zeichen lang sein"
+            },
+            "prompt": {
+                "minLength": "Eingabeaufforderung muss mindestens 10 Zeichen lang sein",
+                "maxLength": "Eingabeaufforderung muss weniger als 1000 Zeichen lang sein"
+            },
+            "oauthRequired": "OAuth-Verbindung erforderlich. Bitte verbinden Sie zuerst Ihr {provider}-Konto.",
+            "githubRequired": "GitHub-Verbindung erforderlich. Bitte verbinden Sie zuerst Ihr GitHub-Konto.",
+            "createSuccess": "Verzeichnis erfolgreich erstellt!",
+            "createFailed": "Verzeichnis konnte nicht erstellt werden",
+            "updateSuccess": "Verzeichnis erfolgreich aktualisiert!",
+            "updateFailed": "Verzeichnis konnte nicht aktualisiert werden",
+            "invalidGeneratedData": "Gültige Verzeichnisdaten konnten nicht generiert werden",
+            "aiGenerationStarted": "Verzeichniserstellung gestartet! KI generiert Inhalte...",
+            "invalidId": "Ungültige Verzeichnis-ID",
+            "deleteSuccess": "Verzeichnis erfolgreich gelöscht",
+            "deleteFailed": "Verzeichnis konnte nicht gelöscht werden",
+            "fetchFailed": "Verzeichnisse konnten nicht abgerufen werden",
+            "organization": {
+                "requiredWhenOwnerProvided": "Organisation muss aktiviert sein, wenn ein Besitzer angegeben ist"
+            }
+        },
+        "generator": {
+            "promptRequired": "Eingabeaufforderung ist erforderlich",
+            "nameRequired": "Name ist erforderlich",
+            "generationStartedSuccessfully": "Generierung erfolgreich gestartet",
+            "updateStartedSuccessfully": "Aktualisierung erfolgreich gestartet",
+            "failedToGenerateItems": "Elemente konnten nicht generiert werden",
+            "failedToUpdateItems": "Elemente konnten nicht aktualisiert werden",
+            "markdownRegeneratedSuccessfully": "Markdown erfolgreich regeneriert",
+            "failedToRegenerateMarkdown": "Markdown konnte nicht regeneriert werden",
+            "notAuthorizedToAccessOrganization": "Sie sind nicht berechtigt, auf diese Organisation zuzugreifen. Bitte kontaktieren Sie den Besitzer ({owner}) für Unterstützung."
+        },
+        "settings": {
+            "profile": {
+                "usernameRequired": "Benutzername ist erforderlich",
+                "usernameMaxLength": "Benutzername muss weniger als 50 Zeichen lang sein",
+                "usernameFormat": "Benutzername darf nur Buchstaben, Zahlen, Bindestriche und Unterstriche enthalten",
+                "updateFailed": "Profil konnte nicht aktualisiert werden",
+                "notAuthenticated": "Nicht authentifiziert"
+            },
+            "password": {
+                "currentRequired": "Aktuelles Passwort ist erforderlich",
+                "newMinLength": "Passwort muss mindestens 8 Zeichen lang sein",
+                "newMaxLength": "Passwort muss weniger als 100 Zeichen lang sein",
+                "updateFailed": "Passwort konnte nicht aktualisiert werden",
+                "updateSuccess": "Passwort erfolgreich aktualisiert",
+                "notAuthenticated": "Nicht authentifiziert"
+            },
+            "vercel": {
+                "notAuthenticated": "Nicht authentifiziert",
+                "tokenRequired": "Token ist erforderlich",
+                "invalidFormat": "Ungültiges Vercel-Token-Format",
+                "saveFailed": "Vercel-Token konnte nicht gespeichert werden",
+                "saveSuccess": "Vercel-Token erfolgreich gespeichert",
+                "validationFailed": "Das bereitgestellte Vercel-Token ist ungültig. Bitte überprüfen Sie es erneut und versuchen Sie es noch einmal.",
+                "removeFailed": "Vercel-Token konnte nicht entfernt werden",
+                "removeSuccess": "Vercel-Token erfolgreich entfernt"
+            },
+            "github": {
+                "notAuthenticated": "Nicht authentifiziert",
+                "disconnectFailed": "GitHub-Verbindung konnte nicht getrennt werden",
+                "disconnectSuccess": "GitHub-Konto erfolgreich getrennt"
+            },
+            "notifications": {
+                "notAuthenticated": "Nicht authentifiziert",
+                "updateFailed": "Einstellungen konnten nicht aktualisiert werden",
+                "updateSuccess": "Benachrichtigungseinstellungen erfolgreich aktualisiert"
+            },
+            "danger": {
+                "notAuthenticated": "Nicht authentifiziert",
+                "deleteFailed": "Konto konnte nicht gelöscht werden",
+                "deleteDisabled": "Kontolöschung ist in der Demo deaktiviert"
+            }
+        },
+        "deploy": {
+            "deployVercelFailed": "Bereitstellung auf Vercel fehlgeschlagen",
+            "updateRepositoryFailed": "Repository konnte nicht aktualisiert werden"
+        }
+    },
+    "validation": {
+        "auth": {
+            "invalidCredentials": "Ungültige E-Mail oder Passwort",
+            "account": {
+                "suspended": "Konto ist gesperrt"
+            },
+            "email": {
+                "required": "E-Mail darf nicht leer sein",
+                "invalid": "Ungültige E-Mail",
+                "emailAlreadyRegistered": "E-Mail ist bereits registriert"
+            },
+            "password": {
+                "required": "Passwort darf nicht leer sein",
+                "minLength": "Passwort muss mindestens {length} Zeichen lang sein",
+                "lowercase": "Passwort muss mindestens einen Kleinbuchstaben enthalten",
+                "numberOrSpecial": "Passwort muss mindestens eine Zahl oder ein Sonderzeichen enthalten",
+                "cannotStartWith": "Passwort darf nicht mit einem Punkt oder Zeilenumbruch beginnen",
+                "digit": "Passwort muss mindestens eine Ziffer enthalten"
+            },
+            "username": {
+                "minLength": "Benutzername muss mindestens {length} Zeichen enthalten"
+            }
+        }
+    }
+}
