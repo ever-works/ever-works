@@ -61,6 +61,10 @@
             "types": "./dist/services/index.d.ts",
             "default": "./dist/services/index.js"
         },
+        "./subscriptions": {
+            "types": "./dist/subscriptions/index.d.ts",
+            "default": "./dist/subscriptions/index.js"
+        },
         "./config": {
             "types": "./dist/config/index.d.ts",
             "default": "./dist/config/index.js"

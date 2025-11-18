@@ -4,6 +4,7 @@ import {
     PrimaryGeneratedColumn,
     ManyToOne,
     OneToMany,
+    OneToOne,
     CreateDateColumn,
     UpdateDateColumn,
 } from 'typeorm';
@@ -12,6 +13,11 @@ import type { ClassToObject, GenerateStatus } from './types';
 import type { PRUpdate } from '@src/data-generator';
 import { DirectoryGenerationHistory } from './directory-generation-history.entity';
 import { TimestampColumn } from './_types';
+import {
+    DirectorySchedule,
+    DirectoryScheduleCadence,
+    DirectoryScheduleStatus,
+} from './directory-schedule.entity';
 
 @Entity({ name: 'directories' })
 export class Directory {
@@ -68,6 +74,21 @@ export class Directory {
 
     @TimestampColumn({ nullable: true })
     generationFinishedAt?: Date;
+
+    @OneToOne(() => DirectorySchedule, (schedule) => schedule.directory)
+    schedule?: ClassToObject<DirectorySchedule>;
+
+    @Column({ type: 'boolean', default: false })
+    scheduledUpdatesEnabled: boolean;
+
+    @Column({ type: 'varchar', nullable: true })
+    scheduledCadence?: DirectoryScheduleCadence | null;
+
+    @TimestampColumn({ nullable: true })
+    scheduledNextRunAt?: Date | null;
+
+    @Column({ type: 'varchar', nullable: true })
+    scheduledStatus?: DirectoryScheduleStatus | null;
 
     // Deployment FIELDS
     @Column({ nullable: true })

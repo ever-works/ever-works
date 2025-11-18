@@ -1,9 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Directory } from '@src/entities/directory.entity';
-import type {
-    DirectoryOperations,
-    GenerationHistoryUpdateInput,
-} from '@src/directory-operations';
+import type { DirectoryOperations, GenerationHistoryUpdateInput } from '@src/directory-operations';
 import { TriggerInternalApiClient } from './trigger-internal-api.client';
 import { DirectoryCommandAction, DirectoryCommandPayloads } from './directory-command.types';
 

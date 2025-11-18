@@ -33,6 +33,8 @@ export type {
     PRUpdate,
     DirectoryGenerationHistoryEntry,
     DirectoryGenerationHistoryResponse,
+    DirectoryScheduleDto,
+    DirectoryScheduleAllowedCadence,
 } from './directory';
 
 export type {

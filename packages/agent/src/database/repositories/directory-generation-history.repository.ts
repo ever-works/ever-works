@@ -11,6 +11,8 @@ type HistoryCreateParams = {
     parameters?: Record<string, any> | null;
     status?: GenerateStatusType;
     startedAt?: Date;
+    triggeredBy?: 'user' | 'schedule' | 'api';
+    scheduleId?: string | null;
 };
 
 type HistoryUpdateParams = {
@@ -41,6 +43,8 @@ export class DirectoryGenerationHistoryRepository {
             parameters: params.parameters ?? null,
             status: params.status ?? GenerateStatusType.GENERATING,
             startedAt: params.startedAt,
+            triggeredBy: params.triggeredBy ?? 'user',
+            scheduleId: params.scheduleId ?? null,
         });
 
         return this.repository.save(record);

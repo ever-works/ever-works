@@ -55,3 +55,22 @@ export enum OAuthProcessType {
     LOGIN = 'login',
     CONNECT = 'connect',
 }
+
+export enum DirectoryScheduleCadence {
+    HOURLY = 'hourly',
+    DAILY = 'daily',
+    WEEKLY = 'weekly',
+    MONTHLY = 'monthly',
+}
+
+export enum DirectoryScheduleStatus {
+    DISABLED = 'disabled',
+    ACTIVE = 'active',
+    PAUSED = 'paused',
+    CANCELED = 'canceled',
+}
+
+export enum DirectoryScheduleBillingMode {
+    SUBSCRIPTION = 'subscription',
+    USAGE = 'usage',
+}

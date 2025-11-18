@@ -3,6 +3,7 @@ import { DirectoryStatusCard } from '@/components/directories/detail/DirectorySt
 import { DirectoryInfo } from '@/components/directories/detail/overview/DirectoryInfo';
 import { DirectoryStats } from '@/components/directories/detail/overview/DirectoryStats';
 import { DirectoryConfig } from '@/components/directories/detail/overview/DirectoryConfig';
+import { DirectoryScheduleCard } from '@/components/directories/detail/DirectoryScheduleCard';
 import { GenerateStatusType } from '@/lib/api/enums';
 
 type Params = { params: Promise<{ id: string }> };
@@ -10,10 +11,11 @@ type Params = { params: Promise<{ id: string }> };
 export default async function DirectoryOverviewPage({ params }: Params) {
     const { id } = await params;
 
-    const [directoryRes, configRes, countRes] = await Promise.all([
+    const [directoryRes, configRes, countRes, scheduleRes] = await Promise.all([
         directoryAPI.get(id),
         directoryAPI.getConfig(id).catch(() => ({ config: null })),
         directoryAPI.getCount(id).catch(() => ({ items: 0, categories: 0, tags: 0 })),
+        directoryAPI.getSchedule(id).catch(() => null),
     ]);
 
     const directory = directoryRes.directory;
@@ -41,6 +43,11 @@ export default async function DirectoryOverviewPage({ params }: Params) {
                 <DirectoryInfo directory={directory} config={config} />
                 {config && <DirectoryConfig config={config} />}
             </div>
+
+            <DirectoryScheduleCard
+                directoryId={directory.id}
+                schedule={scheduleRes?.schedule || null}
+            />
         </div>
     );
 }
