@@ -89,3 +89,27 @@ export const PUBLIC_ROUTES = [
     '/terms',
     '/help',
 ] as const;
+
+
+export const SITE_CONFIG = {
+    name: APP_NAME,
+    logo: {
+        light: '/logo-light.png',
+        dark: '/logo-ever-work.png',
+    },
+    favicon: {
+        light: '/favicon-light.png',
+        dark: '/favicon-dark.png',
+    },
+    title: 'Ever Works',
+    description: 'Build Directories with AI',
+    keywords: ['Ever Works', 'Directories', 'AI', 'Automation', 'Productivity', 'Workflow'],
+    author: 'Ever Works',
+    url: WEB_URL,
+    image: '/logo-light.png',
+    twitter: {
+        card: 'summary_large_image',
+        title: 'Ever Works',
+        description: 'Build Directories with AI',
+    },  
+} as const;
