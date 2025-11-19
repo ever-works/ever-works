@@ -1029,6 +1029,12 @@
                         "description": "轻松更新和组织您的内容"
                     }
                 }
+            },
+            "footer": {
+                "copyright": "© {year} Ever Works. 保留所有权利。",
+                "terms": "服务条款",
+                "privacy": "隐私政策",
+                "help": "帮助"
             }
         }
     },

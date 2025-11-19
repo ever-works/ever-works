@@ -1029,6 +1029,12 @@
                         "description": "Mettez à jour et organisez votre contenu sans effort"
                     }
                 }
+            },
+            "footer": {
+                "copyright": "© {year} Ever Works. Tous droits réservés.",
+                "terms": "Conditions d'utilisation",
+                "privacy": "Politique de confidentialité",
+                "help": "Aide"
             }
         }
     },

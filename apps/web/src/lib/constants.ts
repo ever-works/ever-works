@@ -1,9 +1,12 @@
-export const APP_NAME = 'Ever Works';
+// Site Configuration - Multi-tenant support via environment variables
+export const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME || process.env.APP_NAME || 'Ever Works';
 
 // i18n
-export const LOCALES = ['en', 'ar', 'de', 'es', 'fr', 'zh'] as const;
+export const LOCALES = (process.env.NEXT_PUBLIC_LOCALES || 'en,ar,de,es,fr,zh')
+    .split(',')
+    .map((locale) => locale.trim()) as readonly string[];
 
-export const DEFAULT_LOCALE = 'en';
+export const DEFAULT_LOCALE = process.env.NEXT_PUBLIC_DEFAULT_LOCALE || 'en';
 
 // API URL
 const apiUrl = process.env.API_URL || 'http://localhost:3100';
@@ -14,7 +17,10 @@ export const ALLOWED_REDIRECT_URLS = (process.env.ALLOWED_REDIRECT_URLS || 'loca
     .split(',')
     .map((url) => url.trim());
 
-export const GET_DIRECTORY_LIST_LIMIT = 6;
+export const GET_DIRECTORY_LIST_LIMIT = parseInt(
+    process.env.NEXT_PUBLIC_DIRECTORY_LIST_LIMIT || '6',
+    10,
+);
 
 // App URL
 export const WEB_URL = process.env.NEXT_PUBLIC_WEB_URL || 'http://localhost:3000';
@@ -23,7 +29,7 @@ export const WEB_URL = process.env.NEXT_PUBLIC_WEB_URL || 'http://localhost:3000
 export const AUTH_SECRET = process.env.COOKIE_SECRET || process.env.AUTH_SECRET;
 
 // Redirect search param key
-export const REDIRECT_SEARCH_PARAM = 'redirect_uri';
+export const REDIRECT_SEARCH_PARAM = process.env.REDIRECT_SEARCH_PARAM || 'redirect_uri';
 
 // ROUTES
 export const ROUTES = {
@@ -92,24 +98,32 @@ export const PUBLIC_ROUTES = [
 
 
 export const SITE_CONFIG = {
-    name: APP_NAME,
+    name: process.env.NEXT_PUBLIC_SITE_NAME || APP_NAME,
     logo: {
-        light: '/logo-light.png',
-        dark: '/logo-ever-work.png',
+        light: process.env.NEXT_PUBLIC_LOGO_LIGHT || '/logo-light.png',
+        dark: process.env.NEXT_PUBLIC_LOGO_DARK || '/logo-ever-work.png',
     },
     favicon: {
-        light: '/favicon-light.png',
-        dark: '/favicon-dark.png',
+        light: process.env.NEXT_PUBLIC_FAVICON_LIGHT || '/favicon-light.png',
+        dark: process.env.NEXT_PUBLIC_FAVICON_DARK || '/favicon-dark.png',
     },
-    title: 'Ever Works',
-    description: 'Build Directories with AI',
-    keywords: ['Ever Works', 'Directories', 'AI', 'Automation', 'Productivity', 'Workflow'],
-    author: 'Ever Works',
+    title: process.env.NEXT_PUBLIC_SITE_TITLE || APP_NAME,
+    description:
+        process.env.NEXT_PUBLIC_SITE_DESCRIPTION || 'Build Directories with AI',
+    keywords: process.env.NEXT_PUBLIC_SITE_KEYWORDS
+        ? process.env.NEXT_PUBLIC_SITE_KEYWORDS.split(',').map((k) => k.trim())
+        : ['Ever Works', 'Directories', 'AI', 'Automation', 'Productivity', 'Workflow'],
+    author: process.env.NEXT_PUBLIC_SITE_AUTHOR || APP_NAME,
     url: WEB_URL,
-    image: '/logo-light.png',
+    image: process.env.NEXT_PUBLIC_SITE_IMAGE || '/logo-light.png',
     twitter: {
-        card: 'summary_large_image',
-        title: 'Ever Works',
-        description: 'Build Directories with AI',
-    },  
+        card: (process.env.NEXT_PUBLIC_TWITTER_CARD || 'summary_large_image') as
+            | 'summary'
+            | 'summary_large_image',
+        title: process.env.NEXT_PUBLIC_TWITTER_TITLE || APP_NAME,
+        description:
+            process.env.NEXT_PUBLIC_TWITTER_DESCRIPTION ||
+            process.env.NEXT_PUBLIC_SITE_DESCRIPTION ||
+            'Build Directories with AI',
+    },
 } as const;
