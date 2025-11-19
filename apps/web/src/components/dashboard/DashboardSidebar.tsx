@@ -7,11 +7,12 @@ import { logout } from '@/app/actions/auth';
 import { cn } from '@/lib/utils/cn';
 import { ChatInterface } from '@/components/ai/ChatInterface';
 import { ChatProvider } from '@/components/ai/ChatProvider';
-import { APP_NAME, ROUTES } from '@/lib/constants';
+import { ROUTES } from '@/lib/constants';
 import { Link, usePathname } from '@/i18n/navigation';
 import { Home, Folder, Settings, LogOut, Plus, X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
+import { LogoEverWork } from '../logos';
 
 interface DashboardSidebarProps {
     user: AuthUser;
@@ -55,10 +56,7 @@ export function DashboardSidebar({ user, isOpen, onToggle }: DashboardSidebarPro
                 <div className="flex flex-col h-full">
                     <div className={cn('h-16 flex items-center px-6')}>
                         <div className="flex items-center justify-between w-full">
-                            <h1 className="text-xl font-semibold text-text dark:text-text-dark">
-                                {APP_NAME}
-                            </h1>
-
+                            <LogoEverWork />
                             <Button
                                 onClick={onToggle}
                                 variant="ghost"
