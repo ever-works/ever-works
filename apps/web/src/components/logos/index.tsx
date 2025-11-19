@@ -1,28 +1,42 @@
+'use client';
+
 import Image from 'next/image';
 import { Link } from '@/i18n/navigation';
 import { cn } from '@/lib/utils/cn';
-import { SITE_CONFIG } from '@/lib/constants';
+import { getSiteConfig } from '@/lib/constants';
+import { DirectoryConfig } from '@/lib/api';
 
 interface LogoEverWorkProps {
     className?: string;
     size?: number;
     priority?: boolean;
+    config?: DirectoryConfig | null;
 }
 
-export function LogoEverWork({ className, size = 120, priority = true }: LogoEverWorkProps) {
+export function LogoEverWork({
+    className,
+    size = 120,
+    priority = true,
+    config: configProps,
+}: LogoEverWorkProps) {
+  
+
+    const siteConfig = getSiteConfig(configProps);
+    const logoHref = siteConfig.website || '/';
+
     return (
-        <Link href="/" className={cn('relative flex items-center', className)}>
+        <Link href={logoHref} className={cn('relative flex items-center', className)}>
             <Image
-                src={SITE_CONFIG.logo.light}
-                alt={SITE_CONFIG.name}
+                src={siteConfig.logo.light}
+                alt={siteConfig.name}
                 width={size}
                 height={size}
                 priority={priority}
                 className="block dark:hidden h-auto w-auto max-h-12 object-contain"
             />
             <Image
-                src={SITE_CONFIG.logo.dark}
-                alt={SITE_CONFIG.name}
+                src={siteConfig.logo.dark}
+                alt={siteConfig.name}
                 width={size}
                 height={size}
                 priority={priority}

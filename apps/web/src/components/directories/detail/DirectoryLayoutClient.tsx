@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { useRouter } from '@/i18n/navigation';
-import { ConnectionInfo, Directory } from '@/lib/api/types-only';
+import { ConnectionInfo, Directory, DirectoryConfig } from '@/lib/api/types-only';
 import { DirectoryHeader } from './DirectoryHeader';
 import { DirectoryTabs } from './DirectoryTabs';
 import { GenerateStatusType } from '@/lib/api/enums';
@@ -15,11 +15,13 @@ interface DirectoryLayoutClientProps {
     directory: Directory;
     children: React.ReactNode;
     oauthConnection: ConnectionInfo | null;
+    config: DirectoryConfig | null;
 }
 
 export function DirectoryLayoutClient({
     directory,
     oauthConnection,
+    config,
     children,
 }: DirectoryLayoutClientProps) {
     const router = useRouter();
@@ -60,7 +62,7 @@ export function DirectoryLayoutClient({
     }, [isGenerating, router]);
 
     return (
-        <DirectoryDetailProvider directory={directory} oauthConnection={oauthConnection}>
+        <DirectoryDetailProvider directory={directory} oauthConnection={oauthConnection} config={config}>
             <div className="w-full">
                 <DirectoryHeader directory={directory} />
 

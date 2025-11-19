@@ -197,7 +197,7 @@
         "title": "Panel de Control",
         "toasts": {
             "newUser": {
-                "title": "¡Bienvenido a Ever Works! 🎉",
+                "title": "¡Bienvenido a {companyName}! 🎉",
                 "description": "Tu cuenta ha sido creada exitosamente. Por favor, revisa tu correo electrónico para verificar tu cuenta."
             },
             "emailVerification": {
@@ -1031,7 +1031,7 @@
                 }
             },
             "footer": {
-                "copyright": "© {year} Ever Works. Todos los derechos reservados.",
+                "copyright": "© {year} {companyName}. Todos los derechos reservados.",
                 "terms": "Términos de Servicio",
                 "privacy": "Política de Privacidad",
                 "help": "Ayuda"
@@ -1045,7 +1045,7 @@
         }
     },
     "metadata": {
-        "title": "Ever Works - Constructor de Directorios",
+        "title": "{companyName} - Constructor de Directorios",
         "description": "Una plataforma SaaS para construir y gestionar directorios"
     },
     "api": {

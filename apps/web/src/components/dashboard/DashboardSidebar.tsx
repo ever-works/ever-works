@@ -13,6 +13,7 @@ import { Home, Folder, Settings, LogOut, Plus, X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { LogoEverWork } from '../logos';
+import { useDirectoryDetail } from '../directories/detail/DirectoryDetailContext';
 
 interface DashboardSidebarProps {
     user: AuthUser;
@@ -26,6 +27,7 @@ export function DashboardSidebar({ user, isOpen, onToggle }: DashboardSidebarPro
     const [isPending, startTransition] = useTransition();
     const [avatarError, setAvatarError] = useState(false);
     const t = useTranslations('dashboard.sidebar');
+    const { config } = useDirectoryDetail();
 
     const handleLogout = async () => {
         startTransition(async () => {
@@ -56,7 +58,7 @@ export function DashboardSidebar({ user, isOpen, onToggle }: DashboardSidebarPro
                 <div className="flex flex-col h-full">
                     <div className={cn('h-16 flex items-center px-6')}>
                         <div className="flex items-center justify-between w-full">
-                            <LogoEverWork />
+                            <LogoEverWork config={config} />
                             <Button
                                 onClick={onToggle}
                                 variant="ghost"

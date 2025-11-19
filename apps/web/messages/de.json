@@ -197,7 +197,7 @@
         "title": "Dashboard",
         "toasts": {
             "newUser": {
-                "title": "Willkommen bei Ever Works! 🎉",
+                "title": "Willkommen bei {companyName}! 🎉",
                 "description": "Ihr Konto wurde erfolgreich erstellt. Bitte überprüfen Sie Ihre E-Mails, um Ihr Konto zu verifizieren."
             },
             "emailVerification": {
@@ -1031,7 +1031,7 @@
                 }
             },
             "footer": {
-                "copyright": "© {year} Ever Works. Alle Rechte vorbehalten.",
+                "copyright": "© {year} {companyName}. Alle Rechte vorbehalten.",
                 "terms": "Nutzungsbedingungen",
                 "privacy": "Datenschutzrichtlinie",
                 "help": "Hilfe"
@@ -1045,7 +1045,7 @@
         }
     },
     "metadata": {
-        "title": "Ever Works - Verzeichnis-Builder",
+        "title": "{companyName} - Verzeichnis-Builder",
         "description": "Eine SaaS-Plattform zum Erstellen und Verwalten von Verzeichnissen"
     },
     "api": {
