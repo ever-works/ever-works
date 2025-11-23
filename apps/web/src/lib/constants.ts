@@ -106,28 +106,30 @@ export const getSiteConfig = (config?: DirectoryConfig | null) => {
         name: name,
         website: website,
         logo: {
-            light: process.env.NEXT_PUBLIC_LOGO_LIGHT || '/logo-light.png',
-            dark: process.env.NEXT_PUBLIC_LOGO_DARK || '/logo-ever-work.png',
+            light: config?.logo?.light || process.env.NEXT_PUBLIC_LOGO_LIGHT || '/logo-light.png',
+            dark: config?.logo?.dark || process.env.NEXT_PUBLIC_LOGO_DARK || '/logo-ever-work.png',
         },
         favicon: {
-            light: process.env.NEXT_PUBLIC_FAVICON_LIGHT || '/favicon-light.png',
-            dark: process.env.NEXT_PUBLIC_FAVICON_DARK || '/favicon-dark.png',
+            light: config?.favicon?.light || process.env.NEXT_PUBLIC_FAVICON_LIGHT || '/favicon-light.png',
+            dark: config?.favicon?.dark || process.env.NEXT_PUBLIC_FAVICON_DARK || '/favicon-dark.png',
         },
-        title: process.env.NEXT_PUBLIC_SITE_TITLE || name,
+        title: config?.title || process.env.NEXT_PUBLIC_SITE_TITLE || name,
         description:
-            process.env.NEXT_PUBLIC_SITE_DESCRIPTION || 'Build Directories with AI',
-        keywords: process.env.NEXT_PUBLIC_SITE_KEYWORDS
-            ? process.env.NEXT_PUBLIC_SITE_KEYWORDS.split(',').map((k) => k.trim())
-            : ['Ever Works', 'Directories', 'AI', 'Automation', 'Productivity', 'Workflow'],
-        author: process.env.NEXT_PUBLIC_SITE_AUTHOR || name,
+            config?.description || process.env.NEXT_PUBLIC_SITE_DESCRIPTION || 'Build Directories with AI',
+        keywords: config?.keywords ||
+            (process.env.NEXT_PUBLIC_SITE_KEYWORDS
+                ? process.env.NEXT_PUBLIC_SITE_KEYWORDS.split(',').map((k) => k.trim())
+                : ['Ever Works', 'Directories', 'AI', 'Automation', 'Productivity', 'Workflow']),
+        author: config?.author || process.env.NEXT_PUBLIC_SITE_AUTHOR || name,
         url: website,
-        image: process.env.NEXT_PUBLIC_SITE_IMAGE || '/logo-light.png',
+        image: config?.image || process.env.NEXT_PUBLIC_SITE_IMAGE || '/logo-light.png',
         twitter: {
-            card: (process.env.NEXT_PUBLIC_TWITTER_CARD || 'summary_large_image') as
-                | 'summary'
-                | 'summary_large_image',
-            title: process.env.NEXT_PUBLIC_TWITTER_TITLE || name,
+            card: (config?.twitter?.card ||
+                process.env.NEXT_PUBLIC_TWITTER_CARD ||
+                'summary_large_image') as 'summary' | 'summary_large_image',
+            title: config?.twitter?.title || process.env.NEXT_PUBLIC_TWITTER_TITLE || name,
             description:
+                config?.twitter?.description ||
                 process.env.NEXT_PUBLIC_TWITTER_DESCRIPTION ||
                 process.env.NEXT_PUBLIC_SITE_DESCRIPTION ||
                 'Build Directories with AI',
