@@ -197,7 +197,7 @@
         "title": "仪表板",
         "toasts": {
             "newUser": {
-                "title": "欢迎使用 Ever Works！🎉",
+                "title": "欢迎使用 {companyName}！🎉",
                 "description": "您的账户已成功创建。请查看您的邮箱以验证账户。"
             },
             "emailVerification": {
@@ -1029,6 +1029,12 @@
                         "description": "轻松更新和组织您的内容"
                     }
                 }
+            },
+            "footer": {
+                "copyright": "© {year} {companyName}. 保留所有权利。",
+                "terms": "服务条款",
+                "privacy": "隐私政策",
+                "help": "帮助"
             }
         }
     },
@@ -1039,7 +1045,7 @@
         }
     },
     "metadata": {
-        "title": "Ever Works - 目录构建器",
+        "title": "{companyName} - 目录构建器",
         "description": "用于构建和管理目录的 SaaS 平台"
     },
     "api": {

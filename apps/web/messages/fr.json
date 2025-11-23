@@ -197,7 +197,7 @@
         "title": "Tableau de bord",
         "toasts": {
             "newUser": {
-                "title": "Bienvenue sur Ever Works ! 🎉",
+                "title": "Bienvenue sur {companyName} ! 🎉",
                 "description": "Votre compte a été créé avec succès. Veuillez vérifier votre e-mail pour vérifier votre compte."
             },
             "emailVerification": {
@@ -1029,6 +1029,12 @@
                         "description": "Mettez à jour et organisez votre contenu sans effort"
                     }
                 }
+            },
+            "footer": {
+                "copyright": "© {year} {companyName}. Tous droits réservés.",
+                "terms": "Conditions d'utilisation",
+                "privacy": "Politique de confidentialité",
+                "help": "Aide"
             }
         }
     },
@@ -1039,7 +1045,7 @@
         }
     },
     "metadata": {
-        "title": "Ever Works - Créateur de répertoires",
+        "title": "{companyName} - Créateur de répertoires",
         "description": "Une plateforme SaaS pour créer et gérer des répertoires"
     },
     "api": {

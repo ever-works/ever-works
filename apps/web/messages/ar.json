@@ -197,7 +197,7 @@
         "title": "لوحة التحكم",
         "toasts": {
             "newUser": {
-                "title": "مرحباً بك في Ever Works! 🎉",
+                "title": "مرحباً بك في {companyName}! 🎉",
                 "description": "تم إنشاء حسابك بنجاح. يرجى التحقق من بريدك الإلكتروني للتحقق من حسابك."
             },
             "emailVerification": {
@@ -1029,6 +1029,12 @@
                         "description": "حدّث ونظّم محتواك بسهولة"
                     }
                 }
+            },
+            "footer": {
+                "copyright": "© {year} {companyName}. جميع الحقوق محفوظة.",
+                "terms": "شروط الخدمة",
+                "privacy": "سياسة الخصوصية",
+                "help": "مساعدة"
             }
         }
     },
@@ -1039,7 +1045,7 @@
         }
     },
     "metadata": {
-        "title": "Ever Works - منشئ الأدلة",
+        "title": "{companyName} - منشئ الأدلة",
         "description": "منصة SaaS لبناء وإدارة الأدلة"
     },
     "api": {
