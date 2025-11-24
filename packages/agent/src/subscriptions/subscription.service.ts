@@ -82,7 +82,7 @@ export class SubscriptionService implements OnModuleInit {
             PLAN_SEED_DATA.map((plan) =>
                 this.planRepository.upsert({
                     ...plan,
-                    currency: 'usd',
+                    currency: config.billing.getDefaultCurrency(),
                     active: true,
                 }),
             ),

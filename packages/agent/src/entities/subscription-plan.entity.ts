@@ -5,10 +5,13 @@ import {
     CreateDateColumn,
     UpdateDateColumn,
     OneToMany,
+    Index,
 } from 'typeorm';
 import type { ClassToObject, DirectoryScheduleCadence, SubscriptionPlanCode } from './types';
 import { UserSubscription } from './user-subscription.entity';
 
+@Index(['code'], { unique: true })
+@Index(['active'])
 @Entity({ name: 'subscription_plans' })
 export class SubscriptionPlan {
     @PrimaryGeneratedColumn('uuid')

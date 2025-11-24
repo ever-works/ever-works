@@ -8,15 +8,18 @@ import {
     CreateDateColumn,
     UpdateDateColumn,
     JoinColumn,
+    Index,
 } from 'typeorm';
 import type { ClassToObject, DirectoryScheduleCadence } from './types';
 import { Directory } from './directory.entity';
 import { User } from './user.entity';
-import { UserSubscription } from './user-subscription.entity';
 import { DirectoryScheduleBillingMode, DirectoryScheduleStatus, GenerateStatusType } from './types';
 import { TimestampColumn } from './_types';
 import { UsageLedgerEntry } from './usage-ledger-entry.entity';
 
+@Index(['status', 'nextRunAt'])
+@Index(['userId', 'status'])
+@Index(['directoryId'], { unique: true })
 @Entity({ name: 'directory_schedules' })
 export class DirectorySchedule {
     @PrimaryGeneratedColumn('uuid')
@@ -59,13 +62,6 @@ export class DirectorySchedule {
 
     @Column({ type: 'int', default: 3 })
     maxFailureBeforePause: number;
-
-    @Column({ nullable: true })
-    initiatedBySubscriptionId?: string | null;
-
-    @ManyToOne(() => UserSubscription, { nullable: true })
-    @JoinColumn({ name: 'initiatedBySubscriptionId' })
-    initiatedBySubscription?: ClassToObject<UserSubscription> | null;
 
     @OneToMany(() => UsageLedgerEntry, (entry) => entry.schedule)
     ledgerEntries?: ClassToObject<UsageLedgerEntry>[] | null;

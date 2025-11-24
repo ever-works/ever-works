@@ -6,6 +6,7 @@ import {
     UpdateDateColumn,
     ManyToOne,
     JoinColumn,
+    Index,
 } from 'typeorm';
 import type { ClassToObject, SubscriptionPlanCode } from './types';
 import { User } from './user.entity';
@@ -24,6 +25,8 @@ export enum SubscriptionBillingProvider {
     MANUAL = 'manual',
 }
 
+@Index(['userId', 'status'])
+@Index(['planCode'])
 @Entity({ name: 'user_subscriptions' })
 export class UserSubscription {
     @PrimaryGeneratedColumn('uuid')

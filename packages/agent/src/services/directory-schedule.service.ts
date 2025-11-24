@@ -98,6 +98,29 @@ export class DirectoryScheduleService {
             });
         }
 
+        const maxFailureBeforePause =
+            dto.maxFailureBeforePause ??
+            existing?.maxFailureBeforePause ??
+            config.subscriptions.getMaxFailureBeforePause();
+
+        if (maxFailureBeforePause < 1 || maxFailureBeforePause > 10) {
+            throw new BadRequestException('maxFailureBeforePause must be between 1 and 10');
+        }
+
+        const creatingOrActivating =
+            enable && (!existing || existing.status !== DirectoryScheduleStatus.ACTIVE);
+
+        if (creatingOrActivating) {
+            const activeScheduleCount = await this.scheduleRepository.countActiveByUser(user.id);
+            if (activeScheduleCount >= plan.maxDirectories) {
+                throw new BadRequestException({
+                    status: 'error',
+                    code: 'PLAN_LIMIT_EXCEEDED',
+                    message: `Your ${plan.displayName} plan allows up to ${plan.maxDirectories} scheduled directories.`,
+                });
+            }
+        }
+
         const status = enable ? DirectoryScheduleStatus.ACTIVE : DirectoryScheduleStatus.PAUSED;
 
         const nextRunAt =
@@ -105,19 +128,13 @@ export class DirectoryScheduleService {
                 ? this.calculateNextRun(cadence)
                 : (existing?.nextRunAt ?? null);
 
-        const subscription = await this.subscriptionService.getActiveSubscription(user.id);
-
         const schedule = await this.scheduleRepository.upsert(directory.id, {
             userId: user.id,
             cadence,
             billingMode,
             status,
-            maxFailureBeforePause:
-                dto.maxFailureBeforePause ??
-                existing?.maxFailureBeforePause ??
-                config.subscriptions.getMaxFailureBeforePause(),
+            maxFailureBeforePause,
             nextRunAt,
-            initiatedBySubscriptionId: subscription?.id ?? null,
         });
 
         await this.syncDirectory(directory.id, schedule);
@@ -151,15 +168,15 @@ export class DirectoryScheduleService {
     }
 
     async markRunDispatched(scheduleId: string): Promise<DirectorySchedule | null> {
+        const updated = await this.scheduleRepository.tryMarkDispatched(scheduleId);
+        if (!updated) {
+            return null;
+        }
+
         const schedule = await this.scheduleRepository.findById(scheduleId);
         if (!schedule) {
             return null;
         }
-
-        await this.scheduleRepository.updateById(schedule.id, {
-            lastRunStatus: GenerateStatusType.GENERATING,
-            nextRunAt: null,
-        });
 
         await this.syncDirectory(schedule.directoryId, {
             ...schedule,

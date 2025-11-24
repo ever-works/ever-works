@@ -6,6 +6,7 @@ import {
     CreateDateColumn,
     UpdateDateColumn,
     JoinColumn,
+    Index,
 } from 'typeorm';
 import { Directory } from './directory.entity';
 import { User } from './user.entity';
@@ -23,6 +24,9 @@ export type GenerationMetrics = {
     total_items_in_store?: number;
 };
 
+@Index(['directoryId', 'status'])
+@Index(['triggeredBy'])
+@Index(['scheduleId'])
 @Entity({ name: 'directory_generation_history' })
 export class DirectoryGenerationHistory {
     @PrimaryGeneratedColumn('uuid')

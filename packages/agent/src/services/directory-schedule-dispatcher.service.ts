@@ -16,10 +16,20 @@ export class DirectoryScheduleDispatcherService {
 
     async dispatchDue(limit = config.subscriptions.getMaxBatch()): Promise<number> {
         const schedules = await this.scheduleRepository.findDue(limit);
+        let dispatched = 0;
 
         for (const schedule of schedules) {
             try {
-                await this.directoryGenerationService.runScheduledUpdate(schedule);
+                const reservedSchedule =
+                    (await this.directoryScheduleService.markRunDispatched(schedule.id)) || null;
+
+                if (!reservedSchedule) {
+                    this.logger.warn(`Schedule ${schedule.id} was already dispatched, skipping`);
+                    continue;
+                }
+
+                await this.directoryGenerationService.runScheduledUpdate(reservedSchedule);
+                dispatched += 1;
             } catch (error) {
                 this.logger.error(
                     `Failed to dispatch scheduled update for directory ${schedule.directoryId}`,
@@ -32,6 +42,6 @@ export class DirectoryScheduleDispatcherService {
             }
         }
 
-        return schedules.length;
+        return dispatched;
     }
 }

@@ -321,6 +321,9 @@ export const config = {
     },
 
     billing: {
+        getDefaultCurrency() {
+            return process.env.BILLING_DEFAULT_CURRENCY || 'usd';
+        },
         stripe: {
             getSecretKey() {
                 return process.env.STRIPE_SECRET_KEY;

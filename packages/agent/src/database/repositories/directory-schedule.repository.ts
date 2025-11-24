@@ -14,7 +14,7 @@ export class DirectoryScheduleRepository {
     async findByDirectoryId(directoryId: string): Promise<DirectorySchedule | null> {
         return this.repository.findOne({
             where: { directoryId },
-            relations: ['directory', 'initiatedBySubscription', 'initiatedBySubscription.plan'],
+            relations: ['directory', 'user'],
         });
     }
 
@@ -40,7 +40,7 @@ export class DirectoryScheduleRepository {
     async findById(id: string): Promise<DirectorySchedule | null> {
         return this.repository.findOne({
             where: { id },
-            relations: ['directory', 'initiatedBySubscription'],
+            relations: ['directory', 'user'],
         });
     }
 
@@ -86,5 +86,28 @@ export class DirectoryScheduleRepository {
 
     async pause(scheduleId: string): Promise<void> {
         await this.repository.update(scheduleId, { status: DirectoryScheduleStatus.PAUSED });
+    }
+
+    async tryMarkDispatched(scheduleId: string): Promise<boolean> {
+        const result = await this.repository
+            .createQueryBuilder()
+            .update(DirectorySchedule)
+            .set({
+                lastRunStatus: GenerateStatusType.GENERATING,
+                nextRunAt: null,
+                updatedAt: () => 'CURRENT_TIMESTAMP',
+            })
+            .where('id = :id', { id: scheduleId })
+            .andWhere('status = :status', { status: DirectoryScheduleStatus.ACTIVE })
+            .andWhere('nextRunAt IS NOT NULL')
+            .execute();
+
+        return (result.affected ?? 0) > 0;
+    }
+
+    async countActiveByUser(userId: string): Promise<number> {
+        return this.repository.count({
+            where: { userId, status: DirectoryScheduleStatus.ACTIVE },
+        });
     }
 }

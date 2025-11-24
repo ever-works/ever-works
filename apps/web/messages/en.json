@@ -379,9 +379,91 @@
                 "overview": "Overview",
                 "items": "Items",
                 "generator": "Generator",
+                "schedule": "Schedule",
                 "history": "History",
                 "deploy": "Deploy",
                 "settings": "Settings"
+            },
+            "schedule": {
+                "page": {
+                    "title": "Scheduled updates",
+                    "subtitle": "Automate refreshes for {name} with a dedicated cadence, billing mode, and failure handling.",
+                    "fallbackName": "this directory",
+                    "statusLabel": "Status: {status}",
+                    "nextRunLabel": "Next run: {next}"
+                },
+                "card": {
+                    "title": "Schedule automation",
+                    "subtitle": "Choose how often to refresh, how to bill runs, and set safeguards for repeated failures.",
+                    "labels": {
+                        "enabled": "Enabled",
+                        "disabled": "Disabled",
+                        "billing": "Billing",
+                        "cadence": "Cadence",
+                        "maxFailures": "Max failures before pause",
+                        "plan": "Plan: {plan}",
+                        "nextRun": "Next run: {next}",
+                        "lastRun": "Last run: {last}"
+                    },
+                    "billing": {
+                        "subscription": "Subscription",
+                        "usage": "Pay-per-use"
+                    },
+                    "cadence": {
+                        "hourly": "Every hour",
+                        "daily": "Every day",
+                        "weekly": "Every week",
+                        "monthly": "Every month"
+                    },
+                    "plans": {
+                        "free": "Free",
+                        "standard": "Standard",
+                        "premium": "Premium"
+                    },
+                    "planNote": "Current plan: {plan}.",
+                    "usageRequired": "This cadence requires pay-per-use or an upgrade.",
+                    "cadenceAllowed": "Cadence allowed by your plan.",
+                    "help": {
+                        "maxFailures": "Automatically pause after repeated failures to avoid waste."
+                    },
+                    "stats": {
+                        "nextRun": "Next run",
+                        "lastRun": "Last run",
+                        "status": "Status",
+                        "failures": "Failures",
+                        "notScheduled": "Not scheduled",
+                        "never": "Never",
+                        "disabled": "Disabled"
+                    },
+                    "actions": {
+                        "save": "Save schedule",
+                        "saving": "Saving...",
+                        "runNow": "Run now",
+                        "starting": "Starting...",
+                        "cancel": "Cancel schedule"
+                    },
+                    "success": {
+                        "saved": "Schedule saved.",
+                        "runStarted": "Scheduled run started.",
+                        "cancelled": "Schedule cancelled."
+                    },
+                    "errors": {
+                        "requireUsage": "Enable pay-per-use billing to use this cadence.",
+                        "updateFailed": "Failed to update schedule.",
+                        "runFailed": "Failed to start run.",
+                        "cancelFailed": "Failed to cancel schedule.",
+                        "disableBeforeCancel": "Disable the schedule before cancelling."
+                    }
+                },
+                "actions": {
+                    "invalid": "Invalid data",
+                    "updated": "Schedule updated.",
+                    "updateFailed": "Failed to update schedule.",
+                    "runStarted": "Scheduled run started.",
+                    "runFailed": "Failed to trigger run.",
+                    "cancelled": "Schedule cancelled.",
+                    "cancelFailed": "Failed to cancel schedule."
+                }
             },
             "statusCard": {
                 "notStarted": {

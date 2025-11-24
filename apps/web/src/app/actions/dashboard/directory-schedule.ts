@@ -6,6 +6,7 @@ import { DirectoryScheduleBillingMode, DirectoryScheduleCadence } from '@/lib/ap
 import { getAuthFromCookie } from '@/lib/auth';
 import { revalidatePath } from 'next/cache';
 import { ROUTES } from '@/lib/constants';
+import { getTranslations } from 'next-intl/server';
 
 const updateScheduleSchema = z.object({
     enable: z.boolean(),
@@ -23,9 +24,11 @@ export async function updateDirectorySchedule(
         return { success: false, error: 'Not authenticated' };
     }
 
+    const t = await getTranslations('dashboard.directoryDetail.schedule.actions');
+
     const validation = updateScheduleSchema.safeParse(payload);
     if (!validation.success) {
-        return { success: false, error: validation.error.errors[0]?.message || 'Invalid data' };
+        return { success: false, error: validation.error.errors[0]?.message || t('invalid') };
     }
 
     try {
@@ -34,12 +37,12 @@ export async function updateDirectorySchedule(
 
         return {
             success: true,
-            message: 'Schedule updated.',
+            message: t('updated'),
         };
     } catch (error) {
         return {
             success: false,
-            error: error instanceof Error ? error.message : 'Failed to update schedule.',
+            error: error instanceof Error ? error.message : t('updateFailed'),
         };
     }
 }
@@ -50,14 +53,16 @@ export async function runDirectorySchedule(directoryId: string) {
         return { success: false, error: 'Not authenticated' };
     }
 
+    const t = await getTranslations('dashboard.directoryDetail.schedule.actions');
+
     try {
         await directoryAPI.runSchedule(directoryId);
         revalidatePath(ROUTES.DASHBOARD_DIRECTORY(directoryId));
-        return { success: true, message: 'Scheduled run started.' };
+        return { success: true, message: t('runStarted') };
     } catch (error) {
         return {
             success: false,
-            error: error instanceof Error ? error.message : 'Failed to trigger run.',
+            error: error instanceof Error ? error.message : t('runFailed'),
         };
     }
 }
@@ -68,14 +73,16 @@ export async function cancelDirectorySchedule(directoryId: string) {
         return { success: false, error: 'Not authenticated' };
     }
 
+    const t = await getTranslations('dashboard.directoryDetail.schedule.actions');
+
     try {
         await directoryAPI.cancelSchedule(directoryId);
         revalidatePath(ROUTES.DASHBOARD_DIRECTORY(directoryId));
-        return { success: true, message: 'Schedule cancelled.' };
+        return { success: true, message: t('cancelled') };
     } catch (error) {
         return {
             success: false,
-            error: error instanceof Error ? error.message : 'Failed to cancel schedule.',
+            error: error instanceof Error ? error.message : t('cancelFailed'),
         };
     }
 }

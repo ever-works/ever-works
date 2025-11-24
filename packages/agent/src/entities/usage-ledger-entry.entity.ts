@@ -6,6 +6,7 @@ import {
     JoinColumn,
     CreateDateColumn,
     UpdateDateColumn,
+    Index,
 } from 'typeorm';
 import { DirectoryScheduleBillingMode, type ClassToObject } from './types';
 import { User } from './user.entity';
@@ -25,6 +26,10 @@ export enum UsageLedgerStatus {
     CANCELED = 'canceled',
 }
 
+@Index(['userId', 'status'])
+@Index(['directoryId'])
+@Index(['createdAt'])
+@Index(['scheduleId'])
 @Entity({ name: 'usage_ledger_entries' })
 export class UsageLedgerEntry {
     @PrimaryGeneratedColumn('uuid')

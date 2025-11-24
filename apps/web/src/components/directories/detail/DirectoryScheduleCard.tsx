@@ -18,26 +18,22 @@ import {
     runDirectorySchedule,
     updateDirectorySchedule,
 } from '@/app/actions/dashboard/directory-schedule';
+import { useTranslations } from 'next-intl';
 
 type DirectoryScheduleCardProps = {
     directoryId: string;
     schedule: DirectoryScheduleDto | null;
 };
 
-const cadenceLabels: Record<DirectoryScheduleCadence, string> = {
-    [DirectoryScheduleCadence.HOURLY]: 'Every hour',
-    [DirectoryScheduleCadence.DAILY]: 'Every day',
-    [DirectoryScheduleCadence.WEEKLY]: 'Every week',
-    [DirectoryScheduleCadence.MONTHLY]: 'Every month',
-};
-
-const planLabels: Record<string, string> = {
-    free: 'Free',
-    standard: 'Standard',
-    premium: 'Premium',
-};
+const cadenceOrder = [
+    DirectoryScheduleCadence.HOURLY,
+    DirectoryScheduleCadence.DAILY,
+    DirectoryScheduleCadence.WEEKLY,
+    DirectoryScheduleCadence.MONTHLY,
+];
 
 export function DirectoryScheduleCard({ directoryId, schedule }: DirectoryScheduleCardProps) {
+    const t = useTranslations('dashboard.directoryDetail.schedule.card');
     const router = useRouter();
     const initialStatus = schedule?.status || DirectoryScheduleStatus.DISABLED;
     const [form, setForm] = useState({
@@ -56,7 +52,14 @@ export function DirectoryScheduleCard({ directoryId, schedule }: DirectorySchedu
 
     const nextRunDisplay = useMemo(() => formatDate(schedule?.nextRunAt), [schedule?.nextRunAt]);
     const lastRunDisplay = useMemo(() => formatDate(schedule?.lastRunAt), [schedule?.lastRunAt]);
-    const planLabel = planLabels[schedule?.planCode || 'free'] || schedule?.planCode || 'Free';
+
+    const planLabel = (() => {
+        const known = ['free', 'standard', 'premium'] as const;
+        if (schedule?.planCode && (known as readonly string[]).includes(schedule.planCode)) {
+            return t(`plans.${schedule.planCode as 'free' | 'standard' | 'premium'}`);
+        }
+        return schedule?.planCode || t('plans.free');
+    })();
 
     const updateForm = (updates: Partial<typeof form>) => {
         setForm((prev) => ({ ...prev, ...updates }));
@@ -74,7 +77,7 @@ export function DirectoryScheduleCard({ directoryId, schedule }: DirectorySchedu
                 requiresUsage &&
                 form.billingMode !== DirectoryScheduleBillingMode.USAGE
             ) {
-                setError('Enable pay-per-use billing to use this cadence.');
+                setError(t('errors.requireUsage'));
                 return;
             }
 
@@ -86,11 +89,11 @@ export function DirectoryScheduleCard({ directoryId, schedule }: DirectorySchedu
             });
 
             if (!result.success) {
-                setError(result.error || 'Failed to update schedule.');
+                setError(result.error || t('errors.updateFailed'));
                 return;
             }
 
-            setMessage(result.message || 'Schedule updated.');
+            setMessage(result.message || t('success.saved'));
             router.refresh();
         });
     };
@@ -103,242 +106,227 @@ export function DirectoryScheduleCard({ directoryId, schedule }: DirectorySchedu
             const result = await runDirectorySchedule(directoryId);
 
             if (!result.success) {
-                setError(result.error || 'Failed to trigger run.');
+                setError(result.error || t('errors.runFailed'));
                 return;
             }
 
-            setMessage(
-                result.message || 'Scheduled run started. This page will update once it completes.',
-            );
+            setMessage(result.message || t('success.runStarted'));
             router.refresh();
         });
     };
 
+    const cancelSchedule = () => {
+        startSaving(async () => {
+            setError(null);
+            setMessage(null);
+
+            if (form.enable) {
+                setError(t('errors.disableBeforeCancel'));
+                return;
+            }
+
+            const result = await updateDirectorySchedule(directoryId, {
+                enable: false,
+                cadence: form.cadence,
+                billingMode: form.billingMode,
+                maxFailureBeforePause: form.maxFailureBeforePause,
+            });
+
+            if (!result.success) {
+                setError(result.error || t('errors.cancelFailed'));
+                return;
+            }
+
+            setMessage(result.message || t('success.cancelled'));
+            router.refresh();
+        });
+    };
+
+    const cardClass = cn(
+        'bg-card dark:bg-card-dark border border-card-border dark:border-card-border-dark rounded-xl p-6 shadow-sm space-y-6',
+    );
+
     return (
-        <div
-            className={cn(
-                'rounded-lg border p-6',
-                'bg-card dark:bg-card-dark',
-                'border-card-border dark:border-card-border-dark',
-            )}
-        >
-            <div className="flex items-center justify-between mb-4">
-                <div>
-                    <h3 className="text-lg font-semibold text-text dark:text-text-dark">
-                        Scheduled updates
-                    </h3>
-                    <p className="text-sm text-text-muted dark:text-text-muted-dark">
-                        Automate directory updates on a cadence.
-                    </p>
-                </div>
-                <span className="px-2 py-1 rounded-full text-xs font-semibold bg-surface-tertiary dark:bg-surface-tertiary-dark text-text-muted dark:text-text-muted-dark">
-                    {planLabel}
-                </span>
-            </div>
-
-            {schedule ? (
-                <div className="grid md:grid-cols-3 gap-4 mb-6 text-sm">
-                    <ScheduleStat
-                        label="Next run"
-                        value={nextRunDisplay || 'Not scheduled'}
-                        muted={!nextRunDisplay}
-                    />
-                    <ScheduleStat
-                        label="Last run"
-                        value={lastRunDisplay || 'Not available'}
-                        muted={!lastRunDisplay}
-                        status={schedule.lastRunStatus}
-                    />
-                    <ScheduleStat
-                        label="Status"
-                        value={formatStatus(schedule.status)}
-                        muted={schedule.status === DirectoryScheduleStatus.DISABLED}
-                    />
-                </div>
-            ) : (
-                <p className="text-sm text-text-muted dark:text-text-muted-dark mb-6">
-                    No schedule configured yet.
-                </p>
-            )}
-
-            <div className="space-y-5">
-                <Switch
-                    label="Enable scheduled updates"
-                    checked={form.enable}
-                    onChange={(checked) => updateForm({ enable: checked })}
-                    helperText="When enabled, updates run automatically based on the cadence below."
-                />
-
-                <Select
-                    label="Update cadence"
-                    value={form.cadence}
-                    disabled={!form.enable}
-                    onChange={(event) =>
-                        updateForm({ cadence: event.target.value as DirectoryScheduleCadence })
-                    }
-                >
-                    {schedule?.allowedCadences?.map((item) => (
-                        <option key={item.cadence} value={item.cadence} disabled={!item.allowed}>
-                            {cadenceLabels[item.cadence]}
-                            {!item.allowed ? ' (Upgrade required)' : ''}
-                        </option>
-                    )) || cadenceOptionsFallback()}
-                </Select>
-
-                {requiresUsage && (
-                    <div className="rounded-md bg-amber-50 dark:bg-amber-500/10 border border-amber-100 dark:border-amber-500/30 p-3 text-sm text-amber-800 dark:text-amber-200">
-                        This cadence isn&apos;t covered by your plan. Enable pay-per-use billing to
-                        run it on demand.
-                    </div>
-                )}
-
-                <Switch
-                    label="Bill per run"
-                    checked={form.billingMode === DirectoryScheduleBillingMode.USAGE}
-                    onChange={(checked) =>
-                        updateForm({
-                            billingMode: checked
-                                ? DirectoryScheduleBillingMode.USAGE
-                                : DirectoryScheduleBillingMode.SUBSCRIPTION,
-                        })
-                    }
-                    helperText="Pay only when the schedule runs. Required for cadences outside your plan."
-                    disabled={!form.enable}
-                />
-
-                <div className="grid md:grid-cols-2 gap-4">
-                    <Input
-                        type="number"
-                        min={1}
-                        max={10}
-                        label="Pause after failures"
-                        helperText="Automatically pause if runs fail in a row."
-                        value={form.maxFailureBeforePause}
-                        onChange={(event) => {
-                            const parsed = parseInt(event.target.value || '1', 10);
-                            const clamped = Number.isNaN(parsed)
-                                ? 1
-                                : Math.min(10, Math.max(1, parsed));
-                            updateForm({ maxFailureBeforePause: clamped });
-                        }}
-                    />
+        <div className={cardClass}>
+            <div className="flex flex-col gap-4">
+                <div className="flex items-center justify-between gap-4 flex-wrap">
                     <div>
-                        <p className="text-xs text-text-muted dark:text-text-muted-dark mb-1">
-                            Allowed cadences
+                        <p className="text-xl font-semibold">{t('title')}</p>
+                        <p className="text-sm text-text-secondary dark:text-text-secondary-dark max-w-xl">
+                            {t('subtitle')}
                         </p>
-                        <div className="flex flex-wrap gap-2">
-                            {(schedule?.allowedCadences || []).map((cadence) => (
-                                <span
-                                    key={cadence.cadence}
-                                    className={cn(
-                                        'px-2 py-1 rounded-full text-xs font-medium border',
-                                        cadence.allowed
-                                            ? 'bg-primary/10 text-primary border-primary/30'
-                                            : 'bg-transparent text-text-muted dark:text-text-muted-dark border-border dark:border-border-dark',
-                                    )}
-                                >
-                                    {cadenceLabels[cadence.cadence]}
-                                </span>
-                            ))}
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2 text-sm">
+                            <span className="text-text-secondary dark:text-text-secondary-dark">
+                                {form.enable ? t('labels.enabled') : t('labels.disabled')}
+                            </span>
+                            <Switch
+                                checked={form.enable}
+                                onChange={(checked) => updateForm({ enable: checked })}
+                            />
+                        </div>
+                        <div className="flex items-center gap-2 text-sm">
+                            <span className="text-text-secondary dark:text-text-secondary-dark">
+                                {t('labels.billing')}
+                            </span>
+                            <Select
+                                value={form.billingMode}
+                                onChange={(e) =>
+                                    updateForm({
+                                        billingMode: e.target.value as DirectoryScheduleBillingMode,
+                                    })
+                                }
+                            >
+                                <option value={DirectoryScheduleBillingMode.SUBSCRIPTION}>
+                                    {t('billing.subscription')}
+                                </option>
+                                <option value={DirectoryScheduleBillingMode.USAGE}>
+                                    {t('billing.usage')}
+                                </option>
+                            </Select>
                         </div>
                     </div>
                 </div>
+
+                <div className="grid md:grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium text-text-secondary dark:text-text-secondary-dark">
+                            {t('labels.cadence')}
+                        </label>
+                        <Select
+                            value={form.cadence}
+                            onChange={(event) =>
+                                updateForm({
+                                    cadence: event.target.value as DirectoryScheduleCadence,
+                                })
+                            }
+                        >
+                            {(
+                                schedule?.allowedCadences ||
+                                cadenceOrder.map((value) => ({ cadence: value, allowed: true }))
+                            )
+                                .map((item) => ({
+                                    value: item.cadence,
+                                    label: t(`cadence.${item.cadence}`),
+                                    disabled: !item.allowed,
+                                }))
+                                .map((item) => (
+                                    <option
+                                        key={item.value}
+                                        value={item.value}
+                                        disabled={item.disabled}
+                                    >
+                                        {item.label}
+                                    </option>
+                                ))}
+                        </Select>
+                        <p className="text-xs text-text-secondary dark:text-text-secondary-dark">
+                            {t('planNote', {
+                                plan: planLabel,
+                            })}{' '}
+                            {requiresUsage ? t('usageRequired') : t('cadenceAllowed')}
+                        </p>
+                    </div>
+
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium text-text-secondary dark:text-text-secondary-dark">
+                            {t('labels.maxFailures')}
+                        </label>
+                        <Input
+                            type="number"
+                            min={1}
+                            max={10}
+                            value={form.maxFailureBeforePause}
+                            onChange={(e) =>
+                                updateForm({
+                                    maxFailureBeforePause: parseInt(e.target.value, 10) || 1,
+                                })
+                            }
+                        />
+                        <p className="text-xs text-text-secondary dark:text-text-secondary-dark">
+                            {t('help.maxFailures')}
+                        </p>
+                    </div>
+
+                    <div className="grid grid-cols-2 md:grid-cols-2 gap-3 bg-muted/60 dark:bg-muted-dark/60 rounded-lg p-3">
+                        <InfoStat
+                            label={t('stats.nextRun')}
+                            value={nextRunDisplay || t('stats.notScheduled')}
+                        />
+                        <InfoStat
+                            label={t('stats.lastRun')}
+                            value={lastRunDisplay || t('stats.never')}
+                        />
+                        <InfoStat
+                            label={t('stats.status')}
+                            value={schedule?.status || t('stats.disabled')}
+                        />
+                        <InfoStat
+                            label={t('stats.failures')}
+                            value={`${schedule?.failureCount ?? 0}/${form.maxFailureBeforePause}`}
+                        />
+                    </div>
+                </div>
             </div>
 
-            {message && (
-                <p className="text-sm text-emerald-600 dark:text-emerald-300 mt-4" role="status">
-                    {message}
-                </p>
-            )}
-            {error && (
-                <p className="text-sm text-red-600 dark:text-red-400 mt-4" role="alert">
-                    {error}
-                </p>
+            {schedule && (
+                <div className="flex flex-wrap gap-2 text-xs text-text-secondary dark:text-text-secondary-dark">
+                    <Badge>{t('labels.plan', { plan: planLabel })}</Badge>
+                    <Badge>
+                        {t('labels.nextRun', { next: nextRunDisplay || t('stats.notScheduled') })}
+                    </Badge>
+                    <Badge>
+                        {t('labels.lastRun', { last: lastRunDisplay || t('stats.never') })}
+                    </Badge>
+                </div>
             )}
 
-            <div className="mt-6 flex flex-wrap gap-3">
-                <Button onClick={saveSchedule} disabled={isSaving || !schedule}>
-                    {isSaving ? 'Saving...' : 'Save schedule'}
+            <div className="flex flex-wrap gap-3">
+                <Button onClick={saveSchedule} disabled={isSaving || isRunning}>
+                    {isSaving ? t('actions.saving') : t('actions.save')}
                 </Button>
-                <Button
-                    variant="secondary"
-                    onClick={runNow}
-                    disabled={
-                        isRunning || !schedule || schedule.status !== DirectoryScheduleStatus.ACTIVE
-                    }
-                >
-                    {isRunning ? 'Starting...' : 'Run now'}
+                <Button variant="secondary" onClick={runNow} disabled={isSaving || isRunning}>
+                    {isRunning ? t('actions.starting') : t('actions.runNow')}
+                </Button>
+                <Button variant="ghost" onClick={cancelSchedule} disabled={isSaving || isRunning}>
+                    {t('actions.cancel')}
                 </Button>
             </div>
-        </div>
-    );
-}
 
-function ScheduleStat({
-    label,
-    value,
-    muted,
-    status,
-}: {
-    label: string;
-    value: string;
-    muted?: boolean;
-    status?: GenerateStatusType | null;
-}) {
-    let badge: string | null = null;
-    if (status === GenerateStatusType.ERROR) {
-        badge = 'Failed';
-    }
-    if (status === GenerateStatusType.GENERATED) {
-        badge = 'Success';
-    }
-
-    return (
-        <div>
-            <p className="text-xs text-text-muted dark:text-text-muted-dark mb-1">{label}</p>
-            <p
-                className={cn(
-                    'text-sm font-medium text-text dark:text-text-dark',
-                    muted && 'text-text-muted dark:text-text-muted-dark',
-                )}
-            >
-                {value}
-            </p>
-            {badge && (
-                <span
+            {(message || error) && (
+                <div
                     className={cn(
-                        'inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold mt-1',
-                        badge === 'Failed'
-                            ? 'bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-300'
-                            : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-200',
+                        'text-sm rounded-md px-3 py-2',
+                        error
+                            ? 'bg-destructive/10 text-destructive border border-destructive/40'
+                            : 'bg-success/10 text-success border border-success/40',
                     )}
                 >
-                    {badge}
-                </span>
+                    {error || message}
+                </div>
             )}
         </div>
     );
 }
 
-function cadenceOptionsFallback() {
-    return Object.values(DirectoryScheduleCadence).map((value) => (
-        <option key={value} value={value}>
-            {cadenceLabels[value]}
-        </option>
-    ));
+function Badge({ children }: { children: React.ReactNode }) {
+    return (
+        <span className="rounded-full bg-muted dark:bg-muted-dark px-3 py-1 font-medium text-text-secondary dark:text-text-secondary-dark">
+            {children}
+        </span>
+    );
 }
 
-function formatStatus(status: DirectoryScheduleStatus) {
-    switch (status) {
-        case DirectoryScheduleStatus.ACTIVE:
-            return 'Active';
-        case DirectoryScheduleStatus.PAUSED:
-            return 'Paused';
-        case DirectoryScheduleStatus.CANCELED:
-            return 'Cancelled';
-        default:
-            return 'Disabled';
-    }
+function InfoStat({ label, value }: { label: string; value: string }) {
+    return (
+        <div>
+            <p className="text-xs text-text-secondary dark:text-text-secondary-dark mb-1">
+                {label}
+            </p>
+            <p className="text-sm font-medium text-text dark:text-text-dark">{value}</p>
+        </div>
+    );
 }
 
 function formatDate(value?: string | null) {
@@ -347,7 +335,10 @@ function formatDate(value?: string | null) {
     }
 
     try {
-        return new Date(value).toLocaleString();
+        return new Intl.DateTimeFormat(undefined, {
+            dateStyle: 'medium',
+            timeStyle: 'short',
+        }).format(new Date(value));
     } catch {
         return value;
     }

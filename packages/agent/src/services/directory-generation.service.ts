@@ -367,8 +367,6 @@ export class DirectoryGenerationService {
             throw new NotFoundException('User not found for scheduled update');
         }
 
-        await this.directoryScheduleService.markRunDispatched(schedule.id);
-
         return this.updateItemsGenerator(schedule.directoryId, {}, user, false, {
             triggeredBy: 'schedule',
             scheduleId: schedule.id,
