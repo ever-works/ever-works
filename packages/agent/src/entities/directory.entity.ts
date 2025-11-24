@@ -9,15 +9,16 @@ import {
     UpdateDateColumn,
 } from 'typeorm';
 import { User } from './user.entity';
-import type { ClassToObject, GenerateStatus } from './types';
+import type {
+    ClassToObject,
+    DirectoryScheduleCadence,
+    DirectoryScheduleStatus,
+    GenerateStatus,
+} from './types';
 import type { PRUpdate } from '@src/data-generator';
 import { DirectoryGenerationHistory } from './directory-generation-history.entity';
 import { TimestampColumn } from './_types';
-import {
-    DirectorySchedule,
-    DirectoryScheduleCadence,
-    DirectoryScheduleStatus,
-} from './directory-schedule.entity';
+import { DirectorySchedule } from './directory-schedule.entity';
 
 @Entity({ name: 'directories' })
 export class Directory {

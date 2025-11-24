@@ -1,11 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { UsageLedgerRepository } from '@src/database/repositories/usage-ledger.repository';
-import {
-    DirectoryScheduleBillingMode,
-    DirectorySchedule,
-} from '@src/entities/directory-schedule.entity';
+import { DirectorySchedule } from '@src/entities/directory-schedule.entity';
 import { UsageLedgerEntry, UsageLedgerTriggerType } from '@src/entities/usage-ledger-entry.entity';
 import { config } from '@src/config';
+import { DirectoryScheduleBillingMode } from '@src/entities';
 
 type RecordUsageOptions = {
     userId: string;

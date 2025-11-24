@@ -3,8 +3,8 @@ import {
     DirectoryScheduleBillingMode,
     DirectoryScheduleCadence,
     DirectoryScheduleStatus,
-} from '@src/entities/directory-schedule.entity';
-import { GenerateStatusType } from '@src/entities/types';
+    GenerateStatusType,
+} from '@src/entities/types';
 
 export type DirectoryScheduleAllowedCadence = {
     cadence: DirectoryScheduleCadence;

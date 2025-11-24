@@ -7,10 +7,10 @@ import {
     CreateDateColumn,
     UpdateDateColumn,
 } from 'typeorm';
-import type { ClassToObject } from './types';
+import { DirectoryScheduleBillingMode, type ClassToObject } from './types';
 import { User } from './user.entity';
 import { Directory } from './directory.entity';
-import { DirectorySchedule, DirectoryScheduleBillingMode } from './directory-schedule.entity';
+import { DirectorySchedule } from './directory-schedule.entity';
 import { DirectoryGenerationHistory } from './directory-generation-history.entity';
 
 export enum UsageLedgerTriggerType {

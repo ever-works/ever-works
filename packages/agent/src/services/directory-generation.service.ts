@@ -42,13 +42,10 @@ import {
     DirectoryGenerationMode,
     DirectoryGenerationPayload,
 } from '@src/tasks/trigger/directory-generation.task';
-import { GenerateStatusType } from '@src/entities/types';
+import { DirectoryScheduleBillingMode, GenerateStatusType } from '@src/entities/types';
 import { DirectoryOwnershipService } from './directory-ownership.service';
 import { normalizeGeneratorError } from './utils/error.utils';
-import {
-    DirectorySchedule,
-    DirectoryScheduleBillingMode,
-} from '@src/entities/directory-schedule.entity';
+import { DirectorySchedule } from '@src/entities/directory-schedule.entity';
 import { DirectoryScheduleService } from './directory-schedule.service';
 import { UserRepository } from '@src/database/repositories/user.repository';
 

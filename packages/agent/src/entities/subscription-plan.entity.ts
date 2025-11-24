@@ -6,15 +6,8 @@ import {
     UpdateDateColumn,
     OneToMany,
 } from 'typeorm';
-import type { ClassToObject } from './types';
+import type { ClassToObject, DirectoryScheduleCadence, SubscriptionPlanCode } from './types';
 import { UserSubscription } from './user-subscription.entity';
-import { DirectoryScheduleCadence } from './directory-schedule.entity';
-
-export enum SubscriptionPlanCode {
-    FREE = 'free',
-    STANDARD = 'standard',
-    PREMIUM = 'premium',
-}
 
 @Entity({ name: 'subscription_plans' })
 export class SubscriptionPlan {

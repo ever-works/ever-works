@@ -7,9 +7,10 @@ import {
     ManyToOne,
     JoinColumn,
 } from 'typeorm';
-import type { ClassToObject } from './types';
+import type { ClassToObject, SubscriptionPlanCode } from './types';
 import { User } from './user.entity';
-import { SubscriptionPlan, SubscriptionPlanCode } from './subscription-plan.entity';
+import { SubscriptionPlan } from './subscription-plan.entity';
+import { TimestampColumn } from './_types';
 
 export enum SubscriptionStatus {
     ACTIVE = 'active',
@@ -54,7 +55,7 @@ export class UserSubscription {
     @Column({ type: 'varchar', default: SubscriptionBillingProvider.STRIPE })
     billingProvider: SubscriptionBillingProvider;
 
-    @Column({ type: 'timestamp', nullable: true })
+    @TimestampColumn()
     currentPeriodEnd?: Date | null;
 
     @Column({ type: 'boolean', default: false })

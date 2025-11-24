@@ -9,32 +9,13 @@ import {
     UpdateDateColumn,
     JoinColumn,
 } from 'typeorm';
-import type { ClassToObject } from './types';
+import type { ClassToObject, DirectoryScheduleCadence } from './types';
 import { Directory } from './directory.entity';
 import { User } from './user.entity';
 import { UserSubscription } from './user-subscription.entity';
-import { GenerateStatusType } from './types';
+import { DirectoryScheduleBillingMode, DirectoryScheduleStatus, GenerateStatusType } from './types';
 import { TimestampColumn } from './_types';
 import { UsageLedgerEntry } from './usage-ledger-entry.entity';
-
-export enum DirectoryScheduleCadence {
-    HOURLY = 'hourly',
-    DAILY = 'daily',
-    WEEKLY = 'weekly',
-    MONTHLY = 'monthly',
-}
-
-export enum DirectoryScheduleStatus {
-    DISABLED = 'disabled',
-    ACTIVE = 'active',
-    PAUSED = 'paused',
-    CANCELED = 'canceled',
-}
-
-export enum DirectoryScheduleBillingMode {
-    SUBSCRIPTION = 'subscription',
-    USAGE = 'usage',
-}
 
 @Entity({ name: 'directory_schedules' })
 export class DirectorySchedule {

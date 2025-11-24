@@ -1,15 +1,16 @@
 import { Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { SubscriptionPlanRepository } from '@src/database/repositories/subscription-plan.repository';
 import { UserSubscriptionRepository } from '@src/database/repositories/user-subscription.repository';
-import { SubscriptionPlan, SubscriptionPlanCode } from '@src/entities/subscription-plan.entity';
-import {
-    DirectoryScheduleCadence,
-    DirectoryScheduleBillingMode,
-} from '@src/entities/directory-schedule.entity';
+import { SubscriptionPlan } from '@src/entities/subscription-plan.entity';
 import { config } from '@src/config';
 import { DirectoryScheduleAllowedCadence } from '@src/dto';
 import { User } from '@src/entities/user.entity';
 import { UserRepository } from '@src/database/repositories/user.repository';
+import {
+    DirectoryScheduleBillingMode,
+    DirectoryScheduleCadence,
+    SubscriptionPlanCode,
+} from '@src/entities';
 
 const ALL_CADENCES: DirectoryScheduleCadence[] = [
     DirectoryScheduleCadence.MONTHLY,
@@ -30,7 +31,8 @@ const PLAN_SEED_DATA: Array<{
         code: SubscriptionPlanCode.FREE,
         displayName: 'Free',
         maxDirectories: 1,
-        allowedCadences: [DirectoryScheduleCadence.MONTHLY],
+        // allowedCadences: [DirectoryScheduleCadence.MONTHLY],
+        allowedCadences: ALL_CADENCES, // for now everything is free
         monthlyPrice: '0',
         overagePricePerRun: '10',
     },

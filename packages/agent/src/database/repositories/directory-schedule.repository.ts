@@ -1,11 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, LessThanOrEqual } from 'typeorm';
-import {
-    DirectorySchedule,
-    DirectoryScheduleStatus,
-} from '@src/entities/directory-schedule.entity';
-import { GenerateStatusType } from '@src/entities/types';
+import { DirectorySchedule } from '@src/entities/directory-schedule.entity';
+import { DirectoryScheduleStatus, GenerateStatusType } from '@src/entities/types';
 
 @Injectable()
 export class DirectoryScheduleRepository {
