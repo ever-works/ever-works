@@ -1,8 +1,16 @@
 import 'server-only';
 import { serverFetch, serverMutation } from './server-api';
-import { GenerateStatusType, GenerationMethod, ItemsGeneratorStep, RepoProvider } from './enums';
+import {
+    GenerateStatusType,
+    GenerationMethod,
+    ItemsGeneratorStep,
+    RepoProvider,
+    DirectoryScheduleCadence,
+    DirectoryScheduleStatus,
+    DirectoryScheduleBillingMode,
+} from './enums';
 import { APIResponse, ItemData } from './types';
-import { CreateItemsGeneratorDto } from './items-generator';
+import { CreateItemsGeneratorDto, ItemsGeneratorResponse } from './items-generator';
 
 export interface MarkdownReadmeConfig {
     header?: string;
@@ -73,7 +81,39 @@ export interface Directory {
     lastPullRequest?: { main?: PRUpdate; data?: PRUpdate };
     deploymentState?: GetProjectsReadyState;
     deploymentStartedAt?: string;
+    scheduledUpdatesEnabled?: boolean;
+    scheduledCadence?: DirectoryScheduleCadence | null;
+    scheduledNextRunAt?: string | null;
+    scheduledStatus?: DirectoryScheduleStatus | null;
 }
+
+export interface DirectoryScheduleAllowedCadence {
+    cadence: DirectoryScheduleCadence;
+    reason?: string;
+    payPerUse?: boolean;
+    allowed: boolean;
+}
+
+export interface DirectoryScheduleDto {
+    status: DirectoryScheduleStatus;
+    cadence: DirectoryScheduleCadence | null;
+    billingMode: DirectoryScheduleBillingMode;
+    nextRunAt: string | null;
+    lastRunAt: string | null;
+    lastRunStatus: GenerateStatusType | null;
+    failureCount: number;
+    maxFailureBeforePause: number;
+    allowedCadences: DirectoryScheduleAllowedCadence[];
+    planCode?: string;
+    subscriptionsEnabled: boolean;
+}
+
+export type UpdateDirectorySchedulePayload = {
+    enable?: boolean;
+    cadence?: DirectoryScheduleCadence;
+    billingMode?: DirectoryScheduleBillingMode;
+    maxFailureBeforePause?: number;
+};
 
 export interface DirectoriesResponse {
     directories: Directory[];
@@ -264,6 +304,39 @@ export const directoryAPI = {
         return serverMutation<DirectoryDetails>({
             endpoint: '/directories/generate-details',
             data,
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    getSchedule: async (id: string) => {
+        return serverFetch<APIResponse<{ directoryId: string; schedule: DirectoryScheduleDto }>>(
+            `/directories/${id}/schedule`,
+        );
+    },
+
+    updateSchedule: async (id: string, data: UpdateDirectorySchedulePayload) => {
+        return serverMutation<APIResponse<{ schedule: DirectoryScheduleDto }>>({
+            endpoint: `/directories/${id}/schedule`,
+            data,
+            method: 'PUT',
+            wrapInData: false,
+        });
+    },
+
+    cancelSchedule: async (id: string) => {
+        return serverMutation<APIResponse<{ schedule: DirectoryScheduleDto }>>({
+            endpoint: `/directories/${id}/schedule`,
+            data: {},
+            method: 'DELETE',
+            wrapInData: false,
+        });
+    },
+
+    runSchedule: async (id: string) => {
+        return serverMutation<ItemsGeneratorResponse>({
+            endpoint: `/directories/${id}/schedule/run`,
+            data: {},
             method: 'POST',
             wrapInData: false,
         });

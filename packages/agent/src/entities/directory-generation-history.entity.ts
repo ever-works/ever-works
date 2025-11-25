@@ -5,6 +5,8 @@ import {
     ManyToOne,
     CreateDateColumn,
     UpdateDateColumn,
+    JoinColumn,
+    Index,
 } from 'typeorm';
 import { Directory } from './directory.entity';
 import { User } from './user.entity';
@@ -12,6 +14,7 @@ import type { ClassToObject } from './types';
 import { GenerationMethod } from '@src/items-generator/dto/create-items-generator.dto';
 import { GenerateStatusType } from './types';
 import { TimestampColumn } from './_types';
+import { DirectorySchedule } from './directory-schedule.entity';
 
 export type GenerationMetrics = {
     urls_scanned?: number;
@@ -21,6 +24,9 @@ export type GenerationMetrics = {
     total_items_in_store?: number;
 };
 
+@Index(['directoryId', 'status'])
+@Index(['triggeredBy'])
+@Index(['scheduleId'])
 @Entity({ name: 'directory_generation_history' })
 export class DirectoryGenerationHistory {
     @PrimaryGeneratedColumn('uuid')
@@ -54,6 +60,16 @@ export class DirectoryGenerationHistory {
 
     @Column({ type: 'json', nullable: true })
     metrics?: GenerationMetrics | null;
+
+    @Column({ type: 'varchar', default: 'user' })
+    triggeredBy: 'user' | 'schedule' | 'api';
+
+    @Column({ nullable: true })
+    scheduleId?: string | null;
+
+    @ManyToOne(() => DirectorySchedule, { nullable: true })
+    @JoinColumn({ name: 'scheduleId' })
+    schedule?: ClassToObject<DirectorySchedule> | null;
 
     @Column({ type: 'int', default: 0 })
     newItemsCount: number;

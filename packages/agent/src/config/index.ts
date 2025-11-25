@@ -297,4 +297,43 @@ export const config = {
             return process.env.POSTHOG_HOST;
         },
     },
+
+    subscriptions: {
+        isEnabled() {
+            return process.env.SUBSCRIPTIONS_ENABLED === 'true';
+        },
+        scheduledUpdatesEnabled() {
+            return process.env.SCHEDULED_UPDATES_ENABLED !== 'false';
+        },
+        getDispatchIntervalMinutes() {
+            return parseInt(process.env.SCHEDULED_UPDATES_DISPATCH_INTERVAL_MINUTES || '5');
+        },
+        getMaxBatch() {
+            return parseInt(process.env.SCHEDULED_UPDATES_MAX_BATCH || '25');
+        },
+        getDefaultPlanCode() {
+            return (process.env.SUBSCRIPTIONS_DEFAULT_PLAN as string) || 'free';
+        },
+        getMaxFailureBeforePause() {
+            return parseInt(process.env.SCHEDULED_UPDATES_MAX_FAILURE_BEFORE_PAUSE || '3');
+        },
+        getPayPerUsePriceCents() {
+            const usd = parseFloat(process.env.PAY_PER_USE_PRICE_USD || '5');
+            return Math.max(0, Math.round(usd * 100));
+        },
+    },
+
+    billing: {
+        getDefaultCurrency() {
+            return process.env.BILLING_DEFAULT_CURRENCY || 'usd';
+        },
+        stripe: {
+            getSecretKey() {
+                return process.env.STRIPE_SECRET_KEY;
+            },
+            getWebhookSecret() {
+                return process.env.STRIPE_WEBHOOK_SECRET;
+            },
+        },
+    },
 };

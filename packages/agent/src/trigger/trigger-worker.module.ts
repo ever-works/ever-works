@@ -8,9 +8,16 @@ import { MarkdownGeneratorService } from '@src/markdown-generator/markdown-gener
 import { WebsiteGeneratorService } from '@src/website-generator/website-generator.service';
 import { GitModule } from '@src/git/git.module';
 import { TriggerGenerationOrchestrator } from './trigger-generation.orchestrator';
+import { DirectoryModule } from '@src/services';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 
 @Module({
-    imports: [TriggerItemsGeneratorModule, GitModule],
+    imports: [
+        TriggerItemsGeneratorModule,
+        GitModule,
+        DirectoryModule,
+        EventEmitterModule.forRoot(),
+    ],
     providers: [
         TriggerInternalApiClient,
         RemoteDirectoryOperationsService,

@@ -1,6 +1,8 @@
 import {
+    BadRequestException,
     Body,
     Controller,
+    Delete,
     Get,
     HttpCode,
     HttpStatus,
@@ -30,12 +32,15 @@ import {
     DirectoryGenerationService,
     DirectoryLifecycleService,
     DirectoryQueryService,
+    DirectoryScheduleService,
 } from '@packages/agent/services';
 import { UpdateWebsiteRepositoryResponseDto } from '@packages/agent/website-generator';
 import { AuthService, CurrentUser, JwtAuthGuard } from '../auth';
 import { AuthenticatedUser } from '@src/auth/types/jwt.types';
 import { GenerateDirectoryDetailDto } from './dto/generate-detail.dto';
 import { CACHE_MANAGER, Cache } from '@packages/agent/cache';
+import { UpdateDirectoryScheduleDto } from '@packages/agent/dto';
+import { DirectoryScheduleStatus } from '@packages/agent/entities';
 
 let CACHE_TTL = 1000 * 60 * 5; // 5 minutes
 
@@ -49,6 +54,7 @@ export class DirectoriesController {
         private readonly directoryGenerationService: DirectoryGenerationService,
         private readonly authService: AuthService,
         private readonly directoryDetailService: DirectoryDetailService,
+        private readonly directoryScheduleService: DirectoryScheduleService,
     ) {}
 
     @Get('directories')
@@ -246,6 +252,67 @@ export class DirectoriesController {
         // Wait a little while to ensure the process has started.
         await this.wait(2);
 
+        return response;
+    }
+
+    @Get('directories/:id/schedule')
+    @HttpCode(HttpStatus.OK)
+    async getDirectorySchedule(@CurrentUser() auth: AuthenticatedUser, @Param('id') id: string) {
+        const user = await this.authService.getUser(auth.userId);
+        const result = await this.directoryScheduleService.getSchedule(id, user);
+
+        return {
+            status: 'success',
+            ...result,
+        };
+    }
+
+    @Put('directories/:id/schedule')
+    @HttpCode(HttpStatus.OK)
+    async updateDirectorySchedule(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') id: string,
+        @Body() updateScheduleDto: UpdateDirectoryScheduleDto,
+    ) {
+        const user = await this.authService.getUser(auth.userId);
+        const schedule = await this.directoryScheduleService.updateSchedule(
+            id,
+            updateScheduleDto,
+            user,
+        );
+
+        return {
+            status: 'success',
+            schedule,
+        };
+    }
+
+    @Delete('directories/:id/schedule')
+    @HttpCode(HttpStatus.OK)
+    async cancelDirectorySchedule(@CurrentUser() auth: AuthenticatedUser, @Param('id') id: string) {
+        const user = await this.authService.getUser(auth.userId);
+        const schedule = await this.directoryScheduleService.cancelSchedule(id, user);
+
+        return {
+            status: 'success',
+            schedule,
+        };
+    }
+
+    @Post('directories/:id/schedule/run')
+    @HttpCode(HttpStatus.ACCEPTED)
+    async runScheduledUpdate(@CurrentUser() auth: AuthenticatedUser, @Param('id') id: string) {
+        const user = await this.authService.getUser(auth.userId);
+        const schedule = await this.directoryScheduleService.getScheduleEntity(id, user);
+
+        if (schedule.status !== DirectoryScheduleStatus.ACTIVE) {
+            throw new BadRequestException({
+                status: 'error',
+                message: 'Schedule must be active to run',
+            });
+        }
+
+        const response = await this.directoryGenerationService.runScheduledUpdate(schedule);
         return response;
     }
 

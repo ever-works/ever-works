@@ -379,9 +379,100 @@
                 "overview": "Overview",
                 "items": "Items",
                 "generator": "Generator",
+                "schedule": "Schedule",
                 "history": "History",
                 "deploy": "Deploy",
                 "settings": "Settings"
+            },
+            "schedule": {
+                "page": {
+                    "title": "Scheduled updates",
+                    "subtitle": "Automate refreshes for {name} with a dedicated cadence and failure handling.",
+                    "fallbackName": "this directory"
+                },
+                "card": {
+                    "title": "Automation",
+                    "subtitle": {
+                        "enabled": "Adjust cadence, billing, and safeguards so scheduled refreshes stay reliable.",
+                        "disabled": "Automate refreshes without subscription limits—set cadence and failure guards freely."
+                    },
+                    "summary": {
+                        "status": "Status",
+                        "nextRun": "Next run",
+                        "lastRun": "Last run",
+                        "failures": "Failures",
+                        "notScheduled": "Not scheduled",
+                        "never": "Never",
+                        "statusMap": {
+                            "active": "Automation active",
+                            "paused": "Paused",
+                            "canceled": "Cancelled",
+                            "disabled": "Disabled"
+                        }
+                    },
+                    "fields": {
+                        "automation": "Automation",
+                        "automationHelp": "Pause to temporarily stop future runs.",
+                        "billing": "Billing mode",
+                        "billingHelp": "Subscriptions unlock unlimited runs. Pay-per-use bills per execution.",
+                        "cadence": "Cadence",
+                        "cadenceHelp": "Current plan: {plan}",
+                        "cadenceOpen": "All cadences are available while subscriptions are disabled.",
+                        "maxFailures": "Failure limit",
+                        "maxFailuresHelp": "Automatically pause once this many failures occur."
+                    },
+                    "billing": {
+                        "subscription": "Subscription",
+                        "usage": "Pay-per-use"
+                    },
+                    "cadence": {
+                        "hourly": "Every hour",
+                        "daily": "Every day",
+                        "weekly": "Every week",
+                        "monthly": "Every month"
+                    },
+                    "plans": {
+                        "free": "Free",
+                        "standard": "Standard",
+                        "premium": "Premium",
+                        "unmetered": "Unmetered"
+                    },
+                    "usageRequired": "Switch to pay-per-use to use this cadence.",
+                    "cadenceAllowed": "Cadence allowed on your plan.",
+                    "actions": {
+                        "save": "Save changes",
+                        "saving": "Saving...",
+                        "runNow": "Run now",
+                        "starting": "Starting...",
+                        "cancel": "Cancel schedule",
+                        "cancelling": "Cancelling..."
+                    },
+                    "success": {
+                        "saved": "Schedule saved.",
+                        "runStarted": "Scheduled run started.",
+                        "cancelled": "Schedule cancelled."
+                    },
+                    "errors": {
+                        "requireUsage": "Enable pay-per-use billing to use this cadence.",
+                        "updateFailed": "Failed to update schedule.",
+                        "runFailed": "Failed to start run.",
+                        "cancelFailed": "Failed to cancel schedule."
+                    },
+                    "empty": {
+                        "title": "Run a manual generation first",
+                        "description": "Complete one successful manual run to unlock automated scheduling. Once your directory has data we can keep it fresh for you.",
+                        "refresh": "Refresh status"
+                    }
+                },
+                "actions": {
+                    "invalid": "Invalid data",
+                    "updated": "Schedule updated.",
+                    "updateFailed": "Failed to update schedule.",
+                    "runStarted": "Scheduled run started.",
+                    "runFailed": "Failed to trigger run.",
+                    "cancelled": "Schedule cancelled.",
+                    "cancelFailed": "Failed to cancel schedule."
+                }
             },
             "statusCard": {
                 "notStarted": {

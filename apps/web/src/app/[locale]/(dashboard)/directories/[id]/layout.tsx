@@ -12,20 +12,24 @@ export default async function DirectoryLayout({ params, children }: LayoutParams
 
     let directory: Directory;
     let oauthConnection: ConnectionInfo | null = null;
+    let scheduleAvailable = false;
     let config = null;
 
     try {
         const res = await directoryAPI.get(id);
         directory = res.directory;
 
+        let { config: configRes } = await directoryAPI
+            .getConfig(id)
+            .catch(() => ({ config: null }));
+
+        scheduleAvailable = Boolean(configRes?.metadata?.initial_prompt);
+        config = configRes;
+
         if (directory) {
             oauthConnection = await authAPI.oauth_connections
                 .checkConnection(directory.repoProvider)
                 .catch(() => null);
-
-            // Fetch directory config from config.yml
-            const configRes = await directoryAPI.getConfig(id).catch(() => ({ config: null }));
-            config = configRes.config;
         }
     } catch (error) {
         console.error('Failed to fetch directory:', error);
@@ -33,7 +37,12 @@ export default async function DirectoryLayout({ params, children }: LayoutParams
     }
 
     return (
-        <DirectoryLayoutClient directory={directory} oauthConnection={oauthConnection} config={config}>
+        <DirectoryLayoutClient
+            directory={directory}
+            oauthConnection={oauthConnection}
+            scheduleAvailable={scheduleAvailable}
+            config={config}
+        >
             {children}
         </DirectoryLayoutClient>
     );

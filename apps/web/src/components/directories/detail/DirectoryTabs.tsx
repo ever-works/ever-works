@@ -10,9 +10,10 @@ import { GenerateStatusType } from '@/lib/api/enums';
 
 interface DirectoryTabsProps {
     directory: Directory;
+    scheduleAvailable: boolean;
 }
 
-export function DirectoryTabs({ directory }: DirectoryTabsProps) {
+export function DirectoryTabs({ directory, scheduleAvailable }: DirectoryTabsProps) {
     const pathname = usePathname();
     const t = useTranslations('dashboard.directoryDetail.tabs');
     const isGenerated = directory.generateStatus?.status === GenerateStatusType.GENERATED;
@@ -63,6 +64,30 @@ export function DirectoryTabs({ directory }: DirectoryTabsProps) {
             ),
             isActive: pathname.includes('/generator'),
         },
+        ...(scheduleAvailable
+            ? [
+                  {
+                      name: t('schedule'),
+                      href: `${ROUTES.DASHBOARD_DIRECTORY(directory.id)}/schedule`,
+                      icon: (
+                          <svg
+                              className="w-4 h-4"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                          >
+                              <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M8 7V5a2 2 0 114 0v2m0 0V5a2 2 0 114 0v2m-8 0h8M5 11h14M7 15h2m4 0h2m-8 4h2m4 0h2M6 5h0a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V7a2 2 0 00-2-2h0"
+                              />
+                          </svg>
+                      ),
+                      isActive: pathname.includes('/schedule'),
+                  },
+              ]
+            : []),
         {
             name: t('history'),
             href: `${ROUTES.DASHBOARD_DIRECTORY(directory.id)}/history`,

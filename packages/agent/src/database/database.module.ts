@@ -9,6 +9,10 @@ import { UserRepository } from './repositories/user.repository';
 import { UserGitHubService } from './user-github.service';
 import { ChatHistoryRepository } from './repositories/chat-history.repository';
 import { DirectoryGenerationHistoryRepository } from './repositories/directory-generation-history.repository';
+import { SubscriptionPlanRepository } from './repositories/subscription-plan.repository';
+import { UserSubscriptionRepository } from './repositories/user-subscription.repository';
+import { DirectoryScheduleRepository } from './repositories/directory-schedule.repository';
+import { UsageLedgerRepository } from './repositories/usage-ledger.repository';
 
 @Module({
     imports: [
@@ -33,6 +37,10 @@ import { DirectoryGenerationHistoryRepository } from './repositories/directory-g
         OAuthTokenRepository,
         ChatHistoryRepository,
         DirectoryGenerationHistoryRepository,
+        SubscriptionPlanRepository,
+        UserSubscriptionRepository,
+        DirectoryScheduleRepository,
+        UsageLedgerRepository,
     ],
     exports: [
         TypeOrmModule,
@@ -43,6 +51,10 @@ import { DirectoryGenerationHistoryRepository } from './repositories/directory-g
         OAuthTokenRepository,
         ChatHistoryRepository,
         DirectoryGenerationHistoryRepository,
+        SubscriptionPlanRepository,
+        UserSubscriptionRepository,
+        DirectoryScheduleRepository,
+        UsageLedgerRepository,
     ],
 })
 export class DatabaseModule {}

@@ -13,6 +13,7 @@ import { APIController } from './api.controller';
 import { AiConversationModule } from './ai-conversation/ai-conversation.module';
 import { TriggerInternalModule } from './trigger/trigger-internal.module';
 import { TwentyCrmModule } from './integrations';
+import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 
 @Module({
     imports: [
@@ -34,6 +35,7 @@ import { TwentyCrmModule } from './integrations';
         DirectoriesModule,
         MailModule,
         TriggerInternalModule,
+        SubscriptionsModule,
     ],
     providers: [
         {

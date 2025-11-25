@@ -40,6 +40,7 @@ export const ROUTES = {
     DASHBOARD_DIRECTORY: (id: string) => `/directories/${id}`,
     DASHBOARD_DIRECTORY_ITEMS: (id: string) => `/directories/${id}/items`,
     DASHBOARD_DIRECTORY_GENERATOR: (id: string) => `/directories/${id}/generator`,
+    DASHBOARD_DIRECTORY_SCHEDULE: (id: string) => `/directories/${id}/schedule`,
     DASHBOARD_DIRECTORY_DEPLOY: (id: string) => `/directories/${id}/deploy`,
     DASHBOARD_DIRECTORY_SETTINGS: (id: string) => `/directories/${id}/settings`,
     // Settings

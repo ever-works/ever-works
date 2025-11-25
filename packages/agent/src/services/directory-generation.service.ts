@@ -42,15 +42,28 @@ import {
     DirectoryGenerationMode,
     DirectoryGenerationPayload,
 } from '@src/tasks/trigger/directory-generation.task';
-import { GenerateStatusType } from '@src/entities/types';
+import { DirectoryScheduleBillingMode, GenerateStatusType } from '@src/entities/types';
 import { DirectoryOwnershipService } from './directory-ownership.service';
 import { normalizeGeneratorError } from './utils/error.utils';
+import { DirectorySchedule } from '@src/entities/directory-schedule.entity';
+import { DirectoryScheduleService } from './directory-schedule.service';
+import { UserRepository } from '@src/database/repositories/user.repository';
 
 type GenerationStats = {
     newItemsCount: number;
     updatedItemsCount: number;
     totalItemsCount: number;
     metrics?: ItemsGeneratorMetrics;
+};
+
+type GenerationTriggerContext = {
+    triggeredBy: 'user' | 'schedule' | 'api';
+    scheduleId?: string;
+    billingMode?: DirectoryScheduleBillingMode;
+};
+
+const DEFAULT_GENERATION_CONTEXT: GenerationTriggerContext = {
+    triggeredBy: 'user',
 };
 
 @Injectable()
@@ -69,6 +82,8 @@ export class DirectoryGenerationService {
         private readonly triggerService: TriggerService,
         private readonly generationHistoryRepository: DirectoryGenerationHistoryRepository,
         private readonly ownershipService: DirectoryOwnershipService,
+        private readonly directoryScheduleService: DirectoryScheduleService,
+        private readonly userRepository: UserRepository,
     ) {}
 
     async generateItems(
@@ -76,13 +91,20 @@ export class DirectoryGenerationService {
         dto: CreateItemsGeneratorDto,
         user: User,
         awaitCompletion = true,
+        context: GenerationTriggerContext = DEFAULT_GENERATION_CONTEXT,
     ): Promise<ItemsGeneratorResponseDto> {
         const directory = await this.ownershipService.ensure(directoryId, user.id);
+        const triggerContext = this.resolveContext(context);
 
-        const history = await this.createGenerationHistoryRecord(directory, user, dto);
+        const history = await this.createGenerationHistoryRecord(
+            directory,
+            user,
+            dto,
+            triggerContext,
+        );
 
         if (awaitCompletion) {
-            await this.runInProcessGeneration(directory, user, dto, history);
+            await this.runInProcessGeneration(directory, user, dto, history, triggerContext);
         } else {
             await this.dispatchGenerationTask(
                 DIRECTORY_GENERATION_MODE.CREATE,
@@ -91,6 +113,7 @@ export class DirectoryGenerationService {
                 dto,
                 history.id,
                 history,
+                triggerContext,
             );
         }
 
@@ -108,8 +131,10 @@ export class DirectoryGenerationService {
         updateDto: UpdateItemsGeneratorDto,
         user: User,
         awaitCompletion = true,
+        context: GenerationTriggerContext = DEFAULT_GENERATION_CONTEXT,
     ): Promise<ItemsGeneratorResponseDto> {
         const directory = await this.ownershipService.ensure(directoryId, user.id);
+        const triggerContext = this.resolveContext(context);
 
         let lastRequestData = await this.dataGenerator
             .getLastRequestData(directory, user)
@@ -128,10 +153,15 @@ export class DirectoryGenerationService {
             ...updateDto,
         };
 
-        const history = await this.createGenerationHistoryRecord(directory, user, payload);
+        const history = await this.createGenerationHistoryRecord(
+            directory,
+            user,
+            payload,
+            triggerContext,
+        );
 
         if (awaitCompletion) {
-            await this.runInProcessGeneration(directory, user, payload, history);
+            await this.runInProcessGeneration(directory, user, payload, history, triggerContext);
         } else {
             await this.dispatchGenerationTask(
                 DIRECTORY_GENERATION_MODE.UPDATE,
@@ -140,6 +170,7 @@ export class DirectoryGenerationService {
                 payload,
                 history.id,
                 history,
+                triggerContext,
             );
         }
 
@@ -328,14 +359,30 @@ export class DirectoryGenerationService {
         }
     }
 
+    async runScheduledUpdate(schedule: DirectorySchedule) {
+        const user =
+            (schedule.user as User) || (await this.userRepository.findById(schedule.userId));
+
+        if (!user) {
+            throw new NotFoundException('User not found for scheduled update');
+        }
+
+        return this.updateItemsGenerator(schedule.directoryId, {}, user, false, {
+            triggeredBy: 'schedule',
+            scheduleId: schedule.id,
+            billingMode: schedule.billingMode,
+        });
+    }
+
     private async runInProcessGeneration(
         directory: Directory,
         user: User,
         dto: CreateItemsGeneratorDto,
         history?: DirectoryGenerationHistory,
+        context: GenerationTriggerContext = DEFAULT_GENERATION_CONTEXT,
     ) {
         try {
-            await this.processGeneration(directory, user, dto, history);
+            await this.processGeneration(directory, user, dto, history, context);
         } catch (error) {
             if (error instanceof HttpException) {
                 throw error;
@@ -353,6 +400,7 @@ export class DirectoryGenerationService {
         directory: Directory,
         user: User,
         dto: CreateItemsGeneratorDto,
+        context: GenerationTriggerContext,
     ): Promise<DirectoryGenerationHistory> {
         const parameters = dto ? JSON.parse(JSON.stringify(dto)) : undefined;
 
@@ -363,6 +411,8 @@ export class DirectoryGenerationService {
             parameters,
             status: GenerateStatusType.GENERATING,
             startedAt: new Date(),
+            triggeredBy: context.triggeredBy,
+            scheduleId: context.scheduleId ?? null,
         });
     }
 
@@ -373,6 +423,7 @@ export class DirectoryGenerationService {
         dto: CreateItemsGeneratorDto,
         historyId: string,
         history: DirectoryGenerationHistory,
+        context: GenerationTriggerContext,
     ) {
         const payload: DirectoryGenerationPayload = {
             directoryId: directory.id,
@@ -384,6 +435,8 @@ export class DirectoryGenerationService {
                 history?.startedAt?.toISOString() ??
                 history?.createdAt?.toISOString() ??
                 new Date().toISOString(),
+            triggerSource: context.triggeredBy,
+            scheduleId: context.scheduleId,
         };
 
         const dispatched = await this.triggerService.dispatchDirectoryGeneration(payload);
@@ -402,6 +455,7 @@ export class DirectoryGenerationService {
         user: User,
         dto: CreateItemsGeneratorDto,
         history?: DirectoryGenerationHistory,
+        context: GenerationTriggerContext = DEFAULT_GENERATION_CONTEXT,
     ) {
         const startTime = new Date();
 
@@ -508,9 +562,33 @@ export class DirectoryGenerationService {
             }
         }
 
+        if (context.triggeredBy === 'schedule' && context.scheduleId) {
+            if (!hasError) {
+                await this.directoryScheduleService.markRunCompleted({
+                    scheduleId: context.scheduleId,
+                    historyId: history?.id,
+                    status: GenerateStatusType.GENERATED,
+                });
+            } else {
+                await this.directoryScheduleService.markRunFailed(context.scheduleId);
+            }
+        }
+
         this.eventEmitter.emit(
             DirectoryGenerationCompletedEvent.EVENT_NAME,
             new DirectoryGenerationCompletedEvent(directory),
         );
+    }
+
+    private resolveContext(context?: GenerationTriggerContext): GenerationTriggerContext {
+        if (!context) {
+            return { ...DEFAULT_GENERATION_CONTEXT };
+        }
+
+        return {
+            triggeredBy: context.triggeredBy || DEFAULT_GENERATION_CONTEXT.triggeredBy,
+            scheduleId: context.scheduleId,
+            billingMode: context.billingMode,
+        };
     }
 }

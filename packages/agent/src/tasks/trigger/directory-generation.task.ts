@@ -8,6 +8,8 @@ import { plainToInstance } from 'class-transformer';
 import { Directory } from '@src/entities/directory.entity';
 import { User } from '@src/entities/user.entity';
 import { INestApplicationContext } from '@nestjs/common';
+import { DirectoryScheduleService } from '@src/services/directory-schedule.service';
+import { GenerateStatusType } from '@src/entities/types';
 
 export const DIRECTORY_GENERATION_MODE = {
     CREATE: 'create',
@@ -24,6 +26,8 @@ export type DirectoryGenerationPayload = {
     dto: CreateItemsGeneratorDto;
     historyId: string;
     historyStartedAt?: string;
+    triggerSource?: 'user' | 'schedule' | 'api';
+    scheduleId?: string;
 };
 
 async function createContext(
@@ -60,6 +64,7 @@ export const directoryGenerationTask = task({
 
         try {
             const { orchestrator, directory, user } = await createContext(appContext, payload);
+            const scheduleService = appContext.get(DirectoryScheduleService);
 
             await orchestrator.handleCancellation({
                 directory,
@@ -68,6 +73,10 @@ export const directoryGenerationTask = task({
                 historyId: payload.historyId,
                 historyStartedAt: payload.historyStartedAt,
             });
+
+            if (payload.triggerSource === 'schedule' && payload.scheduleId) {
+                await scheduleService.markRunFailed(payload.scheduleId, 'cancelled');
+            }
         } finally {
             await appContext.close();
         }
@@ -79,14 +88,33 @@ export const directoryGenerationTask = task({
 
         try {
             const { orchestrator, directory, user } = await createContext(appContext, payload);
+            const scheduleService = appContext.get(DirectoryScheduleService);
 
-            await orchestrator.run({
-                directory,
-                user,
-                dto: payload.dto,
-                historyId: payload.historyId,
-                historyStartedAt: payload.historyStartedAt,
-            });
+            try {
+                await orchestrator.run({
+                    directory,
+                    user,
+                    dto: payload.dto,
+                    historyId: payload.historyId,
+                    historyStartedAt: payload.historyStartedAt,
+                });
+
+                if (payload.triggerSource === 'schedule' && payload.scheduleId) {
+                    await scheduleService.markRunCompleted({
+                        scheduleId: payload.scheduleId,
+                        historyId: payload.historyId,
+                        status: GenerateStatusType.GENERATED,
+                    });
+                }
+            } catch (error) {
+                if (payload.triggerSource === 'schedule' && payload.scheduleId) {
+                    await scheduleService.markRunFailed(
+                        payload.scheduleId,
+                        (error as Error)?.message,
+                    );
+                }
+                throw error;
+            }
 
             return {
                 status: 'completed',

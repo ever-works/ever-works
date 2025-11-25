@@ -3,7 +3,7 @@
 import { DirectoryGenerationHistoryEntry } from '@/lib/api/types-only';
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils/cn';
-import { useMounted } from '@/lib/hooks/use-mounted';
+import { ShowDateTime } from '@/components/ui/show-datetime';
 
 interface HistoryTableProps {
     entries: DirectoryGenerationHistoryEntry[];
@@ -18,24 +18,6 @@ const statusColor: Record<string, string> = {
 };
 
 const tdClass = 'px-4 py-4 text-sm text-text dark:text-text-dark align-top';
-
-const formatterCache = new Map<string, Intl.DateTimeFormat>();
-
-function formatDate(value: string | undefined | null, locale: string) {
-    if (!value) return '—';
-    if (!formatterCache.has(locale)) {
-        formatterCache.set(
-            locale,
-            new Intl.DateTimeFormat(locale, {
-                dateStyle: 'medium',
-                timeStyle: 'short',
-            }),
-        );
-    }
-
-    const formatter = formatterCache.get(locale)!;
-    return formatter.format(new Date(value));
-}
 
 function formatDuration(seconds?: number | null) {
     if (!seconds || seconds <= 0) {
@@ -117,10 +99,11 @@ export function HistoryTable({ entries, locale }: HistoryTableProps) {
                                         {getStatusLabel(statusKey, t)}
                                     </span>
                                 </td>
-                                <ShowDateTime
-                                    value={entry.startedAt ?? entry.createdAt}
-                                    locale={locale}
-                                />
+
+                                <td className={tdClass}>
+                                    <ShowDateTime value={entry.startedAt ?? entry.createdAt} />
+                                </td>
+
                                 <td className={tdClass}>
                                     {formatDuration(entry.durationInSeconds)}
                                 </td>
@@ -134,14 +117,4 @@ export function HistoryTable({ entries, locale }: HistoryTableProps) {
             </table>
         </div>
     );
-}
-
-function ShowDateTime({ value, locale }: { value?: string | null; locale: string }) {
-    const mounted = useMounted();
-
-    if (!mounted) {
-        return null;
-    }
-
-    return <td className={tdClass}>{formatDate(value, locale)}</td>;
 }

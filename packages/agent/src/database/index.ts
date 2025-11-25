@@ -6,4 +6,8 @@ export * from './repositories/user.repository';
 export * from './repositories/refresh-token.repository';
 export * from './repositories/oauth-token.repository';
 export * from './repositories/directory-generation-history.repository';
+export * from './repositories/subscription-plan.repository';
+export * from './repositories/user-subscription.repository';
+export * from './repositories/directory-schedule.repository';
+export * from './repositories/usage-ledger.repository';
 export * from './database-init.service';

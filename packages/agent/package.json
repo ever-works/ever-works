@@ -61,6 +61,10 @@
             "types": "./dist/services/index.d.ts",
             "default": "./dist/services/index.js"
         },
+        "./subscriptions": {
+            "types": "./dist/subscriptions/index.d.ts",
+            "default": "./dist/subscriptions/index.js"
+        },
         "./config": {
             "types": "./dist/config/index.d.ts",
             "default": "./dist/config/index.js"
@@ -109,7 +113,7 @@
         "@nestjs/testing": "^11.1.8",
         "@swc/cli": "^0.6.0",
         "@swc/core": "^1.15.1",
-        "@trigger.dev/build": "^4.0.7",
+        "@trigger.dev/build": "^4.1.2",
         "@types/express": "^5.0.5",
         "@types/jest": "^29.5.14",
         "@types/node": "^22.19.0",
@@ -145,7 +149,7 @@
         "@nestjs/websockets": "^11.1.8",
         "@supabase/supabase-js": "^2.80.0",
         "@tavily/core": "^0.3.7",
-        "@trigger.dev/sdk": "^4.0.7",
+        "@trigger.dev/sdk": "^4.1.2",
         "@types/cheerio": "^1.0.0",
         "@types/fs-extra": "^11.0.4",
         "@types/string-similarity": "^4.0.2",

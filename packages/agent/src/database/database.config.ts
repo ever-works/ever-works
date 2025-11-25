@@ -9,6 +9,10 @@ import {
     User,
     Directory,
     DirectoryGenerationHistory,
+    SubscriptionPlan,
+    UserSubscription,
+    DirectorySchedule,
+    UsageLedgerEntry,
 } from '../entities';
 import * as path from 'path';
 import * as os from 'os';
@@ -49,6 +53,10 @@ export const ENTITIES = [
     ChatMessage,
     CacheEntry,
     DirectoryGenerationHistory,
+    SubscriptionPlan,
+    UserSubscription,
+    DirectorySchedule,
+    UsageLedgerEntry,
 ];
 
 export const databaseConfig = registerAs('database', (): DatabaseConfig => {

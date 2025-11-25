@@ -5,13 +5,18 @@ import {
     OneToMany,
     CreateDateColumn,
     UpdateDateColumn,
+    ManyToOne,
+    JoinColumn,
 } from 'typeorm';
 import { OAuthToken } from './oauth-token.entity';
-import { ClassToObject } from './types';
+import type { ClassToObject } from './types';
 import { config } from '@src/config';
 import { Directory } from './directory.entity';
 import { RepoProvider } from '@src/dto';
 import { DirectoryGenerationHistory } from './directory-generation-history.entity';
+import { UserSubscription } from './user-subscription.entity';
+import { SubscriptionPlan } from './subscription-plan.entity';
+import { DirectorySchedule } from './directory-schedule.entity';
 
 @Entity({ name: 'users' })
 export class User {
@@ -80,6 +85,19 @@ export class User {
 
     @OneToMany(() => DirectoryGenerationHistory, (history) => history.user, { lazy: true })
     generationHistory?: Promise<ClassToObject<DirectoryGenerationHistory>[]>;
+
+    @OneToMany(() => UserSubscription, (subscription) => subscription.user, { lazy: true })
+    subscriptions?: Promise<ClassToObject<UserSubscription>[]>;
+
+    @OneToMany(() => DirectorySchedule, (schedule) => schedule.user, { lazy: true })
+    directorySchedules?: Promise<ClassToObject<DirectorySchedule>[]>;
+
+    @Column({ nullable: true })
+    defaultPlanId?: string | null;
+
+    @ManyToOne(() => SubscriptionPlan, { nullable: true, eager: true })
+    @JoinColumn({ name: 'defaultPlanId' })
+    defaultPlan?: ClassToObject<SubscriptionPlan> | null;
 
     local: boolean = false;
 

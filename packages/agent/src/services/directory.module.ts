@@ -13,6 +13,9 @@ import { DirectoryOwnershipService } from './directory-ownership.service';
 import { DirectoryQueryService } from './directory-query.service';
 import { DirectoryLifecycleService } from './directory-lifecycle.service';
 import { DirectoryGenerationService } from './directory-generation.service';
+import { DirectoryScheduleService } from './directory-schedule.service';
+import { DirectoryScheduleDispatcherService } from './directory-schedule-dispatcher.service';
+import { SubscriptionsModule } from '@src/subscriptions';
 
 @Module({
     imports: [
@@ -25,6 +28,7 @@ import { DirectoryGenerationService } from './directory-generation.service';
         DeployModule,
         AiModule,
         TriggerModule,
+        SubscriptionsModule,
     ],
     providers: [
         DirectoryOwnershipService,
@@ -32,6 +36,8 @@ import { DirectoryGenerationService } from './directory-generation.service';
         DirectoryLifecycleService,
         DirectoryGenerationService,
         DirectoryDetailService,
+        DirectoryScheduleService,
+        DirectoryScheduleDispatcherService,
     ],
     exports: [
         DirectoryOwnershipService,
@@ -39,6 +45,8 @@ import { DirectoryGenerationService } from './directory-generation.service';
         DirectoryLifecycleService,
         DirectoryGenerationService,
         DirectoryDetailService,
+        DirectoryScheduleService,
+        DirectoryScheduleDispatcherService,
     ],
 })
 export class DirectoryModule {}
