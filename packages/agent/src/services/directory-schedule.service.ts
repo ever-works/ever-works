@@ -44,12 +44,6 @@ export class DirectoryScheduleService {
 
         await this.ensureDirectoryConfigReady(directory, user);
 
-        if (directory.generateStatus?.status !== GenerateStatusType.GENERATED) {
-            throw new BadRequestException(
-                'Run a successful manual generation before enabling scheduled updates.',
-            );
-        }
-
         const [schedule, allowances, plan] = await Promise.all([
             this.scheduleRepository.findByDirectoryId(directory.id),
             this.subscriptionService.getCadenceAllowances(user),
@@ -76,11 +70,6 @@ export class DirectoryScheduleService {
     async updateSchedule(directoryId: string, dto: UpdateDirectoryScheduleDto, user: User) {
         const directory = await this.ownershipService.ensure(directoryId, user.id);
         const subscriptionsEnabled = this.subscriptionService.isEnabled();
-        if (directory.generateStatus?.status !== GenerateStatusType.GENERATED) {
-            throw new BadRequestException(
-                'Run a successful manual generation before enabling scheduled updates.',
-            );
-        }
         const existing = await this.scheduleRepository.findByDirectoryId(directory.id);
         const plan = await this.subscriptionService.resolvePlanForUser(user);
         const allowances = await this.subscriptionService.getCadenceAllowances(user);
