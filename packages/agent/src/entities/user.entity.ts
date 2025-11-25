@@ -9,7 +9,7 @@ import {
     JoinColumn,
 } from 'typeorm';
 import { OAuthToken } from './oauth-token.entity';
-import { ClassToObject } from './types';
+import type { ClassToObject } from './types';
 import { config } from '@src/config';
 import { Directory } from './directory.entity';
 import { RepoProvider } from '@src/dto';
