@@ -387,12 +387,15 @@
             "schedule": {
                 "page": {
                     "title": "Scheduled updates",
-                    "subtitle": "Automate refreshes for {name} with a dedicated cadence, billing mode, and failure handling.",
+                    "subtitle": "Automate refreshes for {name} with a dedicated cadence and failure handling.",
                     "fallbackName": "this directory"
                 },
                 "card": {
                     "title": "Automation",
-                    "subtitle": "Adjust cadence, billing, and safeguards so scheduled refreshes stay reliable.",
+                    "subtitle": {
+                        "enabled": "Adjust cadence, billing, and safeguards so scheduled refreshes stay reliable.",
+                        "disabled": "Automate refreshes without subscription limits—set cadence and failure guards freely."
+                    },
                     "summary": {
                         "status": "Status",
                         "nextRun": "Next run",
