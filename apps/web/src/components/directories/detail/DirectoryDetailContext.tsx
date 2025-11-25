@@ -1,12 +1,13 @@
 'use client';
 
 import { RepoProvider } from '@/lib/api/enums';
-import { ConnectionInfo, Directory } from '@/lib/api/types-only';
+import { ConnectionInfo, Directory, DirectoryConfig } from '@/lib/api/types-only';
 import { createContext, PropsWithChildren, useContext, useMemo } from 'react';
 
 type DirectoryDetailContextType = {
     directory: Directory;
     oauthConnection: ConnectionInfo | null;
+    config: DirectoryConfig | null;
     repoLinks: {
         main: string | null;
         dataRepo: string | null;
@@ -21,18 +22,21 @@ export const DirectoryDetailContext = createContext<DirectoryDetailContextType>(
 export const DirectoryDetailProvider = ({
     directory,
     oauthConnection,
+    config,
     children,
 }: PropsWithChildren<{
     directory: Directory;
     oauthConnection: ConnectionInfo | null;
+    config: DirectoryConfig | null;
 }>) => {
     const value = useMemo(() => {
         return {
             directory,
             oauthConnection,
+            config,
             repoLinks: repoLink(directory, oauthConnection),
         };
-    }, [directory, oauthConnection]);
+    }, [directory, oauthConnection, config]);
 
     return (
         <DirectoryDetailContext.Provider value={value}>{children}</DirectoryDetailContext.Provider>

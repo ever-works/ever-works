@@ -1,0 +1,1183 @@
+{
+    "auth": {
+        "error": {
+            "title": "Erreur d'authentification",
+            "subtitle": "Nous avons rencontré un problème avec votre authentification",
+            "errorOccurred": "Une erreur s'est produite",
+            "somethingWentWrong": "Quelque chose s'est mal passé",
+            "generic": "Une erreur inattendue s'est produite. Veuillez réessayer plus tard.",
+            "invalidCredentials": "L'adresse e-mail ou le mot de passe que vous avez saisi est incorrect.",
+            "emailNotVerified": "Veuillez vérifier votre adresse e-mail avant de vous connecter.",
+            "accountLocked": "Votre compte a été verrouillé pour des raisons de sécurité.",
+            "sessionExpired": "Votre session a expiré. Veuillez vous connecter à nouveau.",
+            "networkError": "Impossible de se connecter. Veuillez vérifier votre connexion Internet.",
+            "oauth": {
+                "missingCode": "Le code d'autorisation est manquant. Veuillez réessayer de vous connecter.",
+                "invalidState": "État d'autorisation invalide. Veuillez réessayer de vous connecter.",
+                "unsupportedProvider": "Ce fournisseur d'authentification n'est pas pris en charge.",
+                "callbackFailed": "Échec de l'authentification. Veuillez réessayer."
+            },
+            "resetPassword": {
+                "missingToken": "Le lien de réinitialisation du mot de passe est invalide. Jeton de vérification manquant.",
+                "invalidToken": "Le lien de réinitialisation du mot de passe est invalide ou a été falsifié.",
+                "expiredToken": "Le lien de réinitialisation du mot de passe a expiré. Veuillez en demander un nouveau.",
+                "failed": "Échec de la réinitialisation du mot de passe. Veuillez réessayer ou demander un nouveau lien de réinitialisation."
+            },
+            "verifyEmail": {
+                "missingToken": "Le lien de vérification de l'e-mail est invalide. Jeton de vérification manquant.",
+                "invalidToken": "Le lien de vérification de l'e-mail est invalide ou a déjà été utilisé.",
+                "expiredToken": "Le lien de vérification de l'e-mail a expiré. Veuillez en demander un nouveau.",
+                "failed": "Échec de la vérification de l'e-mail. Veuillez réessayer ou demander un nouveau lien de vérification."
+            },
+            "authorize": {
+                "invalidRedirectUrl": "L'URL de redirection est invalide ou non autorisée. Veuillez contacter le support si vous pensez qu'il s'agit d'une erreur."
+            },
+            "actions": {
+                "backToLogin": "Retour à la connexion",
+                "tryRegister": "Essayer de s'inscrire",
+                "resendVerification": "Renvoyer l'e-mail de vérification",
+                "contactSupport": "Contacter le support",
+                "requestNewReset": "Demander un nouveau lien de réinitialisation"
+            },
+            "helpText": "Si vous continuez à rencontrer des problèmes, veuillez consulter nos ressources d'aide ci-dessous.",
+            "links": {
+                "help": "Centre d'aide",
+                "systemStatus": "État du système"
+            }
+        },
+        "login": {
+            "title": "Bon retour",
+            "subtitle": "Connectez-vous à votre compte pour continuer",
+            "form": {
+                "email": {
+                    "label": "Adresse e-mail",
+                    "placeholder": "vous@exemple.com"
+                },
+                "password": {
+                    "label": "Mot de passe",
+                    "placeholder": "Entrez votre mot de passe"
+                },
+                "forgotPassword": "Mot de passe oublié ?",
+                "rememberMe": "Se souvenir de moi pendant 30 jours",
+                "submit": "Se connecter",
+                "submitting": "Connexion en cours..."
+            },
+            "socialLogin": {
+                "divider": "Ou continuer avec",
+                "google": "Google",
+                "github": "GitHub"
+            },
+            "signUp": {
+                "text": "Vous n'avez pas de compte ?",
+                "link": "S'inscrire"
+            },
+            "errors": {
+                "invalidCredentials": "Adresse e-mail ou mot de passe invalide"
+            },
+            "passwordReset": {
+                "success": "Réinitialisation du mot de passe réussie !",
+                "canLogin": "Vous pouvez maintenant vous connecter avec votre nouveau mot de passe."
+            }
+        },
+        "forgotPassword": {
+            "title": "Forgot your password?",
+            "subtitle": "No worries, we'll send you reset instructions",
+            "successTitle": "Check your email",
+            "successSubtitle": "We've sent you password reset instructions",
+            "form": {
+                "email": {
+                    "label": "Email address",
+                    "placeholder": "Enter your email"
+                },
+                "submit": "Send Reset Link",
+                "submitting": "Sending..."
+            },
+            "success": {
+                "title": "Email sent successfully",
+                "message": "We've sent password reset instructions to {email}",
+                "checkSpam": "If you don't see the email, check your spam folder."
+            },
+            "errors": {
+                "failed": "Failed to send reset email. Please try again."
+            },
+            "backToLogin": "Back to login",
+            "noAccount": {
+                "text": "Don't have an account?",
+                "link": "Sign up"
+            }
+        },
+        "resetPassword": {
+            "title": "Réinitialiser votre mot de passe",
+            "subtitle": "Entrez votre nouveau mot de passe ci-dessous",
+            "successTitle": "Réinitialisation du mot de passe réussie",
+            "successSubtitle": "Votre mot de passe a été mis à jour",
+            "form": {
+                "password": {
+                    "label": "Nouveau mot de passe",
+                    "placeholder": "Entrez votre nouveau mot de passe",
+                    "helperText": "Doit contenir au moins 6 caractères avec une lettre minuscule et un chiffre/caractère spécial",
+                    "errors": {
+                        "minLength": "Le mot de passe doit contenir au moins 6 caractères",
+                        "lowercase": "Le mot de passe doit contenir au moins une lettre minuscule",
+                        "numberOrSpecial": "Le mot de passe doit contenir au moins un chiffre ou un caractère spécial",
+                        "cannotStartWith": "Le mot de passe ne peut pas commencer par un point ou une nouvelle ligne"
+                    }
+                },
+                "confirmPassword": {
+                    "label": "Confirmer le nouveau mot de passe",
+                    "placeholder": "Confirmez votre nouveau mot de passe",
+                    "errors": {
+                        "noMatch": "Les mots de passe ne correspondent pas"
+                    }
+                },
+                "submit": "Réinitialiser le mot de passe",
+                "submitting": "Réinitialisation en cours..."
+            },
+            "success": {
+                "title": "Réinitialisation du mot de passe réussie",
+                "message": "Votre mot de passe a été mis à jour avec succès. Vous pouvez maintenant vous connecter avec votre nouveau mot de passe.",
+                "loginButton": "Aller à la connexion"
+            },
+            "errors": {
+                "failed": "Échec de la réinitialisation du mot de passe. Veuillez réessayer ou demander un nouveau lien de réinitialisation.",
+                "noToken": "Lien de réinitialisation invalide",
+                "invalidLink": "Lien de réinitialisation invalide",
+                "missingTokenMessage": "Le lien de réinitialisation du mot de passe est invalide ou incomplet. Veuillez demander une nouvelle réinitialisation de mot de passe.",
+                "requestNewLink": "Demander un nouveau lien de réinitialisation"
+            },
+            "backToLogin": "Retour à la connexion"
+        },
+        "register": {
+            "title": "Créer votre compte",
+            "subtitle": "Commencez à créer des répertoires incroyables dès aujourd'hui",
+            "form": {
+                "name": {
+                    "label": "Nom complet",
+                    "placeholder": "Jean Dupont"
+                },
+                "email": {
+                    "label": "Adresse e-mail",
+                    "placeholder": "vous@exemple.com"
+                },
+                "password": {
+                    "label": "Mot de passe",
+                    "placeholder": "Créez un mot de passe fort",
+                    "hint": "Doit contenir au moins 8 caractères"
+                },
+                "confirmPassword": {
+                    "label": "Confirmer le mot de passe",
+                    "placeholder": "Confirmez votre mot de passe"
+                },
+                "terms": {
+                    "text": "J'accepte les",
+                    "termsLink": "Conditions d'utilisation",
+                    "and": "et la",
+                    "privacyLink": "Politique de confidentialité"
+                },
+                "submit": "Créer un compte",
+                "submitting": "Création du compte..."
+            },
+            "socialSignUp": {
+                "divider": "Ou s'inscrire avec",
+                "google": "Google",
+                "github": "GitHub"
+            },
+            "signIn": {
+                "text": "Vous avez déjà un compte ?",
+                "link": "Se connecter"
+            },
+            "errors": {
+                "passwordsDoNotMatch": "Les mots de passe ne correspondent pas",
+                "passwordTooShort": "Le mot de passe doit contenir au moins 8 caractères",
+                "generic": "Une erreur s'est produite. Veuillez réessayer."
+            }
+        }
+    },
+    "dashboard": {
+        "title": "Tableau de bord",
+        "toasts": {
+            "newUser": {
+                "title": "Bienvenue sur {companyName} ! 🎉",
+                "description": "Votre compte a été créé avec succès. Veuillez vérifier votre e-mail pour vérifier votre compte."
+            },
+            "emailVerification": {
+                "title": "Vérifiez votre e-mail",
+                "description": "Nous avons envoyé un lien de vérification à votre adresse e-mail. Veuillez vérifier votre boîte de réception et votre dossier spam.",
+                "action": "Renvoyer l'e-mail"
+            },
+            "verified": {
+                "title": "E-mail vérifié avec succès ! ✅",
+                "description": "Votre adresse e-mail a été vérifiée. Vous avez maintenant accès à toutes les fonctionnalités."
+            },
+            "oauthConnected": {
+                "title": "Compte connecté à GitHub",
+                "description": "Votre compte a été connecté avec succès à GitHub."
+            }
+        },
+        "header": {
+            "welcome": "Bon retour, {username} !",
+            "subtitle": "Gérez vos répertoires alimentés par l'IA et suivez leurs performances",
+            "notifications": {
+                "title": "Notifications",
+                "empty": "Aucune nouvelle notification"
+            }
+        },
+        "directories": {
+            "title": "Répertoires",
+            "subtitle": "Gérez et organisez vos répertoires alimentés par l'IA",
+            "recent": "Répertoires récents",
+            "viewAll": "Voir tout ({count})",
+            "search": "Rechercher des répertoires...",
+            "create": "Créer un répertoire",
+            "showing": "Affichage de {current} sur {total} répertoires",
+            "pagination": {
+                "previous": "Précédent",
+                "next": "Suivant"
+            },
+            "empty": {
+                "title": "Aucun répertoire pour le moment",
+                "description": "Créez votre premier répertoire alimenté par l'IA pour commencer à organiser et présenter votre contenu.",
+                "action": "Créer votre premier répertoire",
+                "notFound": {
+                    "title": "Aucun répertoire trouvé",
+                    "withSearch": "Essayez d'ajuster vos termes de recherche",
+                    "withoutSearch": "Créez votre premier répertoire alimenté par l'IA pour commencer"
+                }
+            }
+        },
+        "settings": {
+            "title": "Paramètres",
+            "subtitle": "Gérez les paramètres et préférences de votre compte",
+            "tabs": {
+                "profile": "Profil",
+                "security": "Sécurité",
+                "apiTokens": "API et jetons",
+                "oauth": "Comptes connectés",
+                "notifications": "Notifications",
+                "dangerZone": "Zone dangereuse"
+            },
+            "profile": {
+                "title": "Paramètres du profil",
+                "subtitle": "Mettez à jour les informations de votre profil et votre avatar",
+                "fields": {
+                    "name": "Nom",
+                    "username": "Nom d'utilisateur",
+                    "email": "E-mail",
+                    "emailHelperText": "L'e-mail ne peut pas être modifié"
+                },
+                "placeholders": {
+                    "name": "Entrez votre nom",
+                    "username": "Entrez votre nom d'utilisateur"
+                },
+                "actions": {
+                    "save": "Enregistrer les modifications"
+                },
+                "messages": {
+                    "success": "Profil mis à jour avec succès",
+                    "usernameRequired": "Le nom d'utilisateur est requis",
+                    "error": "Échec de la mise à jour du profil",
+                    "unexpectedError": "Une erreur inattendue s'est produite"
+                }
+            },
+            "security": {
+                "title": "Paramètres de sécurité",
+                "subtitle": "Gérez la sécurité et l'authentification de votre compte",
+                "changePassword": {
+                    "title": "Changer le mot de passe",
+                    "currentPassword": "Mot de passe actuel",
+                    "newPassword": "Nouveau mot de passe",
+                    "confirmPassword": "Confirmer le nouveau mot de passe",
+                    "showPasswords": "Afficher les mots de passe",
+                    "placeholders": {
+                        "current": "Entrez le mot de passe actuel",
+                        "new": "Entrez le nouveau mot de passe (min 8 caractères)",
+                        "confirm": "Confirmez le nouveau mot de passe"
+                    },
+                    "actions": {
+                        "update": "Mettre à jour le mot de passe"
+                    },
+                    "messages": {
+                        "success": "Mot de passe mis à jour avec succès",
+                        "fillAllFields": "Veuillez remplir tous les champs de mot de passe",
+                        "minLength": "Le nouveau mot de passe doit contenir au moins 8 caractères",
+                        "mismatch": "Les nouveaux mots de passe ne correspondent pas",
+                        "sameAsCurrent": "Le nouveau mot de passe doit être différent du mot de passe actuel",
+                        "error": "Échec de la mise à jour du mot de passe",
+                        "unexpectedError": "Une erreur inattendue s'est produite"
+                    }
+                },
+                "twoFactor": {
+                    "title": "Authentification à deux facteurs",
+                    "subtitle": "Ajoutez une couche de sécurité supplémentaire à votre compte",
+                    "action": "Bientôt disponible"
+                },
+                "sessions": {
+                    "title": "Sessions actives",
+                    "subtitle": "Gérez vos sessions actives sur tous vos appareils",
+                    "action": "Voir les sessions (Bientôt disponible)"
+                }
+            },
+            "oauth": {
+                "title": "Comptes connectés",
+                "subtitle": "Connectez vos comptes externes pour des fonctionnalités améliorées",
+                "github": {
+                    "name": "GitHub",
+                    "connected": "Créer et gérer des répertoires avec des dépôts GitHub",
+                    "disconnected": "Connectez-vous pour créer des répertoires à partir de dépôts",
+                    "scopes": "Portées",
+                    "actions": {
+                        "connect": "Connecter",
+                        "disconnect": "Déconnecter",
+                        "confirmDisconnect": "Êtes-vous sûr de vouloir déconnecter votre compte GitHub ?"
+                    },
+                    "messages": {
+                        "disconnected": "Compte GitHub déconnecté",
+                        "connectError": "Échec de la connexion à GitHub",
+                        "disconnectError": "Échec de la déconnexion de GitHub"
+                    }
+                }
+            }
+        },
+        "stats": {
+            "totalDirectories": "Total des répertoires",
+            "totalItems": "Total des éléments",
+            "activeWebsites": "Sites Web actifs",
+            "fromLastMonth": "du mois dernier"
+        },
+        "directoryCard": {
+            "status": {
+                "active": "Actif",
+                "notStarted": "Non démarré",
+                "generating": "Génération en cours",
+                "generated": "Généré",
+                "error": "Erreur",
+                "cancelled": "Annulé",
+                "idle": "Inactif"
+            },
+            "noDescription": "Aucune description fournie",
+            "items": "{count} éléments",
+            "views": "{count} vues",
+            "updated": "Mis à jour le {date}",
+            "viewAction": "Voir →"
+        },
+        "directoryList": {
+            "title": "Vos répertoires",
+            "createButton": "Créer un répertoire"
+        },
+        "directoryDetail": {
+            "failedToGenerateItems": "Échec de la génération des éléments. Veuillez réessayer.",
+            "generationCompleted": "Génération terminée avec succès",
+            "generationCancelled": "La génération a été annulée",
+            "status": {
+                "notStarted": "Non démarré",
+                "generating": "Génération en cours",
+                "generated": "Généré",
+                "error": "Erreur",
+                "cancelled": "Annulé"
+            },
+            "tabs": {
+                "overview": "Vue d'ensemble",
+                "items": "Éléments",
+                "generator": "Générateur",
+                "history": "Historique",
+                "deploy": "Déployer",
+                "settings": "Paramètres"
+            },
+            "statusCard": {
+                "notStarted": {
+                    "title": "Génération non démarrée",
+                    "description": "Commencez à générer des éléments pour votre répertoire afin de le remplir de contenu.",
+                    "action": "Démarrer la génération"
+                },
+                "generating": {
+                    "title": "Génération en cours",
+                    "description": "Traitement de votre demande...",
+                    "processing": "Traitement en cours..."
+                },
+                "generated": {
+                    "title": "Génération terminée",
+                    "description": "Votre répertoire a été rempli avec succès d'éléments.",
+                    "viewItems": "Voir les éléments",
+                    "regenerate": "Régénérer"
+                },
+                "error": {
+                    "title": "Échec de la génération",
+                    "description": "Une erreur s'est produite lors de la génération.",
+                    "retry": "Réessayer la génération"
+                },
+                "cancelled": {
+                    "title": "Génération annulée",
+                    "description": "La génération précédente a été arrêtée avant son achèvement.",
+                    "restart": "Redémarrer la génération"
+                }
+            },
+            "stats": {
+                "totalItems": "Total des éléments",
+                "categories": "Catégories",
+                "generationStatus": "Statut de génération",
+                "daysActive": "Jours actifs"
+            },
+            "history": {
+                "title": "Historique de génération",
+                "subtitle": "Suivez les exécutions de génération passées, les éléments créés et les détails d'exécution.",
+                "error": "Échec du chargement de plus d'entrées",
+                "empty": {
+                    "title": "Aucun historique pour le moment",
+                    "description": "Demandez une génération pour voir la progression et les résultats ici."
+                },
+                "status": {
+                    "generating": "En cours",
+                    "generated": "Terminé",
+                    "error": "Échoué",
+                    "cancelled": "Annulé"
+                },
+                "table": {
+                    "run": "Exécution",
+                    "status": "Statut",
+                    "newItems": "Nouveaux éléments",
+                    "updatedItems": "Mis à jour",
+                    "totalItems": "Total",
+                    "duration": "Durée",
+                    "startedAt": "Démarré"
+                },
+                "loadMore": "Charger plus",
+                "noMore": "Plus d'enregistrements",
+                "unknown": "Inconnu"
+            },
+            "info": {
+                "title": "Informations du répertoire",
+                "slug": "Slug",
+                "repositories": "Dépôts",
+                "dataRepo": "Dépôt de données",
+                "websiteRepo": "Dépôt du site Web",
+                "mainRepo": "Dépôt principal",
+                "repoProvider": "Fournisseur de dépôt",
+                "organization": "Organisation",
+                "created": "Créé",
+                "lastUpdated": "Dernière mise à jour",
+                "readmeHeader": "En-tête README",
+                "readmeFooter": "Pied de page README",
+                "custom": "Personnalisé",
+                "customOverwrite": "Personnalisé (Écraser)",
+                "yes": "Oui",
+                "no": "Non"
+            },
+            "config": {
+                "title": "Détails de configuration",
+                "initialPrompt": "Invite de génération initiale",
+                "companyDetails": "Informations sur l'entreprise",
+                "companyName": "Nom de l'entreprise",
+                "companyWebsite": "Site Web",
+                "generationSettings": "Paramètres de génération",
+                "generationMethod": "Méthode de génération",
+                "autoApproval": "Approbation automatique",
+                "pagingMode": "Mode de pagination",
+                "contentTable": "Table des matières",
+                "enabled": "Activé",
+                "disabled": "Désactivé",
+                "pullRequestUpdate": "Détails de la demande de tirage",
+                "branch": "Branche",
+                "prTitle": "Titre de la PR",
+                "mainRepository": "Dépôt principal",
+                "dataRepository": "Dépôt de données"
+            },
+            "activity": {
+                "title": "Activité récente",
+                "noActivity": "Aucune activité pour le moment",
+                "created": "Répertoire créé",
+                "directoryCreated": "Le répertoire a été créé avec succès",
+                "justNow": "À l'instant"
+            },
+            "items": {
+                "title": "Éléments du répertoire",
+                "subtitle": "Gérez et organisez les éléments de votre répertoire",
+                "noItemsTitle": "Aucun élément pour le moment",
+                "noItemsDescription": "Votre répertoire n'a pas encore d'éléments. Générez des éléments pour remplir votre répertoire de contenu.",
+                "generateItems": "Générer des éléments",
+                "searchPlaceholder": "Rechercher des éléments...",
+                "allCategories": "Toutes les catégories",
+                "showing": "Affichage de {current} sur {total} éléments",
+                "noMatch": "Aucun élément ne correspond à vos critères de recherche",
+                "source": "Source",
+                "addItem": "Ajouter un élément",
+                "delete": "Supprimer",
+                "deleteWithPR": "Supprimer avec une demande de tirage",
+                "deleteConfirm": "Êtes-vous sûr de vouloir supprimer \"{name}\" ?",
+                "deleteSuccess": "Élément supprimé avec succès",
+                "deleteFailed": "Échec de la suppression de l'élément",
+                "deleteError": "Une erreur s'est produite lors de la suppression de l'élément",
+                "loadingMore": "Chargement en cours... ({current} sur {total})",
+                "addModal": {
+                    "title": "Ajouter un nouvel élément",
+                    "sourceUrl": "URL source",
+                    "sourceUrlPlaceholder": "https://exemple.com/produit",
+                    "sourceUrlHelp": "Cliquez sur 'Extraire' pour récupérer automatiquement les détails de l'élément depuis l'URL",
+                    "extract": "Extraire",
+                    "extractSuccess": "Détails de l'élément extraits avec succès",
+                    "extractFailed": "Échec de l'extraction des détails de l'élément",
+                    "extractError": "Une erreur s'est produite lors de l'extraction des détails",
+                    "name": "Nom",
+                    "namePlaceholder": "Entrez le nom de l'élément",
+                    "description": "Description",
+                    "descriptionPlaceholder": "Entrez une brève description de l'élément",
+                    "category": "Catégorie",
+                    "tags": "Tags",
+                    "tagPlaceholder": "Ajoutez un tag et appuyez sur Entrée",
+                    "slug": "Slug (Optionnel)",
+                    "slugPlaceholder": "slug-element-personnalise",
+                    "slugHelp": "Identifiant compatible URL. Sera généré automatiquement si laissé vide",
+                    "featured": "Élément mis en avant",
+                    "featuredHelp": "Marquez cet élément comme mis en avant dans le répertoire",
+                    "updateWithPR": "Créer une demande de tirage",
+                    "updateWithPRHelp": "Soumettez les modifications sous forme de demande de tirage au lieu d'un commit direct",
+                    "cancel": "Annuler",
+                    "adding": "Ajout en cours...",
+                    "addItem": "Ajouter l'élément",
+                    "success": "Élément ajouté avec succès",
+                    "successDescription": "L'élément a été ajouté à votre répertoire",
+                    "failed": "Échec de l'ajout de l'élément",
+                    "error": "Une erreur s'est produite lors de l'ajout de l'élément",
+                    "errors": {
+                        "urlRequired": "L'URL source est requise pour l'extraction",
+                        "invalidUrl": "Veuillez entrer une URL valide incluant http:// ou https://",
+                        "requiredFields": "Veuillez remplir tous les champs requis"
+                    }
+                }
+            },
+            "generator": {
+                "regenerationWarning": "Avertissement de régénération",
+                "regenerationWarningDescription": "Ce répertoire a déjà été généré. Démarrer une nouvelle génération remplacera les éléments existants.",
+                "requiredInfo": "Informations requises",
+                "updateConfiguration": "Mettre à jour la configuration",
+                "promptRequired": "L'invite est requise",
+                "operationStartedSuccessfully": "Opération démarrée avec succès",
+                "failedToStartOperation": "Échec du démarrage de l'opération",
+                "directoryName": "Nom du répertoire",
+                "generationPrompt": "Invite de génération",
+                "recommended": "Recommandé",
+                "promptPlaceholder": "Décrivez quels éléments doivent être générés pour ce répertoire...",
+                "promptHelperText": "Soyez précis sur le type de contenu que vous souhaitez générer",
+                "repositoryDescription": "Description du dépôt",
+                "repositoryPlaceholder": "Brève description du dépôt (optionnel)",
+                "startGeneration": "Démarrer la génération",
+                "regenerateItems": "Régénérer les éléments",
+                "updateItems": "Mettre à jour les éléments",
+                "recreateDirectory": "Recréer le répertoire",
+                "showAdvancedOptions": "Afficher les options avancées",
+                "hideAdvancedOptions": "Masquer les options avancées",
+                "cancel": "Annuler",
+                "companyInformation": "Informations sur l'entreprise",
+                "companyInfoDescription": "Détails optionnels de l'entreprise pour le contenu de marque",
+                "companyName": "Nom de l'entreprise",
+                "companyNamePlaceholder": "Entrez le nom de l'entreprise",
+                "companyWebsite": "Site Web de l'entreprise",
+                "companyWebsitePlaceholder": "https://exemple.com",
+                "categoriesKeywords": "Catégories et mots-clés",
+                "categoriesDescription": "Définissez les catégories et mots-clés pour l'organisation du contenu",
+                "initialCategories": "Catégories initiales",
+                "priorityCategories": "Catégories prioritaires",
+                "targetKeywords": "Mots-clés cibles",
+                "addCategoryPlaceholder": "Ajouter une catégorie",
+                "addPriorityCategoryPlaceholder": "Ajouter une catégorie prioritaire",
+                "addKeywordPlaceholder": "Ajouter un mot-clé",
+                "add": "Ajouter",
+                "sourceUrls": "URLs sources",
+                "sourceUrlsDescription": "Ajoutez des URLs spécifiques pour extraire le contenu",
+                "sourceUrlPlaceholder": "https://exemple.com/page",
+                "addUrl": "Ajouter une URL",
+                "noSourceUrlsMessage": "Aucune URL source ajoutée. Le générateur utilisera la recherche pour trouver du contenu.",
+                "advancedConfig": "Configuration avancée",
+                "advancedConfigDescription": "Ajustez finement les paramètres et le comportement de génération",
+                "generationMethod": "Méthode de génération",
+                "methodCreateUpdate": "Créer ou mettre à jour",
+                "methodRecreate": "Recréer (Remplacer tout)",
+                "updateWithPullRequest": "Mettre à jour avec une demande de tirage",
+                "updateWithPullRequestDescription": "Créer une demande de tirage au lieu de commits directs",
+                "enableBadgeEvaluation": "Activer l'évaluation des badges",
+                "enableBadgeEvaluationDescription": "Évaluer et ajouter des badges de qualité aux éléments",
+                "websiteRepositoryCreationMethod": "Méthode de création du dépôt du site Web",
+                "methodDuplicate": "Dupliquer",
+                "methodFork": "Fork",
+                "directoryNamePlaceholder": "Entrez le nom du répertoire",
+                "methodCreateFromTemplate": "Créer à partir d'un modèle",
+                "aiProcessingConfiguration": "Configuration du traitement IA",
+                "maxSearchQueries": "Nombre maximum de requêtes de recherche",
+                "resultsPerQuery": "Résultats par requête",
+                "maxPagesToProcess": "Nombre maximum de pages à traiter",
+                "relevanceThreshold": "Seuil de pertinence",
+                "aiFirstGeneration": "Génération IA en premier",
+                "aiFirstGenerationDescription": "Activer la génération IA des éléments initiaux avant la recherche Web.",
+                "contentFiltering": "Filtrage du contenu",
+                "contentFilteringDescription": "Activer le filtrage de qualité du contenu"
+            },
+            "progress": {
+                "title": "Génération en cours",
+                "processingRequest": "Traitement de votre demande...",
+                "steps": {
+                    "promptComparison": "Comparaison des invites",
+                    "promptProcessing": "Traitement de votre invite",
+                    "aiFirstItemsGeneration": "Génération des éléments IA initiaux",
+                    "searchQueriesGeneration": "Création des requêtes de recherche",
+                    "webSearch": "Recherche sur le Web",
+                    "contentRetrieval": "Récupération du contenu",
+                    "contentFiltering": "Filtrage du contenu pertinent",
+                    "itemsExtraction": "Extraction des éléments du contenu",
+                    "deduplicationDataAggregation": "Suppression des doublons et agrégation des données",
+                    "categoriesTagsProcessing": "Traitement des catégories et tags",
+                    "sourcesValidation": "Validation des sources",
+                    "badgesProcessing": "Traitement des badges de qualité",
+                    "itemsProcessing": "Finalisation des éléments",
+                    "processing": "Traitement en cours..."
+                },
+                "progress": "Progression",
+                "closeNote": "Cela peut prendre quelques minutes. Vous pouvez fermer cette page et revenir plus tard."
+            },
+            "settings": {
+                "generalSettings": "Paramètres généraux",
+                "generalTitle": "Paramètres généraux",
+                "directoryName": "Nom du répertoire",
+                "description": "Description",
+                "organizationRepository": "Dépôt d'organisation",
+                "organizationHelp": "Créer des dépôts sous une organisation au lieu de votre compte personnel",
+                "organizationName": "Nom de l'organisation",
+                "organizationNamePlaceholder": "Entrez le nom de l'organisation",
+                "readmeConfiguration": "Configuration README",
+                "readmeTitle": "Configuration README",
+                "customHeader": "En-tête personnalisé",
+                "customHeaderPlaceholder": "Ajoutez du contenu personnalisé à l'en-tête du README",
+                "overwriteDefaultHeader": "Écraser l'en-tête par défaut",
+                "customFooter": "Pied de page personnalisé",
+                "cantDeleteWhileGenerating": "Impossible de supprimer le répertoire pendant la génération des éléments.",
+                "customFooterPlaceholder": "Ajoutez du contenu personnalisé au pied de page du README",
+                "overwriteDefaultFooter": "Écraser le pied de page par défaut",
+                "dangerZone": "Zone dangereuse",
+                "dangerTitle": "Zone dangereuse",
+                "deleteWarning": "Une fois que vous supprimez un répertoire, il n'y a pas de retour en arrière. Veuillez être certain.",
+                "dangerDescription": "Une fois que vous supprimez un répertoire, il n'y a pas de retour en arrière. Veuillez être certain.",
+                "deleteOptions": "Sélectionnez ce qu'il faut supprimer :",
+                "deleteDataRepository": "Supprimer le dépôt de données",
+                "deleteDataRepositoryDescription": "Supprimer le dépôt de données JSON de GitHub",
+                "deleteMarkdownRepository": "Supprimer le dépôt markdown",
+                "deleteMarkdownRepositoryDescription": "Supprimer le dépôt markdown contenant le README",
+                "deleteWebsiteRepository": "Supprimer le dépôt du site Web",
+                "deleteWebsiteRepositoryDescription": "Supprimer le dépôt du site Web déployé",
+                "deleteConfirm": "Êtes-vous absolument sûr ?",
+                "deleteConfirmDetail": "Cette action ne peut pas être annulée. Le répertoire et les dépôts sélectionnés seront définitivement supprimés.",
+                "confirmDirectoryName": "Tapez le nom du répertoire pour confirmer",
+                "confirmDirectoryNameDescription": "Tapez \"{name}\" pour confirmer la suppression",
+                "deleteNameMismatch": "Le nom du répertoire ne correspond pas",
+                "deleteButton": "Supprimer le répertoire",
+                "deleteConfirmButton": "Oui, supprimer",
+                "deleteSuccess": "Répertoire supprimé avec succès",
+                "deleteFailed": "Échec de la suppression du répertoire",
+                "yesDelete": "Oui, supprimer",
+                "cancel": "Annuler",
+                "saveChanges": "Enregistrer les modifications",
+                "updateReadme": "Mettre à jour le README",
+                "updateSuccess": "Paramètres mis à jour avec succès",
+                "updateFailed": "Échec de la mise à jour des paramètres"
+            },
+            "deploy": {
+                "noTokenAlert": {
+                    "title": "Jeton Vercel requis",
+                    "description": "Pour déployer votre répertoire sur Vercel, vous devez configurer votre jeton API Vercel dans les paramètres de votre compte.",
+                    "configureButton": "Aller aux paramètres des jetons API",
+                    "getTokenButton": "Obtenir le jeton Vercel",
+                    "howTo": {
+                        "title": "Comment configurer votre jeton Vercel :",
+                        "step1": "Cliquez sur 'Obtenir le jeton Vercel' pour ouvrir le tableau de bord Vercel",
+                        "step2": "Créez un nouveau jeton avec les permissions de déploiement",
+                        "step3": "Copiez le jeton généré",
+                        "step4": "Allez dans les paramètres des jetons API et collez votre jeton dans la section Vercel"
+                    }
+                },
+                "form": {
+                    "deployToVercel": {
+                        "title": "Déployer sur Vercel",
+                        "description": "Déployez le dépôt du site Web de votre répertoire sur Vercel.",
+                        "deployButton": "Déployer maintenant",
+                        "deployingButton": "Déploiement en cours...",
+                        "deployingStateButton": "Déploiement en cours ({state})...",
+                        "successMessage": "Votre site Web a été déployé avec succès !",
+                        "teamSelection": {
+                            "title": "Sélectionner l'équipe Vercel",
+                            "description": "Choisissez l'équipe Vercel sur laquelle déployer ce répertoire.",
+                            "label": "Équipe",
+                            "placeholder": "Sélectionner une équipe",
+                            "confirmButton": "Déployer sur l'équipe",
+                            "cancelButton": "Annuler"
+                        }
+                    },
+                    "updateRepository": {
+                        "title": "Mettre à jour le dépôt du site Web",
+                        "description": "Synchroniser les dernières modifications du modèle vers le",
+                        "websiteRepository": "dépôt du site Web",
+                        "updateButton": "Mettre à jour le dépôt",
+                        "updatingButton": "Mise à jour en cours..."
+                    },
+                    "messages": {
+                        "deploySuccess": "Déploiement démarré avec succès",
+                        "deployPending": "Le déploiement est en file d'attente et démarrera sous peu",
+                        "deployFailed": "Échec du déploiement sur Vercel",
+                        "deployError": "Une erreur s'est produite lors du déploiement",
+                        "updateSuccess": "Dépôt mis à jour avec succès",
+                        "updateFailed": "Échec de la mise à jour du dépôt",
+                        "updateError": "Une erreur s'est produite lors de la mise à jour du dépôt"
+                    },
+                    "info": {
+                        "deployInfo": "Le déploiement prend généralement 1 à 3 minutes. Vous recevrez une URL une fois terminé.",
+                        "updateInfo": "Les mises à jour synchronisent le contenu de votre répertoire vers le dépôt du site Web pour le prochain déploiement."
+                    }
+                }
+            }
+        },
+        "directoryCreation": {
+            "title": "Créer un nouveau répertoire",
+            "subtitle": "Choisissez comment vous souhaitez créer votre répertoire",
+            "backToOptions": "Retour aux options",
+            "organizationSelector": {
+                "label": "Propriétaire du dépôt",
+                "loading": "Chargement des organisations...",
+                "personal": "Compte personnel",
+                "personalAccount": "Le dépôt sera créé sous votre compte personnel",
+                "organizations": "Organisations",
+                "personalHelp": "Le dépôt sera créé sous votre compte GitHub personnel",
+                "organizationHelp": "Le dépôt sera créé sous l'organisation {org}"
+            },
+            "ai": {
+                "title": "Créer avec l'IA",
+                "subtitle": "Décrivez votre idée de répertoire en langage naturel et laissez l'IA gérer la configuration",
+                "getStarted": "Commencer",
+                "formTitle": "Créer un répertoire avec l'IA",
+                "formSubtitle": "Décrivez votre idée de répertoire et laissez l'IA gérer la configuration et la génération de contenu initial",
+                "directoryNameLabel": "Nom du répertoire",
+                "directoryNamePlaceholder": "ex. : Outils IA géniaux",
+                "directoryNameHelp": "L'IA suggérera un nom si vous laissez ce champ vide",
+                "promptLabel": "Décrivez votre répertoire",
+                "githubRequired": "Veuillez d'abord connecter votre compte GitHub.",
+                "promptPlaceholder": "Décrivez le type de répertoire que vous souhaitez créer, les éléments qu'il doit contenir et toutes les exigences spécifiques...",
+                "inspirationText": "Besoin d'inspiration ? Essayez l'un de ces exemples :",
+                "examplePrompts": {
+                    "0": {
+                        "name": "Outils IA pour développeurs",
+                        "prompt": "Créer un répertoire des meilleurs outils IA pour développeurs"
+                    },
+                    "1": {
+                        "name": "Hub de composants React",
+                        "prompt": "Construire une liste organisée de composants React open-source"
+                    },
+                    "2": {
+                        "name": "Outils pour équipes distantes",
+                        "prompt": "Générer un répertoire d'applications de productivité pour équipes distantes"
+                    },
+                    "3": {
+                        "name": "Mode durable",
+                        "prompt": "Créer une collection de marques de mode durables"
+                    }
+                },
+                "featuresTitle": "Ce que l'IA fera pour vous :",
+                "features": {
+                    "0": "Générer un nom et une description appropriés",
+                    "1": "Créer les catégories et la structure initiales",
+                    "2": "Trouver et ajouter automatiquement des éléments pertinents",
+                    "3": "Configurer le dépôt GitHub avec une documentation appropriée"
+                },
+                "generateButton": "Générer avec l'IA",
+                "generatingButton": "Génération du répertoire...",
+                "cancelButton": "Annuler",
+                "noteTitle": "Note :",
+                "noteText": "La génération par IA prend généralement 2 à 5 minutes selon la complexité de votre demande. Vous serez notifié lorsque votre répertoire sera prêt.",
+                "errors": {
+                    "promptRequired": "Veuillez décrire le type de répertoire que vous souhaitez créer",
+                    "nameRequired": "Le nom du répertoire est requis",
+                    "slugRequired": "Le slug du répertoire est requis",
+                    "descriptionRequired": "La description du répertoire est requise"
+                },
+                "success": {
+                    "started": "Création du répertoire démarrée !",
+                    "generating": "L'IA génère le contenu. Cela peut prendre quelques minutes...",
+                    "created": "Répertoire créé avec succès !"
+                },
+                "advancedSettings": "Paramètres avancés",
+                "advancedSubtitle": "Configurer les paramètres d'organisation et de dépôt",
+                "organizationLabel": "Dépôt d'organisation",
+                "organizationHelp": "Créer des dépôts sous une organisation au lieu de votre compte personnel",
+                "organizationNameLabel": "Nom de l'organisation",
+                "organizationNamePlaceholder": "Entrez le nom de l'organisation"
+            },
+            "manual": {
+                "title": "Créer manuellement",
+                "subtitle": "Configurez votre répertoire avec un contrôle total sur chaque paramètre et option",
+                "configureNow": "Configurer maintenant",
+                "formTitle": "Créer un répertoire manuellement",
+                "formSubtitle": "Configurez votre répertoire avec un contrôle total sur chaque paramètre",
+                "basicInfo": "Informations de base",
+                "nameLabel": "Nom du répertoire *",
+                "namePlaceholder": "ex. : Outils IA géniaux",
+                "slugLabel": "Slug du répertoire *",
+                "slugPlaceholder": "outils-ia-geniaux",
+                "githubRequired": "Veuillez d'abord connecter votre compte GitHub.",
+                "slugHelp": "Identifiant compatible URL (lettres minuscules, chiffres et tirets uniquement)",
+                "descriptionLabel": "Description *",
+                "descriptionPlaceholder": "Une liste organisée des meilleurs outils et ressources IA pour développeurs",
+                "advancedSettings": "Paramètres avancés",
+                "advancedSubtitle": "Organisation, en-têtes personnalisés et plus encore",
+                "organizationLabel": "Créer sous une organisation",
+                "organizationHelp": "Créer ce répertoire sous une organisation GitHub au lieu de votre compte personnel",
+                "organizationNameLabel": "Nom de l'organisation",
+                "organizationNamePlaceholder": "mon-organisation",
+                "headerLabel": "En-tête README personnalisé",
+                "headerPlaceholder": "Ajoutez du contenu personnalisé en haut de votre fichier README",
+                "headerOverwrite": "Remplacer complètement l'en-tête par défaut",
+                "footerLabel": "Pied de page README personnalisé",
+                "footerPlaceholder": "Ajoutez du contenu personnalisé en bas de votre fichier README",
+                "footerOverwrite": "Remplacer complètement le pied de page par défaut",
+                "createButton": "Créer le répertoire",
+                "creatingButton": "Création du répertoire...",
+                "cancelButton": "Annuler",
+                "nameRequired": "Le nom du répertoire est requis",
+                "slugRequired": "Le slug du répertoire est requis",
+                "descriptionRequired": "La description du répertoire est requise",
+                "success": {
+                    "created": "Répertoire créé avec succès !"
+                }
+            }
+        },
+        "github": {
+            "connection": {
+                "alert": {
+                    "title": "GitHub non connecté",
+                    "subtitle": "Connectez votre compte GitHub pour créer et gérer des répertoires",
+                    "connectButton": "Connecter GitHub",
+                    "connectingButton": "Connexion en cours..."
+                },
+                "status": {
+                    "title": "Statut GitHub",
+                    "connected": "Connecté",
+                    "notConnected": "Non connecté",
+                    "connectedDescription": "Vos répertoires seront stockés comme dépôts GitHub dans votre compte.",
+                    "notConnectedDescription": "Connectez votre compte GitHub pour créer et gérer des répertoires.",
+                    "connectedAccount": "Compte connecté :",
+                    "requiredNote": "Requis pour créer des répertoires",
+                    "connectButton": "Connecter GitHub",
+                    "connectingButton": "Connexion en cours...",
+                    "failedToConnect": "Échec de la connexion à GitHub"
+                }
+            }
+        },
+        "apiTokens": {
+            "title": "API et jetons",
+            "subtitle": "Gérez vos clés API et intégrations tierces",
+            "vercel": {
+                "title": "Intégration Vercel",
+                "subtitle": "Connectez votre compte Vercel pour déployer des répertoires en tant que sites Web",
+                "connected": "Connecté",
+                "notConnected": "Non connecté",
+                "connectedMessage": "Votre compte Vercel est connecté. Vous pouvez maintenant déployer des répertoires sur Vercel.",
+                "disconnect": "Déconnecter Vercel",
+                "disconnecting": "Suppression en cours...",
+                "apiTokenLabel": "Jeton API Vercel",
+                "placeholder": "vc_...",
+                "showToken": "Afficher",
+                "hideToken": "Masquer",
+                "getTokenHelp": "Vous pouvez obtenir votre jeton API depuis",
+                "vercelDashboard": "Tableau de bord Vercel",
+                "save": "Enregistrer le jeton",
+                "saving": "Enregistrement en cours...",
+                "messages": {
+                    "tokenRequired": "Veuillez entrer un jeton Vercel valide",
+                    "saveSuccess": "Jeton Vercel enregistré avec succès",
+                    "saveFailed": "Échec de l'enregistrement du jeton Vercel",
+                    "removeSuccess": "Jeton Vercel supprimé avec succès",
+                    "removeFailed": "Échec de la suppression du jeton Vercel",
+                    "unexpectedError": "Une erreur inattendue s'est produite"
+                }
+            },
+            "apiKeys": {
+                "title": "Clés API",
+                "subtitle": "Générer et gérer les clés API pour l'accès programmatique",
+                "generate": "Générer une clé API (Bientôt disponible)"
+            },
+            "webhooks": {
+                "title": "Webhooks",
+                "subtitle": "Configurer les webhooks pour recevoir des mises à jour en temps réel",
+                "configure": "Configurer les webhooks (Bientôt disponible)"
+            }
+        },
+        "notifications": {
+            "title": "Préférences de notification",
+            "subtitle": "Choisissez comment vous souhaitez être notifié des mises à jour importantes",
+            "email": {
+                "title": "Notifications par e-mail",
+                "directoryUpdates": {
+                    "label": "Mises à jour des répertoires",
+                    "description": "Soyez notifié des mises à jour importantes de vos répertoires"
+                },
+                "newItems": {
+                    "label": "Nouveaux éléments",
+                    "description": "Soyez notifié lorsque de nouveaux éléments sont ajoutés à vos répertoires"
+                },
+                "weeklyDigest": {
+                    "label": "Résumé hebdomadaire",
+                    "description": "Recevez un résumé hebdomadaire de l'activité de vos répertoires"
+                },
+                "marketing": {
+                    "label": "Marketing et promotions",
+                    "description": "Recevez des mises à jour sur les nouvelles fonctionnalités et offres"
+                }
+            },
+            "app": {
+                "title": "Notifications dans l'application",
+                "newItems": {
+                    "label": "Nouveaux éléments",
+                    "description": "Afficher les notifications pour les nouveaux éléments de répertoire"
+                },
+                "comments": {
+                    "label": "Commentaires",
+                    "description": "Soyez notifié des commentaires sur vos répertoires"
+                },
+                "mentions": {
+                    "label": "Mentions",
+                    "description": "Soyez notifié lorsque quelqu'un vous mentionne"
+                },
+                "systemUpdates": {
+                    "label": "Mises à jour système",
+                    "description": "Notifications système importantes et alertes de maintenance"
+                }
+            },
+            "actions": {
+                "save": "Enregistrer les préférences",
+                "saving": "Enregistrement en cours..."
+            },
+            "messages": {
+                "success": "Préférences de notification mises à jour",
+                "error": "Échec de la mise à jour des préférences",
+                "unexpectedError": "Une erreur inattendue s'est produite"
+            }
+        },
+        "sidebar": {
+            "menu": "Menu",
+            "aiChat": "Chat IA",
+            "newDirectory": "Nouveau répertoire",
+            "navigation": {
+                "dashboard": "Tableau de bord",
+                "directories": "Répertoires",
+                "settings": "Paramètres"
+            },
+            "signOut": "Se déconnecter",
+            "signingOut": "Déconnexion en cours..."
+        },
+        "dangerZone": {
+            "title": "Zone dangereuse",
+            "subtitle": "Actions irréversibles et destructives",
+            "export": {
+                "title": "Exporter vos données",
+                "subtitle": "Télécharger tous vos répertoires, éléments et paramètres",
+                "action": "Exporter les données (Bientôt disponible)"
+            },
+            "delete": {
+                "title": "Supprimer le compte",
+                "subtitle": "Supprimer définitivement votre compte et toutes les données associées. Cette action ne peut pas être annulée.",
+                "button": "Supprimer mon compte",
+                "confirmTitle": "⚠️ Ceci supprimera définitivement :",
+                "confirmItems": [
+                    "Votre compte et profil",
+                    "Tous vos répertoires",
+                    "Tous les éléments et données des répertoires",
+                    "Les clés API et intégrations",
+                    "Tous les sites Web associés"
+                ],
+                "confirmLabel": "Tapez votre e-mail {email} pour confirmer",
+                "confirmPlaceholder": "Entrez votre e-mail",
+                "confirmButton": "Oui, supprimer mon compte",
+                "deleting": "Suppression en cours...",
+                "cancel": "Annuler"
+            },
+            "messages": {
+                "confirmEmail": "Veuillez entrer votre e-mail correctement pour confirmer",
+                "deleteSuccess": "Compte supprimé avec succès",
+                "deleteFailed": "Échec de la suppression du compte",
+                "unexpectedError": "Une erreur inattendue s'est produite"
+            }
+        },
+        "aiChat": {
+            "title": "Assistant IA",
+            "subtitle": "Créer des répertoires en langage naturel",
+            "newChat": "Nouveau chat",
+            "loadingConversation": "Chargement de la conversation…",
+            "inputPlaceholder": "Décrivez le répertoire que vous souhaitez créer...",
+            "sendButton": "Envoyer"
+        }
+    },
+    "layout": {
+        "auth": {
+            "backToHome": "Retour à l'accueil",
+            "feature": {
+                "title": "Construire des répertoires avec l'IA",
+                "subtitle": "Créez de beaux répertoires consultables en quelques minutes en utilisant le langage naturel. Aucun codage requis.",
+                "benefits": {
+                    "ai": {
+                        "title": "Création alimentée par l'IA",
+                        "description": "Décrivez ce que vous voulez et laissez l'IA faire le travail"
+                    },
+                    "templates": {
+                        "title": "Modèles professionnels",
+                        "description": "Commencez avec de beaux designs personnalisables"
+                    },
+                    "management": {
+                        "title": "Gestion facile",
+                        "description": "Mettez à jour et organisez votre contenu sans effort"
+                    }
+                }
+            },
+            "footer": {
+                "copyright": "© {year} {companyName}. Tous droits réservés.",
+                "terms": "Conditions d'utilisation",
+                "privacy": "Politique de confidentialité",
+                "help": "Aide"
+            }
+        }
+    },
+    "errors": {
+        "global": {
+            "title": "Quelque chose s'est mal passé !",
+            "tryAgain": "Réessayer"
+        }
+    },
+    "metadata": {
+        "title": "{companyName} - Créateur de répertoires",
+        "description": "Une plateforme SaaS pour créer et gérer des répertoires"
+    },
+    "api": {
+        "errors": {
+            "unauthorized": "Vous n'êtes pas autorisé à effectuer cette action",
+            "unauthorizedLogin": "Non autorisé : Veuillez vous connecter à nouveau.",
+            "forbidden": "Interdit : Vous n'avez pas la permission d'effectuer cette action.",
+            "serverError": "Erreur serveur : {message}",
+            "unexpected": "Une erreur serveur inattendue s'est produite.",
+            "apiError": "Erreur API : {status} {statusText}",
+            "loginFailed": "Échec de la connexion",
+            "registerFailed": "Échec de l'inscription",
+            "unsupportedProvider": "Fournisseur non pris en charge",
+            "providerConnectFailed": "Échec de la connexion au fournisseur",
+            "forgotPasswordFailed": "Échec de l'envoi de l'e-mail de réinitialisation du mot de passe",
+            "resetPasswordFailed": "Échec de la réinitialisation du mot de passe"
+        }
+    },
+    "actions": {
+        "directories": {
+            "slug": {
+                "required": "Le slug est requis",
+                "format": "Le slug doit contenir uniquement des lettres minuscules, des chiffres et des tirets"
+            },
+            "name": {
+                "required": "Le nom est requis",
+                "maxLength": "Le nom doit contenir moins de 100 caractères"
+            },
+            "description": {
+                "required": "La description est requise",
+                "maxLength": "La description doit contenir moins de 500 caractères"
+            },
+            "prompt": {
+                "minLength": "L'invite doit contenir au moins 10 caractères",
+                "maxLength": "L'invite doit contenir moins de 1000 caractères"
+            },
+            "oauthRequired": "Connexion OAuth requise. Veuillez d'abord connecter votre compte {provider}.",
+            "githubRequired": "Connexion GitHub requise. Veuillez d'abord connecter votre compte GitHub.",
+            "createSuccess": "Répertoire créé avec succès !",
+            "createFailed": "Échec de la création du répertoire",
+            "updateSuccess": "Répertoire mis à jour avec succès !",
+            "updateFailed": "Échec de la mise à jour du répertoire",
+            "invalidGeneratedData": "Échec de la génération de données de répertoire valides",
+            "aiGenerationStarted": "Création du répertoire démarrée ! L'IA génère le contenu...",
+            "invalidId": "ID de répertoire invalide",
+            "deleteSuccess": "Répertoire supprimé avec succès",
+            "deleteFailed": "Échec de la suppression du répertoire",
+            "fetchFailed": "Échec de la récupération des répertoires",
+            "organization": {
+                "requiredWhenOwnerProvided": "L'organisation doit être activée lorsque le propriétaire est fourni"
+            }
+        },
+        "generator": {
+            "promptRequired": "L'invite est requise",
+            "nameRequired": "Le nom est requis",
+            "generationStartedSuccessfully": "Génération démarrée avec succès",
+            "updateStartedSuccessfully": "Mise à jour démarrée avec succès",
+            "failedToGenerateItems": "Échec de la génération des éléments",
+            "failedToUpdateItems": "Échec de la mise à jour des éléments",
+            "markdownRegeneratedSuccessfully": "Markdown régénéré avec succès",
+            "failedToRegenerateMarkdown": "Échec de la régénération du markdown",
+            "notAuthorizedToAccessOrganization": "Vous n'êtes pas autorisé à accéder à cette organisation. Veuillez contacter le propriétaire ({owner}) pour obtenir de l'aide."
+        },
+        "settings": {
+            "profile": {
+                "usernameRequired": "Le nom d'utilisateur est requis",
+                "usernameMaxLength": "Le nom d'utilisateur doit contenir moins de 50 caractères",
+                "usernameFormat": "Le nom d'utilisateur ne peut contenir que des lettres, des chiffres, des tirets et des underscores",
+                "updateFailed": "Échec de la mise à jour du profil",
+                "notAuthenticated": "Non authentifié"
+            },
+            "password": {
+                "currentRequired": "Le mot de passe actuel est requis",
+                "newMinLength": "Le mot de passe doit contenir au moins 8 caractères",
+                "newMaxLength": "Le mot de passe doit contenir moins de 100 caractères",
+                "updateFailed": "Échec de la mise à jour du mot de passe",
+                "updateSuccess": "Mot de passe mis à jour avec succès",
+                "notAuthenticated": "Non authentifié"
+            },
+            "vercel": {
+                "notAuthenticated": "Non authentifié",
+                "tokenRequired": "Le jeton est requis",
+                "invalidFormat": "Format de jeton Vercel invalide",
+                "saveFailed": "Échec de l'enregistrement du jeton Vercel",
+                "saveSuccess": "Jeton Vercel enregistré avec succès",
+                "validationFailed": "Le jeton Vercel fourni est invalide. Veuillez vérifier et réessayer.",
+                "removeFailed": "Échec de la suppression du jeton Vercel",
+                "removeSuccess": "Jeton Vercel supprimé avec succès"
+            },
+            "github": {
+                "notAuthenticated": "Non authentifié",
+                "disconnectFailed": "Échec de la déconnexion de GitHub",
+                "disconnectSuccess": "Compte GitHub déconnecté avec succès"
+            },
+            "notifications": {
+                "notAuthenticated": "Non authentifié",
+                "updateFailed": "Échec de la mise à jour des préférences",
+                "updateSuccess": "Préférences de notification mises à jour avec succès"
+            },
+            "danger": {
+                "notAuthenticated": "Non authentifié",
+                "deleteFailed": "Échec de la suppression du compte",
+                "deleteDisabled": "La suppression de compte est désactivée en démo"
+            }
+        },
+        "deploy": {
+            "deployVercelFailed": "Échec du déploiement sur Vercel",
+            "updateRepositoryFailed": "Échec de la mise à jour du dépôt"
+        }
+    },
+    "validation": {
+        "auth": {
+            "invalidCredentials": "E-mail ou mot de passe invalide",
+            "account": {
+                "suspended": "Le compte est suspendu"
+            },
+            "email": {
+                "required": "L'e-mail ne peut pas être vide",
+                "invalid": "E-mail invalide",
+                "emailAlreadyRegistered": "L'e-mail est déjà enregistré"
+            },
+            "password": {
+                "required": "Le mot de passe ne peut pas être vide",
+                "minLength": "Le mot de passe doit contenir au moins {length} caractères",
+                "lowercase": "Le mot de passe doit contenir au moins une lettre minuscule",
+                "numberOrSpecial": "Le mot de passe doit contenir au moins un chiffre ou un caractère spécial",
+                "cannotStartWith": "Le mot de passe ne peut pas commencer par un point ou une nouvelle ligne",
+                "digit": "Le mot de passe doit contenir au moins un chiffre"
+            },
+            "username": {
+                "minLength": "Le nom d'utilisateur doit contenir au moins {length} caractères"
+            }
+        }
+    }
+}

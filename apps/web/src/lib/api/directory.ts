@@ -154,6 +154,27 @@ export interface DirectoryConfig {
     copyright_year?: number;
     paging_mode?: string;
     autoapproval?: boolean;
+    locale?: string;
+    logo?: {
+        light?: string;
+        dark?: string;
+    };
+    favicon?: {
+        light?: string;
+        dark?: string;
+    };
+    title?: string;
+    description?: string;
+    keywords?: string[];
+    categories?: string[];
+    author?: string;
+    url?: string;
+    image?: string;
+    twitter?: {
+        card?: string;
+        title?: string;
+        description?: string;
+    };
     metadata?: {
         initial_prompt?: string;
         generation_method?: GenerationMethod;

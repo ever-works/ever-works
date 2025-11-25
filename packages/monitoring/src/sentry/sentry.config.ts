@@ -8,6 +8,7 @@ export const createSentryConfig = (config?: SentryConfig): any => {
         environment: process.env.NODE_ENV || 'development',
         tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 1.0,
         profilesSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 1.0,
+        enableLogs: true, // Enable Sentry Logs by default
         integrations: [nodeProfilingIntegration()],
         beforeSend(event: any) {
             if (event.request?.url?.includes('/auth')) {
