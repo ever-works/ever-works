@@ -24,6 +24,7 @@ export interface DirectoryScheduleDto {
     maxFailureBeforePause: number;
     allowedCadences: DirectoryScheduleAllowedCadence[];
     planCode?: string;
+    subscriptionsEnabled: boolean;
 }
 
 export class UpdateDirectoryScheduleDto {

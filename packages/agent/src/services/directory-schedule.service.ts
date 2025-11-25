@@ -19,6 +19,8 @@ import {
 } from '@src/entities/types';
 import { UsageLedgerService } from '@src/subscriptions/usage-ledger.service';
 import { UsageLedgerTriggerType } from '@src/entities/usage-ledger-entry.entity';
+import { DataGeneratorService } from '@src/data-generator/data-generator.service';
+import { Directory } from '@src/entities/directory.entity';
 
 @Injectable()
 export class DirectoryScheduleService {
@@ -30,6 +32,7 @@ export class DirectoryScheduleService {
         private readonly ownershipService: DirectoryOwnershipService,
         private readonly subscriptionService: SubscriptionService,
         private readonly usageLedgerService: UsageLedgerService,
+        private readonly dataGeneratorService: DataGeneratorService,
     ) {}
 
     async getSchedule(
@@ -37,6 +40,9 @@ export class DirectoryScheduleService {
         user: User,
     ): Promise<{ schedule: DirectoryScheduleDto; directoryId: string }> {
         const directory = await this.ownershipService.ensure(directoryId, user.id);
+        const subscriptionsEnabled = this.subscriptionService.isEnabled();
+
+        await this.ensureDirectoryConfigReady(directory, user);
 
         if (directory.generateStatus?.status !== GenerateStatusType.GENERATED) {
             throw new BadRequestException(
@@ -52,7 +58,7 @@ export class DirectoryScheduleService {
 
         return {
             directoryId: directory.id,
-            schedule: this.toDto(schedule, allowances, plan.code),
+            schedule: this.toDto(schedule, allowances, plan.code, subscriptionsEnabled),
         };
     }
 
@@ -69,6 +75,12 @@ export class DirectoryScheduleService {
 
     async updateSchedule(directoryId: string, dto: UpdateDirectoryScheduleDto, user: User) {
         const directory = await this.ownershipService.ensure(directoryId, user.id);
+        const subscriptionsEnabled = this.subscriptionService.isEnabled();
+        if (directory.generateStatus?.status !== GenerateStatusType.GENERATED) {
+            throw new BadRequestException(
+                'Run a successful manual generation before enabling scheduled updates.',
+            );
+        }
         const existing = await this.scheduleRepository.findByDirectoryId(directory.id);
         const plan = await this.subscriptionService.resolvePlanForUser(user);
         const allowances = await this.subscriptionService.getCadenceAllowances(user);
@@ -110,7 +122,11 @@ export class DirectoryScheduleService {
         const creatingOrActivating =
             enable && (!existing || existing.status !== DirectoryScheduleStatus.ACTIVE);
 
-        if (creatingOrActivating) {
+        if (enable) {
+            await this.ensureDirectoryConfigReady(directory, user);
+        }
+
+        if (subscriptionsEnabled && creatingOrActivating) {
             const activeScheduleCount = await this.scheduleRepository.countActiveByUser(user.id);
             if (activeScheduleCount >= plan.maxDirectories) {
                 throw new BadRequestException({
@@ -139,11 +155,12 @@ export class DirectoryScheduleService {
 
         await this.syncDirectory(directory.id, schedule);
 
-        return this.toDto(schedule, allowances, plan.code);
+        return this.toDto(schedule, allowances, plan.code, subscriptionsEnabled);
     }
 
     async cancelSchedule(directoryId: string, user: User) {
         const directory = await this.ownershipService.ensure(directoryId, user.id);
+        const subscriptionsEnabled = this.subscriptionService.isEnabled();
         const schedule = await this.scheduleRepository.findByDirectoryId(directory.id);
 
         if (!schedule) {
@@ -164,7 +181,7 @@ export class DirectoryScheduleService {
             this.subscriptionService.resolvePlanForUser(user),
         ]);
 
-        return this.toDto(updated, allowances, plan.code);
+        return this.toDto(updated, allowances, plan.code, subscriptionsEnabled);
     }
 
     async markRunDispatched(scheduleId: string): Promise<DirectorySchedule | null> {
@@ -294,6 +311,7 @@ export class DirectoryScheduleService {
         schedule: DirectorySchedule | null,
         allowances: DirectoryScheduleAllowedCadence[],
         planCode: string,
+        subscriptionsEnabled: boolean,
     ): DirectoryScheduleDto {
         return {
             status: schedule?.status ?? DirectoryScheduleStatus.DISABLED,
@@ -306,7 +324,8 @@ export class DirectoryScheduleService {
             maxFailureBeforePause:
                 schedule?.maxFailureBeforePause ?? config.subscriptions.getMaxFailureBeforePause(),
             allowedCadences: allowances,
-            planCode,
+            planCode: subscriptionsEnabled ? planCode : undefined,
+            subscriptionsEnabled,
         };
     }
 
@@ -318,5 +337,30 @@ export class DirectoryScheduleService {
             scheduledNextRunAt: schedule?.nextRunAt ?? null,
             scheduledStatus: schedule?.status ?? DirectoryScheduleStatus.DISABLED,
         });
+    }
+
+    private async ensureDirectoryConfigReady(directory: Directory, user: User) {
+        try {
+            const config = await this.dataGeneratorService
+                .config(directory, user)
+                .catch(() => null);
+
+            if (!config?.metadata?.initial_prompt) {
+                throw new BadRequestException({
+                    status: 'error',
+                    message:
+                        'Complete an initial directory setup before enabling scheduled updates.',
+                });
+            }
+        } catch (error) {
+            if (error instanceof BadRequestException) {
+                throw error;
+            }
+
+            throw new BadRequestException({
+                status: 'error',
+                message: 'Complete an initial directory setup before enabling scheduled updates.',
+            });
+        }
     }
 }

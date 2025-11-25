@@ -23,7 +23,10 @@ export class UsageLedgerService {
     ) {}
 
     async recordUsage(options: RecordUsageOptions): Promise<UsageLedgerEntry | null> {
-        if (options.billingMode !== DirectoryScheduleBillingMode.USAGE) {
+        if (
+            !config.subscriptions.isEnabled() ||
+            options.billingMode !== DirectoryScheduleBillingMode.USAGE
+        ) {
             return null;
         }
 

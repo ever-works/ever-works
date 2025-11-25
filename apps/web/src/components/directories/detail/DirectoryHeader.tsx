@@ -2,7 +2,6 @@
 
 import { Directory } from '@/lib/api/types-only';
 import { cn } from '@/lib/utils/cn';
-import { Button } from '@/components/ui/button';
 import { useTranslations } from 'next-intl';
 import { GenerateStatusType } from '@/lib/api/enums';
 import { Link as IconLink } from 'lucide-react';

@@ -299,6 +299,9 @@ export const config = {
     },
 
     subscriptions: {
+        isEnabled() {
+            return process.env.SUBSCRIPTIONS_ENABLED === 'true';
+        },
         scheduledUpdatesEnabled() {
             return process.env.SCHEDULED_UPDATES_ENABLED !== 'false';
         },

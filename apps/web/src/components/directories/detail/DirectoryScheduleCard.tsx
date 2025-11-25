@@ -1,6 +1,18 @@
 'use client';
 
-import { useMemo, useState, useTransition } from 'react';
+import {
+    useEffect,
+    useMemo,
+    useState,
+    useTransition,
+    type ComponentType,
+    type ReactNode,
+} from 'react';
+import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
+import { AlertCircle, CheckCircle2, PauseCircle, PlayCircle, Repeat } from 'lucide-react';
+import { toast } from 'sonner';
+
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Select } from '@/components/ui/select';
@@ -10,15 +22,14 @@ import {
     DirectoryScheduleBillingMode,
     DirectoryScheduleCadence,
     DirectoryScheduleStatus,
-    GenerateStatusType,
 } from '@/lib/api/enums';
 import { DirectoryScheduleDto } from '@/lib/api/types-only';
-import { useRouter } from 'next/navigation';
 import {
+    cancelDirectorySchedule,
     runDirectorySchedule,
     updateDirectorySchedule,
 } from '@/app/actions/dashboard/directory-schedule';
-import { useTranslations } from 'next-intl';
+import { ShowDateTime } from '@/components/ui/show-datetime';
 
 type DirectoryScheduleCardProps = {
     directoryId: string;
@@ -32,52 +43,115 @@ const cadenceOrder = [
     DirectoryScheduleCadence.MONTHLY,
 ];
 
+const defaultAllowances = cadenceOrder.map((cadence) => ({
+    cadence,
+    allowed: true,
+}));
+
 export function DirectoryScheduleCard({ directoryId, schedule }: DirectoryScheduleCardProps) {
     const t = useTranslations('dashboard.directoryDetail.schedule.card');
     const router = useRouter();
-    const initialStatus = schedule?.status || DirectoryScheduleStatus.DISABLED;
+
+    if (!schedule) {
+        return (
+            <ScheduleEmptyState
+                title={t('empty.title')}
+                description={t('empty.description')}
+                actionLabel={t('empty.refresh')}
+                onAction={() => router.refresh()}
+            />
+        );
+    }
+
+    return <ScheduleForm directoryId={directoryId} schedule={schedule} />;
+}
+
+function ScheduleForm({
+    directoryId,
+    schedule,
+}: {
+    directoryId: string;
+    schedule: DirectoryScheduleDto;
+}) {
+    const t = useTranslations('dashboard.directoryDetail.schedule.card');
+    const router = useRouter();
+
+    const allowances = useMemo(
+        () => (schedule.allowedCadences?.length ? schedule.allowedCadences : defaultAllowances),
+        [schedule.allowedCadences],
+    );
     const [form, setForm] = useState({
-        enable: initialStatus === DirectoryScheduleStatus.ACTIVE,
-        cadence: schedule?.cadence ?? DirectoryScheduleCadence.MONTHLY,
-        billingMode: schedule?.billingMode || DirectoryScheduleBillingMode.SUBSCRIPTION,
-        maxFailureBeforePause: schedule?.maxFailureBeforePause || 3,
+        enable: schedule.status === DirectoryScheduleStatus.ACTIVE,
+        cadence:
+            schedule.cadence ??
+            allowances.find((item) => item.allowed)?.cadence ??
+            DirectoryScheduleCadence.MONTHLY,
+        billingMode: schedule.billingMode ?? DirectoryScheduleBillingMode.SUBSCRIPTION,
+        maxFailureBeforePause: schedule.maxFailureBeforePause ?? 3,
     });
-    const [message, setMessage] = useState<string | null>(null);
-    const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        setForm({
+            enable: schedule.status === DirectoryScheduleStatus.ACTIVE,
+            cadence:
+                schedule.cadence ??
+                allowances.find((item) => item.allowed)?.cadence ??
+                DirectoryScheduleCadence.MONTHLY,
+            billingMode: schedule.billingMode ?? DirectoryScheduleBillingMode.SUBSCRIPTION,
+            maxFailureBeforePause: schedule.maxFailureBeforePause ?? 3,
+        });
+    }, [
+        schedule.status,
+        schedule.cadence,
+        schedule.billingMode,
+        schedule.maxFailureBeforePause,
+        allowances,
+    ]);
+
     const [isSaving, startSaving] = useTransition();
     const [isRunning, startRunning] = useTransition();
+    const [isCancelling, startCancelling] = useTransition();
 
-    const cadenceInfo = schedule?.allowedCadences?.find((item) => item.cadence === form.cadence);
-    const requiresUsage = cadenceInfo ? !cadenceInfo.allowed : false;
+    const subscriptionsEnabled = schedule.subscriptionsEnabled;
+    const cadenceInfo = allowances.find((item) => item.cadence === form.cadence);
+    const requiresUsage = subscriptionsEnabled && cadenceInfo ? !cadenceInfo.allowed : false;
 
-    const nextRunDisplay = useMemo(() => formatDate(schedule?.nextRunAt), [schedule?.nextRunAt]);
-    const lastRunDisplay = useMemo(() => formatDate(schedule?.lastRunAt), [schedule?.lastRunAt]);
+    const statusLabel = t(`summary.statusMap.${schedule.status}`);
+    const planLabel =
+        subscriptionsEnabled && schedule.planCode
+            ? t(`plans.${schedule.planCode as 'free' | 'standard' | 'premium'}`)
+            : subscriptionsEnabled
+              ? t('plans.free')
+              : t('plans.unmetered');
 
-    const planLabel = (() => {
-        const known = ['free', 'standard', 'premium'] as const;
-        if (schedule?.planCode && (known as readonly string[]).includes(schedule.planCode)) {
-            return t(`plans.${schedule.planCode as 'free' | 'standard' | 'premium'}`);
-        }
-        return schedule?.planCode || t('plans.free');
-    })();
+    const summaryItems = [
+        { label: t('summary.status'), value: statusLabel },
+        {
+            label: t('summary.nextRun'),
+            value: <ShowDateTime value={schedule.nextRunAt} default={t('summary.notScheduled')} />,
+        },
+        {
+            label: t('summary.lastRun'),
+            value: <ShowDateTime value={schedule.lastRunAt} default={t('summary.never')} />,
+        },
+        {
+            label: t('summary.failures'),
+            value: `${schedule.failureCount}/${form.maxFailureBeforePause}`,
+        },
+    ];
 
     const updateForm = (updates: Partial<typeof form>) => {
         setForm((prev) => ({ ...prev, ...updates }));
-        setMessage(null);
-        setError(null);
     };
 
     const saveSchedule = () => {
         startSaving(async () => {
-            setError(null);
-            setMessage(null);
-
             if (
                 form.enable &&
                 requiresUsage &&
                 form.billingMode !== DirectoryScheduleBillingMode.USAGE
             ) {
-                setError(t('errors.requireUsage'));
+                toast.error(t('errors.requireUsage'));
                 return;
             }
 
@@ -89,92 +163,75 @@ export function DirectoryScheduleCard({ directoryId, schedule }: DirectorySchedu
             });
 
             if (!result.success) {
-                setError(result.error || t('errors.updateFailed'));
+                toast.error(result.error || t('errors.updateFailed'));
                 return;
             }
 
-            setMessage(result.message || t('success.saved'));
+            toast.success(result.message || t('success.saved'));
             router.refresh();
         });
     };
 
     const runNow = () => {
         startRunning(async () => {
-            setError(null);
-            setMessage(null);
-
             const result = await runDirectorySchedule(directoryId);
 
             if (!result.success) {
-                setError(result.error || t('errors.runFailed'));
+                toast.error(result.error || t('errors.runFailed'));
                 return;
             }
 
-            setMessage(result.message || t('success.runStarted'));
+            toast.success(result.message || t('success.runStarted'));
             router.refresh();
         });
     };
 
-    const cancelSchedule = () => {
-        startSaving(async () => {
-            setError(null);
-            setMessage(null);
-
-            if (form.enable) {
-                setError(t('errors.disableBeforeCancel'));
-                return;
-            }
-
-            const result = await updateDirectorySchedule(directoryId, {
-                enable: false,
-                cadence: form.cadence,
-                billingMode: form.billingMode,
-                maxFailureBeforePause: form.maxFailureBeforePause,
-            });
+    const cancelScheduleHandler = () => {
+        startCancelling(async () => {
+            const result = await cancelDirectorySchedule(directoryId);
 
             if (!result.success) {
-                setError(result.error || t('errors.cancelFailed'));
+                toast.error(result.error || t('errors.cancelFailed'));
                 return;
             }
 
-            setMessage(result.message || t('success.cancelled'));
+            toast.success(result.message || t('success.cancelled'));
             router.refresh();
         });
     };
 
-    const cardClass = cn(
-        'bg-card dark:bg-card-dark border border-card-border dark:border-card-border-dark rounded-xl p-6 shadow-sm space-y-6',
-    );
-
     return (
-        <div className={cardClass}>
-            <div className="flex flex-col gap-4">
-                <div className="flex items-center justify-between gap-4 flex-wrap">
-                    <div>
-                        <p className="text-xl font-semibold">{t('title')}</p>
-                        <p className="text-sm text-text-secondary dark:text-text-secondary-dark max-w-xl">
-                            {t('subtitle')}
-                        </p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-2 text-sm">
-                            <span className="text-text-secondary dark:text-text-secondary-dark">
-                                {form.enable ? t('labels.enabled') : t('labels.disabled')}
-                            </span>
-                            <Switch
-                                checked={form.enable}
-                                onChange={(checked) => updateForm({ enable: checked })}
-                            />
-                        </div>
-                        <div className="flex items-center gap-2 text-sm">
-                            <span className="text-text-secondary dark:text-text-secondary-dark">
-                                {t('labels.billing')}
-                            </span>
+        <section className="rounded-2xl border border-card-border dark:border-card-border-dark bg-card dark:bg-card-dark p-6 shadow-sm space-y-6">
+            <header className="space-y-2">
+                <p className="text-lg font-semibold text-text dark:text-text-dark">{t('title')}</p>
+                <p className="text-sm text-text-secondary dark:text-text-secondary-dark max-w-2xl">
+                    {t('subtitle')}
+                </p>
+            </header>
+
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                {summaryItems.map((item) => (
+                    <SummaryChip key={item.label} label={item.label} value={item.value} />
+                ))}
+            </div>
+
+            <div className="space-y-4">
+                <div className="grid gap-4 md:grid-cols-2">
+                    <FieldCard label={t('fields.automation')} helper={t('fields.automationHelp')}>
+                        <Switch
+                            checked={form.enable}
+                            onChange={(checked) => updateForm({ enable: checked })}
+                        />
+                    </FieldCard>
+
+                    {subscriptionsEnabled && (
+                        <FieldCard label={t('fields.billing')} helper={t('fields.billingHelp')}>
                             <Select
                                 value={form.billingMode}
-                                onChange={(e) =>
+                                onChange={(event) =>
                                     updateForm({
-                                        billingMode: e.target.value as DirectoryScheduleBillingMode,
+                                        billingMode: event.target
+                                            .value as DirectoryScheduleBillingMode,
                                     })
                                 }
                             >
@@ -185,15 +242,19 @@ export function DirectoryScheduleCard({ directoryId, schedule }: DirectorySchedu
                                     {t('billing.usage')}
                                 </option>
                             </Select>
-                        </div>
-                    </div>
+                        </FieldCard>
+                    )}
                 </div>
 
-                <div className="grid md:grid-cols-3 gap-4">
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium text-text-secondary dark:text-text-secondary-dark">
-                            {t('labels.cadence')}
-                        </label>
+                <div className="grid gap-4 md:grid-cols-2">
+                    <FieldCard
+                        label={t('fields.cadence')}
+                        helper={
+                            subscriptionsEnabled
+                                ? t('fields.cadenceHelp', { plan: planLabel })
+                                : t('fields.cadenceOpen')
+                        }
+                    >
                         <Select
                             value={form.cadence}
                             onChange={(event) =>
@@ -202,144 +263,189 @@ export function DirectoryScheduleCard({ directoryId, schedule }: DirectorySchedu
                                 })
                             }
                         >
-                            {(
-                                schedule?.allowedCadences ||
-                                cadenceOrder.map((value) => ({ cadence: value, allowed: true }))
-                            )
-                                .map((item) => ({
-                                    value: item.cadence,
-                                    label: t(`cadence.${item.cadence}`),
-                                    disabled: !item.allowed,
-                                }))
-                                .map((item) => (
-                                    <option
-                                        key={item.value}
-                                        value={item.value}
-                                        disabled={item.disabled}
-                                    >
-                                        {item.label}
-                                    </option>
-                                ))}
+                            {cadenceOrder.map((cadence) => (
+                                <option
+                                    key={cadence}
+                                    value={cadence}
+                                    disabled={
+                                        subscriptionsEnabled &&
+                                        !allowances.find((item) => item.cadence === cadence)
+                                            ?.allowed
+                                    }
+                                >
+                                    {t(`cadence.${cadence}`)}
+                                </option>
+                            ))}
                         </Select>
-                        <p className="text-xs text-text-secondary dark:text-text-secondary-dark">
-                            {t('planNote', {
-                                plan: planLabel,
-                            })}{' '}
-                            {requiresUsage ? t('usageRequired') : t('cadenceAllowed')}
-                        </p>
-                    </div>
 
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium text-text-secondary dark:text-text-secondary-dark">
-                            {t('labels.maxFailures')}
-                        </label>
+                        {requiresUsage ? (
+                            <HelperPill tone="alert" icon={AlertCircle}>
+                                {t('usageRequired')}
+                            </HelperPill>
+                        ) : (
+                            <HelperPill tone="success" icon={CheckCircle2}>
+                                {t('cadenceAllowed')}
+                            </HelperPill>
+                        )}
+
+                        {subscriptionsEnabled && (
+                            <div className="flex flex-wrap gap-1 pt-2 text-xs text-text-secondary dark:text-text-secondary-dark">
+                                {allowances.map((item) => (
+                                    <span
+                                        key={item.cadence}
+                                        className={cn(
+                                            'rounded-full border px-2 py-0.5',
+                                            item.allowed
+                                                ? 'border-success/40 text-success'
+                                                : 'border-border dark:border-border-dark text-text-secondary/70 dark:text-text-secondary-dark/70',
+                                        )}
+                                    >
+                                        {t(`cadence.${item.cadence}`)}
+                                    </span>
+                                ))}
+                            </div>
+                        )}
+                    </FieldCard>
+
+                    <FieldCard label={t('fields.maxFailures')} helper={t('fields.maxFailuresHelp')}>
                         <Input
                             type="number"
                             min={1}
                             max={10}
                             value={form.maxFailureBeforePause}
-                            onChange={(e) =>
+                            onChange={(event) => {
+                                const nextValue = Number(event.target.value);
+                                const normalized = Number.isFinite(nextValue) ? nextValue : 1;
                                 updateForm({
-                                    maxFailureBeforePause: parseInt(e.target.value, 10) || 1,
-                                })
-                            }
+                                    maxFailureBeforePause: Math.min(10, Math.max(1, normalized)),
+                                });
+                            }}
                         />
-                        <p className="text-xs text-text-secondary dark:text-text-secondary-dark">
-                            {t('help.maxFailures')}
-                        </p>
-                    </div>
-
-                    <div className="grid grid-cols-2 md:grid-cols-2 gap-3 bg-muted/60 dark:bg-muted-dark/60 rounded-lg p-3">
-                        <InfoStat
-                            label={t('stats.nextRun')}
-                            value={nextRunDisplay || t('stats.notScheduled')}
-                        />
-                        <InfoStat
-                            label={t('stats.lastRun')}
-                            value={lastRunDisplay || t('stats.never')}
-                        />
-                        <InfoStat
-                            label={t('stats.status')}
-                            value={schedule?.status || t('stats.disabled')}
-                        />
-                        <InfoStat
-                            label={t('stats.failures')}
-                            value={`${schedule?.failureCount ?? 0}/${form.maxFailureBeforePause}`}
-                        />
-                    </div>
+                    </FieldCard>
                 </div>
             </div>
-
-            {schedule && (
-                <div className="flex flex-wrap gap-2 text-xs text-text-secondary dark:text-text-secondary-dark">
-                    <Badge>{t('labels.plan', { plan: planLabel })}</Badge>
-                    <Badge>
-                        {t('labels.nextRun', { next: nextRunDisplay || t('stats.notScheduled') })}
-                    </Badge>
-                    <Badge>
-                        {t('labels.lastRun', { last: lastRunDisplay || t('stats.never') })}
-                    </Badge>
-                </div>
-            )}
 
             <div className="flex flex-wrap gap-3">
-                <Button onClick={saveSchedule} disabled={isSaving || isRunning}>
+                <Button
+                    variant="secondary"
+                    onClick={runNow}
+                    disabled={
+                        isRunning ||
+                        isSaving ||
+                        isCancelling ||
+                        schedule.status !== DirectoryScheduleStatus.ACTIVE
+                    }
+                    className="gap-2"
+                >
+                    {isRunning ? t('actions.starting') : t('actions.runNow')}
+                    <PlayCircle className="h-4 w-4" aria-hidden />
+                </Button>
+
+                <Button onClick={saveSchedule} disabled={isSaving || isRunning || isCancelling}>
                     {isSaving ? t('actions.saving') : t('actions.save')}
                 </Button>
-                <Button variant="secondary" onClick={runNow} disabled={isSaving || isRunning}>
-                    {isRunning ? t('actions.starting') : t('actions.runNow')}
-                </Button>
-                <Button variant="ghost" onClick={cancelSchedule} disabled={isSaving || isRunning}>
-                    {t('actions.cancel')}
+
+                <Button
+                    variant="ghost"
+                    onClick={cancelScheduleHandler}
+                    disabled={isSaving || isRunning || isCancelling}
+                    className="gap-2"
+                >
+                    {isCancelling ? t('actions.cancelling') : t('actions.cancel')}
+                    <PauseCircle className="h-4 w-4" aria-hidden />
                 </Button>
             </div>
+        </section>
+    );
+}
 
-            {(message || error) && (
-                <div
-                    className={cn(
-                        'text-sm rounded-md px-3 py-2',
-                        error
-                            ? 'bg-destructive/10 text-destructive border border-destructive/40'
-                            : 'bg-success/10 text-success border border-success/40',
-                    )}
-                >
-                    {error || message}
-                </div>
-            )}
+function SummaryChip({ label, value }: { label: string; value: ReactNode | string }) {
+    return (
+        <div className="rounded-xl border border-border dark:border-border-dark bg-surface dark:bg-surface-dark p-4 space-y-1">
+            <p className="text-xs uppercase tracking-wide text-text-secondary dark:text-text-secondary-dark">
+                {label}
+            </p>
+            <p className="text-base font-semibold text-text dark:text-text-dark">{value}</p>
         </div>
     );
 }
 
-function Badge({ children }: { children: React.ReactNode }) {
+function FieldCard({
+    label,
+    helper,
+    children,
+}: {
+    label: string;
+    helper?: string;
+    children: ReactNode;
+}) {
     return (
-        <span className="rounded-full bg-muted dark:bg-muted-dark px-3 py-1 font-medium text-text-secondary dark:text-text-secondary-dark">
+        <div className="rounded-xl border border-border dark:border-border-dark bg-surface dark:bg-surface-dark p-4 space-y-3">
+            <div>
+                <p className="text-sm font-medium text-text dark:text-text-dark">{label}</p>
+                {helper && (
+                    <p className="text-xs text-text-secondary dark:text-text-secondary-dark">
+                        {helper}
+                    </p>
+                )}
+            </div>
+            {children}
+        </div>
+    );
+}
+
+function HelperPill({
+    children,
+    tone,
+    icon: Icon,
+}: {
+    children: ReactNode;
+    tone: 'success' | 'alert';
+    icon: ComponentType<{ className?: string }>;
+}) {
+    return (
+        <span
+            className={cn(
+                'mt-2 inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium',
+                tone === 'success'
+                    ? 'bg-success/10 text-success'
+                    : 'bg-destructive/10 text-destructive',
+            )}
+        >
+            <Icon className="h-4 w-4" aria-hidden />
             {children}
         </span>
     );
 }
 
-function InfoStat({ label, value }: { label: string; value: string }) {
+function ScheduleEmptyState({
+    title,
+    description,
+    actionLabel,
+    onAction,
+}: {
+    title: string;
+    description: string;
+    actionLabel: string;
+    onAction: () => void;
+}) {
     return (
-        <div>
-            <p className="text-xs text-text-secondary dark:text-text-secondary-dark mb-1">
-                {label}
+        <div className="rounded-2xl border border-dashed border-border dark:border-border-dark bg-card dark:bg-card-dark p-10 text-center space-y-4">
+            <Repeat
+                className="mx-auto h-10 w-10 text-text-secondary dark:text-text-secondary-dark"
+                aria-hidden
+            />
+            <p className="text-xl font-semibold text-text dark:text-text-dark">{title}</p>
+            <p className="text-sm text-text-secondary dark:text-text-secondary-dark max-w-xl mx-auto">
+                {description}
             </p>
-            <p className="text-sm font-medium text-text dark:text-text-dark">{value}</p>
+            <Button
+                variant="secondary"
+                onClick={onAction}
+                className="inline-flex items-center gap-2"
+            >
+                {actionLabel}
+            </Button>
         </div>
     );
-}
-
-function formatDate(value?: string | null) {
-    if (!value) {
-        return null;
-    }
-
-    try {
-        return new Intl.DateTimeFormat(undefined, {
-            dateStyle: 'medium',
-            timeStyle: 'short',
-        }).format(new Date(value));
-    } catch {
-        return value;
-    }
 }

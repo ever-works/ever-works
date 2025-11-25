@@ -1,4 +1,10 @@
-import { Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
+import {
+    BadRequestException,
+    Injectable,
+    Logger,
+    NotFoundException,
+    OnModuleInit,
+} from '@nestjs/common';
 import { SubscriptionPlanRepository } from '@src/database/repositories/subscription-plan.repository';
 import { UserSubscriptionRepository } from '@src/database/repositories/user-subscription.repository';
 import { SubscriptionPlan } from '@src/entities/subscription-plan.entity';
@@ -89,11 +95,19 @@ export class SubscriptionService implements OnModuleInit {
         );
     }
 
+    isEnabled() {
+        return config.subscriptions.isEnabled();
+    }
+
     async getActiveSubscription(userId: string) {
         return this.userSubscriptionRepository.findActiveByUser(userId);
     }
 
     async resolvePlanForUser(user: User): Promise<SubscriptionPlan> {
+        if (!this.isEnabled()) {
+            return this.resolveDefaultPlan();
+        }
+
         const subscription = await this.getActiveSubscription(user.id);
         if (subscription?.plan) {
             return subscription.plan as SubscriptionPlan;
@@ -103,22 +117,18 @@ export class SubscriptionService implements OnModuleInit {
             return user.defaultPlan as SubscriptionPlan;
         }
 
-        const defaultCode = this.normalizePlanCode(config.subscriptions.getDefaultPlanCode());
-        const plan = await this.planRepository.findByCode(defaultCode);
-
-        if (!plan) {
-            this.logger.warn(`Subscription plan ${defaultCode} not found, falling back to FREE`);
-            const fallback = await this.planRepository.findByCode(SubscriptionPlanCode.FREE);
-            if (!fallback) {
-                throw new Error('Default subscription plan not found');
-            }
-            return fallback;
-        }
-
-        return plan;
+        return this.resolveDefaultPlan();
     }
 
     async getCadenceAllowances(user: User): Promise<DirectoryScheduleAllowedCadence[]> {
+        if (!this.isEnabled()) {
+            return ALL_CADENCES.map((cadence) => ({
+                cadence,
+                allowed: true,
+                payPerUse: false,
+            }));
+        }
+
         const plan = await this.resolvePlanForUser(user);
         const allowedSet = new Set(plan.allowedCadences || []);
 
@@ -146,6 +156,10 @@ export class SubscriptionService implements OnModuleInit {
         plan: SubscriptionPlan,
         billingMode: DirectoryScheduleBillingMode,
     ): boolean {
+        if (!this.isEnabled()) {
+            return false;
+        }
+
         const allowedSet = new Set(plan.allowedCadences || []);
         if (allowedSet.has(cadence)) {
             return false;
@@ -176,6 +190,10 @@ export class SubscriptionService implements OnModuleInit {
     }
 
     async assignPlanToUser(user: User, planCode: SubscriptionPlanCode): Promise<SubscriptionPlan> {
+        if (!this.isEnabled()) {
+            throw new BadRequestException('Subscriptions are disabled');
+        }
+
         const normalized = this.normalizePlanCode(planCode);
         const plan = await this.planRepository.findByCode(normalized);
 
@@ -199,6 +217,25 @@ export class SubscriptionService implements OnModuleInit {
         return {
             plan,
             allowances,
+            enabled: this.isEnabled(),
         };
+    }
+
+    private async resolveDefaultPlan(): Promise<SubscriptionPlan> {
+        const defaultCode = this.normalizePlanCode(config.subscriptions.getDefaultPlanCode());
+        const plan = await this.planRepository.findByCode(defaultCode);
+
+        if (plan) {
+            return plan;
+        }
+
+        this.logger.warn(`Subscription plan ${defaultCode} not found, falling back to FREE`);
+        const fallback = await this.planRepository.findByCode(SubscriptionPlanCode.FREE);
+
+        if (!fallback) {
+            throw new Error('Default subscription plan not found');
+        }
+
+        return fallback;
     }
 }

@@ -1,4 +1,13 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Post, UseGuards } from '@nestjs/common';
+import {
+    BadRequestException,
+    Body,
+    Controller,
+    Get,
+    HttpCode,
+    HttpStatus,
+    Post,
+    UseGuards,
+} from '@nestjs/common';
 import { JwtAuthGuard, AuthService, CurrentUser } from '@src/auth';
 import { SubscriptionService } from '@packages/agent/subscriptions';
 import { AuthenticatedUser } from '@src/auth/types/jwt.types';
@@ -23,9 +32,17 @@ export class SubscriptionsController {
     async getPlan(@CurrentUser() auth: AuthenticatedUser) {
         const user = await this.authService.getUser(auth.userId);
         const summary = await this.subscriptionService.summarizePlan(user);
+        if (!summary.enabled) {
+            return {
+                status: 'success',
+                enabled: false,
+                plan: null,
+            };
+        }
 
         return {
             status: 'success',
+            enabled: true,
             plan: {
                 code: summary.plan.code,
                 name: summary.plan.displayName,
@@ -40,12 +57,17 @@ export class SubscriptionsController {
         @CurrentUser() auth: AuthenticatedUser,
         @Body() dto: UpdateSubscriptionPlanDto,
     ) {
+        if (!this.subscriptionService.isEnabled()) {
+            throw new BadRequestException('Subscriptions are disabled');
+        }
+
         const user = await this.authService.getUser(auth.userId);
         const plan = await this.subscriptionService.assignPlanToUser(user, dto.planCode);
         const summary = await this.subscriptionService.summarizePlan(user);
 
         return {
             status: 'success',
+            enabled: true,
             plan: {
                 code: plan.code,
                 name: plan.displayName,
