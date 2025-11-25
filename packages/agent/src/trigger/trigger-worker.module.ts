@@ -9,9 +9,15 @@ import { WebsiteGeneratorService } from '@src/website-generator/website-generato
 import { GitModule } from '@src/git/git.module';
 import { TriggerGenerationOrchestrator } from './trigger-generation.orchestrator';
 import { DirectoryModule } from '@src/services';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 
 @Module({
-    imports: [TriggerItemsGeneratorModule, GitModule, DirectoryModule],
+    imports: [
+        TriggerItemsGeneratorModule,
+        GitModule,
+        DirectoryModule,
+        EventEmitterModule.forRoot(),
+    ],
     providers: [
         TriggerInternalApiClient,
         RemoteDirectoryOperationsService,
