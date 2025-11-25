@@ -19,8 +19,12 @@ export default async function DirectoryLayout({ params, children }: LayoutParams
         const res = await directoryAPI.get(id);
         directory = res.directory;
 
-        let { config } = await directoryAPI.getConfig(id).catch(() => ({ config: null }));
-        scheduleAvailable = Boolean(config?.metadata?.initial_prompt);
+        let { config: configRes } = await directoryAPI
+            .getConfig(id)
+            .catch(() => ({ config: null }));
+
+        scheduleAvailable = Boolean(configRes?.metadata?.initial_prompt);
+        config = configRes;
 
         if (directory) {
             oauthConnection = await authAPI.oauth_connections
