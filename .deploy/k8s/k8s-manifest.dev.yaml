@@ -43,12 +43,9 @@ spec:
     spec:
       containers:
         - name: ever-works-api-dev
-          image: registry.digitalocean.com/ever/ever-works-api:latest
+          image: registry.digitalocean.com/ever/ever-works-api-dev:latest
           imagePullPolicy: Always
           env:
-            - name: TZ
-              value: "UTC"
-
             - name: WEB_URL
               value: https://appdev.ever.works
             - name: API_URL
@@ -162,14 +159,6 @@ spec:
             - name: MAIL_FROM
               value: "$MAIL_FROM"
 
-          ports:
-            - containerPort: 3100
-              protocol: TCP
-
-          volumeMounts:
-            - name: git-repos
-              mountPath: /tmp/ever-works-repos
-
           resources:
             requests:
               memory: "512Mi"
@@ -177,6 +166,32 @@ spec:
             limits:
               memory: "2Gi"
               cpu: "2"
+
+          ports:
+            - containerPort: 3100
+              protocol: TCP
+
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 3100
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 3100
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+
+          volumeMounts:
+            - name: git-repos
+              mountPath: /tmp/ever-works-repos
 
       volumes:
         - name: git-repos
@@ -200,21 +215,36 @@ spec:
     spec:
       containers:
         - name: ever-works-web-dev
-          image: registry.digitalocean.com/ever/ever-works-web:latest
+          image: registry.digitalocean.com/ever/ever-works-web-dev:latest
           imagePullPolicy: Always
           env:
-            - name: TZ
-              value: "UTC"
             - name: AUTH_SECRET
               value: "$AUTH_SECRET"
             - name: API_URL
               value: "http://ever-works-api-dev:3100"
             - name: NEXT_PUBLIC_WEB_URL
               value: "https://appdev.ever.works"
-
           ports:
             - containerPort: 3000
               protocol: TCP
+
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
 
           resources:
             requests:
