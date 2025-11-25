@@ -1,0 +1,130 @@
+name: Deploy to DO Dev
+
+on:
+  workflow_run:
+    workflows: ["Build and Publish Docker Images Dev"]
+    branches: [develop]
+    types:
+      - completed
+
+jobs:
+  deploy-dev:
+    runs-on: ubuntu-latest
+
+    environment:
+      name: dev
+      url: https://appdev.ever.works
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+      - name: Save DigitalOcean kubeconfig with short-lived credentials
+        run: doctl kubernetes cluster kubeconfig save --expiry-seconds 600 k8s-gauzy
+
+      - name: Write PostgreSQL Certificate file
+        run: |
+          echo "$DB_CA_CERT" | base64 --decode > ${HOME}/ca-certificate.crt
+        env:
+          DB_CA_CERT: "${{ secrets.DATABASE_CA_CERT }}"
+
+      - name: Generate TLS Secrets
+        run: |
+          rm -f ${HOME}/ingress.api.crt ${HOME}/ingress.api.key ${HOME}/ingress.webapp.crt ${HOME}/ingress.webapp.key
+          echo ${{ secrets.INGRESS_API_CERT }} | base64 --decode > ${HOME}/ingress.api.crt
+          echo ${{ secrets.INGRESS_API_CERT_KEY }} | base64 --decode > ${HOME}/ingress.api.key
+          echo ${{ secrets.INGRESS_WEBAPP_CERT }} | base64 --decode > ${HOME}/ingress.webapp.crt
+          echo ${{ secrets.INGRESS_WEBAPP_CERT_KEY }} | base64 --decode > ${HOME}/ingress.webapp.key
+          kubectl create secret tls apidev.ever.works-tls --save-config --dry-run=client --cert=${HOME}/ingress.api.crt --key=${HOME}/ingress.api.key -o yaml | kubectl --context do-sfo2-k8s-gauzy apply -f -
+          kubectl create secret tls appdev.ever.works-tls --save-config --dry-run=client --cert=${HOME}/ingress.webapp.crt --key=${HOME}/ingress.webapp.key -o yaml | kubectl --context do-sfo2-k8s-gauzy apply -f -
+
+      - name: Apply k8s manifests changes in DigitalOcean k8s cluster (if any)
+        run: |
+          envsubst < $GITHUB_WORKSPACE/.deploy/k8s/k8s-manifest.dev.yaml | kubectl --context do-sfo2-k8s-gauzy apply -f -
+        env:
+          # WEB ENV
+          AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
+
+          # API ENV
+          WEB_URL: https://appdev.ever.works
+          ALLOWED_ORIGINS: https://appdev.ever.works,https://apidev.ever.works
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+
+          # Github
+          GH_APIKEY: ${{ secrets.GH_APIKEY }}
+          GH_OWNER: ${{ secrets.GH_OWNER }}
+
+          # Git
+          GIT_NAME: ${{ secrets.GIT_NAME }}
+          GIT_EMAIL: ${{ secrets.GIT_EMAIL }}
+
+          # Trigger.dev
+          TRIGGER_ENABLED: ${{ secrets.TRIGGER_ENABLED }}
+          TRIGGER_SECRET_KEY: ${{ secrets.TRIGGER_SECRET_KEY }}
+          TRIGGER_INTERNAL_SECRET: ${{ secrets.TRIGGER_INTERNAL_SECRET }}
+
+          # Vercel
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+
+          # GitHub Auth
+          GH_CLIENT_ID: ${{ secrets.GH_CLIENT_ID }}
+          GH_CLIENT_SECRET: ${{ secrets.GH_CLIENT_SECRET }}
+          GH_CALLBACK_URL: https://appdev.ever.works/api/auth/github/callback
+
+          # Google Auth
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_CALLBACK_URL: https://appdev.ever.works/api/auth/google/callback
+
+          # AI Configuration
+          AI_DEFAULT_PROVIDER: ${{ secrets.AI_DEFAULT_PROVIDER }}
+
+          # OpenAI
+          OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
+          # OpenRouter
+          OPENROUTER_MODEL: ${{ secrets.OPENROUTER_MODEL }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+
+          # Tavily
+          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+
+          # SEARCH SERVICES
+          EXTRACT_CONTENT_SERVICE: ${{ secrets.EXTRACT_CONTENT_SERVICE }}
+          WEB_SEARCH_SERVICE: ${{ secrets.WEB_SEARCH_SERVICE }}
+
+          # Database
+          DATABASE_TYPE: ${{ secrets.DATABASE_TYPE }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_HOST: ${{ secrets.DATABASE_HOST }}
+          DATABASE_PORT: ${{ secrets.DATABASE_PORT }}
+          DATABASE_USERNAME: ${{ secrets.DATABASE_USERNAME }}
+          DATABASE_PASSWORD: ${{ secrets.DATABASE_PASSWORD }}
+          DATABASE_NAME: ${{ secrets.DATABASE_NAME }}
+
+          # Enable SSL/TLS for database connections (true/false)
+          DATABASE_SSL_MODE: ${{ secrets.DATABASE_SSL_MODE }}
+          DATABASE_CA_CERT: ${{ secrets.DATABASE_CA_CERT }}
+
+          # Mail
+          MAILER_PROVIDER: ${{ secrets.MAILER_PROVIDER }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_SECURE: ${{ secrets.SMTP_SECURE }}
+          SMTP_IGNORE_TLS: ${{ secrets.SMTP_IGNORE_TLS }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          MAIL_FROM: ${{ secrets.MAIL_FROM }}
+
+      # we need this step because for now we just use :latest tag
+      # note: for production we will use different strategy later
+      - name: Restart Pods to pick up :latest tag version
+        run: |
+          kubectl --context do-sfo2-k8s-gauzy rollout restart deployment/ever-works-api-dev
+          kubectl --context do-sfo2-k8s-gauzy rollout restart deployment/ever-works-web-dev
