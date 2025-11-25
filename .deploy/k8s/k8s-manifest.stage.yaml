@@ -1,0 +1,311 @@
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: ever-works-web-stage
+spec:
+  selector:
+    app: ever-works-web-stage
+  ports:
+    - name: web
+      protocol: TCP
+      port: 3000
+      targetPort: 3000
+
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: ever-works-api-stage
+spec:
+  selector:
+    app: ever-works-api-stage
+  ports:
+    - name: web
+      protocol: TCP
+      port: 3100
+      targetPort: 3100
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ever-works-api-stage
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ever-works-api-stage
+  template:
+    metadata:
+      labels:
+        app: ever-works-api-stage
+    spec:
+      containers:
+        - name: ever-works-api-stage
+          image: registry.digitalocean.com/ever/ever-works-api-stage:latest
+          imagePullPolicy: Always
+          env:
+            - name: WEB_URL
+              value: https://appstage.ever.works
+            - name: API_URL
+              value: https://apistage.ever.works
+            - name: ALLOWED_ORIGINS
+              value: https://appstage.ever.works,https://apistage.ever.works
+            - name: JWT_SECRET
+              value: "$JWT_SECRET"
+
+            # Github
+            - name: GH_APIKEY
+              value: "$GH_APIKEY"
+            - name: GH_OWNER
+              value: "$GH_OWNER"
+
+            # Git
+            - name: GIT_NAME
+              value: "$GIT_NAME"
+            - name: GIT_EMAIL
+              value: "$GIT_EMAIL"
+
+            # Trigger.dev
+            - name: TRIGGER_ENABLED
+              value: "$TRIGGER_ENABLED"
+            - name: TRIGGER_SECRET_KEY
+              value: "$TRIGGER_SECRET_KEY"
+            - name: TRIGGER_API_URL
+              value: "https://api.trigger.dev"
+            - name: TRIGGER_INTERNAL_SECRET
+              value: "$TRIGGER_INTERNAL_SECRET"
+
+            # Vercel
+            - name: VERCEL_TOKEN
+              value: "$VERCEL_TOKEN"
+
+            # GitHub Auth
+            - name: GH_CLIENT_ID
+              value: "$GH_CLIENT_ID"
+            - name: GH_CLIENT_SECRET
+              value: "$GH_CLIENT_SECRET"
+            - name: GH_CALLBACK_URL
+              value: https://appstage.ever.works/api/auth/github/callback
+
+            # Google Auth
+            - name: GOOGLE_CLIENT_ID
+              value: "$GOOGLE_CLIENT_ID"
+            - name: GOOGLE_CLIENT_SECRET
+              value: "$GOOGLE_CLIENT_SECRET"
+            - name: GOOGLE_CALLBACK_URL
+              value: https://appstage.ever.works/api/auth/google/callback
+
+            # AI Configuration
+            - name: AI_DEFAULT_PROVIDER
+              value: "$AI_DEFAULT_PROVIDER"
+
+            # OpenAI
+            - name: OPENAI_MODEL
+              value: "$OPENAI_MODEL"
+            - name: OPENAI_API_KEY
+              value: "$OPENAI_API_KEY"
+
+            # OpenRouter
+            - name: OPENROUTER_MODEL
+              value: "$OPENROUTER_MODEL"
+            - name: OPENROUTER_API_KEY
+              value: "$OPENROUTER_API_KEY"
+
+            # Tavily
+            - name: TAVILY_API_KEY
+              value: "$TAVILY_API_KEY"
+
+            # SEARCH SERVICES
+            - name: EXTRACT_CONTENT_SERVICE
+              value: "$EXTRACT_CONTENT_SERVICE"
+            - name: WEB_SEARCH_SERVICE
+              value: "$WEB_SEARCH_SERVICE"
+
+            # Database
+            - name: DATABASE_TYPE
+              value: "$DATABASE_TYPE"
+            - name: DATABASE_URL
+              value: "$DATABASE_URL"
+            - name: DATABASE_HOST
+              value: "$DATABASE_HOST"
+            - name: DATABASE_PORT
+              value: "$DATABASE_PORT"
+            - name: DATABASE_USERNAME
+              value: "$DATABASE_USERNAME"
+            - name: DATABASE_PASSWORD
+              value: "$DATABASE_PASSWORD"
+            - name: DATABASE_NAME
+              value: "$DATABASE_NAME"
+            - name: DATABASE_SSL_MODE
+              value: "$DATABASE_SSL_MODE"
+            - name: DATABASE_CA_CERT
+              value: "$DATABASE_CA_CERT"
+
+            # Mail
+            - name: SMTP_HOST
+              value: "$SMTP_HOST"
+            - name: SMTP_PORT
+              value: "$SMTP_PORT"
+            - name: SMTP_SECURE
+              value: "$SMTP_SECURE"
+            - name: SMTP_IGNORE_TLS
+              value: "$SMTP_IGNORE_TLS"
+            - name: SMTP_USER
+              value: "$SMTP_USER"
+            - name: SMTP_PASSWORD
+              value: "$SMTP_PASSWORD"
+            - name: MAIL_FROM
+              value: "$MAIL_FROM"
+
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "500m"
+            limits:
+              memory: "2Gi"
+              cpu: "2"
+
+          ports:
+            - containerPort: 3100
+              protocol: TCP
+
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 3100
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 3100
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+
+          volumeMounts:
+            - name: git-repos
+              mountPath: /tmp/ever-works-repos
+
+      volumes:
+        - name: git-repos
+          emptyDir:
+            sizeLimit: 5Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ever-works-web-stage
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: ever-works-web-stage
+  template:
+    metadata:
+      labels:
+        app: ever-works-web-stage
+    spec:
+      containers:
+        - name: ever-works-web-stage
+          image: registry.digitalocean.com/ever/ever-works-web-stage:latest
+          imagePullPolicy: Always
+          env:
+            - name: AUTH_SECRET
+              value: "$AUTH_SECRET"
+            - name: API_URL
+              value: "http://ever-works-api-stage:3100"
+            - name: NEXT_PUBLIC_WEB_URL
+              value: "https://appstage.ever.works"
+          ports:
+            - containerPort: 3000
+              protocol: TCP
+
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ever-works-web-stage-ing
+  namespace: default
+  annotations:
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: appstage.ever.works
+      http:
+        paths:
+          - backend:
+              service:
+                name: ever-works-web-stage
+                port:
+                  number: 3000
+            path: /
+            pathType: Prefix
+  tls:
+    - hosts:
+        - appstage.ever.works
+      secretName: appstage.ever.works-tls
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ever-works-api-stage-ing
+  namespace: default
+  annotations:
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: apistage.ever.works
+      http:
+        paths:
+          - backend:
+              service:
+                name: ever-works-api-stage
+                port:
+                  number: 3100
+            path: /
+            pathType: Prefix
+  tls:
+    - hosts:
+        - apistage.ever.works
+      secretName: apistage.ever.works-tls
