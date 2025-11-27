@@ -84,6 +84,15 @@ export class DirectoryScheduleRepository {
         });
     }
 
+    async findStuckGenerating(olderThan: Date): Promise<DirectorySchedule[]> {
+        return this.repository.find({
+            where: {
+                lastRunStatus: GenerateStatusType.GENERATING,
+                lastRunAt: LessThanOrEqual(olderThan),
+            },
+        });
+    }
+
     async pause(scheduleId: string): Promise<void> {
         await this.repository.update(scheduleId, { status: DirectoryScheduleStatus.PAUSED });
     }

@@ -34,17 +34,22 @@ This document explains how our automated directory refresh feature works. It cov
     - Caps failure thresholds.
     - Mirrors schedule state back to the `Directory` table.
     - Exports DTOs for API/UI consumption (includes `subscriptionsEnabled`).
+    - **Validates run entitlement at runtime** (pauses schedules if plan limits are exceeded).
+    - **Recovers stuck schedules** (marks "zombies" as failed if stuck in `GENERATING` > 1 hour).
 
 - `DirectoryScheduleDispatcherService`
+    - Runs cleanup for stuck schedules (`recoverStuckSchedules`) before dispatching.
     - Reads `findDue(limit)` from the repository, where `limit = SCHEDULED_UPDATES_MAX_BATCH`.
     - For each result, calls `markRunDispatched()` (atomic update that clears `nextRunAt` and sets status to "generating" to prevent duplicate dispatch).
     - Invokes `DirectoryGenerationService.runScheduledUpdate()` for each reserved schedule.
 
 - `DirectoryGenerationService`
-    - Reuses last request data from the directory config.
+    - Reuses last request data from the directory config (handles stale config gracefully by pausing schedule).
     - Creates a new history entry with `triggeredBy='schedule'`.
     - Dispatches the Trigger.dev task or performs in-process generation if Trigger.dev is disabled/unavailable.
+    - **Sequential Fallback**: When Trigger.dev is unavailable, scheduled runs execute sequentially in-process to prevent resource exhaustion.
     - Calls back into `DirectoryScheduleService.markRunCompleted()` or `.markRunFailed()` when the run finishes.
+    - **Drift Prevention**: Calculates next run time based on the *scheduled* time, not completion time.
 
 ### Trigger.dev + Fallback Cron
 
@@ -57,20 +62,22 @@ This document explains how our automated directory refresh feature works. It cov
 
 ```mermaid
 flowchart TD
-    A[Dispatcher cron tick] --> B[findDue(MAX_BATCH)]
+    A[Dispatcher cron tick] --> Z[Recover Stuck Schedules]
+    Z --> B[findDue(MAX_BATCH)]
     B -->|<= N rows| C{markRunDispatched}
     C -->|success| D[runScheduledUpdate(schedule)]
     D --> E[Trigger.dev task or in-process run]
     E --> F{Run result}
-    F -->|success| G[markRunCompleted]
+    F -->|success| G[markRunCompleted (Next run based on schedule anchor)]
     F -->|failure| H[markRunFailed / pause when threshold hit]
 ```
 
+- `recoverStuckSchedules()` identifies rows stuck in `GENERATING` for > 1 hour and marks them failed to prevent "zombies".
 - `findDue(limit)` retrieves active schedules with `nextRunAt <= now()`.
 - If there are more due rows than the batch size, the dispatcher simply processes `limit` items this tick. The remaining rows are picked up on the next cron run—this prevents sending 1,000 runs at once.
 - `markRunDispatched(scheduleId)` uses a `WHERE status=ACTIVE AND nextRunAt IS NOT NULL` clause to atomically reserve a row. If two dispatchers race, only one succeeds and the other drops the row from this cycle.
-- `runScheduledUpdate()` loads the full `Directory` and `User`, fetches `last_request_data`, and calls `updateItemsGenerator()` with a `triggeredBy='schedule'` context.
-- Completion/failure paths set `nextRunAt`, `lastRunAt`, `lastRunStatus`, reset/increment failure counters, and optionally pause the schedule when `failureCount >= maxFailureBeforePause`.
+- `runScheduledUpdate()` loads the full `Directory` and `User`, validates subscription limits (pausing if exceeded), fetches `last_request_data`, and calls `updateItemsGenerator()`.
+- Completion/failure paths set `nextRunAt` (using the original scheduled time as an anchor to prevent drift), `lastRunAt`, `lastRunStatus`, reset/increment failure counters, and optionally pause the schedule when `failureCount >= maxFailureBeforePause`.
 
 ---
 

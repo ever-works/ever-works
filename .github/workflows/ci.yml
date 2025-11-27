@@ -43,31 +43,30 @@ jobs:
           export DATABASE_TYPE=better-sqlite3
           export DATABASE_PATH=./ci-test.db
 
-          # Step 1: Run existing migrations to bring DB schema up to date
-          echo "==> Running existing migrations..."
+          # Step 1: Run existing migrations
+          echo "==> Running migrations..."
           pnpm migration:run
 
-          # Step 2: Try to generate a new migration
-          echo "==> Checking for uncommitted entity changes..."
-          GENERATE_OUTPUT=$(pnpm migration:generate src/migrations/VerifySync 2>&1) || true
-          echo "$GENERATE_OUTPUT"
+          # Step 2: Check if schema is in sync with entities
+          # schema:log shows SQL that would be needed to sync - empty means in sync
+          echo "==> Checking for schema drift..."
+          SCHEMA_LOG=$(pnpm schema:log 2>&1) || true
 
-          # Step 3: Check if a migration file was generated
-          if echo "$GENERATE_OUTPUT" | grep -q "has been generated successfully"; then
+          # Check if there are pending schema changes (look for CREATE/ALTER/DROP statements)
+          if echo "$SCHEMA_LOG" | grep -qE "CREATE TABLE|ALTER TABLE|DROP TABLE|CREATE INDEX|DROP INDEX"; then
             echo ""
             echo "::error::Entity changes detected without corresponding migration!"
-            echo "::error::Please run 'cd apps/api && pnpm migration:generate src/migrations/YourMigrationName'"
+            echo "::error::The following schema changes are needed:"
+            echo "$SCHEMA_LOG"
             echo ""
-            # Show what changed
-            git diff --name-only
+            echo "::error::Please create a migration: cd apps/api && pnpm migration:generate src/migrations/YourMigrationName"
+            rm -f ./ci-test.db
             exit 1
           fi
 
-          # No migration generated means entities are in sync
-          echo "==> Migrations are in sync with entities"
-
           # Cleanup
           rm -f ./ci-test.db
+          echo "==> Migrations are in sync with entities"
 
       - name: Build Internal CLI
         working-directory: apps/internal-cli

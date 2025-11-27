@@ -21,7 +21,8 @@
         "migration:generate": "npm run typeorm -- migration:generate -d typeorm.config.ts",
         "migration:run": "npm run typeorm -- migration:run -d typeorm.config.ts",
         "migration:revert": "npm run typeorm -- migration:revert -d typeorm.config.ts",
-        "migration:show": "npm run typeorm -- migration:show -d typeorm.config.ts"
+        "migration:show": "npm run typeorm -- migration:show -d typeorm.config.ts",
+        "schema:log": "npm run typeorm -- schema:log -d typeorm.config.ts"
     },
     "dependencies": {
         "@nestjs-modules/mailer": "^2.0.2",
