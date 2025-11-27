@@ -63,7 +63,8 @@ export function LanguageSelector({ className }: LanguageSelectorProps) {
                         'hover:bg-surface-tertiary dark:hover:bg-surface-tertiary-dark',
                         'hover:border-border-secondary dark:hover:border-border-secondary-dark',
                         'focus:outline-none focus:ring-2 focus:ring-primary/20',
-                        'active:scale-[0.98]',
+                        'active:scale-[0.98] ',
+                        'cursor-pointer',
                         className,
                     )}
                     aria-label="Select language"
@@ -84,7 +85,8 @@ export function LanguageSelector({ className }: LanguageSelectorProps) {
                             onClick={() => handleLocaleChange(loc)}
                             className={cn(
                                 'flex items-center gap-2',
-                                isActive && 'bg-surface-tertiary dark:bg-surface-tertiary-dark font-medium',
+                                isActive && 'bg-surface-tertiary cursor-pointer dark:bg-surface-tertiary-dark font-medium',
+                                !isActive && 'cursor-pointer',
                             )}
                         >
                             <span aria-hidden="true">{LOCALE_FLAGS[loc]}</span>

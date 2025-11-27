@@ -3,12 +3,12 @@
 import { cn } from '@/lib/utils/cn';
 import { LanguageSelector } from './LanguageSelector';
 import { ThemeToggle } from './ThemeToggle';
-import { APP_NAME, WEB_URL } from '@/lib/constants';
+import { APP_NAME, COMPANY_OWNER, WEB_URL } from '@/lib/constants';
 
 const COPYRIGHT_YEAR = new Date().getFullYear();
 const COMPANY_NAME = APP_NAME;
 const COMPANY_URL = WEB_URL;
-const COMPANY_OWNER = 'Ever Co. LTD';
+const COMPANY_OWNER_NAME = COMPANY_OWNER;
 
 interface FooterProps {
     className?: string;
@@ -49,7 +49,7 @@ function Copyright() {
             >
                 {COMPANY_NAME}
             </a>
-            {' '}By {COMPANY_OWNER} All rights reserved.
+            {' '}By {COMPANY_OWNER_NAME} All rights reserved.
         </div>
     );
 }
