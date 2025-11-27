@@ -37,19 +37,23 @@ export function DropdownMenuTrigger({ children, asChild, className }: DropdownMe
 interface DropdownMenuContentProps {
     children: React.ReactNode;
     align?: 'start' | 'center' | 'end';
+    side?: 'top' | 'bottom';
     className?: string;
 }
 
 export function DropdownMenuContent({
     children,
     align = 'start',
+    side = 'bottom',
     className,
 }: DropdownMenuContentProps) {
     const alignmentClasses = {
-        start: 'origin-top-left left-0',
-        center: 'origin-top left-1/2 -translate-x-1/2',
-        end: 'origin-top-right right-0',
+        start: side === 'bottom' ? 'origin-top-left left-0' : 'origin-bottom-left left-0',
+        center: side === 'bottom' ? 'origin-top left-1/2 -translate-x-1/2' : 'origin-bottom left-1/2 -translate-x-1/2',
+        end: side === 'bottom' ? 'origin-top-right right-0' : 'origin-bottom-right right-0',
     };
+
+    const spacingClasses = side === 'bottom' ? 'mt-2' : 'mb-2 bottom-full';
 
     return (
         <Transition
@@ -62,11 +66,12 @@ export function DropdownMenuContent({
         >
             <MenuItems
                 className={cn(
-                    'absolute z-50 mt-2 min-w-[8rem] overflow-hidden rounded-lg',
+                    'absolute z-50 min-w-[8rem] overflow-hidden rounded-lg',
                     'bg-surface dark:bg-surface-dark',
                     'border border-border dark:border-border-dark',
                     'shadow-lg',
                     'focus:outline-none',
+                    spacingClasses,
                     alignmentClasses[align],
                     className,
                 )}
