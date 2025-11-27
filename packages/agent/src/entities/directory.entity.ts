@@ -32,6 +32,9 @@ export class Directory {
     slug: string;
 
     @Column()
+    slug2: string;
+
+    @Column()
     userId: string;
 
     @ManyToOne(() => User, (user) => user.directories, { onDelete: 'CASCADE', eager: true })
@@ -80,7 +83,7 @@ export class Directory {
     schedule?: ClassToObject<DirectorySchedule>;
 
     @Column({ type: 'boolean', default: false })
-    scheduledUpdatesEnabled: number;
+    scheduledUpdatesEnabled: boolean;
 
     @Column({ type: 'varchar', nullable: true })
     scheduledCadence?: DirectoryScheduleCadence | null;
