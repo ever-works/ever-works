@@ -80,7 +80,7 @@ export class Directory {
     schedule?: ClassToObject<DirectorySchedule>;
 
     @Column({ type: 'boolean', default: false })
-    scheduledUpdatesEnabled: boolean;
+    scheduledUpdatesEnabled: number;
 
     @Column({ type: 'varchar', nullable: true })
     scheduledCadence?: DirectoryScheduleCadence | null;
