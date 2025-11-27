@@ -50,6 +50,9 @@ FROM node:22-alpine
 RUN npm install -g pnpm@10
 RUN npm install -g npm@latest
 
+# Create app directory with proper ownership
+RUN mkdir -p /app && chown node:node /app
+
 USER node
 
 WORKDIR /app
@@ -63,15 +66,21 @@ COPY --from=installer --chown=node:node /app/pnpm-workspace.yaml ./
 COPY --from=installer --chown=node:node /app/apps /app/apps
 COPY --from=installer --chown=node:node /app/packages /app/packages
 
+# Copy entrypoint script
+COPY --chown=node:node .deploy/docker/api/entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
 RUN pnpm install --prod
 RUN pnpm store prune
 
 WORKDIR /app/apps/api
 
 ENV PORT=3100
+# Automatically run migrations on startup (set to "false" to disable)
+ENV RUN_MIGRATIONS=true
 
 VOLUME [ "/tmp/ever-works-repos" ]
 
 EXPOSE 3100
 
-CMD ["node", "/app/apps/api/dist/main"]
+ENTRYPOINT ["/app/entrypoint.sh"]

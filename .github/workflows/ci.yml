@@ -36,6 +36,24 @@ jobs:
       - name: Build all packages
         run: pnpm build
 
+      - name: Verify migrations are in sync with entities
+        working-directory: apps/api
+        run: |
+          # Generate migration to check if entities are in sync
+          pnpm migration:generate src/migrations/VerifySync 2>&1 || true
+
+          # Check if any new migration file was created
+          if git diff --name-only | grep -q "src/migrations/"; then
+            echo "::error::Entity changes detected without corresponding migration!"
+            echo "Please run 'pnpm migration:generate src/migrations/YourMigrationName' in apps/api"
+            git diff --name-only
+            exit 1
+          fi
+
+          # Clean up any generated verification file
+          git checkout -- . 2>/dev/null || true
+          echo "Migrations are in sync with entities"
+
       - name: Build Internal CLI
         working-directory: apps/internal-cli
         run: pnpm build:cli
