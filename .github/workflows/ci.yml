@@ -39,20 +39,35 @@ jobs:
       - name: Verify migrations are in sync with entities
         working-directory: apps/api
         run: |
-          # Generate migration to check if entities are in sync
-          pnpm migration:generate src/migrations/VerifySync 2>&1 || true
+          # Use SQLite for CI migration verification
+          export DATABASE_TYPE=better-sqlite3
+          export DATABASE_PATH=./ci-test.db
 
-          # Check if any new migration file was created
-          if git diff --name-only | grep -q "src/migrations/"; then
+          # Step 1: Run existing migrations to bring DB schema up to date
+          echo "==> Running existing migrations..."
+          pnpm migration:run
+
+          # Step 2: Try to generate a new migration
+          echo "==> Checking for uncommitted entity changes..."
+          GENERATE_OUTPUT=$(pnpm migration:generate src/migrations/VerifySync 2>&1) || true
+          echo "$GENERATE_OUTPUT"
+
+          # Step 3: Check if a migration file was generated
+          if echo "$GENERATE_OUTPUT" | grep -q "has been generated successfully"; then
+            echo ""
             echo "::error::Entity changes detected without corresponding migration!"
-            echo "Please run 'pnpm migration:generate src/migrations/YourMigrationName' in apps/api"
+            echo "::error::Please run 'cd apps/api && pnpm migration:generate src/migrations/YourMigrationName'"
+            echo ""
+            # Show what changed
             git diff --name-only
             exit 1
           fi
 
-          # Clean up any generated verification file
-          git checkout -- . 2>/dev/null || true
-          echo "Migrations are in sync with entities"
+          # No migration generated means entities are in sync
+          echo "==> Migrations are in sync with entities"
+
+          # Cleanup
+          rm -f ./ci-test.db
 
       - name: Build Internal CLI
         working-directory: apps/internal-cli
