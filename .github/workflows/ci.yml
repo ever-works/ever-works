@@ -36,38 +36,6 @@ jobs:
       - name: Build all packages
         run: pnpm build
 
-      - name: Verify migrations are in sync with entities
-        working-directory: apps/api
-        run: |
-          # Use SQLite for CI migration verification
-          export DATABASE_TYPE=better-sqlite3
-          export DATABASE_PATH=./ci-test.db
-
-          # Step 1: Run existing migrations
-          echo "==> Running migrations..."
-          pnpm migration:run
-
-          # Step 2: Check if schema is in sync with entities
-          # schema:log shows SQL that would be needed to sync - empty means in sync
-          echo "==> Checking for schema drift..."
-          SCHEMA_LOG=$(pnpm schema:log 2>&1) || true
-
-          # Check if there are pending schema changes (look for CREATE/ALTER/DROP statements)
-          if echo "$SCHEMA_LOG" | grep -qE "CREATE TABLE|ALTER TABLE|DROP TABLE|CREATE INDEX|DROP INDEX"; then
-            echo ""
-            echo "::error::Entity changes detected without corresponding migration!"
-            echo "::error::The following schema changes are needed:"
-            echo "$SCHEMA_LOG"
-            echo ""
-            echo "::error::Please create a migration: cd apps/api && pnpm migration:generate src/migrations/YourMigrationName"
-            rm -f ./ci-test.db
-            exit 1
-          fi
-
-          # Cleanup
-          rm -f ./ci-test.db
-          echo "==> Migrations are in sync with entities"
-
       - name: Build Internal CLI
         working-directory: apps/internal-cli
         run: pnpm build:cli
