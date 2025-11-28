@@ -25,6 +25,7 @@ import { Directory } from '@src/entities/directory.entity';
 @Injectable()
 export class DirectoryScheduleService {
     private readonly logger = new Logger(DirectoryScheduleService.name);
+    private readonly RETRY_DELAY_MINUTES = 15;
 
     constructor(
         private readonly scheduleRepository: DirectoryScheduleRepository,
@@ -223,10 +224,17 @@ export class DirectoryScheduleService {
 
         // Fix Drift: Calculate next run based on the intended execution time (nextRunAt),
         // not the current completion time. Fallback to now() if nextRunAt is missing or too old.
-        const anchorDate =
+        let anchorDate =
             schedule.nextRunAt && schedule.nextRunAt.getTime() > Date.now() - 24 * 60 * 60 * 1000 // Safety: Don't use very old anchors
                 ? schedule.nextRunAt
                 : new Date();
+
+        // Compensate for retry delays to preserve original schedule anchor
+        if (schedule.failureCount && schedule.failureCount > 0) {
+            anchorDate = new Date(
+                anchorDate.getTime() - schedule.failureCount * this.RETRY_DELAY_MINUTES * 60 * 1000,
+            );
+        }
 
         const nextRunAt =
             schedule.status === DirectoryScheduleStatus.ACTIVE && schedule.cadence
@@ -281,13 +289,8 @@ export class DirectoryScheduleService {
             nextRunAt: reachedLimit
                 ? null
                 : schedule.cadence
-                  ? this.calculateNextRun(schedule.cadence, 15, anchorDate) // 15 min retry delay, but relative to anchor? No, retry should probably be relative to NOW + 15m, OR we just skip to next slot?
-                  : // Current logic: 15 min delay. If we use anchorDate, we might just schedule it in the past.
-                    // Retry logic usually implies "Try again in 15 mins".
-                    // So for retry, we should probably use Date.now() + 15m.
-                    // BUT, if we want to keep the original schedule for *subsequent* runs, we lose the anchor here.
-                    // Let's stick to simple retry logic: now + 15m.
-                    null,
+                  ? new Date(anchorDate.getTime() + this.RETRY_DELAY_MINUTES * 60 * 1000)
+                  : null,
         });
 
         await this.syncDirectory(schedule.directoryId, {
