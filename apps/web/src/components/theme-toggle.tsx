@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils/cn';
+import { useTheme } from '@/lib/hooks/use-theme';
 
 interface ThemeToggleProps {
     className?: string;
@@ -10,27 +10,7 @@ interface ThemeToggleProps {
 }
 
 export function ThemeToggle({ className, variant = 'fixed' }: ThemeToggleProps = {}) {
-    const [isDark, setIsDark] = useState(false);
-    const [mounted, setMounted] = useState(false);
-
-    useEffect(() => {
-        setMounted(true);
-        // Check if dark mode is enabled on initial load
-        const isDarkMode = document.documentElement.classList.contains('dark');
-        setIsDark(isDarkMode);
-    }, []);
-
-    const toggleTheme = () => {
-        if (isDark) {
-            document.documentElement.classList.remove('dark');
-            localStorage.setItem('theme', 'light');
-            setIsDark(false);
-        } else {
-            document.documentElement.classList.add('dark');
-            localStorage.setItem('theme', 'dark');
-            setIsDark(true);
-        }
-    };
+    const { isDark, mounted, toggleTheme } = useTheme();
 
     const buttonClasses =
         variant === 'fixed'
@@ -53,7 +33,7 @@ export function ThemeToggle({ className, variant = 'fixed' }: ThemeToggleProps =
 
     return (
         <Button
-            onClick={toggleTheme}
+            onClick={() => toggleTheme()}
             variant="ghost"
             size="icon"
             className={cn(buttonClasses, className)}

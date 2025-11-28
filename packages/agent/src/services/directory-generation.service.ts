@@ -136,15 +136,31 @@ export class DirectoryGenerationService {
         const directory = await this.ownershipService.ensure(directoryId, user.id);
         const triggerContext = this.resolveContext(context);
 
-        let lastRequestData = await this.dataGenerator
-            .getLastRequestData(directory, user)
-            .catch(() => null);
+        let lastRequestData;
+        try {
+            lastRequestData = await this.dataGenerator
+                .getLastRequestData(directory, user)
+                .catch(() => null);
 
-        if (!lastRequestData) {
-            throw new BadRequestException({
+            if (!lastRequestData) {
+                 throw new Error('No previous request data found');
+            }
+        } catch (error) {
+             this.logger.error(`Failed to load last request data for directory ${directoryId}`, error);
+             
+             if (context.triggeredBy === 'schedule' && context.scheduleId) {
+                 await this.directoryScheduleService.markRunFailed(
+                     context.scheduleId,
+                     'Invalid configuration (stale data). Please run a manual generation to fix.',
+                 );
+                 // Force pause immediately if config is broken
+                 await this.directoryScheduleService.pauseSchedule(context.scheduleId);
+             }
+             
+             throw new BadRequestException({
                 status: 'error',
                 slug: directory.slug,
-                message: 'No previous request data found',
+                message: 'Configuration invalid or missing. Please run a manual generation first.',
             });
         }
 
@@ -367,6 +383,12 @@ export class DirectoryGenerationService {
             throw new NotFoundException('User not found for scheduled update');
         }
 
+        // Enforce plan limits (e.g. if user downgraded)
+        const allowed = await this.directoryScheduleService.validateRunEntitlement(schedule, user);
+        if (!allowed) {
+            return;
+        }
+
         return this.updateItemsGenerator(schedule.directoryId, {}, user, false, {
             triggeredBy: 'schedule',
             scheduleId: schedule.id,
@@ -446,7 +468,13 @@ export class DirectoryGenerationService {
                 `Trigger dispatch failed, falling back to in-process generation for directory ${directory.id} (${mode})`,
             );
 
-            void this.processGeneration(directory, user, dto, history);
+            // If triggered by schedule, await the process to prevent concurrency explosion (sequential fallback)
+            // For user/api triggers, we can keep it async/fire-and-forget or let them wait if they opted for it (but this method is usually called when awaitCompletion=false)
+            if (context.triggeredBy === 'schedule') {
+                 await this.processGeneration(directory, user, dto, history, context);
+            } else {
+                 void this.processGeneration(directory, user, dto, history, context);
+            }
         }
     }
 

@@ -2,6 +2,8 @@ import { DirectoryConfig } from "./api";
 
 // Site Configuration - Multi-tenant support via environment variables
 export const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME || process.env.APP_NAME || 'Ever Works';
+export const COMPANY_OWNER = process.env.NEXT_PUBLIC_COMPANY_OWNER || process.env.COMPANY_OWNER || 'Ever Co. LTD';
+export const COMPANY_OWNER_WEBSITE = process.env.NEXT_PUBLIC_COMPANY_OWNER_WEBSITE || process.env.COMPANY_OWNER_WEBSITE || 'https://ever.works';
 
 // i18n
 export const LOCALES = ['en', 'ar', 'de', 'es', 'fr', 'zh'] as const;
@@ -103,9 +105,13 @@ export const PUBLIC_ROUTES = [
 export const getSiteConfig = (config?: DirectoryConfig | null) => {
     const name = config?.company_name || APP_NAME;
     const website = config?.company_website || WEB_URL;
+    const owner = config?.company_owner || COMPANY_OWNER;
+    const ownerWebsite = config?.company_owner_website || COMPANY_OWNER_WEBSITE;
     return {
         name: name,
         website: website,
+        owner: owner,
+        ownerWebsite: ownerWebsite,
         logo: {
             light: config?.logo?.light || process.env.NEXT_PUBLIC_LOGO_LIGHT || '/logo-light.png',
             dark: config?.logo?.dark || process.env.NEXT_PUBLIC_LOGO_DARK || '/logo-ever-work.png',

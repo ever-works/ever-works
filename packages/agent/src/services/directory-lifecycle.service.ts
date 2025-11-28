@@ -79,9 +79,9 @@ export class DirectoryLifecycleService {
     }
 
     async updateDirectory(id: string, updateDto: UpdateDirectoryDto, user: User) {
-        try {
-            const directory = await this.ownershipService.ensure(id, user.id);
+        const directory = await this.ownershipService.ensure(id, user.id);
 
+        try {
             const updatedDirectory = await this.directoryRepository.update(id, {
                 name: updateDto.name || directory.name,
                 description: updateDto.description || directory.description,
@@ -109,6 +109,36 @@ export class DirectoryLifecycleService {
             }
 
             this.logger.error('Failed to update directory:', error);
+
+            throw new BadRequestException({
+                status: 'error',
+                message: normalizeGeneratorError(error),
+            });
+        }
+    }
+
+    async updateDirectoryItemsCount(id: string, count: number, user: User) {
+        const directory = await this.ownershipService.ensure(id, user.id);
+        try {
+            await this.directoryRepository.update(directory.id, { itemsCount: count });
+        } catch (error) {
+            this.logger.error('Failed to update directory items count:', error);
+
+            throw new BadRequestException({
+                status: 'error',
+                message: normalizeGeneratorError(error),
+            });
+        }
+    }
+
+    async resetDirectoryGenerationStatus(id: string, user: User) {
+        const directory = await this.ownershipService.ensure(id, user.id);
+        try {
+            await this.directoryRepository.update(directory.id, {
+                generateStatus: null,
+            });
+        } catch (error) {
+            this.logger.error('Failed to update directory generation status:', error);
 
             throw new BadRequestException({
                 status: 'error',
