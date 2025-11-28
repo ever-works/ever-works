@@ -55,6 +55,9 @@ export const config = {
         getPort() {
             return process.env.DATABASE_PORT;
         },
+        autoMigrate() {
+            return process.env.DATABASE_AUTO_MIGRATE !== 'false';
+        },
         loggingEnabled() {
             return process.env.DATABASE_LOGGING === 'true';
         },

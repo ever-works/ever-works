@@ -66,10 +66,7 @@ export const databaseConfig = registerAs('database', (): DatabaseConfig => {
 
     const baseConfig: any = {
         entities: ENTITIES,
-        migrationsRun: false,
-        migrationsTableName: 'migrations',
-        migrationsTransactionMode: 'all',
-        synchronize: config.isCli(), // we want to enable auto migration only for CLI app
+        synchronize: config.database.autoMigrate(),
         logging: config.database.loggingEnabled(),
     };
 

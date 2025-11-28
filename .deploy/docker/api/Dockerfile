@@ -76,8 +76,7 @@ RUN pnpm store prune
 WORKDIR /app/apps/api
 
 ENV PORT=3100
-# Automatically run migrations on startup (set to "false" to disable)
-ENV RUN_MIGRATIONS=true
+ENV RUN_MIGRATIONS=false
 
 VOLUME [ "/tmp/ever-works-repos" ]
 
