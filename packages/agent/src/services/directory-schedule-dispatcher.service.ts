@@ -15,6 +15,9 @@ export class DirectoryScheduleDispatcherService {
     ) {}
 
     async dispatchDue(limit = config.subscriptions.getMaxBatch()): Promise<number> {
+        // Step 0: Cleanup zombies
+        await this.directoryScheduleService.recoverStuckSchedules();
+
         const schedules = await this.scheduleRepository.findDue(limit);
         let dispatched = 0;
 
