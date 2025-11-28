@@ -2,7 +2,7 @@ import { Entity, Column, PrimaryColumn, Index, CreateDateColumn, UpdateDateColum
 
 @Entity({ name: 'cache_entries' })
 export class CacheEntry {
-    @PrimaryColumn()
+    @PrimaryColumn('varchar')
     key: string;
 
     @Column('text')

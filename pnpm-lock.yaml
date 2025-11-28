@@ -128,6 +128,9 @@ importers:
       rxjs:
         specifier: ^7.8.2
         version: 7.8.2
+      typeorm:
+        specifier: ^0.3.27
+        version: 0.3.27(better-sqlite3@12.4.1)(ioredis@5.8.2)(mysql2@3.15.3)(pg@8.16.3)(reflect-metadata@0.2.2)(ts-node@10.9.2(@swc/core@1.15.1(@swc/helpers@0.5.17))(@types/node@22.19.0)(typescript@5.9.3))
     devDependencies:
       '@nestjs/cli':
         specifier: ^11.0.10

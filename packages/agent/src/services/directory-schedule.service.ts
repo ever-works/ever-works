@@ -25,6 +25,7 @@ import { Directory } from '@src/entities/directory.entity';
 @Injectable()
 export class DirectoryScheduleService {
     private readonly logger = new Logger(DirectoryScheduleService.name);
+    private readonly RETRY_DELAY_MINUTES = 15;
 
     constructor(
         private readonly scheduleRepository: DirectoryScheduleRepository,
@@ -173,6 +174,24 @@ export class DirectoryScheduleService {
         return this.toDto(updated, allowances, plan.code, subscriptionsEnabled);
     }
 
+    async pauseSchedule(scheduleId: string) {
+        const schedule = await this.scheduleRepository.findById(scheduleId);
+        if (!schedule) {
+            return;
+        }
+
+        await this.scheduleRepository.updateById(scheduleId, {
+            status: DirectoryScheduleStatus.PAUSED,
+            nextRunAt: null,
+        });
+
+        await this.syncDirectory(schedule.directoryId, {
+            ...schedule,
+            status: DirectoryScheduleStatus.PAUSED,
+            nextRunAt: null,
+        });
+    }
+
     async markRunDispatched(scheduleId: string): Promise<DirectorySchedule | null> {
         const updated = await this.scheduleRepository.tryMarkDispatched(scheduleId);
         if (!updated) {
@@ -203,9 +222,23 @@ export class DirectoryScheduleService {
             return;
         }
 
+        // Fix Drift: Calculate next run based on the intended execution time (nextRunAt),
+        // not the current completion time. Fallback to now() if nextRunAt is missing or too old.
+        let anchorDate =
+            schedule.nextRunAt && schedule.nextRunAt.getTime() > Date.now() - 24 * 60 * 60 * 1000 // Safety: Don't use very old anchors
+                ? schedule.nextRunAt
+                : new Date();
+
+        // Compensate for retry delays to preserve original schedule anchor
+        if (schedule.failureCount && schedule.failureCount > 0) {
+            anchorDate = new Date(
+                anchorDate.getTime() - schedule.failureCount * this.RETRY_DELAY_MINUTES * 60 * 1000,
+            );
+        }
+
         const nextRunAt =
             schedule.status === DirectoryScheduleStatus.ACTIVE && schedule.cadence
-                ? this.calculateNextRun(schedule.cadence)
+                ? this.calculateNextRun(schedule.cadence, 0, anchorDate)
                 : null;
 
         await this.scheduleRepository.updateById(schedule.id, {
@@ -242,6 +275,12 @@ export class DirectoryScheduleService {
             schedule.maxFailureBeforePause || config.subscriptions.getMaxFailureBeforePause();
         const reachedLimit = failureCount >= maxFailures;
 
+        // Fix Drift: Even on failure, we want to maintain the cadence anchor if possible.
+        const anchorDate =
+            schedule.nextRunAt && schedule.nextRunAt.getTime() > Date.now() - 24 * 60 * 60 * 1000
+                ? schedule.nextRunAt
+                : new Date();
+
         await this.scheduleRepository.updateById(schedule.id, {
             failureCount,
             lastRunStatus: GenerateStatusType.ERROR,
@@ -250,7 +289,7 @@ export class DirectoryScheduleService {
             nextRunAt: reachedLimit
                 ? null
                 : schedule.cadence
-                  ? this.calculateNextRun(schedule.cadence, 15)
+                  ? new Date(anchorDate.getTime() + this.RETRY_DELAY_MINUTES * 60 * 1000)
                   : null,
         });
 
@@ -266,6 +305,83 @@ export class DirectoryScheduleService {
                 `Schedule ${schedule.id} paused after ${failureCount} failures${reason ? `: ${reason}` : ''}`,
             );
         }
+    }
+
+    async recoverStuckSchedules() {
+        // Consider "stuck" if generating for more than 1 hour
+        const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+        const stuckSchedules = await this.scheduleRepository.findStuckGenerating(oneHourAgo);
+
+        if (stuckSchedules.length === 0) {
+            return 0;
+        }
+
+        this.logger.warn(`Found ${stuckSchedules.length} stuck schedules. Recovering...`);
+
+        for (const schedule of stuckSchedules) {
+            await this.markRunFailed(schedule.id, 'Stuck in GENERATING state for > 1 hour');
+        }
+
+        return stuckSchedules.length;
+    }
+
+    async validateRunEntitlement(schedule: DirectorySchedule, user: User): Promise<boolean> {
+        if (!this.subscriptionService.isEnabled()) {
+            return true;
+        }
+
+        // If pay-per-use, no plan limits to check (assuming they can pay)
+        if (schedule.billingMode === DirectoryScheduleBillingMode.USAGE) {
+            return true;
+        }
+
+        const plan = await this.subscriptionService.resolvePlanForUser(user);
+        const activeCount = await this.scheduleRepository.countActiveByUser(user.id);
+
+        // If they are over the limit, we must pause this schedule
+        // Note: This is a "lazy" enforcement. It happens when the schedule tries to run.
+        // Since we are currently "in" a run (conceptually), checking activeCount includes this one.
+        // If activeCount > plan.maxDirectories, they are over limit.
+        if (activeCount > plan.maxDirectories) {
+            this.logger.warn(
+                `Pausing schedule ${schedule.id} for user ${user.id}. Plan limit exceeded (${activeCount}/${plan.maxDirectories}).`,
+            );
+
+            await this.scheduleRepository.updateById(schedule.id, {
+                status: DirectoryScheduleStatus.PAUSED,
+                nextRunAt: null,
+            });
+
+            await this.syncDirectory(schedule.directoryId, {
+                ...schedule,
+                status: DirectoryScheduleStatus.PAUSED,
+                nextRunAt: null,
+            });
+
+            return false;
+        }
+
+        // Also check if the specific cadence is still allowed on their plan
+        const allowances = await this.subscriptionService.getCadenceAllowances(user);
+        const cadenceAllowed = allowances.find((a) => a.cadence === schedule.cadence)?.allowed;
+
+        if (!cadenceAllowed) {
+            this.logger.warn(
+                `Pausing schedule ${schedule.id} for user ${user.id}. Cadence ${schedule.cadence} no longer allowed on plan.`,
+            );
+            await this.scheduleRepository.updateById(schedule.id, {
+                status: DirectoryScheduleStatus.PAUSED,
+                nextRunAt: null,
+            });
+            await this.syncDirectory(schedule.directoryId, {
+                ...schedule,
+                status: DirectoryScheduleStatus.PAUSED,
+                nextRunAt: null,
+            });
+            return false;
+        }
+
+        return true;
     }
 
     calculateNextRun(

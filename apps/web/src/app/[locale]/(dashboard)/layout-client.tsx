@@ -5,6 +5,7 @@ import { Suspense, useState } from 'react';
 import DashboardToasts from './toasts';
 import { DashboardSidebar } from '@/components/dashboard/DashboardSidebar';
 import { DashboardHeader } from '@/components/dashboard/DashboardHeader';
+import { Footer } from '@/components/footer';
 
 interface DashboardLayoutClientProps {
     user: AuthUser;
@@ -13,7 +14,6 @@ interface DashboardLayoutClientProps {
 
 export function DashboardLayoutClient({ user, children }: DashboardLayoutClientProps) {
     const [sidebarOpen, setSidebarOpen] = useState(true);
-
     return (
         <>
             <Suspense fallback={null}>
@@ -50,6 +50,9 @@ export function DashboardLayoutClient({ user, children }: DashboardLayoutClientP
                             {children}
                         </div>
                     </main>
+
+                    {/* Footer */}
+                     <Footer />
                 </div>
             </div>
         </>

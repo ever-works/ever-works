@@ -155,6 +155,8 @@ export interface DirectoryConfig {
     paging_mode?: string;
     autoapproval?: boolean;
     locale?: string;
+    company_owner?: string;
+    company_owner_website?: string;
     logo?: {
         light?: string;
         dark?: string;

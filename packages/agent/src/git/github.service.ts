@@ -395,6 +395,27 @@ export class GithubService extends GitProvider {
         return result.data;
     }
 
+    async getActionSecret(owner: string, repo: string, secretName: string, token: string) {
+        const octokit = new Octokit({
+            auth: token,
+        });
+
+        try {
+            const result = await octokit.rest.actions.getRepoSecret({
+                owner,
+                repo,
+                secret_name: secretName,
+            });
+
+            return result.data;
+        } catch (err) {
+            if (err instanceof RequestError && err.status === 404) {
+                return undefined;
+            }
+            throw err;
+        }
+    }
+
     async setActionSecret(
         data: { key: string; value: string; repo: string; owner: string },
         publicKey: { key_id: string; key: string },

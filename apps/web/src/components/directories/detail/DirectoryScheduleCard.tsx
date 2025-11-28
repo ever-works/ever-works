@@ -278,14 +278,18 @@ function ScheduleForm({
                             ))}
                         </Select>
 
-                        {requiresUsage ? (
-                            <HelperPill tone="alert" icon={AlertCircle}>
-                                {t('usageRequired')}
-                            </HelperPill>
-                        ) : (
-                            <HelperPill tone="success" icon={CheckCircle2}>
-                                {t('cadenceAllowed')}
-                            </HelperPill>
+                        {subscriptionsEnabled && (
+                            <>
+                                {requiresUsage ? (
+                                    <HelperPill tone="alert" icon={AlertCircle}>
+                                        {t('usageRequired')}
+                                    </HelperPill>
+                                ) : (
+                                    <HelperPill tone="success" icon={CheckCircle2}>
+                                        {t('cadenceAllowed')}
+                                    </HelperPill>
+                                )}
+                            </>
                         )}
 
                         {subscriptionsEnabled && (
