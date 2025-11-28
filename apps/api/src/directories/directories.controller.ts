@@ -42,7 +42,7 @@ import { CACHE_MANAGER, Cache } from '@packages/agent/cache';
 import { UpdateDirectoryScheduleDto } from '@packages/agent/dto';
 import { DirectoryScheduleStatus } from '@packages/agent/entities';
 
-let CACHE_TTL = 1000 * 60 * 5; // 5 minutes
+let CACHE_TTL = 1000 * 60 * 10; // 10 minutes
 
 @Controller('api')
 @UseGuards(JwtAuthGuard)
@@ -147,7 +147,17 @@ export class DirectoriesController {
             cacheKey,
             async () => {
                 const user = await this.authService.getUser(auth.userId);
-                return this.directoryQueryService.directoryCount(id, user);
+                const count = await this.directoryQueryService.directoryCount(id, user);
+
+                // We silently update the directory item count.
+                this.directoryLifecycleService.updateDirectoryItemsCount(id, count.items, user);
+
+                // Also, reset the directory generation status when no items are found.
+                if (count.items <= 0) {
+                    await this.directoryLifecycleService.resetDirectoryGenerationStatus(id, user);
+                }
+
+                return count;
             },
             CACHE_TTL,
         );
