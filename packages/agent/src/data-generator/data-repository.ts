@@ -44,6 +44,15 @@ export class DataRepository {
     private config?: IDataConfig;
     private categories?: Category[];
 
+    private static readonly PRESERVED_PATTERNS = [
+        '.git',
+        '.gitignore',
+        '.github',
+        '.vscode',
+        '.env',
+        '.nvmrc',
+    ];
+
     private constructor(
         public readonly dir: string,
         private readonly configPath: string,
@@ -123,7 +132,11 @@ export class DataRepository {
     async resetFiles() {
         const files = await fs.readdir(this.dir);
         for (const file of files) {
-            if (file === '.git') {
+            const shouldPreserve = DataRepository.PRESERVED_PATTERNS.some(
+                (pattern) => file === pattern || file.startsWith(`${pattern}/`),
+            );
+
+            if (shouldPreserve) {
                 continue;
             }
 

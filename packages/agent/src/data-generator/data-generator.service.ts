@@ -179,6 +179,16 @@ export class DataGeneratorService {
                     return null;
                 });
 
+                if (update_with_pull_request) {
+                    newBranchName = await this.githubService.createAndSwitchToRandomBranch(
+                        dest,
+                        'recreate-directory',
+                    );
+                    this.logger.log(
+                        `Created and switched to new branch for recreate: ${newBranchName}`,
+                    );
+                }
+
                 await data.resetFiles();
             } else if (existed && createOrUpdate && update_with_pull_request) {
                 // In case of update, we want to create a new branch and switch to it
@@ -303,7 +313,12 @@ export class DataGeneratorService {
             let prUpdate: PRUpdate | null = null;
 
             // create PR if we are in update mode and branch was created
-            if (newBranchName && defaultBranch && createOrUpdate) {
+            if (
+                newBranchName &&
+                defaultBranch &&
+                (createOrUpdate ||
+                    createItemsGeneratorDto.generation_method === GenerationMethod.RECREATE)
+            ) {
                 const pr = await this.githubService.createPR(
                     {
                         owner: directory.getRepoOwner(),

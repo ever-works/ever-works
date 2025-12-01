@@ -4,6 +4,15 @@ import * as fs from 'node:fs/promises';
 export class MarkdownRepository {
     private readonly detailsPath: string;
 
+    private static readonly PRESERVED_PATTERNS = [
+        '.git',
+        '.gitignore',
+        '.github',
+        '.vscode',
+        '.env',
+        '.nvmrc',
+    ];
+
     constructor(public readonly dir: string) {
         /*
          *   File structure:
@@ -28,7 +37,11 @@ export class MarkdownRepository {
     async resetFiles() {
         const files = await fs.readdir(this.dir);
         for (const file of files) {
-            if (file === '.git' || file.startsWith('.git')) {
+            const shouldPreserve = MarkdownRepository.PRESERVED_PATTERNS.some(
+                (pattern) => file === pattern || file.startsWith(`${pattern}/`),
+            );
+
+            if (shouldPreserve) {
                 continue;
             }
 
