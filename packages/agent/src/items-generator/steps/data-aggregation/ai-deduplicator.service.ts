@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
-import { AiService, BaseChatModel } from 'src/ai';
+import { BaseChatModel, ModelRouterService, TaskComplexity } from 'src/ai';
 import { slugifyText } from '../../utils/text.utils';
 import { extractedItemsSchema } from '../../schemas/item-extraction.schemas';
 import { ItemData } from '../../dto';
@@ -16,10 +16,10 @@ export class AiDeduplicatorService {
     private llm: BaseChatModel;
 
     constructor(
-        private readonly aiService: AiService,
+        private readonly modelRouter: ModelRouterService,
         private readonly sharedUtils: SharedUtilsService,
     ) {
-        this.llm = this.aiService.createLlmWithTemperature(0.0); // Use temperature 0 for deterministic results
+        this.llm = this.modelRouter.getModel(TaskComplexity.MEDIUM, { temperature: 0 }); // Use temperature 0 for deterministic results
     }
 
     /**

@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
 import { z } from 'zod';
-import { AiService, BaseChatModel } from 'src/ai';
+import { BaseChatModel, ModelRouterService, TaskComplexity } from 'src/ai';
 
 // Prompt comparison prompt
 const PROMPT_COMPARISON_PROMPT = `
@@ -56,9 +56,9 @@ export class PromptComparisonService {
     private readonly logger = new Logger(PromptComparisonService.name);
     private llm: BaseChatModel;
 
-    constructor(private readonly aiService: AiService) {
+    constructor(private readonly modelRouter: ModelRouterService) {
         // Use low temperature for consistent comparison results
-        this.llm = this.aiService.createLlmWithTemperature(0.1);
+        this.llm = this.modelRouter.getModel(TaskComplexity.SIMPLE, { temperature: 0.1 });
     }
 
     /**

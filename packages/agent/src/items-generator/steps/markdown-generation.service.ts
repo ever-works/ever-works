@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
 import { z } from 'zod';
-import { AiService, BaseChatModel } from 'src/ai';
+import { AiService, BaseChatModel, ModelRouterService, TaskComplexity } from 'src/ai';
 import { SearchService } from '../shared';
 import { ItemData } from '../dto';
 
@@ -37,9 +37,10 @@ export class MarkdownGenerationService {
 
     constructor(
         private readonly aiService: AiService,
+        private readonly modelRouter: ModelRouterService,
         private readonly searchService: SearchService,
     ) {
-        this.llm = this.aiService.createLlmWithTemperature(0.6);
+        this.llm = this.modelRouter.getModel(TaskComplexity.COMPLEX, { temperature: 0.6 });
     }
 
     /**

@@ -3,15 +3,18 @@ import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
 import { StringOutputParser } from '@langchain/core/output_parsers';
 import { formatDate } from 'date-fns';
 import { CreateItemsGeneratorDto } from '../dto/create-items-generator.dto';
-import { AiService, BaseChatModel } from 'src/ai';
+import { AiService, BaseChatModel, ModelRouterService, TaskComplexity } from 'src/ai';
 
 @Injectable()
 export class SearchQueryGenerationService {
     private readonly logger = new Logger(SearchQueryGenerationService.name);
     private llm: BaseChatModel;
 
-    constructor(private readonly aiService: AiService) {
-        this.llm = this.aiService.getLlm();
+    constructor(
+        private readonly modelRouter: ModelRouterService,
+        private readonly aiService: AiService,
+    ) {
+        this.llm = this.modelRouter.getModel(TaskComplexity.SIMPLE);
     }
 
     async generateSearchQueries(

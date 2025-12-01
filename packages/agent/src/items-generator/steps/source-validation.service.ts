@@ -3,7 +3,7 @@ import axios from 'axios';
 import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
 import { z } from 'zod';
 import { ItemData, ConfigDto } from '../dto';
-import { AiService, BaseChatModel } from 'src/ai';
+import { AiService, BaseChatModel, ModelRouterService, TaskComplexity } from 'src/ai';
 import { SearchService } from '../shared';
 
 // Schema for AI URL validation response
@@ -74,8 +74,9 @@ export class SourceValidationService {
     constructor(
         private readonly searchService: SearchService,
         private readonly aiService: AiService,
+        private readonly modelRouter: ModelRouterService,
     ) {
-        this.llm = this.aiService.createLlmWithTemperature(0.1); // Low temperature for consistent analysis
+        this.llm = this.modelRouter.getModel(TaskComplexity.SIMPLE, { temperature: 0.1 }); // Low temperature for consistent analysis
     }
 
     async filterAndValidateSourceItems(

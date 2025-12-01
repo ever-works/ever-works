@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
 import { z } from 'zod';
-import { AiService, BaseChatModel } from 'src/ai';
+import { BaseChatModel, ModelRouterService, TaskComplexity } from 'src/ai';
 
 // Prompt processing prompt
 const PROMPT_PROCESSING_PROMPT = `
@@ -97,8 +97,8 @@ export class PromptProcessingService {
     private readonly logger = new Logger(PromptProcessingService.name);
     private llm: BaseChatModel;
 
-    constructor(private readonly aiService: AiService) {
-        this.llm = this.aiService.createLlmWithTemperature(0.0);
+    constructor(private readonly modelRouter: ModelRouterService) {
+        this.llm = this.modelRouter.getModel(TaskComplexity.SIMPLE, { temperature: 0 });
     }
 
     /**

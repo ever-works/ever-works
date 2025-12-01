@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
 import { slugifyText } from '../utils/text.utils';
-import { AiService, BaseChatModel } from 'src/ai';
+import { AiService, BaseChatModel, ModelRouterService, TaskComplexity } from 'src/ai';
 import { CreateItemsGeneratorDto, ItemData } from '../dto';
 import {
     extractedItemsSchema,
@@ -14,8 +14,11 @@ export class AiItemGenerationService {
     private readonly logger = new Logger(AiItemGenerationService.name);
     private llm: BaseChatModel;
 
-    constructor(private readonly aiService: AiService) {
-        this.llm = this.aiService.createLlmWithTemperature(0.3);
+    constructor(
+        private readonly aiService: AiService,
+        private readonly modelRouter: ModelRouterService,
+    ) {
+        this.llm = this.modelRouter.getModel(TaskComplexity.COMPLEX, { temperature: 0.3 });
     }
 
     async generateInitialItemsWithAI(
@@ -130,7 +133,7 @@ Generate the list of items according to the specified schema.
         );
 
         // Use a lower temperature for item generation
-        const lowTempLlm = this.aiService.createLlmWithTemperature(0.0);
+        const lowTempLlm = this.modelRouter.getModel(TaskComplexity.COMPLEX, { temperature: 0 });
 
         const generationChain = generationPrompt.pipe(
             lowTempLlm.withStructuredOutput(extractedItemsSchema),

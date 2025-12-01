@@ -4,7 +4,7 @@ import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
 import { CreateItemsGeneratorDto } from '../dto/create-items-generator.dto';
 import { WebPageData } from '../interfaces/items-generator.interfaces';
 import { slugifyText } from '../utils/text.utils';
-import { AiService, BaseChatModel } from 'src/ai';
+import { AiService, BaseChatModel, ModelRouterService, TaskComplexity } from 'src/ai';
 import { ItemData } from '../dto';
 import {
     extractedItemsSchema,
@@ -59,8 +59,11 @@ export class ItemExtractionService {
     private readonly MAX_CHUNK_SIZE = 3000; // Characters per chunk
     private readonly CHUNK_OVERLAP = 200; // Overlap between chunks
 
-    constructor(private readonly aiService: AiService) {
-        this.llm = this.aiService.createLlmWithTemperature(0.1);
+    constructor(
+        private readonly modelRouter: ModelRouterService,
+        private readonly aiService: AiService,
+    ) {
+        this.llm = this.modelRouter.getModel(TaskComplexity.COMPLEX, { temperature: 0.1 });
 
         this.textSplitter = new RecursiveCharacterTextSplitter({
             chunkSize: this.MAX_CHUNK_SIZE,

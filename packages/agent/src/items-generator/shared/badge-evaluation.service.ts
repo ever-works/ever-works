@@ -3,7 +3,7 @@ import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
 import { z } from 'zod';
 import { BadgeType, BadgeValue, ItemBadges, BadgeEvaluationResult } from '../dto/badge.dto';
 import { ItemData } from '../dto/item-data.dto';
-import { AiService } from '../../ai';
+import { ModelRouterService, TaskComplexity } from '../../ai';
 
 // Zod schema for badge evaluation
 const badgeSchema = z.object({
@@ -23,7 +23,7 @@ const badgeEvaluationSchema = z.object({
 export class BadgeEvaluationService {
     private readonly logger = new Logger(BadgeEvaluationService.name);
 
-    constructor(private readonly aiService: AiService) {}
+    constructor(private readonly modelRouter: ModelRouterService) {}
 
     /**
      * Evaluates badges for a single item based on its source URL and available information
@@ -40,7 +40,7 @@ export class BadgeEvaluationService {
                 return null;
             }
 
-            const llm = this.aiService.getLlm();
+            const llm = this.modelRouter.getModel(TaskComplexity.MEDIUM, { temperature: 0 });
 
             const prompt = HumanMessagePromptTemplate.fromTemplate(`
 You are an expert software engineer tasked with evaluating repository badges based on available information.

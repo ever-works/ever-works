@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
 import { ConfigDto } from '../dto/create-items-generator.dto';
 import { WebPageData, RelevanceAssessment } from '../interfaces/items-generator.interfaces';
-import { AiService, BaseChatModel } from 'src/ai';
+import { AiService, BaseChatModel, ModelRouterService, TaskComplexity } from 'src/ai';
 import z from 'zod';
 
 const relevanceSchema = z.object({
@@ -21,8 +21,11 @@ export class ContentFilteringService {
     private llm: BaseChatModel;
     private BATCH_SIZE = 10;
 
-    constructor(private readonly aiService: AiService) {
-        this.llm = this.aiService.getLlm();
+    constructor(
+        private readonly aiService: AiService,
+        private readonly modelRouter: ModelRouterService,
+    ) {
+        this.llm = this.modelRouter.getModel(TaskComplexity.MEDIUM);
     }
 
     async filterAndAssessPages(

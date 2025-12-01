@@ -3,7 +3,7 @@ import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
 import { z } from 'zod';
 import { ItemData, Category, Tag, CreateItemsGeneratorDto } from '../dto';
 import { slugifyText, unSlugifyText } from '../utils/text.utils';
-import { AiService, BaseChatModel } from 'src/ai';
+import { BaseChatModel, ModelRouterService, TaskComplexity } from 'src/ai';
 import { itemDataWithCategoriesAndTagsSchema } from '../schemas/item-extraction.schemas';
 
 // Prompt for categorization
@@ -61,8 +61,8 @@ export class CategoryProcessingService {
     private llm: BaseChatModel;
     private readonly BATCH_SIZE = 30;
 
-    constructor(private readonly aiService: AiService) {
-        this.llm = this.aiService.createLlmWithTemperature(0.3);
+    constructor(private readonly modelRouter: ModelRouterService) {
+        this.llm = this.modelRouter.getModel(TaskComplexity.MEDIUM, { temperature: 0.3 });
     }
 
     /**
