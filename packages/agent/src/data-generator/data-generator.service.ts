@@ -179,10 +179,12 @@ export class DataGeneratorService {
                     return null;
                 });
 
+                // If PR is requested, create a new branch for recreation
                 if (update_with_pull_request) {
+                    const timestamp = new Date().getTime();
                     newBranchName = await this.githubService.createAndSwitchToRandomBranch(
                         dest,
-                        'recreate-directory',
+                        `recreate-directory-${timestamp}`,
                     );
                     this.logger.log(
                         `Created and switched to new branch for recreate: ${newBranchName}`,
