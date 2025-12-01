@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { BadgeType, BadgeValue, ItemBadges, BadgeEvaluationResult } from '../dto/badge.dto';
 import { ItemData } from '../dto/item-data.dto';
 import { ModelRouterService, TaskComplexity } from '../../ai';
+import pMap from 'p-map';
 
 // Zod schema for badge evaluation
 const badgeSchema = z.object({
@@ -138,20 +139,16 @@ Evaluate the badges for this repository and return the result in the specified f
 
         this.logger.log(`Starting badge evaluation for ${items.length} items`);
 
-        // Process items in parallel with a higher concurrency limit
-        const concurrencyLimit = 10;
-        const chunks = this.chunkArray(items, concurrencyLimit);
-
-        for (const chunk of chunks) {
-            const promises = chunk.map(async (item) => {
+        await pMap(
+            items,
+            async (item) => {
                 const result = await this.evaluateItemBadges(item);
                 if (result) {
                     results.set(item.source_url, result);
                 }
-            });
-
-            await Promise.all(promises);
-        }
+            },
+            { concurrency: 10 },
+        );
 
         this.logger.log(`Badge evaluation completed. ${results.size} items have badges`);
         return results;
@@ -170,16 +167,5 @@ Evaluate the badges for this repository and return the result in the specified f
         ];
 
         return repositoryPatterns.some((pattern) => pattern.test(url));
-    }
-
-    /**
-     * Utility method to chunk array for batch processing
-     */
-    private chunkArray<T>(array: T[], chunkSize: number): T[][] {
-        const chunks: T[][] = [];
-        for (let i = 0; i < array.length; i += chunkSize) {
-            chunks.push(array.slice(i, i + chunkSize));
-        }
-        return chunks;
     }
 }
