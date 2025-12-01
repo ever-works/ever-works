@@ -227,31 +227,30 @@ export class ItemsGeneratorService {
                 });
             }
 
-            // 1.5. AI-First Item Generation
-            let initialAiItems: ItemData[] = [];
+            // 1.5. AI-First Item Generation (in parallel with search query generation)
+            const aiItemsPromise = this.runAiFirstGeneration({
+                enabled: config.ai_first_generation_enabled,
+                directorySlug,
+                createItemsGeneratorDto,
+                featuredItemHints,
+                onProgress,
+            });
 
-            if (config.ai_first_generation_enabled) {
-                onProgress?.(ItemsGeneratorStep.AI_FIRST_ITEMS_GENERATION);
-                this.logger.log(`[${directorySlug}] 1.5. AI-First Item Generation - Invoking`);
-
-                initialAiItems = await this.aiItemGenerationService.generateInitialItemsWithAI(
-                    directorySlug,
-                    createItemsGeneratorDto,
-                    featuredItemHints,
-                );
-                this.logger.log(
-                    `[${directorySlug}] AI generated ${initialAiItems.length} initial items.`,
-                );
-            }
-
-            // 2. AI-Powered Search Query Generation
+            // 2. AI-Powered Search Query Generation (in parallel)
             onProgress?.(ItemsGeneratorStep.SEARCH_QUERIES_GENERATION);
-            this.logger.log(`[${directorySlug}] 2. AI-Powered Search Query Generation - Starting`);
+            this.logger.log(
+                `[${directorySlug}] 2. AI-Powered Search Query Generation - Starting`,
+            );
 
-            const searchQueries =
-                await this.searchQueryGenerationService.generateSearchQueries(
-                    createItemsGeneratorDto,
-                );
+            const searchQueriesPromise = this.searchQueryGenerationService.generateSearchQueries(
+                createItemsGeneratorDto,
+            );
+
+            const [initialAiItems, searchQueries] = await Promise.all([
+                aiItemsPromise,
+                searchQueriesPromise,
+            ]);
+
             this.logger.log(`[${directorySlug}] Generated ${searchQueries.length} search queries.`);
 
             // 3. Web Search & Content Retrieval
@@ -413,6 +412,36 @@ export class ItemsGeneratorService {
 
             throw error;
         }
+    }
+
+    private async runAiFirstGeneration({
+        enabled,
+        directorySlug,
+        createItemsGeneratorDto,
+        featuredItemHints,
+        onProgress,
+    }: {
+        enabled: boolean;
+        directorySlug: string;
+        createItemsGeneratorDto: CreateItemsGeneratorDto;
+        featuredItemHints: string[];
+        onProgress?: (step: string) => void;
+    }): Promise<ItemData[]> {
+        if (!enabled) {
+            return [];
+        }
+
+        onProgress?.(ItemsGeneratorStep.AI_FIRST_ITEMS_GENERATION);
+        this.logger.log(`[${directorySlug}] 1.5. AI-First Item Generation - Invoking`);
+
+        const items = await this.aiItemGenerationService.generateInitialItemsWithAI(
+            directorySlug,
+            createItemsGeneratorDto,
+            featuredItemHints,
+        );
+
+        this.logger.log(`[${directorySlug}] AI generated ${items.length} initial items.`);
+        return items;
     }
 
     /**

@@ -4,6 +4,8 @@ import { z } from 'zod';
 import { AiService, BaseChatModel, ModelRouterService, TaskComplexity } from 'src/ai';
 import { SearchService } from '../shared';
 import { ItemData } from '../dto';
+import pMap from 'p-map';
+import pLimit from 'p-limit';
 
 // Markdown generation prompt
 export const MARKDOWN_PROMPT = `
@@ -96,31 +98,19 @@ export class MarkdownGenerationService {
 
         this.logger.log(`Generating markdown for ${items.length} items`);
 
-        // Process items in batches
-        const BATCH_SIZE = 10;
-        const processedItems: ItemData[] = [];
-
-        // Process each batch
-        for (let i = 0; i < items.length; i += BATCH_SIZE) {
-            const batch = items.slice(i, i + BATCH_SIZE);
-
-            const markdownPromises = batch.map(async (item) => {
+        const processed = await pMap(
+            items,
+            async (item) => {
                 const markdown = await this.generateMarkdown(item);
                 return {
                     ...item,
                     markdown,
                 };
-            });
+            },
+            { concurrency: 5 },
+        );
 
-            const batchResults = await Promise.all(markdownPromises);
-            processedItems.push(...batchResults);
-
-            if (i + BATCH_SIZE < items.length) {
-                await new Promise((resolve) => setTimeout(resolve, 500));
-            }
-        }
-
-        return processedItems;
+        return processed;
     }
 
     /**

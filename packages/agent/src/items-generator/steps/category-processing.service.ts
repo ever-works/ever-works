@@ -5,6 +5,7 @@ import { ItemData, Category, Tag, CreateItemsGeneratorDto } from '../dto';
 import { slugifyText, unSlugifyText } from '../utils/text.utils';
 import { BaseChatModel, ModelRouterService, TaskComplexity } from 'src/ai';
 import { itemDataWithCategoriesAndTagsSchema } from '../schemas/item-extraction.schemas';
+import pMap from 'p-map';
 
 // Prompt for categorization
 const categoryPrompt = <T extends string>(additionalContext?: T) =>
@@ -300,97 +301,66 @@ export class CategoryProcessingService {
         existingTags: Set<string>;
         initialCategoryMetrics: Record<string, number>;
     }): Promise<ItemData[]> {
-        const allCategorizedItems: ItemData[] = [];
-
-        // Process items in batches
+        const batches: Partial<ItemData>[][] = [];
         for (let i = 0; i < items.length; i += this.BATCH_SIZE) {
-            const batch = items.slice(i, i + this.BATCH_SIZE);
-            const batchNumber = Math.floor(i / this.BATCH_SIZE) + 1;
-            const totalBatches = Math.ceil(items.length / this.BATCH_SIZE);
-
-            this.logger.log(
-                `Processing batch ${batchNumber} of ${totalBatches} (${batch.length} items)`,
-            );
-
-            try {
-                // Format existing categories and tags for the prompt
-                const categoriesText = Array.from(existingCategories).join(', ');
-                const tagsText = Array.from(existingTags).join(', ');
-
-                // Format categories metrics for the prompt
-                const total_items = initialCategoryMetrics.total_items || 0;
-                const categoryMetrics: Record<string, number> = {
-                    ...initialCategoryMetrics,
-                    categorized_items: total_items + allCategorizedItems.length,
-                    total_items: total_items + items.length,
-                };
-                allCategorizedItems.forEach((item) => {
-                    const category = typeof item.category === 'string' ? item.category : '';
-                    if (!category) return;
-                    categoryMetrics[category] = (categoryMetrics[category] || 0) + 1;
-                });
-
-                // Use the enhanced prompt if we have existing categories/tags, otherwise use the basic prompt
-                const promptTemplate = this.enhancedPrompt<true>(existingCategories, existingTags);
-
-                const result = await HumanMessagePromptTemplate.fromTemplate(promptTemplate)
-                    .pipe(this.llm.withStructuredOutput(categorizeOutputSchema))
-                    .invoke({
-                        task: prompt,
-                        items: JSON.stringify(batch),
-                        category_metrics: JSON.stringify(categoryMetrics),
-                        existing_categories: categoriesText,
-                        existing_tags: tagsText,
-                    });
-
-                const batchResults = result.items as ItemData[];
-
-                // Extract and store categories and tags from this batch for future batches
-                batchResults.forEach((item) => {
-                    if (item.category && typeof item.category === 'string') {
-                        existingCategories.add(item.category);
-                    }
-
-                    if (Array.isArray(item.tags)) {
-                        item.tags.forEach((tag: any) => {
-                            if (typeof tag === 'string') {
-                                existingTags.add(tag);
-                            }
-                        });
-                    }
-                });
-
-                this.logger.log(
-                    `Batch ${batchNumber} complete. Category metrics: ${JSON.stringify(categoryMetrics)} ` +
-                        `Existing tags count: ${existingTags.size}`,
-                );
-
-                allCategorizedItems.push(...batchResults);
-
-                // Add a small delay between batches to avoid rate limiting
-                if (i + this.BATCH_SIZE < items.length) {
-                    await new Promise((resolve) => setTimeout(resolve, 500));
-                }
-            } catch (error) {
-                this.logger.error(
-                    `Error during batch categorization: ${error.message}`,
-                    error.stack,
-                );
-
-                // Fallback for this batch - use existing categories if available
-                const fallbackCategory =
-                    existingCategories.size > 0 ? Array.from(existingCategories)[0] : 'others';
-
-                const fallbackItems = batch.map((item) => ({
-                    ...item,
-                    category: fallbackCategory,
-                    tags: [],
-                    slug: item.slug || slugifyText(item.name),
-                })) as ItemData[];
-
-                allCategorizedItems.push(...fallbackItems);
-            }
+            batches.push(items.slice(i, i + this.BATCH_SIZE));
         }
+
+        const categoriesText = Array.from(existingCategories).join(', ');
+        const tagsText = Array.from(existingTags).join(', ');
+        const total_items = initialCategoryMetrics.total_items || 0;
+        const baseCategoryMetrics: Record<string, number> = {
+            ...initialCategoryMetrics,
+            categorized_items: total_items,
+            total_items: total_items + items.length,
+        };
+
+        const batchResults = await pMap(
+            batches,
+            async (batch, index) => {
+                const batchNumber = index + 1;
+                const totalBatches = batches.length;
+                this.logger.log(
+                    `Processing batch ${batchNumber} of ${totalBatches} (${batch.length} items)`,
+                );
+                try {
+                    const promptTemplate = this.enhancedPrompt<true>(
+                        existingCategories,
+                        existingTags,
+                    );
+
+                    const result = await HumanMessagePromptTemplate.fromTemplate(promptTemplate)
+                        .pipe(this.llm.withStructuredOutput(categorizeOutputSchema))
+                        .invoke({
+                            task: prompt,
+                            items: JSON.stringify(batch),
+                            category_metrics: JSON.stringify(baseCategoryMetrics),
+                            existing_categories: categoriesText,
+                            existing_tags: tagsText,
+                        });
+
+                    return result.items as ItemData[];
+                } catch (error) {
+                    this.logger.error(
+                        `Error during batch categorization: ${error.message}`,
+                        error.stack,
+                    );
+
+                    const fallbackCategory =
+                        existingCategories.size > 0 ? Array.from(existingCategories)[0] : 'others';
+
+                    return batch.map((item) => ({
+                        ...item,
+                        category: fallbackCategory,
+                        tags: [],
+                        slug: item.slug || slugifyText(item.name),
+                    })) as ItemData[];
+                }
+            },
+            { concurrency: 3 },
+        );
+
+        const allCategorizedItems = batchResults.flat();
 
         // Final consistency pass to normalize categories and tags
         return this.normalizeCategorizationResults(allCategorizedItems);
