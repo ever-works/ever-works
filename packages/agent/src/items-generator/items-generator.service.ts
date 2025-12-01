@@ -13,6 +13,7 @@ import {
     PromptProcessingService,
     PromptComparisonService,
     BadgeProcessingService,
+    DomainDetectionService,
 } from './steps';
 import { Category, ItemData, Tag } from './dto';
 import { IDataConfig } from '../data-generator/data-repository';
@@ -46,6 +47,7 @@ export class ItemsGeneratorService {
         private readonly categoryProcessingService: CategoryProcessingService,
         private readonly markdownGenerationService: MarkdownGenerationService,
         private readonly badgeProcessingService: BadgeProcessingService,
+        private readonly domainDetectionService: DomainDetectionService,
     ) {}
 
     /**
@@ -196,6 +198,16 @@ export class ItemsGeneratorService {
 
             // Update the prompt in the DTO
             createItemsGeneratorDto.prompt = prompt;
+
+            // Domain detection to adapt downstream steps
+            const domainAnalysis = await this.domainDetectionService.detectDomain(
+                directorySlug,
+                prompt,
+                name,
+            );
+            this.logger.log(
+                `[${directorySlug}] Domain analysis → ${domainAnalysis.domain_type} (confidence ${domainAnalysis.confidence.toFixed(2)})`,
+            );
 
             // Add source_urls to the extractedUrls
             let extractedUrls = extractedUrlsFromPrompt;

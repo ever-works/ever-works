@@ -10,6 +10,14 @@ const baseSchema = z.object({
         .describe(
             "A concise, informative summary of the item and its relevance to the main topic. If a good summary isn't directly available, generate one from the page content.",
         ),
+    entity_type: z
+        .enum(['software_tool', 'library', 'service', 'product', 'course', 'place', 'other'])
+        .describe('The entity type for this item'),
+    entity_confidence: z
+        .number()
+        .min(0)
+        .max(1)
+        .describe('Confidence that the entity type is correct (0-1)'),
 });
 
 // Zod schema for ItemData extraction

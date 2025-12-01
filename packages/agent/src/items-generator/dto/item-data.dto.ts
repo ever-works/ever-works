@@ -17,4 +17,6 @@ export interface ItemData {
     tags: string[] | Tag[];
     markdown?: string;
     badges?: ItemBadges;
+    entity_type?: string;
+    entity_confidence?: number;
 }

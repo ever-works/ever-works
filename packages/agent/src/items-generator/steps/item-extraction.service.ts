@@ -207,6 +207,16 @@ export class ItemExtractionService {
 
                                 const validatedItem = schema.parse(extractedItem) as ItemData;
 
+                                if (
+                                    validatedItem.entity_type === 'other' ||
+                                    (validatedItem.entity_confidence ?? 1) < 0.7
+                                ) {
+                                    this.logger.log(
+                                        `[${directorySlug}] Skipping low-confidence/other entity: ${validatedItem.name} (${validatedItem.entity_type}, confidence ${validatedItem.entity_confidence})`,
+                                    );
+                                    continue;
+                                }
+
                                 // Auto-generate slug if not provided or to ensure consistency
                                 validatedItem.slug = slugifyText(validatedItem.name);
 
@@ -258,6 +268,16 @@ export class ItemExtractionService {
                                     : itemDataSchema;
 
                                 const validatedItem = schema.parse(extractedItem) as ItemData;
+
+                                if (
+                                    validatedItem.entity_type === 'other' ||
+                                    (validatedItem.entity_confidence ?? 1) < 0.7
+                                ) {
+                                    this.logger.log(
+                                        `[${directorySlug}] Skipping low-confidence/other entity: ${validatedItem.name} (${validatedItem.entity_type}, confidence ${validatedItem.entity_confidence})`,
+                                    );
+                                    continue;
+                                }
 
                                 // Auto-generate slug if not provided or to ensure consistency
                                 validatedItem.slug = slugifyText(validatedItem.name);
