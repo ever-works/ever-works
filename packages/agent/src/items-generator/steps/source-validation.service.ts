@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { ItemData, ConfigDto } from '../dto';
 import { AiService, BaseChatModel, ModelRouterService, TaskComplexity } from 'src/ai';
 import { SearchService } from '../shared';
+import { UrlPrefilter } from '../utils/url-prefilter';
 
 // Schema for AI URL validation response
 const urlValidationSchema = z.object({
@@ -75,6 +76,7 @@ export class SourceValidationService {
         private readonly searchService: SearchService,
         private readonly aiService: AiService,
         private readonly modelRouter: ModelRouterService,
+        private readonly urlPrefilter: UrlPrefilter,
     ) {
         this.llm = this.modelRouter.getModel(TaskComplexity.SIMPLE, { temperature: 0.1 }); // Low temperature for consistent analysis
     }
@@ -177,6 +179,32 @@ export class SourceValidationService {
                     `Invalid URL structure provided for URL for "${itemName}": ${urlToValidate}`,
                 );
                 return undefined;
+            }
+
+            // 1. Fast Pattern Prefilter (NEW)
+            const classification = this.urlPrefilter.classify(urlToValidate);
+            if (classification === 'reject') {
+                this.logger.log(
+                    `[Prefilter] Rejected URL pattern for "${itemName}": ${urlToValidate}`,
+                );
+                return undefined;
+            }
+            if (classification === 'accept') {
+                this.logger.log(
+                    `[Prefilter] Accepted official URL pattern for "${itemName}": ${urlToValidate}`,
+                );
+                // Still do a quick HEAD check to ensure it's reachable, but skip AI
+                try {
+                    await axios.head(urlToValidate, {
+                        timeout: 5000,
+                        validateStatus: (status) => status >= 200 && status < 400,
+                    });
+                    return urlToValidate;
+                } catch (e) {
+                    this.logger.warn(`[Prefilter] Official URL unreachable: ${urlToValidate}`);
+                    // If unreachable, fall through? No, if official pattern fails, it's probably dead.
+                    return undefined;
+                }
             }
 
             // Check if this URL is a Google search URL

@@ -5,6 +5,7 @@ import { AiItemGenerationService } from './steps/ai-item-generation.service';
 import { SearchQueryGenerationService } from './steps/search-query-generation.service';
 import { WebPageRetrievalService } from './steps/web-page-retrieval.service';
 import { ContentFilteringService } from './steps/content-filtering.service';
+import { ContentPrefilterService } from './steps/content-prefilter.service';
 import { ItemExtractionService } from './steps/item-extraction.service';
 import { SourceValidationService } from './steps/source-validation.service';
 import { DataAggregationService } from './steps/data-aggregation.service';
@@ -22,6 +23,7 @@ import {
 } from './steps/data-aggregation';
 import { AiModule } from '../ai';
 import { GitModule } from '../git';
+import { UrlPrefilter } from './utils/url-prefilter';
 
 export const STEP_SERVICES = [
     // Shared services
@@ -34,6 +36,9 @@ export const STEP_SERVICES = [
     NewItemsExtractorService,
     AiDeduplicatorService,
 
+    // Utils
+    UrlPrefilter,
+
     // Main service
     ItemsGeneratorService,
     ItemSubmissionService,
@@ -45,6 +50,7 @@ export const STEP_SERVICES = [
     SearchQueryGenerationService,
     WebPageRetrievalService,
     ContentFilteringService,
+    ContentPrefilterService,
     ItemExtractionService,
     SourceValidationService,
     DataAggregationService,

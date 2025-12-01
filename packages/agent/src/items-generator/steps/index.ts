@@ -3,6 +3,7 @@ export * from './ai-item-generation.service';
 export * from './search-query-generation.service';
 export * from './web-page-retrieval.service';
 export * from './content-filtering.service';
+export * from './content-prefilter.service';
 export * from './item-extraction.service';
 export * from './source-validation.service';
 export * from './data-aggregation.service';

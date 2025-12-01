@@ -15,6 +15,8 @@ const relevanceSchema = z.object({
     reason: z.string().describe('A brief explanation for the relevance assessment'),
 });
 
+import { ContentPrefilterService } from './content-prefilter.service';
+
 @Injectable()
 export class ContentFilteringService {
     private readonly logger = new Logger(ContentFilteringService.name);
@@ -24,6 +26,7 @@ export class ContentFilteringService {
     constructor(
         private readonly aiService: AiService,
         private readonly modelRouter: ModelRouterService,
+        private readonly contentPrefilterService: ContentPrefilterService,
     ) {
         this.llm = this.modelRouter.getModel(TaskComplexity.MEDIUM);
     }
@@ -39,7 +42,8 @@ export class ContentFilteringService {
             `[${directorySlug}] Starting content filtering for ${webPages.length} pages`,
         );
 
-        const filteredPages = webPages
+        // 1. Basic deduplication and length filter
+        const initialFilteredPages = webPages
             .filter((page, index, self) => {
                 return index === self.findIndex((t) => t.source_url === page.source_url);
             })
@@ -50,16 +54,34 @@ export class ContentFilteringService {
                 return isLongEnough;
             });
 
-        // Check if OpenAI API is configured
-        if (!this.aiService.isAiConfigured()) {
-            return filteredPages;
-        }
-
         this.logger.log(
-            `[${directorySlug}] ${filteredPages.length} pages passed initial length filter`,
+            `[${directorySlug}] ${initialFilteredPages.length} pages passed initial length filter`,
         );
 
-        if (filteredPages.length === 0) {
+        if (initialFilteredPages.length === 0) {
+            return [];
+        }
+
+        // 2. Fast Heuristic Prefiltering (NEW)
+        const prefilteredPages = this.contentPrefilterService.prefilterPages(
+            initialFilteredPages,
+            topicName,
+            topicDescription,
+        );
+
+        const discardedByPrefilter = initialFilteredPages.length - prefilteredPages.length;
+        if (discardedByPrefilter > 0) {
+            this.logger.log(
+                `[${directorySlug}] Prefilter discarded ${discardedByPrefilter} pages (low quality/relevance). Remaining: ${prefilteredPages.length}`,
+            );
+        }
+
+        // Check if OpenAI API is configured
+        if (!this.aiService.isAiConfigured()) {
+            return prefilteredPages;
+        }
+
+        if (prefilteredPages.length === 0) {
             return [];
         }
 
