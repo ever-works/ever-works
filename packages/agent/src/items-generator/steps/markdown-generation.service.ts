@@ -20,6 +20,8 @@ You are directory website builder and your task is to generate markdown summary 
 3. No need to include any info about "Support" if item is a product.
 4. Make sure we output ALL features (as much as possible) of the item inside "Features" block, not only Key Features.
 5. If item is a product/service, make sure to include "Pricing" block with all available plans (if provided content contains it).
+6. Always structure output with headers exactly in this order: ## Overview, ## Features, ## Pricing, ## Use Cases.
+7. If data for a section is unavailable, include the header with a brief placeholder (e.g., "No pricing information available").
 </rules>
 
 Based on this website content:

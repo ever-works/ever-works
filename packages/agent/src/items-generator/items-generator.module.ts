@@ -16,6 +16,7 @@ import { PromptComparisonService } from './steps/prompt-comparison.service';
 import { BadgeProcessingService } from './steps/badge-processing.service';
 import { DomainDetectionService } from './steps/domain-detection.service';
 import { SearchService, NotionService, BadgeEvaluationService } from './shared';
+import { SemanticChunker } from './utils/semantic-chunker';
 import {
     SharedUtilsService,
     NewItemsExtractorService,
@@ -30,6 +31,7 @@ export const STEP_SERVICES = [
     SearchService,
     NotionService,
     BadgeEvaluationService,
+    SemanticChunker,
 
     // Data aggregation shared services
     SharedUtilsService,

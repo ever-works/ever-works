@@ -12,6 +12,7 @@ import {
     itemDataSchema,
     itemDataWithCategoriesAndTagsSchema,
 } from '../schemas/item-extraction.schemas';
+import { SemanticChunker } from '../utils/semantic-chunker';
 
 const ITEMS_EXTRACTION_PROMPT =
     `You are an expert data extractor and technical writer for directory websites.
@@ -62,6 +63,7 @@ export class ItemExtractionService {
     constructor(
         private readonly modelRouter: ModelRouterService,
         private readonly aiService: AiService,
+        private readonly semanticChunker: SemanticChunker,
     ) {
         this.llm = this.modelRouter.getModel(TaskComplexity.COMPLEX, { temperature: 0.1 });
 
@@ -158,8 +160,11 @@ export class ItemExtractionService {
                         `[${directorySlug}] Content size (${page.raw_content.length} chars) exceeds chunk size limit. Processing in chunks for ${page.source_url}`,
                     );
 
-                    // Split the content into chunks
-                    const chunks = await this.textSplitter.splitText(page.raw_content);
+                    // Split the content into semantic chunks
+                    const chunks =
+                        (await this.semanticChunker.chunkContent(page.raw_content)) ||
+                        (await this.textSplitter.splitText(page.raw_content));
+
                     this.logger.log(
                         `[${directorySlug}] Split content into ${chunks.length} chunks for processing from ${page.source_url}`,
                     );
