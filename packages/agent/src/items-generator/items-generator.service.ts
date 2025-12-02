@@ -217,11 +217,11 @@ export class ItemsGeneratorService {
             if (
                 createItemsGeneratorDto.generation_method === GenerationMethod.CREATE_UPDATE &&
                 ($configMetadata.last_request_data?.prompt ||
-                    $configMetadata.last_request_data?.source_urls.length)
+                    $configMetadata.last_request_data?.source_urls?.length)
             ) {
                 const last_request_data = $configMetadata.last_request_data;
                 extractedUrls = extractedUrls.filter((url) => {
-                    const $source_urls = last_request_data.source_urls || [];
+                    const $source_urls = last_request_data?.source_urls || [];
                     const $prompt = last_request_data.prompt || '';
                     return !$source_urls.includes(url) && !$prompt.includes(url);
                 });
@@ -238,13 +238,10 @@ export class ItemsGeneratorService {
 
             // 2. AI-Powered Search Query Generation (in parallel)
             onProgress?.(ItemsGeneratorStep.SEARCH_QUERIES_GENERATION);
-            this.logger.log(
-                `[${directorySlug}] 2. AI-Powered Search Query Generation - Starting`,
-            );
+            this.logger.log(`[${directorySlug}] 2. AI-Powered Search Query Generation - Starting`);
 
-            const searchQueriesPromise = this.searchQueryGenerationService.generateSearchQueries(
-                createItemsGeneratorDto,
-            );
+            const searchQueriesPromise =
+                this.searchQueryGenerationService.generateSearchQueries(createItemsGeneratorDto);
 
             const [initialAiItems, searchQueries] = await Promise.all([
                 aiItemsPromise,

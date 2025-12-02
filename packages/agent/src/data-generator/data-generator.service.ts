@@ -291,10 +291,17 @@ export class DataGeneratorService {
                 } else {
                     newItemsCount++;
                 }
-                await this.processItem(data, item, user).catch((err) => {
+                await this.processItem(data, item).catch((err) => {
                     this.logger.error('Failed to process item', err);
                 });
             }
+
+            await this.githubService.addAll(data.dir);
+            await this.githubService.commit(
+                data.dir,
+                `${newItemsCount > 0 ? 'add' : 'update'} ${itemsWithMarkdown.length} items`,
+                user.asCommitter(),
+            );
 
             // Push changes
             await this.githubService.push(dest, token);
@@ -546,7 +553,7 @@ export class DataGeneratorService {
         }
     }
 
-    private async processItem(data: DataRepository, item: ItemData, user: User) {
+    private async processItem(data: DataRepository, item: ItemData) {
         this.logger.debug(`processItem: Starting for item ${item.name} (slug: ${item.slug})`);
 
         await data.createItemDir(item);
@@ -560,10 +567,6 @@ export class DataGeneratorService {
         promises.push(data.writeItemMarkdown(item, `${md}`));
 
         await Promise.all(promises);
-        await this.githubService.add(data.dir, '.');
-        await this.githubService.commit(data.dir, `add ${item.name}`, user.asCommitter());
-
-        this.logger.log(`processItem: Committed item ${item.name} (slug: ${item.slug})`);
     }
 
     private getPRDetails(directory: Directory) {

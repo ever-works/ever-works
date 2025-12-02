@@ -168,8 +168,8 @@ Provide a relevance score between 0.0 (not relevant) and 1.0 (highly relevant). 
         );
 
         // Process pages in batches
-        for (let i = 0; i < filteredPages.length; i += this.BATCH_SIZE) {
-            const batch = filteredPages.slice(i, i + this.BATCH_SIZE);
+        for (let i = 0; i < prefilteredPages.length; i += this.BATCH_SIZE) {
+            const batch = prefilteredPages.slice(i, i + this.BATCH_SIZE);
 
             // Process the batch in parallel
             const assessmentPromises = batch.map((page) => assessPageRelevance(page));
@@ -183,7 +183,7 @@ Provide a relevance score between 0.0 (not relevant) and 1.0 (highly relevant). 
             relevantPages.push(...relevantPagesFromBatch);
 
             // Add a small delay between batches to avoid rate limiting
-            if (i + this.BATCH_SIZE < filteredPages.length) {
+            if (i + this.BATCH_SIZE < prefilteredPages.length) {
                 await new Promise((resolve) => setTimeout(resolve, 500));
             }
         }

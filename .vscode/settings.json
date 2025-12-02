@@ -7,6 +7,9 @@
 		"langchain",
 		"OLLAMA",
 		"OPENROUTER",
+		"Prefilter",
+		"prefiltered",
+		"pypi",
 		"Tavily",
 		"VERCEL"
 	],

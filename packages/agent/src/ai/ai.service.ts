@@ -22,6 +22,8 @@ export class AiService {
     private readonly isConfigured: boolean;
     private readonly isCLI: boolean;
 
+    private healthCheckCache: Map<string, { timestamp: number; result: any }> = new Map();
+
     constructor() {
         this.isCLI = config.isCli();
 
@@ -456,10 +458,16 @@ export class AiService {
         error?: string;
         response?: string;
     }> {
+        const cacheKey = 'default-provider-health';
+        const cached = this.healthCheckCache.get(cacheKey);
+        if (cached && Date.now() - cached.timestamp < 5 * 60 * 1000) {
+            return cached.result;
+        }
+
         const defaultProvider = this.config.defaultProvider;
         const providerConfig = this.config.providers[defaultProvider];
 
-        return this.testProvider({
+        const result = await this.testProvider({
             type: defaultProvider,
             apiKey: providerConfig.apiKey,
             modelName: providerConfig.modelName,
@@ -467,6 +475,12 @@ export class AiService {
             maxTokens: providerConfig.maxTokens || 100,
             baseURL: providerConfig.baseURL,
         });
+
+        if (result.success) {
+            this.healthCheckCache.set(cacheKey, { timestamp: Date.now(), result });
+        }
+
+        return result;
     }
 
     /**
