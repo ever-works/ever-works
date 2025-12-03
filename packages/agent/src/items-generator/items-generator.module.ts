@@ -28,7 +28,8 @@ export const STEP_SERVICES = [
     SearchService,
     NotionService,
     BadgeEvaluationService,
-    PipelineExecutor,
+    PipelineExecutor, // This has a `CacheDependency`; do not import `CacheManager` here.
+    // It should be called by the consumer of this agent.
 
     // Data aggregation shared services
     SharedUtilsService,

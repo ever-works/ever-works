@@ -105,7 +105,7 @@ export class ItemsGeneratorService {
             let resumeFromStepName: string | undefined;
 
             // Attempt to load checkpoint
-            const checkpoint = await this.pipelineExecutor.loadCheckpoint(directorySlug);
+            const checkpoint = await this.pipelineExecutor.loadCheckpoint(directory);
 
             if (checkpoint) {
                 this.logger.log(

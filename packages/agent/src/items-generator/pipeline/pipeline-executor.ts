@@ -2,6 +2,7 @@ import { Logger, Injectable, Inject } from '@nestjs/common';
 import { IPipelineStep, GenerationContext } from '../interfaces/pipeline.interface';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
+import type { Directory } from '@src/entities';
 
 // Serializable version of GenerationContext (without methods or complex objects like Directory)
 export type SerializableGenerationContext = Omit<
@@ -19,6 +20,9 @@ export interface CheckpointData {
     timestamp: string;
     context: SerializableGenerationContext;
 }
+
+// 1 hour in milliseconds
+const CHECKPOINT_TTL_MS = 60 * 60 * 1000;
 
 @Injectable()
 export class PipelineExecutor {
@@ -109,21 +113,25 @@ export class PipelineExecutor {
         return currentContext;
     }
 
-    async loadCheckpoint(directorySlug: string): Promise<CheckpointData | null> {
-        const checkpointKey = `pipeline-checkpoint-${directorySlug}`;
+    async loadCheckpoint(directory: Directory): Promise<CheckpointData | null> {
+        const checkpointKey = this.getCheckpointKey(directory);
         const checkpointData = await this.cacheManager.get<CheckpointData>(checkpointKey);
         if (checkpointData) {
             this.logger.log(
-                `Loaded checkpoint for ${directorySlug} at step ${checkpointData.stepName}`,
+                `Loaded checkpoint for ${directory.slug} at step ${checkpointData.stepName}`,
             );
             return checkpointData;
         }
         return null;
     }
 
+    private getCheckpointKey(directory: Directory) {
+        return `pipeline-checkpoint-${directory.userId}-${directory.slug}`;
+    }
+
     private async saveCheckpoint(context: GenerationContext, stepIndex: number, stepName: string) {
         try {
-            const checkpointKey = `pipeline-checkpoint-${context.directory.slug}`;
+            const checkpointKey = this.getCheckpointKey(context.directory);
 
             // Create serializable context by excluding non-serializable fields
             // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -142,8 +150,8 @@ export class PipelineExecutor {
             };
 
             // Cache for 1 hour (longer might be needed depending on expected failure recovery time)
-            await this.cacheManager.set(checkpointKey, checkpointData, 60 * 60 * 1000);
-            this.logger.debug(`Checkpoint saved for ${directory.slug} at step ${stepName}`);
+            await this.cacheManager.set(checkpointKey, checkpointData, CHECKPOINT_TTL_MS);
+            this.logger.debug(`Checkpoint saved for ${context.directory.slug} at step ${stepName}`);
         } catch (err) {
             this.logger.warn(`Failed to save checkpoint for step ${stepName}: ${err.message}`);
         }
