@@ -6,6 +6,7 @@ import { DatabaseModule } from '@packages/agent/database';
 import { AuthModule } from '@src/auth';
 import { AiModule } from '@packages/agent/ai';
 import { CacheEntryRepository } from '@packages/agent/cache';
+import { TriggerModule as TasksTriggerModule } from '@packages/tasks';
 
 // Controllers
 import { DirectoriesController } from './directories.controller';
@@ -22,6 +23,7 @@ import { VercelDeploymentVerifierService } from './tasks/vercel-deployment-verif
         DatabaseModule,
         AuthModule,
         AiModule,
+        TasksTriggerModule,
         ScheduleModule.forRoot(),
     ],
     providers: [CacheEntryRepository, DirectoryCleanupService, VercelDeploymentVerifierService],

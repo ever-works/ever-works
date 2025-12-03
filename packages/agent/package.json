@@ -37,13 +37,13 @@
             "types": "./dist/directory-operations/index.d.ts",
             "default": "./dist/directory-operations/index.js"
         },
-        "./trigger": {
-            "types": "./dist/trigger/index.d.ts",
-            "default": "./dist/trigger/index.js"
-        },
         "./items-generator": {
             "types": "./dist/items-generator/index.d.ts",
             "default": "./dist/items-generator/index.js"
+        },
+        "./tasks": {
+            "types": "./dist/tasks/index.d.ts",
+            "default": "./dist/tasks/index.js"
         },
         "./events": {
             "types": "./dist/events/index.d.ts",
@@ -79,9 +79,7 @@
         "build": "nest build -b swc && tsc -p tsconfig.types.json",
         "build:dev": "nest build -b swc --watch",
         "build:types": "tsc -p tsconfig.types.json",
-        "build:types:dev": "tsc -p tsconfig.types.json --watch",
-        "dev:trigger": "npx trigger.dev@latest dev",
-        "deploy:trigger": "npx trigger.dev@latest deploy"
+        "build:types:dev": "tsc -p tsconfig.types.json --watch"
     },
     "peerDependencies": {
         "@nestjs/common": "^11.1",
@@ -113,7 +111,6 @@
         "@nestjs/testing": "^11.1.8",
         "@swc/cli": "^0.6.0",
         "@swc/core": "^1.15.1",
-        "@trigger.dev/build": "^4.1.2",
         "@types/express": "^5.0.5",
         "@types/jest": "^29.5.14",
         "@types/node": "^22.19.0",
@@ -147,10 +144,8 @@
         "@nestjs/cache-manager": "^3.0.1",
         "@nestjs/config": "^4.0.2",
         "@nestjs/typeorm": "^11.0.0",
-        "@nestjs/websockets": "^11.1.8",
         "@supabase/supabase-js": "^2.80.0",
         "@tavily/core": "^0.3.7",
-        "@trigger.dev/sdk": "^4.1.2",
         "@types/cheerio": "^1.0.0",
         "@types/fs-extra": "^11.0.4",
         "@types/string-similarity": "^4.0.2",

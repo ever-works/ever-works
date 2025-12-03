@@ -1,0 +1,31 @@
+{
+	"name": "@packages/tasks",
+	"version": "0.1.0",
+	"private": true,
+	"license": "UNLICENSED",
+	"main": "dist/index.js",
+	"types": "dist/index.d.ts",
+	"scripts": {
+		"build": "tsc -p tsconfig.json",
+		"dev:trigger": "npx trigger.dev@latest dev",
+		"deploy:trigger": "npx trigger.dev@latest deploy"
+	},
+	"dependencies": {
+		"@nestjs/cache-manager": "^3.0.1",
+		"@nestjs/common": "^11.1.8",
+		"@nestjs/core": "^11.1.8",
+		"@nestjs/event-emitter": "^3.0.1",
+		"@nestjs/platform-express": "^11.1.8",
+		"@nestjs/websockets": "^11.1.9",
+		"@packages/agent": "workspace:*",
+		"@trigger.dev/sdk": "^4.1.2",
+		"class-transformer": "^0.5.1",
+		"reflect-metadata": "^0.2.2",
+		"rxjs": "^7.8.2"
+	},
+	"devDependencies": {
+		"@trigger.dev/build": "^4.1.2",
+		"@types/node": "^22.19.0",
+		"typescript": "^5.9.3"
+	}
+}

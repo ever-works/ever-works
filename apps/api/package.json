@@ -38,6 +38,7 @@
         "@nestjs/throttler": "^6.4.0",
         "@packages/agent": "workspace:*",
         "@packages/monitoring": "workspace:*",
+        "@packages/tasks": "workspace:*",
         "@vercel/sdk": "^1.17.0",
         "axios": "^1.13.2",
         "bcrypt": "^6.0.0",

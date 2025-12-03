@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
+import { GitModule } from '@packages/agent/git';
+import { STEP_SERVICES, STEP_SERVICES_EXPORTS } from '@packages/agent/items-generator';
 import { TriggerAiModule } from './trigger-ai.module';
-import { GitModule } from '@src/git/git.module';
-import { STEP_SERVICES, STEP_SERVICES_EXPORTS } from '@src/items-generator';
 
 @Module({
     imports: [TriggerAiModule, GitModule],

@@ -1,34 +1,14 @@
 import { task } from '@trigger.dev/sdk';
 import { NestFactory } from '@nestjs/core';
-import { TriggerWorkerModule } from '@src/trigger/trigger-worker.module';
-import { TriggerInternalApiClient } from '@src/trigger/trigger-internal-api.client';
-import { TriggerGenerationOrchestrator } from '@src/trigger/trigger-generation.orchestrator';
-import { CreateItemsGeneratorDto } from '@src/items-generator/dto';
-import { plainToInstance } from 'class-transformer';
-import { Directory } from '@src/entities/directory.entity';
-import { User } from '@src/entities/user.entity';
 import { INestApplicationContext } from '@nestjs/common';
-import { DirectoryScheduleService } from '@src/services/directory-schedule.service';
-import { GenerateStatusType } from '@src/entities/types';
-
-export const DIRECTORY_GENERATION_MODE = {
-    CREATE: 'create',
-    UPDATE: 'update',
-} as const;
-
-export type DirectoryGenerationMode =
-    (typeof DIRECTORY_GENERATION_MODE)[keyof typeof DIRECTORY_GENERATION_MODE];
-
-export type DirectoryGenerationPayload = {
-    directoryId: string;
-    userId: string;
-    mode: DirectoryGenerationMode;
-    dto: CreateItemsGeneratorDto;
-    historyId: string;
-    historyStartedAt?: string;
-    triggerSource?: 'user' | 'schedule' | 'api';
-    scheduleId?: string;
-};
+import { plainToInstance } from 'class-transformer';
+import { TriggerWorkerModule } from '../../trigger/trigger-worker.module';
+import { TriggerInternalApiClient } from '../../trigger/trigger-internal-api.client';
+import { TriggerGenerationOrchestrator } from '../../trigger/trigger-generation.orchestrator';
+import { DirectoryGenerationPayload } from '@packages/agent/tasks';
+import { Directory, User } from '@packages/agent/entities';
+import { DirectoryScheduleService } from '@packages/agent/services';
+import { GenerateStatusType } from '@packages/agent/entities';
 
 async function createContext(
     appContext: INestApplicationContext,

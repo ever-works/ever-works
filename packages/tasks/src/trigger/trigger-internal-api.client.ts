@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { config } from '@src/config';
-import { Directory } from '@src/entities/directory.entity';
-import { DirectoryCommand, DirectoryCommandAction } from './directory-command.types';
+import { config } from '@packages/agent/config';
+import { Directory } from '@packages/agent/entities';
+import { DirectoryCommand, DirectoryCommandAction } from '@packages/agent/tasks';
 
 type DirectoryContextResponse = {
     directory: Directory;

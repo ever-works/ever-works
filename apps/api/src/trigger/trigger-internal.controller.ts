@@ -21,7 +21,7 @@ import {
     DirectoryOperations,
     GenerationHistoryUpdateInput,
 } from '@packages/agent/directory-operations';
-import { DirectoryCommandAction, DirectoryCommandPayloads } from '@packages/agent/trigger';
+import { DirectoryCommandAction, DirectoryCommandPayloads } from '@packages/agent/tasks';
 import { SkipThrottle } from '@nestjs/throttler';
 import { CacheDto } from './dto/cache.dto';
 
