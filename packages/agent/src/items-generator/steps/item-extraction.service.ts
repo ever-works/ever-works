@@ -12,6 +12,11 @@ import {
     itemDataSchema,
     itemDataWithCategoriesAndTagsSchema,
 } from '../schemas/item-extraction.schemas';
+import {
+    IPipelineStep,
+    GenerationContext,
+} from '../interfaces/pipeline.interface';
+import { ItemsGeneratorStep } from '../constants/steps';
 
 const ITEMS_EXTRACTION_PROMPT =
     `You are an expert data extractor and technical writer for directory websites.
@@ -50,7 +55,7 @@ Exclude any invalid or irrelevant content, and align the findings with the topic
 <web_page_content>`.trim();
 
 @Injectable()
-export class ItemExtractionService {
+export class ItemExtractionService implements IPipelineStep {
     private readonly logger = new Logger(ItemExtractionService.name);
     private llm: BaseChatModel;
     private textSplitter: RecursiveCharacterTextSplitter;
@@ -59,6 +64,8 @@ export class ItemExtractionService {
     private readonly MAX_CHUNK_SIZE = 3000; // Characters per chunk
     private readonly CHUNK_OVERLAP = 200; // Overlap between chunks
 
+    public readonly name = ItemsGeneratorStep.ITEMS_EXTRACTION;
+
     constructor(private readonly aiService: AiService) {
         this.llm = this.aiService.createLlmWithTemperature(0.1);
 
@@ -66,6 +73,29 @@ export class ItemExtractionService {
             chunkSize: this.MAX_CHUNK_SIZE,
             chunkOverlap: this.CHUNK_OVERLAP,
         });
+    }
+
+    async run(context: GenerationContext): Promise<GenerationContext> {
+        const { dto, directory, webPages, featuredItemHints } = context;
+
+        this.logger.log(
+            `[${directory.slug}] AI-Driven Structured Data Extraction for Items from Web - Starting`,
+        );
+
+        const extractedWebItems: ItemData[] = await this.extractItemsFromPages(
+            directory.slug,
+            dto,
+            webPages,
+            featuredItemHints,
+        );
+
+        this.logger.log(
+            `[${directory.slug}] Extracted ${extractedWebItems.length} potential items from web pages.`,
+        );
+
+        context.extractedWebItems = extractedWebItems;
+
+        return context;
     }
 
     /**

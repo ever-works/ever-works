@@ -133,8 +133,8 @@ export class MarkdownGenerationService {
         try {
             return await this.searchService.extractContent(url);
         } catch (error) {
-            // try again with extractContentUsingNaive
-            const text = await this.searchService.extractContentUsingNaive(url).catch(() => null);
+            // try again with extractContentUsingLocal
+            const text = await this.searchService.extractContentUsingLocal(url).catch(() => null);
 
             if (text) {
                 return {

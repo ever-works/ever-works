@@ -8,14 +8,45 @@ import {
     itemDataSchema,
     promptUnderstandingAssessmentSchema,
 } from '../schemas/item-extraction.schemas';
+import {
+    IPipelineStep,
+    GenerationContext,
+} from '../interfaces/pipeline.interface';
+import { ItemsGeneratorStep } from '../constants/steps';
 
 @Injectable()
-export class AiItemGenerationService {
+export class AiItemGenerationService implements IPipelineStep {
     private readonly logger = new Logger(AiItemGenerationService.name);
     private llm: BaseChatModel;
 
+    public readonly name = ItemsGeneratorStep.AI_FIRST_ITEMS_GENERATION;
+
     constructor(private readonly aiService: AiService) {
         this.llm = this.aiService.createLlmWithTemperature(0.3);
+    }
+
+    async run(context: GenerationContext): Promise<GenerationContext> {
+        const { dto, directory, featuredItemHints } = context;
+
+        if (dto.config.ai_first_generation_enabled) {
+            this.logger.log(`[${directory.slug}] AI-First Item Generation - Invoking`);
+
+            const initialAiItems = await this.generateInitialItemsWithAI(
+                directory.slug,
+                dto,
+                featuredItemHints,
+            );
+            this.logger.log(
+                `[${directory.slug}] AI generated ${initialAiItems.length} initial items.`,
+            );
+
+            context.initialAiItems = initialAiItems;
+        } else {
+            this.logger.debug(`[${directory.slug}] AI-First Item Generation - Skipped`);
+            context.initialAiItems = [];
+        }
+
+        return context;
     }
 
     async generateInitialItemsWithAI(

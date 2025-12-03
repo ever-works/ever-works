@@ -21,12 +21,14 @@ import {
 } from './steps/data-aggregation';
 import { AiModule } from '../ai';
 import { GitModule } from '../git';
+import { PipelineExecutor } from './pipeline/pipeline-executor';
 
 export const STEP_SERVICES = [
     // Shared services
     SearchService,
     NotionService,
     BadgeEvaluationService,
+    PipelineExecutor,
 
     // Data aggregation shared services
     SharedUtilsService,

@@ -5,6 +5,8 @@ import { ItemData, Category, Tag, CreateItemsGeneratorDto } from '../dto';
 import { slugifyText, unSlugifyText } from '../utils/text.utils';
 import { AiService, BaseChatModel } from 'src/ai';
 import { itemDataWithCategoriesAndTagsSchema } from '../schemas/item-extraction.schemas';
+import { IPipelineStep, GenerationContext } from '../interfaces/pipeline.interface';
+import { ItemsGeneratorStep } from '../constants/steps';
 
 // Prompt for categorization
 const categoryPrompt = <T extends string>(additionalContext?: T) =>
@@ -56,13 +58,55 @@ type CategoryProcessingParams = {
 };
 
 @Injectable()
-export class CategoryProcessingService {
+export class CategoryProcessingService implements IPipelineStep {
     private readonly logger = new Logger(CategoryProcessingService.name);
     private llm: BaseChatModel;
     private readonly BATCH_SIZE = 30;
 
+    public readonly name = ItemsGeneratorStep.CATEGORIES_TAGS_PROCESSING;
+
     constructor(private readonly aiService: AiService) {
         this.llm = this.aiService.createLlmWithTemperature(0.3);
+    }
+
+    async run(context: GenerationContext): Promise<GenerationContext> {
+        const {
+            dto,
+            directory,
+            existing,
+            aggregatedItems,
+            allInitialCategories,
+            allPriorityCategories,
+            metrics,
+        } = context;
+
+        this.logger.log(`[${directory.slug}] Category and Tag Generation - Starting`);
+
+        // Create a modified DTO with merged priority categories
+        const dtoWithMergedPriorities = {
+            ...dto,
+            priority_categories: allPriorityCategories,
+        };
+
+        const { categories, tags, finalItems } = await this.processCategoriesAndTags({
+            directorySlug: directory.slug,
+            createItemsGeneratorDto: dtoWithMergedPriorities,
+            extractedItems: aggregatedItems,
+            existingCategories: existing.existingCategories || [],
+            existingTags: existing.existingTags || [],
+            initialCategories: allInitialCategories,
+            existingItems: existing.existingItems,
+        });
+
+        this.logger.log(
+            `[${directory.slug}] Directory data generation complete. Final metrics: ${JSON.stringify(metrics)}`,
+        );
+
+        context.finalItems = finalItems;
+        context.finalCategories = categories;
+        context.finalTags = tags;
+
+        return context;
     }
 
     /**

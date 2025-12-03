@@ -2,6 +2,12 @@ import { Injectable, Logger } from '@nestjs/common';
 import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
 import { z } from 'zod';
 import { AiService, BaseChatModel } from 'src/ai';
+import {
+    IPipelineStep,
+    GenerationContext,
+} from '../interfaces/pipeline.interface';
+import { ItemsGeneratorStep } from '../constants/steps';
+import { GenerationMethod } from '../dto';
 
 // Prompt processing prompt
 const PROMPT_PROCESSING_PROMPT = `
@@ -93,12 +99,94 @@ const promptProcessingOutputSchema = z.object({
 });
 
 @Injectable()
-export class PromptProcessingService {
+export class PromptProcessingService implements IPipelineStep {
     private readonly logger = new Logger(PromptProcessingService.name);
     private llm: BaseChatModel;
 
+    public readonly name = ItemsGeneratorStep.PROMPT_PROCESSING;
+
     constructor(private readonly aiService: AiService) {
         this.llm = this.aiService.createLlmWithTemperature(0.0);
+    }
+
+    async run(context: GenerationContext): Promise<GenerationContext> {
+        const { dto, existing, directory } = context;
+        const { source_urls } = dto;
+
+        this.logger.log(
+            `[${directory.slug}] Prompt Processing (URLs, Categories, Priorities, and Featured Hints) - Starting`,
+        );
+
+        const {
+            extractedUrls: extractedUrlsFromPrompt,
+            suggestedCategories,
+            priorityCategories: promptPriorityCategories,
+            featuredItemHints,
+            rewrittenPrompt: prompt,
+        } = await this.processPrompt(directory.slug, dto.prompt);
+
+        const allPriorityCategories = [
+            ...(dto.priority_categories || []),
+            ...promptPriorityCategories,
+        ].filter((category, index, arr) => arr.indexOf(category) === index);
+
+        const allInitialCategories = [
+            ...(dto.initial_categories || []),
+            ...suggestedCategories,
+            ...allPriorityCategories,
+        ].filter((category, index, arr) => arr.indexOf(category) === index);
+
+        if (allInitialCategories.length > 0) {
+            this.logger.log(
+                `[${directory.slug}] Found ${allInitialCategories.length} initial categories: ${allInitialCategories.join(', ')}`,
+            );
+        }
+
+        if (allPriorityCategories.length > 0) {
+            this.logger.log(
+                `[${directory.slug}] Found ${allPriorityCategories.length} priority categories: ${allPriorityCategories.join(', ')}`,
+            );
+        }
+
+        if (featuredItemHints.length > 0) {
+            this.logger.log(
+                `[${directory.slug}] Found ${featuredItemHints.length} featured item hints: ${featuredItemHints.join(', ')}`,
+            );
+        }
+
+        this.logger.log(`[${directory.slug}] Rewritten prompt: "${prompt}"`);
+
+        // Update DTO with rewritten prompt
+        dto.prompt = prompt;
+
+        // Merge extracted URLs
+        let extractedUrls = extractedUrlsFromPrompt;
+        extractedUrls.push(...(source_urls || []));
+
+        const $configMetadata = existing.existingConfig?.metadata || {};
+
+        // Remove urls from extractedUrls or source_urls that was processed in previous runs
+        if (
+            dto.generation_method === GenerationMethod.CREATE_UPDATE &&
+            ($configMetadata.last_request_data?.prompt ||
+                $configMetadata.last_request_data?.source_urls?.length)
+        ) {
+            const last_request_data = $configMetadata.last_request_data;
+            extractedUrls = extractedUrls.filter((url) => {
+                const $source_urls = last_request_data.source_urls || [];
+                const $prompt = last_request_data.prompt || '';
+                return !$source_urls.includes(url) && !$prompt.includes(url);
+            });
+        }
+
+        // Update context
+        context.dto = dto; // prompt is updated
+        context.extractedUrls = extractedUrls;
+        context.allInitialCategories = allInitialCategories;
+        context.allPriorityCategories = allPriorityCategories;
+        context.featuredItemHints = featuredItemHints;
+
+        return context;
     }
 
     /**

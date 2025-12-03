@@ -1,6 +1,7 @@
 {
     "compilerOptions": {
-        "module": "Node16",
+        "module": "NodeNext",
+        "moduleResolution": "NodeNext",
         "declaration": true,
         "removeComments": true,
         "emitDecoratorMetadata": true,
@@ -18,8 +19,14 @@
         "forceConsistentCasingInFileNames": false,
         "noFallthroughCasesInSwitch": false,
         "paths": {
-            "@src/*": ["./src/*"]
+            "@src/*": [
+                "./src/*"
+            ]
         }
     },
-    "exclude": ["examples/**/*", "dist/**/*", "**/*.d.ts"]
+    "exclude": [
+        "examples/**/*",
+        "dist/**/*",
+        "**/*.d.ts"
+    ]
 }

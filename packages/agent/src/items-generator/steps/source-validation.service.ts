@@ -5,6 +5,11 @@ import { z } from 'zod';
 import { ItemData, ConfigDto } from '../dto';
 import { AiService, BaseChatModel } from 'src/ai';
 import { SearchService } from '../shared';
+import {
+    IPipelineStep,
+    GenerationContext,
+} from '../interfaces/pipeline.interface';
+import { ItemsGeneratorStep } from '../constants/steps';
 
 // Schema for AI URL validation response
 const urlValidationSchema = z.object({
@@ -67,15 +72,29 @@ Prefer official sources in this order:
 `;
 
 @Injectable()
-export class SourceValidationService {
+export class SourceValidationService implements IPipelineStep {
     private readonly logger = new Logger(SourceValidationService.name);
     private llm: BaseChatModel;
+
+    public readonly name = ItemsGeneratorStep.SOURCES_VALIDATION;
 
     constructor(
         private readonly searchService: SearchService,
         private readonly aiService: AiService,
     ) {
         this.llm = this.aiService.createLlmWithTemperature(0.1); // Low temperature for consistent analysis
+    }
+
+    async run(context: GenerationContext): Promise<GenerationContext> {
+        const { directory, finalItems } = context;
+
+        this.logger.log(`[${directory.slug}] Filter and Validate Source URLs - Starting`);
+
+        const validatedItems = await this.filterAndValidateSourceItems(directory.slug, finalItems);
+
+        context.finalItems = validatedItems;
+
+        return context;
     }
 
     async filterAndValidateSourceItems(
