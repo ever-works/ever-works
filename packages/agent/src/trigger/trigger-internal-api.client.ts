@@ -49,6 +49,21 @@ export class TriggerInternalApiClient {
         });
     }
 
+    async setCacheEntry(key: string, value: any, ttl?: number): Promise<void> {
+        await this.request<void>({
+            method: 'POST',
+            path: `/cache`,
+            body: { key, value, ttl },
+        });
+    }
+
+    async getCacheEntry<T>(key: string): Promise<T | undefined> {
+        return this.request<T | undefined>({
+            method: 'GET',
+            path: `/cache?key=${encodeURIComponent(key)}`,
+        });
+    }
+
     private async request<T>({
         method,
         path,

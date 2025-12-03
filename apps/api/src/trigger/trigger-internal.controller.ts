@@ -15,6 +15,7 @@ import { config } from '@packages/agent/config';
 import { DirectoryRepository } from '@packages/agent/database';
 import { Directory } from '@packages/agent/entities';
 import { DirectoryCommandDto } from './dto/directory-command.dto';
+import { CACHE_MANAGER, Cache } from '@packages/agent/cache';
 import {
     DIRECTORY_OPERATIONS,
     DirectoryOperations,
@@ -22,6 +23,7 @@ import {
 } from '@packages/agent/directory-operations';
 import { DirectoryCommandAction, DirectoryCommandPayloads } from '@packages/agent/trigger';
 import { SkipThrottle } from '@nestjs/throttler';
+import { CacheDto } from './dto/cache.dto';
 
 type DirectoryContextResponse = {
     directory: Directory;
@@ -50,6 +52,7 @@ export class TriggerInternalController {
         private readonly directoryRepository: DirectoryRepository,
         @Inject(DIRECTORY_OPERATIONS)
         private readonly directoryOperations: DirectoryOperations,
+        @Inject(CACHE_MANAGER) private cacheManager: Cache,
     ) {}
 
     @Get('directories/:id/context')
@@ -106,6 +109,36 @@ export class TriggerInternalController {
         });
 
         return { status: 'ok' };
+    }
+
+    @Post('cache')
+    @Public()
+    async setCache(@Headers('x-trigger-secret') secret: string, @Body() body: CacheDto) {
+        this.ensureSecret(secret);
+
+        const { key, value, ttl } = body;
+
+        if (!key) {
+            throw new BadRequestException('Missing cache key');
+        }
+
+        await this.cacheManager.set(key, value, ttl);
+
+        return { status: 'ok' };
+    }
+
+    @Get('cache')
+    @Public()
+    async getCache(@Headers('x-trigger-secret') secret: string, @Query('key') key: string) {
+        this.ensureSecret(secret);
+
+        if (!key) {
+            throw new BadRequestException('Missing cache key');
+        }
+
+        const value = await this.cacheManager.get(key);
+
+        return { key, value };
     }
 
     private ensureSecret(secret?: string) {

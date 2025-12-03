@@ -1,7 +1,7 @@
 import { Logger, Injectable, Inject } from '@nestjs/common';
 import { IPipelineStep, GenerationContext } from '../interfaces/pipeline.interface';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { Cache } from 'cache-manager';
+import type { Cache } from 'cache-manager';
 import type { Directory } from '@src/entities';
 
 // Serializable version of GenerationContext (without methods or complex objects like Directory)

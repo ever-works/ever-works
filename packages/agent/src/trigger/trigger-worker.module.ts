@@ -10,6 +10,7 @@ import { GitModule } from '@src/git/git.module';
 import { TriggerGenerationOrchestrator } from './trigger-generation.orchestrator';
 import { DirectoryModule } from '@src/services';
 import { EventEmitterModule } from '@nestjs/event-emitter';
+import { TriggerCacheFactory } from './cache/cache.factory';
 
 @Module({
     imports: [
@@ -17,6 +18,7 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
         GitModule,
         DirectoryModule,
         EventEmitterModule.forRoot(),
+        TriggerCacheFactory.register({ isGlobal: true }),
     ],
     providers: [
         TriggerInternalApiClient,
