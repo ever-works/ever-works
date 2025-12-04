@@ -1,14 +1,19 @@
-import { DirectoryConfig } from "./api";
+import { DirectoryConfig } from './api';
 
 // Site Configuration - Multi-tenant support via environment variables
 export const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME || process.env.APP_NAME || 'Ever Works';
-export const COMPANY_OWNER = process.env.NEXT_PUBLIC_COMPANY_OWNER || process.env.COMPANY_OWNER || 'Ever Co. LTD';
-export const COMPANY_OWNER_WEBSITE = process.env.NEXT_PUBLIC_COMPANY_OWNER_WEBSITE || process.env.COMPANY_OWNER_WEBSITE || 'https://ever.works';
+export const COMPANY_OWNER =
+    process.env.NEXT_PUBLIC_COMPANY_OWNER || process.env.COMPANY_OWNER || 'Ever Co. LTD';
+export const COMPANY_OWNER_WEBSITE =
+    process.env.NEXT_PUBLIC_COMPANY_OWNER_WEBSITE ||
+    process.env.COMPANY_OWNER_WEBSITE ||
+    'https://ever.works';
 
 // i18n
 export const LOCALES = ['en', 'ar', 'de', 'es', 'fr', 'zh'] as const;
 
-export const DEFAULT_LOCALE = (process.env.NEXT_PUBLIC_DEFAULT_LOCALE ||'en') as (typeof LOCALES)[number];
+export const DEFAULT_LOCALE = (process.env.NEXT_PUBLIC_DEFAULT_LOCALE ||
+    'en') as (typeof LOCALES)[number];
 
 // API URL
 const apiUrl = process.env.API_URL || 'http://localhost:3100';
@@ -99,8 +104,6 @@ export const PUBLIC_ROUTES = [
     '/help',
 ] as const;
 
-
-
 // Site Configuration - can be merged with directory config from config.yml
 export const getSiteConfig = (config?: DirectoryConfig | null) => {
     const name = config?.company_name || APP_NAME;
@@ -117,13 +120,22 @@ export const getSiteConfig = (config?: DirectoryConfig | null) => {
             dark: config?.logo?.dark || process.env.NEXT_PUBLIC_LOGO_DARK || '/logo-ever-work.png',
         },
         favicon: {
-            light: config?.favicon?.light || process.env.NEXT_PUBLIC_FAVICON_LIGHT || '/favicon-light.png',
-            dark: config?.favicon?.dark || process.env.NEXT_PUBLIC_FAVICON_DARK || '/favicon-dark.png',
+            light:
+                config?.favicon?.light ||
+                process.env.NEXT_PUBLIC_FAVICON_LIGHT ||
+                '/favicon-light.png',
+            dark:
+                config?.favicon?.dark ||
+                process.env.NEXT_PUBLIC_FAVICON_DARK ||
+                '/favicon-dark.png',
         },
         title: config?.title || process.env.NEXT_PUBLIC_SITE_TITLE || name,
         description:
-            config?.description || process.env.NEXT_PUBLIC_SITE_DESCRIPTION || 'Build Directories with AI',
-        keywords: config?.keywords ||
+            config?.description ||
+            process.env.NEXT_PUBLIC_SITE_DESCRIPTION ||
+            'Build Directories with AI',
+        keywords:
+            config?.keywords ||
             (process.env.NEXT_PUBLIC_SITE_KEYWORDS
                 ? process.env.NEXT_PUBLIC_SITE_KEYWORDS.split(',').map((k) => k.trim())
                 : ['Ever Works', 'Directories', 'AI', 'Automation', 'Productivity', 'Workflow']),

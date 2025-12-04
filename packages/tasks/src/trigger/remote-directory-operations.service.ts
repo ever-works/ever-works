@@ -1,6 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { Directory } from '@packages/agent/entities';
-import type { DirectoryOperations, GenerationHistoryUpdateInput } from '@packages/agent/directory-operations';
+import type {
+    DirectoryOperations,
+    GenerationHistoryUpdateInput,
+} from '@packages/agent/directory-operations';
 import { DirectoryCommandAction, DirectoryCommandPayloads } from '@packages/agent/tasks';
 import { TriggerInternalApiClient } from './trigger-internal-api.client';
 

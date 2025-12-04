@@ -2,10 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
 import { z } from 'zod';
 import { AiService, BaseChatModel } from 'src/ai';
-import {
-    IPipelineStep,
-    GenerationContext,
-} from '../interfaces/pipeline.interface';
+import { IPipelineStep, GenerationContext } from '../interfaces/pipeline.interface';
 import { ItemsGeneratorStep } from '../constants/steps';
 import { GenerationMethod } from '../dto';
 

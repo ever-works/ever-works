@@ -49,7 +49,7 @@ This document explains how our automated directory refresh feature works. It cov
     - Dispatches the Trigger.dev task or performs in-process generation if Trigger.dev is disabled/unavailable.
     - **Sequential Fallback**: When Trigger.dev is unavailable, scheduled runs execute sequentially in-process to prevent resource exhaustion.
     - Calls back into `DirectoryScheduleService.markRunCompleted()` or `.markRunFailed()` when the run finishes.
-    - **Drift Prevention**: Calculates next run time based on the *scheduled* time, not completion time.
+    - **Drift Prevention**: Calculates next run time based on the _scheduled_ time, not completion time.
 
 ### Trigger.dev + Fallback Cron
 

@@ -50,6 +50,9 @@ export interface SubmitItemDto {
     featured?: boolean;
     pay_and_publish_now?: boolean;
     slug?: string;
+    brand?: string;
+    brand_logo_url?: string;
+    images?: string[];
 }
 
 export interface RemoveItemDto {

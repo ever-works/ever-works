@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
 import { z } from 'zod';
-import { ItemData, Category, Tag, CreateItemsGeneratorDto } from '../dto';
+import { ItemData, Category, Tag, CreateItemsGeneratorDto, Brand } from '../dto';
 import { slugifyText, unSlugifyText } from '../utils/text.utils';
 import { AiService, BaseChatModel } from 'src/ai';
 import { itemDataWithCategoriesAndTagsSchema } from '../schemas/item-extraction.schemas';
@@ -27,7 +27,9 @@ You are directory website builder and your task is to Categorize the given items
 11. Maintain consistency with existing categories and tags
 12. Override any existing item category if it doesn't match the primary task context
 13. The featured field should remain the same as in the original item
-14. Please give careful consideration to the rules outlined in the <additional_rules> section below (if available).
+14. Preserve the original brand when provided (at most one per item) and keep any brand_logo_url if already set. Do not invent brands when the source is unclear.
+15. Preserve any item images array; do not discard valid URLs.
+16. Please give careful consideration to the rules outlined in the <additional_rules> section below (if available).
 </rules>
 
 ${additionalContext || ''}
@@ -55,6 +57,7 @@ type CategoryProcessingParams = {
     existingCategories: Category[];
     existingTags: Tag[];
     existingItems: ItemData[];
+    existingBrands?: Brand[];
 };
 
 @Injectable()
@@ -88,7 +91,7 @@ export class CategoryProcessingService implements IPipelineStep {
             priority_categories: allPriorityCategories,
         };
 
-        const { categories, tags, finalItems } = await this.processCategoriesAndTags({
+        const { categories, tags, brands, finalItems } = await this.processCategoriesAndTags({
             directorySlug: directory.slug,
             createItemsGeneratorDto: dtoWithMergedPriorities,
             extractedItems: aggregatedItems,
@@ -96,6 +99,7 @@ export class CategoryProcessingService implements IPipelineStep {
             existingTags: existing.existingTags || [],
             initialCategories: allInitialCategories,
             existingItems: existing.existingItems,
+            existingBrands: existing.existingBrands,
         });
 
         this.logger.log(
@@ -105,6 +109,7 @@ export class CategoryProcessingService implements IPipelineStep {
         context.finalItems = finalItems;
         context.finalCategories = categories;
         context.finalTags = tags;
+        context.finalBrands = brands;
 
         return context;
     }
@@ -125,6 +130,7 @@ export class CategoryProcessingService implements IPipelineStep {
         existingTags,
         initialCategories = [],
         existingItems,
+        existingBrands = [],
     }: CategoryProcessingParams) {
         const { prompt, priority_categories = [] } = createItemsGeneratorDto;
 
@@ -137,7 +143,7 @@ export class CategoryProcessingService implements IPipelineStep {
 
         if (!extractedItems || extractedItems.length === 0) {
             this.logger.log(`[${directorySlug}] No items to categorize`);
-            return { finalItems: [], categories: [], tags: [] };
+            return { finalItems: [], categories: [], tags: [], brands: [] };
         }
 
         // Convert existing categories and tags to sets for easy lookup
@@ -182,6 +188,7 @@ export class CategoryProcessingService implements IPipelineStep {
             // Extract unique categories and tags
             const categories = this.extractUniqueCategories(categorized, priority_categories);
             const tags = this.extractUniqueTags(categorized);
+            const brands = this.extractUniqueBrands(categorized, existingBrands);
 
             // Convert to final format
             const finalItems = categorized.map((item) => this.toItemData(item));
@@ -192,7 +199,7 @@ export class CategoryProcessingService implements IPipelineStep {
                 `[${directorySlug}] Category processing complete in ${processingTime.toFixed(2)}s. Found ${categories.length} categories and ${tags.length} tags.`,
             );
 
-            return { finalItems, categories, tags };
+            return { finalItems, categories, tags, brands };
         } catch (error) {
             this.logger.error(
                 `[${directorySlug}] Error during category processing: ${error.message}`,
@@ -212,6 +219,7 @@ export class CategoryProcessingService implements IPipelineStep {
                 finalItems,
                 categories: [defaultCategory],
                 tags: [],
+                brands: [],
             };
         }
     }
@@ -514,6 +522,65 @@ export class CategoryProcessingService implements IPipelineStep {
     }
 
     /**
+     * Extract unique brands from categorized items and merge with existing brands when possible
+     */
+    private extractUniqueBrands(items: ItemData[], existingBrands: Brand[] = []): Brand[] {
+        const existingByName = new Map(
+            existingBrands.map((brand) => [brand.name.toLowerCase(), brand] as const),
+        );
+
+        const brandCandidates: Brand[] = [];
+
+        items.forEach((item) => {
+            const brandName =
+                typeof item.brand === 'string'
+                    ? item.brand
+                    : typeof item.brand?.name === 'string'
+                      ? item.brand.name
+                      : null;
+
+            if (!brandName) {
+                return;
+            }
+
+            const normalized = brandName.trim();
+            const existing = existingByName.get(normalized.toLowerCase());
+
+            const brand_logo_url =
+                item.brand && typeof item.brand === 'object'
+                    ? item.brand.logo_url
+                    : item.brand_logo_url || undefined;
+
+            if (existing) {
+                // Preserve existing id/logo when we already have the brand
+                brandCandidates.push({
+                    ...existing,
+                    logo_url: existing.logo_url || brand_logo_url || existing.logo_url,
+                });
+                return;
+            }
+
+            brandCandidates.push({
+                id: slugifyText(normalized),
+                name: normalized,
+                logo_url: brand_logo_url || undefined,
+            });
+        });
+
+        // Deduplicate by id/name
+        const unique = new Map<string, Brand>();
+        brandCandidates.forEach((brand) => {
+            const key = brand.name.toLowerCase();
+            const existing = unique.get(key);
+            if (!existing || (!existing.logo_url && brand.logo_url)) {
+                unique.set(key, brand);
+            }
+        });
+
+        return Array.from(unique.values());
+    }
+
+    /**
      * Map an array of names to unique identifiable objects
      * @param names Array of names
      */
@@ -574,6 +641,18 @@ export class CategoryProcessingService implements IPipelineStep {
      * @param item Partial item data
      */
     private toItemData(item: Partial<ItemData>): ItemData {
+        const brandName =
+            typeof item.brand === 'string'
+                ? item.brand
+                : typeof item.brand?.name === 'string'
+                  ? item.brand.name
+                  : undefined;
+        const brandSlug = brandName ? slugifyText(brandName) : undefined;
+        const brandLogoUrl =
+            (item.brand && typeof item.brand === 'object' && item.brand.logo_url) ||
+            item.brand_logo_url ||
+            undefined;
+
         return {
             ...(item as ItemData),
             category: slugifyText(item.category as string),
@@ -581,6 +660,8 @@ export class CategoryProcessingService implements IPipelineStep {
                 ? item.tags.map((tag: any) => slugifyText(typeof tag === 'string' ? tag : tag.name))
                 : [],
             slug: item.slug || slugifyText(item.name),
+            brand: brandSlug,
+            brand_logo_url: brandLogoUrl || null,
         };
     }
 }

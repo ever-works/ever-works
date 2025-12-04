@@ -4,10 +4,7 @@ import { ConfigDto } from '../dto/create-items-generator.dto';
 import { WebPageData, RelevanceAssessment } from '../interfaces/items-generator.interfaces';
 import { AiService, BaseChatModel } from 'src/ai';
 import z from 'zod';
-import {
-    IPipelineStep,
-    GenerationContext,
-} from '../interfaces/pipeline.interface';
+import { IPipelineStep, GenerationContext } from '../interfaces/pipeline.interface';
 import { ItemsGeneratorStep } from '../constants/steps';
 
 const relevanceSchema = z.object({

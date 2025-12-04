@@ -49,7 +49,10 @@ export function DropdownMenuContent({
 }: DropdownMenuContentProps) {
     const alignmentClasses = {
         start: side === 'bottom' ? 'origin-top-left left-0' : 'origin-bottom-left left-0',
-        center: side === 'bottom' ? 'origin-top left-1/2 -translate-x-1/2' : 'origin-bottom left-1/2 -translate-x-1/2',
+        center:
+            side === 'bottom'
+                ? 'origin-top left-1/2 -translate-x-1/2'
+                : 'origin-bottom left-1/2 -translate-x-1/2',
         end: side === 'bottom' ? 'origin-top-right right-0' : 'origin-bottom-right right-0',
     };
 

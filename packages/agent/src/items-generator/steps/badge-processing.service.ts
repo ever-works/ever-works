@@ -1,10 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ItemData } from '../dto/item-data.dto';
 import { BadgeEvaluationService } from '../shared/badge-evaluation.service';
-import {
-    IPipelineStep,
-    GenerationContext,
-} from '../interfaces/pipeline.interface';
+import { IPipelineStep, GenerationContext } from '../interfaces/pipeline.interface';
 import { ItemsGeneratorStep } from '../constants/steps';
 
 @Injectable()

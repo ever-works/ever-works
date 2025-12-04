@@ -37,6 +37,9 @@ export const AddItemModal = memo(function AddItemModal({
         featured: false,
         pay_and_publish_now: true,
         slug: '',
+        brand: '',
+        brand_logo_url: '',
+        images: [],
     });
 
     const handleSubmit = useCallback(
@@ -60,6 +63,9 @@ export const AddItemModal = memo(function AddItemModal({
                         slug:
                             formData.slug ||
                             formData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+                        brand: formData.brand || undefined,
+                        brand_logo_url: formData.brand_logo_url || undefined,
+                        images: formData.images.length > 0 ? formData.images : undefined,
                     };
 
                     const result = await addItem(directoryId, submitData);
@@ -79,6 +85,9 @@ export const AddItemModal = memo(function AddItemModal({
                             featured: false,
                             pay_and_publish_now: true,
                             slug: '',
+                            brand: '',
+                            brand_logo_url: '',
+                            images: [],
                         });
                     } else {
                         toast.error(result.message || t('failed'));

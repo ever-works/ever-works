@@ -7,10 +7,7 @@ import {
     NewItemsExtractorService,
     AiDeduplicatorService,
 } from './data-aggregation';
-import {
-    IPipelineStep,
-    GenerationContext,
-} from '../interfaces/pipeline.interface';
+import { IPipelineStep, GenerationContext } from '../interfaces/pipeline.interface';
 import { ItemsGeneratorStep } from '../constants/steps';
 
 type DataAggregationParams = {

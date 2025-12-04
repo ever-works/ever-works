@@ -5,10 +5,7 @@ import { z } from 'zod';
 import { ItemData, ConfigDto } from '../dto';
 import { AiService, BaseChatModel } from 'src/ai';
 import { SearchService } from '../shared';
-import {
-    IPipelineStep,
-    GenerationContext,
-} from '../interfaces/pipeline.interface';
+import { IPipelineStep, GenerationContext } from '../interfaces/pipeline.interface';
 import { ItemsGeneratorStep } from '../constants/steps';
 
 // Schema for AI URL validation response

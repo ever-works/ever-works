@@ -1,5 +1,12 @@
 import { Directory } from '../../entities';
-import { CreateItemsGeneratorDto, ItemData, Category, Tag, ItemsGeneratorMetrics } from '../dto';
+import {
+    CreateItemsGeneratorDto,
+    ItemData,
+    Category,
+    Tag,
+    ItemsGeneratorMetrics,
+    Brand,
+} from '../dto';
 import { ExistingItems } from '../items-generator.service';
 import { WebPageData } from './items-generator.interfaces';
 
@@ -25,6 +32,7 @@ export interface GenerationContext {
     finalItems: ItemData[];
     finalCategories: Category[];
     finalTags: Tag[];
+    finalBrands: Brand[];
 
     metrics: ItemsGeneratorMetrics;
 

@@ -6,56 +6,64 @@ import { directoryGenerationTask } from '../tasks/trigger/directory-generation.t
 
 @Injectable()
 export class TriggerService implements DirectoryGenerationDispatcher {
-	private readonly logger = new Logger(TriggerService.name);
-	private configured = false;
+    private readonly logger = new Logger(TriggerService.name);
+    private configured = false;
 
-	private supportedMachines = ['medium-1x', 'micro', 'small-1x', 'small-2x', 'medium-2x', 'large-1x', 'large-2x'];
+    private supportedMachines = [
+        'medium-1x',
+        'micro',
+        'small-1x',
+        'small-2x',
+        'medium-2x',
+        'large-1x',
+        'large-2x',
+    ];
 
-	private ensureConfigured(): boolean {
-		if (!config.trigger.shouldUseTrigger()) {
-			return false;
-		}
+    private ensureConfigured(): boolean {
+        if (!config.trigger.shouldUseTrigger()) {
+            return false;
+        }
 
-		if (this.configured) {
-			return true;
-		}
+        if (this.configured) {
+            return true;
+        }
 
-		const accessToken = config.trigger.getSecretKey();
-		const baseURL = config.trigger.getApiUrl();
+        const accessToken = config.trigger.getSecretKey();
+        const baseURL = config.trigger.getApiUrl();
 
-		if (!accessToken) {
-			this.logger.warn('TRIGGER_SECRET_KEY is not configured');
-			return false;
-		}
+        if (!accessToken) {
+            this.logger.warn('TRIGGER_SECRET_KEY is not configured');
+            return false;
+        }
 
-		configure({ accessToken, baseURL });
-		this.configured = true;
-		return true;
-	}
+        configure({ accessToken, baseURL });
+        this.configured = true;
+        return true;
+    }
 
-	private machine() {
-		if (this.supportedMachines.includes(config.trigger.getMachine())) {
-			return config.trigger.getMachine();
-		}
+    private machine() {
+        if (this.supportedMachines.includes(config.trigger.getMachine())) {
+            return config.trigger.getMachine();
+        }
 
-		return undefined;
-	}
+        return undefined;
+    }
 
-	async dispatchDirectoryGeneration(payload: DirectoryGenerationPayload): Promise<boolean> {
-		if (!this.ensureConfigured()) {
-			return false;
-		}
+    async dispatchDirectoryGeneration(payload: DirectoryGenerationPayload): Promise<boolean> {
+        if (!this.ensureConfigured()) {
+            return false;
+        }
 
-		try {
-			await directoryGenerationTask.trigger(payload, {
-				tags: ['directory-generation', payload.mode, payload.directoryId],
-				machine: this.machine() as any
-			});
+        try {
+            await directoryGenerationTask.trigger(payload, {
+                tags: ['directory-generation', payload.mode, payload.directoryId],
+                machine: this.machine() as any,
+            });
 
-			return true;
-		} catch (error) {
-			this.logger.error('Failed to dispatch directory-generation task', error as Error);
-			return false;
-		}
-	}
+            return true;
+        } catch (error) {
+            this.logger.error('Failed to dispatch directory-generation task', error as Error);
+            return false;
+        }
+    }
 }

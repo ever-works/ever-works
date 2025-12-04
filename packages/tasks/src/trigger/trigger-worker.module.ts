@@ -13,25 +13,25 @@ import { TriggerGenerationOrchestrator } from './trigger-generation.orchestrator
 import { TriggerCacheFactory } from './cache/cache.factory';
 
 @Module({
-	imports: [
-		TriggerItemsGeneratorModule,
-		GitModule,
-		DirectoryModule,
-		EventEmitterModule.forRoot(),
-		TriggerInternalModule,
-		TriggerCacheFactory.register({ isGlobal: true })
-	],
-	providers: [
-		RemoteDirectoryOperationsService,
-		{
-			provide: DIRECTORY_OPERATIONS,
-			useExisting: RemoteDirectoryOperationsService
-		},
-		DataGeneratorService,
-		MarkdownGeneratorService,
-		WebsiteGeneratorService,
-		TriggerGenerationOrchestrator
-	],
-	exports: [TriggerGenerationOrchestrator, TriggerInternalModule]
+    imports: [
+        TriggerItemsGeneratorModule,
+        GitModule,
+        DirectoryModule,
+        EventEmitterModule.forRoot(),
+        TriggerInternalModule,
+        TriggerCacheFactory.register({ isGlobal: true }),
+    ],
+    providers: [
+        RemoteDirectoryOperationsService,
+        {
+            provide: DIRECTORY_OPERATIONS,
+            useExisting: RemoteDirectoryOperationsService,
+        },
+        DataGeneratorService,
+        MarkdownGeneratorService,
+        WebsiteGeneratorService,
+        TriggerGenerationOrchestrator,
+    ],
+    exports: [TriggerGenerationOrchestrator, TriggerInternalModule],
 })
 export class TriggerWorkerModule {}

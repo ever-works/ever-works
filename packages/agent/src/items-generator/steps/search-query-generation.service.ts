@@ -4,10 +4,7 @@ import { StringOutputParser } from '@langchain/core/output_parsers';
 import { formatDate } from 'date-fns';
 import { CreateItemsGeneratorDto } from '../dto/create-items-generator.dto';
 import { AiService, BaseChatModel } from 'src/ai';
-import {
-    IPipelineStep,
-    GenerationContext,
-} from '../interfaces/pipeline.interface';
+import { IPipelineStep, GenerationContext } from '../interfaces/pipeline.interface';
 import { ItemsGeneratorStep } from '../constants/steps';
 
 @Injectable()

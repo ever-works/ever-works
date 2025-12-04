@@ -45,6 +45,8 @@ Exclude any invalid or irrelevant content, and align the findings with the topic
 - Ensure the source_url is for the item itself, not an article *about* the item
 - Featured items are those that match the specifications provided in the "Featured Item Specifications" section above.
 - Do not use URLs for blog posts merely mentioning the item unless the post *is* the primary resource
+- Each item can have at most ONE brand; include it when the item clearly belongs to a product line/company and set brand_logo_url when a canonical logo is available.
+- Provide multiple high-quality image URLs (screenshots, product imagery) when present on the source; prefer official domains and skip low-quality or unrelated images.
 </extraction_criteria>
 
 <web_page_content>

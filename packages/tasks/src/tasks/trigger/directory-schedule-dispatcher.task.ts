@@ -8,23 +8,23 @@ const interval = Math.max(1, config.subscriptions.getDispatchIntervalMinutes());
 const cronExpression = `*/${interval} * * * *`;
 
 export const directoryScheduleDispatcherTask = schedules.task({
-	id: 'directory-schedule-dispatcher',
-	cron: cronExpression,
-	run: async () => {
-		const appContext = await NestFactory.createApplicationContext(TriggerWorkerModule, {
-			logger: ['error', 'fatal', 'warn']
-		});
+    id: 'directory-schedule-dispatcher',
+    cron: cronExpression,
+    run: async () => {
+        const appContext = await NestFactory.createApplicationContext(TriggerWorkerModule, {
+            logger: ['error', 'fatal', 'warn'],
+        });
 
-		try {
-			const dispatcher = appContext.get(DirectoryScheduleDispatcherService);
-			const dispatched = await dispatcher.dispatchDue();
+        try {
+            const dispatcher = appContext.get(DirectoryScheduleDispatcherService);
+            const dispatched = await dispatcher.dispatchDue();
 
-			return {
-				dispatched,
-				intervalMinutes: interval
-			};
-		} finally {
-			await appContext.close();
-		}
-	}
+            return {
+                dispatched,
+                intervalMinutes: interval,
+            };
+        } finally {
+            await appContext.close();
+        }
+    },
 });

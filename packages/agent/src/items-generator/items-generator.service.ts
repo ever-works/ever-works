@@ -14,7 +14,7 @@ import {
     PromptComparisonService,
     BadgeProcessingService,
 } from './steps';
-import { Category, ItemData, Tag } from './dto';
+import { Category, ItemData, Tag, Brand } from './dto';
 import { IDataConfig } from '../data-generator/data-repository';
 import { Directory } from '../entities';
 import { AiService } from '../ai';
@@ -26,6 +26,7 @@ export type ExistingItems = {
     existingItems?: ItemData[];
     existingCategories?: Category[];
     existingTags?: Tag[];
+    existingBrands?: Brand[];
     existingConfig?: IDataConfig;
 };
 
@@ -93,6 +94,7 @@ export class ItemsGeneratorService {
                 existing.existingItems = [];
                 existing.existingCategories = [];
                 existing.existingTags = [];
+                existing.existingBrands = [];
             }
 
             // Test AI configuration
@@ -129,6 +131,7 @@ export class ItemsGeneratorService {
                         ]),
                     ),
                 };
+                context.finalBrands = checkpoint.context.finalBrands || [];
             } else {
                 if (checkpoint) {
                     this.logger.warn(
@@ -151,6 +154,7 @@ export class ItemsGeneratorService {
                     finalItems: [],
                     finalCategories: [],
                     finalTags: [],
+                    finalBrands: [],
                     metrics: {
                         urls_scanned: 0,
                         pages_processed: 0,
@@ -175,6 +179,7 @@ export class ItemsGeneratorService {
                 items: finalContext.finalItems,
                 categories: finalContext.finalCategories,
                 tags: finalContext.finalTags,
+                brands: finalContext.finalBrands,
                 metrics: finalContext.metrics,
                 contentCache: finalContext.contentCache,
             };

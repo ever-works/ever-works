@@ -140,8 +140,6 @@ export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
                     </div>
                 </div>
             </div>
-
-       
         </div>
     );
 }
