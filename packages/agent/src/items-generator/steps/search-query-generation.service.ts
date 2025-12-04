@@ -4,14 +4,31 @@ import { StringOutputParser } from '@langchain/core/output_parsers';
 import { formatDate } from 'date-fns';
 import { CreateItemsGeneratorDto } from '../dto/create-items-generator.dto';
 import { AiService, BaseChatModel } from 'src/ai';
+import { IPipelineStep, GenerationContext } from '../interfaces/pipeline.interface';
+import { ItemsGeneratorStep } from '../constants/steps';
 
 @Injectable()
-export class SearchQueryGenerationService {
+export class SearchQueryGenerationService implements IPipelineStep {
     private readonly logger = new Logger(SearchQueryGenerationService.name);
     private llm: BaseChatModel;
 
+    public readonly name = ItemsGeneratorStep.SEARCH_QUERIES_GENERATION;
+
     constructor(private readonly aiService: AiService) {
         this.llm = this.aiService.getLlm();
+    }
+
+    async run(context: GenerationContext): Promise<GenerationContext> {
+        const { dto, directory } = context;
+
+        this.logger.log(`[${directory.slug}] AI-Powered Search Query Generation - Starting`);
+
+        const searchQueries = await this.generateSearchQueries(dto);
+        this.logger.log(`[${directory.slug}] Generated ${searchQueries.length} search queries.`);
+
+        context.searchQueries = searchQueries;
+
+        return context;
     }
 
     async generateSearchQueries(

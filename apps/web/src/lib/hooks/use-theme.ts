@@ -39,7 +39,7 @@ export function useTheme(): UseThemeReturn {
         const storedTheme = localStorage.getItem(THEME_STORAGE_KEY) as Theme | null;
         const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
         const initialTheme = storedTheme || (prefersDark ? 'dark' : 'light');
-        
+
         setTheme(initialTheme);
         applyTheme(initialTheme);
     }, []);
@@ -58,4 +58,3 @@ export function useTheme(): UseThemeReturn {
         mounted,
     };
 }
-

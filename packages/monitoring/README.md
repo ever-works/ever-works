@@ -220,17 +220,17 @@ export class UserService {
         try {
             // Your business logic
             const result = await this.userRepository.find(userId);
-            
+
             // Log success
             this.sentry.debug('User found', { userId, resultId: result.id });
-            
+
             return result;
         } catch (error) {
             // Log error with context
-            this.sentry.error('Failed to process user', { 
-                userId, 
+            this.sentry.error('Failed to process user', {
+                userId,
                 error: error.message,
-                stack: error.stack 
+                stack: error.stack,
             });
             throw error;
         }
@@ -239,7 +239,7 @@ export class UserService {
     // You can also use the logger directly for more control
     async advancedLogging() {
         const logger = this.sentry.getLogger();
-        
+
         logger.trace('Detailed trace information', { step: 'initialization' });
         logger.debug('Debug information', { state: 'processing' });
         logger.info('User action completed', { action: 'login' });
@@ -469,6 +469,7 @@ Returns the Sentry logger instance for direct access to logging methods.
 Logs a trace-level message.
 
 **Parameters:**
+
 - `message`: Log message
 - `context`: Optional context data
 
@@ -477,6 +478,7 @@ Logs a trace-level message.
 Logs a debug-level message.
 
 **Parameters:**
+
 - `message`: Log message
 - `context`: Optional context data
 
@@ -485,6 +487,7 @@ Logs a debug-level message.
 Logs an info-level message.
 
 **Parameters:**
+
 - `message`: Log message
 - `context`: Optional context data
 
@@ -493,6 +496,7 @@ Logs an info-level message.
 Logs a warning-level message.
 
 **Parameters:**
+
 - `message`: Log message
 - `context`: Optional context data
 
@@ -501,6 +505,7 @@ Logs a warning-level message.
 Logs an error-level message.
 
 **Parameters:**
+
 - `message`: Log message
 - `context`: Optional context data
 
@@ -509,6 +514,7 @@ Logs an error-level message.
 Logs a fatal-level message.
 
 **Parameters:**
+
 - `message`: Log message
 - `context`: Optional context data
 
@@ -517,6 +523,7 @@ Logs a fatal-level message.
 Captures an exception and sends it to Sentry.
 
 **Parameters:**
+
 - `exception`: The exception to capture
 - `context`: Optional context data (tags, extra, etc.)
 
@@ -525,6 +532,7 @@ Captures an exception and sends it to Sentry.
 Captures a message and sends it to Sentry.
 
 **Parameters:**
+
 - `message`: The message to capture
 - `level`: Optional severity level
 - `context`: Optional context data
@@ -534,6 +542,7 @@ Captures a message and sends it to Sentry.
 Sets the user context for Sentry events.
 
 **Parameters:**
+
 - `user`: User information object
 
 #### `setContext(name: string, context: Record<string, any>)`
@@ -541,6 +550,7 @@ Sets the user context for Sentry events.
 Sets additional context for Sentry events.
 
 **Parameters:**
+
 - `name`: Context name
 - `context`: Context data
 
@@ -549,6 +559,7 @@ Sets additional context for Sentry events.
 Sets a tag for Sentry events.
 
 **Parameters:**
+
 - `key`: Tag key
 - `value`: Tag value
 
@@ -557,6 +568,7 @@ Sets a tag for Sentry events.
 Sets multiple tags for Sentry events.
 
 **Parameters:**
+
 - `tags`: Object with tag key-value pairs
 
 #### `isInitialized(): boolean`

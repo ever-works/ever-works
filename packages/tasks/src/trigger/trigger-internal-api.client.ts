@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { config } from '@src/config';
-import { Directory } from '@src/entities/directory.entity';
-import { DirectoryCommand, DirectoryCommandAction } from './directory-command.types';
+import { config } from '@packages/agent/config';
+import { Directory } from '@packages/agent/entities';
+import { DirectoryCommand, DirectoryCommandAction } from '@packages/agent/tasks';
 
 type DirectoryContextResponse = {
     directory: Directory;
@@ -47,6 +47,23 @@ export class TriggerInternalApiClient {
             path: `/directories/${directoryId}/commands`,
             body: command,
         });
+    }
+
+    async setCacheEntry(key: string, value: any, ttl?: number): Promise<void> {
+        await this.request<void>({
+            method: 'POST',
+            path: `/cache`,
+            body: { key, value, ttl },
+        });
+    }
+
+    async getCacheEntry<T>(key: string): Promise<T | undefined> {
+        const response = await this.request<{ key: string; value: T | undefined }>({
+            method: 'GET',
+            path: `/cache?key=${encodeURIComponent(key)}`,
+        });
+
+        return response?.value;
     }
 
     private async request<T>({

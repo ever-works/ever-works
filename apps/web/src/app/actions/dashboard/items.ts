@@ -107,6 +107,11 @@ export async function extractItemDetails(sourceUrl: string, existingCategories?:
             typeof tag === 'string' ? tag : tag.name,
         );
 
+        const normalizedBrand =
+            typeof response.item.brand === 'string'
+                ? response.item.brand
+                : response.item.brand?.name;
+
         return {
             success: true,
             data: {
@@ -114,6 +119,9 @@ export async function extractItemDetails(sourceUrl: string, existingCategories?:
                 description: response.item.description,
                 category: normalizedCategory,
                 tags: normalizedTags,
+                brand: normalizedBrand,
+                brand_logo_url: response.item.brand_logo_url || undefined,
+                images: response.item.images || [],
             },
             message: response.message,
         };

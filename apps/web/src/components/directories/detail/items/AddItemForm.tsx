@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback, memo, Dispatch, SetStateAction } from 'react';
+import { useState, useCallback, memo, Dispatch, SetStateAction, KeyboardEvent } from 'react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
@@ -20,6 +20,9 @@ export interface ItemFormData {
     featured: boolean;
     pay_and_publish_now: boolean;
     slug: string;
+    brand: string;
+    brand_logo_url: string;
+    images: string[];
 }
 
 interface AddItemFormProps {
@@ -42,6 +45,7 @@ export const AddItemForm = memo(function AddItemForm({
     const t = useTranslations('dashboard.directoryDetail.items.addModal');
     const [isExtracting, setIsExtracting] = useState(false);
     const [tagInput, setTagInput] = useState('');
+    const [imageInput, setImageInput] = useState('');
 
     const isValidHttpUrl = useCallback((value: string) => {
         try {
@@ -82,6 +86,12 @@ export const AddItemForm = memo(function AddItemForm({
                                 ? result.data.tags
                                 : prev.tags,
                         category: shouldUpdateCategory ? result.data.category! : prev.category,
+                        brand: result.data.brand || prev.brand,
+                        brand_logo_url: result.data.brand_logo_url || prev.brand_logo_url,
+                        images:
+                            result.data.images && result.data.images.length > 0
+                                ? result.data.images
+                                : prev.images,
                     };
                 });
                 toast.success(result.message || t('extractSuccess'));
@@ -110,6 +120,27 @@ export const AddItemForm = memo(function AddItemForm({
         setFormData({
             ...formData,
             tags: formData.tags.filter((t) => t !== tag),
+        });
+    };
+
+    const handleAddImage = () => {
+        if (imageInput.trim() && isValidHttpUrl(imageInput.trim())) {
+            if (!formData.images.includes(imageInput.trim())) {
+                setFormData({
+                    ...formData,
+                    images: [...formData.images, imageInput.trim()],
+                });
+            }
+            setImageInput('');
+        } else if (imageInput.trim()) {
+            toast.error(t('errors.invalidImageUrl'));
+        }
+    };
+
+    const handleRemoveImage = (url: string) => {
+        setFormData({
+            ...formData,
+            images: formData.images.filter((img) => img !== url),
         });
     };
 
@@ -222,6 +253,38 @@ export const AddItemForm = memo(function AddItemForm({
                 <p className="text-xs text-text-muted dark:text-text-muted-dark">{t('slugHelp')}</p>
             </div>
 
+            {/* Brand (optional) */}
+            <Input
+                label={t('brand')}
+                type="text"
+                value={formData.brand}
+                onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
+                placeholder={t('brandPlaceholder')}
+                variant="form"
+                disabled={isPending}
+            />
+
+            {/* Brand Logo URL (optional) */}
+            <Input
+                label={t('brandLogoUrl')}
+                type="url"
+                value={formData.brand_logo_url}
+                onChange={(e) => setFormData({ ...formData, brand_logo_url: e.target.value })}
+                placeholder={t('brandLogoUrlPlaceholder')}
+                variant="form"
+                disabled={isPending}
+            />
+
+            {/* Images (optional) */}
+            <ImagesField
+                images={formData.images}
+                imageInput={imageInput}
+                setImageInput={setImageInput}
+                onAddImage={handleAddImage}
+                onRemoveImage={handleRemoveImage}
+                isPending={isPending}
+            />
+
             {/* Options */}
             <div className="space-y-3">
                 <Checkbox
@@ -273,7 +336,12 @@ const TagsField = memo(function TagsField({
                     type="text"
                     value={tagInput}
                     onChange={(e) => setTagInput(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), onAddTag())}
+                    onKeyDown={(e: KeyboardEvent) => {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            onAddTag();
+                        }
+                    }}
                     placeholder={t('tagPlaceholder')}
                     variant="form"
                     className="flex-1"
@@ -304,6 +372,83 @@ const TagsField = memo(function TagsField({
                                 type="button"
                                 onClick={() => onRemoveTag(tag)}
                                 className="hover:opacity-70"
+                            >
+                                <X className="w-3 h-3" />
+                            </button>
+                        </span>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+});
+
+interface ImagesFieldProps {
+    images: string[];
+    imageInput: string;
+    setImageInput: (value: string) => void;
+    onAddImage: () => void;
+    onRemoveImage: (url: string) => void;
+    isPending: boolean;
+}
+
+const ImagesField = memo(function ImagesField({
+    images,
+    imageInput,
+    setImageInput,
+    onAddImage,
+    onRemoveImage,
+    isPending,
+}: ImagesFieldProps) {
+    const t = useTranslations('dashboard.directoryDetail.items.addModal');
+
+    return (
+        <div className="space-y-2">
+            <label className="text-sm font-medium text-text dark:text-text-dark">
+                {t('images')}
+            </label>
+            <div className="flex gap-2">
+                <Input
+                    type="url"
+                    value={imageInput}
+                    onChange={(e) => setImageInput(e.target.value)}
+                    onKeyDown={(e: KeyboardEvent) => {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            onAddImage();
+                        }
+                    }}
+                    placeholder={t('imagePlaceholder')}
+                    variant="form"
+                    className="flex-1"
+                    disabled={isPending}
+                />
+                <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={onAddImage}
+                    disabled={isPending || !imageInput.trim()}
+                >
+                    <Plus className="w-4 h-4" />
+                </Button>
+            </div>
+            <p className="text-xs text-text-muted dark:text-text-muted-dark">{t('imagesHelp')}</p>
+            {images.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-2">
+                    {images.map((url) => (
+                        <span
+                            key={url}
+                            className={cn(
+                                'inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs max-w-[200px]',
+                                'bg-surface-secondary dark:bg-surface-secondary-dark',
+                                'text-text dark:text-text-dark',
+                            )}
+                        >
+                            <span className="truncate">{url}</span>
+                            <button
+                                type="button"
+                                onClick={() => onRemoveImage(url)}
+                                className="hover:opacity-70 shrink-0"
                             >
                                 <X className="w-3 h-3" />
                             </button>

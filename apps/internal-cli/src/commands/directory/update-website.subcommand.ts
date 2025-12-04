@@ -1,5 +1,4 @@
 import { SubCommand, CommandRunner } from 'nest-commander';
-import { Logger } from '@nestjs/common';
 import chalk from 'chalk';
 import ora from 'ora';
 import inquirer from 'inquirer';
@@ -14,8 +13,6 @@ import { handleCliError } from './error';
     description: 'Update the website repository for a directory',
 })
 export class UpdateWebsiteSubCommand extends CommandRunner {
-    private readonly logger = new Logger(UpdateWebsiteSubCommand.name);
-
     constructor(
         private readonly directoryRepository: DirectoryRepository,
         private readonly directoryPrompt: DirectoryPromptService,

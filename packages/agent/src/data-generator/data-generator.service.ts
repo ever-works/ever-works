@@ -96,7 +96,12 @@ export class DataGeneratorService {
             };
         }
 
-        const { categories: newCategories, items: newItems, tags: newTags } = generatedItems;
+        const {
+            categories: newCategories,
+            items: newItems,
+            tags: newTags,
+            contentCache,
+        } = generatedItems;
         const { existingCategories, existingTags } = existingData;
 
         this.logger.debug(
@@ -154,36 +159,46 @@ export class DataGeneratorService {
         try {
             // Ensure directories exist
             await data.ensureDirectoriesExist();
+            await data.ensureDefaultConfig();
 
             // Name of the new branch if we are in update mode
             let newBranchName: string | null = null;
 
-            const createOrUpdate =
-                createItemsGeneratorDto.generation_method === GenerationMethod.CREATE_UPDATE;
+            const isRecreate =
+                createItemsGeneratorDto.generation_method === GenerationMethod.RECREATE;
 
-            const update_with_pull_request = createItemsGeneratorDto.update_with_pull_request;
+            const isUpdate =
+                createItemsGeneratorDto.generation_method === GenerationMethod.CREATE_UPDATE;
+            const shouldCreatePR = createItemsGeneratorDto.update_with_pull_request;
 
             const defaultBranch = await this.githubService.getMainBranch(dest).catch((err) => {
                 this.logger.error('Failed to get main branch', err);
                 return null;
             });
 
-            // In case of re-creation:
-            // Switch to the main branch and remove existing items files.
-            if (createItemsGeneratorDto.generation_method === GenerationMethod.RECREATE) {
-                this.logger.log('Recreating repository, clearing existing files');
-
-                // just to make sure we're recreating from main
+            // Determine branching strategy
+            if (shouldCreatePR && (isRecreate || (existed && isUpdate))) {
+                // Ensure we are on main before creating a new branch
                 await this.githubService.switchToMainBranch(dest).catch((err) => {
                     this.logger.error('Failed to switch to main branch', err);
                     return null;
                 });
 
-                await data.resetFiles();
-            } else if (existed && createOrUpdate && update_with_pull_request) {
-                // In case of update, we want to create a new branch and switch to it
                 newBranchName = await this.githubService.createAndSwitchToRandomBranch(dest);
                 this.logger.log(`Created and switched to new branch: ${newBranchName}`);
+            } else if (isRecreate) {
+                // If Recreate and NO PR, switch to main
+                this.logger.log('Recreating repository on main branch');
+                await this.githubService.switchToMainBranch(dest).catch((err) => {
+                    this.logger.error('Failed to switch to main branch', err);
+                    return null;
+                });
+            }
+
+            // Clear files if we are recreating
+            if (isRecreate) {
+                this.logger.log('Recreating repository, clearing existing files');
+                await data.resetFiles();
             }
 
             const promises = [
@@ -260,8 +275,10 @@ export class DataGeneratorService {
             this.logger.log(`Processing ${newItems.length} items...`);
             this.onGenerationProgress(ItemsGeneratorStep.ITEMS_PROCESSING, directory);
 
-            const itemsWithMarkdown =
-                await this.itemsGeneratorService.generateMarkdownForItems(newItems);
+            const itemsWithMarkdown = await this.itemsGeneratorService.generateMarkdownForItems(
+                newItems,
+                contentCache,
+            );
 
             const existingSlugSet = new Set(
                 (existingData.existingItems || []).map((item) =>
@@ -272,6 +289,7 @@ export class DataGeneratorService {
             let newItemsCount = 0;
             let updatedItemsCount = 0;
 
+            // Write all items to disk (without committing individually)
             for (const item of itemsWithMarkdown) {
                 item.slug = slugifyText(item.slug || item.name);
                 if (existingSlugSet.has(item.slug)) {
@@ -279,9 +297,22 @@ export class DataGeneratorService {
                 } else {
                     newItemsCount++;
                 }
-                await this.processItem(data, item, user).catch((err) => {
-                    this.logger.error('Failed to process item', err);
+                await this.writeItemToDisk(data, item).catch((err) => {
+                    this.logger.error('Failed to write item', err);
                 });
+            }
+
+            // Batch commit all items at once
+            if (itemsWithMarkdown.length > 0) {
+                await this.githubService.addAll(data.dir);
+                const commitMessage =
+                    newItemsCount > 0
+                        ? `add ${newItemsCount} new item${newItemsCount > 1 ? 's' : ''}${updatedItemsCount > 0 ? `, update ${updatedItemsCount}` : ''}`
+                        : `update ${updatedItemsCount} item${updatedItemsCount > 1 ? 's' : ''}`;
+
+                await this.githubService.commit(data.dir, commitMessage, user.asCommitter());
+
+                this.logger.log(`Batch committed ${itemsWithMarkdown.length} items`);
             }
 
             // Push changes
@@ -303,7 +334,7 @@ export class DataGeneratorService {
             let prUpdate: PRUpdate | null = null;
 
             // create PR if we are in update mode and branch was created
-            if (newBranchName && defaultBranch && createOrUpdate) {
+            if (newBranchName && defaultBranch) {
                 const pr = await this.githubService.createPR(
                     {
                         owner: directory.getRepoOwner(),
@@ -529,8 +560,8 @@ export class DataGeneratorService {
         }
     }
 
-    private async processItem(data: DataRepository, item: ItemData, user: User) {
-        this.logger.debug(`processItem: Starting for item ${item.name} (slug: ${item.slug})`);
+    private async writeItemToDisk(data: DataRepository, item: ItemData) {
+        this.logger.debug(`writeItemToDisk: Writing item ${item.name} (slug: ${item.slug})`);
 
         await data.createItemDir(item);
         const promises = [data.writeItem(item)];
@@ -543,10 +574,6 @@ export class DataGeneratorService {
         promises.push(data.writeItemMarkdown(item, `${md}`));
 
         await Promise.all(promises);
-        await this.githubService.add(data.dir, '.');
-        await this.githubService.commit(data.dir, `add ${item.name}`, user.asCommitter());
-
-        this.logger.log(`processItem: Committed item ${item.name} (slug: ${item.slug})`);
     }
 
     private getPRDetails(directory: Directory) {

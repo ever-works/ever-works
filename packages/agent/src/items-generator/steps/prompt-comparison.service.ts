@@ -2,6 +2,9 @@ import { Injectable, Logger } from '@nestjs/common';
 import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
 import { z } from 'zod';
 import { AiService, BaseChatModel } from 'src/ai';
+import { IPipelineStep, GenerationContext } from '../interfaces/pipeline.interface';
+import { ItemsGeneratorStep } from '../constants/steps';
+import { GenerationMethod } from '../dto';
 
 // Prompt comparison prompt
 const PROMPT_COMPARISON_PROMPT = `
@@ -52,13 +55,62 @@ const promptComparisonOutputSchema = z.object({
 export type PromptComparisonResult = z.infer<typeof promptComparisonOutputSchema>;
 
 @Injectable()
-export class PromptComparisonService {
+export class PromptComparisonService implements IPipelineStep {
     private readonly logger = new Logger(PromptComparisonService.name);
     private llm: BaseChatModel;
+
+    public readonly name = ItemsGeneratorStep.PROMPT_COMPARISON;
 
     constructor(private readonly aiService: AiService) {
         // Use low temperature for consistent comparison results
         this.llm = this.aiService.createLlmWithTemperature(0.1);
+    }
+
+    async run(context: GenerationContext): Promise<GenerationContext> {
+        const { dto, existing, directory } = context;
+        const { config } = dto;
+
+        const $configMetadata = existing.existingConfig?.metadata || {};
+
+        if (
+            $configMetadata?.initial_prompt &&
+            dto.generation_method === GenerationMethod.CREATE_UPDATE &&
+            existing.existingItems &&
+            existing.existingItems.length > 0
+        ) {
+            this.logger.log(`[${directory.slug}] Prompt Comparison - Starting`);
+
+            const comparisonResult = await this.comparePrompts(
+                directory.slug,
+                $configMetadata.initial_prompt,
+                dto.prompt,
+            );
+
+            const confidence = comparisonResult.confidence;
+            const confidenceThreshold = config.prompt_comparison_confidence_threshold || 0.5;
+
+            const areRelated =
+                comparisonResult.areRelated && comparisonResult.confidence > confidenceThreshold;
+
+            this.logger.log(
+                `[${directory.slug}] Prompt comparison: ${comparisonResult.areRelated ? 'RELATED' : 'UNRELATED'} ` +
+                    `(confidence: ${confidence.toFixed(2)})`,
+            );
+
+            // If prompts are not related, throw an error
+            // Preventing data inconsistency
+            if (!areRelated) {
+                throw new Error(
+                    `Prompt comparison failed. Prompts are not related. Confidence: ${confidence.toFixed(
+                        2,
+                    )}`,
+                );
+            }
+        } else {
+            this.logger.debug(`[${directory.slug}] Prompt Comparison - Skipped`);
+        }
+
+        return context;
     }
 
     /**

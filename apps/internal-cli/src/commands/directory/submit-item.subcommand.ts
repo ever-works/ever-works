@@ -1,5 +1,4 @@
 import { SubCommand, CommandRunner } from 'nest-commander';
-import { Logger } from '@nestjs/common';
 import chalk from 'chalk';
 import ora from 'ora';
 import inquirer from 'inquirer';
@@ -14,8 +13,6 @@ import { handleCliError } from './error';
     description: 'Submit an item to a directory',
 })
 export class SubmitItemSubCommand extends CommandRunner {
-    private readonly logger = new Logger(SubmitItemSubCommand.name);
-
     constructor(
         private readonly directoryRepository: DirectoryRepository,
         private readonly directoryPrompt: DirectoryPromptService,
@@ -51,15 +48,24 @@ export class SubmitItemSubCommand extends CommandRunner {
             // Show confirmation
             console.log(chalk.cyan('\n--- Item Submission Summary ---'));
             console.log(chalk.gray('Directory:'), chalk.white(directory.slug));
-            console.log(chalk.gray('Item Name:'), chalk.white(itemData.name));
+            console.log(chalk.gray('Name:'), chalk.white(itemData.name));
             console.log(chalk.gray('Source URL:'), chalk.white(itemData.source_url));
             console.log(chalk.gray('Category:'), chalk.white(itemData.category));
-            if (itemData.tags && itemData.tags.length > 0) {
+            if (itemData.tags?.length) {
                 console.log(chalk.gray('Tags:'), chalk.white(itemData.tags.join(', ')));
+            }
+            if (itemData.brand) {
+                console.log(chalk.gray('Brand:'), chalk.white(itemData.brand));
+            }
+            if (itemData.brand_logo_url) {
+                console.log(chalk.gray('Brand Logo:'), chalk.white(itemData.brand_logo_url));
+            }
+            if (itemData.images?.length) {
+                console.log(chalk.gray('Images:'), chalk.white(itemData.images.join(', ')));
             }
             console.log(chalk.gray('Featured:'), chalk.white(itemData.featured ? 'Yes' : 'No'));
             console.log(
-                chalk.gray('Push to main without PR:'),
+                chalk.gray('Push to main:'),
                 chalk.white(itemData.pay_and_publish_now ? 'Yes' : 'No'),
             );
 
@@ -122,8 +128,7 @@ export class SubmitItemSubCommand extends CommandRunner {
     private async promptItemDetails() {
         console.log(chalk.cyan('\n--- Item Details ---'));
 
-        // Required fields
-        const { name } = await inquirer.prompt([
+        const answers = await inquirer.prompt([
             {
                 type: 'input',
                 name: 'name',
@@ -134,9 +139,6 @@ export class SubmitItemSubCommand extends CommandRunner {
                     return true;
                 },
             },
-        ]);
-
-        const { description } = await inquirer.prompt([
             {
                 type: 'input',
                 name: 'description',
@@ -147,9 +149,6 @@ export class SubmitItemSubCommand extends CommandRunner {
                     return true;
                 },
             },
-        ]);
-
-        const { source_url } = await inquirer.prompt([
             {
                 type: 'input',
                 name: 'source_url',
@@ -164,59 +163,57 @@ export class SubmitItemSubCommand extends CommandRunner {
                     }
                 },
             },
-        ]);
-
-        const { category } = await inquirer.prompt([
             {
                 type: 'input',
                 name: 'category',
                 message: 'Category:',
-                validate: (input) => {
-                    if (!input.trim()) return 'Category is required';
-                    return true;
-                },
+                validate: (input) => (input.trim() ? true : 'Category is required'),
             },
-        ]);
-
-        // Optional fields
-        const { tags } = await inquirer.prompt([
             {
                 type: 'input',
                 name: 'tags',
                 message: 'Tags (comma-separated, optional):',
-                filter: (input: string) => {
-                    if (!input.trim()) return [];
-                    return input
-                        .split(',')
-                        .map((tag: string) => tag.trim())
-                        .filter((tag: string) => tag.length > 0);
+            },
+            {
+                type: 'input',
+                name: 'brand',
+                message: 'Brand (optional):',
+            },
+            {
+                type: 'input',
+                name: 'brand_logo_url',
+                message: 'Brand logo URL (optional):',
+                validate: (input) => {
+                    if (!input.trim()) return true;
+                    try {
+                        new URL(input);
+                        return true;
+                    } catch {
+                        return 'Please enter a valid URL';
+                    }
                 },
             },
-        ]);
-
-        const { featured } = await inquirer.prompt([
+            {
+                type: 'input',
+                name: 'images',
+                message: 'Image URLs (comma-separated, optional):',
+            },
             {
                 type: 'confirm',
                 name: 'featured',
                 message: 'Mark as featured?',
                 default: false,
             },
-        ]);
-
-        const { pay_and_publish_now } = await inquirer.prompt([
             {
                 type: 'confirm',
                 name: 'pay_and_publish_now',
-                message: 'Pay and publish now?',
+                message: 'Push to main without PR?',
                 default: true,
             },
-        ]);
-
-        const { slug } = await inquirer.prompt([
             {
                 type: 'input',
                 name: 'slug',
-                message: 'Custom slug (optional, will be auto-generated if empty):',
+                message: 'Custom slug (optional):',
                 validate: (input) => {
                     if (input && !/^[a-z0-9-]+$/.test(input)) {
                         return 'Slug must contain only lowercase letters, numbers, and hyphens';
@@ -226,15 +223,27 @@ export class SubmitItemSubCommand extends CommandRunner {
             },
         ]);
 
+        const parseCommaSeparated = (input: string): string[] | undefined => {
+            if (!input?.trim()) return undefined;
+            const items = input
+                .split(',')
+                .map((s) => s.trim())
+                .filter(Boolean);
+            return items.length > 0 ? items : undefined;
+        };
+
         return {
-            name,
-            description,
-            source_url,
-            category,
-            tags: tags.length > 0 ? tags : undefined,
-            featured,
-            pay_and_publish_now,
-            slug: slug.trim() || undefined,
+            name: answers.name,
+            description: answers.description,
+            source_url: answers.source_url,
+            category: answers.category,
+            tags: parseCommaSeparated(answers.tags),
+            brand: answers.brand?.trim() || undefined,
+            brand_logo_url: answers.brand_logo_url?.trim() || undefined,
+            images: parseCommaSeparated(answers.images),
+            featured: answers.featured,
+            pay_and_publish_now: answers.pay_and_publish_now,
+            slug: answers.slug?.trim() || undefined,
         };
     }
 }

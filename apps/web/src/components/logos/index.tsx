@@ -19,8 +19,6 @@ export function LogoEverWork({
     priority = true,
     config: configProps,
 }: LogoEverWorkProps) {
-  
-
     const siteConfig = getSiteConfig(configProps);
     const logoHref = siteConfig.website || '/';
 

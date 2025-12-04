@@ -5,6 +5,7 @@ import { ApiModule } from './api.module';
 import helmet from 'helmet';
 import { initSentry, initPostHog } from '@packages/monitoring';
 import * as path from 'path';
+import { json, urlencoded } from 'express';
 
 async function bootstrap() {
     // Load environment variables from .env file
@@ -15,6 +16,10 @@ async function bootstrap() {
     initPostHog();
 
     const app = await NestFactory.create(ApiModule);
+
+    // Increase body-parser limit for large payloads
+    app.use(json({ limit: '10mb' }));
+    app.use(urlencoded({ limit: '10mb', extended: true }));
 
     // Security configurations
     app.use(helmet());

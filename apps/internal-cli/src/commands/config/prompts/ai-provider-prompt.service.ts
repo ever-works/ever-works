@@ -441,7 +441,7 @@ export class AiProviderPromptService extends BasePromptService {
             ollama: 'Examples: llama3.1, codellama, mistral, qwen2.5, deepseek-coder',
             mistral: 'Examples: mistral-large-latest, mistral-small-latest, codestral-latest',
             deepseek: 'Examples: deepseek-chat, deepseek-coder, deepseek-reasoner',
-            groq: 'Examples: llama-3.1-70b-versatile, mixtral-8x7b-32768, gemma2-9b-it',
+            groq: 'Examples: openai/gpt-oss-120b, mixtral-8x7b-32768, gemma2-9b-it',
         };
 
         return examples[providerName] || 'Enter the exact model name as specified by the provider';

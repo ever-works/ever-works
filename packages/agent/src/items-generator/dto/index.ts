@@ -11,3 +11,4 @@ export * from './extract-item-details.dto';
 export * from './extract-item-details-response.dto';
 export * from './badge.dto';
 export * from './delete-items-generator.dto';
+export * from './brand.dto';

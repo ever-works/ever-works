@@ -94,6 +94,7 @@ export class SetupSubCommand extends CommandRunner {
             // 1. GitHub & Git Configuration
             const githubGitConfig =
                 await this.githubGitPrompt.promptGitHubGitConfig(existingConfig);
+
             config.GH_APIKEY = githubGitConfig.githubApiKey;
             config.GH_OWNER = githubGitConfig.githubOwner;
             config.GIT_NAME = githubGitConfig.gitName;
@@ -102,6 +103,7 @@ export class SetupSubCommand extends CommandRunner {
             // 2. Deployment Provider Configuration
             const deploymentConfig =
                 await this.deploymentPrompt.promptDeploymentConfig(existingConfig);
+
             if (deploymentConfig.provider === 'vercel' && deploymentConfig.vercelToken) {
                 config.VERCEL_TOKEN = deploymentConfig.vercelToken;
             }
@@ -109,6 +111,7 @@ export class SetupSubCommand extends CommandRunner {
             // 3. AI Provider Configuration
             const aiConfig =
                 await this.aiProviderPrompt.promptAiProviderConfiguration(existingConfig);
+
             if (aiConfig.defaultProvider && aiConfig.defaultProvider !== 'ignore') {
                 config.AI_DEFAULT_PROVIDER = aiConfig.defaultProvider;
                 config.AI_FALLBACK_PROVIDERS = aiConfig.fallbackProviders.join(',');

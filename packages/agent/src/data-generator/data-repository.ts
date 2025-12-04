@@ -14,6 +14,45 @@ export type PRUpdate = {
     url?: string;
 };
 
+export interface SettingsHeaderConfig {
+    submit_enabled?: boolean;
+    pricing_enabled?: boolean;
+    layout_enabled?: boolean;
+    language_enabled?: boolean;
+    theme_enabled?: boolean;
+    layout_default?: string;
+    pagination_default?: string;
+    theme_default?: string;
+}
+
+export interface SettingsHomepageConfig {
+    hero_enabled?: boolean;
+    search_enabled?: boolean;
+    default_view?: string;
+    default_sort?: string;
+}
+
+export interface SettingsFooterConfig {
+    subscribe_enabled?: boolean;
+    version_enabled?: boolean;
+    theme_selector_enabled?: boolean;
+}
+
+export interface SettingsConfig {
+    categories_enabled?: boolean;
+    companies_enabled?: boolean;
+    tags_enabled?: boolean;
+    surveys_enabled?: boolean;
+    header?: SettingsHeaderConfig;
+    homepage?: SettingsHomepageConfig;
+    footer?: SettingsFooterConfig;
+}
+
+export interface PaginationConfig {
+    type?: string;
+    itemsPerPage?: number;
+}
+
 export interface IDataConfig {
     company_name?: string;
     company_website?: string;
@@ -23,6 +62,8 @@ export interface IDataConfig {
     copyright_year?: number;
     paging_mode?: string;
     autoapproval?: boolean;
+    settings?: SettingsConfig;
+    pagination?: PaginationConfig;
     metadata?: {
         initial_prompt?: string;
         generation_method?: GenerationMethod;
@@ -31,6 +72,39 @@ export interface IDataConfig {
     } & (Record<string, any> & {});
 }
 
+const DEFAULT_SETTINGS: SettingsConfig = {
+    categories_enabled: true,
+    companies_enabled: true,
+    tags_enabled: true,
+    surveys_enabled: true,
+    header: {
+        submit_enabled: true,
+        pricing_enabled: true,
+        layout_enabled: true,
+        language_enabled: true,
+        theme_enabled: true,
+        layout_default: 'home1',
+        pagination_default: 'standard',
+        theme_default: 'light',
+    },
+    homepage: {
+        hero_enabled: true,
+        search_enabled: true,
+        default_view: 'classic',
+        default_sort: 'popularity',
+    },
+    footer: {
+        subscribe_enabled: true,
+        version_enabled: true,
+        theme_selector_enabled: true,
+    },
+};
+
+const DEFAULT_PAGINATION: PaginationConfig = {
+    type: 'standard',
+    itemsPerPage: 12,
+};
+
 const DEFAULT_DATA_CONFIG: IDataConfig = {
     company_name: 'Acme',
     content_table: true, // Previous value was false
@@ -38,7 +112,19 @@ const DEFAULT_DATA_CONFIG: IDataConfig = {
     items_name: 'Items',
     paging_mode: 'paging',
     copyright_year: new Date().getFullYear(),
+    settings: DEFAULT_SETTINGS,
+    pagination: DEFAULT_PAGINATION,
 };
+
+const createDefaultConfig = (overrides: Partial<IDataConfig> = {}): IDataConfig =>
+    deepmerge(
+        {
+            ...DEFAULT_DATA_CONFIG,
+            // ensure dynamic defaults (like year) are refreshed per call
+            copyright_year: new Date().getFullYear(),
+        },
+        overrides,
+    );
 
 export class DataRepository {
     private config?: IDataConfig;
@@ -117,13 +203,15 @@ export class DataRepository {
     }
 
     /**
-     * Remove all files except .git
+     * Remove all files except allowlisted ones
      * and ensure all needed directories exist
      */
     async resetFiles() {
         const files = await fs.readdir(this.dir);
+        const allowlist = ['.git', '.gitignore', '.github', '.vscode', '.env', '.nvmrc'];
+
         for (const file of files) {
-            if (file === '.git') {
+            if (allowlist.includes(file)) {
                 continue;
             }
 
@@ -151,8 +239,9 @@ export class DataRepository {
             return this.config;
         } catch (err) {
             if (err?.code === 'ENOENT') {
-                this.config = { ...DEFAULT_DATA_CONFIG }; // set some defaults if needed
-                return this.config;
+                const defaultConfig = createDefaultConfig();
+                await this.writeConfig(defaultConfig);
+                return defaultConfig;
             }
             throw err;
         }
@@ -263,6 +352,21 @@ export class DataRepository {
         await fs.writeFile(this.configPath, str, 'utf-8');
     }
 
+    /**
+     * Ensure a config.yml exists; if missing, create it with defaults merged with optional overrides.
+     */
+    async ensureDefaultConfig(overrides: Partial<IDataConfig> = {}): Promise<IDataConfig> {
+        const exists = await this.fileExists(this.configPath);
+
+        if (!exists) {
+            const defaultConfig = createDefaultConfig(overrides);
+            await this.writeConfig(defaultConfig);
+            return defaultConfig;
+        }
+
+        return this.getConfig();
+    }
+
     async writeCategories(categories: Category[]) {
         this.categories = categories;
         const str = yaml.stringify(categories);
@@ -342,6 +446,18 @@ export class DataRepository {
 
         try {
             await fs.access(itemPath);
+            return true;
+        } catch (err) {
+            if (err?.code === 'ENOENT') {
+                return false;
+            }
+            throw err;
+        }
+    }
+
+    private async fileExists(filePath: string): Promise<boolean> {
+        try {
+            await fs.access(filePath);
             return true;
         } catch (err) {
             if (err?.code === 'ENOENT') {

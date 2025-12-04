@@ -1,13 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { configure, tasks } from '@trigger.dev/sdk';
-import { config } from '@src/config';
-import {
-    DirectoryGenerationPayload,
-    directoryGenerationTask,
-} from '@src/tasks/trigger/directory-generation.task';
+import { configure } from '@trigger.dev/sdk';
+import { config } from '@packages/agent/config';
+import { DirectoryGenerationPayload, DirectoryGenerationDispatcher } from '@packages/agent/tasks';
+import { directoryGenerationTask } from '../tasks/trigger/directory-generation.task';
 
 @Injectable()
-export class TriggerService {
+export class TriggerService implements DirectoryGenerationDispatcher {
     private readonly logger = new Logger(TriggerService.name);
     private configured = false;
 

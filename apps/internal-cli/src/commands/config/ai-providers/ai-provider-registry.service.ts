@@ -146,13 +146,13 @@ export class AiProviderRegistryService {
             displayName: 'Groq',
             description: 'Fast inference with Groq',
             defaults: {
-                model: 'llama-3.1-70b-versatile',
+                model: 'openai/gpt-oss-120b',
                 temperature: 0.7,
                 maxTokens: 8192,
             },
             requiresApiKey: true,
             models: [
-                'llama-3.1-70b-versatile',
+                'openai/gpt-oss-120b',
                 'llama-3.1-8b-instant',
                 'mixtral-8x7b-32768',
                 'gemma-7b-it',
