@@ -159,6 +159,7 @@ export class DataGeneratorService {
         try {
             // Ensure directories exist
             await data.ensureDirectoriesExist();
+            await data.ensureDefaultConfig();
 
             // Name of the new branch if we are in update mode
             let newBranchName: string | null = null;
