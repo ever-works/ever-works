@@ -1,5 +1,4 @@
 import { SubCommand, CommandRunner } from 'nest-commander';
-import { Logger } from '@nestjs/common';
 import chalk from 'chalk';
 import ora from 'ora';
 import inquirer from 'inquirer';
@@ -14,8 +13,6 @@ import { handleCliError } from './error';
     description: 'Delete a directory and its GitHub repositories',
 })
 export class DeleteSubCommand extends CommandRunner {
-    private readonly logger = new Logger(DeleteSubCommand.name);
-
     constructor(
         private readonly directoryRepository: DirectoryRepository,
         private readonly directoryPrompt: DirectoryPromptService,
@@ -164,34 +161,25 @@ export class DeleteSubCommand extends CommandRunner {
     private async promptDeleteOptions() {
         console.log(chalk.cyan('\n--- Deletion Options ---'));
 
-        const { delete_data_repository } = await inquirer.prompt([
+        const answers = await inquirer.prompt([
             {
                 type: 'confirm',
                 name: 'delete_data_repository',
                 message: 'Delete data repository?',
                 default: true,
             },
-        ]);
-
-        const { delete_markdown_repository } = await inquirer.prompt([
             {
                 type: 'confirm',
                 name: 'delete_markdown_repository',
                 message: 'Delete markdown repository?',
                 default: true,
             },
-        ]);
-
-        const { delete_website_repository } = await inquirer.prompt([
             {
                 type: 'confirm',
                 name: 'delete_website_repository',
                 message: 'Delete website repository?',
                 default: true,
             },
-        ]);
-
-        const { reason } = await inquirer.prompt([
             {
                 type: 'input',
                 name: 'reason',
@@ -206,10 +194,10 @@ export class DeleteSubCommand extends CommandRunner {
         ]);
 
         return {
-            delete_data_repository,
-            delete_markdown_repository,
-            delete_website_repository,
-            reason: reason.trim() || undefined,
+            delete_data_repository: answers.delete_data_repository,
+            delete_markdown_repository: answers.delete_markdown_repository,
+            delete_website_repository: answers.delete_website_repository,
+            reason: answers.reason.trim() || undefined,
         };
     }
 }

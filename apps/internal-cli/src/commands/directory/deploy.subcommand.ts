@@ -133,16 +133,13 @@ export class DeploySubCommand extends CommandRunner {
         console.log(chalk.cyan('\n--- Deployment Options ---'));
         console.log(chalk.gray('Leave empty to use environment variables'));
 
-        const { VERCEL_TOKEN } = await inquirer.prompt([
+        const answers = await inquirer.prompt([
             {
                 type: 'password',
                 name: 'VERCEL_TOKEN',
                 message: 'Vercel Token (optional):',
                 mask: '*',
             },
-        ]);
-
-        const { GITHUB_TOKEN } = await inquirer.prompt([
             {
                 type: 'password',
                 name: 'GITHUB_TOKEN',
@@ -152,8 +149,8 @@ export class DeploySubCommand extends CommandRunner {
         ]);
 
         return {
-            VERCEL_TOKEN: VERCEL_TOKEN.trim() || undefined,
-            GITHUB_TOKEN: GITHUB_TOKEN.trim() || undefined,
+            VERCEL_TOKEN: answers.VERCEL_TOKEN.trim() || undefined,
+            GITHUB_TOKEN: answers.GITHUB_TOKEN.trim() || undefined,
         };
     }
 
