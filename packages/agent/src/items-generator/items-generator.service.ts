@@ -107,7 +107,10 @@ export class ItemsGeneratorService {
             // Attempt to load checkpoint
             const checkpoint = await this.pipelineExecutor.loadCheckpoint(directory);
 
-            if (checkpoint) {
+            // Validate checkpoint has required data before using it
+            const isValidCheckpoint = checkpoint && checkpoint.context && checkpoint.stepName;
+
+            if (isValidCheckpoint) {
                 this.logger.log(
                     `Found checkpoint for ${directorySlug}. Last completed step: ${checkpoint.stepName}`,
                 );
@@ -120,6 +123,11 @@ export class ItemsGeneratorService {
                     processedSourceUrls: new Set<string>(checkpoint.context.processedSourceUrls),
                 };
             } else {
+                if (checkpoint) {
+                    this.logger.warn(
+                        `Invalid checkpoint data for ${directorySlug}, starting fresh. Checkpoint: ${JSON.stringify(checkpoint).slice(0, 200)}`,
+                    );
+                }
                 // Initialize new Context if no checkpoint found
                 context = {
                     directory,

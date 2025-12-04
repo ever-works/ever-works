@@ -114,15 +114,19 @@ export class PipelineExecutor {
     }
 
     async loadCheckpoint(directory: Directory): Promise<CheckpointData | null> {
-        const checkpointKey = this.getCheckpointKey(directory);
-        const checkpointData = await this.cacheManager.get<CheckpointData>(checkpointKey);
-        if (checkpointData) {
-            this.logger.log(
-                `Loaded checkpoint for ${directory.slug} at step ${checkpointData.stepName}`,
-            );
-            return checkpointData;
+        try {
+            const checkpointKey = this.getCheckpointKey(directory);
+            const checkpointData = await this.cacheManager.get<CheckpointData>(checkpointKey);
+
+            if (checkpointData && checkpointData.stepName) {
+                return checkpointData;
+            }
+
+            return null;
+        } catch (err) {
+            this.logger.warn(`Failed to load checkpoint for ${directory.slug}: ${err.message}`);
+            return null;
         }
-        return null;
     }
 
     private getCheckpointKey(directory: Directory) {

@@ -58,10 +58,12 @@ export class TriggerInternalApiClient {
     }
 
     async getCacheEntry<T>(key: string): Promise<T | undefined> {
-        return this.request<T | undefined>({
+        const response = await this.request<{ key: string; value: T | undefined }>({
             method: 'GET',
             path: `/cache?key=${encodeURIComponent(key)}`,
         });
+
+        return response?.value;
     }
 
     private async request<T>({

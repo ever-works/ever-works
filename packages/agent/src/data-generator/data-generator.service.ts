@@ -281,6 +281,7 @@ export class DataGeneratorService {
             let newItemsCount = 0;
             let updatedItemsCount = 0;
 
+            // Write all items to disk (without committing individually)
             for (const item of itemsWithMarkdown) {
                 item.slug = slugifyText(item.slug || item.name);
                 if (existingSlugSet.has(item.slug)) {
@@ -288,9 +289,22 @@ export class DataGeneratorService {
                 } else {
                     newItemsCount++;
                 }
-                await this.processItem(data, item, user).catch((err) => {
-                    this.logger.error('Failed to process item', err);
+                await this.writeItemToDisk(data, item).catch((err) => {
+                    this.logger.error('Failed to write item', err);
                 });
+            }
+
+            // Batch commit all items at once
+            if (itemsWithMarkdown.length > 0) {
+                await this.githubService.addAll(data.dir);
+                const commitMessage =
+                    newItemsCount > 0
+                        ? `add ${newItemsCount} new item${newItemsCount > 1 ? 's' : ''}${updatedItemsCount > 0 ? `, update ${updatedItemsCount}` : ''}`
+                        : `update ${updatedItemsCount} item${updatedItemsCount > 1 ? 's' : ''}`;
+
+                await this.githubService.commit(data.dir, commitMessage, user.asCommitter());
+
+                this.logger.log(`Batch committed ${itemsWithMarkdown.length} items`);
             }
 
             // Push changes
@@ -538,8 +552,8 @@ export class DataGeneratorService {
         }
     }
 
-    private async processItem(data: DataRepository, item: ItemData, user: User) {
-        this.logger.debug(`processItem: Starting for item ${item.name} (slug: ${item.slug})`);
+    private async writeItemToDisk(data: DataRepository, item: ItemData) {
+        this.logger.debug(`writeItemToDisk: Writing item ${item.name} (slug: ${item.slug})`);
 
         await data.createItemDir(item);
         const promises = [data.writeItem(item)];
@@ -552,10 +566,6 @@ export class DataGeneratorService {
         promises.push(data.writeItemMarkdown(item, `${md}`));
 
         await Promise.all(promises);
-        await this.githubService.add(data.dir, '.');
-        await this.githubService.commit(data.dir, `add ${item.name}`, user.asCommitter());
-
-        this.logger.log(`processItem: Committed item ${item.name} (slug: ${item.slug})`);
     }
 
     private getPRDetails(directory: Directory) {
