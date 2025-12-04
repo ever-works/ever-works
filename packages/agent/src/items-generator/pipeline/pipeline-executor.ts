@@ -65,10 +65,9 @@ export class PipelineExecutor {
             );
         }
 
-        // If we finished the last step, we are done
+        // If the start index is beyond the last step, we start from the beginning
         if (startIndex >= totalSteps) {
-            this.logger.log(`Pipeline already completed (last step was ${resumeFromStepName}).`);
-            return currentContext;
+            startIndex = 0;
         }
 
         for (let i = startIndex; i < totalSteps; i++) {
