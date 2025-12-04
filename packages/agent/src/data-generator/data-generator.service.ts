@@ -96,7 +96,12 @@ export class DataGeneratorService {
             };
         }
 
-        const { categories: newCategories, items: newItems, tags: newTags } = generatedItems;
+        const {
+            categories: newCategories,
+            items: newItems,
+            tags: newTags,
+            contentCache,
+        } = generatedItems;
         const { existingCategories, existingTags } = existingData;
 
         this.logger.debug(
@@ -269,8 +274,10 @@ export class DataGeneratorService {
             this.logger.log(`Processing ${newItems.length} items...`);
             this.onGenerationProgress(ItemsGeneratorStep.ITEMS_PROCESSING, directory);
 
-            const itemsWithMarkdown =
-                await this.itemsGeneratorService.generateMarkdownForItems(newItems);
+            const itemsWithMarkdown = await this.itemsGeneratorService.generateMarkdownForItems(
+                newItems,
+                contentCache,
+            );
 
             const existingSlugSet = new Set(
                 (existingData.existingItems || []).map((item) =>

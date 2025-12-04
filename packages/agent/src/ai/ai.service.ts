@@ -12,6 +12,18 @@ import {
 } from './ai-provider.interface';
 import { config } from '@src/config';
 
+// Cache TTL for provider health checks (5 minutes)
+const HEALTH_CHECK_CACHE_TTL_MS = 5 * 60 * 1000;
+
+type HealthCheckResult = {
+    success: boolean;
+    provider: string;
+    model: string;
+    responseTime: number;
+    error?: string;
+    response?: string;
+};
+
 @Injectable()
 export class AiService {
     private readonly logger = new Logger(AiService.name);
@@ -19,6 +31,9 @@ export class AiService {
     private readonly providers: Map<AiProviderType, BaseChatModel> = new Map();
     private readonly isConfigured: boolean;
     private readonly isCLI: boolean;
+
+    // In-memory cache for health check results
+    private healthCheckCache: { result: HealthCheckResult; timestamp: number } | null = null;
 
     constructor() {
         this.isCLI = config.isCli();
@@ -566,18 +581,19 @@ export class AiService {
         }
     }
 
-    async testDefaultProvider(): Promise<{
-        success: boolean;
-        provider: string;
-        model: string;
-        responseTime: number;
-        error?: string;
-        response?: string;
-    }> {
+    async testDefaultProvider(forceRetest = false): Promise<HealthCheckResult> {
+        // Check in-memory cache first (unless force retest)
+        if (!forceRetest && this.healthCheckCache) {
+            const { result, timestamp } = this.healthCheckCache;
+            if (Date.now() - timestamp < HEALTH_CHECK_CACHE_TTL_MS) {
+                return result;
+            }
+        }
+
         const defaultProvider = this.config.defaultProvider;
         const providerConfig = this.config.providers[defaultProvider];
 
-        return this.testProvider({
+        const result = await this.testProvider({
             type: defaultProvider,
             apiKey: providerConfig.apiKey,
             modelName: providerConfig.modelName,
@@ -585,6 +601,13 @@ export class AiService {
             maxTokens: providerConfig.maxTokens || 100,
             baseURL: providerConfig.baseURL,
         });
+
+        // Cache successful results in memory
+        if (result.success) {
+            this.healthCheckCache = { result, timestamp: Date.now() };
+        }
+
+        return result;
     }
 
     /**
@@ -597,14 +620,7 @@ export class AiService {
         temperature?: number;
         maxTokens?: number;
         baseURL?: string;
-    }): Promise<{
-        success: boolean;
-        provider: string;
-        model: string;
-        responseTime: number;
-        error?: string;
-        response?: string;
-    }> {
+    }): Promise<HealthCheckResult> {
         const startTime = Date.now();
 
         try {
@@ -674,16 +690,7 @@ export class AiService {
             maxTokens?: number;
             baseURL?: string;
         }>,
-    ): Promise<
-        Array<{
-            success: boolean;
-            provider: string;
-            model: string;
-            responseTime: number;
-            error?: string;
-            response?: string;
-        }>
-    > {
+    ): Promise<HealthCheckResult[]> {
         const results = [];
 
         for (const config of providerConfigs) {

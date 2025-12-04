@@ -121,6 +121,13 @@ export class ItemsGeneratorService {
                     ...checkpoint.context,
                     directory, // Restore directory entity (not serialized)
                     processedSourceUrls: new Set<string>(checkpoint.context.processedSourceUrls),
+                    // Rebuild contentCache from webPages (Maps aren't serializable)
+                    contentCache: new Map<string, string>(
+                        (checkpoint.context.webPages || []).map((wp) => [
+                            wp.source_url,
+                            wp.raw_content,
+                        ]),
+                    ),
                 };
             } else {
                 if (checkpoint) {
@@ -137,6 +144,7 @@ export class ItemsGeneratorService {
                     searchQueries: [],
                     webPages: [],
                     processedSourceUrls: new Set<string>(),
+                    contentCache: new Map<string, string>(),
                     initialAiItems: [],
                     extractedWebItems: [],
                     aggregatedItems: [],
@@ -168,6 +176,7 @@ export class ItemsGeneratorService {
                 categories: finalContext.finalCategories,
                 tags: finalContext.finalTags,
                 metrics: finalContext.metrics,
+                contentCache: finalContext.contentCache,
             };
         } catch (error: any) {
             this.logger.error(
@@ -230,15 +239,22 @@ export class ItemsGeneratorService {
     /**
      * Generate markdown for multiple items
      * @param items The items to generate markdown for
+     * @param contentCache Optional cache of source_url -> raw_content to avoid refetching
      * @returns The items with markdown content
      */
-    async generateMarkdownForItems(items: ItemData[]): Promise<ItemData[]> {
+    async generateMarkdownForItems(
+        items: ItemData[],
+        contentCache?: Map<string, string>,
+    ): Promise<ItemData[]> {
         if (!items || items.length === 0) {
             return [];
         }
 
         try {
-            return await this.markdownGenerationService.generateMarkdownForItems(items);
+            return await this.markdownGenerationService.generateMarkdownForItems(
+                items,
+                contentCache,
+            );
         } catch (error) {
             this.logger.error(`Error generating markdown for items: ${error.message}`, error.stack);
 

@@ -12,10 +12,7 @@ import {
     itemDataSchema,
     itemDataWithCategoriesAndTagsSchema,
 } from '../schemas/item-extraction.schemas';
-import {
-    IPipelineStep,
-    GenerationContext,
-} from '../interfaces/pipeline.interface';
+import { IPipelineStep, GenerationContext } from '../interfaces/pipeline.interface';
 import { ItemsGeneratorStep } from '../constants/steps';
 
 const ITEMS_EXTRACTION_PROMPT =
@@ -72,6 +69,7 @@ export class ItemExtractionService implements IPipelineStep {
         this.textSplitter = new RecursiveCharacterTextSplitter({
             chunkSize: this.MAX_CHUNK_SIZE,
             chunkOverlap: this.CHUNK_OVERLAP,
+            separators: ['\n## ', '\n### ', '\n#### ', '\n\n', '\n', '. ', ' ', ''],
         });
     }
 

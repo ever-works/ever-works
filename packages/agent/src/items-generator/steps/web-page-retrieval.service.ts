@@ -52,6 +52,13 @@ export class WebPageRetrievalService implements IPipelineStep {
 
         context.webPages = webPages;
 
+        // Populate contentCache for reuse in markdown generation
+        for (const page of webPages) {
+            if (page.source_url && page.raw_content) {
+                context.contentCache.set(page.source_url, page.raw_content);
+            }
+        }
+
         return context;
     }
 

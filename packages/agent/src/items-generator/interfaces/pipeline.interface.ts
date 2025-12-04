@@ -14,6 +14,9 @@ export interface GenerationContext {
     webPages: WebPageData[];
     processedSourceUrls: Set<string>;
 
+    // Content cache: source_url -> raw_content (for reuse in markdown generation)
+    contentCache: Map<string, string>;
+
     initialAiItems: ItemData[];
     extractedWebItems: ItemData[];
 

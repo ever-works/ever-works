@@ -7,7 +7,7 @@ import type { Directory } from '@src/entities';
 // Serializable version of GenerationContext (without methods or complex objects like Directory)
 export type SerializableGenerationContext = Omit<
     GenerationContext,
-    'directory' | 'processedSourceUrls' | 'onProgress' | 'shouldStop'
+    'directory' | 'processedSourceUrls' | 'contentCache' | 'onProgress' | 'shouldStop'
 > & {
     // Handle specific field transformations
     processedSourceUrls: string[];
@@ -138,8 +138,13 @@ export class PipelineExecutor {
             const checkpointKey = this.getCheckpointKey(context.directory);
 
             // Create serializable context by excluding non-serializable fields
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            const { directory, processedSourceUrls, shouldStop, ...serializableProps } = context;
+            const {
+                directory,
+                processedSourceUrls,
+                contentCache,
+                shouldStop,
+                ...serializableProps
+            } = context;
 
             const serializableContext: SerializableGenerationContext = {
                 ...serializableProps,
