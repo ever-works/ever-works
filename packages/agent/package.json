@@ -132,12 +132,8 @@
         "typescript-eslint": "^8.46.3"
     },
     "dependencies": {
-        "@langchain/anthropic": "^0.3.33",
         "@langchain/core": "^0.3.79",
-        "@langchain/deepseek": "^0.0.1",
-        "@langchain/groq": "^0.2.4",
         "@langchain/langgraph": "^0.2.74",
-        "@langchain/mistralai": "^0.2.3",
         "@langchain/openai": "0.5.12",
         "@langchain/textsplitters": "^0.1.0",
         "@mozilla/readability": "^0.6.0",
@@ -164,7 +160,7 @@
         "langchain": "^0.3.36",
         "libsodium-wrappers": "^0.7.15",
         "linkedom": "^0.18.12",
-        "octokit": "^3.2.2",
+        "octokit": "^5.0.5",
         "remark-stringify": "^11.0.0",
         "slugify": "^1.6.6",
         "string-similarity": "^4.0.4",

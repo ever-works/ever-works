@@ -1,6 +1,3 @@
-// import { type ChatAnthropic } from '@langchain/anthropic';
-// import { type ChatGroq } from '@langchain/groq';
-// import { type ChatMistralAI } from '@langchain/mistralai';
 import { type ChatOpenAI } from '@langchain/openai';
 
 export type AiProviderType =
@@ -15,16 +12,15 @@ export type AiProviderType =
 
 export type BaseChatModel = ChatOpenAI;
 
-// | ChatAnthropic | ChatMistralAI | ChatGroq
-
 export interface AiProviderConfig {
     type: AiProviderType;
     apiKey?: string;
     modelName?: string;
+    embeddingModelName?: string;
     temperature?: number;
     enabled?: boolean;
     maxTokens?: number;
-    baseURL?: string;
+    baseURL: string;
 }
 
 export interface AiServiceConfig {
