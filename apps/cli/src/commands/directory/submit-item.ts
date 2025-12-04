@@ -68,6 +68,30 @@ export const submitItemCommand = new Command('submit-item')
                     message: 'Tags (comma-separated, optional):',
                 },
                 {
+                    type: 'input',
+                    name: 'brand',
+                    message: 'Brand (optional):',
+                },
+                {
+                    type: 'input',
+                    name: 'brand_logo_url',
+                    message: 'Brand logo URL (optional):',
+                    validate: (input) => {
+                        if (!input.trim()) return true;
+                        try {
+                            new URL(input);
+                            return true;
+                        } catch {
+                            return 'Please enter a valid URL';
+                        }
+                    },
+                },
+                {
+                    type: 'input',
+                    name: 'images',
+                    message: 'Image URLs (comma-separated, optional):',
+                },
+                {
                     type: 'confirm',
                     name: 'featured',
                     message: 'Mark as featured?',
@@ -79,11 +103,15 @@ export const submitItemCommand = new Command('submit-item')
             console.log(chalk.cyan('\n--- Item Submission Summary ---'));
             console.log(chalk.gray('Directory:'), chalk.white(directory.slug));
             console.log(chalk.gray('URL:'), chalk.white(answers.source_url));
-            if (answers.name) console.log(chalk.gray('Name:'), chalk.white(answers.name));
-            if (answers.description)
-                console.log(chalk.gray('Description:'), chalk.white(answers.description));
-            if (answers.category)
-                console.log(chalk.gray('Category:'), chalk.white(answers.category));
+            console.log(chalk.gray('Name:'), chalk.white(answers.name));
+            console.log(chalk.gray('Description:'), chalk.white(answers.description));
+            console.log(chalk.gray('Category:'), chalk.white(answers.category));
+            if (answers.tags) console.log(chalk.gray('Tags:'), chalk.white(answers.tags));
+            if (answers.brand) console.log(chalk.gray('Brand:'), chalk.white(answers.brand));
+            if (answers.brand_logo_url)
+                console.log(chalk.gray('Brand Logo:'), chalk.white(answers.brand_logo_url));
+            if (answers.images) console.log(chalk.gray('Images:'), chalk.white(answers.images));
+            console.log(chalk.gray('Featured:'), chalk.white(answers.featured ? 'Yes' : 'No'));
 
             const confirmed = await inquirer.prompt([
                 {
@@ -103,17 +131,24 @@ export const submitItemCommand = new Command('submit-item')
             const spinner = ora('Submitting item...').start();
 
             try {
+                const parseCommaSeparated = (input: string | undefined): string[] | undefined => {
+                    if (!input?.trim()) return undefined;
+                    const items = input
+                        .split(',')
+                        .map((s) => s.trim())
+                        .filter(Boolean);
+                    return items.length > 0 ? items : undefined;
+                };
+
                 const submitDto = {
                     name: answers.name,
                     description: answers.description,
                     source_url: answers.source_url,
                     category: answers.category,
-                    tags: answers.tags
-                        ? answers.tags
-                              .split(',')
-                              .map((tag: string) => tag.trim())
-                              .filter((tag: string) => tag.length > 0)
-                        : undefined,
+                    tags: parseCommaSeparated(answers.tags),
+                    brand: answers.brand?.trim() || undefined,
+                    brand_logo_url: answers.brand_logo_url?.trim() || undefined,
+                    images: parseCommaSeparated(answers.images),
                     featured: answers.featured || false,
                     pay_and_publish_now: true,
                 };

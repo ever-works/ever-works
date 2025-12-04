@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback, memo, Dispatch, SetStateAction } from 'react';
+import { useState, useCallback, memo, Dispatch, SetStateAction, KeyboardEvent } from 'react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
@@ -336,7 +336,12 @@ const TagsField = memo(function TagsField({
                     type="text"
                     value={tagInput}
                     onChange={(e) => setTagInput(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), onAddTag())}
+                    onKeyDown={(e: KeyboardEvent) => {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            onAddTag();
+                        }
+                    }}
                     placeholder={t('tagPlaceholder')}
                     variant="form"
                     className="flex-1"
@@ -407,7 +412,12 @@ const ImagesField = memo(function ImagesField({
                     type="url"
                     value={imageInput}
                     onChange={(e) => setImageInput(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), onAddImage())}
+                    onKeyDown={(e: KeyboardEvent) => {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            onAddImage();
+                        }
+                    }}
                     placeholder={t('imagePlaceholder')}
                     variant="form"
                     className="flex-1"
