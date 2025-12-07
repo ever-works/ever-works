@@ -37,4 +37,6 @@ jobs:
         working-directory: packages/tasks
         env:
           TRIGGER_ACCESS_TOKEN: ${{ secrets.TRIGGER_ACCESS_TOKEN }}
-        run: npx trigger.dev@4.1.2 whoami
+        run: |
+          npx trigger.dev@4.1.2 login --profile default
+          npx trigger.dev@4.1.2 whoami
