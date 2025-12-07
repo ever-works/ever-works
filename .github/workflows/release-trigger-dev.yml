@@ -37,6 +37,8 @@ jobs:
         working-directory: packages/tasks
         env:
           TRIGGER_ACCESS_TOKEN: ${{ secrets.TRIGGER_ACCESS_TOKEN }}
+        # Note: we don't use the `preview` env in Trigger.dev for now for deployments from the develop branch, 
+        # because it requires a paid account and also because we want to use built-in scheduling in NestJs in the dev!
+        # That's why we just run the login operation below.
         run: |
-          npx trigger.dev@4.1.2 login --profile default
-          npx trigger.dev@4.1.2 whoami
+          npx trigger.dev@latest login
