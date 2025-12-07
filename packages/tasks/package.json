@@ -19,13 +19,13 @@
         "@nestjs/platform-express": "^11.1.8",
         "@nestjs/websockets": "^11.1.9",
         "@packages/agent": "workspace:*",
-        "@trigger.dev/sdk": "^4.1.2",
+        "@trigger.dev/sdk": "^4.2.0",
         "class-transformer": "^0.5.1",
         "reflect-metadata": "^0.2.2",
         "rxjs": "^7.8.2"
     },
     "devDependencies": {
-        "@trigger.dev/build": "^4.1.2",
+        "@trigger.dev/build": "^4.2.0",
         "@types/node": "^22.19.0",
         "typescript": "^5.9.3"
     }
