@@ -37,13 +37,13 @@
             "types": "./dist/directory-operations/index.d.ts",
             "default": "./dist/directory-operations/index.js"
         },
-        "./trigger": {
-            "types": "./dist/trigger/index.d.ts",
-            "default": "./dist/trigger/index.js"
-        },
         "./items-generator": {
             "types": "./dist/items-generator/index.d.ts",
             "default": "./dist/items-generator/index.js"
+        },
+        "./tasks": {
+            "types": "./dist/tasks/index.d.ts",
+            "default": "./dist/tasks/index.js"
         },
         "./events": {
             "types": "./dist/events/index.d.ts",
@@ -79,9 +79,7 @@
         "build": "nest build -b swc && tsc -p tsconfig.types.json",
         "build:dev": "nest build -b swc --watch",
         "build:types": "tsc -p tsconfig.types.json",
-        "build:types:dev": "tsc -p tsconfig.types.json --watch",
-        "dev:trigger": "npx trigger.dev@latest dev",
-        "deploy:trigger": "npx trigger.dev@latest deploy"
+        "build:types:dev": "tsc -p tsconfig.types.json --watch"
     },
     "peerDependencies": {
         "@nestjs/common": "^11.1",
@@ -113,7 +111,6 @@
         "@nestjs/testing": "^11.1.8",
         "@swc/cli": "^0.6.0",
         "@swc/core": "^1.15.1",
-        "@trigger.dev/build": "^4.1.2",
         "@types/express": "^5.0.5",
         "@types/jest": "^29.5.14",
         "@types/node": "^22.19.0",
@@ -135,21 +132,16 @@
         "typescript-eslint": "^8.46.3"
     },
     "dependencies": {
-        "@langchain/anthropic": "^0.3.33",
         "@langchain/core": "^0.3.79",
-        "@langchain/deepseek": "^0.0.1",
-        "@langchain/groq": "^0.2.4",
         "@langchain/langgraph": "^0.2.74",
-        "@langchain/mistralai": "^0.2.3",
         "@langchain/openai": "0.5.12",
         "@langchain/textsplitters": "^0.1.0",
+        "@mozilla/readability": "^0.6.0",
         "@nestjs/cache-manager": "^3.0.1",
         "@nestjs/config": "^4.0.2",
         "@nestjs/typeorm": "^11.0.0",
-        "@nestjs/websockets": "^11.1.8",
         "@supabase/supabase-js": "^2.80.0",
         "@tavily/core": "^0.3.7",
-        "@trigger.dev/sdk": "^4.1.2",
         "@types/cheerio": "^1.0.0",
         "@types/fs-extra": "^11.0.4",
         "@types/string-similarity": "^4.0.2",
@@ -167,7 +159,8 @@
         "isomorphic-git": "^1.35.0",
         "langchain": "^0.3.36",
         "libsodium-wrappers": "^0.7.15",
-        "octokit": "^3.2.2",
+        "linkedom": "^0.18.12",
+        "octokit": "^5.0.5",
         "remark-stringify": "^11.0.0",
         "slugify": "^1.6.6",
         "string-similarity": "^4.0.4",

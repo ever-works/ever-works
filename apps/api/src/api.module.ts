@@ -14,9 +14,13 @@ import { AiConversationModule } from './ai-conversation/ai-conversation.module';
 import { TriggerInternalModule } from './trigger/trigger-internal.module';
 import { TwentyCrmModule } from './integrations';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
+import { CacheFactory } from '@packages/agent/cache';
 
 @Module({
     imports: [
+        CacheFactory.TypeORM({
+            isGlobal: true,
+        }),
         TwentyCrmModule.forRoot(),
         ThrottlerModule.forRoot(throttlerConfig),
         EventEmitterModule.forRoot(),

@@ -1,10 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 
 // AI Providers
-import { ChatOpenAI } from '@langchain/openai';
-import { ChatAnthropic } from '@langchain/anthropic';
-import { ChatMistralAI } from '@langchain/mistralai';
-import { ChatGroq } from '@langchain/groq';
+import { ChatOpenAI, OpenAIEmbeddings } from '@langchain/openai';
+import { Embeddings } from '@langchain/core/embeddings';
 import {
     AiProviderType,
     AiProviderConfig,
@@ -14,6 +12,18 @@ import {
 } from './ai-provider.interface';
 import { config } from '@src/config';
 
+// Cache TTL for provider health checks (5 minutes)
+const HEALTH_CHECK_CACHE_TTL_MS = 5 * 60 * 1000;
+
+type HealthCheckResult = {
+    success: boolean;
+    provider: string;
+    model: string;
+    responseTime: number;
+    error?: string;
+    response?: string;
+};
+
 @Injectable()
 export class AiService {
     private readonly logger = new Logger(AiService.name);
@@ -21,6 +31,9 @@ export class AiService {
     private readonly providers: Map<AiProviderType, BaseChatModel> = new Map();
     private readonly isConfigured: boolean;
     private readonly isCLI: boolean;
+
+    // In-memory cache for health check results
+    private healthCheckCache: { result: HealthCheckResult; timestamp: number } | null = null;
 
     constructor() {
         this.isCLI = config.isCli();
@@ -48,14 +61,17 @@ export class AiService {
                 type: 'openai',
                 apiKey: config.ai.openAi.getKey(),
                 modelName: config.ai.openAi.getModel(),
+                embeddingModelName: config.ai.openAi.getEmbeddingModel(),
                 temperature: config.ai.openAi.getTemperature(),
                 enabled: !!config.ai.openAi.getKey(),
                 maxTokens: config.ai.openAi.getMaxTokens(),
+                baseURL: config.ai.openAi.getBaseUrl(),
             },
             openrouter: {
                 type: 'openrouter',
                 apiKey: config.ai.openRouter.getKey(),
                 modelName: config.ai.openRouter.getModel(),
+                embeddingModelName: config.ai.openRouter.getEmbeddingModel(),
                 temperature: config.ai.openRouter.getTemperature(),
                 enabled: !!config.ai.openRouter.getKey(),
                 maxTokens: config.ai.openRouter.getMaxTokens(),
@@ -65,6 +81,7 @@ export class AiService {
                 type: 'ollama',
                 apiKey: config.ai.ollama.getKey(),
                 modelName: config.ai.ollama.getModel(),
+                embeddingModelName: config.ai.ollama.getEmbeddingModel(),
                 temperature: config.ai.ollama.getTemperature(),
                 enabled: !!config.ai.ollama.getBaseUrl(),
                 baseURL: config.ai.ollama.getBaseUrl(),
@@ -74,6 +91,7 @@ export class AiService {
                 type: 'google',
                 apiKey: config.ai.google.getKey(),
                 modelName: config.ai.google.getModel(),
+                embeddingModelName: config.ai.google.getEmbeddingModel(),
                 temperature: config.ai.google.getTemperature(),
                 enabled: !!config.ai.google.getKey(),
                 maxTokens: config.ai.google.getMaxTokens(),
@@ -83,17 +101,21 @@ export class AiService {
                 type: 'anthropic',
                 apiKey: config.ai.anthropic.getKey(),
                 modelName: config.ai.anthropic.getModel(),
+                embeddingModelName: config.ai.anthropic.getEmbeddingModel(),
                 temperature: config.ai.anthropic.getTemperature(),
                 enabled: !!config.ai.anthropic.getKey(),
                 maxTokens: config.ai.anthropic.getMaxTokens(),
+                baseURL: config.ai.anthropic.getBaseUrl(),
             },
             mistral: {
                 type: 'mistral',
                 apiKey: config.ai.mistral.getKey(),
                 modelName: config.ai.mistral.getModel(),
+                embeddingModelName: config.ai.mistral.getEmbeddingModel(),
                 temperature: config.ai.mistral.getTemperature(),
                 enabled: !!config.ai.mistral.getKey(),
                 maxTokens: config.ai.mistral.getMaxTokens(),
+                baseURL: config.ai.mistral.getBaseUrl(),
             },
             groq: {
                 type: 'groq',
@@ -102,6 +124,7 @@ export class AiService {
                 temperature: config.ai.groq.getTemperature(),
                 enabled: !!config.ai.groq.getKey(),
                 maxTokens: config.ai.groq.getMaxTokens(),
+                baseURL: config.ai.groq.getBaseUrl(),
             },
             deepseek: {
                 type: 'deepseek',
@@ -161,10 +184,18 @@ export class AiService {
      * Create a provider instance based on configuration
      */
     private createProvider(config: AiProviderConfig): BaseChatModel | null {
+        const defaultConfig = this.getProviderConfig(config.type);
+
+        config.apiKey = config.apiKey || defaultConfig?.apiKey;
+        config.modelName = config.modelName || defaultConfig?.modelName;
+        config.temperature = config.temperature ?? defaultConfig?.temperature ?? 0.7;
+        config.maxTokens = config.maxTokens || defaultConfig?.maxTokens || 4096;
+        config.baseURL = config.baseURL || defaultConfig?.baseURL || '';
+
         const commonOptions = {
             apiKey: config.apiKey,
-            temperature: config.temperature || 0.7,
-            maxTokens: config.maxTokens || 4096,
+            temperature: config.temperature,
+            maxTokens: config.maxTokens,
             reasoning: {
                 effort: 'low' as const,
             },
@@ -213,22 +244,31 @@ export class AiService {
                 });
 
             case 'anthropic':
-                return new ChatAnthropic({
+                return new ChatOpenAI({
                     ...commonOptions,
                     model: config.modelName,
-                }) as unknown as BaseChatModel;
-
-            case 'mistral':
-                return new ChatMistralAI({
-                    ...commonOptions,
-                    model: config.modelName,
-                }) as unknown as BaseChatModel;
+                    configuration: {
+                        baseURL: config.baseURL,
+                    },
+                });
 
             case 'groq':
-                return new ChatGroq({
+                return new ChatOpenAI({
                     ...commonOptions,
                     model: config.modelName,
-                }) as unknown as BaseChatModel;
+                    configuration: {
+                        baseURL: config.baseURL,
+                    },
+                });
+
+            case 'mistral':
+                return new ChatOpenAI({
+                    ...commonOptions,
+                    model: config.modelName,
+                    configuration: {
+                        baseURL: config.baseURL,
+                    },
+                });
 
             case 'deepseek':
                 return new ChatOpenAI({
@@ -448,18 +488,112 @@ export class AiService {
         return this.getLlmByProvider(selectedProvider);
     }
 
-    async testDefaultProvider(): Promise<{
-        success: boolean;
-        provider: string;
-        model: string;
-        responseTime: number;
-        error?: string;
-        response?: string;
-    }> {
+    /**
+     * Get Embeddings instance by provider type
+     */
+    getEmbeddings(providerType?: AiProviderType): Embeddings {
+        const targetProvider = this.getEffectiveEmbeddingProvider(providerType);
+        const config = this.config.providers[targetProvider];
+
+        if (!config) {
+            throw new Error(`Provider ${targetProvider} not available for embeddings.`);
+        }
+
+        return this.createEmbeddingProvider(config);
+    }
+
+    getEffectiveEmbeddingProvider(providerType?: AiProviderType): AiProviderType {
+        const targetProvider = providerType || this.config.defaultProvider;
+        const config = this.config.providers[targetProvider];
+
+        if (config && config.enabled && this.supportsEmbeddings(targetProvider)) {
+            return targetProvider;
+        }
+
+        if (this.config.providers['openai']?.enabled) {
+            return 'openai';
+        }
+
+        throw new Error(`No embedding provider available. Requested: ${targetProvider}`);
+    }
+
+    private supportsEmbeddings(providerType: AiProviderType): boolean {
+        return ['openai', 'openrouter', 'ollama', 'google', 'anthropic', 'mistral'].includes(
+            providerType,
+        );
+    }
+
+    private createEmbeddingProvider(config: AiProviderConfig): Embeddings | null {
+        switch (config.type) {
+            case 'openai':
+                return new OpenAIEmbeddings({
+                    apiKey: config.apiKey,
+                    model: config.embeddingModelName,
+                });
+
+            case 'openrouter':
+                return new OpenAIEmbeddings({
+                    apiKey: config.apiKey,
+                    model: config.embeddingModelName,
+                    configuration: {
+                        baseURL: config.baseURL,
+                    },
+                });
+
+            case 'ollama':
+                return new OpenAIEmbeddings({
+                    apiKey: 'ollama', // Ollama doesn't usually require an API key, but client might need a value
+                    model: config.embeddingModelName,
+                    configuration: {
+                        baseURL: config.baseURL,
+                    },
+                });
+
+            case 'anthropic':
+                return new OpenAIEmbeddings({
+                    apiKey: config.apiKey,
+                    model: config.embeddingModelName,
+                    configuration: {
+                        baseURL: config.baseURL,
+                    },
+                });
+
+            case 'google':
+                return new OpenAIEmbeddings({
+                    apiKey: config.apiKey,
+                    model: config.embeddingModelName,
+                    configuration: {
+                        baseURL: config.baseURL,
+                    },
+                });
+
+            case 'mistral':
+                return new OpenAIEmbeddings({
+                    apiKey: config.apiKey,
+                    model: config.embeddingModelName,
+                    configuration: {
+                        baseURL: config.baseURL,
+                    },
+                });
+
+            default:
+                return null;
+        }
+    }
+
+    async testDefaultProvider(forceRetest = false): Promise<HealthCheckResult> {
+        // Check in-memory cache first (unless force retest)
+        if (!forceRetest && this.healthCheckCache) {
+            const { result, timestamp } = this.healthCheckCache;
+            if (Date.now() - timestamp < HEALTH_CHECK_CACHE_TTL_MS) {
+                return result;
+            }
+        }
+
         const defaultProvider = this.config.defaultProvider;
         const providerConfig = this.config.providers[defaultProvider];
 
-        return this.testProvider({
+        const result = await this.testProvider({
             type: defaultProvider,
             apiKey: providerConfig.apiKey,
             modelName: providerConfig.modelName,
@@ -467,6 +601,13 @@ export class AiService {
             maxTokens: providerConfig.maxTokens || 100,
             baseURL: providerConfig.baseURL,
         });
+
+        // Cache successful results in memory
+        if (result.success) {
+            this.healthCheckCache = { result, timestamp: Date.now() };
+        }
+
+        return result;
     }
 
     /**
@@ -479,14 +620,7 @@ export class AiService {
         temperature?: number;
         maxTokens?: number;
         baseURL?: string;
-    }): Promise<{
-        success: boolean;
-        provider: string;
-        model: string;
-        responseTime: number;
-        error?: string;
-        response?: string;
-    }> {
+    }): Promise<HealthCheckResult> {
         const startTime = Date.now();
 
         try {
@@ -498,6 +632,7 @@ export class AiService {
             const testProvider = this.createProvider({
                 ...providerConfig,
                 enabled: true,
+                baseURL: providerConfig.baseURL || '',
             });
 
             if (!testProvider) {
@@ -555,16 +690,7 @@ export class AiService {
             maxTokens?: number;
             baseURL?: string;
         }>,
-    ): Promise<
-        Array<{
-            success: boolean;
-            provider: string;
-            model: string;
-            responseTime: number;
-            error?: string;
-            response?: string;
-        }>
-    > {
+    ): Promise<HealthCheckResult[]> {
         const results = [];
 
         for (const config of providerConfigs) {

@@ -33,4 +33,17 @@ export class SubmitItemDto {
     @IsOptional()
     @IsString()
     slug?: string;
+
+    @IsOptional()
+    @IsString()
+    brand?: string;
+
+    @IsOptional()
+    @IsUrl({ protocols: ['http', 'https'], require_tld: true })
+    brand_logo_url?: string;
+
+    @IsOptional()
+    @IsArray()
+    @IsUrl({ protocols: ['http', 'https'], require_tld: true }, { each: true })
+    images?: string[];
 }

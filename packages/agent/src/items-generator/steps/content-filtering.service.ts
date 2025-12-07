@@ -4,6 +4,8 @@ import { ConfigDto } from '../dto/create-items-generator.dto';
 import { WebPageData, RelevanceAssessment } from '../interfaces/items-generator.interfaces';
 import { AiService, BaseChatModel } from 'src/ai';
 import z from 'zod';
+import { IPipelineStep, GenerationContext } from '../interfaces/pipeline.interface';
+import { ItemsGeneratorStep } from '../constants/steps';
 
 const relevanceSchema = z.object({
     relevant: z.boolean().describe('Whether the content is highly relevant to the topic'),
@@ -16,13 +18,42 @@ const relevanceSchema = z.object({
 });
 
 @Injectable()
-export class ContentFilteringService {
+export class ContentFilteringService implements IPipelineStep {
     private readonly logger = new Logger(ContentFilteringService.name);
     private llm: BaseChatModel;
     private BATCH_SIZE = 10;
 
+    public readonly name = ItemsGeneratorStep.CONTENT_FILTERING;
+
     constructor(private readonly aiService: AiService) {
         this.llm = this.aiService.getLlm();
+    }
+
+    async run(context: GenerationContext): Promise<GenerationContext> {
+        const { dto, directory, webPages } = context;
+        const { config } = dto;
+
+        if (config.content_filtering_enabled) {
+            this.logger.log(`[${directory.slug}] Content Filtering - Starting`);
+
+            const filteredWebPages = await this.filterAndAssessPages(
+                directory.slug,
+                webPages,
+                dto.name,
+                dto.prompt,
+                config,
+            );
+
+            this.logger.log(
+                `[${directory.slug}] Filtered down to ${filteredWebPages.length} relevant pages.`,
+            );
+
+            context.webPages = filteredWebPages;
+        } else {
+            this.logger.debug(`[${directory.slug}] Content Filtering - Skipped`);
+        }
+
+        return context;
     }
 
     async filterAndAssessPages(

@@ -49,11 +49,11 @@ This document explains how our automated directory refresh feature works. It cov
     - Dispatches the Trigger.dev task or performs in-process generation if Trigger.dev is disabled/unavailable.
     - **Sequential Fallback**: When Trigger.dev is unavailable, scheduled runs execute sequentially in-process to prevent resource exhaustion.
     - Calls back into `DirectoryScheduleService.markRunCompleted()` or `.markRunFailed()` when the run finishes.
-    - **Drift Prevention**: Calculates next run time based on the *scheduled* time, not completion time.
+    - **Drift Prevention**: Calculates next run time based on the _scheduled_ time, not completion time.
 
 ### Trigger.dev + Fallback Cron
 
-- Primary mode: `packages/agent/src/tasks/trigger/directory-schedule-dispatcher.task.ts` registers a Trigger.dev cron task (default every 5 minutes). The task boots a Nest context, resolves `DirectoryScheduleDispatcherService`, and processes the batch.
+- Primary mode: `packages/tasks/src/tasks/trigger/directory-schedule-dispatcher.task.ts` registers a Trigger.dev cron task (default every 5 minutes). The task boots a Nest context, resolves `DirectoryScheduleDispatcherService`, and processes the batch.
 - Fallback mode (when `TRIGGER_ENABLED=false`): Nest's cron scheduler calls the same dispatcher service. Config is identical; only the triggering mechanism changes.
 
 ---
@@ -142,7 +142,7 @@ Located in `apps/api/.env.example` and consumed by `packages/agent/src/config/in
 
 ## 7. Trigger.dev Task Summary
 
-- **File**: `packages/agent/src/tasks/trigger/directory-schedule-dispatcher.task.ts`
+- **File**: `packages/tasks/src/tasks/trigger/directory-schedule-dispatcher.task.ts`
 - **Trigger**: `onSchedule({ cron: '*/5 * * * *' })` (configurable via env).
 - **Workflow**:
     1. Boot Nest application context.
@@ -197,7 +197,7 @@ This guard ensures scheduled runs always have the context needed to regenerate c
 | API endpoints    | `apps/api/src/directories/directories.controller.ts` (`/schedule` routes) | All authenticated via JWT guard.                                      |
 | Schedule service | `packages/agent/src/services/directory-schedule.service.ts`               | Contains validation, DTO mapping, and directory syncing.              |
 | Dispatcher       | `packages/agent/src/services/directory-schedule-dispatcher.service.ts`    | Handles batching and locking.                                         |
-| Trigger task     | `packages/agent/src/tasks/trigger/directory-schedule-dispatcher.task.ts`  | Cron-based dispatcher runner.                                         |
+| Trigger task     | `packages/tasks/src/tasks/trigger/directory-schedule-dispatcher.task.ts`  | Cron-based dispatcher runner.                                         |
 | Config           | `packages/agent/src/config/index.ts`                                      | Exposes typed accessors for env vars, including subscription toggles. |
 | Frontend card    | `apps/web/src/components/directories/detail/DirectoryScheduleCard.tsx`    | Client-side UI and server actions.                                    |
 | Env reference    | `apps/api/.env.example`                                                   | Contains every variable described above.                              |

@@ -33,6 +33,24 @@ export const itemDataSchema = baseSchema.extend({
         .describe(
             "Determine if the item warrants a 'featured' status based on prominence, recommendations, or significance. Default to false.",
         ),
+    brand: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('Optional brand/manufacturer associated with the item (one per item).'),
+    brand_logo_url: z
+        .string()
+        .url()
+        .nullable()
+        .optional()
+        .describe('Logo URL for the brand if available and canonical.'),
+    images: z
+        .array(z.string().url())
+        .optional()
+        .default([])
+        .describe(
+            'Image URLs or screenshots that visually represent the item. Provide multiple when available.',
+        ),
 });
 
 export const itemDataWithCategoriesAndTagsSchema = itemDataSchema.extend({
@@ -109,4 +127,22 @@ export const itemDataWithBadgesSchema = baseSchema.extend({
             "Determine if the item warrants a 'featured' status based on prominence, recommendations, or significance. Default to false.",
         ),
     badges: itemBadgesSchema.nullable().describe('Optional badges for repository items'),
+    brand: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('Optional brand/manufacturer associated with the item (one per item).'),
+    brand_logo_url: z
+        .string()
+        .url()
+        .nullable()
+        .optional()
+        .describe('Logo URL for the brand if available and canonical.'),
+    images: z
+        .array(z.string().url())
+        .optional()
+        .default([])
+        .describe(
+            'Image URLs or screenshots that visually represent the item. Provide multiple when available.',
+        ),
 });

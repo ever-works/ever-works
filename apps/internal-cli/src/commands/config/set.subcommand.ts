@@ -112,7 +112,7 @@ export class SetSubCommand extends CommandRunner {
 
         // Service validation
         if (key === 'EXTRACT_CONTENT_SERVICE') {
-            const validServices = ['tavily', 'naive'];
+            const validServices = ['tavily', 'local'];
             if (!validServices.includes(value.toLowerCase())) {
                 return {
                     isValid: false,

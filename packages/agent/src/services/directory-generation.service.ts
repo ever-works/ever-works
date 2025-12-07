@@ -1,9 +1,11 @@
 import {
     BadRequestException,
     HttpException,
+    Inject,
     Injectable,
     Logger,
     NotFoundException,
+    Optional,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DataGeneratorService } from '@src/data-generator/data-generator.service';
@@ -36,12 +38,13 @@ import { DirectoryGenerationHistoryRepository } from '@src/database/repositories
 import { DirectoryGenerationHistory } from '@src/entities/directory-generation-history.entity';
 import { DirectoryGenerationCompletedEvent } from '@src/events';
 import { UpdateWebsiteRepositoryResponseDto } from '@src/website-generator/dto/update-website-repository.dto';
-import { TriggerService } from '@src/trigger';
 import {
     DIRECTORY_GENERATION_MODE,
     DirectoryGenerationMode,
     DirectoryGenerationPayload,
-} from '@src/tasks/trigger/directory-generation.task';
+    DIRECTORY_GENERATION_DISPATCHER,
+    DirectoryGenerationDispatcher,
+} from '@src/tasks';
 import { DirectoryScheduleBillingMode, GenerateStatusType } from '@src/entities/types';
 import { DirectoryOwnershipService } from './directory-ownership.service';
 import { normalizeGeneratorError } from './utils/error.utils';
@@ -79,11 +82,13 @@ export class DirectoryGenerationService {
         private readonly itemsGeneratorService: ItemsGeneratorService,
         private readonly directoryRepository: DirectoryRepository,
         private readonly eventEmitter: EventEmitter2,
-        private readonly triggerService: TriggerService,
         private readonly generationHistoryRepository: DirectoryGenerationHistoryRepository,
         private readonly ownershipService: DirectoryOwnershipService,
         private readonly directoryScheduleService: DirectoryScheduleService,
         private readonly userRepository: UserRepository,
+        @Optional()
+        @Inject(DIRECTORY_GENERATION_DISPATCHER)
+        private readonly generationDispatcher?: DirectoryGenerationDispatcher,
     ) {}
 
     async generateItems(
@@ -143,21 +148,24 @@ export class DirectoryGenerationService {
                 .catch(() => null);
 
             if (!lastRequestData) {
-                 throw new Error('No previous request data found');
+                throw new Error('No previous request data found');
             }
         } catch (error) {
-             this.logger.error(`Failed to load last request data for directory ${directoryId}`, error);
-             
-             if (context.triggeredBy === 'schedule' && context.scheduleId) {
-                 await this.directoryScheduleService.markRunFailed(
-                     context.scheduleId,
-                     'Invalid configuration (stale data). Please run a manual generation to fix.',
-                 );
-                 // Force pause immediately if config is broken
-                 await this.directoryScheduleService.pauseSchedule(context.scheduleId);
-             }
-             
-             throw new BadRequestException({
+            this.logger.error(
+                `Failed to load last request data for directory ${directoryId}`,
+                error,
+            );
+
+            if (context.triggeredBy === 'schedule' && context.scheduleId) {
+                await this.directoryScheduleService.markRunFailed(
+                    context.scheduleId,
+                    'Invalid configuration (stale data). Please run a manual generation to fix.',
+                );
+                // Force pause immediately if config is broken
+                await this.directoryScheduleService.pauseSchedule(context.scheduleId);
+            }
+
+            throw new BadRequestException({
                 status: 'error',
                 slug: directory.slug,
                 message: 'Configuration invalid or missing. Please run a manual generation first.',
@@ -461,7 +469,9 @@ export class DirectoryGenerationService {
             scheduleId: context.scheduleId,
         };
 
-        const dispatched = await this.triggerService.dispatchDirectoryGeneration(payload);
+        const dispatched = this.generationDispatcher
+            ? await this.generationDispatcher.dispatchDirectoryGeneration(payload)
+            : false;
 
         if (!dispatched) {
             this.logger.warn(
@@ -471,9 +481,9 @@ export class DirectoryGenerationService {
             // If triggered by schedule, await the process to prevent concurrency explosion (sequential fallback)
             // For user/api triggers, we can keep it async/fire-and-forget or let them wait if they opted for it (but this method is usually called when awaitCompletion=false)
             if (context.triggeredBy === 'schedule') {
-                 await this.processGeneration(directory, user, dto, history, context);
+                await this.processGeneration(directory, user, dto, history, context);
             } else {
-                 void this.processGeneration(directory, user, dto, history, context);
+                void this.processGeneration(directory, user, dto, history, context);
             }
         }
     }

@@ -22,13 +22,15 @@ export class MarkdownRepository {
     }
 
     /**
-     * Remove all files except .git
+     * Remove all files except allowlisted ones
      * and ensure all needed directories exist
      */
     async resetFiles() {
         const files = await fs.readdir(this.dir);
+        const allowlist = ['.git', '.gitignore', '.github', '.vscode', '.env', '.nvmrc'];
+
         for (const file of files) {
-            if (file === '.git' || file.startsWith('.git')) {
+            if (allowlist.includes(file) || file.startsWith('.git')) {
                 continue;
             }
 

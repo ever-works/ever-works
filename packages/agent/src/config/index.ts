@@ -107,6 +107,12 @@ export const config = {
             getMaxTokens() {
                 return parseInt(process.env.OPENAI_MAX_TOKENS || '4096');
             },
+            getBaseUrl() {
+                return process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1';
+            },
+            getEmbeddingModel() {
+                return process.env.OPENAI_EMBEDDING_MODEL || 'text-embedding-3-small';
+            },
         },
 
         // OpenRouter
@@ -125,6 +131,9 @@ export const config = {
             },
             getBaseUrl() {
                 return process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1';
+            },
+            getEmbeddingModel() {
+                return process.env.OPENROUTER_EMBEDDING_MODEL || 'openai/text-embedding-3-small';
             },
         },
 
@@ -145,6 +154,9 @@ export const config = {
             getBaseUrl() {
                 return process.env.OLLAMA_BASE_URL || 'http://localhost:11434/v1';
             },
+            getEmbeddingModel() {
+                return process.env.OLLAMA_EMBEDDING_MODEL || 'nomic-embed-text';
+            },
         },
 
         // Google AI (Gemini)
@@ -164,6 +176,9 @@ export const config = {
             getBaseUrl() {
                 return 'https://generativelanguage.googleapis.com/v1beta/openai/';
             },
+            getEmbeddingModel() {
+                return process.env.GOOGLE_EMBEDDING_MODEL || 'text-embedding-004';
+            },
         },
 
         // Anthropic (Claude)
@@ -180,6 +195,12 @@ export const config = {
             getMaxTokens() {
                 return parseInt(process.env.ANTHROPIC_MAX_TOKENS || '4096');
             },
+            getBaseUrl() {
+                return process.env.ANTHROPIC_BASE_URL || 'https://api.anthropic.com/v1/';
+            },
+            getEmbeddingModel() {
+                return process.env.ANTHROPIC_EMBEDDING_MODEL || 'voyage-3.5';
+            },
         },
 
         // Mistral AI
@@ -195,6 +216,12 @@ export const config = {
             },
             getMaxTokens() {
                 return parseInt(process.env.MISTRAL_MAX_TOKENS || '4096');
+            },
+            getBaseUrl() {
+                return process.env.MISTRAL_BASE_URL || 'https://api.mistral.ai/v1';
+            },
+            getEmbeddingModel() {
+                return process.env.MISTRAL_EMBEDDING_MODEL || 'mistral-embed';
             },
         },
 
@@ -220,7 +247,7 @@ export const config = {
         // Groq
         groq: {
             getModel() {
-                return process.env.GROQ_MODEL || 'llama-3.1-70b-versatile';
+                return process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
             },
             getKey() {
                 return process.env.GROQ_API_KEY;
@@ -231,13 +258,16 @@ export const config = {
             getMaxTokens() {
                 return parseInt(process.env.GROQ_MAX_TOKENS || '4096');
             },
+            getBaseUrl() {
+                return process.env.GROQ_BASE_URL || 'https://api.groq.com/openai/v1';
+            },
         },
     },
 
     // Search configuration
     search: {
         getExtractContentService() {
-            return (process.env.EXTRACT_CONTENT_SERVICE as 'tavily' | 'naive') || 'tavily';
+            return (process.env.EXTRACT_CONTENT_SERVICE as 'tavily' | 'local') || 'local';
         },
         getWebSearchService() {
             return (process.env.WEB_SEARCH_SERVICE as 'tavily' | 'google-sr') || 'tavily';

@@ -1,14 +1,12 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { DataGeneratorService } from '@src/data-generator/data-generator.service';
-import { MarkdownGeneratorService } from '@src/markdown-generator/markdown-generator.service';
-import { WebsiteGeneratorService } from '@src/website-generator/website-generator.service';
-import { Directory } from '@src/entities/directory.entity';
-import { User } from '@src/entities/user.entity';
-import { CreateItemsGeneratorDto } from '@src/items-generator/dto';
-import { DIRECTORY_OPERATIONS } from '@src/directory-operations';
-import type { DirectoryOperations } from '@src/directory-operations';
-import { GenerateStatusType } from '@src/entities/types';
-import { ItemsGeneratorMetrics } from '@src/items-generator/dto/items-generator-response.dto';
+import { DataGeneratorService } from '@packages/agent/data-generator';
+import { MarkdownGeneratorService } from '@packages/agent/markdown-generator';
+import { WebsiteGeneratorService } from '@packages/agent/website-generator';
+import { Directory, User, GenerateStatusType } from '@packages/agent/entities';
+import { CreateItemsGeneratorDto } from '@packages/agent/items-generator';
+import { DIRECTORY_OPERATIONS } from '@packages/agent/directory-operations';
+import type { DirectoryOperations } from '@packages/agent/directory-operations';
+import { ItemsGeneratorMetrics } from '@packages/agent/items-generator';
 
 type GenerationStats = {
     newItemsCount: number;

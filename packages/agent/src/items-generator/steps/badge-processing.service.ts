@@ -1,12 +1,41 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ItemData } from '../dto/item-data.dto';
 import { BadgeEvaluationService } from '../shared/badge-evaluation.service';
+import { IPipelineStep, GenerationContext } from '../interfaces/pipeline.interface';
+import { ItemsGeneratorStep } from '../constants/steps';
 
 @Injectable()
-export class BadgeProcessingService {
+export class BadgeProcessingService implements IPipelineStep {
     private readonly logger = new Logger(BadgeProcessingService.name);
 
+    public readonly name = ItemsGeneratorStep.BADGES_PROCESSING;
+
     constructor(private readonly badgeEvaluationService: BadgeEvaluationService) {}
+
+    async run(context: GenerationContext): Promise<GenerationContext> {
+        const { dto, directory, finalItems, metrics } = context;
+
+        if (dto.badge_evaluation_enabled) {
+            this.logger.log(`[${directory.slug}] Badge Processing for Repository Items - Starting`);
+
+            const processedItems = await this.processBadges(finalItems);
+
+            // Log badge statistics
+            const badgeStats = this.getBadgeStatistics(processedItems);
+            this.logger.log(
+                `[${directory.slug}] Badge processing completed. Statistics: ${JSON.stringify(badgeStats)}`,
+            );
+
+            context.finalItems = processedItems;
+        }
+
+        context.metrics = {
+            ...metrics,
+            total_items_in_store: context.finalItems.length,
+        };
+
+        return context;
+    }
 
     /**
      * Processes badges for a list of items

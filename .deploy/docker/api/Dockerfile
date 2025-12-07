@@ -40,7 +40,7 @@ RUN pnpm build --filter=ever-works-api...
 # Prune dev deps and husky
 RUN sed -i '/"prepare.*husky/d' package.json
 RUN rm -rf ./**/node_modules
-RUN rm -rf /app/packages/agent/src /app/packages/monitoring/src
+RUN rm -rf /app/packages/agent/src /app/packages/monitoring/src /app/packages/tasks/src
 
 #--
 # Build

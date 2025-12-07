@@ -65,7 +65,7 @@ export interface EverWorksConfig {
     GROQ_MAX_TOKENS?: string;
 
     // Search Services
-    EXTRACT_CONTENT_SERVICE: 'tavily' | 'naive';
+    EXTRACT_CONTENT_SERVICE: 'tavily' | 'local';
     WEB_SEARCH_SERVICE: 'tavily' | 'google-sr';
     TAVILY_API_KEY?: string;
 

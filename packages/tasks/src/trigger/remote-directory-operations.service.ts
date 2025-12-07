@@ -1,8 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { Directory } from '@src/entities/directory.entity';
-import type { DirectoryOperations, GenerationHistoryUpdateInput } from '@src/directory-operations';
+import { Directory } from '@packages/agent/entities';
+import type {
+    DirectoryOperations,
+    GenerationHistoryUpdateInput,
+} from '@packages/agent/directory-operations';
+import { DirectoryCommandAction, DirectoryCommandPayloads } from '@packages/agent/tasks';
 import { TriggerInternalApiClient } from './trigger-internal-api.client';
-import { DirectoryCommandAction, DirectoryCommandPayloads } from './directory-command.types';
 
 @Injectable()
 export class RemoteDirectoryOperationsService implements DirectoryOperations {

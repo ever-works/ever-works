@@ -1,5 +1,4 @@
 import { SubCommand, CommandRunner } from 'nest-commander';
-import { Logger } from '@nestjs/common';
 import chalk from 'chalk';
 import ora from 'ora';
 import inquirer from 'inquirer';
@@ -14,8 +13,6 @@ import { handleCliError } from './error';
     description: 'Update a directory and its GitHub repository',
 })
 export class UpdateSubCommand extends CommandRunner {
-    private readonly logger = new Logger(UpdateSubCommand.name);
-
     constructor(
         private readonly directoryRepository: DirectoryRepository,
         private readonly directoryPrompt: DirectoryPromptService,
@@ -129,7 +126,7 @@ export class UpdateSubCommand extends CommandRunner {
     private async promptUpdateOptions() {
         console.log(chalk.cyan('\n--- Update Options ---'));
 
-        const { generation_method } = await inquirer.prompt([
+        const answers = await inquirer.prompt([
             {
                 type: 'list',
                 name: 'generation_method',
@@ -148,9 +145,6 @@ export class UpdateSubCommand extends CommandRunner {
                 ],
                 default: 'create-update',
             },
-        ]);
-
-        const { update_with_pull_request } = await inquirer.prompt([
             {
                 type: 'confirm',
                 name: 'update_with_pull_request',
@@ -160,8 +154,8 @@ export class UpdateSubCommand extends CommandRunner {
         ]);
 
         return {
-            generation_method,
-            update_with_pull_request,
+            generation_method: answers.generation_method,
+            update_with_pull_request: answers.update_with_pull_request,
         };
     }
 }

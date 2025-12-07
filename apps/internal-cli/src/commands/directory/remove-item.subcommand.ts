@@ -1,5 +1,4 @@
 import { SubCommand, CommandRunner } from 'nest-commander';
-import { Logger } from '@nestjs/common';
 import chalk from 'chalk';
 import ora from 'ora';
 import inquirer from 'inquirer';
@@ -14,8 +13,6 @@ import { handleCliError } from './error';
     description: 'Remove an item from a directory',
 })
 export class RemoveItemSubCommand extends CommandRunner {
-    private readonly logger = new Logger(RemoveItemSubCommand.name);
-
     constructor(
         private readonly directoryRepository: DirectoryRepository,
         private readonly directoryPrompt: DirectoryPromptService,
@@ -123,7 +120,7 @@ export class RemoveItemSubCommand extends CommandRunner {
     private async promptRemovalDetails() {
         console.log(chalk.cyan('\n--- Item Removal Details ---'));
 
-        const { item_slug } = await inquirer.prompt([
+        const answers = await inquirer.prompt([
             {
                 type: 'input',
                 name: 'item_slug',
@@ -136,9 +133,6 @@ export class RemoveItemSubCommand extends CommandRunner {
                     return true;
                 },
             },
-        ]);
-
-        const { reason } = await inquirer.prompt([
             {
                 type: 'input',
                 name: 'reason',
@@ -153,8 +147,8 @@ export class RemoveItemSubCommand extends CommandRunner {
         ]);
 
         return {
-            item_slug,
-            reason: reason.trim() || undefined,
+            item_slug: answers.item_slug,
+            reason: answers.reason.trim() || undefined,
         };
     }
 }

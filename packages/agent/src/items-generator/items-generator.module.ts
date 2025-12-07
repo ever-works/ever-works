@@ -21,12 +21,15 @@ import {
 } from './steps/data-aggregation';
 import { AiModule } from '../ai';
 import { GitModule } from '../git';
+import { PipelineExecutor } from './pipeline/pipeline-executor';
 
 export const STEP_SERVICES = [
     // Shared services
     SearchService,
     NotionService,
     BadgeEvaluationService,
+    PipelineExecutor, // This has a `CacheDependency`; do not import `CacheManager` here.
+    // It should be called by the consumer of this agent.
 
     // Data aggregation shared services
     SharedUtilsService,

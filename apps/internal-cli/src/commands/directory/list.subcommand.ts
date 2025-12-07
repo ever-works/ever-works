@@ -1,7 +1,5 @@
 import { SubCommand, CommandRunner } from 'nest-commander';
-import { Logger } from '@nestjs/common';
 import chalk from 'chalk';
-import ora from 'ora';
 import { DirectoryRepository } from '@packages/agent/database';
 import { ConfigCheckService } from './config-check.service';
 import { handleCliError } from './error';
@@ -11,8 +9,6 @@ import { handleCliError } from './error';
     description: 'List all directories',
 })
 export class ListSubCommand extends CommandRunner {
-    private readonly logger = new Logger(ListSubCommand.name);
-
     constructor(
         private readonly directoryRepository: DirectoryRepository,
         private readonly configCheck: ConfigCheckService,

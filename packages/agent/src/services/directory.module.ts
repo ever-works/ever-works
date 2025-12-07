@@ -8,7 +8,6 @@ import { DeployModule } from '../deploy/deploy.module';
 import { DatabaseModule } from '../database/database.module';
 import { AiModule } from '../ai/ai.module';
 import { DirectoryDetailService } from './directory-detail.service';
-import { TriggerModule } from '@src/trigger';
 import { DirectoryOwnershipService } from './directory-ownership.service';
 import { DirectoryQueryService } from './directory-query.service';
 import { DirectoryLifecycleService } from './directory-lifecycle.service';
@@ -27,7 +26,6 @@ import { SubscriptionsModule } from '@src/subscriptions';
         WebsiteGeneratorModule,
         DeployModule,
         AiModule,
-        TriggerModule,
         SubscriptionsModule,
     ],
     providers: [

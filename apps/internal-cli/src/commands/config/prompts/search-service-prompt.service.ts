@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { BasePromptService } from '@packages/cli-shared';
 
 export interface SearchServiceConfig {
-    extractContentService: 'tavily' | 'naive';
+    extractContentService: 'tavily' | 'local';
     webSearchService: 'tavily' | 'google-sr';
     tavilyApiKey?: string;
 }
@@ -25,8 +25,8 @@ export class SearchServicePromptService extends BasePromptService {
                     value: 'tavily' as const,
                 },
                 {
-                    name: 'Naive - Basic content extraction (no API key required)',
-                    value: 'naive' as const,
+                    name: 'Local - Basic content extraction (no API key required)',
+                    value: 'local' as const,
                 },
             ],
             existingConfig?.EXTRACT_CONTENT_SERVICE,

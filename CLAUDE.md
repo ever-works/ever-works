@@ -11,6 +11,7 @@ You are an AI assistant helping with the **Ever Works Platform**, an open-source
 - **Website**: https://ever.works
 
 ### Tech Stack
+
 - **Monorepo**: Turborepo + pnpm workspaces
 - **Backend**: NestJS 11 with TypeScript, SQLite/PostgreSQL/MySQL
 - **Frontend**: Next.js 16 (App Router) with React 19, Tailwind CSS 4
@@ -22,6 +23,7 @@ You are an AI assistant helping with the **Ever Works Platform**, an open-source
 ## Architecture
 
 ### Monorepo Structure
+
 ```
 ever-works/
 ├── apps/
@@ -38,6 +40,7 @@ ever-works/
 ```
 
 ### Key Modules
+
 - **Auth**: JWT + OAuth (GitHub, Google), iron-session, email verification
 - **Directories**: Core directory management with AI generation
 - **AI Conversation**: Chat interface with streaming support
@@ -49,12 +52,14 @@ ever-works/
 ## Code Style & Conventions
 
 ### TypeScript
+
 - **Strict mode**: Varies by package (web: strict, api: relaxed)
 - **Decorators**: Enabled (NestJS dependency injection)
 - **Path aliases**: `@/*` (web), `@src/*` (api/cli), `@packages/*` (shared)
 - **Target**: ES2021 (backend), ES2017 (frontend)
 
 ### Formatting (Prettier)
+
 - **Print width**: 100 characters
 - **Indentation**: 4 spaces (not tabs)
 - **Quotes**: Single quotes
@@ -64,6 +69,7 @@ ever-works/
 - **Line endings**: LF
 
 ### Naming Conventions
+
 - **Files**: kebab-case (e.g., `auth.service.ts`, `user-profile.tsx`)
 - **Classes**: PascalCase (e.g., `AuthService`, `UserProfile`)
 - **Interfaces/Types**: PascalCase with descriptive names
@@ -71,6 +77,7 @@ ever-works/
 - **Functions/Variables**: camelCase
 
 ### NestJS Patterns
+
 - **Modules**: Feature-based organization (auth/, directories/, etc.)
 - **Services**: Business logic, injectable with `@Injectable()`
 - **Controllers**: Route handlers, use DTOs for validation
@@ -80,6 +87,7 @@ ever-works/
 - **Decorators**: Custom decorators for common patterns (`@Public()`, `@CurrentUser()`)
 
 ### Next.js Patterns
+
 - **App Router**: Use server components by default
 - **Client components**: Mark with `'use client'` only when needed
 - **Server actions**: In `app/actions/` directory
@@ -91,6 +99,7 @@ ever-works/
 ## Development Workflow
 
 ### Commands
+
 ```bash
 # Development
 pnpm dev              # Start all apps in watch mode
@@ -113,12 +122,15 @@ pnpm deploy:trigger   # Deploy Trigger.dev jobs
 ```
 
 ### Build Order
+
 Turbo automatically handles build dependencies:
+
 1. Shared packages (`@packages/*`) build first
 2. Apps build after their dependencies
 3. Use `^build` in turbo.json for dependency ordering
 
 ### Environment Setup
+
 - Copy `.env.example` to `.env` in each app
 - Required for API: `JWT_SECRET`, database config
 - Required for Web: `AUTH_SECRET`, `API_URL`
@@ -127,22 +139,26 @@ Turbo automatically handles build dependencies:
 ## Testing
 
 ### Backend (Jest)
+
 - Unit tests: `*.spec.ts` files next to source
 - Run: `pnpm test` in package directory
 - Coverage: `pnpm test:cov`
 - Watch mode: `pnpm test:watch`
 
 ### Frontend
+
 - Testing setup: TBD (recommend Vitest + Testing Library)
 
 ## Database
 
 ### Supported Databases
+
 - **SQLite**: Development (in-memory or file)
 - **PostgreSQL**: Production recommended
 - **MySQL**: Production alternative
 
 ### TypeORM
+
 - Entities in feature modules
 - Migrations: Manual or auto-sync (dev only)
 - Configuration in `@packages/agent/database`
@@ -150,11 +166,13 @@ Turbo automatically handles build dependencies:
 ## AI Integration
 
 ### Providers
+
 - Primary: OpenAI (GPT-4, GPT-3.5)
 - Alternatives: Anthropic, Google Gemini, Mistral, Groq, DeepSeek
 - Local: Ollama (fallback for development)
 
 ### LangChain
+
 - Agents in `@packages/agent`
 - Streaming support for chat
 - Context management with LangGraph
@@ -162,6 +180,7 @@ Turbo automatically handles build dependencies:
 ## Important Rules
 
 ### DO
+
 - ✅ Use pnpm for package management (never npm/yarn)
 - ✅ Run `pnpm format` before committing
 - ✅ Follow conventional commits (enforced by commitlint)
@@ -174,6 +193,7 @@ Turbo automatically handles build dependencies:
 - ✅ Add JSDoc comments for public APIs
 
 ### DON'T
+
 - ❌ Don't commit `.env` files (use `.env.example`)
 - ❌ Don't use `npm install` or `yarn` (use pnpm)
 - ❌ Don't bypass authentication guards without `@Public()`
@@ -186,7 +206,9 @@ Turbo automatically handles build dependencies:
 ## Git Workflow
 
 ### Commit Messages
+
 Follow conventional commits:
+
 - `feat: add user profile page`
 - `fix: resolve authentication bug`
 - `docs: update API documentation`
@@ -195,22 +217,26 @@ Follow conventional commits:
 - `chore: update dependencies`
 
 ### Husky Hooks
+
 - **commit-msg**: Validates commit message format
 - Configured in `.husky/commit-msg`
 
 ## Deployment
 
 ### Vercel (Web App)
+
 - Automatic deployments from GitHub
 - Environment variables in Vercel dashboard
 - Build command: `pnpm build --filter=ever-works-web`
 
 ### API Deployment
+
 - Docker support via `compose.yaml`
 - Environment variables required
 - Database migrations before deployment
 
 ### Trigger.dev
+
 - Background jobs for AI generation
 - Deploy: `pnpm deploy:trigger`
 - Configure in Trigger.dev dashboard
@@ -218,6 +244,7 @@ Follow conventional commits:
 ## Common Tasks
 
 ### Adding a New Feature
+
 1. Create feature module in appropriate app
 2. Add routes/controllers (API) or pages/components (Web)
 3. Create DTOs for validation
@@ -227,6 +254,7 @@ Follow conventional commits:
 7. Update documentation
 
 ### Adding a Dependency
+
 ```bash
 # Add to specific package
 cd apps/api
@@ -237,6 +265,7 @@ pnpm add -D -w <package>
 ```
 
 ### Creating a New Package
+
 1. Create directory in `packages/`
 2. Add `package.json` with proper exports
 3. Configure TypeScript (`tsconfig.json`)
@@ -260,4 +289,3 @@ pnpm add -D -w <package>
 4. **Consider dependencies**: Check if changes affect other packages
 5. **Suggest tests**: Recommend test cases for new features
 6. **Security first**: Always validate inputs and handle auth properly
-
