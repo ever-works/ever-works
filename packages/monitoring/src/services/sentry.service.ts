@@ -9,7 +9,7 @@ export class SentryService {
     /**
      * Get the Sentry logger instance
      * Use this to send structured logs to Sentry
-     * 
+     *
      * @example
      * ```typescript
      * this.sentryService.getLogger().info('User logged in', { userId: '123' });
@@ -112,4 +112,3 @@ export class SentryService {
         return !!process.env.SENTRY_DSN;
     }
 }
-

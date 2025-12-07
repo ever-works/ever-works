@@ -1,15 +1,16 @@
 import { Module } from '@nestjs/common';
-import { TriggerItemsGeneratorModule } from './trigger-items-generator.module';
-import { TriggerInternalApiClient } from './trigger-internal-api.client';
-import { RemoteDirectoryOperationsService } from './remote-directory-operations.service';
-import { DIRECTORY_OPERATIONS } from '@src/directory-operations';
-import { DataGeneratorService } from '@src/data-generator/data-generator.service';
-import { MarkdownGeneratorService } from '@src/markdown-generator/markdown-generator.service';
-import { WebsiteGeneratorService } from '@src/website-generator/website-generator.service';
-import { GitModule } from '@src/git/git.module';
-import { TriggerGenerationOrchestrator } from './trigger-generation.orchestrator';
-import { DirectoryModule } from '@src/services';
 import { EventEmitterModule } from '@nestjs/event-emitter';
+import { DirectoryModule } from '@packages/agent/services';
+import { DIRECTORY_OPERATIONS } from '@packages/agent/directory-operations';
+import { DataGeneratorService } from '@packages/agent/data-generator';
+import { MarkdownGeneratorService } from '@packages/agent/markdown-generator';
+import { WebsiteGeneratorService } from '@packages/agent/website-generator';
+import { GitModule } from '@packages/agent/git';
+import { TriggerItemsGeneratorModule } from './trigger-items-generator.module';
+import { TriggerInternalModule } from './trigger-internal.module';
+import { RemoteDirectoryOperationsService } from './remote-directory-operations.service';
+import { TriggerGenerationOrchestrator } from './trigger-generation.orchestrator';
+import { TriggerCacheFactory } from './cache/cache.factory';
 
 @Module({
     imports: [
@@ -17,9 +18,10 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
         GitModule,
         DirectoryModule,
         EventEmitterModule.forRoot(),
+        TriggerInternalModule,
+        TriggerCacheFactory.register({ isGlobal: true }),
     ],
     providers: [
-        TriggerInternalApiClient,
         RemoteDirectoryOperationsService,
         {
             provide: DIRECTORY_OPERATIONS,
@@ -30,6 +32,6 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
         WebsiteGeneratorService,
         TriggerGenerationOrchestrator,
     ],
-    exports: [TriggerGenerationOrchestrator, TriggerInternalApiClient],
+    exports: [TriggerGenerationOrchestrator, TriggerInternalModule],
 })
 export class TriggerWorkerModule {}

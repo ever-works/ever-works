@@ -617,6 +617,13 @@
                     "slug": "Slug (Optional)",
                     "slugPlaceholder": "custom-item-slug",
                     "slugHelp": "URL-friendly identifier. Will be auto-generated if left empty",
+                    "brand": "Brand (Optional)",
+                    "brandPlaceholder": "Enter brand name",
+                    "brandLogoUrl": "Brand Logo URL (Optional)",
+                    "brandLogoUrlPlaceholder": "https://example.com/logo.png",
+                    "images": "Images (Optional)",
+                    "imagePlaceholder": "https://example.com/screenshot.png",
+                    "imagesHelp": "Add image URLs (screenshots, product images)",
                     "featured": "Featured Item",
                     "featuredHelp": "Mark this item as featured in the directory",
                     "updateWithPR": "Create Pull Request",
@@ -631,6 +638,7 @@
                     "errors": {
                         "urlRequired": "Source URL is required for extraction",
                         "invalidUrl": "Please enter a valid URL that includes http:// or https://",
+                        "invalidImageUrl": "Please enter a valid image URL",
                         "requiredFields": "Please fill in all required fields"
                     }
                 }

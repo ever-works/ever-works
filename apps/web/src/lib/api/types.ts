@@ -60,6 +60,13 @@ export interface Tag {
     name: string;
 }
 
+export interface Brand {
+    id: string;
+    name: string;
+    logo_url?: string;
+    website?: string;
+}
+
 export interface ItemData {
     name: string;
     description: string;
@@ -70,4 +77,7 @@ export interface ItemData {
     tags: string[] | Tag[];
     markdown?: string;
     badges?: ItemBadges;
+    brand?: string | Brand;
+    brand_logo_url?: string | null;
+    images?: string[];
 }

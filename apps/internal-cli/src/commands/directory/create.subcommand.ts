@@ -1,5 +1,4 @@
 import { SubCommand, CommandRunner } from 'nest-commander';
-import { Logger } from '@nestjs/common';
 import chalk from 'chalk';
 import ora from 'ora';
 import { DirectoryRepository, UserRepository } from '@packages/agent/database';
@@ -15,8 +14,6 @@ import { RepoProvider } from '@packages/agent/dto';
     description: 'Create a new directory',
 })
 export class CreateSubCommand extends CommandRunner {
-    private readonly logger = new Logger(CreateSubCommand.name);
-
     constructor(
         private readonly directoryLifecycleService: DirectoryLifecycleService,
         private readonly directoryRepository: DirectoryRepository,

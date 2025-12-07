@@ -1,5 +1,4 @@
 import { SubCommand, CommandRunner } from 'nest-commander';
-import { Logger } from '@nestjs/common';
 import chalk from 'chalk';
 import ora from 'ora';
 import inquirer from 'inquirer';
@@ -23,8 +22,6 @@ import { getStepProgress, getStepText, ItemsGeneratorStep } from '@packages/cli-
     description: 'Generate data and create a GitHub repository for a directory',
 })
 export class GenerateSubCommand extends CommandRunner {
-    private readonly logger = new Logger(GenerateSubCommand.name);
-
     constructor(
         private readonly directoryRepository: DirectoryRepository,
         private readonly directoryGenerationService: DirectoryGenerationService,

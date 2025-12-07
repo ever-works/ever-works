@@ -4,6 +4,7 @@ import chalk from 'chalk';
 import ora from 'ora';
 import { ConfigService } from '../../config/config.service';
 import { AiService } from '@packages/agent/ai';
+import { config as agentConfig } from '@packages/agent/config';
 import { COMMAND } from '../../config';
 
 @SubCommand({
@@ -81,17 +82,31 @@ export class TestSubCommand extends CommandRunner {
         for (const provider of providers) {
             const spinner = ora(`Testing ${provider} provider...`).start();
 
+            const lowerProvider = provider.toLowerCase();
+            const upperProvider = provider.toUpperCase();
+
             try {
+                const providerConfig = agentConfig.ai[lowerProvider];
+
                 const result = await this.aiService.testProvider({
                     type: provider as any,
-                    apiKey: config[`${provider.toUpperCase()}_API_KEY`],
+
+                    apiKey: config[`${upperProvider}_API_KEY`],
+
                     modelName:
-                        config[`${provider.toUpperCase()}_MODEL`] || this.getDefaultModel(provider),
-                    temperature: parseFloat(
-                        config[`${provider.toUpperCase()}_TEMPERATURE`] || '0.7',
-                    ),
-                    maxTokens: parseInt(config[`${provider.toUpperCase()}_MAX_TOKENS`] || '4096'),
-                    baseURL: config[`${provider.toUpperCase()}_BASE_URL`],
+                        config[`${upperProvider}_MODEL`] ||
+                        providerConfig?.getModel?.() ||
+                        this.getDefaultModel(provider),
+
+                    temperature:
+                        parseFloat(config[`${upperProvider}_TEMPERATURE`] || '0.7') ||
+                        providerConfig?.getTemperature?.(),
+
+                    maxTokens:
+                        parseInt(config[`${upperProvider}_MAX_TOKENS`] || '4096') ||
+                        providerConfig?.getMaxTokens?.(),
+
+                    baseURL: config[`${upperProvider}_BASE_URL`] || providerConfig?.getBaseUrl?.(),
                 });
 
                 if (result.success) {
@@ -264,7 +279,7 @@ export class TestSubCommand extends CommandRunner {
             ollama: 'llama2',
             mistral: 'mistral-large-latest',
             deepseek: 'deepseek-chat',
-            groq: 'llama-3.1-70b-versatile',
+            groq: 'openai/gpt-oss-120b',
         };
         return defaults[provider] || 'default';
     }

@@ -18,8 +18,8 @@ export function Footer({ className }: FooterProps) {
     return (
         <footer
             className={cn(
-                'border-t border-border dark:border-border-dark',
-                'bg-surface-secondary dark:bg-surface-secondary-dark',
+                // 'border-t border-border dark:border-border-dark',
+                // 'bg-surface-secondary dark:bg-surface-secondary-dark',
                 'py-4 px-4 sm:px-6 lg:px-8',
                 className,
             )}
@@ -48,8 +48,8 @@ function Copyright() {
                 aria-label={`Visit ${COMPANY_NAME} website`}
             >
                 {COMPANY_NAME}
-            </a>
-            {' '}By {COMPANY_OWNER_NAME} All rights reserved.
+            </a>{' '}
+            By {COMPANY_OWNER_NAME} All rights reserved.
         </div>
     );
 }

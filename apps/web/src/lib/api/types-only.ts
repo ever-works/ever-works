@@ -83,5 +83,6 @@ export type {
     ItemBadges,
     BadgeEvaluationResult,
     Tag,
+    Brand,
     ItemData,
 } from './types';

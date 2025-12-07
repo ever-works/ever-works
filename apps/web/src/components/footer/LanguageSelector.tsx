@@ -72,8 +72,13 @@ export function LanguageSelector({ className }: LanguageSelectorProps) {
                     <span className="mr-2 text-base leading-none" aria-hidden="true">
                         {currentLocaleFlag}
                     </span>
-                    <span className="text-xs leading-tight whitespace-nowrap">{currentLocaleName}</span>
-                    <ChevronDown className="ml-2 w-3.5 h-3.5 opacity-60 shrink-0" aria-hidden="true" />
+                    <span className="text-xs leading-tight whitespace-nowrap">
+                        {currentLocaleName}
+                    </span>
+                    <ChevronDown
+                        className="ml-2 w-3.5 h-3.5 opacity-60 shrink-0"
+                        aria-hidden="true"
+                    />
                 </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" side="top" className="min-w-[160px]">
@@ -85,14 +90,18 @@ export function LanguageSelector({ className }: LanguageSelectorProps) {
                             onClick={() => handleLocaleChange(loc)}
                             className={cn(
                                 'flex items-center gap-2',
-                                isActive && 'bg-surface-tertiary cursor-pointer dark:bg-surface-tertiary-dark font-medium',
+                                isActive &&
+                                    'bg-surface-tertiary cursor-pointer dark:bg-surface-tertiary-dark font-medium',
                                 !isActive && 'cursor-pointer',
                             )}
                         >
                             <span aria-hidden="true">{LOCALE_FLAGS[loc]}</span>
                             <span>{LOCALE_NAMES[loc]}</span>
                             {isActive && (
-                                <span className="ml-auto text-xs text-primary dark:text-primary-dark" aria-label="Current language">
+                                <span
+                                    className="ml-auto text-xs text-primary dark:text-primary-dark"
+                                    aria-label="Current language"
+                                >
                                     ✓
                                 </span>
                             )}
@@ -103,4 +112,3 @@ export function LanguageSelector({ className }: LanguageSelectorProps) {
         </DropdownMenu>
     );
 }
-

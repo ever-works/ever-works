@@ -1,10 +1,10 @@
 # GitHub Copilot Instructions - Ever Works Platform
 
 ## Project Context
+
 ### Canonical Rules
 
 For the full, always up-to-date project guide, see [`CLAUDE.md`](../CLAUDE.md). This Copilot file only provides lightweight hints and examples.
-
 
 You're working on **Ever Works**, an open-source directory builder platform with AI-powered content generation.
 
@@ -12,6 +12,7 @@ You're working on **Ever Works**, an open-source directory builder platform with
 - **Documentation**: https://github.com/ever-works/ever-works-docs/tree/develop/website/docs
 
 ### Quick Facts
+
 - **Monorepo**: Turborepo + pnpm workspaces
 - **Backend**: NestJS 11 + TypeScript
 - **Frontend**: Next.js 16 (App Router) + React 19
@@ -22,6 +23,7 @@ You're working on **Ever Works**, an open-source directory builder platform with
 ## Code Style
 
 ### Formatting
+
 - **Indentation**: 4 spaces
 - **Quotes**: Single quotes
 - **Semicolons**: Always
@@ -29,6 +31,7 @@ You're working on **Ever Works**, an open-source directory builder platform with
 - **Trailing commas**: Always
 
 ### Naming
+
 - **Files**: kebab-case (`auth.service.ts`, `user-profile.tsx`)
 - **Classes**: PascalCase (`AuthService`, `UserProfile`)
 - **Functions/Variables**: camelCase
@@ -38,64 +41,68 @@ You're working on **Ever Works**, an open-source directory builder platform with
 ## NestJS Patterns
 
 ### Controllers
+
 ```typescript
 @Controller('api/feature')
 export class FeatureController {
-    constructor(private readonly service: FeatureService) {}
+	constructor(private readonly service: FeatureService) {}
 
-    @Get()
-    @Public() // Skip auth if needed
-    async findAll(): Promise<FeatureDto[]> {
-        return this.service.findAll();
-    }
+	@Get()
+	@Public() // Skip auth if needed
+	async findAll(): Promise<FeatureDto[]> {
+		return this.service.findAll();
+	}
 
-    @Post()
-    async create(@Body() dto: CreateFeatureDto): Promise<FeatureDto> {
-        return this.service.create(dto);
-    }
+	@Post()
+	async create(@Body() dto: CreateFeatureDto): Promise<FeatureDto> {
+		return this.service.create(dto);
+	}
 }
 ```
 
 ### Services
+
 ```typescript
 @Injectable()
 export class FeatureService {
-    constructor(
-        @InjectRepository(Entity) private repo: Repository<Entity>,
-        private readonly dependency: DependencyService,
-    ) {}
+	constructor(
+		@InjectRepository(Entity) private repo: Repository<Entity>,
+		private readonly dependency: DependencyService
+	) {}
 
-    async findAll(): Promise<Entity[]> {
-        return this.repo.find();
-    }
+	async findAll(): Promise<Entity[]> {
+		return this.repo.find();
+	}
 }
 ```
 
 ### DTOs
+
 ```typescript
 import { IsString, IsEmail, IsOptional, MinLength } from 'class-validator';
 
 export class CreateUserDto {
-    @IsEmail()
-    email: string;
+	@IsEmail()
+	email: string;
 
-    @IsString()
-    @MinLength(8)
-    password: string;
+	@IsString()
+	@MinLength(8)
+	password: string;
 
-    @IsString()
-    @IsOptional()
-    name?: string;
+	@IsString()
+	@IsOptional()
+	name?: string;
 }
 ```
 
 ### Modules
+
 ```typescript
 @Module({
-    imports: [TypeOrmModule.forFeature([Entity]), DependencyModule],
-    controllers: [FeatureController],
-    providers: [FeatureService],
-    exports: [FeatureService],
+	imports: [TypeOrmModule.forFeature([Entity]), DependencyModule],
+	controllers: [FeatureController],
+	providers: [FeatureService],
+	exports: [FeatureService]
 })
 export class FeatureModule {}
 ```
@@ -103,6 +110,7 @@ export class FeatureModule {}
 ## Next.js Patterns
 
 ### Server Components (Default)
+
 ```typescript
 // app/[locale]/feature/page.tsx
 import { getFeatures } from '@/lib/api/features';
@@ -121,6 +129,7 @@ export default async function FeaturePage() {
 ```
 
 ### Client Components
+
 ```typescript
 'use client';
 
@@ -134,73 +143,79 @@ export function InteractiveComponent() {
 ```
 
 ### Server Actions
+
 ```typescript
 'use server';
 
 import { revalidatePath } from 'next/cache';
 
 export async function createFeature(formData: FormData) {
-    const name = formData.get('name') as string;
+	const name = formData.get('name') as string;
 
-    // Call API
-    await fetch(`${process.env.API_URL}/api/features`, {
-        method: 'POST',
-        body: JSON.stringify({ name }),
-    });
+	// Call API
+	await fetch(`${process.env.API_URL}/api/features`, {
+		method: 'POST',
+		body: JSON.stringify({ name })
+	});
 
-    revalidatePath('/features');
+	revalidatePath('/features');
 }
 ```
 
 ## TypeScript Patterns
 
 ### Interfaces
+
 ```typescript
 interface User {
-    id: string;
-    email: string;
-    name?: string;
-    createdAt: Date;
+	id: string;
+	email: string;
+	name?: string;
+	createdAt: Date;
 }
 ```
 
 ### Types
+
 ```typescript
 type Status = 'active' | 'inactive' | 'pending';
 type Result<T> = { success: true; data: T } | { success: false; error: string };
 ```
 
 ### Generics
+
 ```typescript
 async function fetchData<T>(url: string): Promise<T> {
-    const response = await fetch(url);
-    return response.json();
+	const response = await fetch(url);
+	return response.json();
 }
 ```
 
 ## Database (TypeORM)
 
 ### Entities
+
 ```typescript
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn } from 'typeorm';
 
 @Entity('users')
 export class User {
-    @PrimaryGeneratedColumn('uuid')
-    id: string;
+	@PrimaryGeneratedColumn('uuid')
+	id: string;
 
-    @Column({ unique: true })
-    email: string;
+	@Column({ unique: true })
+	email: string;
 
-    @Column()
-    name: string;
+	@Column()
+	name: string;
 
-    @CreateDateColumn()
-    createdAt: Date;
+	@CreateDateColumn()
+	createdAt: Date;
 }
 ```
 
 ### Repositories
+
 ```typescript
 // In service
 const users = await this.userRepo.find({ where: { active: true } });
@@ -212,41 +227,45 @@ await this.userRepo.delete(id);
 ## Common Patterns
 
 ### Error Handling (NestJS)
+
 ```typescript
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 
 if (!user) {
-    throw new NotFoundException('User not found');
+	throw new NotFoundException('User not found');
 }
 
 if (!isValid) {
-    throw new BadRequestException('Invalid input');
+	throw new BadRequestException('Invalid input');
 }
 ```
 
 ### Async/Await
+
 ```typescript
 // Always use async/await
 async function getData() {
-    const result = await service.fetch();
-    return result;
+	const result = await service.fetch();
+	return result;
 }
 
 // Not .then()
 ```
 
 ### Environment Variables
+
 ```typescript
 // NestJS
-process.env.DATABASE_URL
+process.env.DATABASE_URL;
 
 // Next.js (client-side)
-process.env.NEXT_PUBLIC_API_URL
+process.env.NEXT_PUBLIC_API_URL;
 ```
 
 ## Project Structure
 
 ### Backend (apps/api)
+
 ```
 src/
 ├── auth/              # Authentication
@@ -257,6 +276,7 @@ src/
 ```
 
 ### Frontend (apps/web)
+
 ```
 src/
 ├── app/               # Pages & layouts
@@ -266,6 +286,7 @@ src/
 ```
 
 ### Packages
+
 ```
 packages/
 ├── agent/             # AI & background jobs
@@ -293,6 +314,7 @@ pnpm type-check
 ## Best Practices
 
 ### DO ✅
+
 - Use pnpm for package management
 - Validate inputs with DTOs
 - Use dependency injection
@@ -302,6 +324,7 @@ pnpm type-check
 - Format before committing
 
 ### DON'T ❌
+
 - Don't use npm/yarn
 - Don't commit .env files
 - Don't bypass auth guards
@@ -320,29 +343,29 @@ pnpm type-check
 
 ```typescript
 describe('FeatureService', () => {
-    let service: FeatureService;
+	let service: FeatureService;
 
-    beforeEach(async () => {
-        const module = await Test.createTestingModule({
-            providers: [FeatureService],
-        }).compile();
+	beforeEach(async () => {
+		const module = await Test.createTestingModule({
+			providers: [FeatureService]
+		}).compile();
 
-        service = module.get<FeatureService>(FeatureService);
-    });
+		service = module.get<FeatureService>(FeatureService);
+	});
 
-    it('should be defined', () => {
-        expect(service).toBeDefined();
-    });
+	it('should be defined', () => {
+		expect(service).toBeDefined();
+	});
 });
 ```
 
 ## Commit Messages
 
 Follow conventional commits:
+
 - `feat: add user profile page`
 - `fix: resolve auth bug`
 - `docs: update README`
 - `refactor: simplify service`
 - `test: add unit tests`
 - `chore: update deps`
-

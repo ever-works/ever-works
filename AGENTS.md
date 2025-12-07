@@ -16,6 +16,7 @@ For all AI agents (Cursor, Claude, Augment Code, GitHub Copilot, etc.):
 3. **Copilot-specific hints**: [`.github/copilot-instructions.md`](./.github/copilot-instructions.md)
 
 When in doubt, prefer the guidance in `CLAUDE.md` and only add tool-specific nuances in your own context.
+
 ## Instruction Layering
 
 To keep instructions consistent and easy to maintain, follow this layering model:
@@ -23,8 +24,6 @@ To keep instructions consistent and easy to maintain, follow this layering model
 1. **Root index – `AGENTS.md` (this file)**: Multi-agent entrypoint and meta-rules. Keep this light and focused on routing different tools to the right docs.
 2. **Canonical manual – `CLAUDE.md`**: Single, detailed source of truth for project architecture, workflows, conventions, and general AI behavior.
 3. **Tool-specific supplements**: Files like `AUGMENT.md`, `.github/copilot-instructions.md`, or nested `AGENTS.md` in subfolders may add small, tool- or folder-specific nuances and examples, but should reference `CLAUDE.md` instead of duplicating it.
-
-
 
 ## How Cursor Should Use This File
 
@@ -66,4 +65,3 @@ If you need to extend or refine project rules:
 3. Only add content here if it is **Cursor-specific behavior** that cannot live elsewhere.
 
 Avoid copying large sections from `CLAUDE.md` into this file—link instead.
-

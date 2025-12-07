@@ -1,8 +1,8 @@
 import { schedules } from '@trigger.dev/sdk';
 import { NestFactory } from '@nestjs/core';
-import { TriggerWorkerModule } from '@src/trigger/trigger-worker.module';
-import { DirectoryScheduleDispatcherService } from '@src/services/directory-schedule-dispatcher.service';
-import { config } from '@src/config';
+import { TriggerWorkerModule } from '../../trigger/trigger-worker.module';
+import { DirectoryScheduleDispatcherService } from '@packages/agent/services';
+import { config } from '@packages/agent/config';
 
 const interval = Math.max(1, config.subscriptions.getDispatchIntervalMinutes());
 const cronExpression = `*/${interval} * * * *`;

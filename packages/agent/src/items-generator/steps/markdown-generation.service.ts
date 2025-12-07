@@ -45,9 +45,13 @@ export class MarkdownGenerationService {
     /**
      * Generates markdown summary for a given item
      * @param item The item to generate markdown for
+     * @param contentCache Optional cache of source_url -> raw_content to avoid refetching
      * @returns A markdown string with the item's summary
      */
-    async generateMarkdown(item: Partial<ItemData>): Promise<string> {
+    async generateMarkdown(
+        item: Partial<ItemData>,
+        contentCache?: Map<string, string>,
+    ): Promise<string> {
         if (!item || !item.source_url) {
             this.logger.warn(`Cannot generate markdown: Missing item or source URL`);
             return '';
@@ -56,21 +60,29 @@ export class MarkdownGenerationService {
         this.logger.log(`Generating markdown for: ${item.name} (${item.slug})`);
 
         try {
-            // Extract content from the source URL
-            const content = await this.extractContentFrom(item.source_url);
+            // Check cache first for content
+            let rawContent = contentCache?.get(item.source_url);
 
-            if (!content || !content.rawContent) {
-                this.logger.warn(`Failed to extract content from: "${item.source_url}"`);
+            if (!rawContent) {
+                // Fall back to fetching if not in cache
+                const content = await this.extractContentFrom(item.source_url);
+                rawContent = content?.rawContent;
+            } else {
+                this.logger.debug(`Using cached content for: ${item.source_url}`);
+            }
+
+            if (!rawContent) {
+                this.logger.warn(`Failed to get content for: "${item.source_url}"`);
                 return '';
             }
 
-            // Generate markdown using the extracted content
+            // Generate markdown using the content
             const prompt = HumanMessagePromptTemplate.fromTemplate(MARKDOWN_PROMPT);
             const result = await prompt
                 .pipe(this.llm.withStructuredOutput(markdownOutputSchema))
                 .invoke({
                     item: JSON.stringify(item),
-                    content: content.rawContent.slice(0, 4000),
+                    content: rawContent.slice(0, 4000),
                 });
 
             return result.markdown || '';
@@ -86,9 +98,13 @@ export class MarkdownGenerationService {
     /**
      * Generates markdown summaries for multiple items
      * @param items The items to generate markdown for
+     * @param contentCache Optional cache of source_url -> raw_content to avoid refetching
      * @returns An array of items with their markdown summaries
      */
-    async generateMarkdownForItems(items: ItemData[]): Promise<ItemData[]> {
+    async generateMarkdownForItems(
+        items: ItemData[],
+        contentCache?: Map<string, string>,
+    ): Promise<ItemData[]> {
         if (!items || items.length === 0) {
             return [];
         }
@@ -104,7 +120,7 @@ export class MarkdownGenerationService {
             const batch = items.slice(i, i + BATCH_SIZE);
 
             const markdownPromises = batch.map(async (item) => {
-                const markdown = await this.generateMarkdown(item);
+                const markdown = await this.generateMarkdown(item, contentCache);
                 return {
                     ...item,
                     markdown,
@@ -133,8 +149,8 @@ export class MarkdownGenerationService {
         try {
             return await this.searchService.extractContent(url);
         } catch (error) {
-            // try again with extractContentUsingNaive
-            const text = await this.searchService.extractContentUsingNaive(url).catch(() => null);
+            // try again with extractContentUsingLocal
+            const text = await this.searchService.extractContentUsingLocal(url).catch(() => null);
 
             if (text) {
                 return {

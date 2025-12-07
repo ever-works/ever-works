@@ -95,15 +95,20 @@ export function ThemeToggle({ className }: IClassName) {
                 {/* Sun outline for dark mode */}
                 <Sun className="hidden dark:inline-block h-[18px] w-[18px] dark:text-white cursor-pointer" />
                 {/* Sun filled for light mode */}
-                <Sun className="dark:hidden inline-block h-[18px] w-[18px] text-[#382686] cursor-pointer" fill="currentColor" />
+                <Sun
+                    className="dark:hidden inline-block h-[18px] w-[18px] text-[#382686] cursor-pointer"
+                    fill="currentColor"
+                />
             </>
             <>
                 {/* Moon filled for dark mode */}
-                <Moon className="h-[18px] w-[18px] hidden text-white dark:inline-block cursor-pointer" fill="currentColor" />
+                <Moon
+                    className="h-[18px] w-[18px] hidden text-white dark:inline-block cursor-pointer"
+                    fill="currentColor"
+                />
                 {/* Moon outline for light mode */}
                 <Moon className="dark:hidden inline-block h-[18px] w-[18px] cursor-pointer" />
             </>
         </Toggler>
     );
 }
-

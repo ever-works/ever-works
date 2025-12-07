@@ -16,9 +16,13 @@ import { ConfigModule } from './config/config.module';
 import { ConfigCommands } from './commands/config';
 import { DirectoryCommands } from './commands/directory';
 import { ServeCommands } from './commands/serve';
+import { CacheFactory } from '@packages/agent/cache';
 
 @Module({
     imports: [
+        CacheFactory.TypeORM({
+            isGlobal: true,
+        }),
         DatabaseConfigurations.cli(),
         EventEmitterModule.forRoot(),
         ConfigModule,

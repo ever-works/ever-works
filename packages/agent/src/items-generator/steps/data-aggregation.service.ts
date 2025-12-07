@@ -7,6 +7,8 @@ import {
     NewItemsExtractorService,
     AiDeduplicatorService,
 } from './data-aggregation';
+import { IPipelineStep, GenerationContext } from '../interfaces/pipeline.interface';
+import { ItemsGeneratorStep } from '../constants/steps';
 
 type DataAggregationParams = {
     directorySlug: string;
@@ -18,14 +20,42 @@ type DataAggregationParams = {
 };
 
 @Injectable()
-export class DataAggregationService {
+export class DataAggregationService implements IPipelineStep {
     private readonly logger = new Logger(DataAggregationService.name);
+
+    public readonly name = ItemsGeneratorStep.DEDUPLICATION_AND_DATA_AGGREGATION;
 
     constructor(
         private readonly sharedUtils: SharedUtilsService,
         private readonly newItemsExtractor: NewItemsExtractorService,
         private readonly aiDeduplicator: AiDeduplicatorService,
     ) {}
+
+    async run(context: GenerationContext): Promise<GenerationContext> {
+        const { dto, directory, existing, initialAiItems, extractedWebItems, webPages } = context;
+
+        // Combine AI-generated items and web-extracted items
+        const allDiscoveredItems = [...initialAiItems, ...extractedWebItems];
+        this.logger.log(
+            `[${directory.slug}] Total discovered items (AI + Web before source validation): ${allDiscoveredItems.length}.`,
+        );
+
+        this.logger.log(`[${directory.slug}] Deduplication and Data Aggregation - Starting`);
+
+        const { aggregatedItems, metrics } = await this.aggregateAndDeduplicateData({
+            directorySlug: directory.slug,
+            createItemsGeneratorDto: dto,
+            existingItems: existing.existingItems || [],
+            urlsScannedThisRun: webPages.length, // approximate, initially scanned = retrieved
+            newlyExtractedItemsThisRun: allDiscoveredItems,
+            pagesProcessedThisRun: webPages.length,
+        });
+
+        context.aggregatedItems = aggregatedItems;
+        context.metrics = metrics;
+
+        return context;
+    }
 
     /**
      * Aggregates and deduplicates data from multiple sources

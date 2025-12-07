@@ -2,16 +2,65 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigDto } from '../dto/create-items-generator.dto';
 import { WebPageData } from '../interfaces/items-generator.interfaces';
 import { SearchService, NotionService } from '../shared';
+import { IPipelineStep, GenerationContext } from '../interfaces/pipeline.interface';
+import { ItemsGeneratorStep } from '../constants/steps';
 
 @Injectable()
-export class WebPageRetrievalService {
+export class WebPageRetrievalService implements IPipelineStep {
     private readonly logger = new Logger(WebPageRetrievalService.name);
     private readonly BATCH_SIZE = 10;
+
+    public readonly name = ItemsGeneratorStep.WEB_SEARCH;
 
     constructor(
         private readonly searchService: SearchService,
         private readonly notionService: NotionService,
     ) {}
+
+    async run(context: GenerationContext): Promise<GenerationContext> {
+        const { dto, directory, extractedUrls, searchQueries, processedSourceUrls } = context;
+
+        this.logger.log(`[${directory.slug}] Web Search & Content Retrieval - Starting`);
+
+        // Process extracted URLs first if any were found
+        let initialWebPages: WebPageData[] = [];
+        if (extractedUrls.length > 0) {
+            initialWebPages = await this.retrieveSpecificUrls(
+                directory.slug,
+                extractedUrls,
+                processedSourceUrls,
+            );
+            this.logger.log(
+                `[${directory.slug}] Retrieved ${initialWebPages.length} web pages from extracted URLs`,
+            );
+        }
+
+        // Then proceed with normal web search
+        const searchWebPages = await this.retrieveWebPages(
+            directory.slug,
+            searchQueries,
+            processedSourceUrls,
+            dto.config,
+        );
+
+        // Combine web pages from both sources
+        const webPages = [...initialWebPages, ...searchWebPages];
+
+        this.logger.log(
+            `[${directory.slug}] Retrieved ${webPages.length} web pages for processing.`,
+        );
+
+        context.webPages = webPages;
+
+        // Populate contentCache for reuse in markdown generation
+        for (const page of webPages) {
+            if (page.source_url && page.raw_content) {
+                context.contentCache.set(page.source_url, page.raw_content);
+            }
+        }
+
+        return context;
+    }
 
     async retrieveWebPages(
         slug: string,

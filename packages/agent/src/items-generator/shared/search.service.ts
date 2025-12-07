@@ -2,10 +2,11 @@ import { Injectable, Logger } from '@nestjs/common';
 import { tavily, TavilyClient } from '@tavily/core';
 import { ConfigDto } from '../dto/create-items-generator.dto';
 import { search, OrganicResult, DictionaryResult, OrganicResultNode } from 'google-sr';
-import * as cheerio from 'cheerio';
 import TurndownService from 'turndown';
 import axios from 'axios';
 import { config } from '@src/config';
+import { Readability } from '@mozilla/readability';
+import { parseHTML } from 'linkedom';
 
 export type SearchResult = {
     title: string;
@@ -40,10 +41,10 @@ export class SearchService {
     }
 
     /**
-     * Check if the naive search service is configured
+     * Check if the local search service is configured
      */
-    isNaiveExtractContentConfigured(): boolean {
-        return config.search.getExtractContentService() === 'naive';
+    isLocalExtractContentConfigured(): boolean {
+        return config.search.getExtractContentService() === 'local';
     }
 
     /**
@@ -128,7 +129,8 @@ export class SearchService {
      * @param url The URL to extract content from
      */
     async extractContent(url: string) {
-        if (this.isNaiveExtractContentConfigured() || !this.tavilyClient) {
+        // Change condition to use the new 'local' method
+        if (this.isLocalExtractContentConfigured() || !this.isTavilySearchConfigured()) {
             const text = await this.extractTextFromSourceURL(url);
 
             return {
@@ -149,7 +151,8 @@ export class SearchService {
         return response.results[0];
     }
 
-    async extractContentUsingNaive(url: string) {
+    // Renamed for clarity to reflect
+    async extractContentUsingLocal(url: string) {
         return await this.extractTextFromSourceURL(url);
     }
 
@@ -182,25 +185,97 @@ export class SearchService {
             return '';
         }
 
-        return this.extractTextFromHtml(response.data);
+        return this.extractTextFromHtml(source_url, response.data);
     }
 
-    private extractTextFromHtml(htmlContent: string): string {
+    private extractTextFromHtml(url: string, htmlContent: string): string {
         try {
-            const $ = cheerio.load(htmlContent);
-            // Remove script and style elements
-            $(
-                'script, style, noscript, iframe, header, footer, nav, aside, form, [aria-hidden="true"], .noprint',
-            ).remove();
+            // Use linkedom to create a DOM environment
+            const { document } = parseHTML(htmlContent);
 
-            // Get text from the body, attempt to normalize whitespace
-            let html = $('body').html() || '';
-            html = html.replace(/\s\s+/g, ' ').trim();
+            // 1. Try Mozilla Readability first (best quality)
+            const readabilityContent = this.extractWithReadability(url, document);
+            if (readabilityContent) {
+                return readabilityContent;
+            }
 
-            return this.turndownService.turndown(html);
+            // 2. Fallback: Try meta description
+            const metaContent = this.extractMetaDescription(url, document);
+            if (metaContent) {
+                return metaContent;
+            }
+
+            // 3. Final Fallback: Cleaned body content
+            return this.extractBodyFallback(url, document);
         } catch (error) {
-            this.logger.error(`Error extracting text with Cheerio: ${error.message}`);
-            return '';
+            this.logger.error(
+                `Error extracting text with Readability/Linkedom for ${url}: ${error.message}`,
+                error.stack,
+            );
+            return this.extractBodyFallback(url, null, htmlContent);
         }
+    }
+
+    private extractWithReadability(url: string, document: any): string | null {
+        try {
+            const reader = new Readability(document);
+            const article = reader.parse();
+
+            if (article && article.textContent && article.textContent.length > 200) {
+                this.logger.debug(`Extracted content using Readability for ${url}`);
+                return this.turndownService.turndown(article.content);
+            }
+
+            this.logger.debug(
+                `Readability found insufficient content for ${url} (length: ${article?.textContent?.length || 0}).`,
+            );
+            return null;
+        } catch (error) {
+            this.logger.warn(`Readability extraction failed for ${url}: ${error.message}`);
+            return null;
+        }
+    }
+
+    private extractMetaDescription(url: string, document: any): string | null {
+        const metaDescription =
+            document.querySelector('meta[name="description"]')?.getAttribute('content') ||
+            document.querySelector('meta[property="og:description"]')?.getAttribute('content');
+
+        if (metaDescription && metaDescription.length > 0) {
+            this.logger.debug(`Extracted meta description for ${url}`);
+            return metaDescription;
+        }
+        return null;
+    }
+
+    private extractBodyFallback(url: string, document?: any, originalHtml?: string): string {
+        try {
+            let doc = document;
+            if (!doc && originalHtml) {
+                doc = parseHTML(originalHtml).document;
+            }
+
+            if (!doc) {
+                return '';
+            }
+
+            // Remove scripts, styles, and other non-content elements
+            doc.querySelectorAll(
+                'script, style, noscript, iframe, header, footer, nav, aside, form, [aria-hidden="true"], .noprint',
+            ).forEach((el: any) => el.remove());
+
+            let bodyHtml = doc.body?.innerHTML || '';
+            bodyHtml = bodyHtml.replace(/\s\s+/g, ' ').trim();
+
+            if (bodyHtml.length > 0) {
+                this.logger.debug(`Extracted body HTML as fallback for ${url}`);
+                return this.turndownService.turndown(bodyHtml);
+            }
+        } catch (error) {
+            this.logger.error(`Error in body fallback extraction for ${url}: ${error.message}`);
+        }
+
+        this.logger.warn(`Failed to extract any meaningful content from ${url}`);
+        return '';
     }
 }

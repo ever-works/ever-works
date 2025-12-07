@@ -10,6 +10,11 @@ export interface Category extends Identifiable {
 
 export interface Tag extends Identifiable {}
 
+export interface Brand extends Identifiable {
+    logo_url?: string;
+    website?: string;
+}
+
 export interface ItemData {
     name: string;
     description: string;
@@ -18,4 +23,7 @@ export interface ItemData {
     category: string | string[] | Category | Category[];
     slug?: string;
     tags: string[] | Tag[];
+    brand?: string | Brand;
+    brand_logo_url?: string | null;
+    images?: string[];
 }

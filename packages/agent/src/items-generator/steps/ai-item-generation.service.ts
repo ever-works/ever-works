@@ -8,14 +8,42 @@ import {
     itemDataSchema,
     promptUnderstandingAssessmentSchema,
 } from '../schemas/item-extraction.schemas';
+import { IPipelineStep, GenerationContext } from '../interfaces/pipeline.interface';
+import { ItemsGeneratorStep } from '../constants/steps';
 
 @Injectable()
-export class AiItemGenerationService {
+export class AiItemGenerationService implements IPipelineStep {
     private readonly logger = new Logger(AiItemGenerationService.name);
     private llm: BaseChatModel;
 
+    public readonly name = ItemsGeneratorStep.AI_FIRST_ITEMS_GENERATION;
+
     constructor(private readonly aiService: AiService) {
         this.llm = this.aiService.createLlmWithTemperature(0.3);
+    }
+
+    async run(context: GenerationContext): Promise<GenerationContext> {
+        const { dto, directory, featuredItemHints } = context;
+
+        if (dto.config.ai_first_generation_enabled) {
+            this.logger.log(`[${directory.slug}] AI-First Item Generation - Invoking`);
+
+            const initialAiItems = await this.generateInitialItemsWithAI(
+                directory.slug,
+                dto,
+                featuredItemHints,
+            );
+            this.logger.log(
+                `[${directory.slug}] AI generated ${initialAiItems.length} initial items.`,
+            );
+
+            context.initialAiItems = initialAiItems;
+        } else {
+            this.logger.debug(`[${directory.slug}] AI-First Item Generation - Skipped`);
+            context.initialAiItems = [];
+        }
+
+        return context;
     }
 
     async generateInitialItemsWithAI(
@@ -116,7 +144,10 @@ For each item, provide the following details:
 1.  **name**: The canonical name of the item.
 2.  **description**: A concise description (1-3 sentences) highlighting its specific relevance to "{topicName}".
 3.  **source_url**: The most direct and canonical URL (e.g., homepage, official documentation, repository). If a high-quality, canonical URL cannot be confidently determined, you may omit it but it's highly encouraged.
-4.  **featured**: A boolean indicating if this item should be highlighted or given special prominence (true/false). Consider the featured item guidelines above when making this determination. Default to false if unsure.
+4.  **brand**: Optional single brand/manufacturer associated with the item (or null if not applicable).
+5.  **brand_logo_url**: Optional logo URL for the brand if a canonical logo is clear (prefer SVG/PNGs from the official domain).
+6.  **images**: Array of 1-4 image URLs (screenshots, product images, hero visuals) that clearly represent the item. Prefer official assets from the item or brand domain. Leave empty if none are trustworthy.
+7.  **featured**: A boolean indicating if this item should be highlighted or given special prominence (true/false). Consider the featured item guidelines above when making this determination. Default to false if unsure.
 
 **Critical Instructions:**
 -   *Only generate items if you are completely certain of their relevance to the topic.*
