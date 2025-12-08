@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Confirm your Ever Works account</title>
+    <title>Confirm your {{appName}} account</title>
     <style>
         body {
             margin: 0;
@@ -107,15 +107,15 @@
     <div class="container">
         <!-- Logo Section -->
         <div class="logo-section">
-            <h1 class="logo-title">Ever Works</h1>
-            <p class="logo-subtitle">by Ever Co.</p>
+            <h1 class="logo-title">{{appName}}</h1>
+            <p class="logo-subtitle">by {{companyOwner}}</p>
         </div>
 
         <!-- Main Card -->
         <div class="main-card">
             <!-- Welcome Message -->
             <h2 class="title">
-                Welcome to Ever Works{{#if firstName}}, {{firstName}}{{/if}}
+                Welcome to {{appName}}{{#if firstName}}, {{firstName}}{{/if}}
             </h2>
 
             <p class="subtitle">
@@ -149,7 +149,7 @@
                 If you didn't create an account, you can safely ignore this email.
             </p>
             <p class="footer-copyright">
-                © 2024 Ever Co. All rights reserved.
+                © {{currentYear}} {{companyOwner}} All rights reserved.
             </p>
         </div>
     </div>

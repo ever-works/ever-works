@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { config } from '../config/constants';
 import { MailerService } from './mailer.service';
@@ -13,18 +13,32 @@ import {
 
 @Injectable()
 export class MailService {
-    constructor(private readonly mailerService: MailerService) {}
+    constructor(private readonly mailerService: MailerService) { }
+
+    /**
+     * Get branding context for email templates
+     */
+    private getBrandingContext() {
+        return {
+            appName: config.branding.appName(),
+            companyOwner: config.branding.companyOwner(),
+            platformWebsite: config.branding.platformWebsite(),
+            currentYear: new Date().getFullYear(),
+        };
+    }
 
     /**
      * Send signup confirmation email
      */
     @OnEvent(UserCreatedEvent.EVENT_NAME)
     async sendSignupConfirmation(data: UserCreatedEvent): Promise<void> {
+        const appName = config.branding.appName();
         await this.mailerService.sendMail({
             to: data.user.email,
-            subject: 'Confirm your Ever Works account',
+            subject: `Confirm your ${appName} account`,
             template: 'signup-confirmation',
             context: {
+                ...this.getBrandingContext(),
                 firstName: data.user.username,
                 confirmationUrl: data.confirmationUrl,
                 confirmationToken: data.confirmationToken,
@@ -38,12 +52,14 @@ export class MailService {
     @OnEvent(UserForgotPasswordEvent.EVENT_NAME)
     async sendForgotPassword(data: UserForgotPasswordEvent): Promise<void> {
         const resetUrl = data.resetUrl;
+        const appName = config.branding.appName();
 
         await this.mailerService.sendMail({
             to: data.user.email,
-            subject: 'Reset your Ever Works password',
+            subject: `Reset your ${appName} password`,
             template: 'forgot-password',
             context: {
+                ...this.getBrandingContext(),
                 firstName: data.user.username,
                 resetUrl,
                 resetToken: data.resetToken,
@@ -58,12 +74,14 @@ export class MailService {
     @OnEvent(UserPasswordChangedEvent.EVENT_NAME)
     async sendPasswordChanged(data: UserPasswordChangedEvent): Promise<void> {
         const secureAccountUrl = data.secureAccountUrl;
+        const appName = config.branding.appName();
 
         await this.mailerService.sendMail({
             to: data.user.email,
-            subject: 'Your Ever Works password has been changed',
+            subject: `Your ${appName} password has been changed`,
             template: 'password-changed',
             context: {
+                ...this.getBrandingContext(),
                 firstName: data.user.username,
                 changedAt: this.formatDateTime(data.changedAt),
                 ipAddress: data.ipAddress,
@@ -81,12 +99,14 @@ export class MailService {
     @OnEvent(UserConfirmedEvent.EVENT_NAME)
     async sendWelcomeEmail(data: UserConfirmedEvent): Promise<void> {
         const dashboardUrl = data.dashboardUrl;
+        const appName = config.branding.appName();
 
         await this.mailerService.sendMail({
             to: data.user.email,
-            subject: 'Welcome to Ever Works!',
+            subject: `Welcome to ${appName}!`,
             template: 'welcome',
             context: {
+                ...this.getBrandingContext(),
                 firstName: data.user.username,
                 dashboardUrl,
             },
@@ -100,12 +120,14 @@ export class MailService {
     async sendNewDeviceAlert(data: UserNewDeviceLoginEvent): Promise<void> {
         const verifyUrl = data.verifyUrl;
         const secureAccountUrl = data.secureAccountUrl;
+        const appName = config.branding.appName();
 
         await this.mailerService.sendMail({
             to: data.user.email,
-            subject: 'New login to your Ever Works account',
+            subject: `New login to your ${appName} account`,
             template: 'new-device-login',
             context: {
+                ...this.getBrandingContext(),
                 firstName: data.user.username,
                 loginTime: this.formatDateTime(data.loginTime),
                 device: data.device,
@@ -132,6 +154,7 @@ export class MailService {
             subject: 'Confirm account deletion',
             template: 'account-deletion',
             context: {
+                ...this.getBrandingContext(),
                 firstName: data.user.username,
                 deleteUrl,
                 deleteToken: data.deleteToken,

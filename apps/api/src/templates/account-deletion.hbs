@@ -117,8 +117,8 @@
     <div class="container">
         <!-- Logo Section -->
         <div class="logo-section">
-            <h1 class="logo-title">Ever Works</h1>
-            <p class="logo-subtitle">by Ever Co.</p>
+            <h1 class="logo-title">{{appName}}</h1>
+            <p class="logo-subtitle">by {{companyOwner}}</p>
         </div>
 
         <!-- Main Card -->
@@ -132,7 +132,7 @@
             <p class="subtitle">
                 {{#if firstName}}{{firstName}}, we're{{else}}We're{{/if}}
                 sorry to see you go. Please confirm that you want to permanently delete your
-                Ever Works account.
+                {{appName}} account.
             </p>
 
             <!-- Warning Box -->
@@ -144,7 +144,7 @@
                 <div class="warning-list">
                     • All your projects and data<br>
                     • Your profile and settings<br>
-                    • Access to Ever Works services
+                    • Access to {{appName}} services
                 </div>
             </div>
 
@@ -169,7 +169,7 @@
         <div class="footer">
             <p class="footer-text">
                 If you didn't request this, please ignore this email.<br><br>
-                © 2024 Ever Co. All rights reserved.
+                © {{currentYear}} {{companyOwner}} All rights reserved.
             </p>
         </div>
     </div>
