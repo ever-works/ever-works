@@ -36,17 +36,14 @@ export const itemDataSchema = baseSchema.extend({
     brand: z
         .string()
         .nullable()
-        .optional()
         .describe('Optional brand/manufacturer associated with the item (one per item).'),
     brand_logo_url: z
         .string()
         .url()
         .nullable()
-        .optional()
         .describe('Logo URL for the brand if available and canonical.'),
     images: z
         .array(z.string().url())
-        .optional()
         .default([])
         .describe(
             'Image URLs or screenshots that visually represent the item. Provide multiple when available.',
@@ -130,17 +127,15 @@ export const itemDataWithBadgesSchema = baseSchema.extend({
     brand: z
         .string()
         .nullable()
-        .optional()
         .describe('Optional brand/manufacturer associated with the item (one per item).'),
     brand_logo_url: z
         .string()
         .url()
         .nullable()
-        .optional()
         .describe('Logo URL for the brand if available and canonical.'),
     images: z
         .array(z.string().url())
-        .optional()
+        .nullable()
         .default([])
         .describe(
             'Image URLs or screenshots that visually represent the item. Provide multiple when available.',

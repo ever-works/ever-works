@@ -144,7 +144,7 @@ export class VercelService {
                 {
                     workflow: 'deploy_vercel.yaml',
                     inputs: { environment: 'production' },
-                    branch: 'develop',
+                    branch: 'main',
                     owner: vercelInput.owner,
                     repo: vercelInput.repo,
                 },
