@@ -6,6 +6,8 @@ export interface ItemsGeneratorMetrics {
     items_extracted_current_run: number;
     new_items_added_to_store: number;
     total_items_in_store: number;
+    total_tokens_used?: number;
+    total_cost?: number;
     // total_categories_in_store: number;
     // total_tags_in_store: number;
 }

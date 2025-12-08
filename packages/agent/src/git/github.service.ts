@@ -5,6 +5,7 @@ import _sodium from 'libsodium-wrappers';
 import * as fs from 'node:fs';
 import * as http from 'isomorphic-git/http/node';
 import git from 'isomorphic-git';
+import { sanitizeDescription } from '../utils/sanitize.util';
 
 export const ACTIVE_WORKFLOW_NAMES = ['Vercel Deployment', 'Production deployment'];
 export const ACTIVE_WORKFLOW_FILES = [
@@ -49,10 +50,13 @@ export class GithubService extends GitProvider {
             return existingRepository.data;
         }
 
+        // Sanitize description to remove newlines and other problematic characters
+        const sanitizedDescription = sanitizeDescription(description);
+
         const res = await octokit.rest.repos.createInOrg({
             org,
             name: repo,
-            description,
+            description: sanitizedDescription,
             private: true, // for now
         });
 
@@ -71,9 +75,12 @@ export class GithubService extends GitProvider {
             return existingRepository.data;
         }
 
+        // Sanitize description to remove newlines and other problematic characters
+        const sanitizedDescription = sanitizeDescription(description);
+
         const res = await octokit.rest.repos.createForAuthenticatedUser({
             name: repo,
-            description,
+            description: sanitizedDescription,
             private: true, // for now
         });
 
@@ -354,14 +361,17 @@ export class GithubService extends GitProvider {
                 `Creating repository ${targetOwner}/${newName} from template ${templateOwner}/${templateRepo}...`,
             );
 
+            // Sanitize description to remove newlines and other problematic characters
+            const sanitizedDescription = sanitizeDescription(
+                description || `Repository created from template ${templateOwner}/${templateRepo}`,
+            );
+
             await octokit.rest.repos.createUsingTemplate({
                 template_owner: templateOwner,
                 template_repo: templateRepo,
                 owner: targetOwner,
                 name: newName,
-                description:
-                    description ||
-                    `Repository created from template ${templateOwner}/${templateRepo}`,
+                description: sanitizedDescription,
                 private: isPrivate,
                 include_all_branches: false,
             });

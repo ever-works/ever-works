@@ -1,9 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
 import { z } from 'zod';
-import { AiService, BaseChatModel } from 'src/ai';
+import { AiService } from 'src/ai';
 import { SearchService } from '../shared';
 import { ItemData } from '../dto';
+import { accumulateMetrics, MetricsAccumulator } from '../utils/metrics.util';
+import { getErrorMessage, getErrorStack } from '../utils/error.util';
 
 // Markdown generation prompt
 export const MARKDOWN_PROMPT = `
@@ -23,7 +24,7 @@ You are directory website builder and your task is to generate markdown summary 
 Based on this website content:
 <content>
 {content}
-</content>`;
+</content>` as const;
 
 // Output schema for validation
 export const markdownOutputSchema = z.object({
@@ -33,14 +34,11 @@ export const markdownOutputSchema = z.object({
 @Injectable()
 export class MarkdownGenerationService {
     private readonly logger = new Logger(MarkdownGenerationService.name);
-    private llm: BaseChatModel;
 
     constructor(
         private readonly aiService: AiService,
         private readonly searchService: SearchService,
-    ) {
-        this.llm = this.aiService.createLlmWithTemperature(0.6);
-    }
+    ) {}
 
     /**
      * Generates markdown summary for a given item
@@ -51,6 +49,7 @@ export class MarkdownGenerationService {
     async generateMarkdown(
         item: Partial<ItemData>,
         contentCache?: Map<string, string>,
+        metrics?: MetricsAccumulator,
     ): Promise<string> {
         if (!item || !item.source_url) {
             this.logger.warn(`Cannot generate markdown: Missing item or source URL`);
@@ -77,19 +76,25 @@ export class MarkdownGenerationService {
             }
 
             // Generate markdown using the content
-            const prompt = HumanMessagePromptTemplate.fromTemplate(MARKDOWN_PROMPT);
-            const result = await prompt
-                .pipe(this.llm.withStructuredOutput(markdownOutputSchema))
-                .invoke({
-                    item: JSON.stringify(item),
-                    content: rawContent.slice(0, 4000),
-                });
+            const { result, usage, cost } = await this.aiService.askJson(
+                MARKDOWN_PROMPT,
+                markdownOutputSchema,
+                {
+                    temperature: 0.6,
+                    variables: {
+                        item: JSON.stringify(item),
+                        content: rawContent.slice(0, 4000),
+                    },
+                },
+            );
+
+            accumulateMetrics(metrics, usage, cost);
 
             return result.markdown || '';
         } catch (error) {
             this.logger.error(
-                `Error generating markdown for ${item.name}: ${error.message}`,
-                error.stack,
+                `Error generating markdown for ${item.name}: ${getErrorMessage(error)}`,
+                getErrorStack(error),
             );
             return '';
         }
@@ -104,6 +109,7 @@ export class MarkdownGenerationService {
     async generateMarkdownForItems(
         items: ItemData[],
         contentCache?: Map<string, string>,
+        metrics?: MetricsAccumulator,
     ): Promise<ItemData[]> {
         if (!items || items.length === 0) {
             return [];
@@ -120,7 +126,7 @@ export class MarkdownGenerationService {
             const batch = items.slice(i, i + BATCH_SIZE);
 
             const markdownPromises = batch.map(async (item) => {
-                const markdown = await this.generateMarkdown(item, contentCache);
+                const markdown = await this.generateMarkdown(item, contentCache, metrics);
                 return {
                     ...item,
                     markdown,

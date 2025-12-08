@@ -1,10 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
 import { z } from 'zod';
-import { AiService, BaseChatModel } from 'src/ai';
+import { AiService } from 'src/ai';
 import { IPipelineStep, GenerationContext } from '../interfaces/pipeline.interface';
 import { ItemsGeneratorStep } from '../constants/steps';
 import { GenerationMethod } from '../dto';
+import { accumulateMetrics } from '../utils/metrics.util';
 
 // Prompt processing prompt
 const PROMPT_PROCESSING_PROMPT = `
@@ -72,7 +72,7 @@ Return:
 2. Suggested categories (explicitly mentioned)
 3. Priority categories (with priority indicators)
 4. Featured item hints
-5. Rewritten prompt (core task only)`;
+5. Rewritten prompt (core task only)` as const;
 
 // Output schema for validation
 const promptProcessingOutputSchema = z.object({
@@ -98,13 +98,10 @@ const promptProcessingOutputSchema = z.object({
 @Injectable()
 export class PromptProcessingService implements IPipelineStep {
     private readonly logger = new Logger(PromptProcessingService.name);
-    private llm: BaseChatModel;
 
     public readonly name = ItemsGeneratorStep.PROMPT_PROCESSING;
 
-    constructor(private readonly aiService: AiService) {
-        this.llm = this.aiService.createLlmWithTemperature(0.0);
-    }
+    constructor(private readonly aiService: AiService) {}
 
     async run(context: GenerationContext): Promise<GenerationContext> {
         const { dto, existing, directory } = context;
@@ -120,7 +117,7 @@ export class PromptProcessingService implements IPipelineStep {
             priorityCategories: promptPriorityCategories,
             featuredItemHints,
             rewrittenPrompt: prompt,
-        } = await this.processPrompt(directory.slug, dto.prompt);
+        } = await this.processPrompt(dto.prompt, context.metrics);
 
         const allPriorityCategories = [
             ...(dto.priority_categories || []),
@@ -188,13 +185,10 @@ export class PromptProcessingService implements IPipelineStep {
 
     /**
      * Extract URLs, category hints, priority categories, and featured item hints from a prompt and rewrite the prompt without URLs
-     * @param slug The slug for logging purposes
-     * @param prompt The prompt to extract URLs and categories from
-     * @returns Object containing extracted URLs, suggested categories, priority categories, featured item hints, and rewritten prompt
      */
     async processPrompt(
-        slug: string,
         prompt: string,
+        metrics?: GenerationContext['metrics'],
     ): Promise<{
         extractedUrls: string[];
         suggestedCategories: string[];
@@ -203,7 +197,7 @@ export class PromptProcessingService implements IPipelineStep {
         rewrittenPrompt: string;
     }> {
         if (!prompt) {
-            this.logger.warn(`[${slug}] No prompt provided for processing`);
+            this.logger.warn(`No prompt provided for processing`);
             return {
                 extractedUrls: [],
                 suggestedCategories: [],
@@ -213,16 +207,19 @@ export class PromptProcessingService implements IPipelineStep {
             };
         }
 
-        // Use AI for sophisticated extraction of URLs and categories
         try {
-            this.logger.log(`[${slug}] Using AI to process prompt for URLs and categories`);
+            this.logger.log(`Using AI to process prompt for URLs and categories`);
 
-            const promptTemplate =
-                HumanMessagePromptTemplate.fromTemplate(PROMPT_PROCESSING_PROMPT);
+            const { result, usage, cost } = await this.aiService.askJson(
+                PROMPT_PROCESSING_PROMPT,
+                promptProcessingOutputSchema,
+                {
+                    temperature: 0,
+                    variables: { user_prompt: prompt },
+                },
+            );
 
-            const result = await promptTemplate
-                .pipe(this.llm.withStructuredOutput(promptProcessingOutputSchema))
-                .invoke({ user_prompt: prompt });
+            accumulateMetrics(metrics, usage, cost);
 
             const {
                 extractedUrls,
@@ -233,7 +230,7 @@ export class PromptProcessingService implements IPipelineStep {
             } = result;
 
             this.logger.log(
-                `[${slug}] AI extracted ${extractedUrls.length} URLs, ${suggestedCategories.length} category hints, ${priorityCategories.length} priority categories, and ${featuredItemHints.length} featured item hints from prompt`,
+                `AI extracted ${extractedUrls.length} URLs, ${suggestedCategories.length} category hints, ${priorityCategories.length} priority categories, and ${featuredItemHints.length} featured item hints from prompt`,
             );
 
             const validatedUrls = this.validateUrls(extractedUrls);
@@ -249,7 +246,9 @@ export class PromptProcessingService implements IPipelineStep {
                 rewrittenPrompt: validatedUrls.length > 0 ? rewrittenPrompt || prompt : prompt,
             };
         } catch (error) {
-            this.logger.error(`[${slug}] Error processing prompt: ${error.message}`, error.stack);
+            this.logger.error(
+                `Error processing prompt: ${error instanceof Error ? error.message : String(error)}`,
+            );
 
             // Fallback to regex extraction in case of AI error
             const fallbackUrls = this.extractUrlsWithRegex(prompt);
@@ -281,7 +280,7 @@ export class PromptProcessingService implements IPipelineStep {
         extractedUrls: string[];
         rewrittenPrompt: string;
     }> {
-        const result = await this.processPrompt(slug, prompt);
+        const result = await this.processPrompt(prompt);
         return {
             extractedUrls: result.extractedUrls,
             rewrittenPrompt: result.rewrittenPrompt,

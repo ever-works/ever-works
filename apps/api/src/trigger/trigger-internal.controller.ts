@@ -9,6 +9,7 @@ import {
     Post,
     Query,
     Inject,
+    Delete,
 } from '@nestjs/common';
 import { Public } from '../auth/decorators/public.decorator';
 import { config } from '@packages/agent/config';
@@ -139,6 +140,20 @@ export class TriggerInternalController {
         const value = await this.cacheManager.get(key);
 
         return { key, value };
+    }
+
+    @Delete('cache')
+    @Public()
+    async deleteCache(@Headers('x-trigger-secret') secret: string, @Query('key') key: string) {
+        this.ensureSecret(secret);
+
+        if (!key) {
+            throw new BadRequestException('Missing cache key');
+        }
+
+        const value = await this.cacheManager.del(key);
+
+        return { deleted: value };
     }
 
     private ensureSecret(secret?: string) {

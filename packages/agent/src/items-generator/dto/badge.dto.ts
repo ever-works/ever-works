@@ -32,6 +32,15 @@ export interface BadgeEvaluationResult {
     badges: ItemBadges;
     evaluation_summary: string;
     evaluated_at: string;
+    domain_type?: string;
+    domain_badges?: Record<
+        string,
+        {
+            value: string;
+            evaluated_at?: string;
+            details?: string | null;
+        }
+    >;
 }
 
 /**

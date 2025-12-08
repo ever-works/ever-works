@@ -1,29 +1,44 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
-import { StringOutputParser } from '@langchain/core/output_parsers';
 import { formatDate } from 'date-fns';
 import { CreateItemsGeneratorDto } from '../dto/create-items-generator.dto';
-import { AiService, BaseChatModel } from 'src/ai';
+import { AiService } from 'src/ai';
 import { IPipelineStep, GenerationContext } from '../interfaces/pipeline.interface';
 import { ItemsGeneratorStep } from '../constants/steps';
+import { TopicAnalysis } from '../interfaces/items-generator.interfaces';
+import z from 'zod';
+import { accumulateMetrics } from '../utils/metrics.util';
+import { getErrorMessage, getErrorStack } from '../utils/error.util';
+
+const SEARCH_QUERY_PROMPT =
+    `You are a directory builder generating search queries to find the most relevant, official sources.
+
+Topic: "{name}"
+Description: "{description}"
+Primary keywords: {keywords}
+Synonyms: {synonyms}
+Avoid terms: {exclusions}
+Today is {date}.
+
+Rules:
+- Generate {query_count} distinct, high-intent search queries as an array of strings.
+- Prefer queries that surface official resources (homepages, docs, repositories) over listicles.
+- Mix broad and long-tail variations to improve recall.
+- Do not include exclusion terms in the queries.` as const;
 
 @Injectable()
 export class SearchQueryGenerationService implements IPipelineStep {
     private readonly logger = new Logger(SearchQueryGenerationService.name);
-    private llm: BaseChatModel;
 
     public readonly name = ItemsGeneratorStep.SEARCH_QUERIES_GENERATION;
 
-    constructor(private readonly aiService: AiService) {
-        this.llm = this.aiService.getLlm();
-    }
+    constructor(private readonly aiService: AiService) {}
 
     async run(context: GenerationContext): Promise<GenerationContext> {
-        const { dto, directory } = context;
+        const { dto, directory, topicKeywords, metrics } = context;
 
         this.logger.log(`[${directory.slug}] AI-Powered Search Query Generation - Starting`);
 
-        const searchQueries = await this.generateSearchQueries(dto);
+        const searchQueries = await this.generateSearchQueries(dto, topicKeywords, metrics);
         this.logger.log(`[${directory.slug}] Generated ${searchQueries.length} search queries.`);
 
         context.searchQueries = searchQueries;
@@ -33,6 +48,8 @@ export class SearchQueryGenerationService implements IPipelineStep {
 
     async generateSearchQueries(
         createItemsGeneratorDto: CreateItemsGeneratorDto,
+        topicKeywords?: TopicAnalysis,
+        metrics?: GenerationContext['metrics'],
     ): Promise<string[]> {
         const {
             name,
@@ -42,6 +59,10 @@ export class SearchQueryGenerationService implements IPipelineStep {
         } = createItemsGeneratorDto;
 
         this.logger.log(`[${name}] Generating search queries using LLM...`);
+
+        const keywords = topicKeywords?.primary_keywords || targetKeywords || [];
+        const synonyms = topicKeywords?.synonyms || [];
+        const exclusions = topicKeywords?.exclusion_terms || [];
 
         if (!this.aiService.isAiConfigured()) {
             this.logger.warn(
@@ -66,50 +87,44 @@ export class SearchQueryGenerationService implements IPipelineStep {
             return [...new Set(fallbackQueries)].slice(0, config.max_search_queries);
         }
 
-        const promptTemplate = HumanMessagePromptTemplate.fromTemplate(
-            `You are a directory website builder, and your task is to generate search queries that will help you find relevant information on the web, based on the given details.
-<details>
-- The topic is: "{name}"
-- Description: "{description}"
-- Optional initial keywords: {target_keywords_string}
-- Today is {day} the {datetime}
-</details>
-
-
-<instructions>
-- Generate {num_queries} distinct search queries. Each query should be on a new line.  
-- Use terms that will help find official resources related to the topic.
-- If the task description prioritizes specific items or types of items, don't simply generate queries for those items. Instead, create queries designed to help locate official resources related to the topic.
-- Include variations, long-tail keywords, and queries targeting different aspects of the topic.
-</instructions>
-`,
-        );
-
         const now = new Date();
-        const queryGenerationChain = promptTemplate.pipe(this.llm).pipe(new StringOutputParser());
+
+        const schema = z
+            .object({
+                queries: z.array(z.string().min(3)),
+            })
+            .strict() as z.ZodType<{ queries: string[] }>;
 
         try {
-            const result = await queryGenerationChain.invoke({
-                name,
-                description,
-                target_keywords_string: targetKeywords ? targetKeywords.join(', ') : 'N/A',
-                num_queries: config.max_search_queries * 2,
-                day: formatDate(now, 'cccc'),
-                datetime: formatDate(now, 'yyyy-MM-dd HH:mm'),
-            });
+            const { result, usage, cost } = await this.aiService.askJson(
+                SEARCH_QUERY_PROMPT,
+                schema,
+                {
+                    temperature: 0.2,
+                    variables: {
+                        name,
+                        description,
+                        keywords: keywords.length ? keywords.join(', ') : 'N/A',
+                        synonyms: synonyms.length ? synonyms.join(', ') : 'N/A',
+                        exclusions: exclusions.length ? exclusions.join(', ') : 'N/A',
+                        date: `${formatDate(now, 'cccc')} ${formatDate(now, 'yyyy-MM-dd HH:mm')}`,
+                        query_count: String(config.max_search_queries * 2),
+                    },
+                },
+            );
 
-            const queries = result
-                .split('\n')
-                .map((q) => q.trim().replace(/^- /, ''))
-                .filter((q) => q.length > 3) // Filter out very short or empty lines
-                .filter((q, index, self) => self.indexOf(q) === index); // Ensure uniqueness
+            accumulateMetrics(metrics, usage, cost);
 
-            this.logger.log(`[${name}] LLM generated ${queries.length} unique queries.`);
-            return queries.slice(0, config.max_search_queries);
+            const queries = (result.queries || []).map((q) => q.trim()).filter((q) => q.length > 3);
+
+            const uniqueQueries = Array.from(new Set(queries));
+
+            this.logger.log(`[${name}] LLM generated ${uniqueQueries.length} unique queries.`);
+            return uniqueQueries.slice(0, config.max_search_queries);
         } catch (error) {
             this.logger.error(
-                `[${name}] Error generating search queries with LLM: ${error.message}`,
-                error.stack,
+                `[${name}] Error generating search queries with LLM: ${getErrorMessage(error)}`,
+                getErrorStack(error),
             );
             this.logger.warn(`[${name}] Falling back to basic query generation due to LLM error.`);
             // Fallback to simpler generation if LLM fails

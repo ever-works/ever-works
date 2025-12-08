@@ -438,7 +438,9 @@
                     "updatedItems": "Actualizados",
                     "totalItems": "Total",
                     "duration": "Duración",
-                    "startedAt": "Iniciado"
+                    "startedAt": "Iniciado",
+                    "tokens": "Tokens",
+                    "cost": "Costo"
                 },
                 "loadMore": "Cargar más",
                 "noMore": "No hay más registros",

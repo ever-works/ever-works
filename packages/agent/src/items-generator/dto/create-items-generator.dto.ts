@@ -10,8 +10,15 @@ import {
     IsUrl,
     IsEnum,
     IsNotEmpty,
+    MaxLength,
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Type, Transform } from 'class-transformer';
+import {
+    sanitizeName,
+    sanitizeDescription,
+    sanitizePrompt,
+    sanitizeText,
+} from '../../utils/sanitize.util';
 
 export enum GenerationMethod {
     CREATE_UPDATE = 'create-update',
@@ -26,10 +33,13 @@ export enum WebsiteRepositoryCreationMethod {
 export class CompanyDto {
     @IsString()
     @IsNotEmpty()
+    @MaxLength(200)
+    @Transform(({ value }) => (typeof value === 'string' ? sanitizeName(value, 200) : value))
     name: string;
 
     @IsString()
     @IsUrl({ protocols: ['http', 'https'], require_tld: true })
+    @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
     website: string;
 }
 
@@ -76,13 +86,29 @@ export class ConfigDto {
     prompt_comparison_confidence_threshold: number = 0.5;
 }
 
+/**
+ * Helper to sanitize string arrays by trimming and removing empty values
+ */
+function sanitizeStringArray(value: unknown): string[] {
+    if (!Array.isArray(value)) {
+        return value as string[];
+    }
+    return value
+        .map((item) => (typeof item === 'string' ? sanitizeText(item) : item))
+        .filter((item) => typeof item === 'string' && item.length > 0);
+}
+
 export class CreateItemsGeneratorDto {
     @IsString()
     @IsNotEmpty()
+    @MaxLength(200)
+    @Transform(({ value }) => (typeof value === 'string' ? sanitizeName(value, 200) : value))
     name: string;
 
     @IsString()
     @IsNotEmpty()
+    @MaxLength(5000)
+    @Transform(({ value }) => (typeof value === 'string' ? sanitizePrompt(value, 5000) : value))
     prompt: string;
 
     @IsOptional()
@@ -93,22 +119,28 @@ export class CreateItemsGeneratorDto {
     @IsOptional()
     @IsArray()
     @IsString({ each: true })
+    @Transform(({ value }) => sanitizeStringArray(value))
     initial_categories?: string[];
 
     @IsOptional()
     @IsArray()
     @IsString({ each: true })
+    @Transform(({ value }) => sanitizeStringArray(value))
     priority_categories?: string[]; // Categories that should appear first in the final output
 
     @IsOptional()
     @IsArray()
     @IsString({ each: true })
+    @Transform(({ value }) => sanitizeStringArray(value))
     target_keywords?: string[];
 
     @IsOptional()
     @IsArray()
     @IsString({ each: true })
     @IsUrl({ protocols: ['http', 'https'], require_tld: true }, { each: true })
+    @Transform(({ value }) =>
+        Array.isArray(value) ? value.map((url: string) => url?.trim()).filter(Boolean) : value,
+    )
     source_urls?: string[] = [];
 
     @IsOptional()
@@ -118,6 +150,8 @@ export class CreateItemsGeneratorDto {
 
     @IsOptional()
     @IsString()
+    @MaxLength(500)
+    @Transform(({ value }) => (typeof value === 'string' ? sanitizeDescription(value, 500) : value))
     repository_description?: string;
 
     @IsOptional()

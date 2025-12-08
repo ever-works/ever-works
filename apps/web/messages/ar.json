@@ -438,7 +438,9 @@
                     "updatedItems": "محدث",
                     "totalItems": "الإجمالي",
                     "duration": "المدة",
-                    "startedAt": "بدأ"
+                    "startedAt": "بدأ",
+                    "tokens": "الرموز",
+                    "cost": "التكلفة"
                 },
                 "loadMore": "تحميل المزيد",
                 "noMore": "لا توجد سجلات أخرى",

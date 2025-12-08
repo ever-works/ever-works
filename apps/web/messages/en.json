@@ -529,7 +529,9 @@
                     "updatedItems": "Updated",
                     "totalItems": "Total",
                     "duration": "Duration",
-                    "startedAt": "Started"
+                    "startedAt": "Started",
+                    "tokens": "Tokens",
+                    "cost": "Cost"
                 },
                 "loadMore": "Load more",
                 "noMore": "No more records",

@@ -1,17 +1,17 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
 import { z } from 'zod';
 import { ItemData, Category, Tag, CreateItemsGeneratorDto, Brand } from '../dto';
 import { slugifyText, unSlugifyText } from '../utils/text.utils';
-import { AiService, BaseChatModel } from 'src/ai';
+import { getErrorMessage, getErrorStack } from '../utils/error.util';
+import { AiService } from 'src/ai';
 import { itemDataWithCategoriesAndTagsSchema } from '../schemas/item-extraction.schemas';
 import { IPipelineStep, GenerationContext } from '../interfaces/pipeline.interface';
 import { ItemsGeneratorStep } from '../constants/steps';
+import { accumulateMetrics, MetricsAccumulator } from '../utils/metrics.util';
 
-// Prompt for categorization
-const categoryPrompt = <T extends string>(additionalContext?: T) =>
-    `
-You are directory website builder and your task is to Categorize the given items following these rules and task context.
+// Base prompt for categorization
+const CATEGORY_PROMPT =
+    `You are directory website builder and your task is to Categorize the given items following these rules and task context.
 
 <rules>
 1. Assign ONE category per item based on primary function
@@ -32,7 +32,59 @@ You are directory website builder and your task is to Categorize the given items
 16. Please give careful consideration to the rules outlined in the <additional_rules> section below (if available).
 </rules>
 
-${additionalContext || ''}
+Task context:
+<task>
+{task}
+</task>
+
+Items to categorize:
+<items>
+{items}
+</items>` as const;
+
+// Enhanced prompt with existing categories/tags context
+const ENHANCED_CATEGORY_PROMPT =
+    `You are directory website builder and your task is to Categorize the given items following these rules and task context.
+
+<rules>
+1. Assign ONE category per item based on primary function
+2. Add 1-3 relevant tags per item
+3. Category divergence is preferable for better grouping of items.
+4. You can create new categories in addition to the existing ones when the current categories become too large, while maintaining consistency.
+5. A category is too large if it contains more than 50 items.
+6. The user may provide category hints based on the task context, but you are not limited to these unless explicitly and clearly instructed to use only the provided categories.
+7. Use domain-specific categories (e.g. "open-source projects", "enterprise software", "cloud services")
+8. Avoid duplicate categories (e.g. "Monitoring" and "Monitoring Tools", "Open-source" and "Open Source Projects")
+9. Use descriptive tags (e.g. "open-source", "real-time", "cloud-native")
+10. Avoid unnecessary category suffixes
+11. Maintain consistency with existing categories and tags
+12. Override any existing item category if it doesn't match the primary task context
+13. The featured field should remain the same as in the original item
+14. Preserve the original brand when provided (at most one per item) and keep any brand_logo_url if already set. Do not invent brands when the source is unclear.
+15. Preserve any item images array; do not discard valid URLs.
+16. Please give careful consideration to the rules outlined in the <additional_rules> section below (if available).
+</rules>
+
+<additional_rules>
+- For consistency, use the existing categories and tags listed below whenever appropriate.
+- The category metrics (if provided) can help you understand the distribution of items across categories.
+    - This insight can guide you in deciding when to create new categories to prevent any single category from becoming too large or imbalanced.
+    - The metrics provide the total number of items that need to be categorized. Based on this information, you should determine whether a category is too large or imbalanced, and create new categories as needed.
+    - You are not limited to the provided existing categories, feel free to create new ones if necessary.
+- Prioritize consistency across items with similar purposes.
+</additional_rules>
+
+<existing_categories>
+{existing_categories}
+</existing_categories>
+
+<existing_tags>
+{existing_tags}
+</existing_tags>
+
+<category_metrics>
+{category_metrics}
+</category_metrics>
 
 Task context:
 <task>
@@ -58,19 +110,17 @@ type CategoryProcessingParams = {
     existingTags: Tag[];
     existingItems: ItemData[];
     existingBrands?: Brand[];
+    metrics?: MetricsAccumulator;
 };
 
 @Injectable()
 export class CategoryProcessingService implements IPipelineStep {
     private readonly logger = new Logger(CategoryProcessingService.name);
-    private llm: BaseChatModel;
     private readonly BATCH_SIZE = 30;
 
     public readonly name = ItemsGeneratorStep.CATEGORIES_TAGS_PROCESSING;
 
-    constructor(private readonly aiService: AiService) {
-        this.llm = this.aiService.createLlmWithTemperature(0.3);
-    }
+    constructor(private readonly aiService: AiService) {}
 
     async run(context: GenerationContext): Promise<GenerationContext> {
         const {
@@ -100,6 +150,7 @@ export class CategoryProcessingService implements IPipelineStep {
             initialCategories: allInitialCategories,
             existingItems: existing.existingItems,
             existingBrands: existing.existingBrands,
+            metrics,
         });
 
         this.logger.log(
@@ -131,6 +182,7 @@ export class CategoryProcessingService implements IPipelineStep {
         initialCategories = [],
         existingItems,
         existingBrands = [],
+        metrics,
     }: CategoryProcessingParams) {
         const { prompt, priority_categories = [] } = createItemsGeneratorDto;
 
@@ -179,6 +231,7 @@ export class CategoryProcessingService implements IPipelineStep {
                 existingCategories: existingCategoriesSet,
                 existingTags: existingTagsSet,
                 initialCategoryMetrics,
+                metrics,
             });
 
             this.logger.log(
@@ -202,8 +255,8 @@ export class CategoryProcessingService implements IPipelineStep {
             return { finalItems, categories, tags, brands };
         } catch (error) {
             this.logger.error(
-                `[${directorySlug}] Error during category processing: ${error.message}`,
-                error.stack,
+                `[${directorySlug}] Error during category processing: ${getErrorMessage(error)}`,
+                getErrorStack(error),
             );
 
             // Fallback: assign default category and no tags
@@ -228,6 +281,7 @@ export class CategoryProcessingService implements IPipelineStep {
      * Categorize items using AI
      * @param prompt The prompt to use for categorization
      * @param items Items to categorize
+     * @param metrics Metrics accumulator for token tracking
      */
     private async categorizeItems({
         prompt,
@@ -235,27 +289,27 @@ export class CategoryProcessingService implements IPipelineStep {
         existingCategories,
         existingTags,
         initialCategoryMetrics,
+        metrics,
     }: {
         prompt: string;
         items: Partial<ItemData>[];
         existingCategories: Set<string>;
         existingTags: Set<string>;
         initialCategoryMetrics: Record<string, number>;
+        metrics?: MetricsAccumulator;
     }): Promise<ItemData[]> {
         if (!items || items.length === 0) return [];
 
         try {
-            // Prepare items for categorization
-            const itemsForCategorization = items;
-
             // Process in batches if there are many items
             if (items.length > this.BATCH_SIZE) {
                 return this.processBatchCategorization({
-                    prompt: prompt,
-                    items: itemsForCategorization,
+                    prompt,
+                    items,
                     existingCategories,
                     existingTags,
                     initialCategoryMetrics,
+                    metrics,
                 });
             }
 
@@ -263,23 +317,35 @@ export class CategoryProcessingService implements IPipelineStep {
             const categoriesText = Array.from(existingCategories).join(', ');
             const tagsText = Array.from(existingTags).join(', ');
 
-            // Use the enhanced prompt if we have existing categories/tags, otherwise use the basic prompt
-            const promptTemplate = this.enhancedPrompt(existingCategories, existingTags);
+            // Use enhanced prompt if we have existing categories/tags
+            const hasContext = existingCategories.size > 0 || existingTags.size > 0;
 
-            // Process all items at once if the count is reasonable
-            const result = await HumanMessagePromptTemplate.fromTemplate(promptTemplate)
-                .pipe(this.llm.withStructuredOutput(categorizeOutputSchema))
-                .invoke({
-                    task: prompt,
-                    items: JSON.stringify(itemsForCategorization),
-                    existing_categories: categoriesText,
-                    existing_tags: tagsText,
-                    category_metrics: JSON.stringify(initialCategoryMetrics),
-                });
+            const { result, usage, cost } = hasContext
+                ? await this.aiService.askJson(ENHANCED_CATEGORY_PROMPT, categorizeOutputSchema, {
+                      temperature: 0.3,
+                      variables: {
+                          task: prompt,
+                          items: JSON.stringify(items),
+                          existing_categories: categoriesText,
+                          existing_tags: tagsText,
+                          category_metrics: JSON.stringify(initialCategoryMetrics),
+                      },
+                  })
+                : await this.aiService.askJson(CATEGORY_PROMPT, categorizeOutputSchema, {
+                      temperature: 0.3,
+                      variables: {
+                          task: prompt,
+                          items: JSON.stringify(items),
+                      },
+                  });
 
+            accumulateMetrics(metrics, usage, cost);
             return result.items as ItemData[];
         } catch (error) {
-            this.logger.error(`Error during AI categorization: ${error.message}`, error.stack);
+            this.logger.error(
+                `Error during AI categorization: ${getErrorMessage(error)}`,
+                getErrorStack(error),
+            );
 
             // Fallback to items with default category and tags
             return items.map((item) => ({
@@ -292,52 +358,10 @@ export class CategoryProcessingService implements IPipelineStep {
     }
 
     /**
-     * Generate an enhanced prompt that includes existing categories and tags
-     */
-    private enhancedPrompt<T extends boolean = false>(
-        existingCategories: Set<string>,
-        existingTags: Set<string>,
-    ) {
-        const defaultPrompt = categoryPrompt();
-
-        const enhancedPromptTemplate = categoryPrompt(
-            `
-<additional_rules>
-- For consistency, use the existing categories and tags listed below whenever appropriate.
-- The category metrics (if provided) can help you understand the distribution of items across categories. 
-    - This insight can guide you in deciding when to create new categories to prevent any single category from becoming too large or imbalanced.
-    - The metrics provide the total number of items that need to be categorized. Based on this information, you should determine whether a category is too large or imbalanced, and create new categories as needed.
-    - You are not limited to the provided existing categories, feel free to create new ones if necessary.
-- Prioritize consistency across items with similar purposes.
-</additional_rules>
-
-<existing_categories>
-{existing_categories}
-</existing_categories>
-
-<existing_tags>
-{existing_tags}
-</existing_tags>
-
-<category_metrics>
-{category_metrics}
-</category_metrics>
-` as const,
-        );
-
-        type Returned = T extends true ? typeof enhancedPromptTemplate : typeof defaultPrompt;
-
-        if (!existingCategories.size && !existingTags.size) {
-            return defaultPrompt.trim() as Returned;
-        }
-
-        return enhancedPromptTemplate.trim() as Returned;
-    }
-
-    /**
      * Process items in batches for categorization
      * @param prompt The prompt to use for categorization
      * @param items Items to categorize
+     * @param metrics Metrics accumulator for token tracking
      */
     private async processBatchCategorization({
         prompt,
@@ -345,12 +369,14 @@ export class CategoryProcessingService implements IPipelineStep {
         existingCategories,
         existingTags,
         initialCategoryMetrics,
+        metrics,
     }: {
         prompt: string;
         items: Partial<ItemData>[];
         existingCategories: Set<string>;
         existingTags: Set<string>;
         initialCategoryMetrics: Record<string, number>;
+        metrics?: MetricsAccumulator;
     }): Promise<ItemData[]> {
         const allCategorizedItems: ItemData[] = [];
 
@@ -382,19 +408,23 @@ export class CategoryProcessingService implements IPipelineStep {
                     categoryMetrics[category] = (categoryMetrics[category] || 0) + 1;
                 });
 
-                // Use the enhanced prompt if we have existing categories/tags, otherwise use the basic prompt
-                const promptTemplate = this.enhancedPrompt<true>(existingCategories, existingTags);
+                // Always use enhanced prompt for batch processing (we always have context)
+                const { result, usage, cost } = await this.aiService.askJson(
+                    ENHANCED_CATEGORY_PROMPT,
+                    categorizeOutputSchema,
+                    {
+                        temperature: 0.3,
+                        variables: {
+                            task: prompt,
+                            items: JSON.stringify(batch),
+                            category_metrics: JSON.stringify(categoryMetrics),
+                            existing_categories: categoriesText,
+                            existing_tags: tagsText,
+                        },
+                    },
+                );
 
-                const result = await HumanMessagePromptTemplate.fromTemplate(promptTemplate)
-                    .pipe(this.llm.withStructuredOutput(categorizeOutputSchema))
-                    .invoke({
-                        task: prompt,
-                        items: JSON.stringify(batch),
-                        category_metrics: JSON.stringify(categoryMetrics),
-                        existing_categories: categoriesText,
-                        existing_tags: tagsText,
-                    });
-
+                accumulateMetrics(metrics, usage, cost);
                 const batchResults = result.items as ItemData[];
 
                 // Extract and store categories and tags from this batch for future batches
@@ -425,8 +455,8 @@ export class CategoryProcessingService implements IPipelineStep {
                 }
             } catch (error) {
                 this.logger.error(
-                    `Error during batch categorization: ${error.message}`,
-                    error.stack,
+                    `Error during batch categorization: ${getErrorMessage(error)}`,
+                    getErrorStack(error),
                 );
 
                 // Fallback for this batch - use existing categories if available
