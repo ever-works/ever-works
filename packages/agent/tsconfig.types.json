@@ -8,5 +8,7 @@
         "declarationMap": true,
         "incremental": false
     },
-    "include": ["src/**/*.ts"]
+    "include": [
+        "src/**/*.ts"
+    ]
 }

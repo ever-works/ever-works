@@ -39,6 +39,30 @@ function formatDuration(seconds?: number | null) {
     return `${secs}s`;
 }
 
+function formatTokens(tokens?: number | null) {
+    if (!tokens || tokens <= 0) {
+        return '—';
+    }
+
+    if (tokens >= 1_000_000) {
+        return `${(tokens / 1_000_000).toFixed(1)}M`;
+    }
+
+    if (tokens >= 1_000) {
+        return `${(tokens / 1_000).toFixed(1)}K`;
+    }
+
+    return tokens.toLocaleString();
+}
+
+function formatCost(cost?: number | null) {
+    if (!cost || cost <= 0) {
+        return '—';
+    }
+
+    return `$${cost.toFixed(4)}`;
+}
+
 function getStatusLabel(status: string, t: ReturnType<typeof useTranslations>) {
     switch (status) {
         case 'generating':
@@ -80,6 +104,12 @@ export function HistoryTable({ entries, locale }: HistoryTableProps) {
                         <th className="px-4 py-3 text-left text-sm font-semibold text-text-secondary dark:text-text-secondary-dark">
                             {t('table.totalItems')}
                         </th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-text-secondary dark:text-text-secondary-dark">
+                            {t('table.tokens')}
+                        </th>
+                        {/* <th className="px-4 py-3 text-left text-sm font-semibold text-text-secondary dark:text-text-secondary-dark">
+                            {t('table.cost')}
+                        </th> */}
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-border dark:divide-border-dark">
@@ -110,6 +140,10 @@ export function HistoryTable({ entries, locale }: HistoryTableProps) {
                                 <td className={tdClass}>{entry.newItemsCount}</td>
                                 <td className={tdClass}>{entry.updatedItemsCount}</td>
                                 <td className={tdClass}>{entry.totalItemsCount}</td>
+                                <td className={tdClass}>
+                                    {formatTokens(entry.metrics?.total_tokens_used)}
+                                </td>
+                                {/* <td className={tdClass}>{formatCost(entry.metrics?.total_cost)}</td> */}
                             </tr>
                         );
                     })}

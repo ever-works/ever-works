@@ -17,6 +17,7 @@ import { getTranslations } from 'next-intl/server';
 import { revalidatePath } from 'next/cache';
 import { ROUTES } from '@/lib/constants';
 import { redirect } from 'next/navigation';
+import { sanitizeName, sanitizeDescription, sanitizePrompt } from '@/lib/utils/sanitize';
 
 const readmeConfigSchema = z.object({
     header: z.string().optional(),
@@ -32,13 +33,22 @@ const getCreateDirectorySchema = async () => {
         slug: z
             .string()
             .min(1, t('slug.required'))
-            .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, t('slug.format')),
-        name: z.string().min(1, t('name.required')).max(100, t('name.maxLength')),
+            .transform((val) => val.trim().toLowerCase())
+            .pipe(z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, t('slug.format'))),
+        name: z
+            .string()
+            .min(1, t('name.required'))
+            .transform((val) => sanitizeName(val, 100))
+            .pipe(z.string().max(100, t('name.maxLength'))),
         description: z
             .string()
             .min(1, t('description.required'))
-            .max(500, t('description.maxLength')),
-        owner: z.string().optional(),
+            .transform((val) => sanitizeDescription(val, 500))
+            .pipe(z.string().max(500, t('description.maxLength'))),
+        owner: z
+            .string()
+            .optional()
+            .transform((val) => val?.trim()),
         organization: z.boolean(),
         repoProvider: z.nativeEnum(RepoProvider).optional().default(RepoProvider.GITHUB),
         readmeConfig: readmeConfigSchema.optional(),
@@ -149,8 +159,16 @@ export async function createDirectoryWithAI(request: AIDirectoryOptions) {
 
     // AI prompt validation schema
     const aiPromptSchema = z.object({
-        prompt: z.string().min(10, t('prompt.minLength')).max(1000, t('prompt.maxLength')),
-        name: z.string().min(1, t('name.required')).max(100, t('name.maxLength')),
+        prompt: z
+            .string()
+            .min(10, t('prompt.minLength'))
+            .transform((val) => sanitizePrompt(val, 1000))
+            .pipe(z.string().max(1000, t('prompt.maxLength'))),
+        name: z
+            .string()
+            .min(1, t('name.required'))
+            .transform((val) => sanitizeName(val, 100))
+            .pipe(z.string().max(100, t('name.maxLength'))),
         repoProvider: z.nativeEnum(RepoProvider).optional().default(RepoProvider.GITHUB),
     });
 
@@ -258,12 +276,20 @@ export async function updateDirectory(directoryId: string, data: UpdateDirectory
     const t = await getTranslations('actions.directories');
 
     const updateDirectorySchema = z.object({
-        name: z.string().min(1, t('name.required')).max(100, t('name.maxLength')),
+        name: z
+            .string()
+            .min(1, t('name.required'))
+            .transform((val) => sanitizeName(val, 100))
+            .pipe(z.string().max(100, t('name.maxLength'))),
         description: z
             .string()
             .min(1, t('description.required'))
-            .max(500, t('description.maxLength')),
-        owner: z.string().optional(),
+            .transform((val) => sanitizeDescription(val, 500))
+            .pipe(z.string().max(500, t('description.maxLength'))),
+        owner: z
+            .string()
+            .optional()
+            .transform((val) => val?.trim()),
         organization: z.boolean().optional(),
         readmeConfig: readmeConfigSchema.optional(),
     });

@@ -10,21 +10,55 @@ import {
 } from '@/lib/api';
 import { getTranslations } from 'next-intl/server';
 import { checkOAuthConnection } from './oauth';
+import {
+    sanitizeName,
+    sanitizeDescription,
+    sanitizePrompt,
+    sanitizeStringArray,
+} from '@/lib/utils/sanitize';
 
 export async function generateItems(directoryId: string, data: CreateItemsGeneratorDto) {
     const t = await getTranslations('actions.generator');
     const tDirectories = await getTranslations('actions.directories');
 
     try {
+        // Sanitize input data
+        const sanitizedData: CreateItemsGeneratorDto = {
+            ...data,
+            name: sanitizeName(data.name, 200),
+            prompt: sanitizePrompt(data.prompt, 5000),
+            repository_description: data.repository_description
+                ? sanitizeDescription(data.repository_description, 500)
+                : undefined,
+            initial_categories: data.initial_categories
+                ? sanitizeStringArray(data.initial_categories)
+                : undefined,
+            priority_categories: data.priority_categories
+                ? sanitizeStringArray(data.priority_categories)
+                : undefined,
+            target_keywords: data.target_keywords
+                ? sanitizeStringArray(data.target_keywords)
+                : undefined,
+            source_urls: data.source_urls
+                ? data.source_urls.map((url) => url.trim()).filter(Boolean)
+                : undefined,
+            company: data.company
+                ? {
+                      name: sanitizeName(data.company.name, 200),
+                      website: data.company.website.trim(),
+                  }
+                : undefined,
+        };
+
         // Validate required fields
-        if (!data.prompt || data.prompt.trim() === '') {
+        if (!sanitizedData.prompt || sanitizedData.prompt.trim() === '') {
             return {
                 success: false,
                 error: t('promptRequired'),
             };
         }
 
-        if (!data.name || data.name.trim() === '') {
+        if (!sanitizedData.name || sanitizedData.name.trim() === '') {
             return {
                 success: false,
                 error: t('nameRequired'),
@@ -60,8 +94,8 @@ export async function generateItems(directoryId: string, data: CreateItemsGenera
             }
         }
 
-        // Call the API to generate items
-        const result = await itemsGeneratorAPI.generate(directoryId, data);
+        // Call the API to generate items with sanitized data
+        const result = await itemsGeneratorAPI.generate(directoryId, sanitizedData);
 
         return {
             success: true,

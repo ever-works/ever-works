@@ -1,11 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
-import { AiService, BaseChatModel } from 'src/ai';
+import { AiService } from 'src/ai';
 import { slugifyText } from '../../utils/text.utils';
 import { extractedItemsSchema } from '../../schemas/item-extraction.schemas';
 import { ItemData } from '../../dto';
 import { SharedUtilsService } from './shared-utils.service';
 import { DEDUPLICATOR_PROMPT } from './prompts.constants';
+import { getErrorMessage, getErrorStack } from '../../utils/error.util';
+import { accumulateMetrics, MetricsAccumulator } from '../../utils/metrics.util';
 
 @Injectable()
 export class AiDeduplicatorService {
@@ -13,21 +14,23 @@ export class AiDeduplicatorService {
     private readonly GROUP_DELAY_MS = 1000;
 
     private readonly logger = new Logger(AiDeduplicatorService.name);
-    private llm: BaseChatModel;
 
     constructor(
         private readonly aiService: AiService,
         private readonly sharedUtils: SharedUtilsService,
-    ) {
-        this.llm = this.aiService.createLlmWithTemperature(0.0); // Use temperature 0 for deterministic results
-    }
+    ) {}
 
     /**
      * Deduplicates items using AI with chunking for large arrays
      * @param description Description of the directory
      * @param items Items to deduplicate
+     * @param metrics Optional metrics accumulator for tracking token usage
      */
-    async deduplicateWithAI(description: string, items: ItemData[]): Promise<ItemData[]> {
+    async deduplicateWithAI(
+        description: string,
+        items: ItemData[],
+        metrics?: MetricsAccumulator,
+    ): Promise<ItemData[]> {
         if (!items || items.length === 0) return [];
 
         const startTime = Date.now();
@@ -35,31 +38,38 @@ export class AiDeduplicatorService {
 
         // For small arrays, process directly
         if (items.length <= this.sharedUtils.MAX_CLUSTER_SIZE) {
-            return this.processSingleDeduplicationBatch(description, items);
+            return this.processSingleDeduplicationBatch(description, items, metrics);
         }
 
         // For large arrays, use a chunking strategy
-        return this.processLargeDeduplicationArray(description, items, startTime);
+        return this.processLargeDeduplicationArray(description, items, startTime, metrics);
     }
 
     /**
      * Process a single batch of items for deduplication
      * @param description Description of the directory
      * @param items Items to deduplicate
+     * @param metrics Optional metrics accumulator
      */
     private async processSingleDeduplicationBatch(
         description: string,
         items: ItemData[],
+        metrics?: MetricsAccumulator,
     ): Promise<ItemData[]> {
         try {
-            const prompt = HumanMessagePromptTemplate.fromTemplate(DEDUPLICATOR_PROMPT);
+            const { result, usage, cost } = await this.aiService.askJson(
+                DEDUPLICATOR_PROMPT,
+                extractedItemsSchema,
+                {
+                    temperature: 0,
+                    variables: {
+                        task: description,
+                        items: JSON.stringify(items.map((item) => this.sharedUtils.itemMap(item))),
+                    },
+                },
+            );
 
-            const result = await prompt
-                .pipe(this.llm.withStructuredOutput(extractedItemsSchema))
-                .invoke({
-                    task: description,
-                    items: JSON.stringify(items.map((item) => this.sharedUtils.itemMap(item))),
-                });
+            accumulateMetrics(metrics, usage, cost);
 
             return result.items.map((item) => {
                 return <ItemData>{
@@ -71,7 +81,10 @@ export class AiDeduplicatorService {
             });
         } catch (error) {
             // Fallback to the original items if AI deduplication fails
-            this.logger.warn(`Error during AI deduplication batch: ${error.message}`, error.stack);
+            this.logger.warn(
+                `Error during AI deduplication batch: ${getErrorMessage(error)}`,
+                getErrorStack(error),
+            );
             return items;
         }
     }
@@ -81,11 +94,13 @@ export class AiDeduplicatorService {
      * @param description Description of the directory
      * @param items Items to deduplicate
      * @param startTime Start time for logging
+     * @param metrics Optional metrics accumulator
      */
     private async processLargeDeduplicationArray(
         description: string,
         items: ItemData[],
         startTime: number,
+        metrics?: MetricsAccumulator,
     ): Promise<ItemData[]> {
         // Group similar items by name similarity to create more efficient chunks
         const groupedItems = this.sharedUtils.groupSimilarItems(items);
@@ -120,6 +135,7 @@ export class AiDeduplicatorService {
                     const deduplicatedChunk = await this.processSingleDeduplicationBatch(
                         description,
                         chunk,
+                        metrics,
                     );
                     deduplicatedChunks = deduplicatedChunks.concat(deduplicatedChunk);
 
@@ -144,6 +160,7 @@ export class AiDeduplicatorService {
                 const deduplicatedGroup = await this.processSingleDeduplicationBatch(
                     description,
                     group,
+                    metrics,
                 );
                 processedItems = processedItems.concat(deduplicatedGroup);
 

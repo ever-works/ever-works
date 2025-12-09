@@ -69,7 +69,7 @@ export class CreateSubCommand extends CommandRunner {
             const organization = !!directoryData.owner && directoryData.owner !== ghOwner.login;
 
             // Check if directory already exists and handle conflicts
-            const finalSlug = await this.getFinalSlug(owner, directoryData.slug);
+            const finalSlug = await this.getFinalSlug(user.id, owner, directoryData.slug);
             if (!finalSlug) {
                 return;
             }
@@ -120,12 +120,20 @@ export class CreateSubCommand extends CommandRunner {
         }
     }
 
-    private async getFinalSlug(owner: string, slug: string): Promise<string | null> {
-        let slugExists = await this.directoryRepository.findByOwnerAndSlug(owner, slug);
+    private async getFinalSlug(
+        userId: string,
+        owner: string,
+        slug: string,
+    ): Promise<string | null> {
+        let slugExists = await this.directoryRepository.findByOwnerAndSlug({
+            userId,
+            owner,
+            slug,
+        });
 
         if (slugExists) {
             // Generate a suggested alternative slug
-            const suggestedSlug = await this.generateAvailableSlug(owner, slug);
+            const suggestedSlug = await this.generateAvailableSlug(userId, owner, slug);
 
             // Prompt user for conflict resolution
             const resolution = await this.directoryPrompt.promptSlugConflictResolution(
@@ -140,10 +148,12 @@ export class CreateSubCommand extends CommandRunner {
                 slug = suggestedSlug;
             } else if (resolution.action === 'modify' && resolution.finalSlug) {
                 // Check if the manually entered slug is available
-                const manualSlugExists = await this.directoryRepository.findByOwnerAndSlug(
+                const manualSlugExists = await this.directoryRepository.findByOwnerAndSlug({
+                    userId,
                     owner,
-                    resolution.finalSlug,
-                );
+                    slug: resolution.finalSlug,
+                });
+
                 if (manualSlugExists) {
                     console.log(chalk.red(`\n✗ The slug "${resolution.finalSlug}" is also taken.`));
                     console.log(chalk.blue('Please run the command again with a different name.'));
@@ -159,11 +169,21 @@ export class CreateSubCommand extends CommandRunner {
         return slug;
     }
 
-    private async generateAvailableSlug(owner: string, baseSlug: string): Promise<string> {
+    private async generateAvailableSlug(
+        userId: string,
+        owner: string,
+        baseSlug: string,
+    ): Promise<string> {
         let counter = 1;
         let suggestedSlug = `${baseSlug}-${counter}`;
 
-        while (await this.directoryRepository.findByOwnerAndSlug(owner, suggestedSlug)) {
+        while (
+            await this.directoryRepository.findByOwnerAndSlug({
+                userId,
+                owner,
+                slug: suggestedSlug,
+            })
+        ) {
             counter++;
             suggestedSlug = `${baseSlug}-${counter}`;
         }

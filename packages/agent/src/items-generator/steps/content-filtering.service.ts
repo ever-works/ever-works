@@ -1,36 +1,51 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
 import { ConfigDto } from '../dto/create-items-generator.dto';
 import { WebPageData, RelevanceAssessment } from '../interfaces/items-generator.interfaces';
-import { AiService, BaseChatModel } from 'src/ai';
+import { AiService } from 'src/ai';
 import z from 'zod';
 import { IPipelineStep, GenerationContext } from '../interfaces/pipeline.interface';
 import { ItemsGeneratorStep } from '../constants/steps';
+import { accumulateMetrics } from '../utils/metrics.util';
+import { getErrorMessage, getErrorStack } from '../utils/error.util';
 
-const relevanceSchema = z.object({
-    relevant: z.boolean().describe('Whether the content is highly relevant to the topic'),
-    relevance_score: z
-        .number()
-        .min(0)
-        .max(1)
-        .describe('A score between 0.0 (not relevant) and 1.0 (highly relevant)'),
-    reason: z.string().describe('A brief explanation for the relevance assessment'),
-});
+const RELEVANCE_ASSESSMENT_PROMPT =
+    `You are an expert content analyst. Assess the relevance of the following web page content to the main topic.
+
+Topic: "{topic_name}"
+Description: "{topic_description}"
+
+Web Page Content (first {snippet_length} characters):
+{snippet}
+
+Critically evaluate: Is this page's primary focus highly relevant to the topic and description above?
+- Accept: Pages dedicated to the topic, comprehensive comparisons, core tutorials, official documentation, key project pages.
+- Reject: Pages where the topic is only mentioned briefly, listicles covering many unrelated topics, off-topic niche pages (unless the niche is exactly the topic), low-signal forum threads, or purely marketing fluff.
+
+Return a JSON object matching the provided schema.` as const;
+
+const relevanceSchema = z
+    .object({
+        relevant: z.boolean().describe('Whether the content is highly relevant to the topic'),
+        relevance_score: z
+            .number()
+            .min(0)
+            .max(1)
+            .describe('A score between 0.0 (not relevant) and 1.0 (highly relevant)'),
+        reason: z.string().describe('A brief explanation for the relevance assessment'),
+    })
+    .strict() as z.ZodType<RelevanceAssessment>;
 
 @Injectable()
 export class ContentFilteringService implements IPipelineStep {
     private readonly logger = new Logger(ContentFilteringService.name);
-    private llm: BaseChatModel;
     private BATCH_SIZE = 10;
 
     public readonly name = ItemsGeneratorStep.CONTENT_FILTERING;
 
-    constructor(private readonly aiService: AiService) {
-        this.llm = this.aiService.getLlm();
-    }
+    constructor(private readonly aiService: AiService) {}
 
     async run(context: GenerationContext): Promise<GenerationContext> {
-        const { dto, directory, webPages } = context;
+        const { dto, directory, webPages, metrics } = context;
         const { config } = dto;
 
         if (config.content_filtering_enabled) {
@@ -42,6 +57,7 @@ export class ContentFilteringService implements IPipelineStep {
                 dto.name,
                 dto.prompt,
                 config,
+                metrics,
             );
 
             this.logger.log(
@@ -62,6 +78,7 @@ export class ContentFilteringService implements IPipelineStep {
         topicName: string,
         topicDescription: string,
         config: Required<ConfigDto>,
+        metrics?: GenerationContext['metrics'],
     ): Promise<WebPageData[]> {
         this.logger.log(
             `[${directorySlug}] Starting content filtering for ${webPages.length} pages`,
@@ -103,41 +120,23 @@ export class ContentFilteringService implements IPipelineStep {
             try {
                 this.logger.log(`[${directorySlug}] Assessing relevance for: ${page.source_url}`);
 
-                // Stricter prompt for page relevance
-                const prompt = HumanMessagePromptTemplate.fromTemplate(
-                    `You are an expert content analyst. Assess the relevance of the following web page content to the **main topic**: "{topicName}" (Description: "{topicDescription}").
+                const snippet = this.buildSnippet(page.raw_content);
 
-Web Page Content (first 3000 characters):
-<content>
-{page_content_snippet}
-</content>
+                const {
+                    result: assessmentResult,
+                    usage,
+                    cost,
+                } = await this.aiService.askJson(RELEVANCE_ASSESSMENT_PROMPT, relevanceSchema, {
+                    temperature: 0,
+                    variables: {
+                        topic_name: topicName,
+                        topic_description: topicDescription,
+                        snippet_length: String(snippet.length),
+                        snippet,
+                    },
+                });
 
-**Critically evaluate:** Is this page's **primary focus** highly relevant to "{topicName}" and "{topicDescription}"?
-- **Accept:** Pages dedicated to the topic, comprehensive comparisons, core tutorials, official documentation, key project pages.
-- **Reject:** Pages where the topic is only mentioned briefly, listicles covering many unrelated topics, pages focused *only* on a very specific niche *unless* that niche is the explicit topic "{topicName}" (e.g., reject a page *only* about a Ruby vector library if the topic is general vector databases), forum threads with low signal-to-noise, or purely marketing pages.
-
-Provide a relevance score between 0.0 (not relevant) and 1.0 (highly relevant). Only assign a high score if the primary focus aligns strongly with "{topicName}".
-`,
-                );
-
-                const relevanceChain = prompt.pipe(this.llm.withStructuredOutput(relevanceSchema));
-
-                const SNIPPET_LENGTH = 3000;
-                const snippet_middle = Math.floor(page.raw_content.length / 2);
-
-                const page_content_snippet =
-                    page.raw_content.length > SNIPPET_LENGTH
-                        ? page.raw_content.slice(
-                              page.raw_content.length / 2 - snippet_middle,
-                              page.raw_content.length / 2 + snippet_middle,
-                          )
-                        : page.raw_content;
-
-                const assessmentResult = (await relevanceChain.invoke({
-                    topicName,
-                    topicDescription,
-                    page_content_snippet,
-                })) as RelevanceAssessment;
+                accumulateMetrics(metrics, usage, cost);
 
                 const isRelevant =
                     assessmentResult.relevant &&
@@ -156,8 +155,8 @@ Provide a relevance score between 0.0 (not relevant) and 1.0 (highly relevant). 
                 return { page, isRelevant, assessment: assessmentResult };
             } catch (error) {
                 this.logger.error(
-                    `[${directorySlug}] Error assessing relevance for ${page.source_url}: ${error.message}`,
-                    error.stack,
+                    `[${directorySlug}] Error assessing relevance for ${page.source_url}: ${getErrorMessage(error)}`,
+                    getErrorStack(error),
                 );
                 this.logger.warn(
                     `[${directorySlug}] Keeping page due to relevance assessment error (will rely on later extraction quality): ${page.source_url}`,
@@ -198,5 +197,11 @@ Provide a relevance score between 0.0 (not relevant) and 1.0 (highly relevant). 
             `[${directorySlug}] Content filtering complete. ${relevantPages.length} relevant pages found out of ${webPages.length} total pages.`,
         );
         return relevantPages;
+    }
+
+    private buildSnippet(content: string): string {
+        const SNIPPET_LENGTH = 3000;
+        if (!content) return '';
+        return content.length > SNIPPET_LENGTH ? content.slice(0, SNIPPET_LENGTH) : content;
     }
 }

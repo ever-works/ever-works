@@ -366,4 +366,24 @@ export const config = {
             },
         },
     },
+
+    branding: {
+        getAppName() {
+            return process.env.APP_NAME || process.env.NEXT_PUBLIC_APP_NAME || 'Ever Works';
+        },
+        getCompanyOwner() {
+            return (
+                process.env.COMPANY_OWNER ||
+                process.env.NEXT_PUBLIC_COMPANY_OWNER ||
+                'Ever Co.'
+            );
+        },
+        getPlatformWebsite() {
+            return (
+                process.env.PLATFORM_WEBSITE ||
+                process.env.NEXT_PUBLIC_COMPANY_OWNER_WEBSITE ||
+                'https://ever.works'
+            );
+        },
+    },
 };

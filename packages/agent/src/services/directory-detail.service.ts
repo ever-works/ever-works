@@ -5,6 +5,7 @@ import { AiService, BaseChatModel } from '../ai';
 import { User } from '../entities';
 import { DirectoryRepository } from '../database';
 import { slugifyText } from '../items-generator';
+import { sanitizeDescription, sanitizeStringArray } from '../utils/sanitize.util';
 
 // Prompt for extracting directory details
 export const DIRECTORY_DETAIL_PROMPT = `
@@ -33,7 +34,7 @@ export const directoryDetailSchema = z.object({
     keywords: z.array(z.string()).describe('Array of relevant keywords describing the directory'),
     categories: z
         .array(z.string())
-        .optional()
+        .nullable()
         .describe('One or more relevant high-level category names.'),
 });
 
@@ -85,12 +86,14 @@ export class DirectoryDetailService {
             const baseSlug = slugifyText(name);
             const uniqueSlug = await this.generateUniqueSlug(baseSlug, user.id);
 
+            // Sanitize AI-generated content to remove newlines and control characters
+            // This is critical for GitHub API compatibility
             return {
                 name,
                 slug: uniqueSlug,
-                description: result.description,
-                keywords: result.keywords,
-                categories: result.categories || [],
+                description: sanitizeDescription(result.description),
+                keywords: sanitizeStringArray(result.keywords),
+                categories: sanitizeStringArray(result.categories || []),
             };
         } catch (error) {
             this.logger.error(
@@ -105,8 +108,8 @@ export class DirectoryDetailService {
             return {
                 name,
                 slug: uniqueSlug,
-                description: `Directory for ${name}`,
-                keywords: [name.toLowerCase()],
+                description: sanitizeDescription(`Directory for ${name}`),
+                keywords: [name.toLowerCase().trim()],
                 categories: [],
             };
         }

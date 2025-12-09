@@ -529,7 +529,9 @@
                     "updatedItems": "Updated",
                     "totalItems": "Total",
                     "duration": "Duration",
-                    "startedAt": "Started"
+                    "startedAt": "Started",
+                    "tokens": "Tokens",
+                    "cost": "Cost"
                 },
                 "loadMore": "Load more",
                 "noMore": "No more records",
@@ -715,6 +717,7 @@
                 "steps": {
                     "promptComparison": "Comparing prompts",
                     "promptProcessing": "Processing your prompt",
+                    "domainDetection": "Detecting domain type",
                     "aiFirstItemsGeneration": "Generating initial AI items",
                     "searchQueriesGeneration": "Creating search queries",
                     "webSearch": "Searching the web",

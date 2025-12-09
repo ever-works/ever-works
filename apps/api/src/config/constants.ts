@@ -32,12 +32,37 @@ export const config = {
 
     webAppUrl: () => process.env.WEB_URL || 'http://localhost:3000',
 
+    branding: {
+        appName: () => process.env.APP_NAME || process.env.NEXT_PUBLIC_APP_NAME || 'Ever Works',
+        companyOwner: () =>
+            process.env.COMPANY_OWNER ||
+            process.env.NEXT_PUBLIC_COMPANY_OWNER ||
+            'Ever Co.',
+        platformWebsite: () =>
+            process.env.PLATFORM_WEBSITE ||
+            process.env.NEXT_PUBLIC_COMPANY_OWNER_WEBSITE ||
+            'https://ever.works',
+        appDescription: () =>
+            process.env.APP_DESCRIPTION ||
+            process.env.NEXT_PUBLIC_SITE_DESCRIPTION ||
+            'A SaaS platform for building and managing directories',
+    },
+
     mail: {
         provider: (): 'smtp' | 'faker' => {
             const provider = process.env.MAILER_PROVIDER;
             return !provider || provider === 'none' ? 'faker' : 'smtp';
         },
-        from: () => process.env.EMAIL_FROM || 'Ever Works <no-reply@ever.works>',
+        from: () => {
+            const appName = config.branding.appName();
+            const emailFrom = process.env.EMAIL_FROM;
+            if (emailFrom) {
+                return emailFrom;
+            }
+            // Extract email from EMAIL_FROM or use default
+            const defaultEmail = process.env.EMAIL_FROM_EMAIL || 'no-reply@ever.works';
+            return `${appName} <${defaultEmail}>`;
+        },
         smtpHost: () => process.env.SMTP_HOST || '127.0.0.1',
         smtpPort: () => parseInt(process.env.SMTP_PORT || '587'),
         smtpUser: () => process.env.SMTP_USER,
