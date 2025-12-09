@@ -438,7 +438,9 @@
                     "updatedItems": "已更新",
                     "totalItems": "总计",
                     "duration": "持续时间",
-                    "startedAt": "开始时间"
+                    "startedAt": "开始时间",
+                    "tokens": "令牌",
+                    "cost": "费用"
                 },
                 "loadMore": "加载更多",
                 "noMore": "没有更多记录",
@@ -616,6 +618,7 @@
                 "steps": {
                     "promptComparison": "比较提示",
                     "promptProcessing": "处理您的提示",
+                    "domainDetection": "检测域类型",
                     "aiFirstItemsGeneration": "生成初始 AI 项目",
                     "searchQueriesGeneration": "创建搜索查询",
                     "webSearch": "搜索网络",

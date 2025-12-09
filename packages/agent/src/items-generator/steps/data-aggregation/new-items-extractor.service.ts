@@ -1,30 +1,33 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
-import { AiService, BaseChatModel } from 'src/ai';
+import { AiService } from 'src/ai';
 import { slugifyText } from '../../utils/text.utils';
+import { accumulateMetrics, MetricsAccumulator } from '../../utils/metrics.util';
+import { getErrorMessage, getErrorStack } from '../../utils/error.util';
 import { extractedItemsSchema } from '../../schemas/item-extraction.schemas';
 import { ItemData } from '../../dto';
 import { SharedUtilsService } from './shared-utils.service';
 import { EXTRACT_NEW_ITEMS_PROMPT } from './prompts.constants';
+import { z } from 'zod';
 
 @Injectable()
 export class NewItemsExtractorService {
     private readonly logger = new Logger(NewItemsExtractorService.name);
-    private llm: BaseChatModel;
 
     constructor(
         private readonly aiService: AiService,
         private readonly sharedUtils: SharedUtilsService,
-    ) {
-        this.llm = this.aiService.createLlmWithTemperature(0.0);
-    }
+    ) {}
 
     /**
      * Extracts new items that don't exist in the existing items
      * @param existingItems Existing items
      * @param newItems New items to filter
      */
-    async extractNewItems(existingItems: ItemData[], newItems: ItemData[]): Promise<ItemData[]> {
+    async extractNewItems(
+        existingItems: ItemData[],
+        newItems: ItemData[],
+        metrics?: MetricsAccumulator,
+    ): Promise<ItemData[]> {
         if (!newItems || newItems.length === 0) return [];
         if (!existingItems || existingItems.length === 0) return newItems;
 
@@ -54,7 +57,11 @@ export class NewItemsExtractorService {
 
         // For small arrays, process directly
         if (manuallyFiltered.length <= this.sharedUtils.MAX_CLUSTER_SIZE) {
-            const result = await this.processSingleExtractionBatch(existingItems, manuallyFiltered);
+            const result = await this.processSingleExtractionBatch(
+                existingItems,
+                manuallyFiltered,
+                metrics,
+            );
             this.logger.log(
                 `Completed new items extraction: ${newItems.length} items → ${result.length} new items (through AI processing)`,
             );
@@ -62,7 +69,7 @@ export class NewItemsExtractorService {
         }
 
         // For large arrays, use a chunking strategy
-        return this.processLargeExtractionArray(existingItems, manuallyFiltered);
+        return this.processLargeExtractionArray(existingItems, manuallyFiltered, metrics);
     }
 
     /**
@@ -73,6 +80,7 @@ export class NewItemsExtractorService {
     private async processSingleExtractionBatch(
         existingItems: ItemData[],
         newItems: ItemData[],
+        metrics?: MetricsAccumulator,
     ): Promise<ItemData[]> {
         try {
             // Find only relevant existing items to reduce AI payload
@@ -86,16 +94,23 @@ export class NewItemsExtractorService {
                 `AI processing: comparing ${newItems.length} new items against ${relevantExistingItems.length} relevant existing items (filtered from ${existingItems.length} total)`,
             );
 
-            const prompt = HumanMessagePromptTemplate.fromTemplate(EXTRACT_NEW_ITEMS_PROMPT);
+            const { result, usage, cost } = await this.aiService.askJson(
+                EXTRACT_NEW_ITEMS_PROMPT,
+                extractedItemsSchema,
+                {
+                    temperature: 0,
+                    variables: {
+                        existing: JSON.stringify(
+                            relevantExistingItems.map(this.sharedUtils.itemMap),
+                        ),
+                        new: JSON.stringify(newItems.map(this.sharedUtils.itemMap)),
+                    },
+                },
+            );
 
-            const result = await prompt
-                .pipe(this.llm.withStructuredOutput(extractedItemsSchema))
-                .invoke({
-                    existing: JSON.stringify(relevantExistingItems.map(this.sharedUtils.itemMap)),
-                    new: JSON.stringify(newItems.map(this.sharedUtils.itemMap)),
-                });
+            accumulateMetrics(metrics, usage, cost);
 
-            return result.items.map((item) => {
+            return (result.items || []).map((item) => {
                 return <ItemData>{
                     ...item,
                     slug: slugifyText(item.name),
@@ -105,8 +120,8 @@ export class NewItemsExtractorService {
             });
         } catch (error) {
             this.logger.error(
-                `Error during new items extraction batch: ${error.message}`,
-                error.stack,
+                `Error during new items extraction batch: ${getErrorMessage(error)}`,
+                getErrorStack(error),
             );
 
             return newItems;
@@ -121,6 +136,7 @@ export class NewItemsExtractorService {
     private async processLargeExtractionArray(
         existingItems: ItemData[],
         newItems: ItemData[],
+        metrics?: MetricsAccumulator,
     ): Promise<ItemData[]> {
         // Group similar items by name similarity to create more efficient chunks
         const groupedItems = this.sharedUtils.groupSimilarItems(newItems);
@@ -165,6 +181,7 @@ export class NewItemsExtractorService {
                     const extractedChunk = await this.processSingleExtractionBatchWithRelevantItems(
                         relevantExistingItems,
                         chunk,
+                        metrics,
                     );
                     extractedChunks = extractedChunks.concat(extractedChunk);
 
@@ -189,6 +206,7 @@ export class NewItemsExtractorService {
                 const extractedGroup = await this.processSingleExtractionBatchWithRelevantItems(
                     relevantExistingItems,
                     group,
+                    metrics,
                 );
                 extractedItems = extractedItems.concat(extractedGroup);
 
@@ -217,20 +235,28 @@ export class NewItemsExtractorService {
     private async processSingleExtractionBatchWithRelevantItems(
         relevantExistingItems: ItemData[],
         newItems: ItemData[],
+        metrics?: MetricsAccumulator,
     ): Promise<ItemData[]> {
         try {
             this.logger.log(
                 `AI processing: comparing ${newItems.length} new items against ${relevantExistingItems.length} pre-filtered relevant existing items`,
             );
 
-            const prompt = HumanMessagePromptTemplate.fromTemplate(EXTRACT_NEW_ITEMS_PROMPT);
+            const { result, usage, cost } = await this.aiService.askJson(
+                EXTRACT_NEW_ITEMS_PROMPT,
+                extractedItemsSchema,
+                {
+                    temperature: 0,
+                    variables: {
+                        existing: JSON.stringify(
+                            relevantExistingItems.map(this.sharedUtils.itemMap),
+                        ),
+                        new: JSON.stringify(newItems.map(this.sharedUtils.itemMap)),
+                    },
+                },
+            );
 
-            const result = await prompt
-                .pipe(this.llm.withStructuredOutput(extractedItemsSchema))
-                .invoke({
-                    existing: JSON.stringify(relevantExistingItems.map(this.sharedUtils.itemMap)),
-                    new: JSON.stringify(newItems.map(this.sharedUtils.itemMap)),
-                });
+            accumulateMetrics(metrics, usage, cost);
 
             return result.items.map((item) => {
                 return <ItemData>{
@@ -242,8 +268,8 @@ export class NewItemsExtractorService {
             });
         } catch (error) {
             this.logger.error(
-                `Error during new items extraction batch: ${error.message}`,
-                error.stack,
+                `Error during new items extraction batch: ${getErrorMessage(error)}`,
+                getErrorStack(error),
             );
 
             return newItems;

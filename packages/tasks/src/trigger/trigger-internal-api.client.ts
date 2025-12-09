@@ -66,6 +66,15 @@ export class TriggerInternalApiClient {
         return response?.value;
     }
 
+    async deleteCacheEntry<T>(key: string): Promise<boolean> {
+        const response = await this.request<{ deleted: boolean }>({
+            method: 'DELETE',
+            path: `/cache?key=${encodeURIComponent(key)}`,
+        });
+
+        return response.deleted;
+    }
+
     private async request<T>({
         method,
         path,

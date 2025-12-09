@@ -1,5 +1,6 @@
 import { Logger, Injectable, Inject } from '@nestjs/common';
 import { IPipelineStep, GenerationContext } from '../interfaces/pipeline.interface';
+import { getErrorMessage, getErrorStack } from '../utils/error.util';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import type { Cache } from 'cache-manager';
 import type { Directory } from '@src/entities';
@@ -34,6 +35,10 @@ export class PipelineExecutor {
     addStep(step: IPipelineStep) {
         this.steps.push(step);
         return this;
+    }
+
+    public getStepNames(): string[] {
+        return this.steps.map((s) => s.name);
     }
 
     async execute(
@@ -100,13 +105,16 @@ export class PipelineExecutor {
                 await this.saveCheckpoint(currentContext, i, stepName);
             } catch (error) {
                 this.logger.error(
-                    `[Step ${i + 1}/${totalSteps}] ${stepName} - Failed: ${error.message}`,
-                    error.stack,
+                    `[Step ${i + 1}/${totalSteps}] ${stepName} - Failed: ${getErrorMessage(error)}`,
+                    getErrorStack(error),
                 );
                 // Here we could implement retry logic or custom error handling strategies
                 throw error;
             }
         }
+
+        // Clear checkpoint after successful completion to prevent stale data on next run
+        await this.clearCheckpoint(currentContext.directory);
 
         this.logger.log(`Pipeline execution completed successfully.`);
         return currentContext;
@@ -128,8 +136,22 @@ export class PipelineExecutor {
         }
     }
 
+    /**
+     * Clears the checkpoint for a directory.
+     * Should be called after successful pipeline completion to prevent stale data.
+     */
+    async clearCheckpoint(directory: Directory): Promise<void> {
+        try {
+            const checkpointKey = this.getCheckpointKey(directory);
+            await this.cacheManager.del(checkpointKey);
+            this.logger.debug(`Checkpoint cleared for ${directory.slug}`);
+        } catch (err) {
+            this.logger.warn(`Failed to clear checkpoint for ${directory.slug}: ${err.message}`);
+        }
+    }
+
     private getCheckpointKey(directory: Directory) {
-        return `pipeline-checkpoint-${directory.userId}-${directory.slug}`;
+        return `pipeline-checkpoint-${directory.id}-${directory.slug}`;
     }
 
     private async saveCheckpoint(context: GenerationContext, stepIndex: number, stepName: string) {

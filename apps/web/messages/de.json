@@ -438,7 +438,9 @@
                     "updatedItems": "Aktualisiert",
                     "totalItems": "Gesamt",
                     "duration": "Dauer",
-                    "startedAt": "Gestartet"
+                    "startedAt": "Gestartet",
+                    "tokens": "Token",
+                    "cost": "Kosten"
                 },
                 "loadMore": "Mehr laden",
                 "noMore": "Keine weiteren Einträge",
@@ -616,6 +618,7 @@
                 "steps": {
                     "promptComparison": "Prompts vergleichen",
                     "promptProcessing": "Ihren Prompt verarbeiten",
+                    "domainDetection": "Domaintyp erkennen",
                     "aiFirstItemsGeneration": "Anfängliche KI-Einträge generieren",
                     "searchQueriesGeneration": "Suchanfragen erstellen",
                     "webSearch": "Das Web durchsuchen",

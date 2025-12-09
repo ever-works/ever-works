@@ -1,12 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import axios from 'axios';
-import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
 import { z } from 'zod';
 import { ItemData, ConfigDto } from '../dto';
-import { AiService, BaseChatModel } from 'src/ai';
+import { AiService } from 'src/ai';
 import { SearchService } from '../shared';
 import { IPipelineStep, GenerationContext } from '../interfaces/pipeline.interface';
 import { ItemsGeneratorStep } from '../constants/steps';
+import { accumulateMetrics } from '../utils/metrics.util';
 
 // Schema for AI URL validation response
 const urlValidationSchema = z.object({
@@ -66,28 +66,29 @@ Prefer official sources in this order:
 3. Official documentation
 4. Package manager pages (npm, PyPI, etc.)
 5. Avoid: blog posts, news articles, tutorials, unless they are the only authoritative source
-`;
+` as const;
 
 @Injectable()
 export class SourceValidationService implements IPipelineStep {
     private readonly logger = new Logger(SourceValidationService.name);
-    private llm: BaseChatModel;
 
     public readonly name = ItemsGeneratorStep.SOURCES_VALIDATION;
 
     constructor(
         private readonly searchService: SearchService,
         private readonly aiService: AiService,
-    ) {
-        this.llm = this.aiService.createLlmWithTemperature(0.1); // Low temperature for consistent analysis
-    }
+    ) {}
 
     async run(context: GenerationContext): Promise<GenerationContext> {
-        const { directory, finalItems } = context;
+        const { directory, finalItems, metrics } = context;
 
         this.logger.log(`[${directory.slug}] Filter and Validate Source URLs - Starting`);
 
-        const validatedItems = await this.filterAndValidateSourceItems(directory.slug, finalItems);
+        const validatedItems = await this.filterAndValidateSourceItems(
+            directory.slug,
+            finalItems,
+            metrics,
+        );
 
         context.finalItems = validatedItems;
 
@@ -97,6 +98,7 @@ export class SourceValidationService implements IPipelineStep {
     async filterAndValidateSourceItems(
         directorySlug: string,
         items: ItemData[],
+        metrics?: GenerationContext['metrics'],
     ): Promise<ItemData[]> {
         this.logger.log(`Starting source URL validation and filtering for ${items.length} items.`);
 
@@ -123,7 +125,7 @@ export class SourceValidationService implements IPipelineStep {
 
                 // Process all items in the batch in parallel
                 const validationPromises = batch.map((item) => {
-                    return this.validateAndFetchSourceUrl(directorySlug, item)
+                    return this.validateAndFetchSourceUrl(directorySlug, item, metrics)
                         .then((validatedSourceUrl) => {
                             if (validatedSourceUrl) {
                                 return {
@@ -175,6 +177,7 @@ export class SourceValidationService implements IPipelineStep {
     private async validateAndFetchSourceUrl(
         directorySlug: string,
         currentItem: ItemData,
+        metrics?: GenerationContext['metrics'],
     ): Promise<string | undefined> {
         const sourceUrl = currentItem.source_url;
         const itemName = currentItem.name;
@@ -301,6 +304,7 @@ export class SourceValidationService implements IPipelineStep {
                     safeItemName,
                     safeItemDescription,
                     url,
+                    metrics,
                 );
                 return {
                     url,
@@ -384,6 +388,7 @@ export class SourceValidationService implements IPipelineStep {
         itemName: string,
         itemDescription: string,
         candidateUrl: string,
+        metrics?: GenerationContext['metrics'],
     ): Promise<{ isOfficial: boolean; confidence: number; reasoning: string } | null> {
         if (!this.aiService.isAiConfigured()) {
             this.logger.warn('AI service not configured, skipping AI URL validation');
@@ -404,15 +409,21 @@ export class SourceValidationService implements IPipelineStep {
             }
 
             // Use AI to validate the URL
-            const promptTemplate = HumanMessagePromptTemplate.fromTemplate(URL_VALIDATION_PROMPT);
-            const result = await promptTemplate
-                .pipe(this.llm.withStructuredOutput(urlValidationSchema))
-                .invoke({
-                    itemName,
-                    itemDescription,
-                    candidateUrl,
-                    pageContent: pageContent.slice(0, 2000), // Limit content length
-                });
+            const { result, usage, cost } = await this.aiService.askJson(
+                URL_VALIDATION_PROMPT,
+                urlValidationSchema,
+                {
+                    temperature: 0.1,
+                    variables: {
+                        itemName,
+                        itemDescription,
+                        candidateUrl,
+                        pageContent: pageContent.slice(0, 2000),
+                    },
+                },
+            );
+
+            accumulateMetrics(metrics, usage, cost);
 
             this.logger.log(
                 `AI URL validation for "${itemName}" -> ${candidateUrl}: official=${result.is_official}, confidence=${result.confidence_score}, type=${result.url_type}`,

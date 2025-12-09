@@ -9,6 +9,7 @@ import {
 } from './data-aggregation';
 import { IPipelineStep, GenerationContext } from '../interfaces/pipeline.interface';
 import { ItemsGeneratorStep } from '../constants/steps';
+import { MetricsAccumulator } from '../utils/metrics.util';
 
 type DataAggregationParams = {
     directorySlug: string;
@@ -17,6 +18,7 @@ type DataAggregationParams = {
     newlyExtractedItemsThisRun: ItemData[];
     urlsScannedThisRun: number;
     pagesProcessedThisRun: number;
+    metrics?: MetricsAccumulator;
 };
 
 @Injectable()
@@ -49,6 +51,7 @@ export class DataAggregationService implements IPipelineStep {
             urlsScannedThisRun: webPages.length, // approximate, initially scanned = retrieved
             newlyExtractedItemsThisRun: allDiscoveredItems,
             pagesProcessedThisRun: webPages.length,
+            metrics: context.metrics,
         });
 
         context.aggregatedItems = aggregatedItems;
@@ -67,8 +70,11 @@ export class DataAggregationService implements IPipelineStep {
         newlyExtractedItemsThisRun,
         urlsScannedThisRun,
         pagesProcessedThisRun,
+        metrics: inputMetrics,
     }: DataAggregationParams) {
         const { prompt } = createItemsGeneratorDto;
+        // Use provided metrics or create a new accumulator
+        const metrics: MetricsAccumulator = inputMetrics ?? {};
 
         this.logger.log(`[${directorySlug}] Starting data aggregation and deduplication.`);
 
@@ -94,6 +100,7 @@ export class DataAggregationService implements IPipelineStep {
             deduplicated = await this.newItemsExtractor.extractNewItems(
                 existingItems,
                 deduplicated,
+                metrics,
             );
             newItemsAddedToStoreCount = deduplicated.length;
 
@@ -105,25 +112,31 @@ export class DataAggregationService implements IPipelineStep {
         // Deduplicate with AI (more sophisticated)
         if (deduplicated.length > 0) {
             this.logger.log(`[${directorySlug}] Deduplicating items with AI.`);
-            deduplicated = await this.aiDeduplicator.deduplicateWithAI(prompt, deduplicated);
+            deduplicated = await this.aiDeduplicator.deduplicateWithAI(
+                prompt,
+                deduplicated,
+                metrics,
+            );
             this.logger.log(
                 `[${directorySlug}] AI-based deduplication: ${deduplicated.length} items remaining`,
             );
         }
 
-        // Calculate metrics
-        const metrics: ItemsGeneratorMetrics = {
+        // Calculate final output metrics (merging accumulated token/cost metrics)
+        const outputMetrics: ItemsGeneratorMetrics = {
             urls_scanned: urlsScannedThisRun,
             pages_processed: pagesProcessedThisRun,
             items_extracted_current_run: newlyExtractedItemsThisRun.length,
             new_items_added_to_store: newItemsAddedToStoreCount,
             total_items_in_store: deduplicated.length,
+            total_tokens_used: metrics.total_tokens_used,
+            total_cost: metrics.total_cost,
         };
 
         this.logger.log(
             `[${directorySlug}] Data aggregation and deduplication complete. Final item count: ${deduplicated.length}`,
         );
 
-        return { aggregatedItems: deduplicated, metrics };
+        return { aggregatedItems: deduplicated, metrics: outputMetrics };
     }
 }

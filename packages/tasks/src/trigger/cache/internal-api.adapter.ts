@@ -44,8 +44,7 @@ export class InternalAPIAdapter extends EventEmitter {
 
     async delete(key: string): Promise<boolean> {
         try {
-            // Unsupported operation in this adapter
-            return false;
+            return await this.apiClient.deleteCacheEntry(key);
         } catch (error) {
             this.emit('error', error);
             return false;

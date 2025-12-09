@@ -13,6 +13,7 @@ import {
     PromptProcessingService,
     PromptComparisonService,
     BadgeProcessingService,
+    DomainDetectionService,
 } from './steps';
 import { Category, ItemData, Tag, Brand } from './dto';
 import { IDataConfig } from '../data-generator/data-repository';
@@ -39,6 +40,7 @@ export class ItemsGeneratorService {
         private readonly pipelineExecutor: PipelineExecutor,
         private readonly promptComparisonService: PromptComparisonService,
         private readonly promptProcessingService: PromptProcessingService,
+        private readonly domainDetectionService: DomainDetectionService,
         private readonly aiItemGenerationService: AiItemGenerationService,
         private readonly searchQueryGenerationService: SearchQueryGenerationService,
         private readonly webPageRetrievalService: WebPageRetrievalService,
@@ -54,6 +56,7 @@ export class ItemsGeneratorService {
         this.pipelineExecutor
             .addStep(this.promptComparisonService)
             .addStep(this.promptProcessingService)
+            .addStep(this.domainDetectionService)
             // Run AI Item Generation and Search Query Generation in parallel
             .addStep(
                 new ParallelStep([this.aiItemGenerationService, this.searchQueryGenerationService]),
@@ -108,9 +111,14 @@ export class ItemsGeneratorService {
 
             // Attempt to load checkpoint
             const checkpoint = await this.pipelineExecutor.loadCheckpoint(directory);
+            const lastStep = this.pipelineExecutor.getStepNames().length - 1;
 
             // Validate checkpoint has required data before using it
-            const isValidCheckpoint = checkpoint && checkpoint.context && checkpoint.stepName;
+            const isValidCheckpoint =
+                checkpoint &&
+                checkpoint.context &&
+                checkpoint.stepName &&
+                checkpoint.stepIndex < lastStep;
 
             if (isValidCheckpoint) {
                 this.logger.log(

@@ -7,4 +7,6 @@ export * from './schemas/item-extraction.schemas';
 export * from './shared';
 export * from './steps';
 export * from './utils/text.utils';
+export * from './utils/metrics.util';
+export * from './utils/error.util';
 export * from './constants/steps';

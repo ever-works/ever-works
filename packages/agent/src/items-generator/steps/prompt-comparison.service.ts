@@ -1,21 +1,21 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
 import { z } from 'zod';
-import { AiService, BaseChatModel } from 'src/ai';
+import { AiService } from 'src/ai';
 import { IPipelineStep, GenerationContext } from '../interfaces/pipeline.interface';
 import { ItemsGeneratorStep } from '../constants/steps';
 import { GenerationMethod } from '../dto';
+import { accumulateMetrics } from '../utils/metrics.util';
 
 // Prompt comparison prompt
-const PROMPT_COMPARISON_PROMPT = `
-You are a helpful assistant tasked with comparing two prompts to determine if they are related and describe the same or similar data generation context.
+const PROMPT_COMPARISON_PROMPT =
+    `You are a helpful assistant tasked with comparing two prompts to determine if they are related and describe the same or similar data generation context.
 
 <existing_prompt>
-{existingPrompt}
+{existing_prompt}
 </existing_prompt>
 
 <new_prompt>
-{newPrompt}
+{new_prompt}
 </new_prompt>
 
 Your task:
@@ -34,8 +34,7 @@ Your task:
 
 5. Provide a clear reasoning for your decision.
 
-Be somewhat lenient in determining relatedness - minor variations, additional details, or slight scope changes should still be considered related if the core intent is similar.
-`;
+Be somewhat lenient in determining relatedness - minor variations, additional details, or slight scope changes should still be considered related if the core intent is similar.` as const;
 
 // Output schema for validation
 const promptComparisonOutputSchema = z.object({
@@ -57,14 +56,10 @@ export type PromptComparisonResult = z.infer<typeof promptComparisonOutputSchema
 @Injectable()
 export class PromptComparisonService implements IPipelineStep {
     private readonly logger = new Logger(PromptComparisonService.name);
-    private llm: BaseChatModel;
 
     public readonly name = ItemsGeneratorStep.PROMPT_COMPARISON;
 
-    constructor(private readonly aiService: AiService) {
-        // Use low temperature for consistent comparison results
-        this.llm = this.aiService.createLlmWithTemperature(0.1);
-    }
+    constructor(private readonly aiService: AiService) {}
 
     async run(context: GenerationContext): Promise<GenerationContext> {
         const { dto, existing, directory } = context;
@@ -81,9 +76,9 @@ export class PromptComparisonService implements IPipelineStep {
             this.logger.log(`[${directory.slug}] Prompt Comparison - Starting`);
 
             const comparisonResult = await this.comparePrompts(
-                directory.slug,
                 $configMetadata.initial_prompt,
                 dto.prompt,
+                context.metrics,
             );
 
             const confidence = comparisonResult.confidence;
@@ -115,15 +110,14 @@ export class PromptComparisonService implements IPipelineStep {
 
     /**
      * Compare two prompts to determine if they are related
-     * @param slug The slug for logging purposes
      * @param existingPrompt The existing prompt from the configuration
      * @param newPrompt The new prompt from the request
      * @returns Comparison result with relatedness determination and reasoning
      */
     async comparePrompts(
-        slug: string,
         existingPrompt: string,
         newPrompt: string,
+        metrics?: GenerationContext['metrics'],
     ): Promise<PromptComparisonResult> {
         if (!existingPrompt || !newPrompt) {
             return {
@@ -143,18 +137,21 @@ export class PromptComparisonService implements IPipelineStep {
         }
 
         try {
-            const promptTemplate =
-                HumanMessagePromptTemplate.fromTemplate(PROMPT_COMPARISON_PROMPT);
-            const result = await promptTemplate
-                .pipe(this.llm.withStructuredOutput(promptComparisonOutputSchema))
-                .invoke({
-                    existingPrompt,
-                    newPrompt,
-                });
+            const { result, usage, cost } = await this.aiService.askJson(
+                PROMPT_COMPARISON_PROMPT,
+                promptComparisonOutputSchema,
+                {
+                    temperature: 0.1,
+                    variables: { existing_prompt: existingPrompt, new_prompt: newPrompt },
+                },
+            );
 
+            accumulateMetrics(metrics, usage, cost);
             return result;
         } catch (error) {
-            this.logger.error(`[${slug}] Error comparing prompts: ${error.message}`, error.stack);
+            this.logger.error(
+                `Error comparing prompts: ${error instanceof Error ? error.message : String(error)}`,
+            );
 
             // Fallback to simple string similarity check
             const similarity = this.calculateSimpleSimilarity(existingPrompt, newPrompt);
