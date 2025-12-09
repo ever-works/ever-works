@@ -1,6 +1,8 @@
 // Prompts for deduplication and extraction
 export const DEDUPLICATOR_PROMPT = `
 You are directory website builder and your task is to deduplicate items.
+Directory topic: {task}
+
 Our crawlers found some items, but some of them MIGHT be duplicated.
 Every item has name, description, and optionally URL of item's official website/repository.
 

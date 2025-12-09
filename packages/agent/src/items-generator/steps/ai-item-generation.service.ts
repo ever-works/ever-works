@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
 import { slugifyText } from '../utils/text.utils';
-import { AiService, BaseChatModel } from 'src/ai';
+import { getErrorMessage, getErrorStack } from '../utils/error.util';
+import { AiService } from 'src/ai';
 import { CreateItemsGeneratorDto, ItemData } from '../dto';
 import {
     extractedItemsSchema,
@@ -10,67 +10,9 @@ import {
 } from '../schemas/item-extraction.schemas';
 import { IPipelineStep, GenerationContext } from '../interfaces/pipeline.interface';
 import { ItemsGeneratorStep } from '../constants/steps';
+import { accumulateMetrics, MetricsAccumulator } from '../utils/metrics.util';
 
-@Injectable()
-export class AiItemGenerationService implements IPipelineStep {
-    private readonly logger = new Logger(AiItemGenerationService.name);
-    private llm: BaseChatModel;
-
-    public readonly name = ItemsGeneratorStep.AI_FIRST_ITEMS_GENERATION;
-
-    constructor(private readonly aiService: AiService) {
-        this.llm = this.aiService.createLlmWithTemperature(0.3);
-    }
-
-    async run(context: GenerationContext): Promise<GenerationContext> {
-        const { dto, directory, featuredItemHints } = context;
-
-        if (dto.config.ai_first_generation_enabled) {
-            this.logger.log(`[${directory.slug}] AI-First Item Generation - Invoking`);
-
-            const initialAiItems = await this.generateInitialItemsWithAI(
-                directory.slug,
-                dto,
-                featuredItemHints,
-            );
-            this.logger.log(
-                `[${directory.slug}] AI generated ${initialAiItems.length} initial items.`,
-            );
-
-            context.initialAiItems = initialAiItems;
-        } else {
-            this.logger.debug(`[${directory.slug}] AI-First Item Generation - Skipped`);
-            context.initialAiItems = [];
-        }
-
-        return context;
-    }
-
-    async generateInitialItemsWithAI(
-        directorySlug: string,
-        createItemsGeneratorDto: CreateItemsGeneratorDto,
-        featuredItemHints: string[] = [],
-    ): Promise<ItemData[]> {
-        const {
-            name: topicName,
-            prompt: topicDescription,
-            target_keywords,
-        } = createItemsGeneratorDto;
-
-        this.logger.log(
-            `[${directorySlug}] AI-First Item Generation - Starting for topic: ${topicName}`,
-        );
-        const allGeneratedItems: ItemData[] = [];
-
-        if (!this.aiService.isAiConfigured()) {
-            this.logger.warn(
-                `[${directorySlug}] OpenAI API Key not configured. Skipping AI-first item generation.`,
-            );
-            return [];
-        }
-
-        const understandingPrompt = HumanMessagePromptTemplate.fromTemplate(
-            `You are an AI assistant helping to curate a "Directory website".
+const UNDERSTANDING_PROMPT = `You are an AI assistant helping to curate a "Directory website".
 Topic: "{topicName}"
 Description: "{topicDescription}"
 Keywords: "{target_keywords_string}"
@@ -84,54 +26,10 @@ Before attempting to generate items, please assess if the provided information i
 Consider:
 - Is the topic well-defined?
 - Is the scope clear (not too broad, not too narrow without context)?
-- Are there any ambiguities that would make item generation difficult or likely to produce irrelevant results?
-`,
-        );
+- Are there any ambiguities that would make item generation difficult or likely to produce irrelevant results?` as const;
 
-        const understandingChain = understandingPrompt.pipe(
-            this.llm.withStructuredOutput(promptUnderstandingAssessmentSchema),
-        );
-
-        try {
-            const assessment = (await understandingChain.invoke({
-                topicName,
-                topicDescription,
-                target_keywords_string: target_keywords ? target_keywords.join(', ') : 'N/A',
-            })) as {
-                can_proceed: boolean;
-                reason_if_cannot_proceed: string | null;
-                suggested_clarifications?: string[];
-            };
-
-            if (!assessment.can_proceed) {
-                this.logger.warn(
-                    `[${directorySlug}] AI cannot confidently proceed with item generation for topic "${topicName}" due to prompt clarity. Reason: ${assessment.reason_if_cannot_proceed || 'No specific reason provided.'}`,
-                );
-                if (
-                    assessment.suggested_clarifications &&
-                    assessment.suggested_clarifications.length > 0
-                ) {
-                    this.logger.warn(
-                        `[${directorySlug}] AI suggested clarifications: ${assessment.suggested_clarifications.join('; ')}`,
-                    );
-                }
-                return []; // Do not proceed with item generation
-            }
-
-            this.logger.log(
-                `[${directorySlug}] AI assessment: Prompt for topic "${topicName}" is clear. Proceeding with item generation.`,
-            );
-        } catch (error) {
-            this.logger.error(
-                `[${directorySlug}] Error during AI prompt understanding assessment for topic "${topicName}": ${error.message}. Proceeding with caution (will attempt item generation).`,
-                error.stack,
-            );
-            // If the understanding check itself fails, we log the error but still attempt item generation.
-            // This is a fallback in case the assessment mechanism has an issue.
-        }
-
-        const generationPrompt = HumanMessagePromptTemplate.fromTemplate(
-            `You are an expert curator and technical writer tasked with generating an initial list of items for a "Directory website" about a specific topic.
+const GENERATION_PROMPT =
+    `You are an expert curator and technical writer tasked with generating an initial list of items for a "Directory website" about a specific topic.
 The **main topic** of the Directory website is: "{topicName}"
 Description: "{topicDescription}"
 Optional initial keywords: {target_keywords_string}
@@ -156,27 +54,133 @@ For each item, provide the following details:
 -   Provide **accurate and canonical** information, especially for names and URLs.
 -   If the topic is broad, try to cover its main sub-areas. If it's niche, focus on key resources for that niche.
 
-Generate the list of items according to the specified schema.
-`,
-        );
+Generate the list of items according to the specified schema.` as const;
 
-        // Use a lower temperature for item generation
-        const lowTempLlm = this.aiService.createLlmWithTemperature(0.0);
+@Injectable()
+export class AiItemGenerationService implements IPipelineStep {
+    private readonly logger = new Logger(AiItemGenerationService.name);
 
-        const generationChain = generationPrompt.pipe(
-            lowTempLlm.withStructuredOutput(extractedItemsSchema),
+    public readonly name = ItemsGeneratorStep.AI_FIRST_ITEMS_GENERATION;
+
+    constructor(private readonly aiService: AiService) {}
+
+    async run(context: GenerationContext): Promise<GenerationContext> {
+        const { dto, directory, featuredItemHints, metrics } = context;
+
+        if (dto.config.ai_first_generation_enabled) {
+            this.logger.log(`[${directory.slug}] AI-First Item Generation - Invoking`);
+
+            const initialAiItems = await this.generateInitialItemsWithAI(
+                directory.slug,
+                dto,
+                featuredItemHints,
+                metrics,
+            );
+            this.logger.log(
+                `[${directory.slug}] AI generated ${initialAiItems.length} initial items.`,
+            );
+
+            context.initialAiItems = initialAiItems;
+        } else {
+            this.logger.debug(`[${directory.slug}] AI-First Item Generation - Skipped`);
+            context.initialAiItems = [];
+        }
+
+        return context;
+    }
+
+    async generateInitialItemsWithAI(
+        directorySlug: string,
+        createItemsGeneratorDto: CreateItemsGeneratorDto,
+        featuredItemHints: string[] = [],
+        metrics?: MetricsAccumulator,
+    ): Promise<ItemData[]> {
+        const {
+            name: topicName,
+            prompt: topicDescription,
+            target_keywords,
+        } = createItemsGeneratorDto;
+
+        this.logger.log(
+            `[${directorySlug}] AI-First Item Generation - Starting for topic: ${topicName}`,
         );
+        const allGeneratedItems: ItemData[] = [];
+
+        if (!this.aiService.isAiConfigured()) {
+            this.logger.warn(
+                `[${directorySlug}] OpenAI API Key not configured. Skipping AI-first item generation.`,
+            );
+            return [];
+        }
+
+        const keywordsString = target_keywords ? target_keywords.join(', ') : 'N/A';
+
+        try {
+            const {
+                result: assessment,
+                usage,
+                cost,
+            } = await this.aiService.askJson(
+                UNDERSTANDING_PROMPT,
+                promptUnderstandingAssessmentSchema,
+                {
+                    temperature: 0.3,
+                    variables: {
+                        topicName,
+                        topicDescription,
+                        target_keywords_string: keywordsString,
+                    },
+                },
+            );
+
+            accumulateMetrics(metrics, usage, cost);
+
+            if (!assessment.can_proceed) {
+                this.logger.warn(
+                    `[${directorySlug}] AI cannot confidently proceed with item generation for topic "${topicName}" due to prompt clarity. Reason: ${assessment.reason_if_cannot_proceed || 'No specific reason provided.'}`,
+                );
+                if (
+                    assessment.suggested_clarifications &&
+                    assessment.suggested_clarifications.length > 0
+                ) {
+                    this.logger.warn(
+                        `[${directorySlug}] AI suggested clarifications: ${assessment.suggested_clarifications.join('; ')}`,
+                    );
+                }
+                return []; // Do not proceed with item generation
+            }
+
+            this.logger.log(
+                `[${directorySlug}] AI assessment: Prompt for topic "${topicName}" is clear. Proceeding with item generation.`,
+            );
+        } catch (error) {
+            this.logger.error(
+                `[${directorySlug}] Error during AI prompt understanding assessment for topic "${topicName}": ${getErrorMessage(error)}. Proceeding with caution (will attempt item generation).`,
+                getErrorStack(error),
+            );
+            // If the understanding check itself fails, we log the error but still attempt item generation.
+            // This is a fallback in case the assessment mechanism has an issue.
+        }
 
         // Generate featured hints section for the prompt
         const featuredHintsSection = this.generateFeaturedHintsSection(featuredItemHints);
 
         try {
-            const result = (await generationChain.invoke({
-                topicName,
-                topicDescription,
-                target_keywords_string: target_keywords ? target_keywords.join(', ') : 'N/A',
-                featured_hints_section: featuredHintsSection,
-            })) as { items?: Partial<ItemData>[] };
+            const { result, usage, cost } = await this.aiService.askJson(
+                GENERATION_PROMPT,
+                extractedItemsSchema,
+                {
+                    temperature: 0,
+                    variables: {
+                        topicName,
+                        topicDescription,
+                        target_keywords_string: keywordsString,
+                        featured_hints_section: featuredHintsSection,
+                    },
+                },
+            );
+
+            accumulateMetrics(metrics, usage, cost);
 
             if (result && result.items && result.items.length > 0) {
                 this.logger.log(
@@ -198,9 +202,9 @@ Generate the list of items according to the specified schema.
                             );
                         }
                         allGeneratedItems.push(validatedItem);
-                    } catch (validationError) {
+                    } catch (validationError: any) {
                         this.logger.warn(
-                            `[${directorySlug}] Discarding AI-generated item due to validation error: ${validationError.errors.map((e: any) => e.message).join(', ')}. Item: ${JSON.stringify(generatedItem)}`,
+                            `[${directorySlug}] Discarding AI-generated item due to validation error: ${validationError.errors?.map((e: any) => e.message).join(', ') || getErrorMessage(validationError)}. Item: ${JSON.stringify(generatedItem)}`,
                         );
                     }
                 }
@@ -211,8 +215,8 @@ Generate the list of items according to the specified schema.
             }
         } catch (error) {
             this.logger.error(
-                `[${directorySlug}] Error generating initial items with AI for topic ${topicName}: ${error.message}`,
-                error.stack,
+                `[${directorySlug}] Error generating initial items with AI for topic ${topicName}: ${getErrorMessage(error)}`,
+                getErrorStack(error),
             );
         }
 

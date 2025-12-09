@@ -19,8 +19,11 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-    title: 'Ever Works - Directory Builder',
-    description: 'A SaaS platform for building and managing directories',
+    title: `${process.env.NEXT_PUBLIC_APP_NAME || process.env.APP_NAME || 'Ever Works'} - Directory Builder`,
+    description:
+        process.env.NEXT_PUBLIC_SITE_DESCRIPTION ||
+        process.env.APP_DESCRIPTION ||
+        'A SaaS platform for building and managing directories',
 };
 
 export default async function RootLayout({

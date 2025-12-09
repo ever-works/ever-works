@@ -7,17 +7,6 @@ export enum OAuthProvider {
     GOOGLE = 'google',
 }
 
-export enum BadgeType {
-    SECURITY = 'security',
-    LICENSE = 'license',
-    QUALITY = 'quality',
-}
-
-export enum BadgeValue {
-    A = 'A', // Good/Pass
-    F = 'F', // Fail
-}
-
 export enum GenerateStatusType {
     GENERATING = 'generating',
     GENERATED = 'generated',
@@ -38,6 +27,7 @@ export enum WebsiteRepositoryCreationMethod {
 export enum ItemsGeneratorStep {
     PROMPT_COMPARISON = 'prompt-comparison',
     PROMPT_PROCESSING = 'prompt-processing',
+    DOMAIN_DETECTION = 'domain-detection',
     AI_FIRST_ITEMS_GENERATION = 'ai-first-items-generation',
     SEARCH_QUERIES_GENERATION = 'search-queries-generation',
     WEB_SEARCH = 'web-search',

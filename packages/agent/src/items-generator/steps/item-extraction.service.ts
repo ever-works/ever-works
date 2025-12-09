@@ -1,10 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
 import { CreateItemsGeneratorDto } from '../dto/create-items-generator.dto';
 import { WebPageData } from '../interfaces/items-generator.interfaces';
 import { slugifyText } from '../utils/text.utils';
-import { AiService, BaseChatModel } from 'src/ai';
+import { AiService } from 'src/ai';
 import { ItemData } from '../dto';
 import {
     extractedItemsSchema,
@@ -14,6 +13,8 @@ import {
 } from '../schemas/item-extraction.schemas';
 import { IPipelineStep, GenerationContext } from '../interfaces/pipeline.interface';
 import { ItemsGeneratorStep } from '../constants/steps';
+import { accumulateMetrics, MetricsAccumulator } from '../utils/metrics.util';
+import { getErrorMessage, getErrorStack } from '../utils/error.util';
 
 const ITEMS_EXTRACTION_PROMPT =
     `You are an expert data extractor and technical writer for directory websites.
@@ -51,12 +52,11 @@ Exclude any invalid or irrelevant content, and align the findings with the topic
 
 <web_page_content>
 {page_content_snippet}
-<web_page_content>`.trim();
+</web_page_content>` as const;
 
 @Injectable()
 export class ItemExtractionService implements IPipelineStep {
     private readonly logger = new Logger(ItemExtractionService.name);
-    private llm: BaseChatModel;
     private textSplitter: RecursiveCharacterTextSplitter;
 
     // Constants for content chunking
@@ -66,8 +66,6 @@ export class ItemExtractionService implements IPipelineStep {
     public readonly name = ItemsGeneratorStep.ITEMS_EXTRACTION;
 
     constructor(private readonly aiService: AiService) {
-        this.llm = this.aiService.createLlmWithTemperature(0.1);
-
         this.textSplitter = new RecursiveCharacterTextSplitter({
             chunkSize: this.MAX_CHUNK_SIZE,
             chunkOverlap: this.CHUNK_OVERLAP,
@@ -76,7 +74,7 @@ export class ItemExtractionService implements IPipelineStep {
     }
 
     async run(context: GenerationContext): Promise<GenerationContext> {
-        const { dto, directory, webPages, featuredItemHints } = context;
+        const { dto, directory, webPages, featuredItemHints, metrics } = context;
 
         this.logger.log(
             `[${directory.slug}] AI-Driven Structured Data Extraction for Items from Web - Starting`,
@@ -87,6 +85,8 @@ export class ItemExtractionService implements IPipelineStep {
             dto,
             webPages,
             featuredItemHints,
+            false,
+            metrics,
         );
 
         this.logger.log(
@@ -135,6 +135,7 @@ export class ItemExtractionService implements IPipelineStep {
         relevantPages: WebPageData[],
         featuredItemHints: string[] = [],
         withTags = false,
+        metrics?: MetricsAccumulator,
     ): Promise<ItemData[]> {
         const { name: topicName, prompt: topicDescription, config } = createItemsGeneratorDto;
 
@@ -166,19 +167,14 @@ export class ItemExtractionService implements IPipelineStep {
 
         // Generate featured hints section for the prompt
         const featuredHintsSection = this.generateFeaturedHintsSection(featuredItemHints);
+        const schema = withTags ? extractedItemsSchemaWithTags : extractedItemsSchema;
+        const validationSchema = withTags ? itemDataWithCategoriesAndTagsSchema : itemDataSchema;
 
         // Define the item extraction function
         const extractItemsFromPage = async (page: WebPageData): Promise<ItemData[]> => {
             const extractedItems: ItemData[] = [];
 
             try {
-                // Stricter prompt for item extraction
-                const promptTemplate =
-                    HumanMessagePromptTemplate.fromTemplate(ITEMS_EXTRACTION_PROMPT);
-
-                const schema = withTags ? extractedItemsSchemaWithTags : extractedItemsSchema;
-                const extractionChain = promptTemplate.pipe(this.llm.withStructuredOutput(schema));
-
                 // Check if content is large enough to require chunking
                 if (page.raw_content && page.raw_content.length > this.MAX_CHUNK_SIZE) {
                     this.logger.log(
@@ -199,17 +195,25 @@ export class ItemExtractionService implements IPipelineStep {
                                     `[${directorySlug}] Processing chunk ${index + 1}/${chunks.length} (${chunk.length} chars) from ${page.source_url}`,
                                 );
 
-                                const chunkResult = (await extractionChain.invoke({
-                                    topicName: topicName,
-                                    topicDescription: topicDescription,
-                                    page_content_snippet: chunk,
-                                    featured_hints_section: featuredHintsSection,
-                                })) as { items?: Partial<ItemData>[] };
+                                const { result, usage, cost } = await this.aiService.askJson(
+                                    ITEMS_EXTRACTION_PROMPT,
+                                    schema,
+                                    {
+                                        temperature: 0.1,
+                                        variables: {
+                                            topicName,
+                                            topicDescription,
+                                            page_content_snippet: chunk,
+                                            featured_hints_section: featuredHintsSection,
+                                        },
+                                    },
+                                );
 
-                                return chunkResult?.items || [];
-                            } catch (chunkError: any) {
+                                accumulateMetrics(metrics, usage, cost);
+                                return result?.items || [];
+                            } catch (chunkError) {
                                 this.logger.error(
-                                    `[${directorySlug}] Error processing chunk ${index + 1} from ${page.source_url}: ${chunkError.message}`,
+                                    `[${directorySlug}] Error processing chunk ${index + 1} from ${page.source_url}: ${getErrorMessage(chunkError)}`,
                                 );
                                 return [];
                             }
@@ -228,11 +232,9 @@ export class ItemExtractionService implements IPipelineStep {
                         const validatedItems: ItemData[] = [];
                         for (const extractedItem of allExtractedItems) {
                             try {
-                                const schema = withTags
-                                    ? itemDataWithCategoriesAndTagsSchema
-                                    : itemDataSchema;
-
-                                const validatedItem = schema.parse(extractedItem) as ItemData;
+                                const validatedItem = validationSchema.parse(
+                                    extractedItem,
+                                ) as ItemData;
 
                                 // Auto-generate slug if not provided or to ensure consistency
                                 validatedItem.slug = slugifyText(validatedItem.name);
@@ -241,9 +243,9 @@ export class ItemExtractionService implements IPipelineStep {
                                 this.logger.log(
                                     `[${directorySlug}] Extracted item: "${validatedItem.name}" (Slug: ${validatedItem.slug})`,
                                 );
-                            } catch (validationError) {
+                            } catch (validationError: any) {
                                 this.logger.warn(
-                                    `[${directorySlug}] Discarding item due to validation error: ${validationError.errors.map((e: any) => e.message).join(', ')}. Item: ${JSON.stringify(extractedItem)} from ${page.source_url}`,
+                                    `[${directorySlug}] Discarding item due to validation error: ${validationError.errors?.map((e: any) => e.message).join(', ') || getErrorMessage(validationError)}. Item: ${JSON.stringify(extractedItem)} from ${page.source_url}`,
                                 );
                             }
                         }
@@ -260,12 +262,21 @@ export class ItemExtractionService implements IPipelineStep {
                     }
                 } else {
                     // Process the entire content at once for smaller pages
-                    const extractionResult = (await extractionChain.invoke({
-                        topicName: topicName,
-                        topicDescription: topicDescription,
-                        page_content_snippet: page.raw_content,
-                        featured_hints_section: featuredHintsSection,
-                    })) as { items?: Partial<ItemData>[] };
+                    const {
+                        result: extractionResult,
+                        usage,
+                        cost,
+                    } = await this.aiService.askJson(ITEMS_EXTRACTION_PROMPT, schema, {
+                        temperature: 0.1,
+                        variables: {
+                            topicName,
+                            topicDescription,
+                            page_content_snippet: page.raw_content || '',
+                            featured_hints_section: featuredHintsSection,
+                        },
+                    });
+
+                    accumulateMetrics(metrics, usage, cost);
 
                     if (
                         extractionResult &&
@@ -280,11 +291,9 @@ export class ItemExtractionService implements IPipelineStep {
                         const validatedItems: ItemData[] = [];
                         for (const extractedItem of extractionResult.items) {
                             try {
-                                const schema = withTags
-                                    ? itemDataWithCategoriesAndTagsSchema
-                                    : itemDataSchema;
-
-                                const validatedItem = schema.parse(extractedItem) as ItemData;
+                                const validatedItem = validationSchema.parse(
+                                    extractedItem,
+                                ) as ItemData;
 
                                 // Auto-generate slug if not provided or to ensure consistency
                                 validatedItem.slug = slugifyText(validatedItem.name);
@@ -293,9 +302,9 @@ export class ItemExtractionService implements IPipelineStep {
                                 this.logger.log(
                                     `[${directorySlug}] Extracted item: "${validatedItem.name}" (Slug: ${validatedItem.slug})`,
                                 );
-                            } catch (validationError) {
+                            } catch (validationError: any) {
                                 this.logger.warn(
-                                    `[${directorySlug}] Discarding item due to validation error: ${validationError.errors.map((e: any) => e.message).join(', ')}. Item: ${JSON.stringify(extractedItem)} from ${page.source_url}`,
+                                    `[${directorySlug}] Discarding item due to validation error: ${validationError.errors?.map((e: any) => e.message).join(', ') || getErrorMessage(validationError)}. Item: ${JSON.stringify(extractedItem)} from ${page.source_url}`,
                                 );
                             }
                         }
@@ -308,10 +317,10 @@ export class ItemExtractionService implements IPipelineStep {
                         );
                     }
                 }
-            } catch (error: any) {
+            } catch (error) {
                 this.logger.error(
-                    `[${directorySlug}] Error extracting items from ${page.source_url}: ${error.message}`,
-                    error.stack,
+                    `[${directorySlug}] Error extracting items from ${page.source_url}: ${getErrorMessage(error)}`,
+                    getErrorStack(error),
                 );
             }
 

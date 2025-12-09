@@ -196,6 +196,16 @@ export interface DirectoryCategoriesTags {
     tags: string[];
 }
 
+export interface GenerationMetrics {
+    urls_scanned?: number;
+    pages_processed?: number;
+    items_extracted_current_run?: number;
+    new_items_added_to_store?: number;
+    total_items_in_store?: number;
+    total_tokens_used?: number;
+    total_cost?: number;
+}
+
 export interface DirectoryGenerationHistoryEntry {
     id: string;
     status: GenerateStatusType;
@@ -206,7 +216,7 @@ export interface DirectoryGenerationHistoryEntry {
     newItemsCount: number;
     updatedItemsCount: number;
     totalItemsCount: number;
-    metrics?: Record<string, number | undefined> | null;
+    metrics?: GenerationMetrics | null;
     errorMessage?: string | null;
     parameters?: CreateItemsGeneratorDto | null;
     createdAt: string;

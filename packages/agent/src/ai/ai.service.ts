@@ -1,4 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { HumanMessage } from '@langchain/core/messages';
+import { z } from 'zod';
 
 // AI Providers
 import { ChatOpenAI, OpenAIEmbeddings } from '@langchain/openai';
@@ -11,6 +13,7 @@ import {
     BaseChatModel,
 } from './ai-provider.interface';
 import { config } from '@src/config';
+import { TokenUsage, TokenUsageTracker } from './token-usage.tracker';
 
 // Cache TTL for provider health checks (5 minutes)
 const HEALTH_CHECK_CACHE_TTL_MS = 5 * 60 * 1000;
@@ -23,6 +26,32 @@ type HealthCheckResult = {
     error?: string;
     response?: string;
 };
+
+/**
+ * Type utility to extract variable names from a template string.
+ * Example: "Hello {name}, your task is {task}" → "name" | "task"
+ */
+type ExtractVariableNames<T extends string> = T extends `${string}{${infer Var}}${infer Rest}`
+    ? Var | ExtractVariableNames<Rest>
+    : never;
+
+/**
+ * Creates a record type from extracted variable names.
+ * Example: "Hello {name}" → { name: string }
+ * Falls back to Record<string, string> if no variables found.
+ */
+type TemplateVariables<T extends string> =
+    ExtractVariableNames<T> extends never
+        ? Record<string, string> | undefined
+        : { [K in ExtractVariableNames<T>]: string };
+
+/**
+ * Options type that makes `variables` required when template has placeholders.
+ */
+type AskJsonOptions<Template extends string> =
+    ExtractVariableNames<Template> extends never
+        ? { temperature?: number; variables?: Record<string, string> }
+        : { temperature?: number; variables: { [K in ExtractVariableNames<Template>]: string } };
 
 @Injectable()
 export class AiService {
@@ -48,6 +77,92 @@ export class AiService {
                 `AI Service initialized with ${this.providers.size} provider(s). Default: ${this.config.defaultProvider}`,
             );
         }
+    }
+
+    /**
+     * Structured JSON helper with token/cost tracking.
+     * Uses the default provider/model unless temperature override is provided.
+     *
+     * @param promptTemplate - Template string with {variable} placeholders (use `as const` for type safety)
+     * @param schema - Zod schema for response validation
+     * @param options.temperature - Optional temperature override
+     * @param options.variables - Type-safe variables extracted from template placeholders (required if template has placeholders)
+     *
+     * @example
+     * ```typescript
+     * const PROMPT = "Hello {name}, task: {task}" as const;
+     * // Variables are required and type-checked: { name: string; task: string }
+     * await aiService.askJson(PROMPT, schema, {
+     *     variables: { name: "John", task: "Build app" }
+     * });
+     * ```
+     */
+    async askJson<T, Template extends string = string>(
+        promptTemplate: Template,
+        schema: z.ZodSchema<T>,
+        ...args: ExtractVariableNames<Template> extends never
+            ? [options?: AskJsonOptions<Template>]
+            : [options: AskJsonOptions<Template>]
+    ): Promise<{
+        result: T;
+        usage: TokenUsage | null;
+        cost: number | null;
+        provider: AiProviderType;
+        model: string;
+    }> {
+        const options = args[0];
+        const tracker = new TokenUsageTracker();
+        const providerType = this.config.defaultProvider;
+        const modelName = this.getProviderConfig(providerType)?.modelName || 'unknown';
+
+        const resolvedPrompt = this.renderTemplate(promptTemplate, options?.variables);
+
+        const llm = this.createLlmWithCriteria({
+            providerType,
+            temperature: options?.temperature,
+        });
+
+        try {
+            const result = (await llm
+                .withStructuredOutput(schema)
+                .invoke([new HumanMessage(resolvedPrompt)], {
+                    callbacks: [tracker],
+                })) as T;
+
+            const usage = tracker.usage.totalTokens > 0 ? tracker.usage : null;
+            const cost = usage ? this.calculateCost(providerType, usage) : null;
+
+            return { result, usage, cost, provider: providerType, model: modelName };
+        } catch (error) {
+            this.logger.error(
+                `askJson failed (${providerType}/${modelName}): ${this.getErrorMessage(error)}`,
+            );
+            throw error;
+        }
+    }
+
+    private calculateCost(provider: AiProviderType, usage: TokenUsage): number | null {
+        const capabilities = AI_PROVIDER_CAPABILITIES[provider];
+        if (!capabilities?.costPerToken) {
+            this.logger.debug(`No cost table for provider ${provider}, skipping cost calculation.`);
+            return null;
+        }
+
+        const inputCost = usage.inputTokens * (capabilities.costPerToken.input || 0);
+        const outputCost = usage.outputTokens * (capabilities.costPerToken.output || 0);
+
+        return inputCost + outputCost;
+    }
+
+    private renderTemplate(template: string, variables?: Record<string, any>): string {
+        if (!variables) {
+            return template;
+        }
+
+        return template.replace(/\{(\w+)\}/g, (match, key) => {
+            const value = variables[key];
+            return value !== undefined ? String(value) : match;
+        });
     }
 
     /**
@@ -172,7 +287,7 @@ export class AiService {
                 }
             } catch (error) {
                 this.logger.error(
-                    `Failed to initialize ${providerType} provider: ${error.message}`,
+                    `Failed to initialize ${providerType} provider: ${this.getErrorMessage(error)}`,
                 );
             }
         }
@@ -666,14 +781,14 @@ export class AiService {
             };
         } catch (error) {
             const responseTime = Date.now() - startTime;
-            this.logger.error(`${providerConfig.type} test failed: ${error.message}`);
+            this.logger.error(`${providerConfig.type} test failed: ${this.getErrorMessage(error)}`);
 
             return {
                 success: false,
                 provider: providerConfig.type,
                 model: providerConfig.modelName,
                 responseTime,
-                error: error.message,
+                error: this.getErrorMessage(error),
             };
         }
     }
@@ -720,5 +835,9 @@ export class AiService {
             }
         }
         this.logger.log('================================');
+    }
+
+    private getErrorMessage(error: unknown): string {
+        return error instanceof Error ? error.message : String(error);
     }
 }

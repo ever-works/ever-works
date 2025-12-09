@@ -438,7 +438,9 @@
                     "updatedItems": "Mis à jour",
                     "totalItems": "Total",
                     "duration": "Durée",
-                    "startedAt": "Démarré"
+                    "startedAt": "Démarré",
+                    "tokens": "Jetons",
+                    "cost": "Coût"
                 },
                 "loadMore": "Charger plus",
                 "noMore": "Plus d'enregistrements",
@@ -616,6 +618,7 @@
                 "steps": {
                     "promptComparison": "Comparaison des invites",
                     "promptProcessing": "Traitement de votre invite",
+                    "domainDetection": "Détection du type de domaine",
                     "aiFirstItemsGeneration": "Génération des éléments IA initiaux",
                     "searchQueriesGeneration": "Création des requêtes de recherche",
                     "webSearch": "Recherche sur le Web",

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Welcome to Ever Works!</title>
+    <title>Welcome to {{appName}}!</title>
     <style>
         body {
             margin: 0;
@@ -112,8 +112,8 @@
     <div class="container">
         <!-- Logo Section -->
         <div class="logo-section">
-            <h1 class="logo-title">Ever Works</h1>
-            <p class="logo-subtitle">by Ever Co.</p>
+            <h1 class="logo-title">{{appName}}</h1>
+            <p class="logo-subtitle">by {{companyOwner}}</p>
         </div>
 
         <!-- Main Card -->
@@ -127,7 +127,7 @@
             </h2>
 
             <p class="subtitle">
-                Your Ever Works account is confirmed and ready to use.
+                Your {{appName}} account is confirmed and ready to use.
             </p>
 
             <!-- Getting Started Steps -->
@@ -168,7 +168,7 @@
         <div class="footer">
             <p class="footer-text">
                 Need help? Reply to this email or visit our help center.<br><br>
-                © 2024 Ever Co. All rights reserved.
+                © {{currentYear}} {{companyOwner}} All rights reserved.
             </p>
         </div>
     </div>

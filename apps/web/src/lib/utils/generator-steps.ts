@@ -4,6 +4,7 @@ export function getStepTranslationKey(step: ItemsGeneratorStep): string {
     const stepKeys: Record<ItemsGeneratorStep, string> = {
         [ItemsGeneratorStep.PROMPT_COMPARISON]: 'promptComparison',
         [ItemsGeneratorStep.PROMPT_PROCESSING]: 'promptProcessing',
+        [ItemsGeneratorStep.DOMAIN_DETECTION]: 'domainDetection',
         [ItemsGeneratorStep.AI_FIRST_ITEMS_GENERATION]: 'aiFirstItemsGeneration',
         [ItemsGeneratorStep.SEARCH_QUERIES_GENERATION]: 'searchQueriesGeneration',
         [ItemsGeneratorStep.WEB_SEARCH]: 'webSearch',
@@ -39,6 +40,7 @@ export function getStepText(step: ItemsGeneratorStep | undefined, t: Function): 
     const stepTranslations: Record<string, string> = {
         promptComparison: t('steps.promptComparison'),
         promptProcessing: t('steps.promptProcessing'),
+        domainDetection: t('steps.domainDetection'),
         aiFirstItemsGeneration: t('steps.aiFirstItemsGeneration'),
         searchQueriesGeneration: t('steps.searchQueriesGeneration'),
         webSearch: t('steps.webSearch'),

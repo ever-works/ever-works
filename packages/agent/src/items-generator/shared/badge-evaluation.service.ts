@@ -1,23 +1,66 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { HumanMessagePromptTemplate } from '@langchain/core/prompts';
 import { z } from 'zod';
-import { BadgeType, BadgeValue, ItemBadges, BadgeEvaluationResult } from '../dto/badge.dto';
+import { ItemBadges, BadgeEvaluationResult } from '../dto/badge.dto';
 import { ItemData } from '../dto/item-data.dto';
 import { AiService } from '../../ai';
+import { DomainType } from '../interfaces/items-generator.interfaces';
+import { GenerationContext } from '../interfaces/pipeline.interface';
+import { accumulateMetrics } from '../utils/metrics.util';
+import { getErrorMessage } from '../utils/error.util';
 
-// Zod schema for badge evaluation
-const badgeSchema = z.object({
-    type: z.nativeEnum(BadgeType),
-    value: z.nativeEnum(BadgeValue),
-    details: z.string().nullable().describe('Brief explanation of the evaluation result'),
-});
+type DomainBadgeConfig = Record<
+    string,
+    { values: string[]; description: string; required?: boolean }
+>;
 
-const badgeEvaluationSchema = z.object({
-    security: badgeSchema.nullable(),
-    license: badgeSchema.nullable(),
-    quality: badgeSchema.nullable(),
-    evaluation_summary: z.string().describe('Brief summary of the overall badge evaluation'),
-});
+const DOMAIN_BADGES: Record<DomainType, DomainBadgeConfig> = {
+    [DomainType.SOFTWARE]: {
+        security: {
+            values: ['A', 'F'],
+            description: 'A = no known vulnerabilities, F = has vulnerabilities',
+        },
+        license: {
+            values: ['A', 'F'],
+            description: 'A = permissive license (MIT/Apache/BSD), F = restrictive/no license',
+        },
+        quality: {
+            values: ['A', 'F'],
+            description: 'A = well-maintained, F = unmaintained/broken',
+        },
+    },
+    [DomainType.ECOMMERCE]: {
+        verified: { values: ['yes', 'no'], description: 'Is this an official/brand source?' },
+        price_range: { values: ['$', '$$', '$$$'], description: 'Indicative price range' },
+        availability: {
+            values: ['in_stock', 'limited', 'out_of_stock'],
+            description: 'Availability signal',
+        },
+    },
+    [DomainType.SERVICES]: {
+        availability: {
+            values: ['online', 'in_person', 'both'],
+            description: 'Service delivery mode',
+        },
+        booking: { values: ['instant', 'contact'], description: 'How to book' },
+        verified: { values: ['yes', 'no'], description: 'Official/verified provider' },
+    },
+    [DomainType.GENERAL]: {
+        verified: { values: ['yes', 'no'], description: 'Official/verified source' },
+    },
+};
+
+const BADGE_PROMPT = `You are an expert evaluator assigning badges for a directory item.
+
+Item:
+- Name: {name}
+- Description: {description}
+- Source URL: {source_url}
+- Domain: {domain_type}
+
+Badges to evaluate:
+{badge_criteria}
+
+Return a JSON object with badges and evaluation_summary. Omit badges you cannot determine with confidence.` as const;
 
 @Injectable()
 export class BadgeEvaluationService {
@@ -25,161 +68,124 @@ export class BadgeEvaluationService {
 
     constructor(private readonly aiService: AiService) {}
 
-    /**
-     * Evaluates badges for a single item based on its source URL and available information
-     */
-    async evaluateItemBadges(item: ItemData): Promise<BadgeEvaluationResult | null> {
+    async evaluateItemBadges(
+        item: ItemData,
+        domainType: DomainType = DomainType.SOFTWARE,
+        metrics?: GenerationContext['metrics'],
+    ): Promise<BadgeEvaluationResult | null> {
         try {
-            this.logger.debug(`Evaluating badges for item: ${item.name}`);
-
-            // Only evaluate badges for items with GitHub URLs or other repository URLs
-            if (!this.isRepositoryUrl(item.source_url)) {
-                this.logger.debug(
-                    `Skipping badge evaluation for non-repository URL: ${item.source_url}`,
-                );
+            if (domainType === DomainType.SOFTWARE && !this.isRepositoryUrl(item.source_url)) {
                 return null;
             }
 
-            const llm = this.aiService.getLlm();
+            const schema = this.buildSchema(domainType);
 
-            const prompt = HumanMessagePromptTemplate.fromTemplate(`
-You are an expert software engineer tasked with evaluating repository badges based on available information.
+            const { result, usage, cost } = await this.aiService.askJson(BADGE_PROMPT, schema, {
+                temperature: 0,
+                variables: {
+                    name: item.name,
+                    description: item.description || '',
+                    source_url: item.source_url,
+                    domain_type: domainType,
+                    badge_criteria: this.buildBadgeCriteria(domainType),
+                },
+            });
 
-**Item Information:**
-- Name: {itemName}
-- Description: {itemDescription}
-- Source URL: {sourceUrl}
-
-**Badge Evaluation Criteria:**
-
-**SECURITY Badge:**
-- "A" = Repository does not have known security vulnerabilities
-- "F" = Repository has known security vulnerabilities
-- Consider: GitHub security advisories, dependency vulnerabilities, security best practices
-
-**LICENSE Badge:**
-- "A" = Repository has a permissive license (MIT, Apache 2.0, BSD, etc.)
-- "F" = Repository has a restrictive license (GPL variants) or no license
-- Consider: License file presence, license type, commercial usage restrictions
-
-**QUALITY Badge:**
-- "A" = Repository appears to be well-maintained and functional
-- "F" = Repository appears unmaintained, broken, or has significant issues
-- Consider: Recent commits, issue resolution, documentation quality, test coverage
-
-**Instructions:**
-1. Based on the repository URL and item information, evaluate each badge type
-2. If you cannot determine a badge value with reasonable confidence, omit that badge
-3. Provide brief details explaining your evaluation for each badge
-4. Focus on publicly available information and reasonable inferences
-
-Evaluate the badges for this repository and return the result in the specified format.
-            `);
-
-            const result = await prompt
-                .pipe(llm.withStructuredOutput(badgeEvaluationSchema))
-                .invoke({
-                    itemName: item.name,
-                    itemDescription: item.description,
-                    sourceUrl: item.source_url,
-                });
-
+            const nowIso = new Date().toISOString();
             const badges: ItemBadges = {};
 
-            // Process each badge type
-            if (result.security) {
-                badges.security = {
-                    type: BadgeType.SECURITY,
-                    value: result.security.value,
-                    evaluated_at: new Date().toISOString(),
-                    details: result.security.details,
-                };
+            if (result.badges) {
+                Object.entries(result.badges).forEach(([key, badgeValue]) => {
+                    if (badgeValue?.value) {
+                        badges[key] = {
+                            value: badgeValue.value,
+                            evaluated_at: nowIso,
+                            details: badgeValue.details ?? null,
+                        };
+                    }
+                });
             }
 
-            if (result.license) {
-                badges.license = {
-                    type: BadgeType.LICENSE,
-                    value: result.license.value,
-                    evaluated_at: new Date().toISOString(),
-                    details: result.license.details,
-                };
-            }
+            accumulateMetrics(metrics, usage, cost);
 
-            if (result.quality) {
-                badges.quality = {
-                    type: BadgeType.QUALITY,
-                    value: result.quality.value,
-                    evaluated_at: new Date().toISOString(),
-                    details: result.quality.details,
-                };
-            }
-
-            const badgeResult: BadgeEvaluationResult = {
+            return {
                 badges,
                 evaluation_summary: result.evaluation_summary,
-                evaluated_at: new Date().toISOString(),
+                evaluated_at: nowIso,
+                domain_type: domainType,
             };
-
-            this.logger.debug(
-                `Badge evaluation completed for ${item.name}: ${Object.keys(badges).length} badges evaluated`,
-            );
-            return badgeResult;
         } catch (error) {
-            this.logger.error(`Failed to evaluate badges for item ${item.name}:`, error);
+            this.logger.error(
+                `Failed to evaluate badges for ${item.name}: ${getErrorMessage(error)}`,
+            );
             return null;
         }
     }
 
-    /**
-     * Evaluates badges for multiple items in batch
-     */
-    async evaluateItemsBadges(items: ItemData[]): Promise<Map<string, BadgeEvaluationResult>> {
+    async evaluateItemsBadges(
+        items: ItemData[],
+        domainType: DomainType = DomainType.SOFTWARE,
+        metrics?: GenerationContext['metrics'],
+    ): Promise<Map<string, BadgeEvaluationResult>> {
         const results = new Map<string, BadgeEvaluationResult>();
-
-        this.logger.log(`Starting badge evaluation for ${items.length} items`);
-
-        // Process items in parallel with a reasonable concurrency limit
         const concurrencyLimit = 10;
         const chunks = this.chunkArray(items, concurrencyLimit);
 
         for (const chunk of chunks) {
             const promises = chunk.map(async (item) => {
-                const result = await this.evaluateItemBadges(item);
+                const result = await this.evaluateItemBadges(item, domainType, metrics);
                 if (result) {
                     results.set(item.source_url, result);
                 }
             });
-
             await Promise.all(promises);
         }
 
-        this.logger.log(`Badge evaluation completed. ${results.size} items have badges`);
         return results;
     }
 
-    /**
-     * Checks if a URL is a repository URL that should be evaluated for badges
-     */
     private isRepositoryUrl(url: string): boolean {
-        const repositoryPatterns = [
+        const patterns = [
             /github\.com\/[^\/]+\/[^\/]+/i,
             /gitlab\.com\/[^\/]+\/[^\/]+/i,
             /bitbucket\.org\/[^\/]+\/[^\/]+/i,
             /codeberg\.org\/[^\/]+\/[^\/]+/i,
             /sourceforge\.net\/projects\/[^\/]+/i,
         ];
-
-        return repositoryPatterns.some((pattern) => pattern.test(url));
+        return patterns.some((p) => p.test(url));
     }
 
-    /**
-     * Utility method to chunk array for batch processing
-     */
     private chunkArray<T>(array: T[], chunkSize: number): T[][] {
         const chunks: T[][] = [];
         for (let i = 0; i < array.length; i += chunkSize) {
             chunks.push(array.slice(i, i + chunkSize));
         }
         return chunks;
+    }
+
+    private buildSchema(domainType: DomainType) {
+        const domainConfig = DOMAIN_BADGES[domainType] || DOMAIN_BADGES[DomainType.GENERAL];
+        const badgeShape: Record<string, any> = {};
+
+        for (const [key, def] of Object.entries(domainConfig)) {
+            badgeShape[key] = z
+                .object({
+                    value: z.enum(def.values as [string, ...string[]]),
+                    details: z.string().nullable(),
+                })
+                .nullable();
+        }
+
+        return z.object({
+            evaluation_summary: z.string(),
+            badges: z.object(badgeShape).nullable(),
+        });
+    }
+
+    private buildBadgeCriteria(domainType: DomainType): string {
+        const config = DOMAIN_BADGES[domainType] || DOMAIN_BADGES[DomainType.GENERAL];
+        return Object.entries(config)
+            .map(([key, def]) => `- ${key}: [${def.values.join(', ')}] - ${def.description}`)
+            .join('\n');
     }
 }
