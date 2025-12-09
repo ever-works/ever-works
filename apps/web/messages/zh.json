@@ -618,6 +618,7 @@
                 "steps": {
                     "promptComparison": "比较提示",
                     "promptProcessing": "处理您的提示",
+                    "domainDetection": "检测域类型",
                     "aiFirstItemsGeneration": "生成初始 AI 项目",
                     "searchQueriesGeneration": "创建搜索查询",
                     "webSearch": "搜索网络",

@@ -13,7 +13,6 @@ import { MarkdownGenerationService } from './steps/markdown-generation.service';
 import { PromptProcessingService } from './steps/prompt-processing.service';
 import { PromptComparisonService } from './steps/prompt-comparison.service';
 import { BadgeProcessingService } from './steps/badge-processing.service';
-import { TopicAnalysisService } from './steps/topic-analysis.service';
 import { DomainDetectionService } from './steps/domain-detection.service';
 import { SearchService, NotionService, BadgeEvaluationService } from './shared';
 import {
@@ -45,7 +44,6 @@ export const STEP_SERVICES = [
     // Step services
     PromptComparisonService,
     PromptProcessingService,
-    TopicAnalysisService,
     DomainDetectionService,
     AiItemGenerationService,
     SearchQueryGenerationService,

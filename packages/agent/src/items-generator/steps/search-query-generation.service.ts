@@ -4,7 +4,6 @@ import { CreateItemsGeneratorDto } from '../dto/create-items-generator.dto';
 import { AiService } from 'src/ai';
 import { IPipelineStep, GenerationContext } from '../interfaces/pipeline.interface';
 import { ItemsGeneratorStep } from '../constants/steps';
-import { TopicAnalysis } from '../interfaces/items-generator.interfaces';
 import z from 'zod';
 import { accumulateMetrics } from '../utils/metrics.util';
 import { getErrorMessage, getErrorStack } from '../utils/error.util';
@@ -14,16 +13,13 @@ const SEARCH_QUERY_PROMPT =
 
 Topic: "{name}"
 Description: "{description}"
-Primary keywords: {keywords}
-Synonyms: {synonyms}
-Avoid terms: {exclusions}
+Target keywords: {keywords}
 Today is {date}.
 
 Rules:
 - Generate {query_count} distinct, high-intent search queries as an array of strings.
 - Prefer queries that surface official resources (homepages, docs, repositories) over listicles.
-- Mix broad and long-tail variations to improve recall.
-- Do not include exclusion terms in the queries.` as const;
+- Mix broad and long-tail variations to improve recall.` as const;
 
 @Injectable()
 export class SearchQueryGenerationService implements IPipelineStep {
@@ -34,11 +30,11 @@ export class SearchQueryGenerationService implements IPipelineStep {
     constructor(private readonly aiService: AiService) {}
 
     async run(context: GenerationContext): Promise<GenerationContext> {
-        const { dto, directory, topicKeywords, metrics } = context;
+        const { dto, directory, metrics } = context;
 
         this.logger.log(`[${directory.slug}] AI-Powered Search Query Generation - Starting`);
 
-        const searchQueries = await this.generateSearchQueries(dto, topicKeywords, metrics);
+        const searchQueries = await this.generateSearchQueries(dto, metrics);
         this.logger.log(`[${directory.slug}] Generated ${searchQueries.length} search queries.`);
 
         context.searchQueries = searchQueries;
@@ -48,7 +44,6 @@ export class SearchQueryGenerationService implements IPipelineStep {
 
     async generateSearchQueries(
         createItemsGeneratorDto: CreateItemsGeneratorDto,
-        topicKeywords?: TopicAnalysis,
         metrics?: GenerationContext['metrics'],
     ): Promise<string[]> {
         const {
@@ -60,9 +55,7 @@ export class SearchQueryGenerationService implements IPipelineStep {
 
         this.logger.log(`[${name}] Generating search queries using LLM...`);
 
-        const keywords = topicKeywords?.primary_keywords || targetKeywords || [];
-        const synonyms = topicKeywords?.synonyms || [];
-        const exclusions = topicKeywords?.exclusion_terms || [];
+        const keywords = targetKeywords || [];
 
         if (!this.aiService.isAiConfigured()) {
             this.logger.warn(
@@ -105,8 +98,6 @@ export class SearchQueryGenerationService implements IPipelineStep {
                         name,
                         description,
                         keywords: keywords.length ? keywords.join(', ') : 'N/A',
-                        synonyms: synonyms.length ? synonyms.join(', ') : 'N/A',
-                        exclusions: exclusions.length ? exclusions.join(', ') : 'N/A',
                         date: `${formatDate(now, 'cccc')} ${formatDate(now, 'yyyy-MM-dd HH:mm')}`,
                         query_count: String(config.max_search_queries * 2),
                     },

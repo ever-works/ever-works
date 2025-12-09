@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { BadgeType, BadgeValue } from '../dto/badge.dto';
 
 const baseSchema = z.object({
     name: z
@@ -12,7 +11,6 @@ const baseSchema = z.object({
         ),
 });
 
-// Zod schema for ItemData extraction
 export const itemDataSchema = baseSchema.extend({
     source_url: z
         .string()
@@ -20,12 +18,6 @@ export const itemDataSchema = baseSchema.extend({
         .describe(
             'The most direct, stable, and canonical URL for the item itself (e.g., project homepage, official documentation, GitHub repository etc.). Must be a valid and highly relevant URL.',
         ),
-    // category: z
-    //     .string()
-    //     .nullable()
-    //     .describe(
-    //         "A relevant high-level category name (e.g., 'Monitoring', 'CI/CD', 'Data Visualization').",
-    //     ),
     featured: z
         .boolean()
         .nullable()
@@ -64,7 +56,6 @@ export const itemDataWithCategoriesAndTagsSchema = itemDataSchema.extend({
         ),
 });
 
-// Type for the extracted item, can be an array if multiple items are found on a page
 export const extractedItemsSchema = z.object({
     items: z.array(itemDataSchema),
 });
@@ -73,7 +64,6 @@ export const extractedItemsSchemaWithTags = z.object({
     items: z.array(itemDataWithCategoriesAndTagsSchema),
 });
 
-// Zod schema for AI's assessment of prompt understanding
 export const promptUnderstandingAssessmentSchema = z.object({
     can_proceed: z
         .boolean()
@@ -94,21 +84,14 @@ export const promptUnderstandingAssessmentSchema = z.object({
         ),
 });
 
-// Badge schemas
-export const badgeSchema = z.object({
-    type: z.nativeEnum(BadgeType),
-    value: z.nativeEnum(BadgeValue),
-    evaluated_at: z.string().nullable().describe('ISO date string when badge was evaluated'),
-    details: z.string().nullable().describe('Optional details about the evaluation'),
+const badgeSchema = z.object({
+    value: z.string(),
+    evaluated_at: z.string().nullable(),
+    details: z.string().nullable(),
 });
 
-export const itemBadgesSchema = z.object({
-    security: badgeSchema.nullable(),
-    license: badgeSchema.nullable(),
-    quality: badgeSchema.nullable(),
-});
+export const itemBadgesSchema = z.record(badgeSchema.nullable());
 
-// Extended item schema with badges
 export const itemDataWithBadgesSchema = baseSchema.extend({
     source_url: z
         .string()
@@ -123,7 +106,7 @@ export const itemDataWithBadgesSchema = baseSchema.extend({
         .describe(
             "Determine if the item warrants a 'featured' status based on prominence, recommendations, or significance. Default to false.",
         ),
-    badges: itemBadgesSchema.nullable().describe('Optional badges for repository items'),
+    badges: itemBadgesSchema.nullable(),
     brand: z
         .string()
         .nullable()

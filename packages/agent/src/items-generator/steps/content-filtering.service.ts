@@ -1,10 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigDto } from '../dto/create-items-generator.dto';
-import {
-    WebPageData,
-    RelevanceAssessment,
-    TopicAnalysis,
-} from '../interfaces/items-generator.interfaces';
+import { WebPageData, RelevanceAssessment } from '../interfaces/items-generator.interfaces';
 import { AiService } from 'src/ai';
 import z from 'zod';
 import { IPipelineStep, GenerationContext } from '../interfaces/pipeline.interface';
@@ -17,8 +13,6 @@ const RELEVANCE_ASSESSMENT_PROMPT =
 
 Topic: "{topic_name}"
 Description: "{topic_description}"
-{keywords}
-{exclusions}
 
 Web Page Content (first {snippet_length} characters):
 {snippet}
@@ -51,7 +45,7 @@ export class ContentFilteringService implements IPipelineStep {
     constructor(private readonly aiService: AiService) {}
 
     async run(context: GenerationContext): Promise<GenerationContext> {
-        const { dto, directory, webPages, topicKeywords, metrics } = context;
+        const { dto, directory, webPages, metrics } = context;
         const { config } = dto;
 
         if (config.content_filtering_enabled) {
@@ -63,7 +57,6 @@ export class ContentFilteringService implements IPipelineStep {
                 dto.name,
                 dto.prompt,
                 config,
-                topicKeywords,
                 metrics,
             );
 
@@ -85,7 +78,6 @@ export class ContentFilteringService implements IPipelineStep {
         topicName: string,
         topicDescription: string,
         config: Required<ConfigDto>,
-        topicKeywords?: TopicAnalysis,
         metrics?: GenerationContext['metrics'],
     ): Promise<WebPageData[]> {
         this.logger.log(
@@ -129,14 +121,6 @@ export class ContentFilteringService implements IPipelineStep {
                 this.logger.log(`[${directorySlug}] Assessing relevance for: ${page.source_url}`);
 
                 const snippet = this.buildSnippet(page.raw_content);
-                const keywords =
-                    topicKeywords?.primary_keywords && topicKeywords.primary_keywords.length > 0
-                        ? `Primary Keywords: ${topicKeywords.primary_keywords.join(', ')}`
-                        : 'Primary Keywords: N/A';
-                const exclusions =
-                    topicKeywords?.exclusion_terms && topicKeywords.exclusion_terms.length > 0
-                        ? `Exclusion Terms: ${topicKeywords.exclusion_terms.join(', ')}`
-                        : 'Exclusion Terms: N/A';
 
                 const {
                     result: assessmentResult,
@@ -147,8 +131,6 @@ export class ContentFilteringService implements IPipelineStep {
                     variables: {
                         topic_name: topicName,
                         topic_description: topicDescription,
-                        keywords,
-                        exclusions,
                         snippet_length: String(snippet.length),
                         snippet,
                     },

@@ -618,6 +618,7 @@
                 "steps": {
                     "promptComparison": "Comparaison des invites",
                     "promptProcessing": "Traitement de votre invite",
+                    "domainDetection": "Détection du type de domaine",
                     "aiFirstItemsGeneration": "Génération des éléments IA initiaux",
                     "searchQueriesGeneration": "Création des requêtes de recherche",
                     "webSearch": "Recherche sur le Web",

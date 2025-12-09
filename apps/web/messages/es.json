@@ -618,6 +618,7 @@
                 "steps": {
                     "promptComparison": "Comparando prompts",
                     "promptProcessing": "Procesando tu prompt",
+                    "domainDetection": "Detectando tipo de dominio",
                     "aiFirstItemsGeneration": "Generando elementos iniciales con IA",
                     "searchQueriesGeneration": "Creando consultas de búsqueda",
                     "webSearch": "Buscando en la web",

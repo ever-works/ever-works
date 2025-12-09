@@ -618,6 +618,7 @@
                 "steps": {
                     "promptComparison": "Prompts vergleichen",
                     "promptProcessing": "Ihren Prompt verarbeiten",
+                    "domainDetection": "Domaintyp erkennen",
                     "aiFirstItemsGeneration": "Anfängliche KI-Einträge generieren",
                     "searchQueriesGeneration": "Suchanfragen erstellen",
                     "webSearch": "Das Web durchsuchen",

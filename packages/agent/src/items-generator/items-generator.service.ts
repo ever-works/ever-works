@@ -14,7 +14,6 @@ import {
     PromptComparisonService,
     BadgeProcessingService,
     DomainDetectionService,
-    TopicAnalysisService,
 } from './steps';
 import { Category, ItemData, Tag, Brand } from './dto';
 import { IDataConfig } from '../data-generator/data-repository';
@@ -42,7 +41,6 @@ export class ItemsGeneratorService {
         private readonly promptComparisonService: PromptComparisonService,
         private readonly promptProcessingService: PromptProcessingService,
         private readonly domainDetectionService: DomainDetectionService,
-        private readonly topicAnalysisService: TopicAnalysisService,
         private readonly aiItemGenerationService: AiItemGenerationService,
         private readonly searchQueryGenerationService: SearchQueryGenerationService,
         private readonly webPageRetrievalService: WebPageRetrievalService,
@@ -58,8 +56,7 @@ export class ItemsGeneratorService {
         this.pipelineExecutor
             .addStep(this.promptComparisonService)
             .addStep(this.promptProcessingService)
-            // Run Domain Detection and Topic Analysis in parallel (provides context for later steps)
-            .addStep(new ParallelStep([this.domainDetectionService, this.topicAnalysisService]))
+            .addStep(this.domainDetectionService)
             // Run AI Item Generation and Search Query Generation in parallel
             .addStep(
                 new ParallelStep([this.aiItemGenerationService, this.searchQueryGenerationService]),
@@ -114,14 +111,14 @@ export class ItemsGeneratorService {
 
             // Attempt to load checkpoint
             const checkpoint = await this.pipelineExecutor.loadCheckpoint(directory);
-            const totalSteps = this.pipelineExecutor.getStepNames().length - 1;
+            const lastStep = this.pipelineExecutor.getStepNames().length - 1;
 
             // Validate checkpoint has required data before using it
             const isValidCheckpoint =
                 checkpoint &&
                 checkpoint.context &&
                 checkpoint.stepName &&
-                checkpoint.stepIndex < totalSteps;
+                checkpoint.stepIndex < lastStep;
 
             if (isValidCheckpoint) {
                 this.logger.log(

@@ -8,7 +8,7 @@ import {
     Brand,
 } from '../dto';
 import { ExistingItems } from '../items-generator.service';
-import { WebPageData, TopicAnalysis, DomainAnalysis } from './items-generator.interfaces';
+import { WebPageData, DomainAnalysis } from './items-generator.interfaces';
 
 export interface GenerationContext {
     directory: Directory;
@@ -34,8 +34,7 @@ export interface GenerationContext {
     finalTags: Tag[];
     finalBrands: Brand[];
 
-    // Topic intelligence
-    topicKeywords?: TopicAnalysis;
+    // Domain intelligence
     domainAnalysis?: DomainAnalysis;
 
     metrics: ItemsGeneratorMetrics;

@@ -15,6 +15,15 @@ export interface Brand extends Identifiable {
     website?: string;
 }
 
+export interface Badge {
+    value: string;
+    evaluated_at?: string;
+    details?: string | null;
+    type?: string;
+}
+
+export type ItemBadges = Record<string, Badge>;
+
 export interface ItemData {
     name: string;
     description: string;
@@ -23,6 +32,7 @@ export interface ItemData {
     category: string | string[] | Category | Category[];
     slug?: string;
     tags: string[] | Tag[];
+    badges?: ItemBadges;
     brand?: string | Brand;
     brand_logo_url?: string | null;
     images?: string[];

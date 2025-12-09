@@ -18,11 +18,6 @@ export interface ItemData {
     tags: string[] | Tag[];
     markdown?: string;
     badges?: ItemBadges;
-    // Optional domain-specific badges (non-software domains)
-    domain_badges?: Record<
-        string,
-        { value: string; evaluated_at?: string; details?: string | null }
-    >;
     brand?: string | Brand;
     brand_logo_url?: string | null;
     images?: string[];

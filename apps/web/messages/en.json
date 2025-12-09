@@ -717,6 +717,7 @@
                 "steps": {
                     "promptComparison": "Comparing prompts",
                     "promptProcessing": "Processing your prompt",
+                    "domainDetection": "Detecting domain type",
                     "aiFirstItemsGeneration": "Generating initial AI items",
                     "searchQueriesGeneration": "Creating search queries",
                     "webSearch": "Searching the web",

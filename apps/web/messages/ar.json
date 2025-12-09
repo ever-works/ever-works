@@ -618,6 +618,7 @@
                 "steps": {
                     "promptComparison": "مقارنة الموجهات",
                     "promptProcessing": "معالجة الموجه الخاص بك",
+                    "domainDetection": "اكتشاف نوع النطاق",
                     "aiFirstItemsGeneration": "إنشاء عناصر الذكاء الاصطناعي الأولية",
                     "searchQueriesGeneration": "إنشاء استعلامات البحث",
                     "webSearch": "البحث على الويب",

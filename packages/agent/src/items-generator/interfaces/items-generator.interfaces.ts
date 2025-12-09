@@ -10,14 +10,6 @@ export interface RelevanceAssessment {
     reason: string;
 }
 
-export interface TopicAnalysis {
-    primary_keywords: string[];
-    synonyms: string[];
-    related_terms: string[];
-    exclusion_terms: string[];
-    item_types: string[];
-}
-
 export enum DomainType {
     SOFTWARE = 'software',
     ECOMMERCE = 'ecommerce',

@@ -2,7 +2,6 @@ export enum ItemsGeneratorStep {
     PROMPT_COMPARISON = 'prompt-comparison',
     PROMPT_PROCESSING = 'prompt-processing',
     DOMAIN_DETECTION = 'domain-detection',
-    TOPIC_ANALYSIS = 'topic-analysis',
     AI_FIRST_ITEMS_GENERATION = 'ai-first-items-generation',
     SEARCH_QUERIES_GENERATION = 'search-queries-generation',
     WEB_SEARCH = 'web-search',
