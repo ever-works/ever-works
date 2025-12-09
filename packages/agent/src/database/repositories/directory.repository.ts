@@ -15,8 +15,8 @@ export class DirectoryRepository {
     async create(dto: Partial<Directory>, user: User): Promise<Directory> {
         let exists = await this.findByOwnerAndSlug({
             userId: user.id,
-            owner: dto.owner!,
-            slug: dto.slug!,
+            owner: dto.owner,
+            slug: dto.slug,
         });
 
         if (exists) {
@@ -32,8 +32,8 @@ export class DirectoryRepository {
     async createOrUpdate(dto: Partial<Directory>, user: User): Promise<Directory> {
         let exists = await this.findByOwnerAndSlug({
             userId: user.id,
-            owner: dto.owner!,
-            slug: dto.slug!,
+            owner: dto.owner,
+            slug: dto.slug,
         });
 
         let directory: Directory;
@@ -57,7 +57,7 @@ export class DirectoryRepository {
         slug: string;
     }): Promise<Directory | null> {
         return this.repository.findOne({
-            where: { userId, owner, slug },
+            where: owner ? { userId, owner, slug } : { userId, slug },
             relations: ['user', 'user.oauthTokens'],
         });
     }
