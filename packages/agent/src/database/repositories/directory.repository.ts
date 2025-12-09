@@ -13,13 +13,11 @@ export class DirectoryRepository {
     ) {}
 
     async create(dto: Partial<Directory>, user: User): Promise<Directory> {
-        let exists: Directory | null = null;
-        if (dto.owner) {
-            exists = await this.findByOwnerAndSlug(dto.owner, dto.slug);
-            exists ??= await this.findByUserAndSlug(user.id, dto.slug);
-        } else {
-            exists = await this.findByUserAndSlug(user.id, dto.slug);
-        }
+        let exists = await this.findByOwnerAndSlug({
+            userId: user.id,
+            owner: dto.owner!,
+            slug: dto.slug!,
+        });
 
         if (exists) {
             throw new Error('Directory already exists');
@@ -32,13 +30,11 @@ export class DirectoryRepository {
     }
 
     async createOrUpdate(dto: Partial<Directory>, user: User): Promise<Directory> {
-        let exists: Directory | null = null;
-        if (dto.owner) {
-            exists = await this.findByOwnerAndSlug(dto.owner, dto.slug);
-            exists ??= await this.findByUserAndSlug(user.id, dto.slug);
-        } else {
-            exists = await this.findByUserAndSlug(user.id, dto.slug);
-        }
+        let exists = await this.findByOwnerAndSlug({
+            userId: user.id,
+            owner: dto.owner!,
+            slug: dto.slug!,
+        });
 
         let directory: Directory;
         if (exists && exists.userId === user.id) {
@@ -51,16 +47,17 @@ export class DirectoryRepository {
         return this.findById(directory.id);
     }
 
-    private async findByUserAndSlug(userId: string, slug: string): Promise<Directory | null> {
+    async findByOwnerAndSlug({
+        userId,
+        owner,
+        slug,
+    }: {
+        userId: string;
+        owner: string;
+        slug: string;
+    }): Promise<Directory | null> {
         return this.repository.findOne({
-            where: { userId, slug },
-            relations: ['user', 'user.oauthTokens'],
-        });
-    }
-
-    async findByOwnerAndSlug(owner: string, slug: string): Promise<Directory | null> {
-        return this.repository.findOne({
-            where: { owner, slug },
+            where: { userId, owner, slug },
             relations: ['user', 'user.oauthTokens'],
         });
     }

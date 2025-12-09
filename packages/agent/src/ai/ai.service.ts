@@ -45,6 +45,14 @@ type TemplateVariables<T extends string> =
         ? Record<string, string> | undefined
         : { [K in ExtractVariableNames<T>]: string };
 
+/**
+ * Options type that makes `variables` required when template has placeholders.
+ */
+type AskJsonOptions<Template extends string> =
+    ExtractVariableNames<Template> extends never
+        ? { temperature?: number; variables?: Record<string, string> }
+        : { temperature?: number; variables: { [K in ExtractVariableNames<Template>]: string } };
+
 @Injectable()
 export class AiService {
     private readonly logger = new Logger(AiService.name);
@@ -78,12 +86,12 @@ export class AiService {
      * @param promptTemplate - Template string with {variable} placeholders (use `as const` for type safety)
      * @param schema - Zod schema for response validation
      * @param options.temperature - Optional temperature override
-     * @param options.variables - Type-safe variables extracted from template placeholders
+     * @param options.variables - Type-safe variables extracted from template placeholders (required if template has placeholders)
      *
      * @example
      * ```typescript
      * const PROMPT = "Hello {name}, task: {task}" as const;
-     * // Variables are type-checked: { name: string; task: string }
+     * // Variables are required and type-checked: { name: string; task: string }
      * await aiService.askJson(PROMPT, schema, {
      *     variables: { name: "John", task: "Build app" }
      * });
@@ -92,7 +100,9 @@ export class AiService {
     async askJson<T, Template extends string = string>(
         promptTemplate: Template,
         schema: z.ZodSchema<T>,
-        options?: { temperature?: number; variables?: TemplateVariables<Template> },
+        ...args: ExtractVariableNames<Template> extends never
+            ? [options?: AskJsonOptions<Template>]
+            : [options: AskJsonOptions<Template>]
     ): Promise<{
         result: T;
         usage: TokenUsage | null;
@@ -100,6 +110,7 @@ export class AiService {
         provider: AiProviderType;
         model: string;
     }> {
+        const options = args[0];
         const tracker = new TokenUsageTracker();
         const providerType = this.config.defaultProvider;
         const modelName = this.getProviderConfig(providerType)?.modelName || 'unknown';
