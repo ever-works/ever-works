@@ -3,8 +3,13 @@ import * as fs from 'node:fs/promises';
 import * as yaml from 'yaml';
 import deepmerge from 'deepmerge';
 import { format } from 'date-fns';
-import { Category, ItemData, Tag } from '../agent/types';
-import { CreateItemsGeneratorDto, GenerationMethod } from '../items-generator/dto';
+import {
+    Category,
+    CreateItemsGeneratorDto,
+    GenerationMethod,
+    ItemData,
+    Tag,
+} from '../items-generator/dto';
 
 export type PRUpdate = {
     branch: string;

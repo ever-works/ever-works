@@ -13,7 +13,7 @@ export interface ItemData {
     description: string;
     featured?: boolean;
     source_url: string;
-    category: string | Category;
+    category: string | Category | Category[];
     slug?: string;
     tags: string[] | Tag[];
     markdown?: string;
