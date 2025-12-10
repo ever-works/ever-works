@@ -15,7 +15,6 @@ interface DirectoryLayoutClientProps {
     directory: Directory;
     children: React.ReactNode;
     oauthConnection: ConnectionInfo | null;
-    scheduleAvailable: boolean;
     config: DirectoryConfig | null;
 }
 
@@ -24,7 +23,6 @@ export function DirectoryLayoutClient({
     oauthConnection,
     config,
     children,
-    scheduleAvailable,
 }: DirectoryLayoutClientProps) {
     const router = useRouter();
     const t = useTranslations('dashboard.directoryDetail');
@@ -71,7 +69,7 @@ export function DirectoryLayoutClient({
         >
             <div className="w-full">
                 <DirectoryHeader directory={directory} />
-                <DirectoryTabs directory={directory} scheduleAvailable={scheduleAvailable} />
+                <DirectoryTabs directory={directory} />
 
                 <div className="mt-6">{children}</div>
             </div>
