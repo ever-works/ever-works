@@ -294,9 +294,21 @@ export class MarkdownGeneratorService {
 
             const items = groups[categoryId];
             items.sort((a, b) => {
-                if (a.featured && !b.featured) return -1;
-                if (!a.featured && b.featured) return 1;
-                return 0;
+                const aFeatured = !!a.featured;
+                const bFeatured = !!b.featured;
+
+                if (aFeatured !== bFeatured) {
+                    return aFeatured ? -1 : 1; // featured always first
+                }
+
+                // Within the same featured bucket, honor explicit order ascending
+                const orderA = typeof a.order === 'number' ? a.order : Number.POSITIVE_INFINITY;
+                const orderB = typeof b.order === 'number' ? b.order : Number.POSITIVE_INFINITY;
+                if (orderA !== orderB) {
+                    return orderA - orderB;
+                }
+
+                return a.name.localeCompare(b.name);
             });
 
             for (const item of items) {

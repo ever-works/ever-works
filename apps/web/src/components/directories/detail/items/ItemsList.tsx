@@ -17,7 +17,7 @@ interface ItemsListProps {
 
 export function ItemsList({ items: initialItems, directoryId }: ItemsListProps) {
     const t = useTranslations('dashboard.directoryDetail.items');
-    const [items, setItems] = useState(initialItems);
+    const [items, setItems] = useState(() => sortItems(initialItems));
     const [searchQuery, setSearchQuery] = useState('');
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -264,4 +264,23 @@ function UnSlug(name: string) {
         .replace(/-/g, ' ')
         .replace(/\b\w/g, (char) => char.toUpperCase())
         .trim();
+}
+
+function sortItems(items: ItemData[]): ItemData[] {
+    return [...items].sort((a, b) => {
+        const aFeatured = !!a.featured;
+        const bFeatured = !!b.featured;
+
+        if (aFeatured !== bFeatured) {
+            return aFeatured ? -1 : 1;
+        }
+
+        const orderA = typeof a.order === 'number' ? a.order : Number.POSITIVE_INFINITY;
+        const orderB = typeof b.order === 'number' ? b.order : Number.POSITIVE_INFINITY;
+        if (orderA !== orderB) {
+            return orderA - orderB;
+        }
+
+        return a.name.localeCompare(b.name);
+    });
 }
