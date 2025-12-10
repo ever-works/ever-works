@@ -1,6 +1,7 @@
 export enum ItemsGeneratorStep {
 	PROMPT_COMPARISON = 'prompt-comparison',
 	PROMPT_PROCESSING = 'prompt-processing',
+	DOMAIN_DETECTION = 'domain-detection',
 	AI_FIRST_ITEMS_GENERATION = 'ai-first-items-generation',
 	SEARCH_QUERIES_GENERATION = 'search-queries-generation',
 	WEB_SEARCH = 'web-search',
@@ -11,13 +12,14 @@ export enum ItemsGeneratorStep {
 	CATEGORIES_TAGS_PROCESSING = 'categories-tags-processing',
 	SOURCES_VALIDATION = 'sources-validation',
 	BADGES_PROCESSING = 'badges-processing',
-	ITEMS_PROCESSING = 'items-processing'
+	MARKDOWN_GENERATION = 'markdown-generation'
 }
 
 export function getStepText(step: ItemsGeneratorStep): string {
 	const steps: Record<ItemsGeneratorStep, string> = {
 		[ItemsGeneratorStep.PROMPT_COMPARISON]: 'Comparing prompts',
 		[ItemsGeneratorStep.PROMPT_PROCESSING]: 'Processing your prompt',
+		[ItemsGeneratorStep.DOMAIN_DETECTION]: 'Detecting domain type',
 		[ItemsGeneratorStep.AI_FIRST_ITEMS_GENERATION]: 'Generating initial AI items',
 		[ItemsGeneratorStep.SEARCH_QUERIES_GENERATION]: 'Creating search queries',
 		[ItemsGeneratorStep.WEB_SEARCH]: 'Searching the web',
@@ -28,7 +30,7 @@ export function getStepText(step: ItemsGeneratorStep): string {
 		[ItemsGeneratorStep.CATEGORIES_TAGS_PROCESSING]: 'Processing categories and tags',
 		[ItemsGeneratorStep.SOURCES_VALIDATION]: 'Validating sources',
 		[ItemsGeneratorStep.BADGES_PROCESSING]: 'Processing quality badges',
-		[ItemsGeneratorStep.ITEMS_PROCESSING]: 'Finalizing items'
+		[ItemsGeneratorStep.MARKDOWN_GENERATION]: 'Generating markdown content'
 	};
 
 	return steps[step] || 'Processing';

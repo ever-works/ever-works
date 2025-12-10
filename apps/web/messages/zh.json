@@ -629,7 +629,7 @@
                     "categoriesTagsProcessing": "处理分类和标签",
                     "sourcesValidation": "验证来源",
                     "badgesProcessing": "处理质量徽章",
-                    "itemsProcessing": "完成项目",
+                    "markdownGeneration": "生成Markdown内容",
                     "processing": "处理中..."
                 },
                 "progress": "进度",

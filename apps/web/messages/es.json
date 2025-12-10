@@ -629,7 +629,7 @@
                     "categoriesTagsProcessing": "Procesando categorías y etiquetas",
                     "sourcesValidation": "Validando fuentes",
                     "badgesProcessing": "Procesando insignias de calidad",
-                    "itemsProcessing": "Finalizando elementos",
+                    "markdownGeneration": "Generando contenido Markdown",
                     "processing": "Procesando..."
                 },
                 "progress": "Progreso",

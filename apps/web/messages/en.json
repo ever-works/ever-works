@@ -728,7 +728,7 @@
                     "categoriesTagsProcessing": "Processing categories and tags",
                     "sourcesValidation": "Validating sources",
                     "badgesProcessing": "Processing quality badges",
-                    "itemsProcessing": "Finalizing items",
+                    "markdownGeneration": "Generating markdown content",
                     "processing": "Processing..."
                 },
                 "progress": "Progress",

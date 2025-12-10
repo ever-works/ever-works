@@ -629,7 +629,7 @@
                     "categoriesTagsProcessing": "Kategorien und Tags verarbeiten",
                     "sourcesValidation": "Quellen validieren",
                     "badgesProcessing": "Qualitäts-Badges verarbeiten",
-                    "itemsProcessing": "Einträge finalisieren",
+                    "markdownGeneration": "Markdown-Inhalte generieren",
                     "processing": "Wird verarbeitet..."
                 },
                 "progress": "Fortschritt",

@@ -67,7 +67,8 @@ export class ItemsGeneratorService {
             .addStep(this.dataAggregationService)
             .addStep(this.categoryProcessingService)
             .addStep(this.sourceValidationService)
-            .addStep(this.badgeProcessingService);
+            .addStep(this.badgeProcessingService)
+            .addStep(this.markdownGenerationService);
     }
 
     /**

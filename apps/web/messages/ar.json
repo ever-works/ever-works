@@ -629,7 +629,7 @@
                     "categoriesTagsProcessing": "معالجة الفئات والعلامات",
                     "sourcesValidation": "التحقق من المصادر",
                     "badgesProcessing": "معالجة شارات الجودة",
-                    "itemsProcessing": "إنهاء العناصر",
+                    "markdownGeneration": "إنشاء محتوى Markdown",
                     "processing": "جارٍ المعالجة..."
                 },
                 "progress": "التقدم",

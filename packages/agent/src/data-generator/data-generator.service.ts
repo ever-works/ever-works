@@ -16,7 +16,6 @@ import {
 import { format } from 'date-fns';
 import { GenerateStatusType } from '../entities/types';
 import { LEGAL_NOTICE, LICENSE_TEXT } from './texts';
-import { ItemsGeneratorStep } from '../items-generator/constants/steps';
 import { DIRECTORY_OPERATIONS } from '@src/directory-operations';
 import type { DirectoryOperations } from '@src/directory-operations';
 import { config } from '../config';
@@ -278,14 +277,8 @@ export class DataGeneratorService {
 
             this.logger.debug('files written and committed.');
 
-            // Process items (with markdown generation, writing to disk and committing)
-            this.logger.log(`Processing ${newItems.length} items...`);
-            this.onGenerationProgress(ItemsGeneratorStep.ITEMS_PROCESSING, directory);
-
-            const itemsWithMarkdown = await this.itemsGeneratorService.generateMarkdownForItems(
-                newItems,
-                contentCache,
-            );
+            // Items already have markdown from pipeline - write to disk
+            this.logger.log(`Writing ${newItems.length} items to disk...`);
 
             const existingSlugSet = new Set(
                 (existingData.existingItems || []).map((item) =>
@@ -297,7 +290,7 @@ export class DataGeneratorService {
             let updatedItemsCount = 0;
 
             // Write all items to disk (without committing individually)
-            for (const item of itemsWithMarkdown) {
+            for (const item of newItems) {
                 item.slug = slugifyText(item.slug || item.name);
                 if (existingSlugSet.has(item.slug)) {
                     updatedItemsCount++;
@@ -310,7 +303,7 @@ export class DataGeneratorService {
             }
 
             // Batch commit all items at once
-            if (itemsWithMarkdown.length > 0) {
+            if (newItems.length > 0) {
                 await this.githubService.addAll(data.dir);
                 const commitMessage =
                     newItemsCount > 0
@@ -319,7 +312,7 @@ export class DataGeneratorService {
 
                 await this.githubService.commit(data.dir, commitMessage, user.asCommitter());
 
-                this.logger.log(`Batch committed ${itemsWithMarkdown.length} items`);
+                this.logger.log(`Batch committed ${newItems.length} items`);
             }
 
             // Push changes
@@ -334,7 +327,7 @@ export class DataGeneratorService {
             const stats: GenerationStats = {
                 newItemsCount,
                 updatedItemsCount,
-                totalItemsCount: itemsWithMarkdown.length,
+                totalItemsCount: newItems.length,
                 metrics: generatedItems.metrics,
             };
 
