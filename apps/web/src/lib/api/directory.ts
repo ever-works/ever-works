@@ -137,6 +137,13 @@ export interface DirectoryDetails {
     categories: string[];
 }
 
+export interface UpdateReadmeResponse {
+    status: 'success' | 'skipped';
+    updated: boolean;
+    slug: string;
+    message?: string;
+}
+
 export type PRUpdate = {
     branch: string;
     title: string;
@@ -348,6 +355,15 @@ export const directoryAPI = {
     runSchedule: async (id: string) => {
         return serverMutation<ItemsGeneratorResponse>({
             endpoint: `/directories/${id}/schedule/run`,
+            data: {},
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    updateReadme: async (id: string) => {
+        return serverMutation<UpdateReadmeResponse>({
+            endpoint: `/directories/${id}/update-readme`,
             data: {},
             method: 'POST',
             wrapInData: false,

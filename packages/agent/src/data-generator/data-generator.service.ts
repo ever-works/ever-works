@@ -30,11 +30,17 @@ type GenerationStats = {
 
 type TInitialize =
     | {
-        prUpdate: PRUpdate | null;
-        generation_method?: GenerationMethod;
-        stats: GenerationStats;
-    }
+          prUpdate: PRUpdate | null;
+          generation_method?: GenerationMethod;
+          stats: GenerationStats;
+      }
     | false;
+
+type UpdateMarkdownTemplateResult = {
+    updated: boolean;
+    reason?: 'not_initialized' | 'no_changes';
+    message?: string;
+};
 
 @Injectable()
 export class DataGeneratorService {
@@ -45,7 +51,7 @@ export class DataGeneratorService {
         private readonly itemsGeneratorService: ItemsGeneratorService,
         @Inject(DIRECTORY_OPERATIONS)
         private readonly directoryOperations: DirectoryOperations,
-    ) { }
+    ) {}
 
     async initialize(
         directory: Directory,
@@ -387,6 +393,74 @@ export class DataGeneratorService {
         }
     }
 
+    async updateMarkdownTemplate(
+        directory: Directory,
+        user: User,
+    ): Promise<UpdateMarkdownTemplateResult> {
+        const token = user.getGitToken();
+        const committer = user.asCommitter();
+        const owner = directory.getRepoOwner();
+        const repo = directory.getDataRepo();
+
+        const repositoryExists = await this.githubService
+            .repositoryExists(owner, repo, token)
+            .catch((error) => {
+                this.logger.error(
+                    `Failed to verify repository ${owner}/${repo} existence`,
+                    error.message,
+                );
+                throw error;
+            });
+
+        if (!repositoryExists) {
+            this.logger.warn(
+                `Data repository ${owner}/${repo} not initialized. Skipping README template update.`,
+            );
+            return {
+                updated: false,
+                reason: 'not_initialized',
+                message: 'Data repository is not initialized yet. Run a generation first.',
+            };
+        }
+
+        const dest = await this.githubService.cloneOrPull({
+            owner,
+            repo,
+            token,
+            committer,
+        });
+
+        const dataRepo = await DataRepository.create(dest);
+
+        await dataRepo.ensureDirectoriesExist();
+
+        await dataRepo.writeMarkdownTemplate(this.getHeader(directory), this.getFooter(directory));
+
+        const statusMatrix = await this.githubService.status(dataRepo.dir);
+        const hasChanges = statusMatrix.some(
+            ([, headStatus, workdirStatus]) => headStatus !== workdirStatus,
+        );
+
+        if (!hasChanges) {
+            this.logger.log(`No README template changes detected for ${directory.slug}`);
+            return {
+                updated: false,
+                reason: 'no_changes',
+                message: 'README template already up to date.',
+            };
+        }
+
+        await this.githubService.addAll(dataRepo.dir);
+        await this.githubService.commit(dataRepo.dir, 'update README template', committer);
+
+        await this.githubService.push(dest, token);
+
+        return {
+            updated: true,
+            message: 'README template updated successfully.',
+        };
+    }
+
     /**
      * Remove repository for a directory
      */
@@ -438,7 +512,7 @@ export class DataGeneratorService {
     async getCategoriesTags(directory: Directory, user: User) {
         const data = await this.repositoryData(directory, user);
 
-        const [ categories, tags ] = await Promise.all([ data.getCategories(), data.getTags() ]);
+        const [categories, tags] = await Promise.all([data.getCategories(), data.getTags()]);
 
         return {
             categories,
@@ -449,7 +523,7 @@ export class DataGeneratorService {
     async count(directory: Directory, user: User) {
         const data = await this.repositoryData(directory, user);
 
-        const [ categories, tags, items ] = await Promise.all([
+        const [categories, tags, items] = await Promise.all([
             data.getCategories(),
             data.getTags(),
             data.getItems(),
@@ -521,7 +595,7 @@ export class DataGeneratorService {
 
             try {
                 // Try to get existing data
-                const [ categories, tags, existingItems, config ] = await Promise.all([
+                const [categories, tags, existingItems, config] = await Promise.all([
                     data.getCategories().catch(() => []),
                     data.getTags().catch(() => []),
                     data.getItems().catch(() => []),
@@ -565,7 +639,7 @@ export class DataGeneratorService {
         this.logger.debug(`writeItemToDisk: Writing item ${item.name} (slug: ${item.slug})`);
 
         await data.createItemDir(item);
-        const promises = [ data.writeItem(item) ];
+        const promises = [data.writeItem(item)];
 
         // Write item markdown to disk
         const md =
@@ -599,9 +673,9 @@ export class DataGeneratorService {
     private withCompanyConfig(company?: CompanyDto) {
         return company
             ? {
-                company_name: company.name,
-                company_website: company.website,
-            }
+                  company_name: company.name,
+                  company_website: company.website,
+              }
             : {};
     }
 

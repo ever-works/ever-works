@@ -372,11 +372,7 @@ export const config = {
             return process.env.APP_NAME || process.env.NEXT_PUBLIC_APP_NAME || 'Ever Works';
         },
         getCompanyOwner() {
-            return (
-                process.env.COMPANY_OWNER ||
-                process.env.NEXT_PUBLIC_COMPANY_OWNER ||
-                'Ever Co.'
-            );
+            return process.env.COMPANY_OWNER || process.env.NEXT_PUBLIC_COMPANY_OWNER || 'Ever Co.';
         },
         getPlatformWebsite() {
             return (

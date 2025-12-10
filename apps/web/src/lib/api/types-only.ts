@@ -36,6 +36,7 @@ export type {
     DirectoryGenerationHistoryResponse,
     DirectoryScheduleDto,
     DirectoryScheduleAllowedCadence,
+    UpdateReadmeResponse,
 } from './directory';
 
 export type {

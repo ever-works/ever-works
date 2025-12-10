@@ -366,6 +366,14 @@ export class DirectoriesController {
         return this.directoryGenerationService.regenerateMarkdown(id, user);
     }
 
+    @Post('directories/:id/update-readme')
+    @HttpCode(HttpStatus.OK)
+    async updateReadme(@CurrentUser() auth: AuthenticatedUser, @Param('id') id: string) {
+        const user = await this.authService.getUser(auth.userId);
+
+        return this.directoryGenerationService.updateReadme(id, user);
+    }
+
     @Post('directories/:id/update-website')
     @HttpCode(HttpStatus.OK)
     async updateWebsiteRepository(

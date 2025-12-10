@@ -22,7 +22,7 @@ export class ItemSubmissionService {
     constructor(
         private readonly githubService: GithubService,
         private readonly itemsGeneratorService: ItemsGeneratorService,
-    ) { }
+    ) {}
 
     async submitItem(
         directory: Directory,
@@ -87,7 +87,7 @@ export class ItemSubmissionService {
             const itemsWithMarkdown = await this.itemsGeneratorService.generateMarkdownForItems([
                 itemWithBadges,
             ]);
-            const itemWithMarkdown = itemsWithMarkdown[ 0 ];
+            const itemWithMarkdown = itemsWithMarkdown[0];
 
             // Ensure slug is set
             itemWithMarkdown.slug = slugifyText(itemWithMarkdown.slug || itemWithMarkdown.name);

@@ -316,11 +316,13 @@ export async function updateDirectory(directoryId: string, data: UpdateDirectory
 
         await directoryAPI.update(directoryId, validation.data);
 
+        const readmeUpdate = await directoryAPI.updateReadme(directoryId);
+
         revalidatePath(ROUTES.DASHBOARD_DIRECTORY_SETTINGS(directoryId));
 
         return {
             success: true,
-            message: t('updateSuccess'),
+            message: readmeUpdate?.message || t('updateSuccess'),
         };
     } catch (error) {
         console.error('Failed to update directory:', error);

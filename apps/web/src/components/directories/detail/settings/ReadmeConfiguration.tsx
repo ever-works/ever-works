@@ -1,7 +1,7 @@
 import { cn } from '@/lib/utils';
 import { useTranslations } from 'next-intl';
 import { useSettings } from './SettingsContext';
-import { Textarea } from '@/components/ui/textarea';
+import { AutoResizeTextarea } from '@/components/ui/auto-resize-textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 
@@ -25,7 +25,7 @@ export function ReadmeConfiguration() {
 
             <div className="space-y-4">
                 <div className="space-y-3">
-                    <Textarea
+                    <AutoResizeTextarea
                         label={t('customHeader')}
                         value={formData.readmeConfig?.header || ''}
                         onChange={(e) =>
@@ -40,6 +40,8 @@ export function ReadmeConfiguration() {
                         placeholder={t('customHeaderPlaceholder')}
                         rows={3}
                         variant="form"
+                        minRows={3}
+                        maxHeight={320}
                     />
                     <Checkbox
                         checked={formData.readmeConfig?.overwriteDefaultHeader || false}
@@ -58,7 +60,7 @@ export function ReadmeConfiguration() {
                 </div>
 
                 <div className="space-y-3">
-                    <Textarea
+                    <AutoResizeTextarea
                         label={t('customFooter')}
                         value={formData.readmeConfig?.footer || ''}
                         onChange={(e) =>
@@ -73,6 +75,8 @@ export function ReadmeConfiguration() {
                         placeholder={t('customFooterPlaceholder')}
                         rows={3}
                         variant="form"
+                        minRows={3}
+                        maxHeight={320}
                     />
                     <Checkbox
                         checked={formData.readmeConfig?.overwriteDefaultFooter || false}
