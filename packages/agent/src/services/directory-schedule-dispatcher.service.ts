@@ -15,6 +15,11 @@ export class DirectoryScheduleDispatcherService {
     ) {}
 
     async dispatchDue(limit = config.subscriptions.getMaxBatch()): Promise<number> {
+        if (!config.subscriptions.scheduledUpdatesEnabled()) {
+            this.logger.warn('Scheduled updates disabled, skipping dispatch');
+            return 0;
+        }
+
         // Step 0: Cleanup zombies
         await this.directoryScheduleService.recoverStuckSchedules();
 
