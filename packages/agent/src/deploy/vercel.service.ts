@@ -13,6 +13,8 @@ interface RepoContext {
     publicKey: { key_id: string; key: string };
 }
 
+export type { Vercel } from '@vercel/sdk';
+
 @Injectable()
 export class VercelService {
     private readonly PROVIDER_ID: DeployProvider = 'vercel';
