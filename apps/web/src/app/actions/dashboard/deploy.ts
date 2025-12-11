@@ -80,6 +80,28 @@ export async function updateWebsiteRepository(directoryId: string) {
     }
 }
 
+export async function getVercelTeams() {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    try {
+        const response = await deployAPI.getVercelTeams();
+        return {
+            success: response.status === 'success',
+            teams: response.status === 'success' ? response.teams : [],
+        };
+    } catch (error) {
+        console.error('Get Vercel teams error:', error);
+        return {
+            success: false,
+            teams: [],
+            error: error instanceof Error ? error.message : 'Failed to get Vercel teams',
+        };
+    }
+}
+
 export async function lookupExistingDeployment(directoryId: string) {
     const user = await getAuthFromCookie();
     if (!user) {

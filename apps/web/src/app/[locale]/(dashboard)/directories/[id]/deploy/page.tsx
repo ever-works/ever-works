@@ -51,16 +51,7 @@ export default async function DeployPage({ params }: DeployPageParams) {
         }
     }
 
-    // Get vercel teams
-    const vercelTeamsResponse = await deployAPI.getVercelTeams().catch(() => null);
-
-    return (
-        <DeployForm
-            directory={directory}
-            isDeploying={isDeploying(directory)}
-            vercelTeams={vercelTeamsResponse?.teams || []}
-        />
-    );
+    return <DeployForm directory={directory} isDeploying={isDeploying(directory)} />;
 }
 
 function isDeploying(directory: Directory) {

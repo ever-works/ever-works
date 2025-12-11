@@ -8,6 +8,7 @@ import { useTranslations } from 'next-intl';
 import { Link, useRouter } from '@/i18n/navigation';
 import {
     deployToVercel,
+    getVercelTeams,
     lookupExistingDeployment,
     updateWebsiteRepository,
 } from '@/app/actions/dashboard/deploy';
@@ -20,14 +21,15 @@ import { VercelTeamSelectionDialog } from './VercelTeamSelectionDialog';
 interface DeployFormProps {
     directory: Directory;
     isDeploying?: boolean;
-    vercelTeams?: VercelTeam[];
 }
 
-export function DeployForm({ directory, isDeploying, vercelTeams = [] }: DeployFormProps) {
+export function DeployForm({ directory, isDeploying }: DeployFormProps) {
     const t = useTranslations('dashboard.directoryDetail.deploy');
     const [isPending, startTransition] = useTransition();
     const router = useRouter();
     const [isTeamDialogOpen, setIsTeamDialogOpen] = useState(false);
+    const [vercelTeams, setVercelTeams] = useState<VercelTeam[]>([]);
+
     const hasVercelTeams = vercelTeams.length > 0;
     const setHasCheckedExisting = useRef(false);
 
@@ -37,6 +39,12 @@ export function DeployForm({ directory, isDeploying, vercelTeams = [] }: DeployF
             return cleanup;
         }
     }, [isDeploying, router]);
+
+    useEffect(() => {
+        getVercelTeams().then((res) => {
+            setVercelTeams(res.teams || []);
+        });
+    }, []);
 
     useEffect(() => {
         if (directory.website || setHasCheckedExisting.current) {
