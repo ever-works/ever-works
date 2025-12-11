@@ -603,6 +603,7 @@
                 "updateSuccess": "Item updated successfully",
                 "updateFailed": "Failed to update item",
                 "updateError": "An error occurred while updating the item",
+                "updateItem": "Update item",
                 "loadingMore": "Loading more... ({current} of {total})",
                 "addModal": {
                     "title": "Add New Item",

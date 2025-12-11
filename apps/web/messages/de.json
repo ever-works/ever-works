@@ -508,6 +508,7 @@
                 "deleteSuccess": "Eintrag erfolgreich gelöscht",
                 "deleteFailed": "Eintrag konnte nicht gelöscht werden",
                 "deleteError": "Beim Löschen des Eintrags ist ein Fehler aufgetreten",
+                "updateItem": "Eintrag aktualisieren",
                 "loadingMore": "Lade weitere... ({current} von {total})",
                 "addModal": {
                     "title": "Neuen Eintrag hinzufügen",

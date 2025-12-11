@@ -508,6 +508,7 @@
                 "deleteSuccess": "تم حذف العنصر بنجاح",
                 "deleteFailed": "فشل حذف العنصر",
                 "deleteError": "حدث خطأ أثناء حذف العنصر",
+                "updateItem": "تحديث العنصر",
                 "loadingMore": "جارٍ تحميل المزيد... ({current} من {total})",
                 "addModal": {
                     "title": "إضافة عنصر جديد",

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useTransition, memo } from 'react';
+import React, { useState, useTransition, memo, useEffect } from 'react';
 import { ItemData } from '@/lib/api/types-only';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
@@ -207,7 +207,7 @@ const DisplayDialog = ({ open, onOpenChange, item, directoryId, onUpdate }: Disp
                         {t('addModal.cancel')}
                     </Button>
                     <Button onClick={handleSubmit} disabled={isSubmitting} loading={isSubmitting}>
-                        {t('addModal.addItem', { defaultValue: 'Save' })}
+                        {t('updateItem', { defaultValue: 'Update item' })}
                     </Button>
                 </DialogFooter>
             </DialogContent>

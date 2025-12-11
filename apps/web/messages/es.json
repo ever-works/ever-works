@@ -508,6 +508,7 @@
                 "deleteSuccess": "Elemento eliminado exitosamente",
                 "deleteFailed": "No se pudo eliminar el elemento",
                 "deleteError": "Ocurrió un error al eliminar el elemento",
+                "updateItem": "Actualizar elemento",
                 "loadingMore": "Cargando más... ({current} de {total})",
                 "addModal": {
                     "title": "Añadir Nuevo Elemento",

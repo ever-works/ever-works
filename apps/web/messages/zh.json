@@ -508,6 +508,7 @@
                 "deleteSuccess": "项目删除成功",
                 "deleteFailed": "删除项目失败",
                 "deleteError": "删除项目时发生错误",
+                "updateItem": "更新项目",
                 "loadingMore": "加载更多... ({current} / {total})",
                 "addModal": {
                     "title": "添加新项目",
