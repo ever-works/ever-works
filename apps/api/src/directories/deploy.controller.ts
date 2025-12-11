@@ -3,7 +3,7 @@ import {
     Body,
     Controller,
     ForbiddenException,
-    HttpException,
+    Inject,
     NotFoundException,
     Param,
     Post,
@@ -16,11 +16,15 @@ import { AuthenticatedUser } from '../auth/types/jwt.types';
 import { VercelDeploymentVerifierService } from './tasks/vercel-deployment-verifier.service';
 import { Directory } from '@packages/agent/entities';
 import { VercelTokenDto } from './dto/deploy.dto';
+import { CACHE_MANAGER, Cache } from '@packages/agent/cache';
+
+let CACHE_TTL = 1000 * 60 * 10; // 10 minutes
 
 @Controller('api/deploy')
 @UseGuards(JwtAuthGuard)
 export class DeployController {
     constructor(
+        @Inject(CACHE_MANAGER) private cacheManager: Cache,
         private readonly vercelService: VercelService,
         private readonly directoryRepository: DirectoryRepository,
         private readonly authService: AuthService,
@@ -109,7 +113,15 @@ export class DeployController {
                 throw new Error('You need to configure the Vercel token first.');
             }
 
-            const teams = await this.vercelService.getAccountTeams(user.vercelToken);
+            const cacheKey = `vercel-teams-${auth.userId}`;
+
+            const teams = await this.cacheManager.wrap(
+                cacheKey,
+                async () => {
+                    return await this.vercelService.getAccountTeams(user.vercelToken);
+                },
+                CACHE_TTL,
+            );
 
             return {
                 status: 'success',
