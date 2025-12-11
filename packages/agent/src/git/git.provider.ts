@@ -63,7 +63,7 @@ export abstract class GitProvider {
                 this.logger?.warn(
                     `Failed to pull ${dir}, removing directory and cloning again – ${error.message}`,
                 );
-                await fs.promises.rm(dir, { recursive: true, force: true });
+                await this.removeDirSafe(dir);
             }
         }
 
@@ -163,7 +163,27 @@ export abstract class GitProvider {
     }
 
     removeDir(owner: string, repo: string) {
-        return fs.promises.rm(this.getDir(owner, repo), { recursive: true, force: true });
+        return this.removeDirSafe(this.getDir(owner, repo));
+    }
+
+    private async removeDirSafe(dir: string) {
+        const attempts = 3;
+        for (let i = 0; i < attempts; i++) {
+            try {
+                await fs.promises.rm(dir, { recursive: true, force: true });
+                return;
+            } catch (error: any) {
+                if (error?.code === 'ENOTEMPTY') {
+                    // Attempt to remove .git first, then retry
+                    await fs.promises
+                        .rm(path.join(dir, '.git'), { recursive: true, force: true })
+                        .catch(() => null);
+                    await new Promise((resolve) => setTimeout(resolve, 50));
+                    continue;
+                }
+                throw error;
+            }
+        }
     }
 
     commit(dir: string, message: string, committer: ICommitter = {}) {
