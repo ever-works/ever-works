@@ -10,6 +10,7 @@ import { DirectoryDetailProvider } from './DirectoryDetailContext';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { pageIntervalRefresh } from '@/lib/utils';
+import { syncDirectoryData } from '@/app/actions/dashboard/directories';
 
 interface DirectoryLayoutClientProps {
     directory: Directory;
@@ -27,10 +28,11 @@ export function DirectoryLayoutClient({
     const router = useRouter();
     const t = useTranslations('dashboard.directoryDetail');
     const isGenerating = directory.generateStatus?.status === GenerateStatusType.GENERATING;
-    const lastGenerateStatus = useRef(directory.generateStatus);
+    const lastGenerateStatus = useRef(directory.generateStatus?.status);
+    const generateStatus = directory.generateStatus?.status;
 
     useEffect(() => {
-        const lastStatus = lastGenerateStatus.current?.status;
+        const lastStatus = lastGenerateStatus.current;
         const currentStatus = directory.generateStatus?.status;
 
         if (lastStatus !== currentStatus && currentStatus === GenerateStatusType.ERROR) {
@@ -51,8 +53,8 @@ export function DirectoryLayoutClient({
             });
         }
 
-        lastGenerateStatus.current = directory.generateStatus;
-    }, [directory.generateStatus]);
+        lastGenerateStatus.current = directory.generateStatus?.status;
+    }, [generateStatus]);
 
     useEffect(() => {
         if (isGenerating) {
@@ -60,6 +62,14 @@ export function DirectoryLayoutClient({
             return cleanup;
         }
     }, [isGenerating, router]);
+
+    useEffect(() => {
+        syncDirectoryData(directory.id).catch(() => {
+            // Silent fail; best effort
+        });
+
+        // we want also sync when generateStatus changes
+    }, [directory.id, generateStatus, router]);
 
     return (
         <DirectoryDetailProvider

@@ -9,6 +9,7 @@ import {
     ConnectionInfo,
     DeleteDirectoryDto,
     authAPI,
+    SyncDirectoryResponse,
 } from '@/lib/api';
 import { getAuthFromCookie } from '@/lib/auth';
 import { checkOAuthConnection } from './oauth';
@@ -363,6 +364,27 @@ export async function deleteDirectory(directoryId: string, options?: DeleteDirec
             success: false,
             error: error instanceof Error ? error.message : t('deleteFailed'),
         };
+    }
+}
+
+export async function syncDirectoryData(
+    directoryId: string,
+): Promise<SyncDirectoryResponse | null> {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        return null;
+    }
+
+    try {
+        const res = await directoryAPI.syncData(directoryId);
+        if (res.status === 'success') {
+            revalidatePath(`/directories/${directoryId}`);
+            revalidatePath(`/directories`);
+        }
+        return res;
+    } catch (error) {
+        console.error('Failed to sync directory data:', error);
+        return null;
     }
 }
 

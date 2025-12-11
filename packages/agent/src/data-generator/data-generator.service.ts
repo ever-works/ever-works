@@ -535,6 +535,26 @@ export class DataGeneratorService {
         return data.getConfig();
     }
 
+    /**
+     * Returns a lightweight snapshot of the data repository for sync purposes.
+     * Uses the shared repositoryData() helper to respect cloning/pulling patterns.
+     */
+    async getDataSyncSnapshot(directory: Directory, user: User) {
+        const data = await this.repositoryData(directory, user);
+
+        const [items, config, markdownTemplate] = await Promise.all([
+            data.getItems().catch(() => []),
+            data.getConfig().catch(() => null),
+            data.readMarkdownTemplate().catch(() => null),
+        ]);
+
+        return {
+            itemsCount: items.length,
+            prUpdate: config?.metadata?.pr_update,
+            readmeTemplate: markdownTemplate,
+        };
+    }
+
     private async repositoryData(directory: Directory, user: User) {
         const token = user.getGitToken();
         const committer = user.asCommitter();

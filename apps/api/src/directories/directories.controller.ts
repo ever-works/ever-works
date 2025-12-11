@@ -148,17 +148,7 @@ export class DirectoriesController {
             cacheKey,
             async () => {
                 const user = await this.authService.getUser(auth.userId);
-                const count = await this.directoryQueryService.directoryCount(id, user);
-
-                // We silently update the directory item count.
-                this.directoryLifecycleService.updateDirectoryItemsCount(id, count.items, user);
-
-                // Also, reset the directory generation status when no items are found.
-                if (count.items <= 0) {
-                    await this.directoryLifecycleService.resetDirectoryGenerationStatus(id, user);
-                }
-
-                return count;
+                return this.directoryQueryService.directoryCount(id, user);
             },
             CACHE_TTL,
         );
@@ -408,6 +398,14 @@ export class DirectoriesController {
         const user = await this.authService.getUser(auth.userId);
 
         return this.directoryLifecycleService.deleteDirectory(id, deleteDirectoryDto, user);
+    }
+
+    @Post('directories/:id/sync-data')
+    @HttpCode(HttpStatus.OK)
+    async syncDirectoryData(@CurrentUser() auth: AuthenticatedUser, @Param('id') id: string) {
+        const user = await this.authService.getUser(auth.userId);
+
+        return this.directoryLifecycleService.syncFromDataRepository(id, user);
     }
 
     private wait(sec = 2) {

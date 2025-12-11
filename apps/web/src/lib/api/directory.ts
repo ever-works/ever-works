@@ -237,6 +237,12 @@ export interface DirectoryGenerationHistoryResponse {
     offset: number;
 }
 
+export interface SyncDirectoryResponse {
+    status: 'success' | 'error';
+    updated?: string[];
+    message?: string;
+}
+
 export const directoryAPI = {
     // Get all directories with pagination and search
     getAll: async (options?: { limit?: number; offset?: number; search?: string }) => {
@@ -355,6 +361,15 @@ export const directoryAPI = {
     runSchedule: async (id: string) => {
         return serverMutation<ItemsGeneratorResponse>({
             endpoint: `/directories/${id}/schedule/run`,
+            data: {},
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    syncData: async (id: string) => {
+        return serverMutation<SyncDirectoryResponse>({
+            endpoint: `/directories/${id}/sync-data`,
             data: {},
             method: 'POST',
             wrapInData: false,

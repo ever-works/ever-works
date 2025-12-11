@@ -30,7 +30,7 @@ export default async function DirectoryOverviewPage({ params }: Params) {
             {showStatusCard && <DirectoryStatusCard directory={directory} />}
 
             <DirectoryStats
-                itemsCount={countRes.items}
+                itemsCount={directory.itemsCount || countRes.items}
                 categoriesCount={countRes.categories}
                 tagsCount={countRes.tags}
                 directory={directory}
