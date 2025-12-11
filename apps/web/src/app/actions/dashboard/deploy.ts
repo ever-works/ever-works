@@ -79,3 +79,36 @@ export async function updateWebsiteRepository(directoryId: string) {
         };
     }
 }
+
+export async function lookupExistingDeployment(directoryId: string) {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    try {
+        const response = await deployAPI.lookupExistingDeployment(directoryId);
+
+        // Ensure the page revalidates when we discover a deployment
+        if (response.status === 'success' && response.website) {
+            revalidatePath(ROUTES.DASHBOARD_DIRECTORY_DEPLOY(directoryId));
+        }
+
+        return {
+            success: response.status === 'success',
+            website: response.website,
+            deploymentState: response.deploymentState,
+            found: response.found ?? false,
+            error: response.status === 'error' ? response.message || undefined : null,
+        };
+    } catch (error) {
+        console.error('Lookup existing deployment error:', error);
+        return {
+            success: false,
+            website: undefined,
+            deploymentState: undefined,
+            found: false,
+            error: error instanceof Error ? error.message : 'Failed to lookup deployment',
+        };
+    }
+}

@@ -1,12 +1,16 @@
 'use client';
 
-import { useEffect, useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import type { Directory, VercelTeam } from '@/lib/api';
 import { cn } from '@/lib/utils/cn';
 import { toast } from 'sonner';
 import { useTranslations } from 'next-intl';
 import { Link, useRouter } from '@/i18n/navigation';
-import { deployToVercel, updateWebsiteRepository } from '@/app/actions/dashboard/deploy';
+import {
+    deployToVercel,
+    lookupExistingDeployment,
+    updateWebsiteRepository,
+} from '@/app/actions/dashboard/deploy';
 import { RefreshCw, Info, Loader2, Triangle } from 'lucide-react';
 import { useDirectoryDetail } from '../DirectoryDetailContext';
 import { Button } from '@/components/ui/button';
@@ -25,6 +29,7 @@ export function DeployForm({ directory, isDeploying, vercelTeams = [] }: DeployF
     const router = useRouter();
     const [isTeamDialogOpen, setIsTeamDialogOpen] = useState(false);
     const hasVercelTeams = vercelTeams.length > 0;
+    const setHasCheckedExisting = useRef(false);
 
     useEffect(() => {
         if (isDeploying) {
@@ -32,6 +37,20 @@ export function DeployForm({ directory, isDeploying, vercelTeams = [] }: DeployF
             return cleanup;
         }
     }, [isDeploying, router]);
+
+    useEffect(() => {
+        if (directory.website || setHasCheckedExisting.current) {
+            return;
+        }
+
+        setHasCheckedExisting.current = true;
+        startTransition(async () => {
+            const result = await lookupExistingDeployment(directory.id).catch(() => null);
+            if (result?.success && result.website) {
+                router.refresh();
+            }
+        });
+    }, [directory.id, directory.website, router]);
 
     const runDeploy = (teamScope?: string) => {
         startTransition(async () => {

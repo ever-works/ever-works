@@ -39,6 +39,18 @@ export default async function DeployPage({ params }: DeployPageParams) {
         return <VercelTokenAlert />;
     }
 
+    // Hydrate existing deployment from Vercel if we don't have the URL stored yet
+    if (!directory.website) {
+        const lookup = await deployAPI.lookupExistingDeployment(id).catch(() => null);
+
+        if (lookup?.status === 'success' && lookup.website) {
+            const refreshed = await directoryAPI.get(id).catch(() => null);
+            if (refreshed?.directory) {
+                directory = refreshed.directory;
+            }
+        }
+    }
+
     // Get vercel teams
     const vercelTeamsResponse = await deployAPI.getVercelTeams().catch(() => null);
 

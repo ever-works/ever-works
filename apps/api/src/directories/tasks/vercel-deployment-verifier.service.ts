@@ -166,4 +166,94 @@ export class VercelDeploymentVerifierService {
 
         return () => cleanup('CANCELED');
     }
+
+    async lookupExistingDeployment(
+        directory: Directory,
+        vercelToken: string,
+    ): Promise<{ found: boolean; website?: string; deploymentState?: GetProjectsReadyState }> {
+        const vercel = await this.vercelService.createVercelSDK(vercelToken);
+
+        try {
+            const teamsResponse = await vercel.teams.getTeams({});
+            const scopes = [
+                undefined, // personal account
+                ...(teamsResponse?.teams || []).map((t) => t?.slug).filter(Boolean),
+            ];
+
+            for (const scope of scopes) {
+                const project = await this.findProject(vercel, directory, scope);
+                if (!project) {
+                    continue;
+                }
+
+                const { website, deploymentState } = await this.extractDeploymentData(
+                    vercel,
+                    project.id,
+                    project.slug,
+                );
+
+                if (website || deploymentState) {
+                    await this.repository.update(directory.id, {
+                        website: website ?? undefined,
+                        deploymentState: deploymentState ?? directory.deploymentState,
+                    });
+                }
+
+                return {
+                    found: true,
+                    website,
+                    deploymentState: deploymentState ?? null,
+                };
+            }
+
+            return { found: false };
+        } catch (error) {
+            this.logger.error(
+                `Failed to lookup existing deployment for directory ${directory.id}:`,
+                error,
+            );
+            return { found: false };
+        }
+    }
+
+    private async findProject(vercel: any, directory: Directory, teamScope?: string) {
+        const projects = await vercel.projects.getProjects({
+            limit: '100',
+            search: directory.slug,
+            slug: teamScope,
+        });
+
+        return projects.projects.find((p) => p.name.includes(directory.getWebsiteRepo())) || null;
+    }
+
+    private async extractDeploymentData(vercel: any, projectId: string, teamScope?: string) {
+        const projectDomains = await vercel.projects.getProjectDomains({
+            idOrName: projectId,
+            slug: teamScope,
+        });
+
+        const customDomain =
+            projectDomains.domains.find((d) => !d.name.endsWith('.vercel.app')) ||
+            projectDomains.domains.find((d) => d.name.endsWith('.vercel.app'));
+
+        const latestDeploymentResponse = await vercel.deployments.getDeployments({
+            projectId,
+            limit: 1,
+            slug: teamScope,
+        });
+
+        const latestDeployment = latestDeploymentResponse.deployments?.[0];
+
+        const website =
+            customDomain?.name && customDomain.name.length > 0
+                ? `https://${customDomain.name}`
+                : latestDeployment?.url
+                  ? `https://${latestDeployment.url}`
+                  : undefined;
+
+        return {
+            website,
+            deploymentState: latestDeployment?.readyState as GetProjectsReadyState | undefined,
+        };
+    }
 }

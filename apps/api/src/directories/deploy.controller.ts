@@ -123,6 +123,44 @@ export class DeployController {
         }
     }
 
+    @Post('/directories/:id/vercel/lookup')
+    async lookupExistingDeployment(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') id: string,
+    ) {
+        const user = await this.authService.getUser(auth.userId);
+        const directory = await this.validateDirectoryOwnership(id, user.id);
+
+        if (directory.website) {
+            return {
+                status: 'success',
+                website: directory.website,
+                deploymentState: directory.deploymentState,
+            };
+        }
+
+        const vercelToken = user.vercelToken;
+        if (!vercelToken) {
+            throw new BadRequestException({
+                status: 'error',
+                message: 'Vercel token is required to lookup deployments',
+            });
+        }
+
+        const existingDeployment =
+            await this.vercelDeploymentVerifierService.lookupExistingDeployment(
+                directory,
+                vercelToken,
+            );
+
+        return {
+            status: 'success',
+            website: existingDeployment.website,
+            deploymentState: existingDeployment.deploymentState,
+            found: existingDeployment.found,
+        };
+    }
+
     private async validateDirectoryOwnership(
         directoryId: string,
         userId: string,
