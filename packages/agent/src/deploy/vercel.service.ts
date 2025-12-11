@@ -5,6 +5,7 @@ import { GithubService } from '../git/github.service';
 import { Directory } from '../entities/directory.entity';
 import { User } from '../entities/user.entity';
 import { WebsiteUpdateService } from '../website-generator/website-update.service';
+import { WEBSITE_TEMPLATE_CONFIG } from '../website-generator';
 
 interface RepoContext {
     owner: string;
@@ -146,7 +147,7 @@ export class VercelService {
                 {
                     workflow: 'deploy_vercel.yaml',
                     inputs: { environment: 'production' },
-                    branch: 'main',
+                    branch: WEBSITE_TEMPLATE_CONFIG.branch,
                     owner: vercelInput.owner,
                     repo: vercelInput.repo,
                 },

@@ -39,12 +39,14 @@ export abstract class GitProvider {
         token,
         committer,
         autoSwitchToMainBranch = true,
+        branch,
     }: {
         owner: string;
         repo: string;
         token: string;
         committer: ICommitter;
         autoSwitchToMainBranch?: boolean;
+        branch?: string;
     }): Promise<string> {
         const dir = this.getDir(owner, repo);
         const url = this.getURL(owner, repo);
@@ -75,6 +77,7 @@ export abstract class GitProvider {
             http,
             dir,
             url,
+            ref: branch,
             singleBranch: true,
         });
 

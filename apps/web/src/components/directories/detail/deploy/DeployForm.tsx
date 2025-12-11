@@ -154,12 +154,15 @@ export function DeployForm({ directory, isDeploying }: DeployFormProps) {
                             disabled={isPending || isDeploying}
                             size="lg"
                         >
-                            {isDeploying ? (
+                            {isPending || isDeploying ? (
                                 <span className="flex items-center gap-2 capitalize">
                                     <Loader2 className="animate-spin h-4 w-4" />
-                                    {t('form.deployToVercel.deployingStateButton', {
-                                        state: directory.deploymentState || 'INITIALIZING',
-                                    })}
+
+                                    {isDeploying
+                                        ? t('form.deployToVercel.deployingStateButton', {
+                                              state: directory.deploymentState || 'INITIALIZING',
+                                          })
+                                        : t('form.deployToVercel.deployButton')}
                                 </span>
                             ) : (
                                 t('form.deployToVercel.deployButton')
