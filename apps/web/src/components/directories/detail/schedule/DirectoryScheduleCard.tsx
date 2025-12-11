@@ -30,9 +30,9 @@ import {
     updateDirectorySchedule,
 } from '@/app/actions/dashboard/directory-schedule';
 import { ShowDateTime } from '@/components/ui/show-datetime';
+import { useDirectoryDetail } from '../DirectoryDetailContext';
 
 type DirectoryScheduleCardProps = {
-    directoryId: string;
     schedule: DirectoryScheduleDto | null;
 };
 
@@ -48,7 +48,8 @@ const defaultAllowances = cadenceOrder.map((cadence) => ({
     allowed: true,
 }));
 
-export function DirectoryScheduleCard({ directoryId, schedule }: DirectoryScheduleCardProps) {
+export function DirectoryScheduleCard({ schedule }: DirectoryScheduleCardProps) {
+    const { directory } = useDirectoryDetail();
     const t = useTranslations('dashboard.directoryDetail.schedule.card');
     const router = useRouter();
 
@@ -63,7 +64,7 @@ export function DirectoryScheduleCard({ directoryId, schedule }: DirectorySchedu
         );
     }
 
-    return <ScheduleForm directoryId={directoryId} schedule={schedule} />;
+    return <ScheduleForm directoryId={directory.id} schedule={schedule} />;
 }
 
 function ScheduleForm({

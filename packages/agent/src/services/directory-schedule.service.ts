@@ -450,7 +450,7 @@ export class DirectoryScheduleService {
                 .config(directory, user)
                 .catch(() => null);
 
-            if (!config?.metadata?.initial_prompt) {
+            if (!config?.metadata?.last_request_data) {
                 throw new BadRequestException({
                     status: 'error',
                     message:
