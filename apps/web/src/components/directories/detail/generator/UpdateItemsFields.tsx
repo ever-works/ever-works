@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
 import { useDirectoryDetail } from '../DirectoryDetailContext';
 import { Link } from '@/i18n/navigation';
+import { PrUpdateInfo } from '../PrUpdateInfo';
 
 interface UpdateItemsFieldsProps {
     generationMethod?: GenerationMethod;
@@ -74,45 +75,11 @@ export function UpdateItemsFields({
             </div>
 
             {/* PR Update Information */}
-            {(mainPR || dataPR) && (
-                <div className="mt-6 border-t border-border dark:border-border-dark">
-                    <h4 className="text-sm font-medium text-text-secondary dark:text-text-secondary-dark mb-2 mt-5">
-                        {tConf('pullRequestUpdate')}
-                    </h4>
-
-                    <div className="bg-surface dark:bg-surface-dark rounded-md p-3 space-y-2">
-                        <div>
-                            <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                                {tConf('mainRepository')}
-                            </p>
-                            <Link
-                                href={mainPR?.url || '#'}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-sm text-primary hover:underline font-mono"
-                            >
-                                {mainPR?.branch.substring(0, 10)} -{' '}
-                                {mainPR?.number ? `#${mainPR.number}` : '-'}
-                            </Link>
-                        </div>
-
-                        <div>
-                            <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                                {tConf('dataRepository')}
-                            </p>
-                            <Link
-                                href={dataPR?.url || '#'}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-sm text-primary hover:underline font-mono"
-                            >
-                                {mainPR?.branch.substring(0, 10)} -{' '}
-                                {dataPR?.number ? `#${dataPR.number}` : '-'}
-                            </Link>
-                        </div>
-                    </div>
-                </div>
-            )}
+            <PrUpdateInfo
+                mainPR={mainPR}
+                dataPR={dataPR}
+                className="mt-6 border-t border-border dark:border-border-dark"
+            />
         </div>
     );
 }
