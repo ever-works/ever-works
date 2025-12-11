@@ -48,6 +48,7 @@ export function ConfigFields({
     const { config: directoryConfig } = useDirectoryDetail();
     const hasConfig = !!directoryConfig && Object.keys(directoryConfig).length > 0;
     const isRecreate = generationMethod === GenerationMethod.RECREATE;
+    const content_filtering_enabled = config?.content_filtering_enabled || false;
 
     return (
         <div className="space-y-6">
@@ -199,6 +200,7 @@ export function ConfigFields({
                         label={t('relevanceThreshold')}
                         type="number"
                         step="0.1"
+                        disabled={!content_filtering_enabled}
                         value={
                             config?.relevance_threshold_content ||
                             DEFAULT_CONFIG.relevance_threshold_content
