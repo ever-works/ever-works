@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 import { EventEmitterModule } from '@nestjs/event-emitter';
-import { DirectoryModule } from '@packages/agent/services';
 import { DIRECTORY_OPERATIONS } from '@packages/agent/directory-operations';
 import { DataGeneratorService } from '@packages/agent/data-generator';
 import { MarkdownGeneratorService } from '@packages/agent/markdown-generator';
@@ -16,7 +15,6 @@ import { TriggerCacheFactory } from './cache/cache.factory';
     imports: [
         TriggerItemsGeneratorModule,
         GitModule,
-        DirectoryModule,
         EventEmitterModule.forRoot(),
         TriggerInternalModule,
         TriggerCacheFactory.register({ isGlobal: true }),

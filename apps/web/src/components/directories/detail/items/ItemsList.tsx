@@ -206,35 +206,69 @@ function VirtualizedList({
     const loadMoreRef = useRef<HTMLDivElement>(null);
     const ITEMS_PER_PAGE = 30; // Items to load at a time
 
+    // Use a ref to store the latest values for use in the observer callback
+    const stateRef = useRef({ itemsLength: items.length, visibleEnd: visibleRange.end });
+
+    // Keep the ref in sync with current values
+    stateRef.current = { itemsLength: items.length, visibleEnd: visibleRange.end };
+
     useEffect(() => {
-        // Use Intersection Observer to detect when to load more items
+        const currentRef = loadMoreRef.current;
+        if (!currentRef) return;
+
         const observer = new IntersectionObserver(
             (entries) => {
                 const target = entries[0];
-                if (target.isIntersecting && visibleRange.end < items.length) {
-                    // Load more items when the trigger element is visible
-                    setVisibleRange({
-                        start: 0,
-                        end: Math.min(items.length, visibleRange.end + ITEMS_PER_PAGE),
-                    });
+                if (target.isIntersecting) {
+                    const { itemsLength, visibleEnd } = stateRef.current;
+                    if (visibleEnd < itemsLength) {
+                        setVisibleRange({
+                            start: 0,
+                            end: Math.min(itemsLength, visibleEnd + ITEMS_PER_PAGE),
+                        });
+                    }
                 }
             },
             {
-                root: document.getElementById('main-content'),
-                rootMargin: '100px',
-                threshold: 0.1,
+                root: null,
+                rootMargin: '200px',
+                threshold: 0,
             },
         );
 
-        if (loadMoreRef.current) {
-            observer.observe(loadMoreRef.current);
-        }
+        observer.observe(currentRef);
 
         return () => {
-            if (loadMoreRef.current) {
-                observer.unobserve(loadMoreRef.current);
-            }
+            observer.disconnect();
         };
+        // setVisibleRange is stable (from useState), so observer is created once
+    }, [setVisibleRange]);
+
+    // When visibleRange.end changes and there are more items to load,
+    // re-check if the loader is still in view by triggering a manual check
+    useEffect(() => {
+        if (visibleRange.end >= items.length) return;
+
+        const currentRef = loadMoreRef.current;
+        if (!currentRef) return;
+
+        // Check if the element is currently in the viewport
+        const rect = currentRef.getBoundingClientRect();
+        const isInViewport =
+            rect.top < window.innerHeight + 200 && // 200px matches rootMargin
+            rect.bottom > -200;
+
+        if (isInViewport) {
+            // Schedule the next load after render completes
+            const timeoutId = setTimeout(() => {
+                setVisibleRange({
+                    start: 0,
+                    end: Math.min(items.length, visibleRange.end + ITEMS_PER_PAGE),
+                });
+            }, 50);
+
+            return () => clearTimeout(timeoutId);
+        }
     }, [items.length, visibleRange.end, setVisibleRange]);
 
     // Get visible items - always start from 0 for simplicity

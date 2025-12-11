@@ -25,6 +25,12 @@ import {
 import { DirectoryCommandAction, DirectoryCommandPayloads } from '@packages/agent/tasks';
 import { SkipThrottle } from '@nestjs/throttler';
 import { CacheDto } from './dto/cache.dto';
+import {
+    DirectoryScheduleDispatcherService,
+    DirectoryScheduleService,
+} from '@packages/agent/services';
+import { ScheduleRunCompleteDto, ScheduleRunFailureDto } from './dto/schedule-run.dto';
+import { GenerateStatusType } from '@packages/agent/entities';
 
 type DirectoryContextResponse = {
     directory: Directory;
@@ -54,6 +60,8 @@ export class TriggerInternalController {
         @Inject(DIRECTORY_OPERATIONS)
         private readonly directoryOperations: DirectoryOperations,
         @Inject(CACHE_MANAGER) private cacheManager: Cache,
+        private readonly scheduleDispatcher: DirectoryScheduleDispatcherService,
+        private readonly directoryScheduleService: DirectoryScheduleService,
     ) {}
 
     @Get('directories/:id/context')
@@ -108,6 +116,58 @@ export class TriggerInternalController {
             directory,
             operations: this.directoryOperations,
         });
+
+        return { status: 'ok' };
+    }
+
+    @Post('schedules/dispatch')
+    @Public()
+    async dispatchSchedules(@Headers('x-trigger-secret') secret: string) {
+        this.ensureSecret(secret);
+
+        const dispatched = await this.scheduleDispatcher.dispatchDue();
+
+        return {
+            dispatched,
+        };
+    }
+
+    @Post('schedules/:id/complete')
+    @Public()
+    async markScheduleRunCompleted(
+        @Headers('x-trigger-secret') secret: string,
+        @Param('id') scheduleId: string,
+        @Body() body: ScheduleRunCompleteDto,
+    ) {
+        this.ensureSecret(secret);
+
+        if (!scheduleId) {
+            throw new BadRequestException('Missing schedule id');
+        }
+
+        await this.directoryScheduleService.markRunCompleted({
+            scheduleId,
+            historyId: body.historyId,
+            status: body.status ?? GenerateStatusType.GENERATED,
+        });
+
+        return { status: 'ok' };
+    }
+
+    @Post('schedules/:id/fail')
+    @Public()
+    async markScheduleRunFailed(
+        @Headers('x-trigger-secret') secret: string,
+        @Param('id') scheduleId: string,
+        @Body() body: ScheduleRunFailureDto,
+    ) {
+        this.ensureSecret(secret);
+
+        if (!scheduleId) {
+            throw new BadRequestException('Missing schedule id');
+        }
+
+        await this.directoryScheduleService.markRunFailed(scheduleId, body.reason);
 
         return { status: 'ok' };
     }
