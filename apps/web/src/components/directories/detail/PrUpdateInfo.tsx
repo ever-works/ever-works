@@ -36,7 +36,7 @@ export function PrUpdateInfo({
                             mainPR?.url && 'text-primary hover:underline font-mono',
                         )}
                     >
-                        {mainPR?.branch.substring(0, 10)} -{' '}
+                        {mainPR?.branch?.substring(0, 10)} -{' '}
                         {mainPR?.number ? `#${mainPR.number}` : '-'}
                     </Button>
                 </div>
@@ -55,7 +55,7 @@ export function PrUpdateInfo({
                             dataPR?.url && 'text-primary hover:underline font-mono',
                         )}
                     >
-                        {dataPR?.branch.substring(0, 10)} -{' '}
+                        {dataPR?.branch?.substring(0, 10)} -{' '}
                         {dataPR?.number ? `#${dataPR.number}` : '-'}
                     </Button>
                 </div>
