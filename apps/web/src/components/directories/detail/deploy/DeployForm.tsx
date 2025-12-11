@@ -160,7 +160,9 @@ export function DeployForm({ directory, isDeploying }: DeployFormProps) {
 
                                     {isDeploying
                                         ? t('form.deployToVercel.deployingStateButton', {
-                                              state: directory.deploymentState || 'INITIALIZING',
+                                              state: (
+                                                  directory.deploymentState || 'INITIALIZING'
+                                              ).toLowerCase(),
                                           })
                                         : t('form.deployToVercel.deployButton')}
                                 </span>
