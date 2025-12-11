@@ -42,6 +42,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
             loading = false,
             disabled,
             children,
+            type,
             target,
             ...props
         },
@@ -76,6 +77,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
                 ref={ref}
                 disabled={disabled || loading}
                 className={cn(variant === 'unstyled' ? '' : classes, className)}
+                type={type || 'button'}
                 {...props}
             >
                 {loading && (
