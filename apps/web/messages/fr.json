@@ -751,6 +751,11 @@
                         "updateInfo": "Les mises à jour synchronisent le contenu de votre répertoire vers le dépôt du site Web pour le prochain déploiement."
                     }
                 }
+            },
+            "schedule": {
+                "card": {
+                    "requiresGeneration": "Run at least one item generation before enabling schedules."
+                }
             }
         },
         "directoryCreation": {

@@ -751,6 +751,11 @@
                         "updateInfo": "Updates synchronisieren Ihre Verzeichnisinhalte zum Website-Repository für die nächste Bereitstellung."
                     }
                 }
+            },
+            "schedule": {
+                "card": {
+                    "requiresGeneration": "Run at least one item generation before enabling schedules."
+                }
             }
         },
         "directoryCreation": {

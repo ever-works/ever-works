@@ -49,7 +49,7 @@ const defaultAllowances = cadenceOrder.map((cadence) => ({
 }));
 
 export function DirectoryScheduleCard({ schedule }: DirectoryScheduleCardProps) {
-    const { directory } = useDirectoryDetail();
+    const { directory, config } = useDirectoryDetail();
     const t = useTranslations('dashboard.directoryDetail.schedule.card');
     const router = useRouter();
 
@@ -64,18 +64,21 @@ export function DirectoryScheduleCard({ schedule }: DirectoryScheduleCardProps) 
         );
     }
 
-    return <ScheduleForm directoryId={directory.id} schedule={schedule} />;
+    return <ScheduleForm directoryId={directory.id} schedule={schedule} config={config} />;
 }
 
 function ScheduleForm({
     directoryId,
     schedule,
+    config,
 }: {
     directoryId: string;
     schedule: DirectoryScheduleDto;
+    config: any;
 }) {
     const t = useTranslations('dashboard.directoryDetail.schedule.card');
     const router = useRouter();
+    const hasLastRequest = !!config?.metadata?.last_request_data;
 
     const allowances = useMemo(
         () => (schedule.allowedCadences?.length ? schedule.allowedCadences : defaultAllowances),
@@ -208,6 +211,11 @@ function ScheduleForm({
                 <p className="text-sm text-text-secondary dark:text-text-secondary-dark max-w-2xl">
                     {schedule.subscriptionsEnabled ? t('subtitle.enabled') : t('subtitle.disabled')}
                 </p>
+                {!hasLastRequest && (
+                    <p className="text-sm text-warning dark:text-warning-dark max-w-2xl">
+                        {t('requiresGeneration')}
+                    </p>
+                )}
             </header>
 
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -220,8 +228,9 @@ function ScheduleForm({
                 <div className="grid gap-4 md:grid-cols-2">
                     <FieldCard label={t('fields.automation')} helper={t('fields.automationHelp')}>
                         <Switch
-                            checked={form.enable}
+                            checked={form.enable && hasLastRequest}
                             onChange={(checked) => updateForm({ enable: checked })}
+                            disabled={!hasLastRequest}
                         />
                     </FieldCard>
 
@@ -235,6 +244,7 @@ function ScheduleForm({
                                             .value as DirectoryScheduleBillingMode,
                                     })
                                 }
+                                disabled={!hasLastRequest}
                             >
                                 <option value={DirectoryScheduleBillingMode.SUBSCRIPTION}>
                                     {t('billing.subscription')}
@@ -263,6 +273,7 @@ function ScheduleForm({
                                     cadence: event.target.value as DirectoryScheduleCadence,
                                 })
                             }
+                            disabled={!hasLastRequest}
                         >
                             {cadenceOrder.map((cadence) => (
                                 <option
@@ -325,6 +336,7 @@ function ScheduleForm({
                                     maxFailureBeforePause: Math.min(10, Math.max(1, normalized)),
                                 });
                             }}
+                            disabled={!hasLastRequest}
                         />
                     </FieldCard>
                 </div>
@@ -338,7 +350,8 @@ function ScheduleForm({
                         isRunning ||
                         isSaving ||
                         isCancelling ||
-                        schedule.status !== DirectoryScheduleStatus.ACTIVE
+                        schedule.status !== DirectoryScheduleStatus.ACTIVE ||
+                        !hasLastRequest
                     }
                     className="gap-2"
                 >
@@ -346,7 +359,10 @@ function ScheduleForm({
                     <PlayCircle className="h-4 w-4" aria-hidden />
                 </Button>
 
-                <Button onClick={saveSchedule} disabled={isSaving || isRunning || isCancelling}>
+                <Button
+                    onClick={saveSchedule}
+                    disabled={isSaving || isRunning || isCancelling || !hasLastRequest}
+                >
                     {isSaving ? t('actions.saving') : t('actions.save')}
                 </Button>
 

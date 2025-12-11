@@ -751,6 +751,11 @@
                         "updateInfo": "更新会将您的目录内容同步到网站仓库，以便下次部署。"
                     }
                 }
+            },
+            "schedule": {
+                "card": {
+                    "requiresGeneration": "Run at least one item generation before enabling schedules."
+                }
             }
         },
         "directoryCreation": {

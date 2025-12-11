@@ -751,6 +751,11 @@
                         "updateInfo": "تزامن التحديثات محتوى دليلك مع مستودع الموقع للنشر التالي."
                     }
                 }
+            },
+            "schedule": {
+                "card": {
+                    "requiresGeneration": "Run at least one item generation before enabling schedules."
+                }
             }
         },
         "directoryCreation": {

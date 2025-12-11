@@ -462,7 +462,8 @@
                         "title": "Run a manual generation first",
                         "description": "Complete one successful manual run to unlock automated scheduling. Once your directory has data we can keep it fresh for you.",
                         "refresh": "Refresh status"
-                    }
+                    },
+                    "requiresGeneration": "Run at least one item generation before enabling schedules."
                 },
                 "actions": {
                     "invalid": "Invalid data",

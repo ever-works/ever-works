@@ -751,6 +751,11 @@
                         "updateInfo": "Las actualizaciones sincronizan el contenido de tu directorio al repositorio del sitio web para el próximo despliegue."
                     }
                 }
+            },
+            "schedule": {
+                "card": {
+                    "requiresGeneration": "Run at least one item generation before enabling schedules."
+                }
             }
         },
         "directoryCreation": {
