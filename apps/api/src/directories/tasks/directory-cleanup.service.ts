@@ -55,12 +55,17 @@ export class DirectoryCleanupService {
     }
 
     private async handleStalledDirectory(directory: Directory) {
-        await Promise.all([
-            this.repository.recordGenerationFinishTime(directory.id, new Date()),
-            this.repository.updateGenerateStatus(directory.id, {
-                status: GenerateStatusType.ERROR,
-                error: 'Generation stalled',
-            }),
-        ]);
+        const promises = [this.repository.recordGenerationFinishTime(directory.id, new Date())];
+
+        if (directory.generateStatus.status === GenerateStatusType.GENERATING) {
+            promises.push(
+                this.repository.updateGenerateStatus(directory.id, {
+                    status: GenerateStatusType.ERROR,
+                    error: 'Generation stalled',
+                }),
+            );
+        }
+
+        await Promise.all(promises);
     }
 }
