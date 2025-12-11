@@ -29,10 +29,10 @@ export const DEFAULT_CONFIG: ConfigDto = {
     max_search_queries: 10,
     max_results_per_query: 5,
     max_pages_to_process: 10,
-    relevance_threshold_content: 0.5,
+    relevance_threshold_content: 0.6,
     min_content_length_for_extraction: 100,
     ai_first_generation_enabled: false,
-    content_filtering_enabled: false,
+    content_filtering_enabled: true,
     prompt_comparison_confidence_threshold: 0.8,
 };
 
@@ -48,7 +48,8 @@ export function ConfigFields({
     const { config: directoryConfig } = useDirectoryDetail();
     const hasConfig = !!directoryConfig && Object.keys(directoryConfig).length > 0;
     const isRecreate = generationMethod === GenerationMethod.RECREATE;
-    const content_filtering_enabled = config?.content_filtering_enabled || false;
+    const content_filtering_enabled =
+        config?.content_filtering_enabled !== undefined ? config?.content_filtering_enabled : true;
 
     return (
         <div className="space-y-6">
@@ -85,7 +86,7 @@ export function ConfigFields({
             {/* Checkboxes */}
             <div className="space-y-3">
                 <Checkbox
-                    checked={updateWithPullRequest || false}
+                    checked={updateWithPullRequest}
                     onChange={(e) => onChange({ update_with_pull_request: e.target.checked })}
                     label={t('updateWithPullRequest')}
                     description={t('updateWithPullRequestDescription')}
@@ -93,7 +94,7 @@ export function ConfigFields({
                 />
 
                 <Checkbox
-                    checked={badgeEvaluationEnabled || false}
+                    checked={badgeEvaluationEnabled}
                     onChange={(e) => onChange({ badge_evaluation_enabled: e.target.checked })}
                     label={t('enableBadgeEvaluation')}
                     description={t('enableBadgeEvaluationDescription')}
@@ -223,7 +224,7 @@ export function ConfigFields({
 
                 <div className="space-y-3">
                     <Checkbox
-                        checked={config?.ai_first_generation_enabled || false}
+                        checked={config?.ai_first_generation_enabled}
                         onChange={(e) =>
                             onChange({
                                 config: {
@@ -238,7 +239,7 @@ export function ConfigFields({
                     />
 
                     <Checkbox
-                        checked={config?.content_filtering_enabled || false}
+                        checked={config?.content_filtering_enabled}
                         onChange={(e) =>
                             onChange({
                                 config: { ...config, content_filtering_enabled: e.target.checked },
