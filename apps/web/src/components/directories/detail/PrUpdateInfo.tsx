@@ -13,7 +13,7 @@ export function PrUpdateInfo({
 }) {
     const tConf = useTranslations('dashboard.directoryDetail.config');
 
-    if (!mainPR && !dataPR) {
+    if (!mainPR?.url && !dataPR?.url) {
         return null;
     }
 
