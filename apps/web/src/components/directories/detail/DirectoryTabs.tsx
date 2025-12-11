@@ -97,7 +97,7 @@ export function DirectoryTabs({ directory }: DirectoryTabsProps) {
         {
             name: t('deploy'),
             href: `${ROUTES.DASHBOARD_DIRECTORY(directory.id)}/deploy`,
-            visible: Boolean(config?.metadata?.initial_prompt),
+            visible: Boolean(config),
             icon: (
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path

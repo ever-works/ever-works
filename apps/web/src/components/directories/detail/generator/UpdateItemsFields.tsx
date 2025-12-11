@@ -22,12 +22,14 @@ export function UpdateItemsFields({
     updateWithPullRequest,
     onChange,
 }: UpdateItemsFieldsProps) {
-    const { directory } = useDirectoryDetail();
+    const { directory, config } = useDirectoryDetail();
     const t = useTranslations('dashboard.directoryDetail.generator');
     const tConf = useTranslations('dashboard.directoryDetail.config');
 
     const mainPR = directory.lastPullRequest?.main;
     const dataPR = directory.lastPullRequest?.data;
+    const hasConfig = !!config && Object.keys(config).length > 0;
+    const isRecreate = generationMethod === GenerationMethod.RECREATE;
 
     return (
         <div
@@ -55,6 +57,13 @@ export function UpdateItemsFields({
                     </option>
                     <option value={GenerationMethod.RECREATE}>{t('methodRecreate')}</option>
                 </Select>
+
+                {isRecreate && hasConfig && (
+                    <div className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning dark:text-warning-dark">
+                        <p className="font-medium">{t('recreateInlineTitle')}</p>
+                        <p className="text-xs mt-1">{t('recreateInlineDescription')}</p>
+                    </div>
+                )}
 
                 <Switch
                     label={t('updateWithPullRequest')}

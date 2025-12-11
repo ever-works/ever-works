@@ -47,6 +47,7 @@ export type {
     UpdateItemsGeneratorDto,
     SubmitItemDto,
     RemoveItemDto,
+    UpdateItemDto,
     ExtractItemDetailsDto,
     ItemsGeneratorResponse,
     ExtractItemDetailsResponse,

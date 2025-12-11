@@ -61,6 +61,15 @@ export function ItemsList({ items: initialItems, directoryId }: ItemsListProps) 
         setItems((prev) => prev.filter((i) => i.slug !== itemSlug));
     }, []);
 
+    const handleItemUpdate = useCallback((updated: Partial<ItemData> & { slug?: string }) => {
+        if (!updated.slug) return;
+        setItems((prev) =>
+            sortItems(
+                prev.map((item) => (item.slug === updated.slug ? { ...item, ...updated } : item)),
+            ),
+        );
+    }, []);
+
     return (
         <div className="space-y-6">
             {/* Search and Filter Bar */}
@@ -147,6 +156,9 @@ export function ItemsList({ items: initialItems, directoryId }: ItemsListProps) 
                                 viewMode={viewMode}
                                 directoryId={directoryId}
                                 onDelete={() => handleItemDelete(item.slug!)}
+                                onUpdate={(updated) =>
+                                    handleItemUpdate({ ...updated, slug: item.slug })
+                                }
                             />
                         ))}
                     </div>
@@ -157,6 +169,7 @@ export function ItemsList({ items: initialItems, directoryId }: ItemsListProps) 
                         viewMode={viewMode}
                         directoryId={directoryId}
                         onItemDelete={handleItemDelete}
+                        onItemUpdate={handleItemUpdate}
                         visibleRange={visibleRange}
                         setVisibleRange={setVisibleRange}
                     />
@@ -175,6 +188,7 @@ interface VirtualizedListProps {
     viewMode: 'grid' | 'list';
     directoryId: string;
     onItemDelete: (itemSlug: string) => void;
+    onItemUpdate: (item: Partial<ItemData> & { slug?: string }) => void;
     visibleRange: { start: number; end: number };
     setVisibleRange: (range: { start: number; end: number }) => void;
 }
@@ -184,6 +198,7 @@ function VirtualizedList({
     viewMode,
     directoryId,
     onItemDelete,
+    onItemUpdate,
     visibleRange,
     setVisibleRange,
 }: VirtualizedListProps) {
@@ -240,6 +255,7 @@ function VirtualizedList({
                         viewMode={viewMode}
                         directoryId={directoryId}
                         onDelete={() => onItemDelete(item.slug!)}
+                        onUpdate={(updated) => onItemUpdate({ ...updated, slug: item.slug })}
                     />
                 ))}
             </div>

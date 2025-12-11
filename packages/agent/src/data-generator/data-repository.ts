@@ -411,6 +411,24 @@ export class DataRepository {
         await fs.writeFile(filepath, str, 'utf-8');
     }
 
+    async updateItemMetadata(
+        slug: string,
+        updates: Partial<Pick<ItemData, 'featured' | 'order'>>,
+    ): Promise<ItemData | null> {
+        const existing = await this.getItem(slug).catch(() => null);
+        if (!existing) {
+            return null;
+        }
+
+        const next: ItemData = {
+            ...existing,
+            ...updates,
+        };
+
+        await this.writeItem({ ...next, slug });
+        return next;
+    }
+
     async writeItemMarkdown(item: ItemData, markdown: string) {
         const filepath = path.join(this.getItemPath(item.slug), `${item.slug}.md`);
         await fs.writeFile(filepath, markdown, 'utf-8');

@@ -544,7 +544,21 @@
                         "invalidUrl": "请输入包含 http:// 或 https:// 的有效 URL",
                         "requiredFields": "请填写所有必填字段"
                     }
-                }
+                },
+                "updateSuccess": "项目删除成功",
+                "updateFailed": "删除项目失败",
+                "updateError": "删除项目时发生错误",
+                "editDisplay": "删除",
+                "editDisplayDescription": "Toggle featured status and set display order.",
+                "orderLabel": "Display order (optional)",
+                "orderHelp": "Lower numbers show earlier within featured/non-featured groups.",
+                "deleteDialogTitle": "删除",
+                "deleteDialogDescription": "This will remove {name} from the repository.",
+                "createPRLabel": "Create Pull Request",
+                "createPRHelp": "If enabled, changes are proposed via PR instead of direct commit.",
+                "reasonLabel": "Reason (optional)",
+                "reasonPlaceholder": "Why are you removing this item?",
+                "confirmDelete": "Delete item"
             },
             "generator": {
                 "regenerationWarning": "重新生成警告",
@@ -610,7 +624,12 @@
                 "aiFirstGeneration": "AI 优先生成",
                 "aiFirstGenerationDescription": "在网页搜索之前启用 AI 生成初始项目。",
                 "contentFiltering": "内容过滤",
-                "contentFilteringDescription": "启用内容质量过滤"
+                "contentFilteringDescription": "启用内容质量过滤",
+                "recreateConfirmTitle": "Recreate directory data?",
+                "recreateConfirmDescription": "Recreate will delete existing items and regenerate them from scratch. This action cannot be undone.",
+                "confirmRecreate": "Yes, recreate",
+                "recreateInlineTitle": "Recreate will remove existing items",
+                "recreateInlineDescription": "This mode deletes current items and rebuilds them from scratch. Proceed only if you want to replace everything."
             },
             "progress": {
                 "title": "生成进行中",

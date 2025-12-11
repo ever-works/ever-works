@@ -544,7 +544,21 @@
                         "invalidUrl": "Por favor, ingresa una URL válida que incluya http:// o https://",
                         "requiredFields": "Por favor, completa todos los campos requeridos"
                     }
-                }
+                },
+                "updateSuccess": "Elemento eliminado exitosamente",
+                "updateFailed": "No se pudo eliminar el elemento",
+                "updateError": "Ocurrió un error al eliminar el elemento",
+                "editDisplay": "Eliminar",
+                "editDisplayDescription": "Toggle featured status and set display order.",
+                "orderLabel": "Display order (optional)",
+                "orderHelp": "Lower numbers show earlier within featured/non-featured groups.",
+                "deleteDialogTitle": "Eliminar",
+                "deleteDialogDescription": "This will remove {name} from the repository.",
+                "createPRLabel": "Create Pull Request",
+                "createPRHelp": "If enabled, changes are proposed via PR instead of direct commit.",
+                "reasonLabel": "Reason (optional)",
+                "reasonPlaceholder": "Why are you removing this item?",
+                "confirmDelete": "Delete item"
             },
             "generator": {
                 "regenerationWarning": "Advertencia de Regeneración",
@@ -610,7 +624,12 @@
                 "aiFirstGeneration": "Generación con IA Primero",
                 "aiFirstGenerationDescription": "Habilita la generación con IA de elementos iniciales antes de la búsqueda web.",
                 "contentFiltering": "Filtrado de Contenido",
-                "contentFilteringDescription": "Habilita el filtrado de calidad del contenido"
+                "contentFilteringDescription": "Habilita el filtrado de calidad del contenido",
+                "recreateConfirmTitle": "Recreate directory data?",
+                "recreateConfirmDescription": "Recreate will delete existing items and regenerate them from scratch. This action cannot be undone.",
+                "confirmRecreate": "Yes, recreate",
+                "recreateInlineTitle": "Recreate will remove existing items",
+                "recreateInlineDescription": "This mode deletes current items and rebuilds them from scratch. Proceed only if you want to replace everything."
             },
             "progress": {
                 "title": "Generación en Progreso",

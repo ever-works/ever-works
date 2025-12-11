@@ -544,7 +544,21 @@
                         "invalidUrl": "يرجى إدخال رابط صالح يتضمن http:// أو https://",
                         "requiredFields": "يرجى ملء جميع الحقول المطلوبة"
                     }
-                }
+                },
+                "updateSuccess": "تم حذف العنصر بنجاح",
+                "updateFailed": "فشل حذف العنصر",
+                "updateError": "حدث خطأ أثناء حذف العنصر",
+                "editDisplay": "حذف",
+                "editDisplayDescription": "Toggle featured status and set display order.",
+                "orderLabel": "Display order (optional)",
+                "orderHelp": "Lower numbers show earlier within featured/non-featured groups.",
+                "deleteDialogTitle": "حذف",
+                "deleteDialogDescription": "This will remove {name} from the repository.",
+                "createPRLabel": "Create Pull Request",
+                "createPRHelp": "If enabled, changes are proposed via PR instead of direct commit.",
+                "reasonLabel": "Reason (optional)",
+                "reasonPlaceholder": "Why are you removing this item?",
+                "confirmDelete": "Delete item"
             },
             "generator": {
                 "regenerationWarning": "تحذير إعادة الإنشاء",
@@ -610,7 +624,12 @@
                 "aiFirstGeneration": "الإنشاء بالذكاء الاصطناعي أولاً",
                 "aiFirstGenerationDescription": "تفعيل إنشاء العناصر الأولية بالذكاء الاصطناعي قبل البحث على الويب.",
                 "contentFiltering": "تصفية المحتوى",
-                "contentFilteringDescription": "تفعيل تصفية جودة المحتوى"
+                "contentFilteringDescription": "تفعيل تصفية جودة المحتوى",
+                "recreateConfirmTitle": "Recreate directory data?",
+                "recreateConfirmDescription": "Recreate will delete existing items and regenerate them from scratch. This action cannot be undone.",
+                "confirmRecreate": "Yes, recreate",
+                "recreateInlineTitle": "Recreate will remove existing items",
+                "recreateInlineDescription": "This mode deletes current items and rebuilds them from scratch. Proceed only if you want to replace everything."
             },
             "progress": {
                 "title": "الإنشاء قيد التنفيذ",

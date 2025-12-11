@@ -1,4 +1,13 @@
-import { IsString, IsNotEmpty, IsOptional, IsBoolean, IsUrl, IsArray } from 'class-validator';
+import {
+    IsString,
+    IsNotEmpty,
+    IsOptional,
+    IsBoolean,
+    IsUrl,
+    IsArray,
+    IsInt,
+    Min,
+} from 'class-validator';
 
 export class SubmitItemDto {
     @IsString()
@@ -25,6 +34,11 @@ export class SubmitItemDto {
     @IsOptional()
     @IsBoolean()
     featured?: boolean;
+
+    @IsOptional()
+    @IsInt()
+    @Min(0)
+    order?: number;
 
     @IsOptional()
     @IsBoolean()

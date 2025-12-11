@@ -26,6 +26,7 @@ import {
     SubmitItemDto,
     SubmitItemResponseDto,
     UpdateItemsGeneratorDto,
+    UpdateItemDto,
 } from '@packages/agent/items-generator';
 import {
     DirectoryDetailService,
@@ -348,6 +349,18 @@ export class DirectoriesController {
         const user = await this.authService.getUser(auth.userId);
 
         return this.directoryGenerationService.removeItem(id, removeItemDto, user);
+    }
+
+    @Post('directories/:id/update-item')
+    @HttpCode(HttpStatus.OK)
+    async updateItemMetadata(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') id: string,
+        @Body() updateItemDto: UpdateItemDto,
+    ) {
+        const user = await this.authService.getUser(auth.userId);
+
+        return this.directoryGenerationService.updateItemMetadata(id, updateItemDto, user);
     }
 
     @Post('extract-item-details')

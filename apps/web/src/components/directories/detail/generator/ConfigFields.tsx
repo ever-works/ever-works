@@ -6,6 +6,7 @@ import { GenerationMethod, WebsiteRepositoryCreationMethod } from '@/lib/api/enu
 import { ConfigDto } from '@/lib/api/types-only';
 import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
+import { useDirectoryDetail } from '../DirectoryDetailContext';
 
 interface ConfigFieldsProps {
     config?: ConfigDto;
@@ -44,6 +45,9 @@ export function ConfigFields({
     onChange,
 }: ConfigFieldsProps) {
     const t = useTranslations('dashboard.directoryDetail.generator');
+    const { config: directoryConfig } = useDirectoryDetail();
+    const hasConfig = !!directoryConfig && Object.keys(directoryConfig).length > 0;
+    const isRecreate = generationMethod === GenerationMethod.RECREATE;
 
     return (
         <div className="space-y-6">
@@ -69,6 +73,12 @@ export function ConfigFields({
                     </option>
                     <option value={GenerationMethod.RECREATE}>{t('methodRecreate')}</option>
                 </select>
+                {isRecreate && hasConfig && (
+                    <div className="mt-2 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning dark:text-warning-dark">
+                        <p className="font-medium">{t('recreateInlineTitle')}</p>
+                        <p className="text-xs mt-1">{t('recreateInlineDescription')}</p>
+                    </div>
+                )}
             </div>
 
             {/* Checkboxes */}

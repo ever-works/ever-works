@@ -24,6 +24,7 @@ import {
     RemoveItemResponseDto,
     ExtractItemDetailsDto,
     ExtractItemDetailsResponseDto,
+    UpdateItemDto,
 } from '@src/items-generator/dto';
 import {
     ItemsGeneratorMetrics,
@@ -286,6 +287,39 @@ export class DirectoryGenerationService {
                 status: 'error',
                 slug: directoryId,
                 item_slug: dto.item_slug,
+                message: normalizeGeneratorError(error),
+            });
+        }
+    }
+
+    async updateItemMetadata(directoryId: string, dto: UpdateItemDto, user: User) {
+        try {
+            const directory = await this.ownershipService.ensure(directoryId, user.id);
+
+            const result = await this.itemSubmissionService.updateItem(directory, user, dto);
+
+            if (result.status === 'success') {
+                await this.markdownGenerator.initialize(directory, user, {
+                    generation_method: GenerationMethod.CREATE_UPDATE,
+                });
+            }
+
+            if (result.status === 'error') {
+                result.message = normalizeGeneratorError(result.message);
+                throw new BadRequestException(result);
+            }
+
+            return result;
+        } catch (error) {
+            if (error instanceof HttpException) {
+                throw error;
+            }
+
+            this.logger.error('Error updating item metadata:', error);
+
+            throw new BadRequestException({
+                status: 'error',
+                slug: directoryId,
                 message: normalizeGeneratorError(error),
             });
         }

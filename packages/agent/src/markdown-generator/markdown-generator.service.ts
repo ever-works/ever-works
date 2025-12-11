@@ -336,6 +336,15 @@ export class MarkdownGeneratorService {
         return categoryIds.sort((aId, bId) => {
             const categoryA = categories.get(aId);
             const categoryB = categories.get(bId);
+            const featuredCountA = groups[aId].filter((item) => item.featured).length;
+            const featuredCountB = groups[bId].filter((item) => item.featured).length;
+
+            // Ensure categories with featured items always come first
+            const aHasFeatured = featuredCountA > 0;
+            const bHasFeatured = featuredCountB > 0;
+            if (aHasFeatured !== bHasFeatured) {
+                return aHasFeatured ? -1 : 1;
+            }
 
             // If both have priority, sort by priority number (lower = higher priority)
             if (categoryA?.priority !== undefined && categoryB?.priority !== undefined) {
@@ -350,9 +359,6 @@ export class MarkdownGeneratorService {
                 return 1;
             }
 
-            // order by items featured count
-            const featuredCountA = groups[aId].filter((item) => item.featured).length;
-            const featuredCountB = groups[bId].filter((item) => item.featured).length;
             if (featuredCountA !== featuredCountB) {
                 return featuredCountB - featuredCountA;
             }

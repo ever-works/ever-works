@@ -1,6 +1,6 @@
 'use server';
 
-import { itemsGeneratorAPI, SubmitItemDto, RemoveItemDto } from '@/lib/api';
+import { itemsGeneratorAPI, SubmitItemDto, RemoveItemDto, UpdateItemDto } from '@/lib/api';
 import { getAuthFromCookie } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { ROUTES } from '@/lib/constants';
@@ -39,7 +39,11 @@ export async function addItem(directoryId: string, data: SubmitItemDto) {
     }
 }
 
-export async function removeItem(directoryId: string, itemSlug: string, reason?: string) {
+export async function removeItem(
+    directoryId: string,
+    itemSlug: string,
+    options?: { reason?: string; create_pull_request?: boolean },
+) {
     const user = await getAuthFromCookie();
     if (!user) {
         redirect(ROUTES.AUTH_LOGIN);
@@ -50,7 +54,8 @@ export async function removeItem(directoryId: string, itemSlug: string, reason?:
     try {
         const response = await itemsGeneratorAPI.removeItem(directoryId, {
             item_slug: itemSlug,
-            reason,
+            reason: options?.reason,
+            create_pull_request: options?.create_pull_request,
         });
 
         if (response.status) {
@@ -130,6 +135,38 @@ export async function extractItemDetails(sourceUrl: string, existingCategories?:
         return {
             success: false,
             error: error instanceof Error ? error.message : t('extractError'),
+        };
+    }
+}
+
+export async function updateItem(directoryId: string, data: UpdateItemDto) {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    const t = await getTranslations('dashboard.directoryDetail.items');
+
+    try {
+        const response = await itemsGeneratorAPI.updateItem(directoryId, data);
+
+        if (response.status === 'success') {
+            revalidatePath(`/directories/${directoryId}/items`);
+            revalidatePath(`/directories/${directoryId}`);
+        }
+
+        return {
+            status: response.status,
+            message:
+                response.message ||
+                (response.status === 'success' ? t('updateSuccess') : t('updateFailed')),
+            item: response,
+        };
+    } catch (error) {
+        console.error('Update item error:', error);
+        return {
+            status: 'error',
+            message: error instanceof Error ? error.message : t('updateError'),
         };
     }
 }

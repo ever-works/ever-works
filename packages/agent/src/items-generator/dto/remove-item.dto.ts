@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsOptional } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsBoolean } from 'class-validator';
 
 export class RemoveItemDto {
     @IsString()
@@ -8,4 +8,8 @@ export class RemoveItemDto {
     @IsOptional()
     @IsString()
     reason?: string;
+
+    @IsOptional()
+    @IsBoolean()
+    create_pull_request?: boolean;
 }
