@@ -43,6 +43,7 @@ export interface GenerationContext {
     allInitialCategories: string[];
     allPriorityCategories: string[];
     featuredItemHints: string[];
+    subject?: string;
 
     // Control
     shouldStop?: boolean;

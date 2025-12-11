@@ -222,13 +222,9 @@ export class SearchService {
             const article = reader.parse();
 
             if (article && article.textContent && article.textContent.length > 200) {
-                this.logger.debug(`Extracted content using Readability for ${url}`);
                 return this.turndownService.turndown(article.content);
             }
 
-            this.logger.debug(
-                `Readability found insufficient content for ${url} (length: ${article?.textContent?.length || 0}).`,
-            );
             return null;
         } catch (error) {
             this.logger.warn(`Readability extraction failed for ${url}: ${error.message}`);
@@ -242,7 +238,6 @@ export class SearchService {
             document.querySelector('meta[property="og:description"]')?.getAttribute('content');
 
         if (metaDescription && metaDescription.length > 0) {
-            this.logger.debug(`Extracted meta description for ${url}`);
             return metaDescription;
         }
         return null;

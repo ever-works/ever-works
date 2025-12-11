@@ -59,16 +59,16 @@ export class SourceValidationService implements IPipelineStep {
     ) {}
 
     async run(context: GenerationContext): Promise<GenerationContext> {
-        const { directory, finalItems, metrics } = context;
+        const { directory, finalItems, metrics, subject } = context;
 
         this.logger.log(
             `[${directory.slug}] Validating source URLs for ${finalItems.length} items`,
         );
 
         const validatedItems = await this.filterAndValidateSourceItems(
-            directory.slug,
             finalItems,
             metrics,
+            subject,
         );
 
         context.finalItems = validatedItems;
@@ -77,9 +77,9 @@ export class SourceValidationService implements IPipelineStep {
     }
 
     async filterAndValidateSourceItems(
-        directorySlug: string,
         items: ItemData[],
         metrics?: GenerationContext['metrics'],
+        subject?: string,
     ): Promise<ItemData[]> {
         if (!items || items.length === 0) {
             return [];
@@ -94,7 +94,7 @@ export class SourceValidationService implements IPipelineStep {
                 const batch = items.slice(i, i + BATCH_SIZE);
 
                 const validationPromises = batch.map((item) => {
-                    return this.validateAndFetchSourceUrl(directorySlug, item, metrics)
+                    return this.validateAndFetchSourceUrl(item, metrics, subject)
                         .then((validatedSourceUrl) => {
                             if (validatedSourceUrl) {
                                 return { ...item, source_url: validatedSourceUrl, valid: true };
@@ -127,9 +127,9 @@ export class SourceValidationService implements IPipelineStep {
     }
 
     private async validateAndFetchSourceUrl(
-        directorySlug: string,
         currentItem: ItemData,
         metrics?: GenerationContext['metrics'],
+        subject?: string,
     ): Promise<string | undefined> {
         const sourceUrl = currentItem.source_url;
         const itemName = currentItem.name;
@@ -198,6 +198,7 @@ export class SourceValidationService implements IPipelineStep {
             const searchQueries = this.generateOfficialSourceQueries(
                 safeItemName,
                 safeItemDescription,
+                subject,
             );
 
             const allDocuments = [];
@@ -229,10 +230,11 @@ export class SourceValidationService implements IPipelineStep {
             }
 
             const urlAnalysisPromises = uniqueUrls.slice(0, 8).map(async (url) => {
-                const basicValidation = await validateUrl(url);
-                if (!basicValidation) {
-                    return null;
-                }
+                // for now, skip basic validation (we just trust the search results)
+                // const basicValidation = await validateUrl(url);
+                // if (!basicValidation) {
+                //     return null;
+                // }
 
                 const aiValidation = await this.validateUrlWithAI(
                     safeItemName,
@@ -303,6 +305,11 @@ export class SourceValidationService implements IPipelineStep {
                 // Continue with empty content - AI can still analyze the URL structure
             }
 
+            const midContent = Math.floor(pageContent.length / 2);
+            const partialContent =
+                pageContent.slice(midContent - 1000, midContent + 1000) ||
+                pageContent.slice(0, 2000);
+
             const { result, usage, cost } = await this.aiService.askJson(
                 URL_VALIDATION_PROMPT,
                 urlValidationSchema,
@@ -312,7 +319,7 @@ export class SourceValidationService implements IPipelineStep {
                         itemName,
                         itemDescription,
                         candidateUrl,
-                        pageContent: pageContent.slice(0, 2000),
+                        pageContent: partialContent,
                     },
                 },
             );
@@ -329,19 +336,27 @@ export class SourceValidationService implements IPipelineStep {
         }
     }
 
-    private generateOfficialSourceQueries(itemName: string, itemDescription: string): string[] {
-        const queries = [
-            `"${itemName}" official website`,
-            `"${itemName}" github repository`,
-            `"${itemName}" documentation`,
-        ];
+    private generateOfficialSourceQueries(
+        itemName: string,
+        itemDescription: string,
+        subject?: string,
+    ): string[] {
+        const queries = [];
+
+        if (subject) {
+            queries.push(`"${itemName}" ${subject}`);
+        }
 
         const descriptionLower = itemDescription.toLowerCase();
         if (descriptionLower.includes('library') || descriptionLower.includes('framework')) {
-            queries.push(`"${itemName}" library official`);
+            queries.push(`"${itemName}" library`);
         }
         if (descriptionLower.includes('tool') || descriptionLower.includes('software')) {
             queries.push(`"${itemName}" tool official site`);
+        }
+
+        if (queries.length === 0) {
+            queries.push(`"${itemName}" official website`);
         }
 
         return queries;
