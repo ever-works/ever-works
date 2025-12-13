@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DirectoryRepository } from '@packages/agent/database';
-import { VercelService } from '@packages/agent/deploy';
+import { type Vercel, VercelService } from '@packages/agent/deploy';
 import { Directory } from '@packages/agent/entities';
 
 type CancelVerification = () => void;
@@ -13,6 +13,10 @@ type GetProjectsReadyState =
     | 'READY'
     | 'CANCELED'
     | 'TIMEOUT';
+
+type VercelProject = Awaited<
+    ReturnType<InstanceType<typeof Vercel>['projects']['getProjects']>
+>['projects'][0];
 
 @Injectable()
 export class VercelDeploymentVerifierService {
@@ -165,5 +169,146 @@ export class VercelDeploymentVerifierService {
         }, POLL_INTERVAL);
 
         return () => cleanup('CANCELED');
+    }
+
+    async lookupExistingDeployment(
+        directory: Directory,
+        vercelToken: string,
+    ): Promise<{ found: boolean; website?: string; deploymentState?: GetProjectsReadyState }> {
+        const vercel = await this.vercelService.createVercelSDK(vercelToken);
+
+        try {
+            const teamsResponse = await vercel.teams.getTeams({});
+            const scopes = [
+                undefined, // personal account
+                ...(teamsResponse?.teams || []).map((t) => t?.slug).filter(Boolean),
+            ];
+
+            for (const scope of scopes) {
+                const project = await this.findProject(vercel, directory, scope);
+                if (!project) {
+                    continue;
+                }
+
+                const { website, deploymentState } = await this.extractDeploymentData(
+                    vercel,
+                    project.id,
+                    project.slug,
+                );
+
+                if (website || deploymentState) {
+                    await this.repository.update(directory.id, {
+                        website: website ?? undefined,
+                        deploymentState: deploymentState ?? directory.deploymentState,
+                    });
+                }
+
+                return {
+                    found: true,
+                    website,
+                    deploymentState: deploymentState ?? null,
+                };
+            }
+
+            return { found: false };
+        } catch (error) {
+            this.logger.error(
+                `Failed to lookup existing deployment for directory ${directory.id}:`,
+                error,
+            );
+            return { found: false };
+        }
+    }
+
+    private async findProject(vercel: Vercel, directory: Directory, teamScope?: string) {
+        const projects = await this.getProjectsSafe(vercel, {
+            limit: '100',
+            search: directory.slug,
+            slug: teamScope,
+        });
+
+        return projects.projects.find((p) => this.isProjectLinkedToDirectory(p, directory));
+    }
+
+    private async extractDeploymentData(vercel: Vercel, projectId: string, teamScope?: string) {
+        const projectDomains = await vercel.projects.getProjectDomains({
+            idOrName: projectId,
+            slug: teamScope,
+        });
+
+        const customDomain =
+            projectDomains.domains.find((d) => !d.name.endsWith('.vercel.app')) ||
+            projectDomains.domains.find((d) => d.name.endsWith('.vercel.app'));
+
+        const latestDeploymentResponse = await this.getDeploymentsSafe(vercel, {
+            projectId,
+            limit: 1,
+            slug: teamScope,
+        });
+
+        const latestDeployment = latestDeploymentResponse.deployments?.[0];
+
+        const website =
+            customDomain?.name && customDomain.name.length > 0
+                ? `https://${customDomain.name}`
+                : latestDeployment?.url
+                  ? `https://${latestDeployment.url}`
+                  : undefined;
+
+        return {
+            website,
+            deploymentState: latestDeployment?.readyState as GetProjectsReadyState | undefined,
+        };
+    }
+
+    private isProjectLinkedToDirectory(project: VercelProject, directory: Directory): boolean {
+        const link = project?.link as any;
+        if (!link) {
+            return false;
+        }
+
+        const expectedRepo = directory.getWebsiteRepo().toLowerCase();
+        const expectedOwner = directory.getRepoOwner().toLowerCase();
+
+        // Normalize repo/name variants across link schemas
+        const repo = link.repo || link.project || link.projectName || link.name;
+        const owner =
+            link.org || link.owner || link.repoOwner || link.projectNamespace || link.slug;
+
+        if (!repo || !owner) {
+            return false;
+        }
+
+        return repo.toLowerCase() === expectedRepo && owner.toLowerCase() === expectedOwner;
+    }
+
+    private async getProjectsSafe(
+        vercel: Vercel,
+        args: { limit: string; search: string; slug?: string },
+    ) {
+        try {
+            return await vercel.projects.getProjects(args);
+        } catch (error: any) {
+            const raw = error?.rawValue;
+            if (raw?.projects) {
+                return raw;
+            }
+            throw error;
+        }
+    }
+
+    private async getDeploymentsSafe(
+        vercel: any,
+        args: { projectId: string; limit?: number | string; slug?: string },
+    ) {
+        try {
+            return await vercel.deployments.getDeployments(args);
+        } catch (error: any) {
+            const raw = error?.rawValue;
+            if (raw?.deployments) {
+                return raw;
+            }
+            throw error;
+        }
     }
 }

@@ -6,11 +6,10 @@ import { ItemsGeneratorStep } from '../constants/steps';
 import { GenerationMethod } from '../dto';
 import { accumulateMetrics } from '../utils/metrics.util';
 
-// Prompt processing prompt
 const PROMPT_PROCESSING_PROMPT = `
 # Prompt Extraction and Rewriting Task
 
-You extract URLs, categories, priority indicators, and featured item specifications from user prompts, then rewrite the prompt to focus only on the core task.
+You extract URLs, categories, priority indicators, featured item specifications, and the core subject from user prompts, then rewrite the prompt to focus only on the core task.
 
 ## Extraction Rules
 
@@ -46,6 +45,25 @@ Extract specifications for items that should be highlighted:
 - Specific named items (e.g., "highlight Docker and Kubernetes")
 - Company-specific products when mentioned
 
+### 5. Subject Extraction
+Extract the core subject/topic that the user wants to build a directory about.
+This is the main theme stripped of decorative words like "Awesome", "Best", "Top", "List of", etc.
+
+Examples:
+- "Awesome Apple Devices" → "Apple devices"
+- "Awesome Vector Databases" → "vector databases"
+- "Awesome DevOps" → "DevOps"
+- "Awesome MCP" → "MCP"
+- "AI Developer Tools" → "AI developer tools"
+- "Best Time Tracking Apps" → "time tracking apps"
+- "Top React Component Libraries" → "React component libraries"
+- "List of Machine Learning Frameworks" → "machine learning frameworks"
+
+The subject should be:
+- Lowercase (except for proper nouns/acronyms like "React", "AI", "MCP", "DevOps")
+- Singular or plural based on what makes grammatical sense
+- Concise but descriptive enough to be useful for searches
+
 ## Prompt Rewriting
 
 Remove ALL of the following while preserving the core task:
@@ -72,9 +90,9 @@ Return:
 2. Suggested categories (explicitly mentioned)
 3. Priority categories (with priority indicators)
 4. Featured item hints
-5. Rewritten prompt (core task only)` as const;
+5. Subject (core topic of the directory)
+6. Rewritten prompt (core task only)` as const;
 
-// Output schema for validation
 const promptProcessingOutputSchema = z.object({
     extractedUrls: z.array(z.string()).describe('List of URLs extracted from the prompt'),
     suggestedCategories: z
@@ -90,6 +108,11 @@ const promptProcessingOutputSchema = z.object({
         .describe(
             'List of specifications about which items should be featured/highlighted, extracted from prominence indicators in the prompt',
         ),
+    subject: z
+        .string()
+        .describe(
+            'The core subject/topic of the directory, stripped of decorative words like "Awesome", "Best", etc.',
+        ),
     rewrittenPrompt: z
         .string()
         .describe('The prompt rewritten without URLs but preserving context'),
@@ -104,18 +127,15 @@ export class PromptProcessingService implements IPipelineStep {
     constructor(private readonly aiService: AiService) {}
 
     async run(context: GenerationContext): Promise<GenerationContext> {
-        const { dto, existing, directory } = context;
+        const { dto, existing } = context;
         const { source_urls } = dto;
-
-        this.logger.log(
-            `[${directory.slug}] Prompt Processing (URLs, Categories, Priorities, and Featured Hints) - Starting`,
-        );
 
         const {
             extractedUrls: extractedUrlsFromPrompt,
             suggestedCategories,
             priorityCategories: promptPriorityCategories,
             featuredItemHints,
+            subject,
             rewrittenPrompt: prompt,
         } = await this.processPrompt(dto.prompt, context.metrics);
 
@@ -130,36 +150,12 @@ export class PromptProcessingService implements IPipelineStep {
             ...allPriorityCategories,
         ].filter((category, index, arr) => arr.indexOf(category) === index);
 
-        if (allInitialCategories.length > 0) {
-            this.logger.log(
-                `[${directory.slug}] Found ${allInitialCategories.length} initial categories: ${allInitialCategories.join(', ')}`,
-            );
-        }
-
-        if (allPriorityCategories.length > 0) {
-            this.logger.log(
-                `[${directory.slug}] Found ${allPriorityCategories.length} priority categories: ${allPriorityCategories.join(', ')}`,
-            );
-        }
-
-        if (featuredItemHints.length > 0) {
-            this.logger.log(
-                `[${directory.slug}] Found ${featuredItemHints.length} featured item hints: ${featuredItemHints.join(', ')}`,
-            );
-        }
-
-        this.logger.log(`[${directory.slug}] Rewritten prompt: "${prompt}"`);
-
-        // Update DTO with rewritten prompt
         dto.prompt = prompt;
 
-        // Merge extracted URLs
-        let extractedUrls = extractedUrlsFromPrompt;
-        extractedUrls.push(...(source_urls || []));
+        let extractedUrls = [...extractedUrlsFromPrompt, ...(source_urls || [])];
 
         const $configMetadata = existing.existingConfig?.metadata || {};
 
-        // Remove urls from extractedUrls or source_urls that was processed in previous runs
         if (
             dto.generation_method === GenerationMethod.CREATE_UPDATE &&
             ($configMetadata.last_request_data?.prompt ||
@@ -173,19 +169,16 @@ export class PromptProcessingService implements IPipelineStep {
             });
         }
 
-        // Update context
-        context.dto = dto; // prompt is updated
+        context.dto = dto;
         context.extractedUrls = extractedUrls;
         context.allInitialCategories = allInitialCategories;
         context.allPriorityCategories = allPriorityCategories;
         context.featuredItemHints = featuredItemHints;
+        context.subject = subject;
 
         return context;
     }
 
-    /**
-     * Extract URLs, category hints, priority categories, and featured item hints from a prompt and rewrite the prompt without URLs
-     */
     async processPrompt(
         prompt: string,
         metrics?: GenerationContext['metrics'],
@@ -194,6 +187,7 @@ export class PromptProcessingService implements IPipelineStep {
         suggestedCategories: string[];
         priorityCategories: string[];
         featuredItemHints: string[];
+        subject: string;
         rewrittenPrompt: string;
     }> {
         if (!prompt) {
@@ -203,13 +197,12 @@ export class PromptProcessingService implements IPipelineStep {
                 suggestedCategories: [],
                 priorityCategories: [],
                 featuredItemHints: [],
+                subject: '',
                 rewrittenPrompt: prompt || '',
             };
         }
 
         try {
-            this.logger.log(`Using AI to process prompt for URLs and categories`);
-
             const { result, usage, cost } = await this.aiService.askJson(
                 PROMPT_PROCESSING_PROMPT,
                 promptProcessingOutputSchema,
@@ -226,12 +219,9 @@ export class PromptProcessingService implements IPipelineStep {
                 suggestedCategories,
                 priorityCategories,
                 featuredItemHints,
+                subject,
                 rewrittenPrompt,
             } = result;
-
-            this.logger.log(
-                `AI extracted ${extractedUrls.length} URLs, ${suggestedCategories.length} category hints, ${priorityCategories.length} priority categories, and ${featuredItemHints.length} featured item hints from prompt`,
-            );
 
             const validatedUrls = this.validateUrls(extractedUrls);
             const cleanedCategories = this.cleanCategories(suggestedCategories);
@@ -243,6 +233,7 @@ export class PromptProcessingService implements IPipelineStep {
                 suggestedCategories: cleanedCategories,
                 priorityCategories: cleanedPriorityCategories,
                 featuredItemHints: cleanedFeaturedItemHints,
+                subject: subject?.trim() || '',
                 rewrittenPrompt: validatedUrls.length > 0 ? rewrittenPrompt || prompt : prompt,
             };
         } catch (error) {
@@ -250,7 +241,6 @@ export class PromptProcessingService implements IPipelineStep {
                 `Error processing prompt: ${error instanceof Error ? error.message : String(error)}`,
             );
 
-            // Fallback to regex extraction in case of AI error
             const fallbackUrls = this.extractUrlsWithRegex(prompt);
             const rewrittenPrompt =
                 fallbackUrls.length > 0
@@ -262,19 +252,14 @@ export class PromptProcessingService implements IPipelineStep {
                 suggestedCategories: [],
                 priorityCategories: [],
                 featuredItemHints: [],
+                subject: this.extractSubjectFallback(prompt),
                 rewrittenPrompt,
             };
         }
     }
 
-    /**
-     * Backward compatibility method for extracting URLs from prompt
-     * @param slug The slug for logging purposes
-     * @param prompt The prompt to extract URLs from
-     * @returns Object containing extracted URLs and rewritten prompt
-     */
     async extractUrlsFromPrompt(
-        slug: string,
+        _slug: string,
         prompt: string,
     ): Promise<{
         extractedUrls: string[];
@@ -287,38 +272,23 @@ export class PromptProcessingService implements IPipelineStep {
         };
     }
 
-    /**
-     * Extract URLs from text using regex
-     * @param text The text to extract URLs from
-     * @returns Array of extracted URLs
-     */
     private extractUrlsWithRegex(text: string): string[] {
         if (!text) return [];
 
-        // Regex to match URLs
         const urlRegex = /(https?:\/\/[^\s]+)/g;
         const matches = text.match(urlRegex);
 
         return this.validateUrls(matches || []);
     }
 
-    /**
-     * Rewrite prompt without URLs
-     * @param prompt The original prompt
-     * @param urls URLs to remove from the prompt
-     * @returns Rewritten prompt
-     */
     private rewritePromptWithoutUrls(prompt: string, urls: string[]): string {
         if (!prompt || urls.length === 0) return prompt;
 
         let rewritten = prompt;
-
-        // Replace each URL with an empty string
         urls.forEach((url) => {
             rewritten = rewritten.replace(url, '');
         });
 
-        // Clean up any double spaces or trailing/leading spaces
         rewritten = rewritten
             .replace(/\s+/g, ' ')
             .replace(/\s+\./g, '.')
@@ -328,46 +298,56 @@ export class PromptProcessingService implements IPipelineStep {
         return rewritten;
     }
 
-    /**
-     * Validate URLs to ensure they are properly formatted
-     * @param urls Array of URLs to validate
-     * @returns Array of valid URLs
-     */
     private validateUrls(urls: string[]): string[] {
         if (!urls || urls.length === 0) return [];
 
         return urls.filter((url) => {
             try {
-                // Check if URL is valid by creating a URL object
                 new URL(url);
                 return true;
-            } catch (error) {
-                this.logger.warn(`Invalid URL format: ${url}`);
+            } catch {
                 return false;
             }
         });
     }
 
-    /**
-     * Clean and normalize category suggestions
-     * @param categories Array of category suggestions to clean
-     * @returns Array of cleaned category names
-     */
     private cleanCategories(categories: string[]): string[] {
         if (!categories || categories.length === 0) return [];
 
         return categories
-            .filter(Boolean) // Remove empty strings
-            .map((category) => category.trim()) // Trim whitespace
-            .filter((category) => category.length > 0) // Remove empty after trim
+            .filter(Boolean)
+            .map((category) => category.trim())
+            .filter((category) => category.length > 0)
             .map((category) => {
-                // Normalize category names (capitalize first letter, remove extra spaces)
                 return category
-                    .replace(/\s+/g, ' ') // Replace multiple spaces with single space
+                    .replace(/\s+/g, ' ')
                     .split(' ')
                     .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
                     .join(' ');
             })
-            .filter((category, index, arr) => arr.indexOf(category) === index); // Remove duplicates
+            .filter((category, index, arr) => arr.indexOf(category) === index);
+    }
+
+    private extractSubjectFallback(prompt: string): string {
+        if (!prompt) return '';
+
+        const prefixPatterns = [
+            /^awesome\s+/i,
+            /^best\s+/i,
+            /^top\s+/i,
+            /^list\s+of\s+/i,
+            /^collection\s+of\s+/i,
+            /^curated\s+/i,
+            /^ultimate\s+/i,
+        ];
+
+        let subject = prompt.trim();
+
+        for (const pattern of prefixPatterns) {
+            subject = subject.replace(pattern, '');
+        }
+
+        const words = subject.split(/\s+/).slice(0, 5);
+        return words.join(' ').trim().toLowerCase();
     }
 }

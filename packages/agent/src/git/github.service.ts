@@ -195,6 +195,7 @@ export class GithubService extends GitProvider {
         token,
         committer,
         forcePush,
+        branch,
     }: {
         originalRepoOwner: string;
         originalRepoName: string;
@@ -202,6 +203,7 @@ export class GithubService extends GitProvider {
         token: string;
         committer: ICommitter;
         forcePush?: boolean;
+        branch?: string;
     }) {
         const duplicated = await this.createEmptyRepo(targetRepoName, '', token);
         const origin = duplicated.clone_url;
@@ -217,7 +219,12 @@ export class GithubService extends GitProvider {
             repo: originalRepoName,
             token,
             committer: this.getCommitter(committer),
+            branch,
         });
+
+        if (branch) {
+            await this.switchToBranch(originalDir, branch);
+        }
 
         await this.remoteRemove(originalDir, 'origin');
         await this.remoteAdd(originalDir, 'origin', origin);
@@ -239,6 +246,7 @@ export class GithubService extends GitProvider {
         targetRepoName,
         token,
         committer,
+        branch,
     }: {
         originalRepoOwner: string;
         originalRepoName: string;
@@ -246,6 +254,7 @@ export class GithubService extends GitProvider {
         targetRepoName: string;
         token: string;
         committer: ICommitter;
+        branch?: string;
     }) {
         const duplicated = await this.createEmptyRepoAsOrg(targetOrg, targetRepoName, '', token);
         const origin = duplicated.clone_url;
@@ -261,7 +270,12 @@ export class GithubService extends GitProvider {
             repo: originalRepoName,
             token,
             committer: this.getCommitter(committer),
+            branch,
         });
+
+        if (branch) {
+            await this.switchToBranch(originalDir, branch);
+        }
 
         await this.remoteRemove(originalDir, 'origin');
         await this.remoteAdd(originalDir, 'origin', origin);
@@ -373,7 +387,7 @@ export class GithubService extends GitProvider {
                 name: newName,
                 description: sanitizedDescription,
                 private: isPrivate,
-                include_all_branches: false,
+                include_all_branches: true,
             });
 
             this.enableWorkflows({

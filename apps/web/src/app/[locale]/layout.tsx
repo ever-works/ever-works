@@ -7,6 +7,7 @@ import { Toaster } from 'sonner';
 
 import './globals.css';
 import { themeInitScript } from '@/lib/theme-init';
+import { TopLoader } from '@/components/ui/top-loader';
 
 const geistSans = Geist({
     variable: '--font-geist-sans',
@@ -48,6 +49,7 @@ export default async function RootLayout({
                 className={`${geistSans.variable} ${geistMono.variable} antialiased`}
                 suppressHydrationWarning
             >
+                <TopLoader />
                 <NextIntlClientProvider>
                     {children}
                     <Toaster

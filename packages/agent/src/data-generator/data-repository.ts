@@ -3,8 +3,13 @@ import * as fs from 'node:fs/promises';
 import * as yaml from 'yaml';
 import deepmerge from 'deepmerge';
 import { format } from 'date-fns';
-import { Category, ItemData, Tag } from '../agent/types';
-import { CreateItemsGeneratorDto, GenerationMethod } from '../items-generator/dto';
+import {
+    Category,
+    CreateItemsGeneratorDto,
+    GenerationMethod,
+    ItemData,
+    Tag,
+} from '../items-generator/dto';
 
 export type PRUpdate = {
     branch: string;
@@ -404,6 +409,24 @@ export class DataRepository {
         const str = yaml.stringify({ ...rest, updated_at });
         const filepath = path.join(this.getItemPath(item.slug), `${item.slug}.yml`);
         await fs.writeFile(filepath, str, 'utf-8');
+    }
+
+    async updateItemMetadata(
+        slug: string,
+        updates: Partial<Pick<ItemData, 'featured' | 'order'>>,
+    ): Promise<ItemData | null> {
+        const existing = await this.getItem(slug).catch(() => null);
+        if (!existing) {
+            return null;
+        }
+
+        const next: ItemData = {
+            ...existing,
+            ...updates,
+        };
+
+        await this.writeItem({ ...next, slug });
+        return next;
     }
 
     async writeItemMarkdown(item: ItemData, markdown: string) {

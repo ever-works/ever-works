@@ -6,7 +6,7 @@ This document explains how our automated directory refresh feature works. It cov
 
 ## 1. High-Level Overview
 
-1. A user manually generates a directory and saves a prompt/config (`config.metadata.initial_prompt` and `config.metadata.last_request_data`).
+1. A user manually generates a directory and saves a prompt/config (`config.metadata.last_request_data` and `config.metadata.last_request_data`).
 2. Once that metadata exists, the schedule UI becomes available and the backend accepts schedule API calls.
 3. The user chooses cadence, billing mode, and safeguards. The backend validates those choices against plan limits or pay-per-use rules.
 4. `DirectoryScheduleService` persists schedule information and mirrors denormalized data onto the `Directory` entity (so dashboards can render state quickly).
@@ -29,7 +29,7 @@ This document explains how our automated directory refresh feature works. It cov
 
 - `DirectoryScheduleService`
     - Ensures the caller owns the directory.
-    - Calls `DataGeneratorService.config()` to guarantee `metadata.initial_prompt` exists.
+    - Calls `DataGeneratorService.config()` to guarantee `metadata.last_request_data` exists.
     - Validates cadences and billing modes against plan limits (or forces usage billing).
     - Caps failure thresholds.
     - Mirrors schedule state back to the `Directory` table.
@@ -127,7 +127,7 @@ Located in `apps/api/.env.example` and consumed by `packages/agent/src/config/in
 
 ## 6. Frontend Flow (apps/web)
 
-1. `DirectoryLayout` fetches `/directories/:id` + `/directories/:id/config`. If `config.metadata.initial_prompt` is missing, the schedule tab is hidden and `/schedule` routes return 404.
+1. `DirectoryLayout` fetches `/directories/:id` + `/directories/:id/config`. If `config.metadata.last_request_data` is missing, the schedule tab is hidden and `/schedule` routes return 404.
 2. `DirectorySchedulePage` fetches `/directories/:id/schedule`. If the API fails (no schedule yet), the card renders an empty state prompting a manual refresh.
 3. `DirectoryScheduleCard` displays:
     - Summary chips (status, next run, last run, failures).
@@ -181,7 +181,7 @@ Located in `apps/api/.env.example` and consumed by `packages/agent/src/config/in
 
 ## 10. Initial Prompt Requirement
 
-The entire system depends on `config.metadata.initial_prompt` and `config.metadata.last_request_data`. We enforce this in two places:
+The entire system depends on `config.metadata.last_request_data` and `config.metadata.last_request_data`. We enforce this in two places:
 
 1. **UI**: `DirectoryLayout` only enables the schedule tab when the config contains an initial prompt. Otherwise, `/schedule` routes return 404.
 2. **Backend**: `DirectoryScheduleService.ensureDirectoryConfigReady()` loads the config using `DataGeneratorService.config()` for every `getSchedule` and `updateSchedule` call. If the prompt is missing, it throws a `400` (“Complete an initial directory setup before enabling scheduled updates.”).
@@ -216,7 +216,7 @@ A: Yes. If `TRIGGER_ENABLED=false`, our Nest cron fallback kicks in, using the s
 A: Flip `SUBSCRIPTIONS_ENABLED=true`. The backend instantly enforces plan limits; the UI automatically re-renders billing controls because the DTO includes `subscriptionsEnabled=true`. Existing schedules keep their cadence, but users will see pay-per-use messaging if they exceed plan allowances.
 
 **Q: Why do I sometimes see “Complete an initial directory setup before enabling scheduled updates”?**  
-A: The directory’s config repository doesn’t contain `metadata.initial_prompt` yet. Run a manual generation (or supply the prompt), then refresh the schedule page.
+A: The directory’s config repository doesn’t contain `metadata.last_request_data` yet. Run a manual generation (or supply the prompt), then refresh the schedule page.
 
 ---
 

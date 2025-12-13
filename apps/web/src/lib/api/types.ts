@@ -50,6 +50,7 @@ export interface ItemData {
     name: string;
     description: string;
     featured?: boolean;
+    order?: number;
     source_url: string;
     category: string | Category;
     slug?: string;

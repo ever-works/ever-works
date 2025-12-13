@@ -508,6 +508,7 @@
                 "deleteSuccess": "项目删除成功",
                 "deleteFailed": "删除项目失败",
                 "deleteError": "删除项目时发生错误",
+                "updateItem": "更新项目",
                 "loadingMore": "加载更多... ({current} / {total})",
                 "addModal": {
                     "title": "添加新项目",
@@ -544,7 +545,21 @@
                         "invalidUrl": "请输入包含 http:// 或 https:// 的有效 URL",
                         "requiredFields": "请填写所有必填字段"
                     }
-                }
+                },
+                "updateSuccess": "项目删除成功",
+                "updateFailed": "删除项目失败",
+                "updateError": "删除项目时发生错误",
+                "editDisplay": "删除",
+                "editDisplayDescription": "Toggle featured status and set display order.",
+                "orderLabel": "Display order (optional)",
+                "orderHelp": "Lower numbers show earlier within featured/non-featured groups.",
+                "deleteDialogTitle": "删除",
+                "deleteDialogDescription": "This will remove {name} from the repository.",
+                "createPRLabel": "Create Pull Request",
+                "createPRHelp": "If enabled, changes are proposed via PR instead of direct commit.",
+                "reasonLabel": "Reason (optional)",
+                "reasonPlaceholder": "Why are you removing this item?",
+                "confirmDelete": "Delete item"
             },
             "generator": {
                 "regenerationWarning": "重新生成警告",
@@ -610,7 +625,12 @@
                 "aiFirstGeneration": "AI 优先生成",
                 "aiFirstGenerationDescription": "在网页搜索之前启用 AI 生成初始项目。",
                 "contentFiltering": "内容过滤",
-                "contentFilteringDescription": "启用内容质量过滤"
+                "contentFilteringDescription": "启用内容质量过滤",
+                "recreateConfirmTitle": "Recreate directory data?",
+                "recreateConfirmDescription": "Recreate will delete existing items and regenerate them from scratch. This action cannot be undone.",
+                "confirmRecreate": "Yes, recreate",
+                "recreateInlineTitle": "Recreate will remove existing items",
+                "recreateInlineDescription": "This mode deletes current items and rebuilds them from scratch. Proceed only if you want to replace everything."
             },
             "progress": {
                 "title": "生成进行中",
@@ -629,7 +649,7 @@
                     "categoriesTagsProcessing": "处理分类和标签",
                     "sourcesValidation": "验证来源",
                     "badgesProcessing": "处理质量徽章",
-                    "itemsProcessing": "完成项目",
+                    "markdownGeneration": "生成Markdown内容",
                     "processing": "处理中..."
                 },
                 "progress": "进度",
@@ -731,6 +751,11 @@
                         "deployInfo": "部署通常需要 1-3 分钟。完成后您将收到一个 URL。",
                         "updateInfo": "更新会将您的目录内容同步到网站仓库，以便下次部署。"
                     }
+                }
+            },
+            "schedule": {
+                "card": {
+                    "requiresGeneration": "Run at least one item generation before enabling schedules."
                 }
             }
         },

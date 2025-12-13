@@ -1,12 +1,17 @@
 'use client';
 
-import { useEffect, useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import type { Directory, VercelTeam } from '@/lib/api';
 import { cn } from '@/lib/utils/cn';
 import { toast } from 'sonner';
 import { useTranslations } from 'next-intl';
 import { Link, useRouter } from '@/i18n/navigation';
-import { deployToVercel, updateWebsiteRepository } from '@/app/actions/dashboard/deploy';
+import {
+    deployToVercel,
+    getVercelTeams,
+    lookupExistingDeployment,
+    updateWebsiteRepository,
+} from '@/app/actions/dashboard/deploy';
 import { RefreshCw, Info, Loader2, Triangle } from 'lucide-react';
 import { useDirectoryDetail } from '../DirectoryDetailContext';
 import { Button } from '@/components/ui/button';
@@ -16,15 +21,17 @@ import { VercelTeamSelectionDialog } from './VercelTeamSelectionDialog';
 interface DeployFormProps {
     directory: Directory;
     isDeploying?: boolean;
-    vercelTeams?: VercelTeam[];
 }
 
-export function DeployForm({ directory, isDeploying, vercelTeams = [] }: DeployFormProps) {
+export function DeployForm({ directory, isDeploying }: DeployFormProps) {
     const t = useTranslations('dashboard.directoryDetail.deploy');
     const [isPending, startTransition] = useTransition();
     const router = useRouter();
     const [isTeamDialogOpen, setIsTeamDialogOpen] = useState(false);
+    const [vercelTeams, setVercelTeams] = useState<VercelTeam[]>([]);
+
     const hasVercelTeams = vercelTeams.length > 0;
+    const setHasCheckedExisting = useRef(false);
 
     useEffect(() => {
         if (isDeploying) {
@@ -32,6 +39,26 @@ export function DeployForm({ directory, isDeploying, vercelTeams = [] }: DeployF
             return cleanup;
         }
     }, [isDeploying, router]);
+
+    useEffect(() => {
+        getVercelTeams().then((res) => {
+            setVercelTeams(res.teams || []);
+        });
+    }, []);
+
+    useEffect(() => {
+        if (directory.website || setHasCheckedExisting.current) {
+            return;
+        }
+
+        setHasCheckedExisting.current = true;
+        startTransition(async () => {
+            const result = await lookupExistingDeployment(directory.id).catch(() => null);
+            if (result?.success && result.website) {
+                router.refresh();
+            }
+        });
+    }, [directory.id, directory.website, router]);
 
     const runDeploy = (teamScope?: string) => {
         startTransition(async () => {
@@ -127,12 +154,17 @@ export function DeployForm({ directory, isDeploying, vercelTeams = [] }: DeployF
                             disabled={isPending || isDeploying}
                             size="lg"
                         >
-                            {isDeploying ? (
+                            {isPending || isDeploying ? (
                                 <span className="flex items-center gap-2 capitalize">
                                     <Loader2 className="animate-spin h-4 w-4" />
-                                    {t('form.deployToVercel.deployingStateButton', {
-                                        state: directory.deploymentState || 'INITIALIZING',
-                                    })}
+
+                                    {isDeploying
+                                        ? t('form.deployToVercel.deployingStateButton', {
+                                              state: (
+                                                  directory.deploymentState || 'INITIALIZING'
+                                              ).toLowerCase(),
+                                          })
+                                        : t('form.deployToVercel.deployButton')}
                                 </span>
                             ) : (
                                 t('form.deployToVercel.deployButton')

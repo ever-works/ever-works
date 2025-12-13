@@ -1,14 +1,13 @@
 import { Injectable, Logger, Inject } from '@nestjs/common';
 import * as fs from 'node:fs/promises';
 import { GithubService } from '../git/github.service';
-import type { Identifiable, ItemData, Tag } from '../agent/types';
 import { Category } from '../items-generator/dto/category.dto';
 import { Directory } from '../entities/directory.entity';
 import { User } from '../entities/user.entity';
 import { DataRepository, PRUpdate } from '../data-generator/data-repository';
 import { ReadmeBuilder } from './readme-builder';
 import { MarkdownRepository } from './markdown-repository';
-import { GenerationMethod } from '../items-generator/dto';
+import { GenerationMethod, Identifiable, ItemData, Tag } from '../items-generator/dto';
 import { DIRECTORY_OPERATIONS } from '@src/directory-operations';
 import type { DirectoryOperations } from '@src/directory-operations';
 
@@ -295,9 +294,21 @@ export class MarkdownGeneratorService {
 
             const items = groups[categoryId];
             items.sort((a, b) => {
-                if (a.featured && !b.featured) return -1;
-                if (!a.featured && b.featured) return 1;
-                return 0;
+                const aFeatured = !!a.featured;
+                const bFeatured = !!b.featured;
+
+                if (aFeatured !== bFeatured) {
+                    return aFeatured ? -1 : 1; // featured always first
+                }
+
+                // Within the same featured bucket, honor explicit order ascending
+                const orderA = typeof a.order === 'number' ? a.order : Number.POSITIVE_INFINITY;
+                const orderB = typeof b.order === 'number' ? b.order : Number.POSITIVE_INFINITY;
+                if (orderA !== orderB) {
+                    return orderA - orderB;
+                }
+
+                return a.name.localeCompare(b.name);
             });
 
             for (const item of items) {
@@ -325,6 +336,15 @@ export class MarkdownGeneratorService {
         return categoryIds.sort((aId, bId) => {
             const categoryA = categories.get(aId);
             const categoryB = categories.get(bId);
+            const featuredCountA = groups[aId].filter((item) => item.featured).length;
+            const featuredCountB = groups[bId].filter((item) => item.featured).length;
+
+            // Ensure categories with featured items always come first
+            const aHasFeatured = featuredCountA > 0;
+            const bHasFeatured = featuredCountB > 0;
+            if (aHasFeatured !== bHasFeatured) {
+                return aHasFeatured ? -1 : 1;
+            }
 
             // If both have priority, sort by priority number (lower = higher priority)
             if (categoryA?.priority !== undefined && categoryB?.priority !== undefined) {
@@ -339,9 +359,6 @@ export class MarkdownGeneratorService {
                 return 1;
             }
 
-            // order by items featured count
-            const featuredCountA = groups[aId].filter((item) => item.featured).length;
-            const featuredCountB = groups[bId].filter((item) => item.featured).length;
             if (featuredCountA !== featuredCountB) {
                 return featuredCountB - featuredCountA;
             }

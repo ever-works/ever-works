@@ -40,6 +40,8 @@ export class DirectoryScheduleService {
         directoryId: string,
         user: User,
     ): Promise<{ schedule: DirectoryScheduleDto; directoryId: string }> {
+        this.ensureSchedulingEnabled();
+
         const directory = await this.ownershipService.ensure(directoryId, user.id);
         const subscriptionsEnabled = this.subscriptionService.isEnabled();
 
@@ -58,6 +60,7 @@ export class DirectoryScheduleService {
     }
 
     async getScheduleEntity(directoryId: string, user: User): Promise<DirectorySchedule> {
+        this.ensureSchedulingEnabled();
         const directory = await this.ownershipService.ensure(directoryId, user.id);
         const schedule = await this.scheduleRepository.findByDirectoryId(directory.id);
 
@@ -69,6 +72,7 @@ export class DirectoryScheduleService {
     }
 
     async updateSchedule(directoryId: string, dto: UpdateDirectoryScheduleDto, user: User) {
+        this.ensureSchedulingEnabled();
         const directory = await this.ownershipService.ensure(directoryId, user.id);
         const subscriptionsEnabled = this.subscriptionService.isEnabled();
         const existing = await this.scheduleRepository.findByDirectoryId(directory.id);
@@ -149,6 +153,7 @@ export class DirectoryScheduleService {
     }
 
     async cancelSchedule(directoryId: string, user: User) {
+        this.ensureSchedulingEnabled();
         const directory = await this.ownershipService.ensure(directoryId, user.id);
         const subscriptionsEnabled = this.subscriptionService.isEnabled();
         const schedule = await this.scheduleRepository.findByDirectoryId(directory.id);
@@ -175,6 +180,7 @@ export class DirectoryScheduleService {
     }
 
     async pauseSchedule(scheduleId: string) {
+        this.ensureSchedulingEnabled();
         const schedule = await this.scheduleRepository.findById(scheduleId);
         if (!schedule) {
             return;
@@ -450,7 +456,7 @@ export class DirectoryScheduleService {
                 .config(directory, user)
                 .catch(() => null);
 
-            if (!config?.metadata?.initial_prompt) {
+            if (!config?.metadata?.last_request_data) {
                 throw new BadRequestException({
                     status: 'error',
                     message:
@@ -465,6 +471,15 @@ export class DirectoryScheduleService {
             throw new BadRequestException({
                 status: 'error',
                 message: 'Complete an initial directory setup before enabling scheduled updates.',
+            });
+        }
+    }
+
+    private ensureSchedulingEnabled() {
+        if (!config.subscriptions.scheduledUpdatesEnabled()) {
+            throw new BadRequestException({
+                status: 'error',
+                message: 'Scheduled updates are currently disabled.',
             });
         }
     }

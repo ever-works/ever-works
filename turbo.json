@@ -15,10 +15,12 @@
 			"cache": false
 		},
 		"dev": {
-			"outputs": []
+			"outputs": [],
+			"cache": false
 		},
 		"dev:trigger": {
-			"outputs": []
+			"outputs": [],
+			"cache": false
 		},
 		"lint": {
 			"outputs": []

@@ -50,14 +50,9 @@ export class DirectoryLifecycleService {
 
             const items = await this.dataGenerator.getItems(dir, user).catch(() => []);
             if (items.length > 0) {
-                await Promise.all([
-                    this.directoryRepository.updateGenerateStatus(dir.id, {
-                        status: GenerateStatusType.GENERATED,
-                    }),
-                    this.directoryRepository.update(dir.id, {
-                        itemsCount: items.length,
-                    }),
-                ]);
+                await this.directoryRepository.updateGenerateStatus(dir.id, {
+                    status: GenerateStatusType.GENERATED,
+                });
             }
 
             return {
@@ -117,29 +112,59 @@ export class DirectoryLifecycleService {
         }
     }
 
-    async updateDirectoryItemsCount(id: string, count: number, user: User) {
-        const directory = await this.ownershipService.ensure(id, user.id);
+    async syncFromDataRepository(directoryId: string, user: User) {
+        const directory = await this.ownershipService.ensure(directoryId, user.id);
+        const updates: Record<string, unknown> = {};
+
         try {
-            await this.directoryRepository.update(directory.id, { itemsCount: count });
+            const snapshot = await this.dataGenerator.getDataSyncSnapshot(directory, user);
+
+            if (
+                typeof snapshot.itemsCount === 'number' &&
+                directory.itemsCount !== snapshot.itemsCount
+            ) {
+                updates.itemsCount = snapshot.itemsCount;
+
+                if (snapshot.itemsCount <= 0) {
+                    updates.generateStatus = null;
+                }
+            }
+
+            const prUpdate = snapshot.prUpdate;
+            if (prUpdate && (!directory.lastPullRequest || !directory.lastPullRequest.data)) {
+                updates.lastPullRequest = {
+                    ...(directory.lastPullRequest || {}),
+                    data: prUpdate,
+                };
+            }
+
+            // Sync readme config from markdown templates
+            if (!directory.readmeConfig) {
+                const markdownTemplate = snapshot.readmeTemplate;
+                if (markdownTemplate?.header || markdownTemplate?.footer) {
+                    updates.readmeConfig = {
+                        header: markdownTemplate.header || '',
+                        footer: markdownTemplate.footer || '',
+                        overwriteDefaultHeader: false,
+                        overwriteDefaultFooter: false,
+                    };
+                }
+            }
+
+            if (Object.keys(updates).length > 0) {
+                await this.directoryRepository.update(directory.id, updates);
+            }
+
+            return {
+                status: 'success',
+                updated: Object.keys(updates),
+                message:
+                    Object.keys(updates).length > 0
+                        ? 'Directory synced from data repository.'
+                        : 'Directory already up to date.',
+            };
         } catch (error) {
-            this.logger.error('Failed to update directory items count:', error);
-
-            throw new BadRequestException({
-                status: 'error',
-                message: normalizeGeneratorError(error),
-            });
-        }
-    }
-
-    async resetDirectoryGenerationStatus(id: string, user: User) {
-        const directory = await this.ownershipService.ensure(id, user.id);
-        try {
-            await this.directoryRepository.update(directory.id, {
-                generateStatus: null,
-            });
-        } catch (error) {
-            this.logger.error('Failed to update directory generation status:', error);
-
+            this.logger.error('Failed to sync directory from data repository', error);
             throw new BadRequestException({
                 status: 'error',
                 message: normalizeGeneratorError(error),

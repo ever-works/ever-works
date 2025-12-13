@@ -26,6 +26,7 @@ import {
     SubmitItemDto,
     SubmitItemResponseDto,
     UpdateItemsGeneratorDto,
+    UpdateItemDto,
 } from '@packages/agent/items-generator';
 import {
     DirectoryDetailService,
@@ -147,17 +148,7 @@ export class DirectoriesController {
             cacheKey,
             async () => {
                 const user = await this.authService.getUser(auth.userId);
-                const count = await this.directoryQueryService.directoryCount(id, user);
-
-                // We silently update the directory item count.
-                this.directoryLifecycleService.updateDirectoryItemsCount(id, count.items, user);
-
-                // Also, reset the directory generation status when no items are found.
-                if (count.items <= 0) {
-                    await this.directoryLifecycleService.resetDirectoryGenerationStatus(id, user);
-                }
-
-                return count;
+                return this.directoryQueryService.directoryCount(id, user);
             },
             CACHE_TTL,
         );
@@ -350,6 +341,18 @@ export class DirectoriesController {
         return this.directoryGenerationService.removeItem(id, removeItemDto, user);
     }
 
+    @Post('directories/:id/update-item')
+    @HttpCode(HttpStatus.OK)
+    async updateItemMetadata(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') id: string,
+        @Body() updateItemDto: UpdateItemDto,
+    ) {
+        const user = await this.authService.getUser(auth.userId);
+
+        return this.directoryGenerationService.updateItemMetadata(id, updateItemDto, user);
+    }
+
     @Post('extract-item-details')
     @HttpCode(HttpStatus.OK)
     async extractItemDetails(
@@ -364,6 +367,14 @@ export class DirectoriesController {
         const user = await this.authService.getUser(auth.userId);
 
         return this.directoryGenerationService.regenerateMarkdown(id, user);
+    }
+
+    @Post('directories/:id/update-readme')
+    @HttpCode(HttpStatus.OK)
+    async updateReadme(@CurrentUser() auth: AuthenticatedUser, @Param('id') id: string) {
+        const user = await this.authService.getUser(auth.userId);
+
+        return this.directoryGenerationService.updateReadme(id, user);
     }
 
     @Post('directories/:id/update-website')
@@ -387,6 +398,14 @@ export class DirectoriesController {
         const user = await this.authService.getUser(auth.userId);
 
         return this.directoryLifecycleService.deleteDirectory(id, deleteDirectoryDto, user);
+    }
+
+    @Post('directories/:id/sync-data')
+    @HttpCode(HttpStatus.OK)
+    async syncDirectoryData(@CurrentUser() auth: AuthenticatedUser, @Param('id') id: string) {
+        const user = await this.authService.getUser(auth.userId);
+
+        return this.directoryLifecycleService.syncFromDataRepository(id, user);
     }
 
     private wait(sec = 2) {

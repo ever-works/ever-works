@@ -6,6 +6,7 @@ import { GenerationMethod, WebsiteRepositoryCreationMethod } from '@/lib/api/enu
 import { ConfigDto } from '@/lib/api/types-only';
 import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
+import { useDirectoryDetail } from '../DirectoryDetailContext';
 
 interface ConfigFieldsProps {
     config?: ConfigDto;
@@ -28,10 +29,10 @@ export const DEFAULT_CONFIG: ConfigDto = {
     max_search_queries: 10,
     max_results_per_query: 5,
     max_pages_to_process: 10,
-    relevance_threshold_content: 0.5,
+    relevance_threshold_content: 0.6,
     min_content_length_for_extraction: 100,
     ai_first_generation_enabled: false,
-    content_filtering_enabled: false,
+    content_filtering_enabled: true,
     prompt_comparison_confidence_threshold: 0.8,
 };
 
@@ -44,6 +45,11 @@ export function ConfigFields({
     onChange,
 }: ConfigFieldsProps) {
     const t = useTranslations('dashboard.directoryDetail.generator');
+    const { config: directoryConfig } = useDirectoryDetail();
+    const hasConfig = !!directoryConfig && Object.keys(directoryConfig).length > 0;
+    const isRecreate = generationMethod === GenerationMethod.RECREATE;
+    const content_filtering_enabled =
+        config?.content_filtering_enabled !== undefined ? config?.content_filtering_enabled : true;
 
     return (
         <div className="space-y-6">
@@ -69,12 +75,18 @@ export function ConfigFields({
                     </option>
                     <option value={GenerationMethod.RECREATE}>{t('methodRecreate')}</option>
                 </select>
+                {isRecreate && hasConfig && (
+                    <div className="mt-2 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning dark:text-warning-dark">
+                        <p className="font-medium">{t('recreateInlineTitle')}</p>
+                        <p className="text-xs mt-1">{t('recreateInlineDescription')}</p>
+                    </div>
+                )}
             </div>
 
             {/* Checkboxes */}
             <div className="space-y-3">
                 <Checkbox
-                    checked={updateWithPullRequest || false}
+                    checked={updateWithPullRequest}
                     onChange={(e) => onChange({ update_with_pull_request: e.target.checked })}
                     label={t('updateWithPullRequest')}
                     description={t('updateWithPullRequestDescription')}
@@ -82,7 +94,7 @@ export function ConfigFields({
                 />
 
                 <Checkbox
-                    checked={badgeEvaluationEnabled || false}
+                    checked={badgeEvaluationEnabled}
                     onChange={(e) => onChange({ badge_evaluation_enabled: e.target.checked })}
                     label={t('enableBadgeEvaluation')}
                     description={t('enableBadgeEvaluationDescription')}
@@ -189,6 +201,7 @@ export function ConfigFields({
                         label={t('relevanceThreshold')}
                         type="number"
                         step="0.1"
+                        disabled={!content_filtering_enabled}
                         value={
                             config?.relevance_threshold_content ||
                             DEFAULT_CONFIG.relevance_threshold_content
@@ -211,7 +224,7 @@ export function ConfigFields({
 
                 <div className="space-y-3">
                     <Checkbox
-                        checked={config?.ai_first_generation_enabled || false}
+                        checked={config?.ai_first_generation_enabled}
                         onChange={(e) =>
                             onChange({
                                 config: {
@@ -226,7 +239,7 @@ export function ConfigFields({
                     />
 
                     <Checkbox
-                        checked={config?.content_filtering_enabled || false}
+                        checked={config?.content_filtering_enabled}
                         onChange={(e) =>
                             onChange({
                                 config: { ...config, content_filtering_enabled: e.target.checked },

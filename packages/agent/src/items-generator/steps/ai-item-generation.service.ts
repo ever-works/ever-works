@@ -34,8 +34,10 @@ The **main topic** of the Directory website is: "{topicName}"
 Description: "{topicDescription}"
 Optional initial keywords: {target_keywords_string}
 
+## Featured Item Guidelines:
 {featured_hints_section}
 
+## Task:
 Based on this topic, please generate a comprehensive list of distinct items (e.g., tools, software, libraries, frameworks, official documentation, key community resources, important projects).
 
 For each item, provide the following details:
@@ -45,7 +47,7 @@ For each item, provide the following details:
 4.  **brand**: Optional single brand/manufacturer associated with the item (or null if not applicable).
 5.  **brand_logo_url**: Optional logo URL for the brand if a canonical logo is clear (prefer SVG/PNGs from the official domain).
 6.  **images**: Array of 1-4 image URLs (screenshots, product images, hero visuals) that clearly represent the item. Prefer official assets from the item or brand domain. Leave empty if none are trustworthy.
-7.  **featured**: A boolean indicating if this item should be highlighted or given special prominence (true/false). Consider the featured item guidelines above when making this determination. Default to false if unsure.
+7.  **featured**: A boolean indicating whether this item should be highlighted or given special prominence (true/false). This value should be set to true only when the item specification complies with the "Featured Item Guidelines".
 
 **Critical Instructions:**
 -   *Only generate items if you are completely certain of their relevance to the topic.*

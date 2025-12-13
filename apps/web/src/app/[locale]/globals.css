@@ -228,3 +228,25 @@ body {
     -webkit-text-fill-color: transparent;
     background-clip: text;
 }
+
+/* Top Loader - Clean, professional style matching app theme */
+#nprogress .bar {
+    background: #3b82f6 !important;
+    height: 2px !important;
+}
+
+#nprogress .peg {
+    box-shadow:
+        0 0 10px #3b82f6,
+        0 0 5px #3b82f6 !important;
+}
+
+.dark #nprogress .bar {
+    background: #60a5fa !important;
+}
+
+.dark #nprogress .peg {
+    box-shadow:
+        0 0 10px #60a5fa,
+        0 0 5px #60a5fa !important;
+}
