@@ -114,7 +114,7 @@ export class DirectoryLifecycleService {
 
     async syncFromDataRepository(directoryId: string, user: User) {
         const directory = await this.ownershipService.ensure(directoryId, user.id);
-        const updates: Record<string, unknown> = {};
+        const updates: Record<string, any> = {};
 
         try {
             const snapshot = await this.dataGenerator.getDataSyncSnapshot(directory, user);
@@ -138,17 +138,18 @@ export class DirectoryLifecycleService {
                 };
             }
 
+            updates.readmeConfig = directory.readmeConfig || {};
+
             // Sync readme config from markdown templates
-            if (!directory.readmeConfig) {
-                const markdownTemplate = snapshot.readmeTemplate;
-                if (markdownTemplate?.header || markdownTemplate?.footer) {
-                    updates.readmeConfig = {
-                        header: markdownTemplate.header || '',
-                        footer: markdownTemplate.footer || '',
-                        overwriteDefaultHeader: false,
-                        overwriteDefaultFooter: false,
-                    };
-                }
+            const markdownTemplate = snapshot.readmeTemplate;
+            if (markdownTemplate?.header && !directory.readmeConfig?.header) {
+                updates.readmeConfig.header = markdownTemplate.header;
+                updates.readmeConfig.overwriteDefaultHeader = false;
+            }
+
+            if (markdownTemplate?.footer && !directory.readmeConfig?.footer) {
+                updates.readmeConfig.footer = markdownTemplate.footer;
+                updates.readmeConfig.overwriteDefaultFooter = false;
             }
 
             if (Object.keys(updates).length > 0) {
