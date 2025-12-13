@@ -122,6 +122,7 @@ export class WebsiteUpdateService {
         const originalDir = await this.githubService.cloneOrPull({
             owner: WEBSITE_TEMPLATE_CONFIG.owner,
             repo: WEBSITE_TEMPLATE_CONFIG.repo,
+            branch: WEBSITE_TEMPLATE_CONFIG.branch,
             token,
             committer: user.asCommitter(),
         });
@@ -130,6 +131,7 @@ export class WebsiteUpdateService {
         const targetRepoUrl = this.githubService.getURL(directory.getRepoOwner(), websiteRepo);
 
         // Remove existing origin and add new one
+        await this.githubService.switchToBranch(originalDir, WEBSITE_TEMPLATE_CONFIG.branch);
         await this.githubService.remoteRemove(originalDir, 'origin');
         await this.githubService.remoteAdd(originalDir, 'origin', targetRepoUrl);
 
@@ -155,12 +157,14 @@ export class WebsiteUpdateService {
             this.githubService.cloneOrPull({
                 owner: WEBSITE_TEMPLATE_CONFIG.owner,
                 repo: WEBSITE_TEMPLATE_CONFIG.repo,
+                branch: WEBSITE_TEMPLATE_CONFIG.branch,
                 token,
                 committer,
             }),
 
             this.githubService.cloneOrPull({
                 owner: directory.getRepoOwner(),
+                branch: WEBSITE_TEMPLATE_CONFIG.branch,
                 repo: websiteRepo,
                 token,
                 committer,

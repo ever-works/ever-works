@@ -12,8 +12,9 @@ export interface ItemData {
     name: string;
     description: string;
     featured?: boolean;
+    order?: number;
     source_url: string;
-    category: string | Category;
+    category: string | Category | Category[];
     slug?: string;
     tags: string[] | Tag[];
     markdown?: string;

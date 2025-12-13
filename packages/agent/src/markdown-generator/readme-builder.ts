@@ -41,7 +41,7 @@ export class ReadmeBuilder {
         let toc = '';
 
         if (this.isTocEnabled) {
-            toc += '## Table of Contents\n\n';
+            toc += '## 📑 Table of Contents\n\n';
             this.toc.forEach((header) => {
                 const slug = slugifyText(header);
                 toc += `- [${header}](#${slug})\n`;

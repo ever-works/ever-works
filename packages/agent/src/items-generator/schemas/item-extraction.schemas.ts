@@ -16,15 +16,9 @@ export const itemDataSchema = baseSchema.extend({
         .string()
         .nullable()
         .describe(
-            'The most direct, stable, and canonical URL for the item itself (e.g., project homepage, official documentation, GitHub repository etc.). Must be a valid and highly relevant URL.',
+            'The most direct, stable, and canonical URL for the item itself. Must be a valid and highly relevant URL.',
         ),
-    featured: z
-        .boolean()
-        .nullable()
-        .default(false)
-        .describe(
-            "Determine if the item warrants a 'featured' status based on prominence, recommendations, or significance. Default to false.",
-        ),
+    featured: z.boolean().nullable().default(false),
     brand: z
         .string()
         .nullable()

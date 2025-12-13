@@ -1,27 +1,22 @@
 'use client';
 
-import React, { useTransition, memo } from 'react';
+import { memo, useTransition } from 'react';
 import { ItemData, ItemBadges } from '@/lib/api/types-only';
 import { cn } from '@/lib/utils/cn';
 import { Link } from '@/i18n/navigation';
-import { Button } from '@/components/ui/button';
 import { useTranslations } from 'next-intl';
+import { ExternalLink } from 'lucide-react';
 import { removeItem } from '@/app/actions/dashboard/items';
 import { toast } from 'sonner';
-import { Trash2, ExternalLink, MoreVertical, Loader2 } from 'lucide-react';
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { getCategoryName } from '@/lib/utils/items';
+import { ItemActions } from './ItemActions';
 
 interface ItemCardProps {
     item: ItemData;
     viewMode: 'grid' | 'list';
     directoryId: string;
     onDelete?: () => void;
+    onUpdate?: (item: Partial<ItemData>) => void;
 }
 
 export const ItemCard = memo(function ItemCard({
@@ -29,6 +24,7 @@ export const ItemCard = memo(function ItemCard({
     viewMode,
     directoryId,
     onDelete,
+    onUpdate,
 }: ItemCardProps) {
     const t = useTranslations('dashboard.directoryDetail.items');
     const [isPending, startTransition] = useTransition();
@@ -54,19 +50,43 @@ export const ItemCard = memo(function ItemCard({
     };
 
     if (viewMode === 'list') {
-        return <ItemCardList item={item} onDelete={handleDelete} isPending={isPending} />;
+        return (
+            <ItemCardList
+                item={item}
+                onDelete={handleDelete}
+                directoryId={directoryId}
+                onUpdate={onUpdate}
+                isPending={isPending}
+            />
+        );
     }
 
-    return <ItemCardGrid item={item} onDelete={handleDelete} isPending={isPending} />;
+    return (
+        <ItemCardGrid
+            item={item}
+            onDelete={handleDelete}
+            directoryId={directoryId}
+            onUpdate={onUpdate}
+            isPending={isPending}
+        />
+    );
 });
 
 interface ItemCardViewProps {
     item: ItemData;
     onDelete: () => void;
     isPending: boolean;
+    onUpdate?: (item: Partial<ItemData>) => void;
+    directoryId: string;
 }
 
-const ItemCardList = memo(function ItemCardList({ item, onDelete, isPending }: ItemCardViewProps) {
+const ItemCardList = memo(function ItemCardList({
+    item,
+    onDelete,
+    isPending,
+    onUpdate,
+    directoryId,
+}: ItemCardViewProps) {
     return (
         <div
             className={cn(
@@ -106,13 +126,25 @@ const ItemCardList = memo(function ItemCardList({ item, onDelete, isPending }: I
                         <ExternalLink className="w-3 h-3" />
                     </Link>
                 )}
-                <ItemActions onDelete={onDelete} isPending={isPending} />
+                <ItemActions
+                    item={item}
+                    directoryId={directoryId}
+                    onDelete={onDelete}
+                    onUpdate={onUpdate}
+                    isPending={isPending}
+                />
             </div>
         </div>
     );
 });
 
-const ItemCardGrid = memo(function ItemCardGrid({ item, onDelete, isPending }: ItemCardViewProps) {
+const ItemCardGrid = memo(function ItemCardGrid({
+    item,
+    onDelete,
+    isPending,
+    onUpdate,
+    directoryId,
+}: ItemCardViewProps) {
     const t = useTranslations('dashboard.directoryDetail.items');
 
     return (
@@ -128,7 +160,13 @@ const ItemCardGrid = memo(function ItemCardGrid({ item, onDelete, isPending }: I
                 <h4 className="font-medium text-text dark:text-text-dark line-clamp-1">
                     {item.name}
                 </h4>
-                <ItemActions onDelete={onDelete} isPending={isPending} />
+                <ItemActions
+                    item={item}
+                    directoryId={directoryId}
+                    onDelete={onDelete}
+                    onUpdate={onUpdate}
+                    isPending={isPending}
+                />
             </div>
 
             <ItemBadgesDisplay badges={item.badges} className="mb-2" />
@@ -158,36 +196,6 @@ const ItemCardGrid = memo(function ItemCardGrid({ item, onDelete, isPending }: I
                 )}
             </div>
         </div>
-    );
-});
-
-interface ItemActionsProps {
-    onDelete: () => void;
-    isPending: boolean;
-}
-
-const ItemActions = memo(function ItemActions({ onDelete, isPending }: ItemActionsProps) {
-    const t = useTranslations('dashboard.directoryDetail.items');
-
-    return (
-        <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" disabled={isPending}>
-                    {isPending ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                        <MoreVertical className="w-4 h-4" />
-                    )}
-                </Button>
-            </DropdownMenuTrigger>
-
-            <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={onDelete} className="text-danger dark:text-danger-dark">
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    {t('delete')}
-                </DropdownMenuItem>
-            </DropdownMenuContent>
-        </DropdownMenu>
     );
 });
 

@@ -462,7 +462,8 @@
                         "title": "Run a manual generation first",
                         "description": "Complete one successful manual run to unlock automated scheduling. Once your directory has data we can keep it fresh for you.",
                         "refresh": "Refresh status"
-                    }
+                    },
+                    "requiresGeneration": "Run at least one item generation before enabling schedules."
                 },
                 "actions": {
                     "invalid": "Invalid data",
@@ -599,6 +600,10 @@
                 "deleteSuccess": "Item deleted successfully",
                 "deleteFailed": "Failed to delete item",
                 "deleteError": "An error occurred while deleting the item",
+                "updateSuccess": "Item updated successfully",
+                "updateFailed": "Failed to update item",
+                "updateError": "An error occurred while updating the item",
+                "updateItem": "Update item",
                 "loadingMore": "Loading more... ({current} of {total})",
                 "addModal": {
                     "title": "Add New Item",
@@ -643,7 +648,18 @@
                         "invalidImageUrl": "Please enter a valid image URL",
                         "requiredFields": "Please fill in all required fields"
                     }
-                }
+                },
+                "editDisplay": "Edit display",
+                "editDisplayDescription": "Toggle featured status and set display order.",
+                "orderLabel": "Display order (optional)",
+                "orderHelp": "Lower numbers show earlier within featured/non-featured groups.",
+                "deleteDialogTitle": "Delete item",
+                "deleteDialogDescription": "This will remove {name} from the repository.",
+                "createPRLabel": "Create Pull Request",
+                "createPRHelp": "If enabled, changes are proposed via PR instead of direct commit.",
+                "reasonLabel": "Reason (optional)",
+                "reasonPlaceholder": "Why are you removing this item?",
+                "confirmDelete": "Delete item"
             },
             "generator": {
                 "regenerationWarning": "Regeneration Warning",
@@ -709,7 +725,12 @@
                 "aiFirstGeneration": "AI-First Generation",
                 "aiFirstGenerationDescription": "Enable AI-generation of initial items before web search.",
                 "contentFiltering": "Content Filtering",
-                "contentFilteringDescription": "Enable content quality filtering"
+                "contentFilteringDescription": "Enable content quality filtering",
+                "recreateConfirmTitle": "Recreate directory data?",
+                "recreateConfirmDescription": "Recreate will delete existing items and regenerate them from scratch. This action cannot be undone.",
+                "confirmRecreate": "Yes, recreate",
+                "recreateInlineTitle": "Recreate will remove existing items",
+                "recreateInlineDescription": "This mode deletes current items and rebuilds them from scratch. Proceed only if you want to replace everything."
             },
             "progress": {
                 "title": "Generation in Progress",
@@ -728,7 +749,7 @@
                     "categoriesTagsProcessing": "Processing categories and tags",
                     "sourcesValidation": "Validating sources",
                     "badgesProcessing": "Processing quality badges",
-                    "itemsProcessing": "Finalizing items",
+                    "markdownGeneration": "Generating markdown content",
                     "processing": "Processing..."
                 },
                 "progress": "Progress",

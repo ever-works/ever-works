@@ -137,6 +137,13 @@ export interface DirectoryDetails {
     categories: string[];
 }
 
+export interface UpdateReadmeResponse {
+    status: 'success' | 'skipped';
+    updated: boolean;
+    slug: string;
+    message?: string;
+}
+
 export type PRUpdate = {
     branch: string;
     title: string;
@@ -228,6 +235,12 @@ export interface DirectoryGenerationHistoryResponse {
     total: number;
     limit: number;
     offset: number;
+}
+
+export interface SyncDirectoryResponse {
+    status: 'success' | 'error';
+    updated?: string[];
+    message?: string;
 }
 
 export const directoryAPI = {
@@ -348,6 +361,24 @@ export const directoryAPI = {
     runSchedule: async (id: string) => {
         return serverMutation<ItemsGeneratorResponse>({
             endpoint: `/directories/${id}/schedule/run`,
+            data: {},
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    syncData: async (id: string) => {
+        return serverMutation<SyncDirectoryResponse>({
+            endpoint: `/directories/${id}/sync-data`,
+            data: {},
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    updateReadme: async (id: string) => {
+        return serverMutation<UpdateReadmeResponse>({
+            endpoint: `/directories/${id}/update-readme`,
             data: {},
             method: 'POST',
             wrapInData: false,

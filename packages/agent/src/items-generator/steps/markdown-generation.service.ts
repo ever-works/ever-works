@@ -5,8 +5,9 @@ import { SearchService } from '../shared';
 import { ItemData } from '../dto';
 import { accumulateMetrics, MetricsAccumulator } from '../utils/metrics.util';
 import { getErrorMessage, getErrorStack } from '../utils/error.util';
+import { IPipelineStep, GenerationContext } from '../interfaces/pipeline.interface';
+import { ItemsGeneratorStep } from '../constants/steps';
 
-// Markdown generation prompt
 export const MARKDOWN_PROMPT = `
 You are directory website builder and your task is to generate markdown summary for item:
 <item>
@@ -32,13 +33,33 @@ export const markdownOutputSchema = z.object({
 });
 
 @Injectable()
-export class MarkdownGenerationService {
+export class MarkdownGenerationService implements IPipelineStep {
     private readonly logger = new Logger(MarkdownGenerationService.name);
+    public readonly name = ItemsGeneratorStep.MARKDOWN_GENERATION;
 
     constructor(
         private readonly aiService: AiService,
         private readonly searchService: SearchService,
     ) {}
+
+    async run(context: GenerationContext): Promise<GenerationContext> {
+        const { directory, finalItems, contentCache, metrics } = context;
+
+        if (!finalItems || finalItems.length === 0) {
+            return context;
+        }
+
+        this.logger.log(`[${directory.slug}] Generating markdown for ${finalItems.length} items`);
+
+        const itemsWithMarkdown = await this.generateMarkdownForItems(
+            finalItems,
+            contentCache,
+            metrics,
+        );
+
+        context.finalItems = itemsWithMarkdown;
+        return context;
+    }
 
     /**
      * Generates markdown summary for a given item

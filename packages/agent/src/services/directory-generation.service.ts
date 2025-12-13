@@ -24,6 +24,7 @@ import {
     RemoveItemResponseDto,
     ExtractItemDetailsDto,
     ExtractItemDetailsResponseDto,
+    UpdateItemDto,
 } from '@src/items-generator/dto';
 import {
     ItemsGeneratorMetrics,
@@ -291,6 +292,39 @@ export class DirectoryGenerationService {
         }
     }
 
+    async updateItemMetadata(directoryId: string, dto: UpdateItemDto, user: User) {
+        try {
+            const directory = await this.ownershipService.ensure(directoryId, user.id);
+
+            const result = await this.itemSubmissionService.updateItem(directory, user, dto);
+
+            if (result.status === 'success') {
+                await this.markdownGenerator.initialize(directory, user, {
+                    generation_method: GenerationMethod.CREATE_UPDATE,
+                });
+            }
+
+            if (result.status === 'error') {
+                result.message = normalizeGeneratorError(result.message);
+                throw new BadRequestException(result);
+            }
+
+            return result;
+        } catch (error) {
+            if (error instanceof HttpException) {
+                throw error;
+            }
+
+            this.logger.error('Error updating item metadata:', error);
+
+            throw new BadRequestException({
+                status: 'error',
+                slug: directoryId,
+                message: normalizeGeneratorError(error),
+            });
+        }
+    }
+
     async extractItemDetails(dto: ExtractItemDetailsDto): Promise<ExtractItemDetailsResponseDto> {
         try {
             const item = await this.itemsGeneratorService.extractItemDetailsFromUrl(
@@ -346,6 +380,53 @@ export class DirectoryGenerationService {
             throw new BadRequestException({
                 status: 'error',
                 id: directoryId,
+                message: normalizeGeneratorError(error),
+            });
+        }
+    }
+
+    async updateReadme(directoryId: string, user: User) {
+        try {
+            const directory = await this.ownershipService.ensure(directoryId, user.id);
+
+            const templateUpdate = await this.dataGenerator.updateMarkdownTemplate(directory, user);
+
+            // If repository is not initialized yet, exit gracefully with a clear message.
+            if (!templateUpdate.updated && templateUpdate.reason === 'not_initialized') {
+                return {
+                    status: 'skipped',
+                    updated: false,
+                    slug: directory.slug,
+                    message: templateUpdate.message,
+                };
+            }
+
+            if (templateUpdate.updated) {
+                await this.markdownGenerator.initialize(directory, user, {
+                    generation_method: GenerationMethod.CREATE_UPDATE,
+                });
+            }
+
+            return {
+                status: 'success',
+                updated: templateUpdate.updated,
+                slug: directory.slug,
+                message:
+                    templateUpdate.message ||
+                    (templateUpdate.updated
+                        ? 'README updated successfully.'
+                        : 'README already up to date.'),
+            };
+        } catch (error) {
+            if (error instanceof HttpException) {
+                throw error;
+            }
+
+            this.logger.error('Error updating README:', error);
+
+            throw new BadRequestException({
+                status: 'error',
+                directoryId,
                 message: normalizeGeneratorError(error),
             });
         }

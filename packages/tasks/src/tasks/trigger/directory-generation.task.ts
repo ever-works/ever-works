@@ -6,9 +6,8 @@ import { TriggerWorkerModule } from '../../trigger/trigger-worker.module';
 import { TriggerInternalApiClient } from '../../trigger/trigger-internal-api.client';
 import { TriggerGenerationOrchestrator } from '../../trigger/trigger-generation.orchestrator';
 import { DirectoryGenerationPayload } from '@packages/agent/tasks';
-import { Directory, User } from '@packages/agent/entities';
-import { DirectoryScheduleService } from '@packages/agent/services';
-import { GenerateStatusType } from '@packages/agent/entities';
+import { Directory, User, GenerateStatusType } from '@packages/agent/entities';
+import { RemoteDirectoryScheduleService } from '../../trigger/remote-directory-schedule.service';
 
 async function createContext(
     appContext: INestApplicationContext,
@@ -44,7 +43,7 @@ export const directoryGenerationTask = task({
 
         try {
             const { orchestrator, directory, user } = await createContext(appContext, payload);
-            const scheduleService = appContext.get(DirectoryScheduleService);
+            const scheduleService = appContext.get(RemoteDirectoryScheduleService);
 
             await orchestrator.handleCancellation({
                 directory,
@@ -68,7 +67,7 @@ export const directoryGenerationTask = task({
 
         try {
             const { orchestrator, directory, user } = await createContext(appContext, payload);
-            const scheduleService = appContext.get(DirectoryScheduleService);
+            const scheduleService = appContext.get(RemoteDirectoryScheduleService);
 
             try {
                 await orchestrator.run({
@@ -80,8 +79,7 @@ export const directoryGenerationTask = task({
                 });
 
                 if (payload.triggerSource === 'schedule' && payload.scheduleId) {
-                    await scheduleService.markRunCompleted({
-                        scheduleId: payload.scheduleId,
+                    await scheduleService.markRunCompleted(payload.scheduleId, {
                         historyId: payload.historyId,
                         status: GenerateStatusType.GENERATED,
                     });

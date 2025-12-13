@@ -12,19 +12,16 @@ export default async function DirectoryLayout({ params, children }: LayoutParams
 
     let directory: Directory;
     let oauthConnection: ConnectionInfo | null = null;
-    let scheduleAvailable = false;
     let config = null;
 
     try {
-        const res = await directoryAPI.get(id);
+        const [res, configRes] = await Promise.all([
+            directoryAPI.get(id),
+            directoryAPI.getConfig(id).catch(() => ({ config: null })),
+        ]);
+
         directory = res.directory;
-
-        let { config: configRes } = await directoryAPI
-            .getConfig(id)
-            .catch(() => ({ config: null }));
-
-        scheduleAvailable = Boolean(configRes?.metadata?.initial_prompt);
-        config = configRes;
+        config = configRes.config;
 
         if (directory) {
             oauthConnection = await authAPI.oauth_connections
@@ -40,7 +37,6 @@ export default async function DirectoryLayout({ params, children }: LayoutParams
         <DirectoryLayoutClient
             directory={directory}
             oauthConnection={oauthConnection}
-            scheduleAvailable={scheduleAvailable}
             config={config}
         >
             {children}

@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
 import { useDirectoryDetail } from '../DirectoryDetailContext';
 import { Link } from '@/i18n/navigation';
+import { PrUpdateInfo } from '../PrUpdateInfo';
 
 interface UpdateItemsFieldsProps {
     generationMethod?: GenerationMethod;
@@ -22,12 +23,14 @@ export function UpdateItemsFields({
     updateWithPullRequest,
     onChange,
 }: UpdateItemsFieldsProps) {
-    const { directory } = useDirectoryDetail();
+    const { directory, config } = useDirectoryDetail();
     const t = useTranslations('dashboard.directoryDetail.generator');
     const tConf = useTranslations('dashboard.directoryDetail.config');
 
     const mainPR = directory.lastPullRequest?.main;
     const dataPR = directory.lastPullRequest?.data;
+    const hasConfig = !!config && Object.keys(config).length > 0;
+    const isRecreate = generationMethod === GenerationMethod.RECREATE;
 
     return (
         <div
@@ -56,6 +59,13 @@ export function UpdateItemsFields({
                     <option value={GenerationMethod.RECREATE}>{t('methodRecreate')}</option>
                 </Select>
 
+                {isRecreate && hasConfig && (
+                    <div className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning dark:text-warning-dark">
+                        <p className="font-medium">{t('recreateInlineTitle')}</p>
+                        <p className="text-xs mt-1">{t('recreateInlineDescription')}</p>
+                    </div>
+                )}
+
                 <Switch
                     label={t('updateWithPullRequest')}
                     checked={updateWithPullRequest !== undefined ? updateWithPullRequest : true}
@@ -65,45 +75,11 @@ export function UpdateItemsFields({
             </div>
 
             {/* PR Update Information */}
-            {(mainPR || dataPR) && (
-                <div className="mt-6 border-t border-border dark:border-border-dark">
-                    <h4 className="text-sm font-medium text-text-secondary dark:text-text-secondary-dark mb-2 mt-5">
-                        {tConf('pullRequestUpdate')}
-                    </h4>
-
-                    <div className="bg-surface dark:bg-surface-dark rounded-md p-3 space-y-2">
-                        <div>
-                            <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                                {tConf('mainRepository')}
-                            </p>
-                            <Link
-                                href={mainPR?.url || '#'}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-sm text-primary hover:underline font-mono"
-                            >
-                                {mainPR?.branch.substring(0, 10)} -{' '}
-                                {mainPR?.number ? `#${mainPR.number}` : '-'}
-                            </Link>
-                        </div>
-
-                        <div>
-                            <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                                {tConf('dataRepository')}
-                            </p>
-                            <Link
-                                href={dataPR?.url || '#'}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-sm text-primary hover:underline font-mono"
-                            >
-                                {mainPR?.branch.substring(0, 10)} -{' '}
-                                {dataPR?.number ? `#${dataPR.number}` : '-'}
-                            </Link>
-                        </div>
-                    </div>
-                </div>
-            )}
+            <PrUpdateInfo
+                mainPR={mainPR}
+                dataPR={dataPR}
+                className="mt-6 border-t border-border dark:border-border-dark"
+            />
         </div>
     );
 }

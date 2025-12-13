@@ -39,16 +39,19 @@ export default async function DeployPage({ params }: DeployPageParams) {
         return <VercelTokenAlert />;
     }
 
-    // Get vercel teams
-    const vercelTeamsResponse = await deployAPI.getVercelTeams().catch(() => null);
+    // Hydrate existing deployment from Vercel if we don't have the URL stored yet
+    if (!directory.website) {
+        const lookup = await deployAPI.lookupExistingDeployment(id).catch(() => null);
 
-    return (
-        <DeployForm
-            directory={directory}
-            isDeploying={isDeploying(directory)}
-            vercelTeams={vercelTeamsResponse?.teams || []}
-        />
-    );
+        if (lookup?.status === 'success' && lookup.website) {
+            const refreshed = await directoryAPI.get(id).catch(() => null);
+            if (refreshed?.directory) {
+                directory = refreshed.directory;
+            }
+        }
+    }
+
+    return <DeployForm directory={directory} isDeploying={isDeploying(directory)} />;
 }
 
 function isDeploying(directory: Directory) {

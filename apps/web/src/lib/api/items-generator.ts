@@ -48,6 +48,7 @@ export interface SubmitItemDto {
     category: string;
     tags?: string[];
     featured?: boolean;
+    order?: number;
     pay_and_publish_now?: boolean;
     slug?: string;
     brand?: string;
@@ -58,6 +59,14 @@ export interface SubmitItemDto {
 export interface RemoveItemDto {
     item_slug: string;
     reason?: string;
+    create_pull_request?: boolean;
+}
+
+export interface UpdateItemDto {
+    item_slug: string;
+    featured?: boolean;
+    order?: number;
+    create_pull_request?: boolean;
 }
 
 export interface ExtractItemDetailsDto {
@@ -133,6 +142,16 @@ export const itemsGeneratorAPI = {
     removeItem: async (directoryId: string, data: RemoveItemDto) => {
         return serverMutation<ItemResponse>({
             endpoint: `/directories/${directoryId}/remove-item`,
+            data,
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    // Update item metadata
+    updateItem: async (directoryId: string, data: UpdateItemDto) => {
+        return serverMutation<ItemResponse>({
+            endpoint: `/directories/${directoryId}/update-item`,
             data,
             method: 'POST',
             wrapInData: false,
