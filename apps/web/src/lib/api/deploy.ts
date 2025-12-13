@@ -34,6 +34,13 @@ export interface DeployWebsiteVercelDto {
     vercelTeamScope?: string;
 }
 
+export type LookupDeploymentResponseDto = APIResponse<{
+    website?: string;
+    deploymentState?: string;
+    found: boolean;
+    message?: string;
+}>;
+
 export const deployAPI = {
     // Deploy to Vercel
     deployToVercel: async (directoryId: string, data: DeployWebsiteVercelDto) => {
@@ -60,6 +67,15 @@ export const deployAPI = {
         return serverMutation<VercelTeamResponse>({
             endpoint: '/deploy/vercel/teams',
             data: {},
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    lookupExistingDeployment(directoryId: string, data?: DeployWebsiteVercelDto) {
+        return serverMutation<LookupDeploymentResponseDto>({
+            endpoint: `/deploy/directories/${directoryId}/vercel/lookup`,
+            data: data || {},
             method: 'POST',
             wrapInData: false,
         });

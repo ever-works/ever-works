@@ -6,17 +6,16 @@ import { ROUTES } from '@/lib/constants';
 import { useTranslations } from 'next-intl';
 import { usePathname } from '@/i18n/navigation';
 import { Directory } from '@/lib/api';
-import { GenerateStatusType } from '@/lib/api/enums';
+import { useDirectoryDetail } from './DirectoryDetailContext';
 
 interface DirectoryTabsProps {
     directory: Directory;
-    scheduleAvailable: boolean;
 }
 
-export function DirectoryTabs({ directory, scheduleAvailable }: DirectoryTabsProps) {
-    const pathname = usePathname();
+export function DirectoryTabs({ directory }: DirectoryTabsProps) {
     const t = useTranslations('dashboard.directoryDetail.tabs');
-    const isGenerated = directory.generateStatus?.status === GenerateStatusType.GENERATED;
+    const pathname = usePathname();
+    const { config } = useDirectoryDetail();
 
     const tabs = [
         {
@@ -64,30 +63,22 @@ export function DirectoryTabs({ directory, scheduleAvailable }: DirectoryTabsPro
             ),
             isActive: pathname.includes('/generator'),
         },
-        ...(scheduleAvailable
-            ? [
-                  {
-                      name: t('schedule'),
-                      href: `${ROUTES.DASHBOARD_DIRECTORY(directory.id)}/schedule`,
-                      icon: (
-                          <svg
-                              className="w-4 h-4"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                          >
-                              <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M8 7V5a2 2 0 114 0v2m0 0V5a2 2 0 114 0v2m-8 0h8M5 11h14M7 15h2m4 0h2m-8 4h2m4 0h2M6 5h0a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V7a2 2 0 00-2-2h0"
-                              />
-                          </svg>
-                      ),
-                      isActive: pathname.includes('/schedule'),
-                  },
-              ]
-            : []),
+        {
+            name: t('schedule'),
+            href: `${ROUTES.DASHBOARD_DIRECTORY(directory.id)}/schedule`,
+            visible: Boolean(config),
+            icon: (
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M8 7V5a2 2 0 114 0v2m0 0V5a2 2 0 114 0v2m-8 0h8M5 11h14M7 15h2m4 0h2m-8 4h2m4 0h2M6 5h0a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V7a2 2 0 00-2-2h0"
+                    />
+                </svg>
+            ),
+            isActive: pathname.includes('/schedule'),
+        },
         {
             name: t('history'),
             href: `${ROUTES.DASHBOARD_DIRECTORY(directory.id)}/history`,
@@ -103,30 +94,22 @@ export function DirectoryTabs({ directory, scheduleAvailable }: DirectoryTabsPro
             ),
             isActive: pathname.includes('/history'),
         },
-        ...(isGenerated
-            ? [
-                  {
-                      name: t('deploy'),
-                      href: `${ROUTES.DASHBOARD_DIRECTORY(directory.id)}/deploy`,
-                      icon: (
-                          <svg
-                              className="w-4 h-4"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                          >
-                              <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M7 16l-4-4m0 0l4-4m-4 4h18M17 8l4 4m0 0l-4 4m4-4H3"
-                              />
-                          </svg>
-                      ),
-                      isActive: pathname.includes('/deploy'),
-                  },
-              ]
-            : []),
+        {
+            name: t('deploy'),
+            href: `${ROUTES.DASHBOARD_DIRECTORY(directory.id)}/deploy`,
+            visible: Boolean(config),
+            icon: (
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M7 16l-4-4m0 0l4-4m-4 4h18M17 8l4 4m0 0l-4 4m4-4H3"
+                    />
+                </svg>
+            ),
+            isActive: pathname.includes('/deploy'),
+        },
         {
             name: t('settings'),
             href: `${ROUTES.DASHBOARD_DIRECTORY(directory.id)}/settings`,
@@ -148,7 +131,7 @@ export function DirectoryTabs({ directory, scheduleAvailable }: DirectoryTabsPro
             ),
             isActive: pathname.includes('/settings'),
         },
-    ];
+    ].filter((tab) => tab.visible !== false);
 
     return (
         <nav className="border-b border-border dark:border-border-dark">

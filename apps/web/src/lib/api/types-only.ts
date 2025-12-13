@@ -36,6 +36,8 @@ export type {
     DirectoryGenerationHistoryResponse,
     DirectoryScheduleDto,
     DirectoryScheduleAllowedCadence,
+    UpdateReadmeResponse,
+    SyncDirectoryResponse,
 } from './directory';
 
 export type {
@@ -46,6 +48,7 @@ export type {
     UpdateItemsGeneratorDto,
     SubmitItemDto,
     RemoveItemDto,
+    UpdateItemDto,
     ExtractItemDetailsDto,
     ItemsGeneratorResponse,
     ExtractItemDetailsResponse,

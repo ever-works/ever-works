@@ -1,4 +1,4 @@
-export const LEGAL_NOTICE = `## Legal
+export const LEGAL_NOTICE = `## ™️ Legal
 
 All product names, logos, and brands are the property of their respective owners. All company, product, and service names used in this repository, related repositories, and associated websites are for identification purposes only. The use of these names, logos, and brands does not imply endorsement, affiliation, or sponsorship.
 
@@ -8,7 +8,7 @@ We disclaim any responsibility for errors, omissions, or inaccuracies in the con
 
 If you believe that your intellectual property rights or other legal rights have been infringed, please contact us immediately at legal@ever.co and we will take appropriate action.
 
-## License
+## 🛡️ License
 
 Shield: [![CC BY-SA 4.0][cc-by-sa-shield]][cc-by-sa]
 

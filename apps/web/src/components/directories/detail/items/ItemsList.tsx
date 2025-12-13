@@ -17,7 +17,7 @@ interface ItemsListProps {
 
 export function ItemsList({ items: initialItems, directoryId }: ItemsListProps) {
     const t = useTranslations('dashboard.directoryDetail.items');
-    const [items, setItems] = useState(initialItems);
+    const [items, setItems] = useState(() => sortItems(initialItems));
     const [searchQuery, setSearchQuery] = useState('');
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -59,6 +59,15 @@ export function ItemsList({ items: initialItems, directoryId }: ItemsListProps) 
     // Memoized callback for item deletion
     const handleItemDelete = useCallback((itemSlug: string) => {
         setItems((prev) => prev.filter((i) => i.slug !== itemSlug));
+    }, []);
+
+    const handleItemUpdate = useCallback((updated: Partial<ItemData> & { slug?: string }) => {
+        if (!updated.slug) return;
+        setItems((prev) =>
+            sortItems(
+                prev.map((item) => (item.slug === updated.slug ? { ...item, ...updated } : item)),
+            ),
+        );
     }, []);
 
     return (
@@ -147,6 +156,9 @@ export function ItemsList({ items: initialItems, directoryId }: ItemsListProps) 
                                 viewMode={viewMode}
                                 directoryId={directoryId}
                                 onDelete={() => handleItemDelete(item.slug!)}
+                                onUpdate={(updated) =>
+                                    handleItemUpdate({ ...updated, slug: item.slug })
+                                }
                             />
                         ))}
                     </div>
@@ -157,6 +169,7 @@ export function ItemsList({ items: initialItems, directoryId }: ItemsListProps) 
                         viewMode={viewMode}
                         directoryId={directoryId}
                         onItemDelete={handleItemDelete}
+                        onItemUpdate={handleItemUpdate}
                         visibleRange={visibleRange}
                         setVisibleRange={setVisibleRange}
                     />
@@ -175,6 +188,7 @@ interface VirtualizedListProps {
     viewMode: 'grid' | 'list';
     directoryId: string;
     onItemDelete: (itemSlug: string) => void;
+    onItemUpdate: (item: Partial<ItemData> & { slug?: string }) => void;
     visibleRange: { start: number; end: number };
     setVisibleRange: (range: { start: number; end: number }) => void;
 }
@@ -184,6 +198,7 @@ function VirtualizedList({
     viewMode,
     directoryId,
     onItemDelete,
+    onItemUpdate,
     visibleRange,
     setVisibleRange,
 }: VirtualizedListProps) {
@@ -191,35 +206,69 @@ function VirtualizedList({
     const loadMoreRef = useRef<HTMLDivElement>(null);
     const ITEMS_PER_PAGE = 30; // Items to load at a time
 
+    // Use a ref to store the latest values for use in the observer callback
+    const stateRef = useRef({ itemsLength: items.length, visibleEnd: visibleRange.end });
+
+    // Keep the ref in sync with current values
+    stateRef.current = { itemsLength: items.length, visibleEnd: visibleRange.end };
+
     useEffect(() => {
-        // Use Intersection Observer to detect when to load more items
+        const currentRef = loadMoreRef.current;
+        if (!currentRef) return;
+
         const observer = new IntersectionObserver(
             (entries) => {
                 const target = entries[0];
-                if (target.isIntersecting && visibleRange.end < items.length) {
-                    // Load more items when the trigger element is visible
-                    setVisibleRange({
-                        start: 0,
-                        end: Math.min(items.length, visibleRange.end + ITEMS_PER_PAGE),
-                    });
+                if (target.isIntersecting) {
+                    const { itemsLength, visibleEnd } = stateRef.current;
+                    if (visibleEnd < itemsLength) {
+                        setVisibleRange({
+                            start: 0,
+                            end: Math.min(itemsLength, visibleEnd + ITEMS_PER_PAGE),
+                        });
+                    }
                 }
             },
             {
-                root: document.getElementById('main-content'),
-                rootMargin: '100px',
-                threshold: 0.1,
+                root: null,
+                rootMargin: '200px',
+                threshold: 0,
             },
         );
 
-        if (loadMoreRef.current) {
-            observer.observe(loadMoreRef.current);
-        }
+        observer.observe(currentRef);
 
         return () => {
-            if (loadMoreRef.current) {
-                observer.unobserve(loadMoreRef.current);
-            }
+            observer.disconnect();
         };
+        // setVisibleRange is stable (from useState), so observer is created once
+    }, [setVisibleRange]);
+
+    // When visibleRange.end changes and there are more items to load,
+    // re-check if the loader is still in view by triggering a manual check
+    useEffect(() => {
+        if (visibleRange.end >= items.length) return;
+
+        const currentRef = loadMoreRef.current;
+        if (!currentRef) return;
+
+        // Check if the element is currently in the viewport
+        const rect = currentRef.getBoundingClientRect();
+        const isInViewport =
+            rect.top < window.innerHeight + 200 && // 200px matches rootMargin
+            rect.bottom > -200;
+
+        if (isInViewport) {
+            // Schedule the next load after render completes
+            const timeoutId = setTimeout(() => {
+                setVisibleRange({
+                    start: 0,
+                    end: Math.min(items.length, visibleRange.end + ITEMS_PER_PAGE),
+                });
+            }, 50);
+
+            return () => clearTimeout(timeoutId);
+        }
     }, [items.length, visibleRange.end, setVisibleRange]);
 
     // Get visible items - always start from 0 for simplicity
@@ -240,6 +289,7 @@ function VirtualizedList({
                         viewMode={viewMode}
                         directoryId={directoryId}
                         onDelete={() => onItemDelete(item.slug!)}
+                        onUpdate={(updated) => onItemUpdate({ ...updated, slug: item.slug })}
                     />
                 ))}
             </div>
@@ -264,4 +314,23 @@ function UnSlug(name: string) {
         .replace(/-/g, ' ')
         .replace(/\b\w/g, (char) => char.toUpperCase())
         .trim();
+}
+
+function sortItems(items: ItemData[]): ItemData[] {
+    return [...items].sort((a, b) => {
+        const aFeatured = !!a.featured;
+        const bFeatured = !!b.featured;
+
+        if (aFeatured !== bFeatured) {
+            return aFeatured ? -1 : 1;
+        }
+
+        const orderA = typeof a.order === 'number' ? a.order : Number.POSITIVE_INFINITY;
+        const orderB = typeof b.order === 'number' ? b.order : Number.POSITIVE_INFINITY;
+        if (orderA !== orderB) {
+            return orderA - orderB;
+        }
+
+        return a.name.localeCompare(b.name);
+    });
 }

@@ -16,7 +16,6 @@ import {
 import { format } from 'date-fns';
 import { GenerateStatusType } from '../entities/types';
 import { LEGAL_NOTICE, LICENSE_TEXT } from './texts';
-import { ItemsGeneratorStep } from '../items-generator/constants/steps';
 import { DIRECTORY_OPERATIONS } from '@src/directory-operations';
 import type { DirectoryOperations } from '@src/directory-operations';
 import { config } from '../config';
@@ -30,11 +29,17 @@ type GenerationStats = {
 
 type TInitialize =
     | {
-        prUpdate: PRUpdate | null;
-        generation_method?: GenerationMethod;
-        stats: GenerationStats;
-    }
+          prUpdate: PRUpdate | null;
+          generation_method?: GenerationMethod;
+          stats: GenerationStats;
+      }
     | false;
+
+type UpdateMarkdownTemplateResult = {
+    updated: boolean;
+    reason?: 'not_initialized' | 'no_changes';
+    message?: string;
+};
 
 @Injectable()
 export class DataGeneratorService {
@@ -45,7 +50,7 @@ export class DataGeneratorService {
         private readonly itemsGeneratorService: ItemsGeneratorService,
         @Inject(DIRECTORY_OPERATIONS)
         private readonly directoryOperations: DirectoryOperations,
-    ) { }
+    ) {}
 
     async initialize(
         directory: Directory,
@@ -272,14 +277,8 @@ export class DataGeneratorService {
 
             this.logger.debug('files written and committed.');
 
-            // Process items (with markdown generation, writing to disk and committing)
-            this.logger.log(`Processing ${newItems.length} items...`);
-            this.onGenerationProgress(ItemsGeneratorStep.ITEMS_PROCESSING, directory);
-
-            const itemsWithMarkdown = await this.itemsGeneratorService.generateMarkdownForItems(
-                newItems,
-                contentCache,
-            );
+            // Items already have markdown from pipeline - write to disk
+            this.logger.log(`Writing ${newItems.length} items to disk...`);
 
             const existingSlugSet = new Set(
                 (existingData.existingItems || []).map((item) =>
@@ -291,7 +290,7 @@ export class DataGeneratorService {
             let updatedItemsCount = 0;
 
             // Write all items to disk (without committing individually)
-            for (const item of itemsWithMarkdown) {
+            for (const item of newItems) {
                 item.slug = slugifyText(item.slug || item.name);
                 if (existingSlugSet.has(item.slug)) {
                     updatedItemsCount++;
@@ -304,7 +303,7 @@ export class DataGeneratorService {
             }
 
             // Batch commit all items at once
-            if (itemsWithMarkdown.length > 0) {
+            if (newItems.length > 0) {
                 await this.githubService.addAll(data.dir);
                 const commitMessage =
                     newItemsCount > 0
@@ -313,7 +312,7 @@ export class DataGeneratorService {
 
                 await this.githubService.commit(data.dir, commitMessage, user.asCommitter());
 
-                this.logger.log(`Batch committed ${itemsWithMarkdown.length} items`);
+                this.logger.log(`Batch committed ${newItems.length} items`);
             }
 
             // Push changes
@@ -328,7 +327,7 @@ export class DataGeneratorService {
             const stats: GenerationStats = {
                 newItemsCount,
                 updatedItemsCount,
-                totalItemsCount: itemsWithMarkdown.length,
+                totalItemsCount: newItems.length,
                 metrics: generatedItems.metrics,
             };
 
@@ -387,6 +386,74 @@ export class DataGeneratorService {
         }
     }
 
+    async updateMarkdownTemplate(
+        directory: Directory,
+        user: User,
+    ): Promise<UpdateMarkdownTemplateResult> {
+        const token = user.getGitToken();
+        const committer = user.asCommitter();
+        const owner = directory.getRepoOwner();
+        const repo = directory.getDataRepo();
+
+        const repositoryExists = await this.githubService
+            .repositoryExists(owner, repo, token)
+            .catch((error) => {
+                this.logger.error(
+                    `Failed to verify repository ${owner}/${repo} existence`,
+                    error.message,
+                );
+                throw error;
+            });
+
+        if (!repositoryExists) {
+            this.logger.warn(
+                `Data repository ${owner}/${repo} not initialized. Skipping README template update.`,
+            );
+            return {
+                updated: false,
+                reason: 'not_initialized',
+                message: 'Data repository is not initialized yet. Run a generation first.',
+            };
+        }
+
+        const dest = await this.githubService.cloneOrPull({
+            owner,
+            repo,
+            token,
+            committer,
+        });
+
+        const dataRepo = await DataRepository.create(dest);
+
+        await dataRepo.ensureDirectoriesExist();
+
+        await dataRepo.writeMarkdownTemplate(this.getHeader(directory), this.getFooter(directory));
+
+        const statusMatrix = await this.githubService.status(dataRepo.dir);
+        const hasChanges = statusMatrix.some(
+            ([, headStatus, workdirStatus]) => headStatus !== workdirStatus,
+        );
+
+        if (!hasChanges) {
+            this.logger.log(`No README template changes detected for ${directory.slug}`);
+            return {
+                updated: false,
+                reason: 'no_changes',
+                message: 'README template already up to date.',
+            };
+        }
+
+        await this.githubService.addAll(dataRepo.dir);
+        await this.githubService.commit(dataRepo.dir, 'update README template', committer);
+
+        await this.githubService.push(dest, token);
+
+        return {
+            updated: true,
+            message: 'README template updated successfully.',
+        };
+    }
+
     /**
      * Remove repository for a directory
      */
@@ -438,7 +505,7 @@ export class DataGeneratorService {
     async getCategoriesTags(directory: Directory, user: User) {
         const data = await this.repositoryData(directory, user);
 
-        const [ categories, tags ] = await Promise.all([ data.getCategories(), data.getTags() ]);
+        const [categories, tags] = await Promise.all([data.getCategories(), data.getTags()]);
 
         return {
             categories,
@@ -449,7 +516,7 @@ export class DataGeneratorService {
     async count(directory: Directory, user: User) {
         const data = await this.repositoryData(directory, user);
 
-        const [ categories, tags, items ] = await Promise.all([
+        const [categories, tags, items] = await Promise.all([
             data.getCategories(),
             data.getTags(),
             data.getItems(),
@@ -466,6 +533,26 @@ export class DataGeneratorService {
         const data = await this.repositoryData(directory, user);
 
         return data.getConfig();
+    }
+
+    /**
+     * Returns a lightweight snapshot of the data repository for sync purposes.
+     * Uses the shared repositoryData() helper to respect cloning/pulling patterns.
+     */
+    async getDataSyncSnapshot(directory: Directory, user: User) {
+        const data = await this.repositoryData(directory, user);
+
+        const [items, config, markdownTemplate] = await Promise.all([
+            data.getItems().catch(() => []),
+            data.getConfig().catch(() => null),
+            data.readMarkdownTemplate().catch(() => null),
+        ]);
+
+        return {
+            itemsCount: items.length,
+            prUpdate: config?.metadata?.pr_update,
+            readmeTemplate: markdownTemplate,
+        };
     }
 
     private async repositoryData(directory: Directory, user: User) {
@@ -521,7 +608,7 @@ export class DataGeneratorService {
 
             try {
                 // Try to get existing data
-                const [ categories, tags, existingItems, config ] = await Promise.all([
+                const [categories, tags, existingItems, config] = await Promise.all([
                     data.getCategories().catch(() => []),
                     data.getTags().catch(() => []),
                     data.getItems().catch(() => []),
@@ -565,7 +652,7 @@ export class DataGeneratorService {
         this.logger.debug(`writeItemToDisk: Writing item ${item.name} (slug: ${item.slug})`);
 
         await data.createItemDir(item);
-        const promises = [ data.writeItem(item) ];
+        const promises = [data.writeItem(item)];
 
         // Write item markdown to disk
         const md =
@@ -599,9 +686,9 @@ export class DataGeneratorService {
     private withCompanyConfig(company?: CompanyDto) {
         return company
             ? {
-                company_name: company.name,
-                company_website: company.website,
-            }
+                  company_name: company.name,
+                  company_website: company.website,
+              }
             : {};
     }
 

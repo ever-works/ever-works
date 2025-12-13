@@ -15,7 +15,7 @@ export function getStepTranslationKey(step: ItemsGeneratorStep): string {
         [ItemsGeneratorStep.CATEGORIES_TAGS_PROCESSING]: 'categoriesTagsProcessing',
         [ItemsGeneratorStep.SOURCES_VALIDATION]: 'sourcesValidation',
         [ItemsGeneratorStep.BADGES_PROCESSING]: 'badgesProcessing',
-        [ItemsGeneratorStep.ITEMS_PROCESSING]: 'itemsProcessing',
+        [ItemsGeneratorStep.MARKDOWN_GENERATION]: 'markdownGeneration',
     };
 
     return stepKeys[step] || 'processing';
@@ -51,7 +51,7 @@ export function getStepText(step: ItemsGeneratorStep | undefined, t: Function): 
         categoriesTagsProcessing: t('steps.categoriesTagsProcessing'),
         sourcesValidation: t('steps.sourcesValidation'),
         badgesProcessing: t('steps.badgesProcessing'),
-        itemsProcessing: t('steps.itemsProcessing'),
+        markdownGeneration: t('steps.markdownGeneration'),
     };
 
     return stepTranslations[stepKey] || t('steps.processing');

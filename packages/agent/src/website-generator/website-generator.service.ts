@@ -20,6 +20,7 @@ export class WebsiteGeneratorService {
             return this.githubService.duplicateAsOrg({
                 originalRepoOwner: WEBSITE_TEMPLATE_CONFIG.owner,
                 originalRepoName: WEBSITE_TEMPLATE_CONFIG.repo,
+                branch: WEBSITE_TEMPLATE_CONFIG.branch,
                 targetOrg: directory.getRepoOwner(),
                 targetRepoName: directory.getWebsiteRepo(),
                 token,
@@ -30,6 +31,7 @@ export class WebsiteGeneratorService {
         return this.githubService.duplicate({
             originalRepoOwner: WEBSITE_TEMPLATE_CONFIG.owner,
             originalRepoName: WEBSITE_TEMPLATE_CONFIG.repo,
+            branch: WEBSITE_TEMPLATE_CONFIG.branch,
             targetRepoName: directory.getWebsiteRepo(),
             token,
             committer,

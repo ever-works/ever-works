@@ -180,7 +180,7 @@ export class GeneratePromptService extends BasePromptService {
             max_search_queries: 10,
             max_results_per_query: 20,
             max_pages_to_process: 10,
-            relevance_threshold_content: 0.5,
+            relevance_threshold_content: 0.6,
             min_content_length_for_extraction: 300,
             ai_first_generation_enabled: true,
             content_filtering_enabled: true,

@@ -10,12 +10,12 @@ import { DirectoryDetailProvider } from './DirectoryDetailContext';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { pageIntervalRefresh } from '@/lib/utils';
+import { syncDirectoryData } from '@/app/actions/dashboard/directories';
 
 interface DirectoryLayoutClientProps {
     directory: Directory;
     children: React.ReactNode;
     oauthConnection: ConnectionInfo | null;
-    scheduleAvailable: boolean;
     config: DirectoryConfig | null;
 }
 
@@ -24,15 +24,15 @@ export function DirectoryLayoutClient({
     oauthConnection,
     config,
     children,
-    scheduleAvailable,
 }: DirectoryLayoutClientProps) {
     const router = useRouter();
     const t = useTranslations('dashboard.directoryDetail');
     const isGenerating = directory.generateStatus?.status === GenerateStatusType.GENERATING;
-    const lastGenerateStatus = useRef(directory.generateStatus);
+    const lastGenerateStatus = useRef(directory.generateStatus?.status);
+    const generateStatus = directory.generateStatus?.status;
 
     useEffect(() => {
-        const lastStatus = lastGenerateStatus.current?.status;
+        const lastStatus = lastGenerateStatus.current;
         const currentStatus = directory.generateStatus?.status;
 
         if (lastStatus !== currentStatus && currentStatus === GenerateStatusType.ERROR) {
@@ -53,8 +53,8 @@ export function DirectoryLayoutClient({
             });
         }
 
-        lastGenerateStatus.current = directory.generateStatus;
-    }, [directory.generateStatus]);
+        lastGenerateStatus.current = directory.generateStatus?.status;
+    }, [generateStatus]);
 
     useEffect(() => {
         if (isGenerating) {
@@ -62,6 +62,14 @@ export function DirectoryLayoutClient({
             return cleanup;
         }
     }, [isGenerating, router]);
+
+    useEffect(() => {
+        syncDirectoryData(directory.id).catch(() => {
+            // Silent fail; best effort
+        });
+
+        // we want also sync when generateStatus changes
+    }, [directory.id, generateStatus, router]);
 
     return (
         <DirectoryDetailProvider
@@ -71,7 +79,7 @@ export function DirectoryLayoutClient({
         >
             <div className="w-full">
                 <DirectoryHeader directory={directory} />
-                <DirectoryTabs directory={directory} scheduleAvailable={scheduleAvailable} />
+                <DirectoryTabs directory={directory} />
 
                 <div className="mt-6">{children}</div>
             </div>

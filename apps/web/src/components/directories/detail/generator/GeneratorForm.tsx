@@ -17,6 +17,13 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils/cn';
 import { toast } from 'sonner';
 import { useRouter } from '@/i18n/navigation';
+import {
+    Dialog,
+    DialogContent,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { generateItems, updateItems } from '@/app/actions/dashboard/generator';
 import { useTranslations } from 'next-intl';
 import { GenerationMethod, WebsiteRepositoryCreationMethod } from '@/lib/api/enums';
@@ -33,6 +40,7 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
     const [isPending, startTransition] = useTransition();
     const [expandedSections, setExpandedSections] = useState<string[]>([]);
     const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
+    const [confirmRecreate, setConfirmRecreate] = useState(false);
 
     // Check if directory has been generated before
     const isGenerated = !!config?.metadata;
@@ -66,11 +74,23 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
+        if (
+            formData.generation_method === GenerationMethod.RECREATE &&
+            config &&
+            Object.keys(config || {}).length > 0 &&
+            isGenerated
+        ) {
+            setConfirmRecreate(true);
+            return;
+        }
+
+        await submitGeneration();
+    };
+
+    const submitGeneration = async () => {
         startTransition(async () => {
             let result;
 
-            // Minimal form (existing directory, not showing advanced options)
-            // Uses update endpoint which doesn't require prompt
             if (
                 isGenerated &&
                 !showAdvancedOptions &&
@@ -82,7 +102,6 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
                 };
                 result = await updateItems(directoryId, updateData);
             } else {
-                // Full form: requires prompt for generate endpoint
                 if (!formData.prompt.trim()) {
                     toast.error(t('promptRequired'));
                     return;
@@ -226,6 +245,45 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
                     {t('cancel')}
                 </Button>
             </div>
+
+            <Dialog open={confirmRecreate} onOpenChange={setConfirmRecreate}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>
+                            {t('recreateConfirmTitle', {
+                                defaultValue: 'Recreate directory data?',
+                            })}
+                        </DialogTitle>
+                        <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
+                            {t('recreateConfirmDescription', {
+                                defaultValue:
+                                    'Recreate will delete existing items and regenerate them from scratch. This action cannot be undone.',
+                            })}
+                        </p>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={() => setConfirmRecreate(false)}
+                            disabled={isPending}
+                        >
+                            {t('cancel')}
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="danger"
+                            onClick={() => {
+                                setConfirmRecreate(false);
+                                void submitGeneration();
+                            }}
+                            disabled={isPending}
+                        >
+                            {t('confirmRecreate', { defaultValue: 'Yes, recreate' })}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </form>
     );
 }

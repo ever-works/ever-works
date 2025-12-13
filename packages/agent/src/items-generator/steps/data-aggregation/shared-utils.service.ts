@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import * as stringSimilarity from 'string-similarity';
+import stringSimilarity from 'string-similarity-js';
 import { ItemData } from '../../dto';
 
 @Injectable()
@@ -110,7 +110,7 @@ export class SharedUtilsService {
                 if (!currentName || !candidateName) continue;
 
                 // Calculate similarity
-                const similarity = stringSimilarity.compareTwoStrings(currentName, candidateName);
+                const similarity = stringSimilarity(currentName, candidateName);
 
                 // Check if the candidate name appears before the current name
                 const splittedCurrentItemName = tr(currentItem.name).split(' ');

@@ -20,7 +20,9 @@ export class MarkdownReadmeConfigDto implements MarkdownReadmeConfig {
     @IsOptional()
     @IsString()
     @Transform(({ value }) =>
-        typeof value === 'string' ? sanitizeText(value, { removeNewlines: false }) : value,
+        typeof value === 'string'
+            ? sanitizeText(value, { removeNewlines: false, collapseSpaces: false, trim: true })
+            : value,
     )
     header?: string;
 
@@ -31,7 +33,9 @@ export class MarkdownReadmeConfigDto implements MarkdownReadmeConfig {
     @IsOptional()
     @IsString()
     @Transform(({ value }) =>
-        typeof value === 'string' ? sanitizeText(value, { removeNewlines: false }) : value,
+        typeof value === 'string'
+            ? sanitizeText(value, { removeNewlines: false, collapseSpaces: false, trim: true })
+            : value,
     )
     footer?: string;
 

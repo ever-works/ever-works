@@ -35,9 +35,7 @@ export const config = {
     branding: {
         appName: () => process.env.APP_NAME || process.env.NEXT_PUBLIC_APP_NAME || 'Ever Works',
         companyOwner: () =>
-            process.env.COMPANY_OWNER ||
-            process.env.NEXT_PUBLIC_COMPANY_OWNER ||
-            'Ever Co.',
+            process.env.COMPANY_OWNER || process.env.NEXT_PUBLIC_COMPANY_OWNER || 'Ever Co.',
         platformWebsite: () =>
             process.env.PLATFORM_WEBSITE ||
             process.env.NEXT_PUBLIC_COMPANY_OWNER_WEBSITE ||

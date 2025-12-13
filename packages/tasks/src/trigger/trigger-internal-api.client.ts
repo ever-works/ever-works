@@ -1,11 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { config } from '@packages/agent/config';
-import { Directory } from '@packages/agent/entities';
+import { Directory, GenerateStatusType } from '@packages/agent/entities';
 import { DirectoryCommand, DirectoryCommandAction } from '@packages/agent/tasks';
 
 type DirectoryContextResponse = {
     directory: Directory;
     user: any;
+};
+
+type DispatchSchedulesResponse = {
+    dispatched: number;
 };
 
 @Injectable()
@@ -46,6 +50,32 @@ export class TriggerInternalApiClient {
             method: 'POST',
             path: `/directories/${directoryId}/commands`,
             body: command,
+        });
+    }
+
+    async dispatchSchedules(): Promise<DispatchSchedulesResponse> {
+        return this.request<DispatchSchedulesResponse>({
+            method: 'POST',
+            path: `/schedules/dispatch`,
+        });
+    }
+
+    async markScheduleCompleted(
+        scheduleId: string,
+        payload: { historyId?: string; status: GenerateStatusType },
+    ): Promise<void> {
+        await this.request<void>({
+            method: 'POST',
+            path: `/schedules/${scheduleId}/complete`,
+            body: payload,
+        });
+    }
+
+    async markScheduleFailed(scheduleId: string, reason?: string): Promise<void> {
+        await this.request<void>({
+            method: 'POST',
+            path: `/schedules/${scheduleId}/fail`,
+            body: { reason },
         });
     }
 
