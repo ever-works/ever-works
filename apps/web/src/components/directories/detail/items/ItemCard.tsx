@@ -172,7 +172,7 @@ const ItemCardGrid = memo(function ItemCardGrid({
             <ItemBadgesDisplay badges={item.badges} className="mb-2" />
 
             {item.description && (
-                <p className="text-sm text-text-secondary dark:text-text-secondary-dark line-clamp-2 mb-3">
+                <p className="text-sm text-text-secondary dark:text-text-secondary-dark line-clamp-2 mb-3 flex-1">
                     {item.description}
                 </p>
             )}
