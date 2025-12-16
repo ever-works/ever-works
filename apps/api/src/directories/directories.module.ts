@@ -11,6 +11,7 @@ import { TriggerModule as TasksTriggerModule } from '@packages/tasks';
 // Controllers
 import { DirectoriesController } from './directories.controller';
 import { DeployController } from './deploy.controller';
+import { MembersController } from './members.controller';
 
 // Tasks
 import { DirectoryCleanupService } from './tasks/directory-cleanup.service';
@@ -27,6 +28,6 @@ import { VercelDeploymentVerifierService } from './tasks/vercel-deployment-verif
         ScheduleModule.forRoot(),
     ],
     providers: [CacheEntryRepository, DirectoryCleanupService, VercelDeploymentVerifierService],
-    controllers: [DirectoriesController, DeployController],
+    controllers: [DirectoriesController, DeployController, MembersController],
 })
 export class DirectoriesModule {}

@@ -400,7 +400,53 @@
                 "schedule": "Schedule",
                 "history": "History",
                 "deploy": "Deploy",
+                "members": "Members",
                 "settings": "Settings"
+            },
+            "members": {
+                "title": "Team Members",
+                "subtitle": "Manage who has access to this directory and their permissions.",
+                "inviteMember": "Invite Member",
+                "noMembers": "No team members yet. Invite someone to collaborate.",
+                "roles": {
+                    "creator": "Creator",
+                    "owner": "Owner",
+                    "manager": "Manager",
+                    "editor": "Editor",
+                    "viewer": "Viewer"
+                },
+                "roleDescriptions": {
+                    "owner": "Full control including deletion and member management.",
+                    "manager": "Can edit directory and manage members, but cannot delete.",
+                    "editor": "Can edit directory content and run generations.",
+                    "viewer": "Read-only access to view the directory."
+                },
+                "invite": {
+                    "title": "Invite Team Member",
+                    "description": "Add a new member to collaborate on this directory.",
+                    "emailLabel": "Email address",
+                    "emailPlaceholder": "colleague@example.com",
+                    "roleLabel": "Role",
+                    "submit": "Send Invite",
+                    "cancel": "Cancel",
+                    "success": "Member invited successfully.",
+                    "errors": {
+                        "emailRequired": "Email address is required.",
+                        "failed": "Failed to invite member. Please try again."
+                    }
+                },
+                "confirmRemove": {
+                    "title": "Remove Member",
+                    "description": "Are you sure you want to remove {username} from this directory? They will lose all access.",
+                    "confirm": "Remove",
+                    "cancel": "Cancel"
+                },
+                "roleUpdated": "Member role updated.",
+                "memberRemoved": "Member removed successfully.",
+                "errors": {
+                    "updateFailed": "Failed to update member role.",
+                    "removeFailed": "Failed to remove member."
+                }
             },
             "schedule": {
                 "page": {

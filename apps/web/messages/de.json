@@ -399,7 +399,53 @@
                 "generator": "Generator",
                 "history": "Verlauf",
                 "deploy": "Bereitstellen",
+                "members": "Mitglieder",
                 "settings": "Einstellungen"
+            },
+            "members": {
+                "title": "Teammitglieder",
+                "subtitle": "Verwalten Sie, wer Zugriff auf dieses Verzeichnis hat und welche Berechtigungen sie haben.",
+                "inviteMember": "Mitglied einladen",
+                "noMembers": "Noch keine Teammitglieder. Laden Sie jemanden zur Zusammenarbeit ein.",
+                "roles": {
+                    "creator": "Ersteller",
+                    "owner": "Eigentümer",
+                    "manager": "Manager",
+                    "editor": "Bearbeiter",
+                    "viewer": "Betrachter"
+                },
+                "roleDescriptions": {
+                    "owner": "Volle Kontrolle einschließlich Löschung und Mitgliederverwaltung.",
+                    "manager": "Kann Verzeichnis bearbeiten und Mitglieder verwalten, aber nicht löschen.",
+                    "editor": "Kann Verzeichnisinhalte bearbeiten und Generierungen ausführen.",
+                    "viewer": "Nur Lesezugriff zum Anzeigen des Verzeichnisses."
+                },
+                "invite": {
+                    "title": "Teammitglied einladen",
+                    "description": "Fügen Sie ein neues Mitglied hinzu, um an diesem Verzeichnis zusammenzuarbeiten.",
+                    "emailLabel": "E-Mail-Adresse",
+                    "emailPlaceholder": "kollege@beispiel.com",
+                    "roleLabel": "Rolle",
+                    "submit": "Einladung senden",
+                    "cancel": "Abbrechen",
+                    "success": "Mitglied erfolgreich eingeladen.",
+                    "errors": {
+                        "emailRequired": "E-Mail-Adresse ist erforderlich.",
+                        "failed": "Mitglied konnte nicht eingeladen werden. Bitte versuchen Sie es erneut."
+                    }
+                },
+                "confirmRemove": {
+                    "title": "Mitglied entfernen",
+                    "description": "Sind Sie sicher, dass Sie {username} aus diesem Verzeichnis entfernen möchten? Sie verlieren allen Zugriff.",
+                    "confirm": "Entfernen",
+                    "cancel": "Abbrechen"
+                },
+                "roleUpdated": "Mitgliedsrolle aktualisiert.",
+                "memberRemoved": "Mitglied erfolgreich entfernt.",
+                "errors": {
+                    "updateFailed": "Mitgliedsrolle konnte nicht aktualisiert werden.",
+                    "removeFailed": "Mitglied konnte nicht entfernt werden."
+                }
             },
             "statusCard": {
                 "notStarted": {

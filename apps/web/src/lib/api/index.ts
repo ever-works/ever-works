@@ -7,3 +7,4 @@ export * from './ai-conversation';
 export * from './settings';
 export * from './health';
 export * from './deploy';
+export * from './members';

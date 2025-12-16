@@ -399,7 +399,53 @@
                 "generator": "Generador",
                 "history": "Historial",
                 "deploy": "Desplegar",
+                "members": "Miembros",
                 "settings": "Configuración"
+            },
+            "members": {
+                "title": "Miembros del equipo",
+                "subtitle": "Gestiona quién tiene acceso a este directorio y sus permisos.",
+                "inviteMember": "Invitar miembro",
+                "noMembers": "Aún no hay miembros del equipo. Invita a alguien a colaborar.",
+                "roles": {
+                    "creator": "Creador",
+                    "owner": "Propietario",
+                    "manager": "Administrador",
+                    "editor": "Editor",
+                    "viewer": "Lector"
+                },
+                "roleDescriptions": {
+                    "owner": "Control total incluyendo eliminación y gestión de miembros.",
+                    "manager": "Puede editar el directorio y gestionar miembros, pero no puede eliminar.",
+                    "editor": "Puede editar el contenido del directorio y ejecutar generaciones.",
+                    "viewer": "Acceso de solo lectura para ver el directorio."
+                },
+                "invite": {
+                    "title": "Invitar miembro del equipo",
+                    "description": "Añade un nuevo miembro para colaborar en este directorio.",
+                    "emailLabel": "Correo electrónico",
+                    "emailPlaceholder": "colega@ejemplo.com",
+                    "roleLabel": "Rol",
+                    "submit": "Enviar invitación",
+                    "cancel": "Cancelar",
+                    "success": "Miembro invitado con éxito.",
+                    "errors": {
+                        "emailRequired": "El correo electrónico es requerido.",
+                        "failed": "Error al invitar al miembro. Por favor, inténtalo de nuevo."
+                    }
+                },
+                "confirmRemove": {
+                    "title": "Eliminar miembro",
+                    "description": "¿Estás seguro de que quieres eliminar a {username} de este directorio? Perderá todo el acceso.",
+                    "confirm": "Eliminar",
+                    "cancel": "Cancelar"
+                },
+                "roleUpdated": "Rol del miembro actualizado.",
+                "memberRemoved": "Miembro eliminado con éxito.",
+                "errors": {
+                    "updateFailed": "Error al actualizar el rol del miembro.",
+                    "removeFailed": "Error al eliminar el miembro."
+                }
             },
             "statusCard": {
                 "notStarted": {

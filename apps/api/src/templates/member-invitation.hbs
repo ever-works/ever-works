@@ -1,0 +1,198 @@
+<html lang='en'>
+    <head>
+        <meta charset='UTF-8' />
+        <meta name='viewport' content='width=device-width, initial-scale=1.0' />
+        <title>You've been invited to collaborate</title>
+        <style>
+            body {
+                margin: 0;
+                padding: 0;
+                font-family:
+                    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+                    sans-serif;
+                background-color: #f8fafc;
+                line-height: 1.6;
+            }
+            .container {
+                max-width: 600px;
+                margin: 0 auto;
+            }
+            .logo-section {
+                padding: 40px 20px 30px;
+                text-align: center;
+            }
+            .logo-title {
+                font-size: 28px;
+                font-weight: 600;
+                color: #1e293b;
+                margin: 0;
+            }
+            .logo-subtitle {
+                font-size: 14px;
+                color: #94a3b8;
+                margin: 5px 0 0;
+            }
+            .main-card {
+                margin: 0 20px 40px;
+                background-color: #ffffff;
+                border-radius: 8px;
+                padding: 40px 30px;
+            }
+            .icon {
+                text-align: center;
+                font-size: 40px;
+                margin-bottom: 20px;
+            }
+            .title {
+                font-size: 24px;
+                color: #1e293b;
+                font-weight: 600;
+                text-align: center;
+                margin: 0 0 10px;
+            }
+            .subtitle {
+                text-align: center;
+                color: #64748b;
+                margin: 0 0 30px;
+                font-size: 16px;
+            }
+            .info-box {
+                background-color: #f8fafc;
+                border-radius: 6px;
+                padding: 20px;
+                margin-bottom: 25px;
+            }
+            .info-row {
+                display: flex;
+                margin-bottom: 10px;
+            }
+            .info-row:last-child {
+                margin-bottom: 0;
+            }
+            .info-label {
+                font-size: 14px;
+                color: #94a3b8;
+                width: 100px;
+                flex-shrink: 0;
+            }
+            .info-value {
+                font-size: 14px;
+                color: #1e293b;
+                font-weight: 500;
+            }
+            .role-badge {
+                display: inline-block;
+                padding: 4px 12px;
+                background-color: #e0e7ff;
+                color: #4338ca;
+                border-radius: 9999px;
+                font-size: 13px;
+                font-weight: 500;
+            }
+            .button {
+                display: inline-block;
+                text-decoration: none;
+                background-color: #1e293b;
+                color: #ffffff;
+                font-size: 16px;
+                font-weight: 500;
+                padding: 12px 48px;
+                border-radius: 6px;
+                text-align: center;
+                width: 100%;
+                box-sizing: border-box;
+            }
+            .button-container {
+                text-align: center;
+            }
+            .footer {
+                padding: 0 20px 40px;
+                text-align: center;
+            }
+            .footer-text {
+                font-size: 14px;
+                color: #94a3b8;
+                margin: 0;
+            }
+        </style>
+    </head>
+    <body>
+        <div class='container'>
+            <!-- Logo Section -->
+            <div class='logo-section'>
+                <h1 class='logo-title'>{{appName}}</h1>
+                <p class='logo-subtitle'>by {{companyOwner}}</p>
+            </div>
+
+            <!-- Main Card -->
+            <div class='main-card'>
+                <!-- Icon -->
+                <div class='icon'>👥</div>
+
+                <!-- Title -->
+                <h2 class='title'>
+                    You've been invited!
+                </h2>
+
+                <p class='subtitle'>
+                    {{inviterName}}
+                    has invited you to collaborate on a directory.
+                </p>
+
+                <!-- Invitation Details -->
+                <div class='info-box'>
+                    <table
+                        width='100%'
+                        cellpadding='0'
+                        cellspacing='0'
+                        style='border-collapse: collapse;'
+                    >
+                        <tr>
+                            <td
+                                style='padding: 8px 0; font-size: 14px; color: #94a3b8; width: 100px;'
+                            >Directory</td>
+                            <td
+                                style='padding: 8px 0; font-size: 14px; color: #1e293b; font-weight: 500;'
+                            >{{directoryName}}</td>
+                        </tr>
+                        <tr>
+                            <td
+                                style='padding: 8px 0; font-size: 14px; color: #94a3b8; width: 100px;'
+                            >Your Role</td>
+                            <td style='padding: 8px 0;'>
+                                <span class='role-badge'>{{roleName}}</span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td
+                                style='padding: 8px 0; font-size: 14px; color: #94a3b8; width: 100px;'
+                            >Invited by</td>
+                            <td
+                                style='padding: 8px 0; font-size: 14px; color: #1e293b; font-weight: 500;'
+                            >{{inviterName}}</td>
+                        </tr>
+                    </table>
+                </div>
+
+                <!-- CTA Button -->
+                <div class='button-container'>
+                    <a href='{{directoryUrl}}' class='button'>
+                        View Directory
+                    </a>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div class='footer'>
+                <p class='footer-text'>
+                    If you didn't expect this invitation, you can safely ignore this email.<br /><br
+                    />
+                    ©
+                    {{currentYear}}
+                    {{companyOwner}}
+                    All rights reserved.
+                </p>
+            </div>
+        </div>
+    </body>
+</html>
