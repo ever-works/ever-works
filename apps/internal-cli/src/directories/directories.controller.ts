@@ -9,7 +9,7 @@ import {
     Post,
     Query,
 } from '@nestjs/common';
-import { DirectoryRepository, UserRepository } from '@packages/agent/database';
+import { UserRepository } from '@packages/agent/database';
 import { DeployVercelDto, VercelService } from '@packages/agent/deploy';
 import { CreateDirectoryDto } from '@packages/agent/dto';
 import {
@@ -28,6 +28,7 @@ import {
 import {
     DirectoryGenerationService,
     DirectoryLifecycleService,
+    DirectoryOwnershipService,
     DirectoryQueryService,
 } from '@packages/agent/services';
 import { UpdateWebsiteRepositoryResponseDto } from '@packages/agent/website-generator';
@@ -38,8 +39,8 @@ export class DirectoriesController {
         private readonly directoryQueryService: DirectoryQueryService,
         private readonly directoryLifecycleService: DirectoryLifecycleService,
         private readonly directoryGenerationService: DirectoryGenerationService,
+        private readonly ownershipService: DirectoryOwnershipService,
         private readonly vercelService: VercelService,
-        private readonly directoryRepository: DirectoryRepository,
         private readonly userRepository: UserRepository,
     ) {}
 
@@ -165,11 +166,8 @@ export class DirectoriesController {
 
         const user = await this.userRepository.createOrGetLocalUser();
 
-        // some db query result:
-        const directory = await this.directoryRepository.findById(id);
-        if (!directory) {
-            throw new NotFoundException('Directory not found');
-        }
+        // Verify user has edit access to the directory
+        const { directory } = await this.ownershipService.ensureCanEdit(id, user.id);
 
         const vercel = vercelToken || process.env.VERCEL_TOKEN;
         if (!vercel) {

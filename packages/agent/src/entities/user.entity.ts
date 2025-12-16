@@ -17,6 +17,7 @@ import { DirectoryGenerationHistory } from './directory-generation-history.entit
 import { UserSubscription } from './user-subscription.entity';
 import { SubscriptionPlan } from './subscription-plan.entity';
 import { DirectorySchedule } from './directory-schedule.entity';
+import { DirectoryMember } from './directory-member.entity';
 
 @Entity({ name: 'users' })
 export class User {
@@ -91,6 +92,9 @@ export class User {
 
     @OneToMany(() => DirectorySchedule, (schedule) => schedule.user, { lazy: true })
     directorySchedules?: Promise<ClassToObject<DirectorySchedule>[]>;
+
+    @OneToMany(() => DirectoryMember, (member) => member.user, { lazy: true })
+    directoryMemberships?: Promise<ClassToObject<DirectoryMember>[]>;
 
     @Column({ nullable: true })
     defaultPlanId?: string | null;

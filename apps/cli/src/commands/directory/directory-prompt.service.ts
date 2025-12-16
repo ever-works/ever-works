@@ -14,6 +14,8 @@ export type {
     Directory,
 } from '@packages/cli-shared';
 
+export { DirectoryMemberRole } from '@packages/cli-shared';
+
 export class DirectoryPromptService extends BaseDirectoryPromptService {
     private apiService = getApiService();
 

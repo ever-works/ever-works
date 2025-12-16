@@ -3,7 +3,7 @@ import chalk from 'chalk';
 import ora from 'ora';
 import { requireAuth } from '../auth';
 import { getApiService } from '../../services/api.service';
-import { Directory } from '@packages/cli-shared';
+import { Directory, DirectoryMemberRole } from '@packages/cli-shared';
 import { handleCliError } from '../../utils/error';
 
 export const listCommand = new Command('list')
@@ -38,8 +38,19 @@ export const listCommand = new Command('list')
                 console.log(chalk.cyan('\nDirectories:'));
                 console.log(chalk.gray('─'.repeat(80)));
 
+                const ownedCount = directories.filter(
+                    (d) => d.userRole === DirectoryMemberRole.OWNER || !d.userRole,
+                ).length;
+                const sharedCount = directories.length - ownedCount;
+
                 directories.forEach((dir, index) => {
-                    console.log(chalk.white(`${index + 1}. ${dir.name}`));
+                    const role = dir.userRole || DirectoryMemberRole.OWNER;
+                    const isShared = role !== DirectoryMemberRole.OWNER;
+                    const roleLabel = isShared
+                        ? chalk.magenta(`[${role}]`)
+                        : chalk.gray(`[${role}]`);
+
+                    console.log(chalk.white(`${index + 1}. ${dir.name} ${roleLabel}`));
                     console.log(chalk.gray(`   Slug: ${dir.slug}`));
                     console.log(
                         chalk.gray(
@@ -54,7 +65,10 @@ export const listCommand = new Command('list')
                 });
 
                 console.log(chalk.gray('─'.repeat(80)));
-                console.log(chalk.cyan(`Total: ${directories.length} directories`));
+                console.log(
+                    chalk.cyan(`Total: ${directories.length} directories`) +
+                        chalk.gray(` (${ownedCount} owned, ${sharedCount} shared with you)`),
+                );
             } catch (error) {
                 spinner.fail('Failed to load directories');
                 throw error;

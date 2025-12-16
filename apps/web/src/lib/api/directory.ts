@@ -8,6 +8,7 @@ import {
     DirectoryScheduleCadence,
     DirectoryScheduleStatus,
     DirectoryScheduleBillingMode,
+    DirectoryMemberRole,
 } from './enums';
 import { APIResponse, ItemData } from './types';
 import { CreateItemsGeneratorDto, ItemsGeneratorResponse } from './items-generator';
@@ -85,6 +86,9 @@ export interface Directory {
     scheduledCadence?: DirectoryScheduleCadence | null;
     scheduledNextRunAt?: string | null;
     scheduledStatus?: DirectoryScheduleStatus | null;
+    // User's role in this directory (owner, manager, editor, viewer)
+    // This is computed based on user's access - creator is always 'owner'
+    userRole?: DirectoryMemberRole;
 }
 
 export interface DirectoryScheduleAllowedCadence {

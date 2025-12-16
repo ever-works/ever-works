@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, ILike, LessThan, IsNull } from 'typeorm';
+import { Repository, ILike, LessThan, IsNull, In } from 'typeorm';
 import { Directory } from '../../entities/directory.entity';
-import { User } from '../../entities';
+import { User, DirectoryMember } from '../../entities';
 import { prepareLikeSearchTerm } from '../utils';
 
 @Injectable()
@@ -226,5 +226,111 @@ export class DirectoryRepository {
         });
 
         return stalledDirectories;
+    }
+
+    /**
+     * Find all directories accessible to a user (as creator OR as member).
+     * This combines owned directories with those the user has been invited to.
+     */
+    async findAllAccessible(options?: {
+        userId: string;
+        memberDirectoryIds?: string[];
+        limit?: number;
+        offset?: number;
+        search?: string;
+    }): Promise<Directory[]> {
+        const { userId, memberDirectoryIds = [], limit, offset, search } = options || {};
+
+        if (!userId) {
+            return [];
+        }
+
+        const queryBuilder = this.repository
+            .createQueryBuilder('directory')
+            .leftJoinAndSelect('directory.user', 'user')
+            .leftJoinAndSelect('user.oauthTokens', 'oauthTokens');
+
+        // User has access if they are the creator OR they have a membership
+        if (memberDirectoryIds.length > 0) {
+            queryBuilder.where(
+                '(directory.userId = :userId OR directory.id IN (:...memberDirectoryIds))',
+                { userId, memberDirectoryIds },
+            );
+        } else {
+            queryBuilder.where('directory.userId = :userId', { userId });
+        }
+
+        // Apply search filter
+        if (search) {
+            const sanitizedSearch = prepareLikeSearchTerm(search);
+            if (sanitizedSearch) {
+                queryBuilder.andWhere(
+                    '(directory.name ILIKE :search OR directory.description ILIKE :search OR directory.slug ILIKE :search)',
+                    { search: `%${sanitizedSearch}%` },
+                );
+            }
+        }
+
+        queryBuilder.orderBy('directory.updatedAt', 'DESC');
+
+        if (limit) {
+            queryBuilder.take(limit);
+        }
+
+        if (offset) {
+            queryBuilder.skip(offset);
+        }
+
+        return queryBuilder.getMany();
+    }
+
+    /**
+     * Count all directories accessible to a user (as creator OR as member).
+     */
+    async countAllAccessible(options?: {
+        userId: string;
+        memberDirectoryIds?: string[];
+        search?: string;
+    }): Promise<number> {
+        const { userId, memberDirectoryIds = [], search } = options || {};
+
+        if (!userId) {
+            return 0;
+        }
+
+        const queryBuilder = this.repository.createQueryBuilder('directory');
+
+        // User has access if they are the creator OR they have a membership
+        if (memberDirectoryIds.length > 0) {
+            queryBuilder.where(
+                '(directory.userId = :userId OR directory.id IN (:...memberDirectoryIds))',
+                { userId, memberDirectoryIds },
+            );
+        } else {
+            queryBuilder.where('directory.userId = :userId', { userId });
+        }
+
+        // Apply search filter
+        if (search) {
+            const sanitizedSearch = prepareLikeSearchTerm(search);
+            if (sanitizedSearch) {
+                queryBuilder.andWhere(
+                    '(directory.name ILIKE :search OR directory.description ILIKE :search OR directory.slug ILIKE :search)',
+                    { search: `%${sanitizedSearch}%` },
+                );
+            }
+        }
+
+        return queryBuilder.getCount();
+    }
+
+    /**
+     * Find a directory by ID with members relation loaded.
+     */
+    async findByIdWithMembers(id: string): Promise<Directory | null> {
+        return this.repository.findOne({
+            where: { id },
+            relations: ['user', 'user.oauthTokens', 'members', 'members.user'],
+        });
     }
 }

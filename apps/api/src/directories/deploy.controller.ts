@@ -1,20 +1,9 @@
-import {
-    BadRequestException,
-    Body,
-    Controller,
-    ForbiddenException,
-    Inject,
-    NotFoundException,
-    Param,
-    Post,
-    UseGuards,
-} from '@nestjs/common';
-import { DirectoryRepository } from '@packages/agent/database';
+import { BadRequestException, Body, Controller, Param, Post, UseGuards } from '@nestjs/common';
 import { DeployVercelDto, VercelService } from '@packages/agent/deploy';
+import { DirectoryOwnershipService } from '@packages/agent/services';
 import { AuthService, CurrentUser, JwtAuthGuard } from '../auth';
 import { AuthenticatedUser } from '../auth/types/jwt.types';
 import { VercelDeploymentVerifierService } from './tasks/vercel-deployment-verifier.service';
-import { Directory } from '@packages/agent/entities';
 import { VercelTokenDto } from './dto/deploy.dto';
 
 @Controller('api/deploy')
@@ -22,7 +11,7 @@ import { VercelTokenDto } from './dto/deploy.dto';
 export class DeployController {
     constructor(
         private readonly vercelService: VercelService,
-        private readonly directoryRepository: DirectoryRepository,
+        private readonly ownershipService: DirectoryOwnershipService,
         private readonly authService: AuthService,
         private readonly vercelDeploymentVerifierService: VercelDeploymentVerifierService,
     ) {}
@@ -36,7 +25,7 @@ export class DeployController {
         const { VERCEL_TOKEN, GITHUB_TOKEN, vercelTeamScope } = deployVercel;
 
         const user = await this.authService.getUser(auth.userId);
-        const directory = await this.validateDirectoryOwnership(id, user.id);
+        const { directory } = await this.ownershipService.ensureCanEdit(id, user.id);
 
         const ghToken = GITHUB_TOKEN || user.getGitToken();
 
@@ -129,7 +118,7 @@ export class DeployController {
         @Param('id') id: string,
     ) {
         const user = await this.authService.getUser(auth.userId);
-        const directory = await this.validateDirectoryOwnership(id, user.id);
+        const { directory } = await this.ownershipService.ensureCanView(id, user.id);
 
         if (directory.website) {
             return {
@@ -159,28 +148,5 @@ export class DeployController {
             deploymentState: existingDeployment.deploymentState,
             found: existingDeployment.found,
         };
-    }
-
-    private async validateDirectoryOwnership(
-        directoryId: string,
-        userId: string,
-    ): Promise<Directory> {
-        const directory = await this.directoryRepository.findById(directoryId);
-
-        if (!directory) {
-            throw new NotFoundException({
-                status: 'error',
-                message: `Directory with id '${directoryId}' not found`,
-            });
-        }
-
-        if (directory.userId !== userId) {
-            throw new ForbiddenException({
-                status: 'error',
-                message: 'You do not have permission to access this directory',
-            });
-        }
-
-        return directory;
     }
 }

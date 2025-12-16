@@ -15,6 +15,7 @@ interface ItemCardProps {
     item: ItemData;
     viewMode: 'grid' | 'list';
     directoryId: string;
+    canEdit?: boolean;
     onDelete?: () => void;
     onUpdate?: (item: Partial<ItemData>) => void;
 }
@@ -23,6 +24,7 @@ export const ItemCard = memo(function ItemCard({
     item,
     viewMode,
     directoryId,
+    canEdit = false,
     onDelete,
     onUpdate,
 }: ItemCardProps) {
@@ -55,6 +57,7 @@ export const ItemCard = memo(function ItemCard({
                 item={item}
                 onDelete={handleDelete}
                 directoryId={directoryId}
+                canEdit={canEdit}
                 onUpdate={onUpdate}
                 isPending={isPending}
             />
@@ -66,6 +69,7 @@ export const ItemCard = memo(function ItemCard({
             item={item}
             onDelete={handleDelete}
             directoryId={directoryId}
+            canEdit={canEdit}
             onUpdate={onUpdate}
             isPending={isPending}
         />
@@ -76,6 +80,7 @@ interface ItemCardViewProps {
     item: ItemData;
     onDelete: () => void;
     isPending: boolean;
+    canEdit?: boolean;
     onUpdate?: (item: Partial<ItemData>) => void;
     directoryId: string;
 }
@@ -84,6 +89,7 @@ const ItemCardList = memo(function ItemCardList({
     item,
     onDelete,
     isPending,
+    canEdit = false,
     onUpdate,
     directoryId,
 }: ItemCardViewProps) {
@@ -126,13 +132,15 @@ const ItemCardList = memo(function ItemCardList({
                         <ExternalLink className="w-3 h-3" />
                     </Link>
                 )}
-                <ItemActions
-                    item={item}
-                    directoryId={directoryId}
-                    onDelete={onDelete}
-                    onUpdate={onUpdate}
-                    isPending={isPending}
-                />
+                {canEdit && (
+                    <ItemActions
+                        item={item}
+                        directoryId={directoryId}
+                        onDelete={onDelete}
+                        onUpdate={onUpdate}
+                        isPending={isPending}
+                    />
+                )}
             </div>
         </div>
     );
@@ -142,6 +150,7 @@ const ItemCardGrid = memo(function ItemCardGrid({
     item,
     onDelete,
     isPending,
+    canEdit = false,
     onUpdate,
     directoryId,
 }: ItemCardViewProps) {
@@ -160,13 +169,15 @@ const ItemCardGrid = memo(function ItemCardGrid({
                 <h4 className="font-medium text-text dark:text-text-dark line-clamp-1">
                     {item.name}
                 </h4>
-                <ItemActions
-                    item={item}
-                    directoryId={directoryId}
-                    onDelete={onDelete}
-                    onUpdate={onUpdate}
-                    isPending={isPending}
-                />
+                {canEdit && (
+                    <ItemActions
+                        item={item}
+                        directoryId={directoryId}
+                        onDelete={onDelete}
+                        onUpdate={onUpdate}
+                        isPending={isPending}
+                    />
+                )}
             </div>
 
             <ItemBadgesDisplay badges={item.badges} className="mb-2" />

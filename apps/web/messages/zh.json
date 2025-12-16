@@ -345,6 +345,15 @@
             "fromLastMonth": "较上月"
         },
         "directoryCard": {
+            "role": {
+                "owner": "所有者",
+                "manager": "管理员",
+                "editor": "编辑者",
+                "viewer": "查看者"
+            },
+            "shared": {
+                "tooltip": "以{role}身份与您共享"
+            },
             "status": {
                 "active": "活跃",
                 "notStarted": "未开始",
@@ -368,6 +377,15 @@
             "failedToGenerateItems": "生成项目失败。请重试。",
             "generationCompleted": "生成成功完成",
             "generationCancelled": "生成已取消",
+            "role": {
+                "owner": "所有者",
+                "manager": "管理员",
+                "editor": "编辑者",
+                "viewer": "查看者"
+            },
+            "shared": {
+                "tooltip": "以{role}身份与您共享"
+            },
             "status": {
                 "notStarted": "未开始",
                 "generating": "生成中",
@@ -448,6 +466,13 @@
             },
             "info": {
                 "title": "目录信息",
+                "yourRole": "您的角色",
+                "role": {
+                    "owner": "所有者",
+                    "manager": "管理员",
+                    "editor": "编辑者",
+                    "viewer": "查看者"
+                },
                 "slug": "标识符",
                 "repositories": "仓库",
                 "dataRepo": "数据仓库",

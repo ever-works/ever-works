@@ -64,3 +64,17 @@ export enum DirectoryScheduleBillingMode {
     SUBSCRIPTION = 'subscription',
     USAGE = 'usage',
 }
+
+/**
+ * Roles for directory members.
+ * - OWNER: Full control, can delete directory and manage all members
+ * - MANAGER: Can edit directory and manage content, invite members (except owner)
+ * - EDITOR: Can edit directory content but cannot manage members
+ * - VIEWER: Read-only access to directory
+ */
+export enum DirectoryMemberRole {
+    OWNER = 'owner',
+    MANAGER = 'manager',
+    EDITOR = 'editor',
+    VIEWER = 'viewer',
+}

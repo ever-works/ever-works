@@ -27,7 +27,14 @@ export const deleteCommand = new Command('delete')
             }
 
             const directory = selection.directory;
-            console.log(chalk.green(`\n✓ Selected directory: ${directory.slug}`));
+            const role = selection.role!;
+            const isShared = selection.isShared!;
+
+            console.log(
+                chalk.green(
+                    `\n✓ Selected directory: ${directoryPrompt.formatSelectedDirectory(directory, role, isShared)}`,
+                ),
+            );
 
             // Show warning about what will be deleted
             console.log(chalk.red('\n⚠️  WARNING: This action cannot be undone!'));

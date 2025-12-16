@@ -345,6 +345,15 @@
             "fromLastMonth": "del mes pasado"
         },
         "directoryCard": {
+            "role": {
+                "owner": "Propietario",
+                "manager": "Administrador",
+                "editor": "Editor",
+                "viewer": "Observador"
+            },
+            "shared": {
+                "tooltip": "Compartido contigo como {role}"
+            },
             "status": {
                 "active": "Activo",
                 "notStarted": "No Iniciado",
@@ -368,6 +377,15 @@
             "failedToGenerateItems": "No se pudieron generar los elementos. Por favor, inténtalo de nuevo.",
             "generationCompleted": "Generación completada exitosamente",
             "generationCancelled": "La generación fue cancelada",
+            "role": {
+                "owner": "Propietario",
+                "manager": "Administrador",
+                "editor": "Editor",
+                "viewer": "Observador"
+            },
+            "shared": {
+                "tooltip": "Compartido contigo como {role}"
+            },
             "status": {
                 "notStarted": "No Iniciado",
                 "generating": "Generando",
@@ -448,6 +466,13 @@
             },
             "info": {
                 "title": "Información del Directorio",
+                "yourRole": "Tu Rol",
+                "role": {
+                    "owner": "Propietario",
+                    "manager": "Administrador",
+                    "editor": "Editor",
+                    "viewer": "Observador"
+                },
                 "slug": "Slug",
                 "repositories": "Repositorios",
                 "dataRepo": "Repositorio de Datos",

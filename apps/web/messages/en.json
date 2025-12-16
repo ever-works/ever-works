@@ -354,6 +354,15 @@
                 "cancelled": "Cancelled",
                 "idle": "Idle"
             },
+            "role": {
+                "owner": "Owner",
+                "manager": "Manager",
+                "editor": "Editor",
+                "viewer": "Viewer"
+            },
+            "shared": {
+                "tooltip": "Shared with you as {role}"
+            },
             "noDescription": "No description provided",
             "items": "{count} items",
             "views": "{count} views",
@@ -368,6 +377,15 @@
             "failedToGenerateItems": "Failed to generate items. Please try again.",
             "generationCompleted": "Generation completed successfully",
             "generationCancelled": "Generation was cancelled",
+            "role": {
+                "owner": "Owner",
+                "manager": "Manager",
+                "editor": "Editor",
+                "viewer": "Viewer"
+            },
+            "shared": {
+                "tooltip": "Shared with you as {role}"
+            },
             "status": {
                 "notStarted": "Not Started",
                 "generating": "Generating",
@@ -540,6 +558,13 @@
             },
             "info": {
                 "title": "Directory Information",
+                "yourRole": "Your Role",
+                "role": {
+                    "owner": "Owner",
+                    "manager": "Manager",
+                    "editor": "Editor",
+                    "viewer": "Viewer"
+                },
                 "slug": "Slug",
                 "repositories": "Repositories",
                 "dataRepo": "Data Repository",

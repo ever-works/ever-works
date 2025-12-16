@@ -13,9 +13,10 @@ import { getCategoryName } from '@/lib/utils/items';
 interface ItemsListProps {
     items: ItemData[];
     directoryId: string;
+    canEdit?: boolean;
 }
 
-export function ItemsList({ items: initialItems, directoryId }: ItemsListProps) {
+export function ItemsList({ items: initialItems, directoryId, canEdit = false }: ItemsListProps) {
     const t = useTranslations('dashboard.directoryDetail.items');
     const [items, setItems] = useState(() => sortItems(initialItems));
     const [searchQuery, setSearchQuery] = useState('');
@@ -155,6 +156,7 @@ export function ItemsList({ items: initialItems, directoryId }: ItemsListProps) 
                                 item={item}
                                 viewMode={viewMode}
                                 directoryId={directoryId}
+                                canEdit={canEdit}
                                 onDelete={() => handleItemDelete(item.slug!)}
                                 onUpdate={(updated) =>
                                     handleItemUpdate({ ...updated, slug: item.slug })
@@ -168,6 +170,7 @@ export function ItemsList({ items: initialItems, directoryId }: ItemsListProps) 
                         items={filteredItems}
                         viewMode={viewMode}
                         directoryId={directoryId}
+                        canEdit={canEdit}
                         onItemDelete={handleItemDelete}
                         onItemUpdate={handleItemUpdate}
                         visibleRange={visibleRange}
@@ -187,6 +190,7 @@ interface VirtualizedListProps {
     items: ItemData[];
     viewMode: 'grid' | 'list';
     directoryId: string;
+    canEdit?: boolean;
     onItemDelete: (itemSlug: string) => void;
     onItemUpdate: (item: Partial<ItemData> & { slug?: string }) => void;
     visibleRange: { start: number; end: number };
@@ -197,6 +201,7 @@ function VirtualizedList({
     items,
     viewMode,
     directoryId,
+    canEdit = false,
     onItemDelete,
     onItemUpdate,
     visibleRange,
@@ -288,6 +293,7 @@ function VirtualizedList({
                         item={item}
                         viewMode={viewMode}
                         directoryId={directoryId}
+                        canEdit={canEdit}
                         onDelete={() => onItemDelete(item.slug!)}
                         onUpdate={(updated) => onItemUpdate({ ...updated, slug: item.slug })}
                     />

@@ -3,9 +3,9 @@
 import { Directory } from '@/lib/api/types-only';
 import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
-import { GenerateStatusType } from '@/lib/api/enums';
-import { Link as IconLink } from 'lucide-react';
-import { useDirectoryDetail } from './DirectoryDetailContext';
+import { DirectoryMemberRole, GenerateStatusType } from '@/lib/api/enums';
+import { Link as IconLink, Users } from 'lucide-react';
+import { useDirectoryDetail, useDirectoryPermissions } from './DirectoryDetailContext';
 import { getStepText } from '@/lib/utils/generator-steps';
 import { Link } from '@/i18n/navigation';
 
@@ -17,8 +17,10 @@ export function DirectoryHeader({ directory }: DirectoryHeaderProps) {
     const t = useTranslations('dashboard.directoryDetail');
     const tProgress = useTranslations('dashboard.directoryDetail.progress');
     const { repoLinks } = useDirectoryDetail();
+    const { role } = useDirectoryPermissions();
 
     const isGenerating = directory.generateStatus?.status === GenerateStatusType.GENERATING;
+    const isShared = role && role !== DirectoryMemberRole.OWNER;
 
     const getStatusDisplay = () => {
         if (!directory.generateStatus) {
@@ -117,6 +119,18 @@ export function DirectoryHeader({ directory }: DirectoryHeaderProps) {
                         <h1 className="text-3xl font-bold text-text dark:text-text-dark">
                             {directory.name}
                         </h1>
+                        {isShared && (
+                            <span
+                                className={cn(
+                                    'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium',
+                                    'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
+                                )}
+                                title={t('shared.tooltip', { role: t(`role.${role}`) })}
+                            >
+                                <Users className="w-4 h-4" />
+                                {t(`role.${role}`)}
+                            </span>
+                        )}
                         <span
                             className={cn(
                                 'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium',

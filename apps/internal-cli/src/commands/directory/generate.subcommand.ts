@@ -53,17 +53,23 @@ export class GenerateSubCommand extends CommandRunner {
             }
 
             // Select directory
-            const { directory, cancelled } = await this.directoryPrompt.promptDirectorySelection(
+            const selection = await this.directoryPrompt.promptDirectorySelection(
                 this.directoryRepository,
             );
 
-            if (cancelled || !directory) {
+            if (selection.cancelled || !selection.directory) {
                 console.log(chalk.blue('\nℹ Generation cancelled.'));
                 return;
             }
 
+            const directory = selection.directory;
+            const role = selection.role!;
+            const isShared = selection.isShared!;
+
             console.log(
-                chalk.green(`\n✓ Selected directory: ${directory.name} (${directory.slug})`),
+                chalk.green(
+                    `\n✓ Selected directory: ${this.directoryPrompt.formatSelectedDirectory(directory, role, isShared)}`,
+                ),
             );
 
             if (directory.generateStatus?.status === 'generating') {

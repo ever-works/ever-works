@@ -27,9 +27,18 @@ export interface SlugConflictResolution {
 	finalSlug?: string;
 }
 
+export enum DirectoryMemberRole {
+	OWNER = 'owner',
+	MANAGER = 'manager',
+	EDITOR = 'editor',
+	VIEWER = 'viewer'
+}
+
 export interface DirectorySelection {
 	directory: Directory | null;
 	cancelled: boolean;
+	role?: DirectoryMemberRole;
+	isShared?: boolean;
 }
 
 export enum GenerateStatusType {
@@ -60,6 +69,7 @@ export interface Directory {
 	generateStatus?: GenerateStatus;
 	deploymentState?: GetProjectsReadyState;
 	deploymentStartedAt?: string;
+	userRole?: DirectoryMemberRole;
 }
 
 export class DirectoryPromptService extends BasePromptService {
@@ -157,11 +167,17 @@ export class DirectoryPromptService extends BasePromptService {
 
 		type Choice = { name: string; value: Directory | null; short: string };
 
-		const choices: Choice[] = directories.map((dir) => ({
-			name: `${chalk.cyan(dir.slug)} - ${dir.name} ${chalk.gray(`(${dir.owner})`)}`,
-			value: dir,
-			short: dir.slug
-		}));
+		const choices: Choice[] = directories.map((dir) => {
+			const role = dir.userRole || DirectoryMemberRole.OWNER;
+			const isShared = role !== DirectoryMemberRole.OWNER;
+			const roleLabel = this.formatRoleLabel(role, isShared);
+
+			return {
+				name: `${chalk.cyan(dir.slug)} - ${dir.name} ${roleLabel} ${chalk.gray(`(${dir.owner})`)}`,
+				value: dir,
+				short: dir.slug
+			};
+		});
 
 		choices.push({
 			name: chalk.gray('Cancel'),
@@ -183,7 +199,39 @@ export class DirectoryPromptService extends BasePromptService {
 			return { directory: null, cancelled: true };
 		}
 
-		return { directory: selectedDirectory, cancelled: false };
+		// Determine role for the selected directory
+		const role = selectedDirectory.userRole || DirectoryMemberRole.OWNER;
+		const isShared = role !== DirectoryMemberRole.OWNER;
+
+		return {
+			directory: selectedDirectory,
+			cancelled: false,
+			role,
+			isShared
+		};
+	}
+
+	/**
+	 * Formats a directory selection message showing the role.
+	 */
+	formatSelectedDirectory(directory: Directory, role: DirectoryMemberRole, isShared: boolean): string {
+		const roleLabel = this.formatRoleLabel(role, isShared);
+		return `${directory.name} (${directory.slug}) ${roleLabel}`;
+	}
+
+	/**
+	 * Formats role label for display
+	 */
+	protected formatRoleLabel(role: DirectoryMemberRole, isShared: boolean): string {
+		const roleLabels: Record<DirectoryMemberRole, string> = {
+			[DirectoryMemberRole.OWNER]: 'Owner',
+			[DirectoryMemberRole.MANAGER]: 'Manager',
+			[DirectoryMemberRole.EDITOR]: 'Editor',
+			[DirectoryMemberRole.VIEWER]: 'Viewer'
+		};
+
+		const label = roleLabels[role] || role;
+		return isShared ? chalk.magenta(`[${label}]`) : chalk.gray(`[${label}]`);
 	}
 
 	/**

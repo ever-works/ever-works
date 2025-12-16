@@ -14,11 +14,13 @@ import type {
     DirectoryScheduleCadence,
     DirectoryScheduleStatus,
     GenerateStatus,
+    DirectoryMemberRole,
 } from './types';
 import type { PRUpdate } from '@src/data-generator';
 import { DirectoryGenerationHistory } from './directory-generation-history.entity';
 import { TimestampColumn } from './_types';
 import { DirectorySchedule } from './directory-schedule.entity';
+import { DirectoryMember } from './directory-member.entity';
 
 @Entity({ name: 'directories' })
 export class Directory {
@@ -79,6 +81,9 @@ export class Directory {
     @OneToOne(() => DirectorySchedule, (schedule) => schedule.directory)
     schedule?: ClassToObject<DirectorySchedule>;
 
+    @OneToMany(() => DirectoryMember, (member) => member.directory)
+    members?: ClassToObject<DirectoryMember>[];
+
     @Column({ type: 'boolean', default: false })
     scheduledUpdatesEnabled: boolean;
 
@@ -132,6 +137,46 @@ export class Directory {
         return (
             this.owner || oauthToken?.username || oauthToken?.metadata?.login || this.user.username
         );
+    }
+
+    /**
+     * Check if a user is the creator/owner of this directory.
+     * Note: This checks the original creator (userId), not the OWNER role in members.
+     */
+    isCreator(userId: string): boolean {
+        return this.userId === userId;
+    }
+
+    /**
+     * Get member entry for a specific user.
+     * Returns undefined if members are not loaded or user is not a member.
+     */
+    getMember(userId: string): DirectoryMember | undefined {
+        if (!this.members) return undefined;
+        return this.members.find((m) => m.userId === userId) as DirectoryMember | undefined;
+    }
+
+    /**
+     * Check if a user has access to this directory (either as creator or as member).
+     * Note: Requires members relation to be loaded for member check.
+     */
+    hasAccess(userId: string): boolean {
+        if (this.isCreator(userId)) return true;
+        const member = this.getMember(userId);
+        return !!member;
+    }
+
+    /**
+     * Get the role of a user in this directory.
+     * Returns 'owner' for the creator, or the member's role if they're a member.
+     */
+    getUserRole(userId: string): DirectoryMemberRole | null {
+        if (this.isCreator(userId)) {
+            // Creator always has owner role
+            return 'owner' as DirectoryMemberRole;
+        }
+        const member = this.getMember(userId);
+        return member?.role || null;
     }
 }
 

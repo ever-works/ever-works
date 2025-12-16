@@ -4,6 +4,7 @@ import { ROUTES } from '@/lib/constants';
 import { DeployForm } from '@/components/directories/detail/deploy/DeployForm';
 import { VercelTokenAlert } from '@/components/directories/detail/deploy/VercelTokenAlert';
 import { GenerateStatusType } from '@/lib/api/enums';
+import { canDeploy } from '@/lib/permissions';
 
 type DeployPageParams = {
     params: Promise<{ id: string }>;
@@ -22,6 +23,11 @@ export default async function DeployPage({ params }: DeployPageParams) {
         ]);
         directory = res.directory;
         userProfile = userProfileRes;
+
+        // Server-side permission check: only editors+ can deploy
+        if (!canDeploy(directory.userRole)) {
+            notFound();
+        }
 
         // Only allow deploy if directory is generated
         if (directory.generateStatus?.status !== GenerateStatusType.GENERATED) {

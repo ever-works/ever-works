@@ -6,7 +6,7 @@ import { ROUTES } from '@/lib/constants';
 import { useTranslations } from 'next-intl';
 import { usePathname } from '@/i18n/navigation';
 import { Directory } from '@/lib/api';
-import { useDirectoryDetail } from './DirectoryDetailContext';
+import { useDirectoryDetail, useDirectoryPermissions } from './DirectoryDetailContext';
 
 interface DirectoryTabsProps {
     directory: Directory;
@@ -16,6 +16,7 @@ export function DirectoryTabs({ directory }: DirectoryTabsProps) {
     const t = useTranslations('dashboard.directoryDetail.tabs');
     const pathname = usePathname();
     const { config } = useDirectoryDetail();
+    const permissions = useDirectoryPermissions();
 
     const tabs = [
         {
@@ -51,6 +52,7 @@ export function DirectoryTabs({ directory }: DirectoryTabsProps) {
         {
             name: t('generator'),
             href: `${ROUTES.DASHBOARD_DIRECTORY(directory.id)}/generator`,
+            visible: permissions.canGenerate,
             icon: (
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path
@@ -66,7 +68,7 @@ export function DirectoryTabs({ directory }: DirectoryTabsProps) {
         {
             name: t('schedule'),
             href: `${ROUTES.DASHBOARD_DIRECTORY(directory.id)}/schedule`,
-            visible: Boolean(config),
+            visible: Boolean(config) && permissions.canManageSchedule,
             icon: (
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path
@@ -97,7 +99,7 @@ export function DirectoryTabs({ directory }: DirectoryTabsProps) {
         {
             name: t('deploy'),
             href: `${ROUTES.DASHBOARD_DIRECTORY(directory.id)}/deploy`,
-            visible: Boolean(config),
+            visible: Boolean(config) && permissions.canDeploy,
             icon: (
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path
@@ -113,6 +115,7 @@ export function DirectoryTabs({ directory }: DirectoryTabsProps) {
         {
             name: t('settings'),
             href: `${ROUTES.DASHBOARD_DIRECTORY(directory.id)}/settings`,
+            visible: permissions.canAccessSettings,
             icon: (
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path

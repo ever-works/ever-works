@@ -5,7 +5,8 @@ import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { useTranslations, useLocale } from 'next-intl';
 import type { Directory } from '@/lib/api/directory';
-import { GenerateStatusType } from '@/lib/api/enums';
+import { DirectoryMemberRole, GenerateStatusType } from '@/lib/api/enums';
+import { Users } from 'lucide-react';
 
 interface DirectoryCardProps {
     directory: Directory;
@@ -24,6 +25,8 @@ export function DirectoryCard({ directory }: DirectoryCardProps) {
     const locale = useLocale();
 
     const status = directory.generateStatus?.status;
+    const userRole = directory.userRole;
+    const isShared = userRole && userRole !== DirectoryMemberRole.OWNER;
 
     return (
         <Link
@@ -37,12 +40,26 @@ export function DirectoryCard({ directory }: DirectoryCardProps) {
             )}
         >
             <div className="flex items-start justify-between gap-4 mb-3">
-                <h3 className="text-lg font-semibold text-text dark:text-text-dark">
-                    {directory.name}
-                </h3>
+                <div className="flex items-center gap-2 min-w-0">
+                    <h3 className="text-lg font-semibold text-text dark:text-text-dark truncate">
+                        {directory.name}
+                    </h3>
+                    {isShared && (
+                        <span
+                            className={cn(
+                                'inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium shrink-0',
+                                'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
+                            )}
+                            title={t('shared.tooltip', { role: t(`role.${userRole}`) })}
+                        >
+                            <Users className="w-3 h-3" />
+                            {t(`role.${userRole}`)}
+                        </span>
+                    )}
+                </div>
                 <span
                     className={cn(
-                        'px-2 py-1 rounded text-xs font-medium whitespace-nowrap',
+                        'px-2 py-1 rounded text-xs font-medium whitespace-nowrap shrink-0',
                         status === GenerateStatusType.ERROR && 'bg-danger/10 text-danger',
                         status === GenerateStatusType.GENERATING && 'bg-info/10 text-info',
                         status === GenerateStatusType.GENERATED && 'bg-success/10 text-success',
@@ -61,6 +78,11 @@ export function DirectoryCard({ directory }: DirectoryCardProps) {
 
             <p className="text-sm text-text-muted dark:text-text-muted-dark mb-1">
                 /{directory.slug}
+                {directory.owner && (
+                    <span className="ml-1 text-text-secondary dark:text-text-secondary-dark">
+                        ({directory.owner})
+                    </span>
+                )}
             </p>
 
             <div className="flex-1 mb-4">
