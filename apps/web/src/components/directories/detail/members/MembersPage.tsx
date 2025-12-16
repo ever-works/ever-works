@@ -6,7 +6,7 @@ import { Directory, DirectoryMember, DirectoryOwner } from '@/lib/api';
 import { MembersList } from './MembersList';
 import { InviteMemberDialog } from './InviteMemberDialog';
 import { Button } from '@/components/ui/button';
-import { isOwner } from '@/lib/permissions';
+import { canManageMembers } from '@/lib/permissions';
 
 interface MembersPageProps {
     directory: Directory;
@@ -18,7 +18,7 @@ export function MembersPage({ directory, members: initialMembers, owner }: Membe
     const t = useTranslations('dashboard.directoryDetail.members');
     const [members, setMembers] = useState(initialMembers);
     const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
-    const canInvite = isOwner(directory.userRole) || directory.userRole === 'manager';
+    const canInvite = canManageMembers(directory.userRole);
 
     const handleMemberAdded = (member: DirectoryMember) => {
         setMembers((prev) => [...prev, member]);

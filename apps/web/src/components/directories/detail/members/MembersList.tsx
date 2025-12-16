@@ -1,11 +1,9 @@
 'use client';
 
-import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Directory, DirectoryMember, DirectoryOwner } from '@/lib/api';
-import { DirectoryMemberRole } from '@/lib/api/enums';
 import { MemberRow } from './MemberRow';
-import { isOwner } from '@/lib/permissions';
+import { canManageMembers } from '@/lib/permissions';
 
 interface MembersListProps {
     directory: Directory;
@@ -23,7 +21,6 @@ export function MembersList({
     onMemberUpdated,
 }: MembersListProps) {
     const t = useTranslations('dashboard.directoryDetail.members');
-    const currentUserIsOwner = isOwner(directory.userRole);
 
     return (
         <div className="bg-surface dark:bg-surface-dark border border-border dark:border-border-dark rounded-lg overflow-hidden">
@@ -57,8 +54,7 @@ export function MembersList({
                             key={member.id}
                             directoryId={directory.id}
                             member={member}
-                            canManage={currentUserIsOwner || directory.userRole === 'manager'}
-                            isCurrentUserOwner={currentUserIsOwner}
+                            canManage={canManageMembers(directory.userRole)}
                             onRemoved={() => onMemberRemoved(member.id)}
                             onUpdated={onMemberUpdated}
                         />

@@ -21,7 +21,6 @@ interface MemberRowProps {
     directoryId: string;
     member: DirectoryMember;
     canManage: boolean;
-    isCurrentUserOwner: boolean;
     onRemoved: () => void;
     onUpdated: (member: DirectoryMember) => void;
 }
@@ -30,7 +29,6 @@ export function MemberRow({
     directoryId,
     member,
     canManage,
-    isCurrentUserOwner,
     onRemoved,
     onUpdated,
 }: MemberRowProps) {
@@ -38,9 +36,6 @@ export function MemberRow({
     const [isUpdating, setIsUpdating] = useState(false);
     const [isRemoving, setIsRemoving] = useState(false);
     const [confirmRemoveOpen, setConfirmRemoveOpen] = useState(false);
-
-    const canModifyThisMember =
-        canManage && (isCurrentUserOwner || member.role !== DirectoryMemberRole.OWNER);
 
     const handleRoleChange = async (newRole: DirectoryMemberRole) => {
         if (newRole === member.role) return;
@@ -85,10 +80,6 @@ export function MemberRow({
         { value: DirectoryMemberRole.MANAGER, label: t('roles.manager') },
     ];
 
-    if (isCurrentUserOwner) {
-        roleOptions.push({ value: DirectoryMemberRole.OWNER, label: t('roles.owner') });
-    }
-
     return (
         <>
             <div className="px-4 py-3 flex items-center gap-4">
@@ -106,7 +97,7 @@ export function MemberRow({
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
-                    {canModifyThisMember ? (
+                    {canManage ? (
                         <Select
                             value={member.role}
                             onChange={(e) =>
@@ -127,7 +118,7 @@ export function MemberRow({
                             {t(`roles.${member.role}`)}
                         </span>
                     )}
-                    {canModifyThisMember && (
+                    {canManage && (
                         <Button
                             variant="ghost"
                             size="icon"

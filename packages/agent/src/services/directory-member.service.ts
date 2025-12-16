@@ -8,7 +8,7 @@ import { DirectoryMemberRepository } from '@src/database/repositories/directory-
 import { UserRepository } from '@src/database/repositories/user.repository';
 import { DirectoryOwnershipService } from './directory-ownership.service';
 import { DirectoryMember } from '@src/entities/directory-member.entity';
-import { DirectoryMemberRole } from '@src/entities/types';
+import { DirectoryMemberRole, ASSIGNABLE_MEMBER_ROLES } from '@src/entities/types';
 import { User } from '@src/entities/user.entity';
 import type { Directory } from '@src/entities';
 
@@ -62,15 +62,17 @@ export class DirectoryMemberService {
         userId: string,
         dto: InviteMemberDto,
     ): Promise<InviteMemberResult> {
-        const { directory, isCreator } = await this.ownershipService.ensureCanManageMembers(
+        const { directory } = await this.ownershipService.ensureCanManageMembers(
             directoryId,
             userId,
         );
 
-        if (dto.role === DirectoryMemberRole.OWNER && !isCreator) {
-            throw new ForbiddenException({
+        if (
+            !ASSIGNABLE_MEMBER_ROLES.includes(dto.role as (typeof ASSIGNABLE_MEMBER_ROLES)[number])
+        ) {
+            throw new BadRequestException({
                 status: 'error',
-                message: 'Only the directory creator can assign owner role',
+                message: 'Invalid role. Members can only be assigned: viewer, editor, or manager',
             });
         }
 
@@ -121,10 +123,7 @@ export class DirectoryMemberService {
         memberId: string,
         dto: UpdateMemberRoleDto,
     ): Promise<DirectoryMemberDto> {
-        const { isCreator } = await this.ownershipService.ensureCanManageMembers(
-            directoryId,
-            userId,
-        );
+        await this.ownershipService.ensureCanManageMembers(directoryId, userId);
 
         const member = await this.memberRepository.findById(memberId);
         if (!member || member.directoryId !== directoryId) {
@@ -134,17 +133,12 @@ export class DirectoryMemberService {
             });
         }
 
-        if (dto.role === DirectoryMemberRole.OWNER && !isCreator) {
-            throw new ForbiddenException({
+        if (
+            !ASSIGNABLE_MEMBER_ROLES.includes(dto.role as (typeof ASSIGNABLE_MEMBER_ROLES)[number])
+        ) {
+            throw new BadRequestException({
                 status: 'error',
-                message: 'Only the directory creator can assign owner role',
-            });
-        }
-
-        if (member.role === DirectoryMemberRole.OWNER && !isCreator) {
-            throw new ForbiddenException({
-                status: 'error',
-                message: 'Only the directory creator can modify an owner',
+                message: 'Invalid role. Members can only be assigned: viewer, editor, or manager',
             });
         }
 
@@ -157,23 +151,13 @@ export class DirectoryMemberService {
     }
 
     async removeMember(directoryId: string, userId: string, memberId: string): Promise<void> {
-        const { isCreator } = await this.ownershipService.ensureCanManageMembers(
-            directoryId,
-            userId,
-        );
+        await this.ownershipService.ensureCanManageMembers(directoryId, userId);
 
         const member = await this.memberRepository.findById(memberId);
         if (!member || member.directoryId !== directoryId) {
             throw new NotFoundException({
                 status: 'error',
                 message: 'Member not found',
-            });
-        }
-
-        if (member.role === DirectoryMemberRole.OWNER && !isCreator) {
-            throw new ForbiddenException({
-                status: 'error',
-                message: 'Only the directory creator can remove an owner',
             });
         }
 
