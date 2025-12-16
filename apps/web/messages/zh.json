@@ -739,6 +739,11 @@
                         "step4": "前往 API 令牌设置，并将您的令牌粘贴到 Vercel 部分"
                     }
                 },
+                "sharedNoTokenAlert": {
+                    "title": "部署不可用",
+                    "description": "目录所有者尚未配置用于部署的 Vercel 令牌。请联系目录所有者以设置部署。",
+                    "hint": "作为协作者，一旦所有者配置了 Vercel 集成，您就可以触发部署。"
+                },
                 "form": {
                     "deployToVercel": {
                         "title": "部署到 Vercel",

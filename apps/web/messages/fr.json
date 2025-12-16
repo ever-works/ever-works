@@ -739,6 +739,11 @@
                         "step4": "Allez dans les paramètres des jetons API et collez votre jeton dans la section Vercel"
                     }
                 },
+                "sharedNoTokenAlert": {
+                    "title": "Déploiement non disponible",
+                    "description": "Le propriétaire du répertoire n'a pas configuré de jeton Vercel pour le déploiement. Veuillez contacter le propriétaire du répertoire pour configurer le déploiement.",
+                    "hint": "En tant que collaborateur, vous pourrez déclencher des déploiements une fois que le propriétaire aura configuré son intégration Vercel."
+                },
                 "form": {
                     "deployToVercel": {
                         "title": "Déployer sur Vercel",

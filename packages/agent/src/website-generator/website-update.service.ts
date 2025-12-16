@@ -19,7 +19,9 @@ export class WebsiteUpdateService {
         directory: Directory,
         user: User,
     ): Promise<{ method: string; message: string }> {
-        const token = user.getGitToken();
+        // Use directory owner's Git token (they set up the repos)
+        const directoryOwner = directory.user as User;
+        const token = directoryOwner.getGitToken();
         const websiteRepo = directory.getWebsiteRepo();
 
         // Check if the target repository exists
@@ -59,7 +61,10 @@ export class WebsiteUpdateService {
      * Updates a forked repository by pulling from upstream
      */
     private async updateFork(directory: Directory, user: User): Promise<boolean> {
-        const token = user.getGitToken();
+        // Use directory owner's Git token (they set up the repos)
+        // but use current user as committer for attribution
+        const directoryOwner = directory.user as User;
+        const token = directoryOwner.getGitToken();
         const committer = user.asCommitter();
 
         const websiteRepo = directory.getWebsiteRepo();
@@ -110,7 +115,9 @@ export class WebsiteUpdateService {
      * Updates using duplicate method: clone original, replace remote, push
      */
     private async updateDuplicate(directory: Directory, user: User): Promise<void> {
-        const token = user.getGitToken();
+        // Use directory owner's Git token (they set up the repos)
+        const directoryOwner = directory.user as User;
+        const token = directoryOwner.getGitToken();
         const websiteRepo = directory.getWebsiteRepo();
 
         await this.githubService.removeDir(
@@ -147,7 +154,10 @@ export class WebsiteUpdateService {
      * Updates using template method: clone both repos, replace files, commit and push
      */
     private async updateTemplate(directory: Directory, user: User): Promise<void> {
-        const token = user.getGitToken();
+        // Use directory owner's Git token (they set up the repos)
+        // but use current user as committer for attribution
+        const directoryOwner = directory.user as User;
+        const token = directoryOwner.getGitToken();
         const committer = user.asCommitter();
 
         const websiteRepo = directory.getWebsiteRepo();

@@ -839,6 +839,11 @@
                         "step4": "Go to API Tokens Settings and paste your token in the Vercel section"
                     }
                 },
+                "sharedNoTokenAlert": {
+                    "title": "Deployment Not Available",
+                    "description": "The directory owner has not configured a Vercel token for deployment. Please contact the directory owner to set up deployment.",
+                    "hint": "As a collaborator, you can trigger deployments once the owner configures their Vercel integration."
+                },
                 "form": {
                     "deployToVercel": {
                         "title": "Deploy to Vercel",

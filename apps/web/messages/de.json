@@ -739,6 +739,11 @@
                         "step4": "Gehen Sie zu API-Token-Einstellungen und fügen Sie Ihren Token im Vercel-Bereich ein"
                     }
                 },
+                "sharedNoTokenAlert": {
+                    "title": "Bereitstellung nicht verfügbar",
+                    "description": "Der Verzeichnisbesitzer hat keinen Vercel-Token für die Bereitstellung konfiguriert. Bitte kontaktieren Sie den Verzeichnisbesitzer, um die Bereitstellung einzurichten.",
+                    "hint": "Als Mitarbeiter können Sie Bereitstellungen auslösen, sobald der Besitzer seine Vercel-Integration konfiguriert hat."
+                },
                 "form": {
                     "deployToVercel": {
                         "title": "Auf Vercel bereitstellen",

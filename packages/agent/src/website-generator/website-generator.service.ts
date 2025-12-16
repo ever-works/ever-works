@@ -11,7 +11,10 @@ export class WebsiteGeneratorService {
     constructor(private readonly githubService: GithubService) {}
 
     private async duplicate(directory: Directory, user: User) {
-        const token = user.getGitToken();
+        // Use directory owner's Git token (they set up the repos)
+        // but use current user as committer for attribution
+        const directoryOwner = directory.user as User;
+        const token = directoryOwner.getGitToken();
         const committer = user.asCommitter();
 
         await this.cleanup(directory);
@@ -40,7 +43,9 @@ export class WebsiteGeneratorService {
     }
 
     private async fork(directory: Directory, user: User) {
-        const token = user.getGitToken();
+        // Use directory owner's Git token (they set up the repos)
+        const directoryOwner = directory.user as User;
+        const token = directoryOwner.getGitToken();
 
         return this.githubService.fork(
             {
@@ -54,7 +59,9 @@ export class WebsiteGeneratorService {
     }
 
     private async createUsingTemplate(directory: Directory, user: User) {
-        const token = user.getGitToken();
+        // Use directory owner's Git token (they set up the repos)
+        const directoryOwner = directory.user as User;
+        const token = directoryOwner.getGitToken();
 
         return this.githubService.createRepoFromTemplate(
             WEBSITE_TEMPLATE_CONFIG.owner,
@@ -96,7 +103,9 @@ export class WebsiteGeneratorService {
      * Remove repository for a directory
      */
     async removeRepository(directory: Directory, user: User): Promise<void> {
-        const token = user.getGitToken();
+        // Use directory owner's Git token (they set up the repos)
+        const directoryOwner = directory.user as User;
+        const token = directoryOwner.getGitToken();
         const websiteRepo = directory.getWebsiteRepo();
 
         try {

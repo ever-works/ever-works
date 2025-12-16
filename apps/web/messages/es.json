@@ -739,6 +739,11 @@
                         "step4": "Ve a Configuración de Tokens API y pega tu token en la sección de Vercel"
                     }
                 },
+                "sharedNoTokenAlert": {
+                    "title": "Despliegue no disponible",
+                    "description": "El propietario del directorio no ha configurado un token de Vercel para el despliegue. Por favor, contacta al propietario del directorio para configurar el despliegue.",
+                    "hint": "Como colaborador, podrás activar despliegues una vez que el propietario configure su integración de Vercel."
+                },
                 "form": {
                     "deployToVercel": {
                         "title": "Desplegar en Vercel",

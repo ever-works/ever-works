@@ -41,6 +41,13 @@ export type LookupDeploymentResponseDto = APIResponse<{
     message?: string;
 }>;
 
+export type DeploymentCapabilityResponseDto = APIResponse<{
+    canDeploy: boolean;
+    isShared: boolean;
+    ownerHasToken: boolean;
+    userHasToken: boolean;
+}>;
+
 export const deployAPI = {
     // Deploy to Vercel
     deployToVercel: async (directoryId: string, data: DeployWebsiteVercelDto) => {
@@ -76,6 +83,19 @@ export const deployAPI = {
         return serverMutation<LookupDeploymentResponseDto>({
             endpoint: `/deploy/directories/${directoryId}/vercel/lookup`,
             data: data || {},
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    /**
+     * Check if deployment is possible for a directory.
+     * For shared directories, checks the owner's Vercel token.
+     */
+    checkDeploymentCapability(directoryId: string) {
+        return serverMutation<DeploymentCapabilityResponseDto>({
+            endpoint: `/deploy/directories/${directoryId}/vercel/check`,
+            data: {},
             method: 'POST',
             wrapInData: false,
         });
