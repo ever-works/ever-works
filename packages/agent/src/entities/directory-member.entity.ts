@@ -18,6 +18,9 @@ import { ClassToObject, DirectoryMemberRole } from './types';
  *
  * This allows multiple users to access and manage the same directory
  * with different permission levels.
+ *
+ * Note: Members can only have roles: MANAGER, EDITOR, or VIEWER.
+ * OWNER role is reserved for the directory creator (identified by directory.userId).
  */
 @Entity({ name: 'directory_members' })
 @Unique(['directoryId', 'userId']) // A user can only have one membership per directory
@@ -57,7 +60,8 @@ export class DirectoryMember {
 
     /**
      * Check if this member has at least the specified role level.
-     * Role hierarchy: owner > manager > editor > viewer
+     * Role hierarchy: manager > editor > viewer
+     * Note: OWNER is not included as members cannot have OWNER role.
      */
     hasRoleOrHigher(role: DirectoryMemberRole): boolean {
         const roleHierarchy: Record<DirectoryMemberRole, number> = {
@@ -72,9 +76,10 @@ export class DirectoryMember {
 
     /**
      * Check if this member can manage (add/remove/update) other members.
+     * Only managers can manage members (OWNER role is for directory creator only).
      */
     canManageMembers(): boolean {
-        return this.role === DirectoryMemberRole.OWNER || this.role === DirectoryMemberRole.MANAGER;
+        return this.role === DirectoryMemberRole.MANAGER;
     }
 
     /**
@@ -82,12 +87,5 @@ export class DirectoryMember {
      */
     canEdit(): boolean {
         return this.hasRoleOrHigher(DirectoryMemberRole.EDITOR);
-    }
-
-    /**
-     * Check if this member is the owner.
-     */
-    isOwner(): boolean {
-        return this.role === DirectoryMemberRole.OWNER;
     }
 }

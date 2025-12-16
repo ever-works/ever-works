@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { DirectoryMember } from '@/lib/api';
+import { DirectoryMember, AssignableMemberRole } from '@/lib/api';
 import { DirectoryMemberRole } from '@/lib/api/enums';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
@@ -37,7 +37,7 @@ export function MemberRow({
     const [isRemoving, setIsRemoving] = useState(false);
     const [confirmRemoveOpen, setConfirmRemoveOpen] = useState(false);
 
-    const handleRoleChange = async (newRole: DirectoryMemberRole) => {
+    const handleRoleChange = async (newRole: AssignableMemberRole) => {
         if (newRole === member.role) return;
 
         setIsUpdating(true);
@@ -101,7 +101,7 @@ export function MemberRow({
                         <Select
                             value={member.role}
                             onChange={(e) =>
-                                handleRoleChange(e.target.value as DirectoryMemberRole)
+                                handleRoleChange(e.target.value as AssignableMemberRole)
                             }
                             disabled={isUpdating}
                             variant="form"

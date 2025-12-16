@@ -153,67 +153,28 @@ export class DirectoryMemberRepository {
     }
 
     /**
-     * Get the owner member of a directory (role = OWNER).
-     */
-    async findOwner(directoryId: string): Promise<DirectoryMember | null> {
-        return this.repository.findOne({
-            where: { directoryId, role: DirectoryMemberRole.OWNER },
-            relations: ['user'],
-        });
-    }
-
-    /**
-     * Transfer ownership from one user to another.
-     * The current owner becomes a manager.
-     */
-    async transferOwnership(
-        directoryId: string,
-        currentOwnerId: string,
-        newOwnerId: string,
-    ): Promise<{ previousOwner: DirectoryMember | null; newOwner: DirectoryMember | null }> {
-        // Demote current owner to manager
-        await this.repository.update(
-            { directoryId, userId: currentOwnerId },
-            { role: DirectoryMemberRole.MANAGER },
-        );
-
-        // Promote new owner
-        await this.repository.update(
-            { directoryId, userId: newOwnerId },
-            { role: DirectoryMemberRole.OWNER },
-        );
-
-        return {
-            previousOwner: await this.findMember(directoryId, currentOwnerId),
-            newOwner: await this.findMember(directoryId, newOwnerId),
-        };
-    }
-
-    /**
-     * Get members who can edit the directory (editors, managers, owners).
+     * Get members who can edit the directory (editors and managers).
+     * Note: Directory creator (owner) is identified by directory.userId, not membership.
      */
     async findEditableMembers(directoryId: string): Promise<DirectoryMember[]> {
         return this.repository.find({
             where: {
                 directoryId,
-                role: In([
-                    DirectoryMemberRole.OWNER,
-                    DirectoryMemberRole.MANAGER,
-                    DirectoryMemberRole.EDITOR,
-                ]),
+                role: In([DirectoryMemberRole.MANAGER, DirectoryMemberRole.EDITOR]),
             },
             relations: ['user'],
         });
     }
 
     /**
-     * Get members who can manage other members (owners and managers).
+     * Get members who can manage other members (managers only).
+     * Note: Directory creator (owner) is identified by directory.userId, not membership.
      */
     async findManagers(directoryId: string): Promise<DirectoryMember[]> {
         return this.repository.find({
             where: {
                 directoryId,
-                role: In([DirectoryMemberRole.OWNER, DirectoryMemberRole.MANAGER]),
+                role: DirectoryMemberRole.MANAGER,
             },
             relations: ['user'],
         });

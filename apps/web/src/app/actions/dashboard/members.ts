@@ -1,7 +1,6 @@
 'use server';
 
-import { membersAPI, DirectoryMember } from '@/lib/api';
-import { DirectoryMemberRole } from '@/lib/api/enums';
+import { membersAPI, DirectoryMember, AssignableMemberRole } from '@/lib/api';
 import { revalidatePath } from 'next/cache';
 
 interface ActionResult {
@@ -13,7 +12,7 @@ interface ActionResult {
 export async function inviteMember(
     directoryId: string,
     email: string,
-    role: DirectoryMemberRole,
+    role: AssignableMemberRole,
 ): Promise<ActionResult> {
     try {
         const result = await membersAPI.invite(directoryId, { email, role });
@@ -35,7 +34,7 @@ export async function inviteMember(
 export async function updateMemberRole(
     directoryId: string,
     memberId: string,
-    role: DirectoryMemberRole,
+    role: AssignableMemberRole,
 ): Promise<ActionResult> {
     try {
         const result = await membersAPI.updateRole(directoryId, memberId, { role });

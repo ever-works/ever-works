@@ -1,7 +1,9 @@
 import 'server-only';
 import { serverFetch, serverMutation } from './server-api';
-import { DirectoryMemberRole } from './enums';
+import { DirectoryMemberRole, ASSIGNABLE_MEMBER_ROLES } from './enums';
 import { APIResponse } from './types';
+
+export type AssignableMemberRole = (typeof ASSIGNABLE_MEMBER_ROLES)[number];
 
 export interface DirectoryMember {
     id: string;
@@ -31,11 +33,11 @@ export interface MembersListResponse {
 
 export interface InviteMemberDto {
     email: string;
-    role: DirectoryMemberRole;
+    role: AssignableMemberRole;
 }
 
 export interface UpdateMemberRoleDto {
-    role: DirectoryMemberRole;
+    role: AssignableMemberRole;
 }
 
 export const membersAPI = {

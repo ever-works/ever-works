@@ -27,6 +27,15 @@ export interface SlugConflictResolution {
 	finalSlug?: string;
 }
 
+/**
+ * Roles for directory access.
+ * - OWNER: Reserved for directory creator only (returned by API for creator)
+ * - MANAGER: Can edit directory and manage content, invite/remove members
+ * - EDITOR: Can edit directory content but cannot manage members
+ * - VIEWER: Read-only access to directory
+ *
+ * Note: Members can only be assigned MANAGER, EDITOR, or VIEWER roles.
+ */
 export enum DirectoryMemberRole {
 	OWNER = 'owner',
 	MANAGER = 'manager',

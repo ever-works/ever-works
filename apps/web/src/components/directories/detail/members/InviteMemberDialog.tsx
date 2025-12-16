@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { DirectoryMember } from '@/lib/api';
+import { DirectoryMember, AssignableMemberRole } from '@/lib/api';
 import { DirectoryMemberRole } from '@/lib/api/enums';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -33,7 +33,7 @@ export function InviteMemberDialog({
 }: InviteMemberDialogProps) {
     const t = useTranslations('dashboard.directoryDetail.members');
     const [email, setEmail] = useState('');
-    const [role, setRole] = useState<DirectoryMemberRole>(DirectoryMemberRole.VIEWER);
+    const [role, setRole] = useState<AssignableMemberRole>(DirectoryMemberRole.VIEWER);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState('');
 
@@ -114,7 +114,7 @@ export function InviteMemberDialog({
                     <Select
                         label={t('invite.roleLabel')}
                         value={role}
-                        onChange={(e) => setRole(e.target.value as DirectoryMemberRole)}
+                        onChange={(e) => setRole(e.target.value as AssignableMemberRole)}
                         disabled={isSubmitting}
                     >
                         {roleOptions.map((opt) => (
