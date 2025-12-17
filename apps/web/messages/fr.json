@@ -345,6 +345,15 @@
             "fromLastMonth": "du mois dernier"
         },
         "directoryCard": {
+            "role": {
+                "owner": "Propriétaire",
+                "manager": "Gestionnaire",
+                "editor": "Éditeur",
+                "viewer": "Observateur"
+            },
+            "shared": {
+                "tooltip": "Partagé avec vous en tant que {role}"
+            },
             "status": {
                 "active": "Actif",
                 "notStarted": "Non démarré",
@@ -368,6 +377,15 @@
             "failedToGenerateItems": "Échec de la génération des éléments. Veuillez réessayer.",
             "generationCompleted": "Génération terminée avec succès",
             "generationCancelled": "La génération a été annulée",
+            "role": {
+                "owner": "Propriétaire",
+                "manager": "Gestionnaire",
+                "editor": "Éditeur",
+                "viewer": "Observateur"
+            },
+            "shared": {
+                "tooltip": "Partagé avec vous en tant que {role}"
+            },
             "status": {
                 "notStarted": "Non démarré",
                 "generating": "Génération en cours",
@@ -381,7 +399,53 @@
                 "generator": "Générateur",
                 "history": "Historique",
                 "deploy": "Déployer",
+                "members": "Membres",
                 "settings": "Paramètres"
+            },
+            "members": {
+                "title": "Membres de l'équipe",
+                "subtitle": "Gérez qui a accès à ce répertoire et leurs permissions.",
+                "inviteMember": "Inviter un membre",
+                "noMembers": "Pas encore de membres. Invitez quelqu'un à collaborer.",
+                "roles": {
+                    "creator": "Créateur",
+                    "owner": "Propriétaire",
+                    "manager": "Gestionnaire",
+                    "editor": "Éditeur",
+                    "viewer": "Lecteur"
+                },
+                "roleDescriptions": {
+                    "owner": "Contrôle total incluant la suppression et la gestion des membres.",
+                    "manager": "Peut modifier le répertoire et gérer les membres, mais ne peut pas supprimer.",
+                    "editor": "Peut modifier le contenu du répertoire et exécuter des générations.",
+                    "viewer": "Accès en lecture seule pour voir le répertoire."
+                },
+                "invite": {
+                    "title": "Inviter un membre",
+                    "description": "Ajoutez un nouveau membre pour collaborer sur ce répertoire.",
+                    "emailLabel": "Adresse e-mail",
+                    "emailPlaceholder": "collegue@exemple.com",
+                    "roleLabel": "Rôle",
+                    "submit": "Envoyer l'invitation",
+                    "cancel": "Annuler",
+                    "success": "Membre invité avec succès.",
+                    "errors": {
+                        "emailRequired": "L'adresse e-mail est requise.",
+                        "failed": "Échec de l'invitation du membre. Veuillez réessayer."
+                    }
+                },
+                "confirmRemove": {
+                    "title": "Supprimer le membre",
+                    "description": "Êtes-vous sûr de vouloir supprimer {username} de ce répertoire ? Ils perdront tout accès.",
+                    "confirm": "Supprimer",
+                    "cancel": "Annuler"
+                },
+                "roleUpdated": "Rôle du membre mis à jour.",
+                "memberRemoved": "Membre supprimé avec succès.",
+                "errors": {
+                    "updateFailed": "Échec de la mise à jour du rôle du membre.",
+                    "removeFailed": "Échec de la suppression du membre."
+                }
             },
             "statusCard": {
                 "notStarted": {
@@ -448,6 +512,13 @@
             },
             "info": {
                 "title": "Informations du répertoire",
+                "yourRole": "Votre rôle",
+                "role": {
+                    "owner": "Propriétaire",
+                    "manager": "Gestionnaire",
+                    "editor": "Éditeur",
+                    "viewer": "Observateur"
+                },
                 "slug": "Slug",
                 "repositories": "Dépôts",
                 "dataRepo": "Dépôt de données",
@@ -713,6 +784,11 @@
                         "step3": "Copiez le jeton généré",
                         "step4": "Allez dans les paramètres des jetons API et collez votre jeton dans la section Vercel"
                     }
+                },
+                "sharedNoTokenAlert": {
+                    "title": "Déploiement non disponible",
+                    "description": "Le propriétaire du répertoire n'a pas configuré de jeton Vercel pour le déploiement. Veuillez contacter le propriétaire du répertoire pour configurer le déploiement.",
+                    "hint": "En tant que collaborateur, vous pourrez déclencher des déploiements une fois que le propriétaire aura configuré son intégration Vercel."
                 },
                 "form": {
                     "deployToVercel": {

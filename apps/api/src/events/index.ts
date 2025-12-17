@@ -1,7 +1,19 @@
-import { User } from '@packages/agent/entities';
+import { User, Directory } from '@packages/agent/entities';
 
 export abstract class BaseUserEvent {
     public abstract user: User;
+}
+
+export class MemberInvitedEvent {
+    static EVENT_NAME = 'directory.member_invited';
+
+    constructor(
+        public invitee: User,
+        public inviter: User,
+        public directory: Directory,
+        public role: string,
+        public directoryUrl: string,
+    ) {}
 }
 
 export class UserCreatedEvent extends BaseUserEvent {

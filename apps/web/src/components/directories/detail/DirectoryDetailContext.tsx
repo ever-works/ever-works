@@ -2,6 +2,7 @@
 
 import { RepoProvider } from '@/lib/api/enums';
 import { ConnectionInfo, Directory, DirectoryConfig } from '@/lib/api/types-only';
+import { DirectoryPermissions, getPermissions } from '@/lib/permissions';
 import { createContext, PropsWithChildren, useContext, useMemo } from 'react';
 
 type DirectoryDetailContextType = {
@@ -13,6 +14,7 @@ type DirectoryDetailContextType = {
         dataRepo: string | null;
         websiteRepo: string | null;
     } | null;
+    permissions: DirectoryPermissions;
 };
 
 export const DirectoryDetailContext = createContext<DirectoryDetailContextType>(
@@ -35,6 +37,7 @@ export const DirectoryDetailProvider = ({
             oauthConnection,
             config,
             repoLinks: repoLink(directory, oauthConnection),
+            permissions: getPermissions(directory.userRole),
         };
     }, [directory, oauthConnection, config]);
 
@@ -50,6 +53,14 @@ export const useDirectoryDetail = () => {
     }
 
     return context;
+};
+
+/**
+ * Hook to get just the permissions from the context.
+ */
+export const useDirectoryPermissions = () => {
+    const { permissions } = useDirectoryDetail();
+    return permissions;
 };
 
 function repoLink(directory: Directory, oauthConnection: ConnectionInfo | null) {

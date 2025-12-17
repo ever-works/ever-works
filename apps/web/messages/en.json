@@ -354,6 +354,15 @@
                 "cancelled": "Cancelled",
                 "idle": "Idle"
             },
+            "role": {
+                "owner": "Owner",
+                "manager": "Manager",
+                "editor": "Editor",
+                "viewer": "Viewer"
+            },
+            "shared": {
+                "tooltip": "Shared with you as {role}"
+            },
             "noDescription": "No description provided",
             "items": "{count} items",
             "views": "{count} views",
@@ -368,6 +377,15 @@
             "failedToGenerateItems": "Failed to generate items. Please try again.",
             "generationCompleted": "Generation completed successfully",
             "generationCancelled": "Generation was cancelled",
+            "role": {
+                "owner": "Owner",
+                "manager": "Manager",
+                "editor": "Editor",
+                "viewer": "Viewer"
+            },
+            "shared": {
+                "tooltip": "Shared with you as {role}"
+            },
             "status": {
                 "notStarted": "Not Started",
                 "generating": "Generating",
@@ -382,7 +400,53 @@
                 "schedule": "Schedule",
                 "history": "History",
                 "deploy": "Deploy",
+                "members": "Members",
                 "settings": "Settings"
+            },
+            "members": {
+                "title": "Team Members",
+                "subtitle": "Manage who has access to this directory and their permissions.",
+                "inviteMember": "Invite Member",
+                "noMembers": "No team members yet. Invite someone to collaborate.",
+                "roles": {
+                    "creator": "Creator",
+                    "owner": "Owner",
+                    "manager": "Manager",
+                    "editor": "Editor",
+                    "viewer": "Viewer"
+                },
+                "roleDescriptions": {
+                    "owner": "Full control including deletion and member management.",
+                    "manager": "Can edit directory and manage members, but cannot delete.",
+                    "editor": "Can edit directory content and run generations.",
+                    "viewer": "Read-only access to view the directory."
+                },
+                "invite": {
+                    "title": "Invite Team Member",
+                    "description": "Add a new member to collaborate on this directory.",
+                    "emailLabel": "Email address",
+                    "emailPlaceholder": "colleague@example.com",
+                    "roleLabel": "Role",
+                    "submit": "Send Invite",
+                    "cancel": "Cancel",
+                    "success": "Member invited successfully.",
+                    "errors": {
+                        "emailRequired": "Email address is required.",
+                        "failed": "Failed to invite member. Please try again."
+                    }
+                },
+                "confirmRemove": {
+                    "title": "Remove Member",
+                    "description": "Are you sure you want to remove {username} from this directory? They will lose all access.",
+                    "confirm": "Remove",
+                    "cancel": "Cancel"
+                },
+                "roleUpdated": "Member role updated.",
+                "memberRemoved": "Member removed successfully.",
+                "errors": {
+                    "updateFailed": "Failed to update member role.",
+                    "removeFailed": "Failed to remove member."
+                }
             },
             "schedule": {
                 "page": {
@@ -540,6 +604,13 @@
             },
             "info": {
                 "title": "Directory Information",
+                "yourRole": "Your Role",
+                "role": {
+                    "owner": "Owner",
+                    "manager": "Manager",
+                    "editor": "Editor",
+                    "viewer": "Viewer"
+                },
                 "slug": "Slug",
                 "repositories": "Repositories",
                 "dataRepo": "Data Repository",
@@ -813,6 +884,11 @@
                         "step3": "Copy the generated token",
                         "step4": "Go to API Tokens Settings and paste your token in the Vercel section"
                     }
+                },
+                "sharedNoTokenAlert": {
+                    "title": "Deployment Not Available",
+                    "description": "The directory owner has not configured a Vercel token for deployment. Please contact the directory owner to set up deployment.",
+                    "hint": "As a collaborator, you can trigger deployments once the owner configures their Vercel integration."
                 },
                 "form": {
                     "deployToVercel": {

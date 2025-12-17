@@ -1,8 +1,11 @@
 import { BadRequestException, HttpException, Injectable, Logger } from '@nestjs/common';
 import { DirectoryRepository } from '@src/database/repositories/directory.repository';
+import { DirectoryMemberRepository } from '@src/database/repositories/directory-member.repository';
 import { DirectoryGenerationHistoryRepository } from '@src/database/repositories/directory-generation-history.repository';
 import { DataGeneratorService } from '@src/data-generator/data-generator.service';
 import { User } from '@src/entities/user.entity';
+import { Directory } from '@src/entities/directory.entity';
+import { DirectoryMemberRole } from '@src/entities/types';
 import { DirectoryOwnershipService } from './directory-ownership.service';
 import { normalizeGeneratorError } from './utils/error.utils';
 import {
@@ -11,12 +14,29 @@ import {
 } from '@src/dto/directory-generation-history.dto';
 import { DirectoryGenerationHistory } from '@src/entities/directory-generation-history.entity';
 
+// Extended directory response type with userRole for API responses
+// Uses Omit to exclude class methods from Directory, then adds userRole
+type DirectoryMethods =
+    | 'getDataRepo'
+    | 'getWebsiteRepo'
+    | 'getMainRepo'
+    | 'getRepoOwner'
+    | 'isCreator'
+    | 'getMember'
+    | 'hasAccess'
+    | 'getUserRole';
+
+export type DirectoryWithRole = Omit<Directory, DirectoryMethods> & {
+    userRole: DirectoryMemberRole;
+};
+
 @Injectable()
 export class DirectoryQueryService {
     private readonly logger = new Logger(DirectoryQueryService.name);
 
     constructor(
         private readonly directoryRepository: DirectoryRepository,
+        private readonly directoryMemberRepository: DirectoryMemberRepository,
         private readonly dataGenerator: DataGeneratorService,
         private readonly generationHistoryRepository: DirectoryGenerationHistoryRepository,
         private readonly ownershipService: DirectoryOwnershipService,
@@ -34,26 +54,40 @@ export class DirectoryQueryService {
         }
 
         try {
-            let directories = await this.directoryRepository.findAll({
+            // Get directory IDs where user has membership (not as creator)
+            const memberDirectoryIds =
+                await this.directoryMemberRepository.getAccessibleDirectoryIds(user.id);
+
+            // Find all directories user has access to (as creator or member)
+            let directories = await this.directoryRepository.findAllAccessible({
                 userId: user.id,
+                memberDirectoryIds,
                 limit,
                 offset,
                 search: sanitizedSearch,
             });
 
-            directories = directories.map((dir) => {
-                dir.owner = dir.getRepoOwner();
-                return dir;
-            });
+            // Add userRole to each directory
+            const directoriesWithRoles: DirectoryWithRole[] = await Promise.all(
+                directories.map(async (dir) => {
+                    dir.owner = dir.getRepoOwner();
+                    const userRole = await this.ownershipService.getUserRole(dir.id, user.id);
+                    return {
+                        ...dir,
+                        userRole: userRole || DirectoryMemberRole.VIEWER,
+                    } as DirectoryWithRole;
+                }),
+            );
 
-            const total = await this.directoryRepository.countAll({
+            const total = await this.directoryRepository.countAllAccessible({
                 userId: user.id,
+                memberDirectoryIds,
                 search: sanitizedSearch,
             });
 
             return {
                 status: 'success',
-                directories,
+                directories: directoriesWithRoles,
                 total,
                 limit,
                 offset,
@@ -74,12 +108,19 @@ export class DirectoryQueryService {
 
     async getDirectory(id: string, user: User) {
         try {
-            const directory = await this.ownershipService.ensure(id, user.id);
+            const accessResult = await this.ownershipService.ensureAccess(id, user.id);
+            const directory = accessResult.directory;
             directory.owner = directory.getRepoOwner();
+
+            // Return directory with user's role
+            const directoryWithRole: DirectoryWithRole = {
+                ...directory,
+                userRole: accessResult.role,
+            };
 
             return {
                 status: 'success',
-                directory,
+                directory: directoryWithRole,
             };
         } catch (error) {
             if (error instanceof HttpException) {
@@ -100,7 +141,8 @@ export class DirectoryQueryService {
     }
 
     async directoryItems(directoryId: string, user: User) {
-        const directory = await this.ownershipService.ensure(directoryId, user.id);
+        // Any access level can view items
+        const { directory } = await this.ownershipService.ensureCanView(directoryId, user.id);
 
         try {
             const items = await this.dataGenerator.getItems(directory, user);
@@ -131,7 +173,8 @@ export class DirectoryQueryService {
     }
 
     async directoryConfig(directoryId: string, user: User) {
-        const directory = await this.ownershipService.ensure(directoryId, user.id);
+        // Any access level can view config
+        const { directory } = await this.ownershipService.ensureCanView(directoryId, user.id);
 
         try {
             const config = await this.dataGenerator.config(directory, user);
@@ -162,7 +205,8 @@ export class DirectoryQueryService {
     }
 
     async directoryCount(directoryId: string, user: User) {
-        const directory = await this.ownershipService.ensure(directoryId, user.id);
+        // Any access level can view count
+        const { directory } = await this.ownershipService.ensureCanView(directoryId, user.id);
 
         try {
             const count = await this.dataGenerator.count(directory, user);
@@ -195,7 +239,8 @@ export class DirectoryQueryService {
     }
 
     async directoryCategoriesTags(directoryId: string, user: User) {
-        const directory = await this.ownershipService.ensure(directoryId, user.id);
+        // Any access level can view categories and tags
+        const { directory } = await this.ownershipService.ensureCanView(directoryId, user.id);
 
         try {
             const { categories, tags } = await this.dataGenerator.getCategoriesTags(
@@ -236,7 +281,8 @@ export class DirectoryQueryService {
         user: User,
         options: { limit?: number; offset?: number } = {},
     ): Promise<DirectoryGenerationHistoryListDto> {
-        const directory = await this.ownershipService.ensure(directoryId, user.id);
+        // Any access level can view generation history
+        const { directory } = await this.ownershipService.ensureCanView(directoryId, user.id);
 
         const limit = Math.min(Math.max(options.limit ?? 20, 1), 100);
         const offset = Math.max(options.offset ?? 0, 0);

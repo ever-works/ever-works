@@ -345,6 +345,15 @@
             "fromLastMonth": "vom letzten Monat"
         },
         "directoryCard": {
+            "role": {
+                "owner": "Eigentümer",
+                "manager": "Manager",
+                "editor": "Bearbeiter",
+                "viewer": "Betrachter"
+            },
+            "shared": {
+                "tooltip": "Mit Ihnen geteilt als {role}"
+            },
             "status": {
                 "active": "Aktiv",
                 "notStarted": "Nicht gestartet",
@@ -368,6 +377,15 @@
             "failedToGenerateItems": "Einträge konnten nicht generiert werden. Bitte versuchen Sie es erneut.",
             "generationCompleted": "Generierung erfolgreich abgeschlossen",
             "generationCancelled": "Generierung wurde abgebrochen",
+            "role": {
+                "owner": "Eigentümer",
+                "manager": "Manager",
+                "editor": "Bearbeiter",
+                "viewer": "Betrachter"
+            },
+            "shared": {
+                "tooltip": "Mit Ihnen geteilt als {role}"
+            },
             "status": {
                 "notStarted": "Nicht gestartet",
                 "generating": "Wird generiert",
@@ -381,7 +399,53 @@
                 "generator": "Generator",
                 "history": "Verlauf",
                 "deploy": "Bereitstellen",
+                "members": "Mitglieder",
                 "settings": "Einstellungen"
+            },
+            "members": {
+                "title": "Teammitglieder",
+                "subtitle": "Verwalten Sie, wer Zugriff auf dieses Verzeichnis hat und welche Berechtigungen sie haben.",
+                "inviteMember": "Mitglied einladen",
+                "noMembers": "Noch keine Teammitglieder. Laden Sie jemanden zur Zusammenarbeit ein.",
+                "roles": {
+                    "creator": "Ersteller",
+                    "owner": "Eigentümer",
+                    "manager": "Manager",
+                    "editor": "Bearbeiter",
+                    "viewer": "Betrachter"
+                },
+                "roleDescriptions": {
+                    "owner": "Volle Kontrolle einschließlich Löschung und Mitgliederverwaltung.",
+                    "manager": "Kann Verzeichnis bearbeiten und Mitglieder verwalten, aber nicht löschen.",
+                    "editor": "Kann Verzeichnisinhalte bearbeiten und Generierungen ausführen.",
+                    "viewer": "Nur Lesezugriff zum Anzeigen des Verzeichnisses."
+                },
+                "invite": {
+                    "title": "Teammitglied einladen",
+                    "description": "Fügen Sie ein neues Mitglied hinzu, um an diesem Verzeichnis zusammenzuarbeiten.",
+                    "emailLabel": "E-Mail-Adresse",
+                    "emailPlaceholder": "kollege@beispiel.com",
+                    "roleLabel": "Rolle",
+                    "submit": "Einladung senden",
+                    "cancel": "Abbrechen",
+                    "success": "Mitglied erfolgreich eingeladen.",
+                    "errors": {
+                        "emailRequired": "E-Mail-Adresse ist erforderlich.",
+                        "failed": "Mitglied konnte nicht eingeladen werden. Bitte versuchen Sie es erneut."
+                    }
+                },
+                "confirmRemove": {
+                    "title": "Mitglied entfernen",
+                    "description": "Sind Sie sicher, dass Sie {username} aus diesem Verzeichnis entfernen möchten? Sie verlieren allen Zugriff.",
+                    "confirm": "Entfernen",
+                    "cancel": "Abbrechen"
+                },
+                "roleUpdated": "Mitgliedsrolle aktualisiert.",
+                "memberRemoved": "Mitglied erfolgreich entfernt.",
+                "errors": {
+                    "updateFailed": "Mitgliedsrolle konnte nicht aktualisiert werden.",
+                    "removeFailed": "Mitglied konnte nicht entfernt werden."
+                }
             },
             "statusCard": {
                 "notStarted": {
@@ -448,6 +512,13 @@
             },
             "info": {
                 "title": "Verzeichnisinformationen",
+                "yourRole": "Ihre Rolle",
+                "role": {
+                    "owner": "Eigentümer",
+                    "manager": "Manager",
+                    "editor": "Bearbeiter",
+                    "viewer": "Betrachter"
+                },
                 "slug": "Slug",
                 "repositories": "Repositories",
                 "dataRepo": "Daten-Repository",
@@ -713,6 +784,11 @@
                         "step3": "Kopieren Sie den generierten Token",
                         "step4": "Gehen Sie zu API-Token-Einstellungen und fügen Sie Ihren Token im Vercel-Bereich ein"
                     }
+                },
+                "sharedNoTokenAlert": {
+                    "title": "Bereitstellung nicht verfügbar",
+                    "description": "Der Verzeichnisbesitzer hat keinen Vercel-Token für die Bereitstellung konfiguriert. Bitte kontaktieren Sie den Verzeichnisbesitzer, um die Bereitstellung einzurichten.",
+                    "hint": "Als Mitarbeiter können Sie Bereitstellungen auslösen, sobald der Besitzer seine Vercel-Integration konfiguriert hat."
                 },
                 "form": {
                     "deployToVercel": {

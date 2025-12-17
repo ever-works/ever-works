@@ -1,6 +1,8 @@
 import { directoryAPI } from '@/lib/api';
 import { SettingsForm } from '@/components/directories/detail/settings/SettingsForm';
 import { getAuthFromCookie } from '@/lib/auth';
+import { canAccessSettings } from '@/lib/permissions';
+import { notFound } from 'next/navigation';
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -10,6 +12,11 @@ export default async function DirectorySettingsPage({ params }: Params) {
     const user = await getAuthFromCookie();
     const res = await directoryAPI.get(id);
     const directory = res.directory;
+
+    // Server-side permission check: only managers and owners can access settings
+    if (!canAccessSettings(directory.userRole)) {
+        notFound();
+    }
 
     return (
         <div className="max-w-4xl">

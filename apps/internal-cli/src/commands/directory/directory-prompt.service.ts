@@ -2,8 +2,12 @@ import { Injectable } from '@nestjs/common';
 import chalk from 'chalk';
 import inquirer from 'inquirer';
 import { MarkdownReadmeConfigDto } from '@packages/agent/dto';
-import { DirectoryRepository } from '@packages/agent/database';
-import { Directory } from '@packages/agent/entities';
+import {
+    DirectoryRepository,
+    DirectoryMemberRepository,
+    UserRepository,
+} from '@packages/agent/database';
+import { Directory, DirectoryMemberRole } from '@packages/agent/entities';
 import { validateSlug, BasePromptService } from '@packages/cli-shared';
 
 export interface DirectoryInputData {
@@ -22,10 +26,19 @@ export interface SlugConflictResolution {
 export interface DirectorySelection {
     directory: Directory | null;
     cancelled: boolean;
+    role?: DirectoryMemberRole;
+    isShared?: boolean;
 }
 
 @Injectable()
 export class DirectoryPromptService extends BasePromptService {
+    constructor(
+        private readonly userRepository: UserRepository,
+        private readonly directoryMemberRepository: DirectoryMemberRepository,
+    ) {
+        super();
+    }
+
     async promptDirectoryCreation(
         ownerDefault?: string,
         orgs?: { name: string; value: any }[],
@@ -202,13 +215,26 @@ export class DirectoryPromptService extends BasePromptService {
     }
 
     /**
-     * Prompts user to select a directory from available directories
+     * Prompts user to select a directory from available directories.
+     * Includes both owned directories and directories shared with the user.
      */
     async promptDirectorySelection(
         directoryRepository: DirectoryRepository,
     ): Promise<DirectorySelection> {
         try {
-            const directories = await directoryRepository.findAll();
+            // Get local user and all accessible directories (owned + shared)
+            const user = await this.userRepository.createOrGetLocalUser();
+
+            // Get membership info to determine roles
+            const memberships = await this.directoryMemberRepository.findByUser(user.id);
+            const memberDirectoryIds = memberships.map((m) => m.directoryId);
+            const membershipMap = new Map(memberships.map((m) => [m.directoryId, m.role]));
+
+            // Get all accessible directories
+            const directories = await directoryRepository.findAllAccessible({
+                userId: user.id,
+                memberDirectoryIds,
+            });
 
             if (directories.length === 0) {
                 console.log(chalk.yellow('\n⚠ No directories found.'));
@@ -224,11 +250,20 @@ export class DirectoryPromptService extends BasePromptService {
 
             type Choice = { name: string; value: Directory | null; short: string };
 
-            const choices: Choice[] = directories.map((dir) => ({
-                name: `${chalk.cyan(dir.slug)} - ${dir.name} ${chalk.gray(`(${dir.getRepoOwner()})`)}`,
-                value: dir,
-                short: dir.slug,
-            }));
+            const choices: Choice[] = directories.map((dir) => {
+                const isOwned = dir.userId === user.id;
+                const role = isOwned
+                    ? DirectoryMemberRole.OWNER
+                    : membershipMap.get(dir.id) || DirectoryMemberRole.VIEWER;
+
+                const roleLabel = this.formatRoleLabel(role, !isOwned);
+
+                return {
+                    name: `${chalk.cyan(dir.slug)} - ${dir.name} ${roleLabel} ${chalk.gray(`(${dir.getRepoOwner()})`)}`,
+                    value: dir,
+                    short: dir.slug,
+                };
+            });
 
             choices.push({
                 name: chalk.gray('Cancel'),
@@ -250,10 +285,45 @@ export class DirectoryPromptService extends BasePromptService {
                 return { directory: null, cancelled: true };
             }
 
-            return { directory: selectedDirectory, cancelled: false };
+            // Determine role for the selected directory
+            const isOwned = selectedDirectory.userId === user.id;
+            const role = isOwned
+                ? DirectoryMemberRole.OWNER
+                : membershipMap.get(selectedDirectory.id) || DirectoryMemberRole.VIEWER;
+
+            return {
+                directory: selectedDirectory,
+                cancelled: false,
+                role,
+                isShared: !isOwned,
+            };
         } catch (error) {
             console.log(chalk.red('\n✗ Failed to load directories:'), error.message);
             return { directory: null, cancelled: true };
         }
+    }
+
+    /**
+     * Formats a directory selection message showing the role.
+     */
+    formatSelectedDirectory(
+        directory: Directory,
+        role: DirectoryMemberRole,
+        isShared: boolean,
+    ): string {
+        const roleLabel = this.formatRoleLabel(role, isShared);
+        return `${directory.name} (${directory.slug}) ${roleLabel}`;
+    }
+
+    private formatRoleLabel(role: DirectoryMemberRole, isShared: boolean): string {
+        const roleLabels: Record<DirectoryMemberRole, string> = {
+            [DirectoryMemberRole.OWNER]: 'Owner',
+            [DirectoryMemberRole.MANAGER]: 'Manager',
+            [DirectoryMemberRole.EDITOR]: 'Editor',
+            [DirectoryMemberRole.VIEWER]: 'Viewer',
+        };
+
+        const label = roleLabels[role] || role;
+        return isShared ? chalk.magenta(`[${label}]`) : chalk.gray(`[${label}]`);
     }
 }

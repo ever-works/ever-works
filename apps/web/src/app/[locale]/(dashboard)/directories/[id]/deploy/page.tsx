@@ -1,9 +1,11 @@
-import { authAPI, deployAPI, Directory, directoryAPI } from '@/lib/api';
+import { deployAPI, Directory, directoryAPI } from '@/lib/api';
 import { notFound, redirect } from 'next/navigation';
 import { ROUTES } from '@/lib/constants';
 import { DeployForm } from '@/components/directories/detail/deploy/DeployForm';
 import { VercelTokenAlert } from '@/components/directories/detail/deploy/VercelTokenAlert';
+import { SharedDirectoryNoTokenAlert } from '@/components/directories/detail/deploy/SharedDirectoryNoTokenAlert';
 import { GenerateStatusType } from '@/lib/api/enums';
+import { canDeploy } from '@/lib/permissions';
 
 type DeployPageParams = {
     params: Promise<{ id: string }>;
@@ -13,29 +15,37 @@ export default async function DeployPage({ params }: DeployPageParams) {
     const { id } = await params;
 
     let directory: Directory;
-    let userProfile;
+    let deploymentCapability;
 
     try {
-        let [res, userProfileRes] = await Promise.all([
+        const [res, capabilityRes] = await Promise.all([
             directoryAPI.get(id),
-            authAPI.getFreshProfile(),
+            deployAPI.checkDeploymentCapability(id),
         ]);
         directory = res.directory;
-        userProfile = userProfileRes;
+        deploymentCapability = capabilityRes;
+
+        // Server-side permission check: only editors+ can deploy
+        if (!canDeploy(directory.userRole)) {
+            notFound();
+        }
 
         // Only allow deploy if directory is generated
         if (directory.generateStatus?.status !== GenerateStatusType.GENERATED) {
             redirect(ROUTES.DASHBOARD_DIRECTORY(id));
         }
     } catch (error) {
-        console.error('Failed to fetch directory or user profile:', error);
+        console.error('Failed to fetch directory or deployment capability:', error);
         notFound();
     }
 
-    // Check if user has vercel token configured
-    const hasVercelToken = !!userProfile?.vercelToken;
-
-    if (!hasVercelToken) {
+    // Check deployment capability based on shared/owned status
+    if (!deploymentCapability.canDeploy) {
+        // For shared directories, show message about owner needing to configure token
+        if (deploymentCapability.isShared) {
+            return <SharedDirectoryNoTokenAlert />;
+        }
+        // For owned directories, show the regular token configuration alert
         return <VercelTokenAlert />;
     }
 

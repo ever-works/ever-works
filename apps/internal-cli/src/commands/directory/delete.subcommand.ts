@@ -40,7 +40,14 @@ export class DeleteSubCommand extends CommandRunner {
             }
 
             const directory = selection.directory;
-            console.log(chalk.green(`\n✓ Selected directory: ${directory.slug}`));
+            const role = selection.role!;
+            const isShared = selection.isShared!;
+
+            console.log(
+                chalk.green(
+                    `\n✓ Selected directory: ${this.directoryPrompt.formatSelectedDirectory(directory, role, isShared)}`,
+                ),
+            );
 
             // Prompt for deletion options
             const deleteOptions = await this.promptDeleteOptions();

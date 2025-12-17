@@ -26,6 +26,7 @@ import { DirectoryCommandAction, DirectoryCommandPayloads } from '@packages/agen
 import { SkipThrottle } from '@nestjs/throttler';
 import { CacheDto } from './dto/cache.dto';
 import {
+    DirectoryOwnershipService,
     DirectoryScheduleDispatcherService,
     DirectoryScheduleService,
 } from '@packages/agent/services';
@@ -57,6 +58,7 @@ type DirectoryCommandDefinition<K extends DirectoryCommandAction> = {
 export class TriggerInternalController {
     constructor(
         private readonly directoryRepository: DirectoryRepository,
+        private readonly ownershipService: DirectoryOwnershipService,
         @Inject(DIRECTORY_OPERATIONS)
         private readonly directoryOperations: DirectoryOperations,
         @Inject(CACHE_MANAGER) private cacheManager: Cache,
@@ -77,15 +79,8 @@ export class TriggerInternalController {
             throw new BadRequestException('Missing userId');
         }
 
-        const directory = await this.directoryRepository.findById(directoryId);
-
-        if (!directory) {
-            throw new BadRequestException('Directory not found');
-        }
-
-        if (directory.userId !== userId) {
-            throw new BadRequestException('Directory does not belong to provided user');
-        }
+        // Use ownership service to verify access (throws if no access)
+        const { directory } = await this.ownershipService.ensureAccess(directoryId, userId);
 
         return {
             directory: this.stripRelations(directory),

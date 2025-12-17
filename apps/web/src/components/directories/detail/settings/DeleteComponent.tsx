@@ -19,8 +19,15 @@ import {
     DialogClose,
 } from '@/components/ui/dialog';
 import { GenerateStatusType } from '@/lib/api/enums';
+import { useDirectoryPermissions } from '../DirectoryDetailContext';
 
 export function DeleteComponent({ directory }: { directory: Directory }) {
+    const permissions = useDirectoryPermissions();
+
+    // Only owners can delete directories
+    if (!permissions.canDelete) {
+        return null;
+    }
     const t = useTranslations('dashboard.directoryDetail.settings');
     const router = useRouter();
     const [isPending, startTransition] = useTransition();

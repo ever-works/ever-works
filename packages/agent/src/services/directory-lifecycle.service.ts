@@ -74,7 +74,8 @@ export class DirectoryLifecycleService {
     }
 
     async updateDirectory(id: string, updateDto: UpdateDirectoryDto, user: User) {
-        const directory = await this.ownershipService.ensure(id, user.id);
+        // Require at least editor role to update directory
+        const { directory } = await this.ownershipService.ensureCanEdit(id, user.id);
 
         try {
             const updatedDirectory = await this.directoryRepository.update(id, {
@@ -113,7 +114,8 @@ export class DirectoryLifecycleService {
     }
 
     async syncFromDataRepository(directoryId: string, user: User) {
-        const directory = await this.ownershipService.ensure(directoryId, user.id);
+        // Require at least editor role to sync
+        const { directory } = await this.ownershipService.ensureCanEdit(directoryId, user.id);
         const updates: Record<string, any> = {};
 
         try {
@@ -178,17 +180,10 @@ export class DirectoryLifecycleService {
         deleteDirectoryDto: DeleteDirectoryDto,
         user: User,
     ): Promise<DeleteDirectoryResponseDto> {
-        const directory = await this.ownershipService.ensure(directoryId, user.id);
+        // Only owners can delete directories
+        const { directory } = await this.ownershipService.ensureIsOwner(directoryId, user.id);
 
         try {
-            if (directory.userId !== user.id) {
-                throw new BadRequestException({
-                    status: 'error',
-                    directoryId,
-                    message: 'You do not have permission to delete this directory',
-                });
-            }
-
             const deletedRepositories: string[] = [];
 
             if (deleteDirectoryDto.delete_data_repository !== false) {
