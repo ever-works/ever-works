@@ -179,4 +179,31 @@ export class DirectoryMemberRepository {
             relations: ['user'],
         });
     }
+
+    /**
+     * Get member roles for a user across multiple directories in a single query.
+     * Returns a Map of directoryId -> role for directories where the user is a member.
+     */
+    async getMemberRolesForDirectories(
+        userId: string,
+        directoryIds: string[],
+    ): Promise<Map<string, DirectoryMemberRole>> {
+        if (directoryIds.length === 0) {
+            return new Map();
+        }
+
+        const members = await this.repository.find({
+            where: {
+                userId,
+                directoryId: In(directoryIds),
+            },
+            select: ['directoryId', 'role'],
+        });
+
+        const roleMap = new Map<string, DirectoryMemberRole>();
+        for (const member of members) {
+            roleMap.set(member.directoryId, member.role);
+        }
+        return roleMap;
+    }
 }

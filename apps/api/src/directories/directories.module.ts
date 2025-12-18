@@ -7,6 +7,7 @@ import { AuthModule } from '@src/auth';
 import { AiModule } from '@packages/agent/ai';
 import { CacheEntryRepository } from '@packages/agent/cache';
 import { TriggerModule as TasksTriggerModule } from '@packages/tasks';
+import { WebsiteGeneratorModule } from '@packages/agent/website-generator';
 
 // Controllers
 import { DirectoriesController } from './directories.controller';
@@ -16,6 +17,7 @@ import { MembersController } from './members.controller';
 // Tasks
 import { DirectoryCleanupService } from './tasks/directory-cleanup.service';
 import { VercelDeploymentVerifierService } from './tasks/vercel-deployment-verifier.service';
+import { WebsiteTemplateSchedulerService } from './tasks/website-template-scheduler.service';
 
 @Module({
     imports: [
@@ -25,9 +27,15 @@ import { VercelDeploymentVerifierService } from './tasks/vercel-deployment-verif
         AuthModule,
         AiModule,
         TasksTriggerModule,
+        WebsiteGeneratorModule,
         ScheduleModule.forRoot(),
     ],
-    providers: [CacheEntryRepository, DirectoryCleanupService, VercelDeploymentVerifierService],
+    providers: [
+        CacheEntryRepository,
+        DirectoryCleanupService,
+        VercelDeploymentVerifierService,
+        WebsiteTemplateSchedulerService,
+    ],
     controllers: [DirectoriesController, DeployController, MembersController],
 })
 export class DirectoriesModule {}

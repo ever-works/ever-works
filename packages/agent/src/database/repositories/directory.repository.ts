@@ -1,9 +1,17 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, ILike, LessThan, IsNull, In } from 'typeorm';
+import { Repository, LessThan, IsNull, Brackets, Raw } from 'typeorm';
 import { Directory } from '../../entities/directory.entity';
-import { User, DirectoryMember } from '../../entities';
+import { User } from '../../entities';
 import { prepareLikeSearchTerm } from '../utils';
+
+/**
+ * Cross-database case-insensitive LIKE using LOWER() function.
+ * Works with SQLite, PostgreSQL, and MySQL.
+ */
+function caseInsensitiveLike(search: string) {
+    return Raw((alias) => `LOWER(${alias}) LIKE LOWER(:search)`, { search: `%${search}%` });
+}
 
 @Injectable()
 export class DirectoryRepository {
@@ -78,11 +86,11 @@ export class DirectoryRepository {
             const sanitizedSearch = prepareLikeSearchTerm(search);
 
             if (sanitizedSearch) {
-                // Create OR conditions for search
+                // Create OR conditions for search using cross-database case-insensitive LIKE
                 const searchConditions = [
-                    { name: ILike(`%${sanitizedSearch}%`) },
-                    { description: ILike(`%${sanitizedSearch}%`) },
-                    { slug: ILike(`%${sanitizedSearch}%`) },
+                    { name: caseInsensitiveLike(sanitizedSearch) },
+                    { description: caseInsensitiveLike(sanitizedSearch) },
+                    { slug: caseInsensitiveLike(sanitizedSearch) },
                 ];
 
                 // If userId is specified, add it to each search condition
@@ -253,20 +261,32 @@ export class DirectoryRepository {
         // User has access if they are the creator OR they have a membership
         if (memberDirectoryIds.length > 0) {
             queryBuilder.where(
-                '(directory.userId = :userId OR directory.id IN (:...memberDirectoryIds))',
-                { userId, memberDirectoryIds },
+                new Brackets((qb) => {
+                    qb.where('directory.userId = :userId', { userId }).orWhere(
+                        'directory.id IN (:...memberDirectoryIds)',
+                        { memberDirectoryIds },
+                    );
+                }),
             );
         } else {
             queryBuilder.where('directory.userId = :userId', { userId });
         }
 
-        // Apply search filter
+        // Apply search filter using cross-database case-insensitive LIKE
         if (search) {
             const sanitizedSearch = prepareLikeSearchTerm(search);
             if (sanitizedSearch) {
+                const searchPattern = `%${sanitizedSearch.toLowerCase()}%`;
                 queryBuilder.andWhere(
-                    '(directory.name ILIKE :search OR directory.description ILIKE :search OR directory.slug ILIKE :search)',
-                    { search: `%${sanitizedSearch}%` },
+                    new Brackets((qb) => {
+                        qb.where('LOWER(directory.name) LIKE :search', { search: searchPattern })
+                            .orWhere('LOWER(directory.description) LIKE :search', {
+                                search: searchPattern,
+                            })
+                            .orWhere('LOWER(directory.slug) LIKE :search', {
+                                search: searchPattern,
+                            });
+                    }),
                 );
             }
         }
@@ -303,20 +323,32 @@ export class DirectoryRepository {
         // User has access if they are the creator OR they have a membership
         if (memberDirectoryIds.length > 0) {
             queryBuilder.where(
-                '(directory.userId = :userId OR directory.id IN (:...memberDirectoryIds))',
-                { userId, memberDirectoryIds },
+                new Brackets((qb) => {
+                    qb.where('directory.userId = :userId', { userId }).orWhere(
+                        'directory.id IN (:...memberDirectoryIds)',
+                        { memberDirectoryIds },
+                    );
+                }),
             );
         } else {
             queryBuilder.where('directory.userId = :userId', { userId });
         }
 
-        // Apply search filter
+        // Apply search filter using cross-database case-insensitive LIKE
         if (search) {
             const sanitizedSearch = prepareLikeSearchTerm(search);
             if (sanitizedSearch) {
+                const searchPattern = `%${sanitizedSearch.toLowerCase()}%`;
                 queryBuilder.andWhere(
-                    '(directory.name ILIKE :search OR directory.description ILIKE :search OR directory.slug ILIKE :search)',
-                    { search: `%${sanitizedSearch}%` },
+                    new Brackets((qb) => {
+                        qb.where('LOWER(directory.name) LIKE :search', { search: searchPattern })
+                            .orWhere('LOWER(directory.description) LIKE :search', {
+                                search: searchPattern,
+                            })
+                            .orWhere('LOWER(directory.slug) LIKE :search', {
+                                search: searchPattern,
+                            });
+                    }),
                 );
             }
         }
@@ -331,6 +363,16 @@ export class DirectoryRepository {
         return this.repository.findOne({
             where: { id },
             relations: ['user', 'user.oauthTokens', 'members', 'members.user'],
+        });
+    }
+
+    /**
+     * Find all directories with website template auto-update enabled.
+     */
+    async findWithWebsiteAutoUpdateEnabled(): Promise<Directory[]> {
+        return this.repository.find({
+            where: { websiteTemplateAutoUpdate: true },
+            relations: ['user', 'user.oauthTokens'],
         });
     }
 }

@@ -11,12 +11,15 @@ import {
     getVercelTeams,
     lookupExistingDeployment,
     updateWebsiteRepository,
+    updateWebsiteTemplateSettings,
 } from '@/app/actions/dashboard/deploy';
-import { RefreshCw, Info, Loader2, Triangle } from 'lucide-react';
+import { RefreshCw, Info, Loader2, Triangle, Settings2, AlertCircle } from 'lucide-react';
 import { useDirectoryDetail } from '../DirectoryDetailContext';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 import { pageIntervalRefresh } from '@/lib/utils';
 import { VercelTeamSelectionDialog } from './VercelTeamSelectionDialog';
+import { formatDistanceToNow } from 'date-fns';
 
 interface DeployFormProps {
     directory: Directory;
@@ -177,6 +180,9 @@ export function DeployForm({ directory, isDeploying }: DeployFormProps) {
             {/* Update Repository Section */}
             <UpdateWebsiteRepository directory={directory} />
 
+            {/* Website Template Settings Section */}
+            <WebsiteTemplateSettings directory={directory} />
+
             {/* Info Section */}
             <div className="p-6 rounded-lg bg-info/5 dark:bg-info-dark/5 border border-info/20 dark:border-info-dark/20">
                 <div className="flex gap-3">
@@ -251,6 +257,155 @@ function UpdateWebsiteRepository({ directory }: DeployFormProps) {
                             ? t('form.updateRepository.updatingButton')
                             : t('form.updateRepository.updateButton')}
                     </Button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function WebsiteTemplateSettings({ directory }: DeployFormProps) {
+    const t = useTranslations('dashboard.directoryDetail.deploy');
+    const [isPending, startTransition] = useTransition();
+    const router = useRouter();
+    const [autoUpdate, setAutoUpdate] = useState(directory.websiteTemplateAutoUpdate ?? false);
+    const [useBeta, setUseBeta] = useState(directory.websiteTemplateUseBeta ?? false);
+
+    const handleAutoUpdateChange = (checked: boolean) => {
+        setAutoUpdate(checked);
+        startTransition(async () => {
+            try {
+                const result = await updateWebsiteTemplateSettings(directory.id, {
+                    websiteTemplateAutoUpdate: checked,
+                });
+
+                if (result.success) {
+                    toast.success(t('form.websiteTemplate.updateSuccess'));
+                    router.refresh();
+                } else {
+                    setAutoUpdate(!checked); // Revert on failure
+                    toast.error(result.error || t('form.websiteTemplate.updateFailed'));
+                }
+            } catch (error) {
+                setAutoUpdate(!checked); // Revert on failure
+                console.error('Update auto-update setting failed:', error);
+                toast.error(t('form.websiteTemplate.updateFailed'));
+            }
+        });
+    };
+
+    const handleUseBetaChange = (checked: boolean) => {
+        setUseBeta(checked);
+        startTransition(async () => {
+            try {
+                const result = await updateWebsiteTemplateSettings(directory.id, {
+                    websiteTemplateUseBeta: checked,
+                });
+
+                if (result.success) {
+                    toast.success(t('form.websiteTemplate.updateSuccess'));
+                    router.refresh();
+                } else {
+                    setUseBeta(!checked); // Revert on failure
+                    toast.error(result.error || t('form.websiteTemplate.updateFailed'));
+                }
+            } catch (error) {
+                setUseBeta(!checked); // Revert on failure
+                console.error('Update use beta setting failed:', error);
+                toast.error(t('form.websiteTemplate.updateFailed'));
+            }
+        });
+    };
+
+    const formatDate = (dateString: string | null | undefined) => {
+        if (!dateString) return null;
+        try {
+            return formatDistanceToNow(new Date(dateString), { addSuffix: true });
+        } catch {
+            return null;
+        }
+    };
+
+    const lastUpdated = formatDate(directory.websiteTemplateLastUpdatedAt);
+    const lastChecked = formatDate(directory.websiteTemplateLastCheckedAt);
+    const hasError = Boolean(directory.websiteTemplateLastError);
+
+    return (
+        <div className="rounded-lg bg-surface dark:bg-surface-dark border border-border dark:border-border-dark p-6">
+            <div className="flex items-start gap-4">
+                <div
+                    className={cn(
+                        'shrink-0 w-10 h-10 rounded-full flex items-center justify-center',
+                        'bg-accent/10 dark:bg-accent-dark/10',
+                    )}
+                >
+                    <Settings2 className="w-5 h-5 text-accent dark:text-accent-dark" />
+                </div>
+                <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-text dark:text-text-dark mb-2">
+                        {t('form.websiteTemplate.title')}
+                    </h3>
+                    <p className="text-text-secondary dark:text-text-secondary-dark mb-4">
+                        {t('form.websiteTemplate.description')}
+                    </p>
+
+                    <div className="space-y-4">
+                        <Switch
+                            checked={autoUpdate}
+                            onChange={handleAutoUpdateChange}
+                            disabled={isPending}
+                            label={t('form.websiteTemplate.autoUpdate')}
+                            helperText={t('form.websiteTemplate.autoUpdateDescription')}
+                        />
+
+                        <Switch
+                            checked={useBeta}
+                            onChange={handleUseBetaChange}
+                            disabled={isPending}
+                            label={t('form.websiteTemplate.useBeta')}
+                            helperText={t('form.websiteTemplate.useBetaDescription')}
+                        />
+
+                        {/* Status display */}
+                        {(lastUpdated || lastChecked) && (
+                            <div className="mt-4 pt-4 border-t border-border dark:border-border-dark">
+                                <div className="text-sm text-text-secondary dark:text-text-secondary-dark space-y-1">
+                                    {lastUpdated && (
+                                        <p>
+                                            <span className="font-medium">
+                                                {t('form.websiteTemplate.lastUpdated')}:
+                                            </span>{' '}
+                                            {lastUpdated}
+                                        </p>
+                                    )}
+                                    {lastChecked && (
+                                        <p>
+                                            <span className="font-medium">
+                                                {t('form.websiteTemplate.lastChecked')}:
+                                            </span>{' '}
+                                            {lastChecked}
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Error display */}
+                        {hasError && (
+                            <div className="mt-4 p-3 rounded-lg bg-error/10 dark:bg-error-dark/10 border border-error/20 dark:border-error-dark/20">
+                                <div className="flex gap-2 items-start">
+                                    <AlertCircle className="shrink-0 w-4 h-4 text-error dark:text-error-dark mt-0.5" />
+                                    <div>
+                                        <p className="text-sm font-medium text-error dark:text-error-dark">
+                                            {t('form.websiteTemplate.lastError')}
+                                        </p>
+                                        <p className="text-sm text-text-secondary dark:text-text-secondary-dark mt-1">
+                                            {directory.websiteTemplateLastError}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>

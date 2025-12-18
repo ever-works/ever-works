@@ -826,6 +826,19 @@
                     "info": {
                         "deployInfo": "El despliegue típicamente toma 1-3 minutos. Recibirás una URL una vez completado.",
                         "updateInfo": "Las actualizaciones sincronizan el contenido de tu directorio al repositorio del sitio web para el próximo despliegue."
+                    },
+                    "websiteTemplate": {
+                        "title": "Actualizaciones Automáticas de Plantilla",
+                        "description": "Mantén tu sitio web sincronizado automáticamente con los últimos cambios de la plantilla.",
+                        "autoUpdate": "Actualizar automáticamente",
+                        "autoUpdateDescription": "Verificar actualizaciones de plantilla cada hora y aplicarlas automáticamente.",
+                        "useBeta": "Usar versión beta de la plantilla",
+                        "useBetaDescription": "Usar la rama stage en lugar de la rama main estable.",
+                        "lastUpdated": "Última actualización",
+                        "lastChecked": "Última verificación",
+                        "lastError": "Último error",
+                        "updateSuccess": "Configuración actualizada exitosamente",
+                        "updateFailed": "Error al actualizar la configuración"
                     }
                 }
             },
@@ -1257,7 +1270,8 @@
         },
         "deploy": {
             "deployVercelFailed": "No se pudo desplegar en Vercel",
-            "updateRepositoryFailed": "No se pudo actualizar el repositorio"
+            "updateRepositoryFailed": "No se pudo actualizar el repositorio",
+            "updateSettingsFailed": "Error al actualizar la configuración de la plantilla del sitio web"
         }
     },
     "validation": {

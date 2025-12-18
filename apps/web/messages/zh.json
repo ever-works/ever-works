@@ -826,6 +826,19 @@
                     "info": {
                         "deployInfo": "部署通常需要 1-3 分钟。完成后您将收到一个 URL。",
                         "updateInfo": "更新会将您的目录内容同步到网站仓库，以便下次部署。"
+                    },
+                    "websiteTemplate": {
+                        "title": "自动模板更新",
+                        "description": "自动保持您的网站与最新模板更改同步。",
+                        "autoUpdate": "自动更新",
+                        "autoUpdateDescription": "每小时检查模板更新并自动应用。",
+                        "useBeta": "使用模板测试版",
+                        "useBetaDescription": "使用 stage 分支而不是稳定的 main 分支。",
+                        "lastUpdated": "上次更新",
+                        "lastChecked": "上次检查",
+                        "lastError": "上次错误",
+                        "updateSuccess": "设置更新成功",
+                        "updateFailed": "设置更新失败"
                     }
                 }
             },
@@ -1257,7 +1270,8 @@
         },
         "deploy": {
             "deployVercelFailed": "部署到 Vercel 失败",
-            "updateRepositoryFailed": "更新仓库失败"
+            "updateRepositoryFailed": "更新仓库失败",
+            "updateSettingsFailed": "更新网站模板设置失败"
         }
     },
     "validation": {
