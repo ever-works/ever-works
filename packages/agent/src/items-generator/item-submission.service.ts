@@ -35,7 +35,10 @@ export class ItemSubmissionService {
         );
 
         try {
-            const token = user.getGitToken();
+            // Use directory owner's Git token (they set up the repos)
+            // but use current user as committer for attribution
+            const directoryOwner = directory.user as User;
+            const token = directoryOwner.getGitToken();
             const committer = user.asCommitter();
 
             const repo = directory.getDataRepo();
@@ -219,7 +222,10 @@ export class ItemSubmissionService {
         );
 
         try {
-            const token = user.getGitToken();
+            // Use directory owner's Git token (they set up the repos)
+            // but use current user as committer for attribution
+            const directoryOwner = directory.user as User;
+            const token = directoryOwner.getGitToken();
             const committer = user.asCommitter();
 
             const repo = directory.getDataRepo();
@@ -360,7 +366,10 @@ export class ItemSubmissionService {
         );
 
         try {
-            const token = user.getGitToken();
+            // Use directory owner's Git token (they set up the repos)
+            // but use current user as committer for attribution
+            const directoryOwner = directory.user as User;
+            const token = directoryOwner.getGitToken();
             const committer = user.asCommitter();
 
             const repo = directory.getDataRepo();

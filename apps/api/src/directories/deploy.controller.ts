@@ -1,20 +1,9 @@
-import {
-    BadRequestException,
-    Body,
-    Controller,
-    ForbiddenException,
-    Inject,
-    NotFoundException,
-    Param,
-    Post,
-    UseGuards,
-} from '@nestjs/common';
-import { DirectoryRepository } from '@packages/agent/database';
+import { BadRequestException, Body, Controller, Param, Post, UseGuards } from '@nestjs/common';
 import { DeployVercelDto, VercelService } from '@packages/agent/deploy';
+import { DirectoryOwnershipService } from '@packages/agent/services';
 import { AuthService, CurrentUser, JwtAuthGuard } from '../auth';
 import { AuthenticatedUser } from '../auth/types/jwt.types';
 import { VercelDeploymentVerifierService } from './tasks/vercel-deployment-verifier.service';
-import { Directory } from '@packages/agent/entities';
 import { VercelTokenDto } from './dto/deploy.dto';
 
 @Controller('api/deploy')
@@ -22,7 +11,7 @@ import { VercelTokenDto } from './dto/deploy.dto';
 export class DeployController {
     constructor(
         private readonly vercelService: VercelService,
-        private readonly directoryRepository: DirectoryRepository,
+        private readonly ownershipService: DirectoryOwnershipService,
         private readonly authService: AuthService,
         private readonly vercelDeploymentVerifierService: VercelDeploymentVerifierService,
     ) {}
@@ -36,16 +25,25 @@ export class DeployController {
         const { VERCEL_TOKEN, GITHUB_TOKEN, vercelTeamScope } = deployVercel;
 
         const user = await this.authService.getUser(auth.userId);
-        const directory = await this.validateDirectoryOwnership(id, user.id);
+        const { directory, isCreator } = await this.ownershipService.ensureCanEdit(id, user.id);
 
-        const ghToken = GITHUB_TOKEN || user.getGitToken();
+        // For shared directories, use the directory owner's tokens
+        // The owner set up the infrastructure, collaborators just trigger deployments
+        const directoryOwner = directory.user;
 
-        // Validate vercel token
-        const vercelToken = VERCEL_TOKEN || user.vercelToken;
+        // Use owner's GitHub token for shared directories (they connected the repos)
+        const ghToken =
+            GITHUB_TOKEN || (isCreator ? user.getGitToken() : directoryOwner.getGitToken());
+
+        // Use owner's Vercel token for shared directories (they configured deployment)
+        const vercelToken =
+            VERCEL_TOKEN || (isCreator ? user.vercelToken : directoryOwner.vercelToken);
         if (!vercelToken) {
             throw new BadRequestException({
                 status: 'error',
-                message: 'Vercel token is required',
+                message: isCreator
+                    ? 'Vercel token is required. Please configure it in your settings.'
+                    : 'The directory owner has not configured a Vercel token for deployment.',
             });
         }
 
@@ -123,13 +121,38 @@ export class DeployController {
         }
     }
 
+    /**
+     * Check if deployment is possible for a directory.
+     * For shared directories, checks the owner's Vercel token.
+     */
+    @Post('/directories/:id/vercel/check')
+    async checkDeploymentCapability(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') id: string,
+    ) {
+        const user = await this.authService.getUser(auth.userId);
+        const { directory, isCreator } = await this.ownershipService.ensureCanView(id, user.id);
+
+        // Determine which Vercel token to check
+        const directoryOwner = directory.user;
+        const vercelToken = isCreator ? user.vercelToken : directoryOwner.vercelToken;
+
+        return {
+            status: 'success',
+            canDeploy: Boolean(vercelToken),
+            isShared: !isCreator,
+            ownerHasToken: Boolean(directoryOwner.vercelToken),
+            userHasToken: Boolean(user.vercelToken),
+        };
+    }
+
     @Post('/directories/:id/vercel/lookup')
     async lookupExistingDeployment(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id') id: string,
     ) {
         const user = await this.authService.getUser(auth.userId);
-        const directory = await this.validateDirectoryOwnership(id, user.id);
+        const { directory, isCreator } = await this.ownershipService.ensureCanView(id, user.id);
 
         if (directory.website) {
             return {
@@ -139,11 +162,15 @@ export class DeployController {
             };
         }
 
-        const vercelToken = user.vercelToken;
+        // For shared directories, use the directory owner's Vercel token
+        const directoryOwner = directory.user;
+        const vercelToken = isCreator ? user.vercelToken : directoryOwner.vercelToken;
         if (!vercelToken) {
             throw new BadRequestException({
                 status: 'error',
-                message: 'Vercel token is required to lookup deployments',
+                message: isCreator
+                    ? 'Vercel token is required to lookup deployments'
+                    : 'The directory owner has not configured a Vercel token',
             });
         }
 
@@ -159,28 +186,5 @@ export class DeployController {
             deploymentState: existingDeployment.deploymentState,
             found: existingDeployment.found,
         };
-    }
-
-    private async validateDirectoryOwnership(
-        directoryId: string,
-        userId: string,
-    ): Promise<Directory> {
-        const directory = await this.directoryRepository.findById(directoryId);
-
-        if (!directory) {
-            throw new NotFoundException({
-                status: 'error',
-                message: `Directory with id '${directoryId}' not found`,
-            });
-        }
-
-        if (directory.userId !== userId) {
-            throw new ForbiddenException({
-                status: 'error',
-                message: 'You do not have permission to access this directory',
-            });
-        }
-
-        return directory;
     }
 }

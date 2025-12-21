@@ -329,9 +329,15 @@ importers:
       '@headlessui/react':
         specifier: ^2.2.9
         version: 2.2.9(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
+      '@tanstack/react-virtual':
+        specifier: ^3.13.13
+        version: 3.13.13(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
+      date-fns:
+        specifier: ^4.1.0
+        version: 4.1.0
       deepmerge:
         specifier: ^4.3.1
         version: 4.3.1
@@ -1936,8 +1942,8 @@ packages:
   '@microsoft/fetch-event-source@2.0.1':
     resolution: {integrity: sha512-W6CLUJ2eBMw3Rec70qrsEW0jOm/3twwJv21mrmj2yORiaVmVYGS4sSS5yUwvQc1ZlDLYGPnClVWmUUMagKNsfA==}
 
-  '@mistralai/mistralai@1.10.0':
-    resolution: {integrity: sha512-tdIgWs4Le8vpvPiUEWne6tK0qbVc+jMenujnvTqOjogrJUsCSQhus0tHTU1avDDh5//Rq2dFgP9mWRAdIEoBqg==}
+  '@mistralai/mistralai@1.11.0':
+    resolution: {integrity: sha512-6/BVj2mcaggYbpMzNSxtqtM2Tv/Jb5845XFd2CMYFO+O5VBkX70iLjtkBBTI4JFhh1l9vTCIMYXBVOjLoBVHGQ==}
 
   '@mixmark-io/domino@2.2.0':
     resolution: {integrity: sha512-Y28PR25bHXUg88kCV7nivXrP2Nj2RueZ3/l/jdx6J9f8J4nsEGcgX0Qe6lt7Pa+J79+kPiJU3LguR6O/6zrLOw==}
@@ -3107,14 +3113,14 @@ packages:
   '@tailwindcss/postcss@4.1.17':
     resolution: {integrity: sha512-+nKl9N9mN5uJ+M7dBOOCzINw94MPstNR/GtIhz1fpZysxL/4a+No64jCBD6CPN+bIHWFx3KWuu8XJRrj/572Dw==}
 
-  '@tanstack/react-virtual@3.13.12':
-    resolution: {integrity: sha512-Gd13QdxPSukP8ZrkbgS2RwoZseTTbQPLnQEn7HY/rqtM+8Zt95f7xKC7N0EsKs7aoz0WzZ+fditZux+F8EzYxA==}
+  '@tanstack/react-virtual@3.13.13':
+    resolution: {integrity: sha512-4o6oPMDvQv+9gMi8rE6gWmsOjtUZUYIJHv7EB+GblyYdi8U6OqLl8rhHWIUZSL1dUU2dPwTdTgybCKf9EjIrQg==}
     peerDependencies:
       react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
       react-dom: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
 
-  '@tanstack/virtual-core@3.13.12':
-    resolution: {integrity: sha512-1YBOJfRHV4sXUmWsFSf5rQor4Ss82G8dQWLRbnk3GA4jeP8hQt1hxXh0tmflpC0dz3VgEv/1+qwPyLeWkQuPFA==}
+  '@tanstack/virtual-core@3.13.13':
+    resolution: {integrity: sha512-uQFoSdKKf5S8k51W5t7b2qpfkyIbdHMzAn+AMQvHPxKUPeo1SsGaA4JRISQT87jm28b7z8OEqPcg1IOZagQHcA==}
 
   '@tavily/core@0.3.7':
     resolution: {integrity: sha512-WnEeWfXGajam+uyWMf7qtEAKnitYWy9Bb6OFPtCEeT1GyXMqvpUd+4itssGnDt6RLFHv23erlt6MyPXKMD8CPA==}
@@ -9031,7 +9037,7 @@ snapshots:
       '@floating-ui/react': 0.26.28(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
       '@react-aria/focus': 3.21.2(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
       '@react-aria/interactions': 3.25.6(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
-      '@tanstack/react-virtual': 3.13.12(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
+      '@tanstack/react-virtual': 3.13.13(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
       react: 19.2.3
       react-dom: 19.2.3(react@19.2.3)
       use-sync-external-store: 1.6.0(react@19.2.3)
@@ -9611,7 +9617,7 @@ snapshots:
   '@langchain/mistralai@0.2.3(@langchain/core@0.3.79(@opentelemetry/api@1.9.0)(@opentelemetry/sdk-trace-base@2.2.0(@opentelemetry/api@1.9.0))(openai@5.12.2(ws@8.18.3)(zod@3.25.76)))':
     dependencies:
       '@langchain/core': 0.3.79(@opentelemetry/api@1.9.0)(@opentelemetry/sdk-trace-base@2.2.0(@opentelemetry/api@1.9.0))(openai@5.12.2(ws@8.18.3)(zod@3.25.76))
-      '@mistralai/mistralai': 1.10.0
+      '@mistralai/mistralai': 1.11.0
       uuid: 10.0.0
     optional: true
 
@@ -9668,7 +9674,7 @@ snapshots:
 
   '@microsoft/fetch-event-source@2.0.1': {}
 
-  '@mistralai/mistralai@1.10.0':
+  '@mistralai/mistralai@1.11.0':
     dependencies:
       zod: 3.25.76
       zod-to-json-schema: 3.24.6(zod@3.25.76)
@@ -10956,13 +10962,13 @@ snapshots:
       postcss: 8.5.6
       tailwindcss: 4.1.17
 
-  '@tanstack/react-virtual@3.13.12(react-dom@19.2.3(react@19.2.3))(react@19.2.3)':
+  '@tanstack/react-virtual@3.13.13(react-dom@19.2.3(react@19.2.3))(react@19.2.3)':
     dependencies:
-      '@tanstack/virtual-core': 3.13.12
+      '@tanstack/virtual-core': 3.13.13
       react: 19.2.3
       react-dom: 19.2.3(react@19.2.3)
 
-  '@tanstack/virtual-core@3.13.12': {}
+  '@tanstack/virtual-core@3.13.13': {}
 
   '@tavily/core@0.3.7':
     dependencies:

@@ -1,9 +1,17 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, ILike, LessThan, IsNull } from 'typeorm';
+import { Repository, LessThan, IsNull, Brackets, Raw } from 'typeorm';
 import { Directory } from '../../entities/directory.entity';
 import { User } from '../../entities';
 import { prepareLikeSearchTerm } from '../utils';
+
+/**
+ * Cross-database case-insensitive LIKE using LOWER() function.
+ * Works with SQLite, PostgreSQL, and MySQL.
+ */
+function caseInsensitiveLike(search: string) {
+    return Raw((alias) => `LOWER(${alias}) LIKE LOWER(:search)`, { search: `%${search}%` });
+}
 
 @Injectable()
 export class DirectoryRepository {
@@ -78,11 +86,11 @@ export class DirectoryRepository {
             const sanitizedSearch = prepareLikeSearchTerm(search);
 
             if (sanitizedSearch) {
-                // Create OR conditions for search
+                // Create OR conditions for search using cross-database case-insensitive LIKE
                 const searchConditions = [
-                    { name: ILike(`%${sanitizedSearch}%`) },
-                    { description: ILike(`%${sanitizedSearch}%`) },
-                    { slug: ILike(`%${sanitizedSearch}%`) },
+                    { name: caseInsensitiveLike(sanitizedSearch) },
+                    { description: caseInsensitiveLike(sanitizedSearch) },
+                    { slug: caseInsensitiveLike(sanitizedSearch) },
                 ];
 
                 // If userId is specified, add it to each search condition
@@ -226,5 +234,145 @@ export class DirectoryRepository {
         });
 
         return stalledDirectories;
+    }
+
+    /**
+     * Find all directories accessible to a user (as creator OR as member).
+     * This combines owned directories with those the user has been invited to.
+     */
+    async findAllAccessible(options?: {
+        userId: string;
+        memberDirectoryIds?: string[];
+        limit?: number;
+        offset?: number;
+        search?: string;
+    }): Promise<Directory[]> {
+        const { userId, memberDirectoryIds = [], limit, offset, search } = options || {};
+
+        if (!userId) {
+            return [];
+        }
+
+        const queryBuilder = this.repository
+            .createQueryBuilder('directory')
+            .leftJoinAndSelect('directory.user', 'user')
+            .leftJoinAndSelect('user.oauthTokens', 'oauthTokens');
+
+        // User has access if they are the creator OR they have a membership
+        if (memberDirectoryIds.length > 0) {
+            queryBuilder.where(
+                new Brackets((qb) => {
+                    qb.where('directory.userId = :userId', { userId }).orWhere(
+                        'directory.id IN (:...memberDirectoryIds)',
+                        { memberDirectoryIds },
+                    );
+                }),
+            );
+        } else {
+            queryBuilder.where('directory.userId = :userId', { userId });
+        }
+
+        // Apply search filter using cross-database case-insensitive LIKE
+        if (search) {
+            const sanitizedSearch = prepareLikeSearchTerm(search);
+            if (sanitizedSearch) {
+                const searchPattern = `%${sanitizedSearch.toLowerCase()}%`;
+                queryBuilder.andWhere(
+                    new Brackets((qb) => {
+                        qb.where('LOWER(directory.name) LIKE :search', { search: searchPattern })
+                            .orWhere('LOWER(directory.description) LIKE :search', {
+                                search: searchPattern,
+                            })
+                            .orWhere('LOWER(directory.slug) LIKE :search', {
+                                search: searchPattern,
+                            });
+                    }),
+                );
+            }
+        }
+
+        queryBuilder.orderBy('directory.updatedAt', 'DESC');
+
+        if (limit) {
+            queryBuilder.take(limit);
+        }
+
+        if (offset) {
+            queryBuilder.skip(offset);
+        }
+
+        return queryBuilder.getMany();
+    }
+
+    /**
+     * Count all directories accessible to a user (as creator OR as member).
+     */
+    async countAllAccessible(options?: {
+        userId: string;
+        memberDirectoryIds?: string[];
+        search?: string;
+    }): Promise<number> {
+        const { userId, memberDirectoryIds = [], search } = options || {};
+
+        if (!userId) {
+            return 0;
+        }
+
+        const queryBuilder = this.repository.createQueryBuilder('directory');
+
+        // User has access if they are the creator OR they have a membership
+        if (memberDirectoryIds.length > 0) {
+            queryBuilder.where(
+                new Brackets((qb) => {
+                    qb.where('directory.userId = :userId', { userId }).orWhere(
+                        'directory.id IN (:...memberDirectoryIds)',
+                        { memberDirectoryIds },
+                    );
+                }),
+            );
+        } else {
+            queryBuilder.where('directory.userId = :userId', { userId });
+        }
+
+        // Apply search filter using cross-database case-insensitive LIKE
+        if (search) {
+            const sanitizedSearch = prepareLikeSearchTerm(search);
+            if (sanitizedSearch) {
+                const searchPattern = `%${sanitizedSearch.toLowerCase()}%`;
+                queryBuilder.andWhere(
+                    new Brackets((qb) => {
+                        qb.where('LOWER(directory.name) LIKE :search', { search: searchPattern })
+                            .orWhere('LOWER(directory.description) LIKE :search', {
+                                search: searchPattern,
+                            })
+                            .orWhere('LOWER(directory.slug) LIKE :search', {
+                                search: searchPattern,
+                            });
+                    }),
+                );
+            }
+        }
+
+        return queryBuilder.getCount();
+    }
+
+    /**
+     * Find a directory by ID with members relation loaded.
+     */
+    async findByIdWithMembers(id: string): Promise<Directory | null> {
+        return this.repository.findOne({
+            where: { id },
+            relations: ['user', 'user.oauthTokens', 'members', 'members.user'],
+        });
+    }
+
+    /**
+     * Find all directories with website template auto-update enabled.
+     */
+    async findWithWebsiteAutoUpdateEnabled(): Promise<Directory[]> {
+        return this.repository.find({
+            where: { websiteTemplateAutoUpdate: true },
+            relations: ['user', 'user.oauthTokens'],
+        });
     }
 }

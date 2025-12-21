@@ -29,7 +29,10 @@ export class MarkdownGeneratorService {
     ) {}
 
     async initialize(directory: Directory, user: User, options: InitializeOptions = {}) {
-        const token = user.getGitToken();
+        // Use directory owner's Git token (they set up the repos)
+        // but use current user as committer for attribution
+        const directoryOwner = directory.user as User;
+        const token = directoryOwner.getGitToken();
         const committer = user.asCommitter();
 
         const description = options?.repository_description || directory.description;
@@ -208,7 +211,9 @@ export class MarkdownGeneratorService {
     }
 
     async removeItemDetail(directory: Directory, user: User, slug: string, branch?: string) {
-        const token = user.getGitToken();
+        // Use directory owner's Git token (they set up the repos)
+        const directoryOwner = directory.user as User;
+        const token = directoryOwner.getGitToken();
         const committer = user.asCommitter();
 
         const markdownPath = await this.githubService.cloneOrPull({
@@ -233,7 +238,9 @@ export class MarkdownGeneratorService {
      * Remove repository for a directory
      */
     async removeRepository(directory: Directory, user: User): Promise<void> {
-        const token = user.getGitToken();
+        // Use directory owner's Git token (they set up the repos)
+        const directoryOwner = directory.user as User;
+        const token = directoryOwner.getGitToken();
 
         try {
             // Delete the GitHub repository

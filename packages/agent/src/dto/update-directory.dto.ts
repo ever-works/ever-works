@@ -1,5 +1,5 @@
 import { Type, Transform } from 'class-transformer';
-import { IsOptional, IsString, ValidateNested, MaxLength } from 'class-validator';
+import { IsOptional, IsString, IsBoolean, ValidateNested, MaxLength } from 'class-validator';
 import { MarkdownReadmeConfigDto } from './create-directory.dto';
 import { sanitizeName, sanitizeDescription } from '../utils/sanitize.util';
 
@@ -28,4 +28,12 @@ export class UpdateDirectoryDto {
     @ValidateNested()
     @Type(() => MarkdownReadmeConfigDto)
     readmeConfig?: MarkdownReadmeConfigDto;
+
+    @IsOptional()
+    @IsBoolean()
+    websiteTemplateAutoUpdate?: boolean;
+
+    @IsOptional()
+    @IsBoolean()
+    websiteTemplateUseBeta?: boolean;
 }

@@ -134,3 +134,37 @@ export async function lookupExistingDeployment(directoryId: string) {
         };
     }
 }
+
+export async function updateWebsiteTemplateSettings(
+    directoryId: string,
+    settings: {
+        websiteTemplateAutoUpdate?: boolean;
+        websiteTemplateUseBeta?: boolean;
+    },
+) {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    const t = await getTranslations('actions.deploy');
+
+    try {
+        const response = await directoryAPI.update(directoryId, settings);
+
+        revalidatePath(ROUTES.DASHBOARD_DIRECTORY_DEPLOY(directoryId));
+
+        return {
+            success: response.status === 'success',
+            data: response.directory,
+            error: response.status === 'error' ? t('updateSettingsFailed') : null,
+        };
+    } catch (error) {
+        console.error('Update website template settings error:', error);
+        return {
+            success: false,
+            data: null,
+            error: error instanceof Error ? error.message : t('updateSettingsFailed'),
+        };
+    }
+}

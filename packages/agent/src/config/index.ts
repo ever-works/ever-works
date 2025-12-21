@@ -353,6 +353,15 @@ export const config = {
         },
     },
 
+    websiteTemplate: {
+        autoUpdateEnabled() {
+            return process.env.WEBSITE_TEMPLATE_AUTO_UPDATE_ENABLED !== 'false';
+        },
+        getBetaBranch() {
+            return process.env.WEBSITE_TEMPLATE_BETA_BRANCH || 'stage';
+        },
+    },
+
     billing: {
         getDefaultCurrency() {
             return process.env.BILLING_DEFAULT_CURRENCY || 'usd';

@@ -27,7 +27,14 @@ export const deployCommand = new Command('deploy')
             }
 
             const directory = selection.directory;
-            console.log(chalk.green(`\n✓ Selected directory: ${directory.slug}`));
+            const role = selection.role!;
+            const isShared = selection.isShared!;
+
+            console.log(
+                chalk.green(
+                    `\n✓ Selected directory: ${directoryPrompt.formatSelectedDirectory(directory, role, isShared)}`,
+                ),
+            );
 
             // Attempt to fetch Vercel teams (optional)
             let vercelTeams: VercelTeam[] = [];

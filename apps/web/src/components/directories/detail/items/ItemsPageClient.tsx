@@ -10,6 +10,7 @@ import { useTranslations } from 'next-intl';
 import { Plus } from 'lucide-react';
 import { useRouter } from '@/i18n/navigation';
 import { getCategoryName } from '@/lib/utils/items';
+import { useDirectoryPermissions } from '../DirectoryDetailContext';
 
 interface ItemsPageClientProps {
     items: ItemData[];
@@ -19,6 +20,7 @@ interface ItemsPageClientProps {
 export function ItemsPageClient({ items, directoryId }: ItemsPageClientProps) {
     const t = useTranslations('dashboard.directoryDetail.items');
     const router = useRouter();
+    const permissions = useDirectoryPermissions();
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
     // Get unique categories from existing items
@@ -50,26 +52,30 @@ export function ItemsPageClient({ items, directoryId }: ItemsPageClientProps) {
                             {t('subtitle')}
                         </p>
                     </div>
-                    <Button
-                        variant="primary"
-                        onClick={() => setIsAddModalOpen(true)}
-                        className={cn('inline-flex items-center gap-2')}
-                    >
-                        <Plus className="w-4 h-4" />
-                        {t('addItem')}
-                    </Button>
+                    {permissions.canEdit && (
+                        <Button
+                            variant="primary"
+                            onClick={() => setIsAddModalOpen(true)}
+                            className={cn('inline-flex items-center gap-2')}
+                        >
+                            <Plus className="w-4 h-4" />
+                            {t('addItem')}
+                        </Button>
+                    )}
                 </div>
             </div>
 
-            <ItemsList items={items} directoryId={directoryId} />
+            <ItemsList items={items} directoryId={directoryId} canEdit={permissions.canEdit} />
 
-            <AddItemModal
-                directoryId={directoryId}
-                categories={finalCategories}
-                isOpen={isAddModalOpen}
-                onClose={() => setIsAddModalOpen(false)}
-                onSuccess={handleAddSuccess}
-            />
+            {permissions.canEdit && (
+                <AddItemModal
+                    directoryId={directoryId}
+                    categories={finalCategories}
+                    isOpen={isAddModalOpen}
+                    onClose={() => setIsAddModalOpen(false)}
+                    onSuccess={handleAddSuccess}
+                />
+            )}
         </>
     );
 }

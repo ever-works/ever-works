@@ -42,7 +42,8 @@ export class DirectoryScheduleService {
     ): Promise<{ schedule: DirectoryScheduleDto; directoryId: string }> {
         this.ensureSchedulingEnabled();
 
-        const directory = await this.ownershipService.ensure(directoryId, user.id);
+        // Any access level can view schedule
+        const { directory } = await this.ownershipService.ensureCanView(directoryId, user.id);
         const subscriptionsEnabled = this.subscriptionService.isEnabled();
 
         await this.ensureDirectoryConfigReady(directory, user);
@@ -61,7 +62,8 @@ export class DirectoryScheduleService {
 
     async getScheduleEntity(directoryId: string, user: User): Promise<DirectorySchedule> {
         this.ensureSchedulingEnabled();
-        const directory = await this.ownershipService.ensure(directoryId, user.id);
+        // Any access level can view schedule
+        const { directory } = await this.ownershipService.ensureCanView(directoryId, user.id);
         const schedule = await this.scheduleRepository.findByDirectoryId(directory.id);
 
         if (!schedule) {
@@ -73,7 +75,8 @@ export class DirectoryScheduleService {
 
     async updateSchedule(directoryId: string, dto: UpdateDirectoryScheduleDto, user: User) {
         this.ensureSchedulingEnabled();
-        const directory = await this.ownershipService.ensure(directoryId, user.id);
+        // Require editor role to update schedule
+        const { directory } = await this.ownershipService.ensureCanEdit(directoryId, user.id);
         const subscriptionsEnabled = this.subscriptionService.isEnabled();
         const existing = await this.scheduleRepository.findByDirectoryId(directory.id);
         const plan = await this.subscriptionService.resolvePlanForUser(user);
@@ -154,7 +157,8 @@ export class DirectoryScheduleService {
 
     async cancelSchedule(directoryId: string, user: User) {
         this.ensureSchedulingEnabled();
-        const directory = await this.ownershipService.ensure(directoryId, user.id);
+        // Require editor role to cancel schedule
+        const { directory } = await this.ownershipService.ensureCanEdit(directoryId, user.id);
         const subscriptionsEnabled = this.subscriptionService.isEnabled();
         const schedule = await this.scheduleRepository.findByDirectoryId(directory.id);
 

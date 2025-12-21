@@ -1,6 +1,11 @@
 import { SubCommand, CommandRunner } from 'nest-commander';
 import chalk from 'chalk';
-import { DirectoryRepository } from '@packages/agent/database';
+import {
+    DirectoryRepository,
+    DirectoryMemberRepository,
+    UserRepository,
+} from '@packages/agent/database';
+import { DirectoryMemberRole } from '@packages/agent/entities';
 import { ConfigCheckService } from './config-check.service';
 import { handleCliError } from './error';
 
@@ -11,6 +16,8 @@ import { handleCliError } from './error';
 export class ListSubCommand extends CommandRunner {
     constructor(
         private readonly directoryRepository: DirectoryRepository,
+        private readonly directoryMemberRepository: DirectoryMemberRepository,
+        private readonly userRepository: UserRepository,
         private readonly configCheck: ConfigCheckService,
     ) {
         super();
@@ -23,7 +30,19 @@ export class ListSubCommand extends CommandRunner {
             // Check configuration first
             await this.configCheck.requireConfiguration();
 
-            const directories = await this.directoryRepository.findAll();
+            // Get local user and all accessible directories (owned + shared)
+            const user = await this.userRepository.createOrGetLocalUser();
+
+            // Get membership info to determine roles
+            const memberships = await this.directoryMemberRepository.findByUser(user.id);
+            const memberDirectoryIds = memberships.map((m) => m.directoryId);
+            const membershipMap = new Map(memberships.map((m) => [m.directoryId, m.role]));
+
+            // Get all accessible directories
+            const directories = await this.directoryRepository.findAllAccessible({
+                userId: user.id,
+                memberDirectoryIds,
+            });
 
             if (directories.length === 0) {
                 console.log(chalk.yellow('\n⚠ No directories found.'));
@@ -37,9 +56,9 @@ export class ListSubCommand extends CommandRunner {
             // Display directories in a table format
             console.log(chalk.cyan('\nDirectories:\n'));
 
-            // Table headers
-            const headers = ['ID', 'Slug', 'Name', 'Owner', 'Org', 'Description'];
-            const columnWidths = [4, 20, 25, 15, 4, 40];
+            // Table headers - added Role column
+            const headers = ['ID', 'Slug', 'Name', 'Role', 'Owner', 'Description'];
+            const columnWidths = [4, 18, 22, 9, 12, 38];
 
             // Print header
             this.printTableRow(headers, columnWidths, true);
@@ -47,18 +66,35 @@ export class ListSubCommand extends CommandRunner {
 
             // Print directory rows
             directories.forEach((dir) => {
+                // Determine user's role
+                const role =
+                    dir.userId === user.id
+                        ? DirectoryMemberRole.OWNER
+                        : membershipMap.get(dir.id) || DirectoryMemberRole.VIEWER;
+
+                const isShared = dir.userId !== user.id;
+
                 const row = [
                     dir.id.toString(),
                     this.truncateText(dir.slug, columnWidths[1] - 2),
                     this.truncateText(dir.name, columnWidths[2] - 2),
-                    this.truncateText(dir.getRepoOwner(), columnWidths[3] - 2),
-                    dir.organization ? 'Yes' : 'No',
+                    this.formatRole(role, isShared),
+                    this.truncateText(dir.getRepoOwner(), columnWidths[4] - 2),
                     this.truncateText(dir.description, columnWidths[5] - 2),
                 ];
-                this.printTableRow(row, columnWidths);
+                this.printTableRow(row, columnWidths, false, isShared);
             });
 
+            const ownedCount = directories.filter((d) => d.userId === user.id).length;
+            const sharedCount = directories.length - ownedCount;
+
             console.log(chalk.gray(`\nTotal: ${directories.length} directories`));
+            if (sharedCount > 0) {
+                console.log(
+                    chalk.gray(`  • ${ownedCount} owned, `) +
+                        chalk.magenta(`${sharedCount} shared with you`),
+                );
+            }
             console.log(
                 chalk.gray('\nUse ') +
                     chalk.cyan('directory create') +
@@ -70,7 +106,24 @@ export class ListSubCommand extends CommandRunner {
         }
     }
 
-    private printTableRow(columns: string[], widths: number[], isHeader: boolean = false): void {
+    private formatRole(role: DirectoryMemberRole, isShared: boolean): string {
+        const roleLabels: Record<DirectoryMemberRole, string> = {
+            [DirectoryMemberRole.OWNER]: 'Owner',
+            [DirectoryMemberRole.MANAGER]: 'Manager',
+            [DirectoryMemberRole.EDITOR]: 'Editor',
+            [DirectoryMemberRole.VIEWER]: 'Viewer',
+        };
+
+        const label = roleLabels[role] || role;
+        return isShared ? chalk.magenta(label) : label;
+    }
+
+    private printTableRow(
+        columns: string[],
+        widths: number[],
+        isHeader: boolean = false,
+        isShared: boolean = false,
+    ): void {
         const row = columns
             .map((col, index) => {
                 const width = widths[index];
@@ -81,6 +134,9 @@ export class ListSubCommand extends CommandRunner {
 
         if (isHeader) {
             console.log(chalk.cyan.bold('│' + row + '│'));
+        } else if (isShared) {
+            // Use a slightly different style for shared directories
+            console.log(chalk.gray('│') + row + chalk.gray('│'));
         } else {
             console.log(chalk.gray('│' + row + '│'));
         }

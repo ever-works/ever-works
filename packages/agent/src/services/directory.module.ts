@@ -14,6 +14,7 @@ import { DirectoryLifecycleService } from './directory-lifecycle.service';
 import { DirectoryGenerationService } from './directory-generation.service';
 import { DirectoryScheduleService } from './directory-schedule.service';
 import { DirectoryScheduleDispatcherService } from './directory-schedule-dispatcher.service';
+import { DirectoryMemberService } from './directory-member.service';
 import { SubscriptionsModule } from '@src/subscriptions';
 
 @Module({
@@ -36,6 +37,7 @@ import { SubscriptionsModule } from '@src/subscriptions';
         DirectoryDetailService,
         DirectoryScheduleService,
         DirectoryScheduleDispatcherService,
+        DirectoryMemberService,
     ],
     exports: [
         DirectoryOwnershipService,
@@ -45,6 +47,7 @@ import { SubscriptionsModule } from '@src/subscriptions';
         DirectoryDetailService,
         DirectoryScheduleService,
         DirectoryScheduleDispatcherService,
+        DirectoryMemberService,
     ],
 })
 export class DirectoryModule {}
