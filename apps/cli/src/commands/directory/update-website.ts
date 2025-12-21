@@ -27,7 +27,14 @@ export const updateWebsiteCommand = new Command('update-website')
             }
 
             const directory = selection.directory;
-            console.log(chalk.green(`\n✓ Selected directory: ${directory.slug}`));
+            const role = selection.role!;
+            const isShared = selection.isShared!;
+
+            console.log(
+                chalk.green(
+                    `\n✓ Selected directory: ${directoryPrompt.formatSelectedDirectory(directory, role, isShared)}`,
+                ),
+            );
 
             // Show information about what will happen
             console.log(chalk.cyan('\n--- Website Update Process ---'));

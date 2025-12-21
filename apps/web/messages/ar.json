@@ -345,6 +345,15 @@
             "fromLastMonth": "من الشهر الماضي"
         },
         "directoryCard": {
+            "role": {
+                "owner": "المالك",
+                "manager": "المدير",
+                "editor": "المحرر",
+                "viewer": "المشاهد"
+            },
+            "shared": {
+                "tooltip": "تمت مشاركته معك كـ{role}"
+            },
             "status": {
                 "active": "نشط",
                 "notStarted": "لم يبدأ",
@@ -368,6 +377,15 @@
             "failedToGenerateItems": "فشل إنشاء العناصر. يرجى المحاولة مرة أخرى.",
             "generationCompleted": "تم الإنشاء بنجاح",
             "generationCancelled": "تم إلغاء الإنشاء",
+            "role": {
+                "owner": "المالك",
+                "manager": "المدير",
+                "editor": "المحرر",
+                "viewer": "المشاهد"
+            },
+            "shared": {
+                "tooltip": "تمت مشاركته معك كـ{role}"
+            },
             "status": {
                 "notStarted": "لم يبدأ",
                 "generating": "قيد الإنشاء",
@@ -381,7 +399,53 @@
                 "generator": "المولد",
                 "history": "السجل",
                 "deploy": "النشر",
+                "members": "الأعضاء",
                 "settings": "الإعدادات"
+            },
+            "members": {
+                "title": "أعضاء الفريق",
+                "subtitle": "إدارة من يمكنه الوصول إلى هذا الدليل وصلاحياتهم.",
+                "inviteMember": "دعوة عضو",
+                "noMembers": "لا يوجد أعضاء في الفريق بعد. ادعُ شخصًا للتعاون.",
+                "roles": {
+                    "creator": "المنشئ",
+                    "owner": "المالك",
+                    "manager": "المدير",
+                    "editor": "المحرر",
+                    "viewer": "المشاهد"
+                },
+                "roleDescriptions": {
+                    "owner": "تحكم كامل بما في ذلك الحذف وإدارة الأعضاء.",
+                    "manager": "يمكنه تعديل الدليل وإدارة الأعضاء، لكن لا يمكنه الحذف.",
+                    "editor": "يمكنه تعديل محتوى الدليل وتشغيل عمليات التوليد.",
+                    "viewer": "وصول للقراءة فقط لعرض الدليل."
+                },
+                "invite": {
+                    "title": "دعوة عضو للفريق",
+                    "description": "أضف عضوًا جديدًا للتعاون في هذا الدليل.",
+                    "emailLabel": "عنوان البريد الإلكتروني",
+                    "emailPlaceholder": "colleague@example.com",
+                    "roleLabel": "الدور",
+                    "submit": "إرسال الدعوة",
+                    "cancel": "إلغاء",
+                    "success": "تمت دعوة العضو بنجاح.",
+                    "errors": {
+                        "emailRequired": "عنوان البريد الإلكتروني مطلوب.",
+                        "failed": "فشل في دعوة العضو. يرجى المحاولة مرة أخرى."
+                    }
+                },
+                "confirmRemove": {
+                    "title": "إزالة العضو",
+                    "description": "هل أنت متأكد من أنك تريد إزالة {username} من هذا الدليل؟ سيفقدون كل الوصول.",
+                    "confirm": "إزالة",
+                    "cancel": "إلغاء"
+                },
+                "roleUpdated": "تم تحديث دور العضو.",
+                "memberRemoved": "تمت إزالة العضو بنجاح.",
+                "errors": {
+                    "updateFailed": "فشل في تحديث دور العضو.",
+                    "removeFailed": "فشل في إزالة العضو."
+                }
             },
             "statusCard": {
                 "notStarted": {
@@ -448,6 +512,13 @@
             },
             "info": {
                 "title": "معلومات الدليل",
+                "yourRole": "دورك",
+                "role": {
+                    "owner": "المالك",
+                    "manager": "المدير",
+                    "editor": "المحرر",
+                    "viewer": "المشاهد"
+                },
                 "slug": "المعرف",
                 "repositories": "المستودعات",
                 "dataRepo": "مستودع البيانات",
@@ -714,6 +785,11 @@
                         "step4": "الذهاب إلى إعدادات رموز API والصق رمزك في قسم Vercel"
                     }
                 },
+                "sharedNoTokenAlert": {
+                    "title": "النشر غير متاح",
+                    "description": "لم يقم مالك الدليل بتكوين رمز Vercel للنشر. يرجى الاتصال بمالك الدليل لإعداد النشر.",
+                    "hint": "كمتعاون، يمكنك تشغيل عمليات النشر بمجرد أن يقوم المالك بتكوين تكامل Vercel الخاص به."
+                },
                 "form": {
                     "deployToVercel": {
                         "title": "النشر على Vercel",
@@ -750,6 +826,19 @@
                     "info": {
                         "deployInfo": "عادة ما يستغرق النشر 1-3 دقائق. ستحصل على رابط عند اكتماله.",
                         "updateInfo": "تزامن التحديثات محتوى دليلك مع مستودع الموقع للنشر التالي."
+                    },
+                    "websiteTemplate": {
+                        "title": "تحديثات القالب التلقائية",
+                        "description": "حافظ على موقعك متزامناً تلقائياً مع أحدث تغييرات القالب.",
+                        "autoUpdate": "التحديث تلقائياً",
+                        "autoUpdateDescription": "التحقق من تحديثات القالب كل ساعة وتطبيقها تلقائياً.",
+                        "useBeta": "استخدام النسخة التجريبية من القالب",
+                        "useBetaDescription": "استخدام فرع stage بدلاً من فرع main المستقر.",
+                        "lastUpdated": "آخر تحديث",
+                        "lastChecked": "آخر فحص",
+                        "lastError": "آخر خطأ",
+                        "updateSuccess": "تم تحديث الإعدادات بنجاح",
+                        "updateFailed": "فشل تحديث الإعدادات"
                     }
                 }
             },
@@ -1181,7 +1270,8 @@
         },
         "deploy": {
             "deployVercelFailed": "فشل النشر على Vercel",
-            "updateRepositoryFailed": "فشل تحديث المستودع"
+            "updateRepositoryFailed": "فشل تحديث المستودع",
+            "updateSettingsFailed": "فشل تحديث إعدادات قالب الموقع"
         }
     },
     "validation": {

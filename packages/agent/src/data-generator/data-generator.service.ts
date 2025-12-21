@@ -116,7 +116,10 @@ export class DataGeneratorService {
 
         const description = `machine-readable data for ${directory.slug}`;
 
-        const token = user.getGitToken();
+        // Use directory owner's Git token (they set up the repos)
+        // but use current user as committer for attribution
+        const directoryOwner = directory.user as User;
+        const token = directoryOwner.getGitToken();
         const committer = user.asCommitter();
 
         const repo = directory.getDataRepo();
@@ -390,7 +393,9 @@ export class DataGeneratorService {
         directory: Directory,
         user: User,
     ): Promise<UpdateMarkdownTemplateResult> {
-        const token = user.getGitToken();
+        // Use directory owner's Git token (they set up the repos)
+        const directoryOwner = directory.user as User;
+        const token = directoryOwner.getGitToken();
         const committer = user.asCommitter();
         const owner = directory.getRepoOwner();
         const repo = directory.getDataRepo();
@@ -458,7 +463,9 @@ export class DataGeneratorService {
      * Remove repository for a directory
      */
     async removeRepository(directory: Directory, user: User): Promise<void> {
-        const token = user.getGitToken();
+        // Use directory owner's Git token (they set up the repos)
+        const directoryOwner = directory.user as User;
+        const token = directoryOwner.getGitToken();
         const repo = directory.getDataRepo();
 
         try {
@@ -556,7 +563,9 @@ export class DataGeneratorService {
     }
 
     private async repositoryData(directory: Directory, user: User) {
-        const token = user.getGitToken();
+        // Use directory owner's Git token (they set up the repos)
+        const directoryOwner = directory.user as User;
+        const token = directoryOwner.getGitToken();
         const committer = user.asCommitter();
 
         const repo = directory.getDataRepo();
@@ -589,7 +598,9 @@ export class DataGeneratorService {
     private async getExistingData(directory: Directory, user: User) {
         this.logger.debug(`Getting existing data for directory: ${directory.slug}`);
 
-        const token = user.getGitToken();
+        // Use directory owner's Git token (they set up the repos)
+        const directoryOwner = directory.user as User;
+        const token = directoryOwner.getGitToken();
         const committer = user.asCommitter();
 
         const repo = directory.getDataRepo();

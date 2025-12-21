@@ -345,6 +345,15 @@
             "fromLastMonth": "较上月"
         },
         "directoryCard": {
+            "role": {
+                "owner": "所有者",
+                "manager": "管理员",
+                "editor": "编辑者",
+                "viewer": "查看者"
+            },
+            "shared": {
+                "tooltip": "以{role}身份与您共享"
+            },
             "status": {
                 "active": "活跃",
                 "notStarted": "未开始",
@@ -368,6 +377,15 @@
             "failedToGenerateItems": "生成项目失败。请重试。",
             "generationCompleted": "生成成功完成",
             "generationCancelled": "生成已取消",
+            "role": {
+                "owner": "所有者",
+                "manager": "管理员",
+                "editor": "编辑者",
+                "viewer": "查看者"
+            },
+            "shared": {
+                "tooltip": "以{role}身份与您共享"
+            },
             "status": {
                 "notStarted": "未开始",
                 "generating": "生成中",
@@ -381,7 +399,53 @@
                 "generator": "生成器",
                 "history": "历史",
                 "deploy": "部署",
+                "members": "成员",
                 "settings": "设置"
+            },
+            "members": {
+                "title": "团队成员",
+                "subtitle": "管理谁可以访问此目录及其权限。",
+                "inviteMember": "邀请成员",
+                "noMembers": "还没有团队成员。邀请人协作。",
+                "roles": {
+                    "creator": "创建者",
+                    "owner": "所有者",
+                    "manager": "管理员",
+                    "editor": "编辑者",
+                    "viewer": "查看者"
+                },
+                "roleDescriptions": {
+                    "owner": "完全控制，包括删除和成员管理。",
+                    "manager": "可以编辑目录和管理成员，但不能删除。",
+                    "editor": "可以编辑目录内容和运行生成。",
+                    "viewer": "只能查看目录的只读访问。"
+                },
+                "invite": {
+                    "title": "邀请团队成员",
+                    "description": "添加新成员来协作此目录。",
+                    "emailLabel": "电子邮件地址",
+                    "emailPlaceholder": "colleague@example.com",
+                    "roleLabel": "角色",
+                    "submit": "发送邀请",
+                    "cancel": "取消",
+                    "success": "成员邀请成功。",
+                    "errors": {
+                        "emailRequired": "需要电子邮件地址。",
+                        "failed": "邀请成员失败。请重试。"
+                    }
+                },
+                "confirmRemove": {
+                    "title": "移除成员",
+                    "description": "您确定要从此目录中移除 {username} 吗？他们将失去所有访问权限。",
+                    "confirm": "移除",
+                    "cancel": "取消"
+                },
+                "roleUpdated": "成员角色已更新。",
+                "memberRemoved": "成员已成功移除。",
+                "errors": {
+                    "updateFailed": "更新成员角色失败。",
+                    "removeFailed": "移除成员失败。"
+                }
             },
             "statusCard": {
                 "notStarted": {
@@ -448,6 +512,13 @@
             },
             "info": {
                 "title": "目录信息",
+                "yourRole": "您的角色",
+                "role": {
+                    "owner": "所有者",
+                    "manager": "管理员",
+                    "editor": "编辑者",
+                    "viewer": "查看者"
+                },
                 "slug": "标识符",
                 "repositories": "仓库",
                 "dataRepo": "数据仓库",
@@ -714,6 +785,11 @@
                         "step4": "前往 API 令牌设置，并将您的令牌粘贴到 Vercel 部分"
                     }
                 },
+                "sharedNoTokenAlert": {
+                    "title": "部署不可用",
+                    "description": "目录所有者尚未配置用于部署的 Vercel 令牌。请联系目录所有者以设置部署。",
+                    "hint": "作为协作者，一旦所有者配置了 Vercel 集成，您就可以触发部署。"
+                },
                 "form": {
                     "deployToVercel": {
                         "title": "部署到 Vercel",
@@ -750,6 +826,19 @@
                     "info": {
                         "deployInfo": "部署通常需要 1-3 分钟。完成后您将收到一个 URL。",
                         "updateInfo": "更新会将您的目录内容同步到网站仓库，以便下次部署。"
+                    },
+                    "websiteTemplate": {
+                        "title": "自动模板更新",
+                        "description": "自动保持您的网站与最新模板更改同步。",
+                        "autoUpdate": "自动更新",
+                        "autoUpdateDescription": "每小时检查模板更新并自动应用。",
+                        "useBeta": "使用模板测试版",
+                        "useBetaDescription": "使用 stage 分支而不是稳定的 main 分支。",
+                        "lastUpdated": "上次更新",
+                        "lastChecked": "上次检查",
+                        "lastError": "上次错误",
+                        "updateSuccess": "设置更新成功",
+                        "updateFailed": "设置更新失败"
                     }
                 }
             },
@@ -1181,7 +1270,8 @@
         },
         "deploy": {
             "deployVercelFailed": "部署到 Vercel 失败",
-            "updateRepositoryFailed": "更新仓库失败"
+            "updateRepositoryFailed": "更新仓库失败",
+            "updateSettingsFailed": "更新网站模板设置失败"
         }
     },
     "validation": {

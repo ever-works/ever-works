@@ -6,3 +6,4 @@ export * from './directory-lifecycle.service';
 export * from './directory-generation.service';
 export * from './directory-schedule.service';
 export * from './directory-schedule-dispatcher.service';
+export * from './directory-member.service';

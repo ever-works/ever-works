@@ -99,7 +99,8 @@ export class DirectoryGenerationService {
         awaitCompletion = true,
         context: GenerationTriggerContext = DEFAULT_GENERATION_CONTEXT,
     ): Promise<ItemsGeneratorResponseDto> {
-        const directory = await this.ownershipService.ensure(directoryId, user.id);
+        // Require editor role to generate/update items
+        const { directory } = await this.ownershipService.ensureCanEdit(directoryId, user.id);
         const triggerContext = this.resolveContext(context);
 
         const history = await this.createGenerationHistoryRecord(
@@ -139,7 +140,8 @@ export class DirectoryGenerationService {
         awaitCompletion = true,
         context: GenerationTriggerContext = DEFAULT_GENERATION_CONTEXT,
     ): Promise<ItemsGeneratorResponseDto> {
-        const directory = await this.ownershipService.ensure(directoryId, user.id);
+        // Require editor role to generate/update items
+        const { directory } = await this.ownershipService.ensureCanEdit(directoryId, user.id);
         const triggerContext = this.resolveContext(context);
 
         let lastRequestData;
@@ -210,7 +212,8 @@ export class DirectoryGenerationService {
 
     async submitItem(directoryId: string, dto: SubmitItemDto, user: User) {
         try {
-            const directory = await this.ownershipService.ensure(directoryId, user.id);
+            // Require editor role to generate/update items
+            const { directory } = await this.ownershipService.ensureCanEdit(directoryId, user.id);
 
             const result = await this.itemSubmissionService.submitItem(directory, user, dto);
 
@@ -255,7 +258,8 @@ export class DirectoryGenerationService {
         user: User,
     ): Promise<RemoveItemResponseDto> {
         try {
-            const directory = await this.ownershipService.ensure(directoryId, user.id);
+            // Require editor role to generate/update items
+            const { directory } = await this.ownershipService.ensureCanEdit(directoryId, user.id);
 
             const result = await this.itemSubmissionService.removeItem(directory, user, dto);
 
@@ -294,7 +298,8 @@ export class DirectoryGenerationService {
 
     async updateItemMetadata(directoryId: string, dto: UpdateItemDto, user: User) {
         try {
-            const directory = await this.ownershipService.ensure(directoryId, user.id);
+            // Require editor role to generate/update items
+            const { directory } = await this.ownershipService.ensureCanEdit(directoryId, user.id);
 
             const result = await this.itemSubmissionService.updateItem(directory, user, dto);
 
@@ -363,7 +368,8 @@ export class DirectoryGenerationService {
 
     async regenerateMarkdown(directoryId: string, user: User) {
         try {
-            const directory = await this.ownershipService.ensure(directoryId, user.id);
+            // Require editor role to generate/update items
+            const { directory } = await this.ownershipService.ensureCanEdit(directoryId, user.id);
 
             await this.markdownGenerator.initialize(directory, user, {
                 generation_method: GenerationMethod.RECREATE,
@@ -387,7 +393,8 @@ export class DirectoryGenerationService {
 
     async updateReadme(directoryId: string, user: User) {
         try {
-            const directory = await this.ownershipService.ensure(directoryId, user.id);
+            // Require editor role to generate/update items
+            const { directory } = await this.ownershipService.ensureCanEdit(directoryId, user.id);
 
             const templateUpdate = await this.dataGenerator.updateMarkdownTemplate(directory, user);
 
@@ -437,7 +444,8 @@ export class DirectoryGenerationService {
         user: User,
     ): Promise<UpdateWebsiteRepositoryResponseDto> {
         try {
-            const directory = await this.ownershipService.ensure(directoryId, user.id);
+            // Require editor role to generate/update items
+            const { directory } = await this.ownershipService.ensureCanEdit(directoryId, user.id);
 
             const result = await this.websiteUpdateService.updateRepository(directory, user);
 

@@ -9,6 +9,7 @@ import {
     UserPasswordChangedEvent,
     UserCreatedEvent,
     UserConfirmedEvent,
+    MemberInvitedEvent,
 } from '../events';
 
 @Injectable()
@@ -162,6 +163,35 @@ export class MailService {
                 expiresIn: data.expiresIn || '24 hours',
             },
         });
+    }
+
+    /**
+     * Send member invitation email
+     */
+    @OnEvent(MemberInvitedEvent.EVENT_NAME)
+    async sendMemberInvitation(data: MemberInvitedEvent): Promise<void> {
+        const appName = config.branding.appName();
+
+        await this.mailerService.sendMail({
+            to: data.invitee.email,
+            subject: `You've been invited to collaborate on ${data.directory.name}`,
+            template: 'member-invitation',
+            context: {
+                ...this.getBrandingContext(),
+                inviteeName: data.invitee.username,
+                inviterName: data.inviter.username,
+                directoryName: data.directory.name,
+                roleName: this.formatRoleName(data.role),
+                directoryUrl: data.directoryUrl,
+            },
+        });
+    }
+
+    /**
+     * Helper method to format role name for display
+     */
+    private formatRoleName(role: string): string {
+        return role.charAt(0).toUpperCase() + role.slice(1).toLowerCase();
     }
 
     /**

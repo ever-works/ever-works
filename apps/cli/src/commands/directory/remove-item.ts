@@ -27,7 +27,14 @@ export const removeItemCommand = new Command('remove-item')
             }
 
             const directory = selection.directory;
-            console.log(chalk.green(`\n✓ Selected directory: ${directory.slug}`));
+            const role = selection.role!;
+            const isShared = selection.isShared!;
+
+            console.log(
+                chalk.green(
+                    `\n✓ Selected directory: ${directoryPrompt.formatSelectedDirectory(directory, role, isShared)}`,
+                ),
+            );
 
             // Collect item information
             const answers = await inquirer.prompt([

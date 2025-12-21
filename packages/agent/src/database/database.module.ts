@@ -2,6 +2,7 @@ import { Logger, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { DirectoryRepository } from './repositories/directory.repository';
+import { DirectoryMemberRepository } from './repositories/directory-member.repository';
 import { RefreshTokenRepository } from './repositories/refresh-token.repository';
 import { OAuthTokenRepository } from './repositories/oauth-token.repository';
 import { databaseConfig, ENTITIES } from './database.config';
@@ -31,6 +32,7 @@ import { UsageLedgerRepository } from './repositories/usage-ledger.repository';
     ],
     providers: [
         DirectoryRepository,
+        DirectoryMemberRepository,
         UserGitHubService,
         RefreshTokenRepository,
         UserRepository,
@@ -46,6 +48,7 @@ import { UsageLedgerRepository } from './repositories/usage-ledger.repository';
         TypeOrmModule,
         UserGitHubService,
         DirectoryRepository,
+        DirectoryMemberRepository,
         UserRepository,
         RefreshTokenRepository,
         OAuthTokenRepository,

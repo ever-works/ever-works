@@ -31,7 +31,14 @@ export const generateCommand = new Command('generate')
             }
 
             const directory = selection.directory;
-            console.log(chalk.green(`\n✓ Selected directory: ${directory.slug}`));
+            const role = selection.role!;
+            const isShared = selection.isShared!;
+
+            console.log(
+                chalk.green(
+                    `\n✓ Selected directory: ${directoryPrompt.formatSelectedDirectory(directory, role, isShared)}`,
+                ),
+            );
 
             if (directory.generateStatus?.status === GenerateStatusType.GENERATING) {
                 console.log(chalk.yellow('\n⚠ Generation already in progress.'));

@@ -83,7 +83,7 @@ export class AuthService {
             isActive: true,
         });
 
-        this.sendVerificationEmail(user.id, emailVerificationCallbackUrl);
+        this.sendVerificationEmail(user.id);
 
         const { password: _, ...userWithoutPassword } = user;
         return this.generateTokens(userWithoutPassword);
@@ -364,7 +364,8 @@ export class AuthService {
             passwordResetExpires: expires,
         });
 
-        let callbackUrl = forgotPasswordDto.resetPasswordCallbackUrl;
+        // let callbackUrl = forgotPasswordDto.resetPasswordCallbackUrl;
+        let callbackUrl = null;
         if (callbackUrl && !callbackUrl.includes('token=')) {
             callbackUrl += `?token=${resetToken}`;
         } else {

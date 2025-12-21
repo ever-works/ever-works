@@ -1,12 +1,13 @@
 'use client';
 
-import { GenerateStatusType } from '@/lib/api/enums';
+import { DirectoryMemberRole } from '@/lib/api/enums';
 import { Directory, DirectoryConfig } from '@/lib/api/types-only';
 import { useMounted } from '@/lib/hooks/use-mounted';
 import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
 import { useDirectoryDetail } from '../DirectoryDetailContext';
 import { Link } from '@/i18n/navigation';
+import { Users, UserCircle } from 'lucide-react';
 
 interface DirectoryInfoProps {
     directory: Directory;
@@ -17,7 +18,36 @@ export function DirectoryInfo({ directory, config }: DirectoryInfoProps) {
     const t = useTranslations('dashboard.directoryDetail.info');
     const { repoLinks } = useDirectoryDetail();
 
+    const userRole = directory.userRole;
+    const isShared = userRole && userRole !== DirectoryMemberRole.OWNER;
+
     const infoItems = [
+        {
+            label: t('yourRole'),
+            value: (
+                <span
+                    className={cn(
+                        'inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium',
+                        isShared
+                            ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300'
+                            : 'bg-primary/10 text-primary dark:bg-primary/20',
+                    )}
+                >
+                    {isShared ? <Users className="w-3 h-3" /> : <UserCircle className="w-3 h-3" />}
+                    {t(`role.${userRole || DirectoryMemberRole.OWNER}`)}
+                </span>
+            ),
+            icon: (
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                    />
+                </svg>
+            ),
+        },
         {
             label: t('slug'),
             value: directory.slug,
