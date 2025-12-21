@@ -11,7 +11,7 @@ interface AuthLayoutProps {
 export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
     const t = useTranslations('layout.auth');
     return (
-        <div className="min-h-screen bg-background dark:bg-background-dark flex flex-col">
+        <div className="min-h-screen bg-background dark:bg-surface-dark flex flex-col">
             <div className="flex-1 flex">
                 {/* Left side - Form */}
                 <div className="flex-1 flex items-center justify-center px-8 py-12">
