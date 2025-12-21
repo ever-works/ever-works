@@ -826,6 +826,19 @@
                     "info": {
                         "deployInfo": "Le déploiement prend généralement 1 à 3 minutes. Vous recevrez une URL une fois terminé.",
                         "updateInfo": "Les mises à jour synchronisent le contenu de votre répertoire vers le dépôt du site Web pour le prochain déploiement."
+                    },
+                    "websiteTemplate": {
+                        "title": "Mises à jour automatiques du modèle",
+                        "description": "Gardez votre site Web automatiquement synchronisé avec les dernières modifications du modèle.",
+                        "autoUpdate": "Mettre à jour automatiquement",
+                        "autoUpdateDescription": "Vérifier les mises à jour du modèle toutes les heures et les appliquer automatiquement.",
+                        "useBeta": "Utiliser la version bêta du modèle",
+                        "useBetaDescription": "Utiliser la branche stage au lieu de la branche main stable.",
+                        "lastUpdated": "Dernière mise à jour",
+                        "lastChecked": "Dernière vérification",
+                        "lastError": "Dernière erreur",
+                        "updateSuccess": "Paramètres mis à jour avec succès",
+                        "updateFailed": "Échec de la mise à jour des paramètres"
                     }
                 }
             },
@@ -1257,7 +1270,8 @@
         },
         "deploy": {
             "deployVercelFailed": "Échec du déploiement sur Vercel",
-            "updateRepositoryFailed": "Échec de la mise à jour du dépôt"
+            "updateRepositoryFailed": "Échec de la mise à jour du dépôt",
+            "updateSettingsFailed": "Échec de la mise à jour des paramètres du modèle de site Web"
         }
     },
     "validation": {

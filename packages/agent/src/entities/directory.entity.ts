@@ -110,6 +110,25 @@ export class Directory {
     @Column({ nullable: true })
     itemsCount?: number;
 
+    // Website Template Auto-Update FIELDS
+    @Column({ type: 'boolean', default: false })
+    websiteTemplateAutoUpdate: boolean;
+
+    @Column({ type: 'boolean', default: false })
+    websiteTemplateUseBeta: boolean;
+
+    @Column({ type: 'varchar', nullable: true })
+    websiteTemplateLastCommit?: string | null;
+
+    @Column({ type: 'varchar', nullable: true })
+    websiteTemplateLastError?: string | null;
+
+    @TimestampColumn({ nullable: true })
+    websiteTemplateLastUpdatedAt?: Date | null;
+
+    @TimestampColumn({ nullable: true })
+    websiteTemplateLastCheckedAt?: Date | null;
+
     // Timestamps
     @CreateDateColumn()
     createdAt: Date;

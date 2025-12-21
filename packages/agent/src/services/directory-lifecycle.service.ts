@@ -78,7 +78,8 @@ export class DirectoryLifecycleService {
         const { directory } = await this.ownershipService.ensureCanEdit(id, user.id);
 
         try {
-            const updatedDirectory = await this.directoryRepository.update(id, {
+            // Build update data object
+            const updateData: Record<string, any> = {
                 name: updateDto.name || directory.name,
                 description: updateDto.description || directory.description,
                 owner: updateDto.owner ?? directory.owner,
@@ -87,7 +88,22 @@ export class DirectoryLifecycleService {
                         ? updateDto.organization
                         : directory.organization,
                 readmeConfig: updateDto.readmeConfig ?? directory.readmeConfig,
-            });
+            };
+
+            // Handle website template auto-update settings
+            if (updateDto.websiteTemplateAutoUpdate !== undefined) {
+                updateData.websiteTemplateAutoUpdate = updateDto.websiteTemplateAutoUpdate;
+            }
+
+            if (updateDto.websiteTemplateUseBeta !== undefined) {
+                updateData.websiteTemplateUseBeta = updateDto.websiteTemplateUseBeta;
+                // Clear last commit when switching branches to force re-check
+                if (updateDto.websiteTemplateUseBeta !== directory.websiteTemplateUseBeta) {
+                    updateData.websiteTemplateLastCommit = null;
+                }
+            }
+
+            const updatedDirectory = await this.directoryRepository.update(id, updateData);
 
             if (!updatedDirectory) {
                 throw new NotFoundException({ status: 'error', message: 'Directory not found' });

@@ -826,6 +826,19 @@
                     "info": {
                         "deployInfo": "Die Bereitstellung dauert normalerweise 1-3 Minuten. Sie erhalten eine URL, sobald sie abgeschlossen ist.",
                         "updateInfo": "Updates synchronisieren Ihre Verzeichnisinhalte zum Website-Repository für die nächste Bereitstellung."
+                    },
+                    "websiteTemplate": {
+                        "title": "Automatische Vorlagen-Updates",
+                        "description": "Halten Sie Ihre Website automatisch mit den neuesten Vorlagenänderungen synchron.",
+                        "autoUpdate": "Automatisch aktualisieren",
+                        "autoUpdateDescription": "Stündlich nach Vorlagen-Updates suchen und automatisch anwenden.",
+                        "useBeta": "Beta-Version der Vorlage verwenden",
+                        "useBetaDescription": "Den stage-Branch anstelle des stabilen main-Branchs verwenden.",
+                        "lastUpdated": "Zuletzt aktualisiert",
+                        "lastChecked": "Zuletzt geprüft",
+                        "lastError": "Letzter Fehler",
+                        "updateSuccess": "Einstellungen erfolgreich aktualisiert",
+                        "updateFailed": "Einstellungen konnten nicht aktualisiert werden"
                     }
                 }
             },
@@ -1257,7 +1270,8 @@
         },
         "deploy": {
             "deployVercelFailed": "Bereitstellung auf Vercel fehlgeschlagen",
-            "updateRepositoryFailed": "Repository konnte nicht aktualisiert werden"
+            "updateRepositoryFailed": "Repository konnte nicht aktualisiert werden",
+            "updateSettingsFailed": "Website-Vorlageneinstellungen konnten nicht aktualisiert werden"
         }
     },
     "validation": {

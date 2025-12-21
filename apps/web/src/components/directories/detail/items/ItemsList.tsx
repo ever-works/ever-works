@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { ItemData } from '@/lib/api/types-only';
 import { cn } from '@/lib/utils/cn';
 import { Input } from '@/components/ui/input';
@@ -16,17 +17,53 @@ interface ItemsListProps {
     canEdit?: boolean;
 }
 
+// Estimated heights for virtualization
+const GRID_ROW_HEIGHT = 200; // Approximate height for grid cards
+const LIST_ITEM_HEIGHT = 80; // Approximate height for list items
+const GAP = 16; // Gap between items (gap-4 = 16px)
+
+// Hook to get responsive column count
+function useColumnCount(viewMode: 'grid' | 'list') {
+    const [columns, setColumns] = useState(3);
+
+    useEffect(() => {
+        if (viewMode === 'list') {
+            setColumns(1);
+            return;
+        }
+
+        const updateColumns = () => {
+            const width = window.innerWidth;
+            if (width >= 1024) {
+                setColumns(3); // lg:grid-cols-3
+            } else if (width >= 640) {
+                setColumns(2); // sm:grid-cols-2
+            } else {
+                setColumns(1); // default single column
+            }
+        };
+
+        updateColumns();
+        window.addEventListener('resize', updateColumns);
+        return () => window.removeEventListener('resize', updateColumns);
+    }, [viewMode]);
+
+    return columns;
+}
+
 export function ItemsList({ items: initialItems, directoryId, canEdit = false }: ItemsListProps) {
     const t = useTranslations('dashboard.directoryDetail.items');
     const [items, setItems] = useState(() => sortItems(initialItems));
     const [searchQuery, setSearchQuery] = useState('');
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-    const listContainerRef = useRef<HTMLDivElement>(null);
+    const scrollContainerRef = useRef<HTMLElement | null>(null);
+    const columns = useColumnCount(viewMode);
 
-    // Start with first 30 items loaded
-    const INITIAL_LOAD = 30;
-    const [visibleRange, setVisibleRange] = useState({ start: 0, end: INITIAL_LOAD });
+    // Get scroll container reference (the main element)
+    useEffect(() => {
+        scrollContainerRef.current = document.getElementById('main-content');
+    }, []);
 
     // Memoize categories to prevent recalculation
     const categories = useMemo(() => {
@@ -51,11 +88,6 @@ export function ItemsList({ items: initialItems, directoryId, canEdit = false }:
             return matchesSearch && matchesCategory;
         });
     }, [items, searchQuery, selectedCategory]);
-
-    // Reset visible range when filters change
-    useEffect(() => {
-        setVisibleRange({ start: 0, end: INITIAL_LOAD });
-    }, [searchQuery, selectedCategory, viewMode, INITIAL_LOAD]);
 
     // Memoized callback for item deletion
     const handleItemDelete = useCallback((itemSlug: string) => {
@@ -134,50 +166,24 @@ export function ItemsList({ items: initialItems, directoryId, canEdit = false }:
             </div>
 
             {/* Items Display */}
-            <div ref={listContainerRef}>
-                {filteredItems.length === 0 ? (
-                    <div className="text-center py-12">
-                        <p className="text-text-secondary dark:text-text-secondary-dark">
-                            {t('noMatch')}
-                        </p>
-                    </div>
-                ) : filteredItems.length <= INITIAL_LOAD ? (
-                    // For small filtered results, render all items without virtualization
-                    <div
-                        className={cn(
-                            viewMode === 'grid'
-                                ? 'grid sm:grid-cols-2 lg:grid-cols-3 gap-4'
-                                : 'space-y-2',
-                        )}
-                    >
-                        {filteredItems.map((item) => (
-                            <MemoizedItemCard
-                                key={item.slug}
-                                item={item}
-                                viewMode={viewMode}
-                                directoryId={directoryId}
-                                canEdit={canEdit}
-                                onDelete={() => handleItemDelete(item.slug!)}
-                                onUpdate={(updated) =>
-                                    handleItemUpdate({ ...updated, slug: item.slug })
-                                }
-                            />
-                        ))}
-                    </div>
-                ) : (
-                    // For large filtered results, use virtualization
-                    <VirtualizedList
-                        items={filteredItems}
-                        viewMode={viewMode}
-                        directoryId={directoryId}
-                        canEdit={canEdit}
-                        onItemDelete={handleItemDelete}
-                        onItemUpdate={handleItemUpdate}
-                        visibleRange={visibleRange}
-                        setVisibleRange={setVisibleRange}
-                    />
-                )}
-            </div>
+            {filteredItems.length === 0 ? (
+                <div className="text-center py-12">
+                    <p className="text-text-secondary dark:text-text-secondary-dark">
+                        {t('noMatch')}
+                    </p>
+                </div>
+            ) : (
+                <VirtualizedItemsList
+                    items={filteredItems}
+                    viewMode={viewMode}
+                    columns={columns}
+                    directoryId={directoryId}
+                    canEdit={canEdit}
+                    onItemDelete={handleItemDelete}
+                    onItemUpdate={handleItemUpdate}
+                    scrollContainerRef={scrollContainerRef}
+                />
+            )}
         </div>
     );
 }
@@ -185,132 +191,104 @@ export function ItemsList({ items: initialItems, directoryId, canEdit = false }:
 // Memoized ItemCard to prevent unnecessary re-renders
 const MemoizedItemCard = React.memo(ItemCard);
 
-// Virtualized list that uses parent scroll with incremental loading
-interface VirtualizedListProps {
+interface VirtualizedItemsListProps {
     items: ItemData[];
     viewMode: 'grid' | 'list';
+    columns: number;
     directoryId: string;
-    canEdit?: boolean;
+    canEdit: boolean;
     onItemDelete: (itemSlug: string) => void;
     onItemUpdate: (item: Partial<ItemData> & { slug?: string }) => void;
-    visibleRange: { start: number; end: number };
-    setVisibleRange: (range: { start: number; end: number }) => void;
+    scrollContainerRef: React.RefObject<HTMLElement | null>;
 }
 
-function VirtualizedList({
+function VirtualizedItemsList({
     items,
     viewMode,
+    columns,
     directoryId,
-    canEdit = false,
+    canEdit,
     onItemDelete,
     onItemUpdate,
-    visibleRange,
-    setVisibleRange,
-}: VirtualizedListProps) {
-    const t = useTranslations('dashboard.directoryDetail.items');
-    const loadMoreRef = useRef<HTMLDivElement>(null);
-    const ITEMS_PER_PAGE = 30; // Items to load at a time
+    scrollContainerRef,
+}: VirtualizedItemsListProps) {
+    const listRef = useRef<HTMLDivElement>(null);
+    const [scrollMargin, setScrollMargin] = useState(0);
 
-    // Use a ref to store the latest values for use in the observer callback
-    const stateRef = useRef({ itemsLength: items.length, visibleEnd: visibleRange.end });
-
-    // Keep the ref in sync with current values
-    stateRef.current = { itemsLength: items.length, visibleEnd: visibleRange.end };
-
+    // Calculate scroll margin (offset from top of scroll container to this component)
     useEffect(() => {
-        const currentRef = loadMoreRef.current;
-        if (!currentRef) return;
-
-        const observer = new IntersectionObserver(
-            (entries) => {
-                const target = entries[0];
-                if (target.isIntersecting) {
-                    const { itemsLength, visibleEnd } = stateRef.current;
-                    if (visibleEnd < itemsLength) {
-                        setVisibleRange({
-                            start: 0,
-                            end: Math.min(itemsLength, visibleEnd + ITEMS_PER_PAGE),
-                        });
-                    }
-                }
-            },
-            {
-                root: null,
-                rootMargin: '200px',
-                threshold: 0,
-            },
-        );
-
-        observer.observe(currentRef);
-
-        return () => {
-            observer.disconnect();
+        const calculateScrollMargin = () => {
+            if (listRef.current && scrollContainerRef.current) {
+                const listRect = listRef.current.getBoundingClientRect();
+                const containerRect = scrollContainerRef.current.getBoundingClientRect();
+                setScrollMargin(
+                    listRect.top - containerRect.top + scrollContainerRef.current.scrollTop,
+                );
+            }
         };
-        // setVisibleRange is stable (from useState), so observer is created once
-    }, [setVisibleRange]);
 
-    // When visibleRange.end changes and there are more items to load,
-    // re-check if the loader is still in view by triggering a manual check
-    useEffect(() => {
-        if (visibleRange.end >= items.length) return;
+        calculateScrollMargin();
+        // Recalculate on resize
+        window.addEventListener('resize', calculateScrollMargin);
+        return () => window.removeEventListener('resize', calculateScrollMargin);
+    }, [scrollContainerRef]);
 
-        const currentRef = loadMoreRef.current;
-        if (!currentRef) return;
-
-        // Check if the element is currently in the viewport
-        const rect = currentRef.getBoundingClientRect();
-        const isInViewport =
-            rect.top < window.innerHeight + 200 && // 200px matches rootMargin
-            rect.bottom > -200;
-
-        if (isInViewport) {
-            // Schedule the next load after render completes
-            const timeoutId = setTimeout(() => {
-                setVisibleRange({
-                    start: 0,
-                    end: Math.min(items.length, visibleRange.end + ITEMS_PER_PAGE),
-                });
-            }, 50);
-
-            return () => clearTimeout(timeoutId);
+    // Calculate rows for grid view
+    const rows = useMemo(() => {
+        if (viewMode === 'list') {
+            return items.map((item) => [item]);
         }
-    }, [items.length, visibleRange.end, setVisibleRange]);
+        // Group items into rows based on column count
+        const result: ItemData[][] = [];
+        for (let i = 0; i < items.length; i += columns) {
+            result.push(items.slice(i, i + columns));
+        }
+        return result;
+    }, [items, columns, viewMode]);
 
-    // Get visible items - always start from 0 for simplicity
-    const visibleItems = useMemo(() => items.slice(0, visibleRange.end), [items, visibleRange.end]);
+    const rowVirtualizer = useVirtualizer({
+        count: rows.length,
+        getScrollElement: () => scrollContainerRef.current,
+        estimateSize: () => (viewMode === 'list' ? LIST_ITEM_HEIGHT + GAP : GRID_ROW_HEIGHT + GAP),
+        overscan: 5, // Render 5 extra rows above/below viewport
+        scrollMargin,
+    });
+
+    const virtualRows = rowVirtualizer.getVirtualItems();
+    const totalSize = rowVirtualizer.getTotalSize();
 
     return (
-        <div>
-            {/* Render visible items */}
-            <div
-                className={cn(
-                    viewMode === 'grid' ? 'grid sm:grid-cols-2 lg:grid-cols-3 gap-4' : 'space-y-2',
-                )}
-            >
-                {visibleItems.map((item) => (
-                    <MemoizedItemCard
-                        key={item.slug}
-                        item={item}
-                        viewMode={viewMode}
-                        directoryId={directoryId}
-                        canEdit={canEdit}
-                        onDelete={() => onItemDelete(item.slug!)}
-                        onUpdate={(updated) => onItemUpdate({ ...updated, slug: item.slug })}
-                    />
-                ))}
-            </div>
-
-            {/* Load more trigger */}
-            {visibleRange.end < items.length && (
-                <div ref={loadMoreRef} className="text-center py-8">
-                    <div className="inline-flex items-center gap-2">
-                        <div className="w-4 h-4 border-2 border-primary dark:border-primary-dark border-t-transparent rounded-full animate-spin" />
-                        <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
-                            {t('loadingMore', { current: visibleRange.end, total: items.length })}
-                        </p>
+        <div ref={listRef} className="relative w-full" style={{ height: `${totalSize}px` }}>
+            {virtualRows.map((virtualRow) => {
+                const rowItems = rows[virtualRow.index];
+                return (
+                    <div
+                        key={virtualRow.key}
+                        data-index={virtualRow.index}
+                        className={cn(
+                            'absolute top-0 left-0 w-full',
+                            viewMode === 'grid' ? 'grid sm:grid-cols-2 lg:grid-cols-3 gap-4' : '',
+                        )}
+                        style={{
+                            transform: `translateY(${virtualRow.start - scrollMargin}px)`,
+                        }}
+                    >
+                        {rowItems.map((item) => (
+                            <MemoizedItemCard
+                                key={item.slug}
+                                item={item}
+                                viewMode={viewMode}
+                                directoryId={directoryId}
+                                canEdit={canEdit}
+                                onDelete={() => onItemDelete(item.slug!)}
+                                onUpdate={(updated) =>
+                                    onItemUpdate({ ...updated, slug: item.slug })
+                                }
+                            />
+                        ))}
                     </div>
-                </div>
-            )}
+                );
+            })}
         </div>
     );
 }

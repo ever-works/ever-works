@@ -617,6 +617,37 @@ export class GithubService extends GitProvider {
     }
 
     /**
+     * Gets the latest commit SHA for a branch
+     */
+    async getLatestCommit(
+        owner: string,
+        repo: string,
+        branch: string,
+        token: string,
+    ): Promise<{ sha: string; message: string; date: string } | null> {
+        const octokit = new Octokit({ auth: token });
+
+        try {
+            const { data } = await octokit.rest.repos.getBranch({
+                owner,
+                repo,
+                branch,
+            });
+
+            return {
+                sha: data.commit.sha,
+                message: data.commit.commit.message,
+                date: data.commit.commit.committer?.date || new Date().toISOString(),
+            };
+        } catch (err) {
+            if (err instanceof RequestError && err.status === 404) {
+                return null;
+            }
+            throw err;
+        }
+    }
+
+    /**
      * Deletes a repository
      */
     async deleteRepository(owner: string, repo: string, token: string): Promise<void> {

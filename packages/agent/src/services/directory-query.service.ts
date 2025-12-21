@@ -67,17 +67,32 @@ export class DirectoryQueryService {
                 search: sanitizedSearch,
             });
 
-            // Add userRole to each directory
-            const directoriesWithRoles: DirectoryWithRole[] = await Promise.all(
-                directories.map(async (dir) => {
-                    dir.owner = dir.getRepoOwner();
-                    const userRole = await this.ownershipService.getUserRole(dir.id, user.id);
-                    return {
-                        ...dir,
-                        userRole: userRole || DirectoryMemberRole.VIEWER,
-                    } as DirectoryWithRole;
-                }),
+            // Separate directories into owned vs member-accessed for role computation
+            const nonOwnedDirectoryIds = directories
+                .filter((dir) => dir.userId !== user.id)
+                .map((dir) => dir.id);
+
+            // Batch fetch member roles for non-owned directories (single query)
+            const memberRoles = await this.directoryMemberRepository.getMemberRolesForDirectories(
+                user.id,
+                nonOwnedDirectoryIds,
             );
+
+            // Add userRole to each directory without additional queries
+            const directoriesWithRoles: DirectoryWithRole[] = directories.map((dir) => {
+                dir.owner = dir.getRepoOwner();
+
+                // Creator is always OWNER, otherwise look up member role
+                const userRole =
+                    dir.userId === user.id
+                        ? DirectoryMemberRole.OWNER
+                        : memberRoles.get(dir.id) || DirectoryMemberRole.VIEWER;
+
+                return {
+                    ...dir,
+                    userRole,
+                } as DirectoryWithRole;
+            });
 
             const total = await this.directoryRepository.countAllAccessible({
                 userId: user.id,

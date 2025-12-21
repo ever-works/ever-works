@@ -826,6 +826,19 @@
                     "info": {
                         "deployInfo": "عادة ما يستغرق النشر 1-3 دقائق. ستحصل على رابط عند اكتماله.",
                         "updateInfo": "تزامن التحديثات محتوى دليلك مع مستودع الموقع للنشر التالي."
+                    },
+                    "websiteTemplate": {
+                        "title": "تحديثات القالب التلقائية",
+                        "description": "حافظ على موقعك متزامناً تلقائياً مع أحدث تغييرات القالب.",
+                        "autoUpdate": "التحديث تلقائياً",
+                        "autoUpdateDescription": "التحقق من تحديثات القالب كل ساعة وتطبيقها تلقائياً.",
+                        "useBeta": "استخدام النسخة التجريبية من القالب",
+                        "useBetaDescription": "استخدام فرع stage بدلاً من فرع main المستقر.",
+                        "lastUpdated": "آخر تحديث",
+                        "lastChecked": "آخر فحص",
+                        "lastError": "آخر خطأ",
+                        "updateSuccess": "تم تحديث الإعدادات بنجاح",
+                        "updateFailed": "فشل تحديث الإعدادات"
                     }
                 }
             },
@@ -1257,7 +1270,8 @@
         },
         "deploy": {
             "deployVercelFailed": "فشل النشر على Vercel",
-            "updateRepositoryFailed": "فشل تحديث المستودع"
+            "updateRepositoryFailed": "فشل تحديث المستودع",
+            "updateSettingsFailed": "فشل تحديث إعدادات قالب الموقع"
         }
     },
     "validation": {

@@ -7,7 +7,6 @@ import { useTranslations } from 'next-intl';
 import { usePathname } from '@/i18n/navigation';
 import { Directory } from '@/lib/api';
 import { useDirectoryDetail, useDirectoryPermissions } from './DirectoryDetailContext';
-import { vi } from 'zod/v4/locales';
 
 interface DirectoryTabsProps {
     directory: Directory;
@@ -24,7 +23,12 @@ export function DirectoryTabs({ directory }: DirectoryTabsProps) {
             name: t('overview'),
             href: ROUTES.DASHBOARD_DIRECTORY(directory.id),
             icon: (
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg
+                    className="w-4 h-4 shrink-0"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                >
                     <path
                         strokeLinecap="round"
                         strokeLinejoin="round"
@@ -39,7 +43,12 @@ export function DirectoryTabs({ directory }: DirectoryTabsProps) {
             name: t('items'),
             href: `${ROUTES.DASHBOARD_DIRECTORY(directory.id)}/items`,
             icon: (
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg
+                    className="w-4 h-4 shrink-0"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                >
                     <path
                         strokeLinecap="round"
                         strokeLinejoin="round"
@@ -55,7 +64,12 @@ export function DirectoryTabs({ directory }: DirectoryTabsProps) {
             href: `${ROUTES.DASHBOARD_DIRECTORY(directory.id)}/generator`,
             visible: permissions.canGenerate,
             icon: (
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg
+                    className="w-4 h-4 shrink-0"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                >
                     <path
                         strokeLinecap="round"
                         strokeLinejoin="round"
@@ -71,7 +85,12 @@ export function DirectoryTabs({ directory }: DirectoryTabsProps) {
             href: `${ROUTES.DASHBOARD_DIRECTORY(directory.id)}/schedule`,
             visible: Boolean(config) && permissions.canManageSchedule,
             icon: (
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg
+                    className="w-4 h-4 shrink-0"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                >
                     <path
                         strokeLinecap="round"
                         strokeLinejoin="round"
@@ -86,7 +105,12 @@ export function DirectoryTabs({ directory }: DirectoryTabsProps) {
             name: t('history'),
             href: `${ROUTES.DASHBOARD_DIRECTORY(directory.id)}/history`,
             icon: (
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg
+                    className="w-4 h-4 shrink-0"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                >
                     <path
                         strokeLinecap="round"
                         strokeLinejoin="round"
@@ -102,7 +126,12 @@ export function DirectoryTabs({ directory }: DirectoryTabsProps) {
             href: `${ROUTES.DASHBOARD_DIRECTORY(directory.id)}/deploy`,
             visible: Boolean(config) && permissions.canDeploy,
             icon: (
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg
+                    className="w-4 h-4 shrink-0"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                >
                     <path
                         strokeLinecap="round"
                         strokeLinejoin="round"
@@ -119,7 +148,12 @@ export function DirectoryTabs({ directory }: DirectoryTabsProps) {
             // visible: permissions.canManageMembers,
             visible: false,
             icon: (
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg
+                    className="w-4 h-4 shrink-0"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                >
                     <path
                         strokeLinecap="round"
                         strokeLinejoin="round"
@@ -135,7 +169,12 @@ export function DirectoryTabs({ directory }: DirectoryTabsProps) {
             href: `${ROUTES.DASHBOARD_DIRECTORY(directory.id)}/settings`,
             visible: permissions.canAccessSettings,
             icon: (
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg
+                    className="w-4 h-4 shrink-0"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                >
                     <path
                         strokeLinecap="round"
                         strokeLinejoin="round"
@@ -156,22 +195,24 @@ export function DirectoryTabs({ directory }: DirectoryTabsProps) {
 
     return (
         <nav className="border-b border-border dark:border-border-dark">
-            <div className="flex space-x-8">
-                {tabs.map((tab) => (
-                    <Link
-                        key={tab.name}
-                        href={tab.href}
-                        className={cn(
-                            'flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors',
-                            tab.isActive
-                                ? 'border-primary text-primary'
-                                : 'border-transparent text-text-secondary dark:text-text-secondary-dark hover:text-text dark:hover:text-text-dark hover:border-border-hover dark:hover:border-border-hover-dark',
-                        )}
-                    >
-                        {tab.icon}
-                        {tab.name}
-                    </Link>
-                ))}
+            <div className="-mb-px flex overflow-x-auto scrollbar-none">
+                <div className="flex min-w-full sm:min-w-0 gap-1 sm:gap-2 md:gap-6 lg:gap-8 px-1">
+                    {tabs.map((tab) => (
+                        <Link
+                            key={tab.name}
+                            href={tab.href}
+                            className={cn(
+                                'flex items-center gap-1.5 sm:gap-2 py-3 sm:py-4 px-3 md:px-1 border-b-2 font-medium text-sm whitespace-nowrap transition-colors',
+                                tab.isActive
+                                    ? 'border-primary text-primary'
+                                    : 'border-transparent text-text-secondary dark:text-text-secondary-dark hover:text-text dark:hover:text-text-dark hover:border-border-hover dark:hover:border-border-hover-dark',
+                            )}
+                        >
+                            {tab.icon}
+                            {tab.name}
+                        </Link>
+                    ))}
+                </div>
             </div>
         </nav>
     );

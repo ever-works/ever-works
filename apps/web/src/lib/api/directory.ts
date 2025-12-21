@@ -36,6 +36,8 @@ export interface UpdateDirectoryDto {
     owner?: string;
     organization?: boolean;
     readmeConfig?: MarkdownReadmeConfig;
+    websiteTemplateAutoUpdate?: boolean;
+    websiteTemplateUseBeta?: boolean;
 }
 
 export interface DeleteDirectoryDto {
@@ -89,6 +91,13 @@ export interface Directory {
     // User's role in this directory (owner, manager, editor, viewer)
     // This is computed based on user's access - creator is always 'owner'
     userRole?: DirectoryMemberRole;
+    // Website template auto-update settings
+    websiteTemplateAutoUpdate?: boolean;
+    websiteTemplateUseBeta?: boolean;
+    websiteTemplateLastCommit?: string | null;
+    websiteTemplateLastError?: string | null;
+    websiteTemplateLastUpdatedAt?: string | null;
+    websiteTemplateLastCheckedAt?: string | null;
 }
 
 export interface DirectoryScheduleAllowedCadence {
