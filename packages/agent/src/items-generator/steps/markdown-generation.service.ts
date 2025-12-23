@@ -107,7 +107,7 @@ export class MarkdownGenerationService implements IPipelineStep {
                         content: rawContent.slice(0, 4000),
                     },
                     routing: {
-                        complexity: TaskComplexity.COMPLEX,
+                        complexity: TaskComplexity.MEDIUM,
                         taskId: 'markdown-generation',
                     },
                 },
