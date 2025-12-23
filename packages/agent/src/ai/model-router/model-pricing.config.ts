@@ -654,21 +654,21 @@ export const MODEL_PRICING: Record<string, ProviderPricing> = {
 };
 
 /**
- * Get pricing for a specific model
+ * Get pricing for a specific model (exact match only)
  */
 export function getModelPricing(provider: string, model: string): ModelPricing | null {
     const providerPricing = MODEL_PRICING[provider.toLowerCase()];
     if (!providerPricing) return null;
 
-    // Try exact match first
+    // Exact match
     if (providerPricing[model]) {
         return providerPricing[model];
     }
 
-    // Try to find a matching model (partial match)
+    // Try case-insensitive exact match
     const modelLower = model.toLowerCase();
     for (const [key, pricing] of Object.entries(providerPricing)) {
-        if (key.toLowerCase().includes(modelLower) || modelLower.includes(key.toLowerCase())) {
+        if (key.toLowerCase() === modelLower) {
             return pricing;
         }
     }
