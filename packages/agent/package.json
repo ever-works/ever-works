@@ -156,7 +156,7 @@
         "google-sr": "^6.0.0",
         "import-in-the-middle": "^2.0.0",
         "isomorphic-git": "^1.35.0",
-        "langchain": "^0.3.36",
+        "langchain": "^0.3.37",
         "libsodium-wrappers": "^0.7.15",
         "linkedom": "^0.18.12",
         "octokit": "^5.0.5",
