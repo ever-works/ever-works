@@ -63,6 +63,9 @@ export class DirectorySchedule {
     @Column({ type: 'int', default: 3 })
     maxFailureBeforePause: number;
 
+    @Column({ type: 'boolean', default: false })
+    alwaysCreatePullRequest: boolean;
+
     @OneToMany(() => UsageLedgerEntry, (entry) => entry.schedule)
     ledgerEntries?: ClassToObject<UsageLedgerEntry>[] | null;
 

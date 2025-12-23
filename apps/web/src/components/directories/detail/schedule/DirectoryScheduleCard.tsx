@@ -92,6 +92,7 @@ function ScheduleForm({
             DirectoryScheduleCadence.MONTHLY,
         billingMode: schedule.billingMode ?? DirectoryScheduleBillingMode.SUBSCRIPTION,
         maxFailureBeforePause: schedule.maxFailureBeforePause ?? 3,
+        alwaysCreatePullRequest: schedule.alwaysCreatePullRequest ?? false,
     });
 
     useEffect(() => {
@@ -103,12 +104,14 @@ function ScheduleForm({
                 DirectoryScheduleCadence.MONTHLY,
             billingMode: schedule.billingMode ?? DirectoryScheduleBillingMode.SUBSCRIPTION,
             maxFailureBeforePause: schedule.maxFailureBeforePause ?? 3,
+            alwaysCreatePullRequest: schedule.alwaysCreatePullRequest ?? false,
         });
     }, [
         schedule.status,
         schedule.cadence,
         schedule.billingMode,
         schedule.maxFailureBeforePause,
+        schedule.alwaysCreatePullRequest,
         allowances,
     ]);
 
@@ -164,6 +167,7 @@ function ScheduleForm({
                 cadence: form.cadence,
                 billingMode: form.billingMode,
                 maxFailureBeforePause: form.maxFailureBeforePause,
+                alwaysCreatePullRequest: form.alwaysCreatePullRequest,
             });
 
             if (!result.success) {
@@ -336,6 +340,19 @@ function ScheduleForm({
                                     maxFailureBeforePause: Math.min(10, Math.max(1, normalized)),
                                 });
                             }}
+                            disabled={!hasLastRequest}
+                        />
+                    </FieldCard>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                    <FieldCard
+                        label={t('fields.createPullRequest')}
+                        helper={t('fields.createPullRequestHelp')}
+                    >
+                        <Switch
+                            checked={form.alwaysCreatePullRequest}
+                            onChange={(checked) => updateForm({ alwaysCreatePullRequest: checked })}
                             disabled={!hasLastRequest}
                         />
                     </FieldCard>

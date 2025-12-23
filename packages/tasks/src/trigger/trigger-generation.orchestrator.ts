@@ -55,14 +55,16 @@ export class TriggerGenerationOrchestrator {
         try {
             const generated = await this.dataGenerator.initialize(directory, user, dto);
 
-            if (generated !== false && generated?.stats) {
-                generationStats = generated.stats as GenerationStats;
+            if (generated.success === false) {
+                throw new Error(generated.error.message);
             }
 
-            if (generated !== false && (generated.stats?.totalItemsCount ?? 0) > 0) {
+            generationStats = generated.stats;
+
+            if (generated.stats.totalItemsCount > 0) {
                 await this.markdownGenerator.initialize(directory, user, {
                     repository_description: dto.repository_description,
-                    generation_method: generated.generation_method,
+                    generation_method: dto.generation_method,
                     pr_update: generated.prUpdate,
                 });
             }

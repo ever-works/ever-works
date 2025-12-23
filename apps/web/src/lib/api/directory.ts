@@ -116,6 +116,7 @@ export interface DirectoryScheduleDto {
     lastRunStatus: GenerateStatusType | null;
     failureCount: number;
     maxFailureBeforePause: number;
+    alwaysCreatePullRequest: boolean;
     allowedCadences: DirectoryScheduleAllowedCadence[];
     planCode?: string;
     subscriptionsEnabled: boolean;
@@ -126,6 +127,7 @@ export type UpdateDirectorySchedulePayload = {
     cadence?: DirectoryScheduleCadence;
     billingMode?: DirectoryScheduleBillingMode;
     maxFailureBeforePause?: number;
+    alwaysCreatePullRequest?: boolean;
 };
 
 export interface DirectoriesResponse {

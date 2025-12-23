@@ -3,7 +3,7 @@ import { HumanMessage } from '@langchain/core/messages';
 import { z } from 'zod';
 
 // AI Providers
-import { ChatOpenAI, OpenAIEmbeddings } from '@langchain/openai';
+import { ChatOpenAI, ChatOpenAIFields, OpenAIEmbeddings } from '@langchain/openai';
 import { Embeddings } from '@langchain/core/embeddings';
 import {
     AiProviderType,
@@ -307,12 +307,12 @@ export class AiService {
         config.maxTokens = config.maxTokens || defaultConfig?.maxTokens || 4096;
         config.baseURL = config.baseURL || defaultConfig?.baseURL || '';
 
-        const commonOptions = {
+        const commonOptions: ChatOpenAIFields = {
             apiKey: config.apiKey,
             temperature: config.temperature,
             maxTokens: config.maxTokens,
             reasoning: {
-                effort: 'low' as const,
+                effort: 'low',
             },
         };
 

@@ -18,22 +18,44 @@ import { GenerateStatusType } from '../entities/types';
 import { LEGAL_NOTICE, LICENSE_TEXT } from './texts';
 import { DIRECTORY_OPERATIONS } from '@src/directory-operations';
 import type { DirectoryOperations } from '@src/directory-operations';
+import pMap from 'p-map';
 import { config } from '../config';
 
-type GenerationStats = {
+const PARALLEL_WRITE_CONCURRENCY = 10;
+
+const DEFAULT_ITEM_MARKDOWN = (item: ItemData) =>
+    `# ${item.name}\n\n${item.description}\n\n[${item.source_url}](${item.source_url})`;
+
+export type InitializeErrorCode =
+    | 'CLONE_FAILED'
+    | 'REPO_CREATE_FAILED'
+    | 'DATA_REPO_FAILED'
+    | 'GENERATION_FAILED'
+    | 'PUSH_FAILED';
+
+export type InitializeError = {
+    code: InitializeErrorCode;
+    message: string;
+    cause?: Error;
+};
+
+export type GenerationStats = {
     newItemsCount: number;
     updatedItemsCount: number;
     totalItemsCount: number;
     metrics?: ItemsGeneratorMetrics;
 };
 
-type TInitialize =
+export type InitializeResult =
     | {
+          success: true;
           prUpdate: PRUpdate | null;
-          generation_method?: GenerationMethod;
           stats: GenerationStats;
       }
-    | false;
+    | {
+          success: false;
+          error: InitializeError;
+      };
 
 type UpdateMarkdownTemplateResult = {
     updated: boolean;
@@ -52,11 +74,21 @@ export class DataGeneratorService {
         private readonly directoryOperations: DirectoryOperations,
     ) {}
 
+    private getDirectoryOwner(directory: Directory): User {
+        const owner = directory.user;
+        if (!owner || typeof owner.getGitToken !== 'function') {
+            throw new Error(
+                `Directory owner not loaded for directory ${directory.id}. Ensure the user relation is joined.`,
+            );
+        }
+        return owner as User;
+    }
+
     async initialize(
         directory: Directory,
         user: User,
         createItemsGeneratorDto: CreateItemsGeneratorDto,
-    ): Promise<TInitialize> {
+    ): Promise<InitializeResult> {
         this.logger.debug(
             `Initializing data repository for directory: ${JSON.stringify(createItemsGeneratorDto)}`,
         );
@@ -96,8 +128,8 @@ export class DataGeneratorService {
             };
 
             return {
+                success: true,
                 prUpdate: null,
-                generation_method: createItemsGeneratorDto.generation_method,
                 stats,
             };
         }
@@ -106,7 +138,7 @@ export class DataGeneratorService {
             categories: newCategories,
             items: newItems,
             tags: newTags,
-            contentCache,
+            // contentCache,
         } = generatedItems;
         const { existingCategories, existingTags } = existingData;
 
@@ -118,7 +150,7 @@ export class DataGeneratorService {
 
         // Use directory owner's Git token (they set up the repos)
         // but use current user as committer for attribution
-        const directoryOwner = directory.user as User;
+        const directoryOwner = this.getDirectoryOwner(directory);
         const token = directoryOwner.getGitToken();
         const committer = user.asCommitter();
 
@@ -141,26 +173,39 @@ export class DataGeneratorService {
         );
 
         // Cloning repository
-        const dest = await this.githubService
-            .cloneOrPull({
+        let dest: string;
+        try {
+            dest = await this.githubService.cloneOrPull({
                 owner: directory.getRepoOwner(),
                 repo,
                 token,
                 committer,
-            })
-            .catch((err) => {
-                this.logger.error('Failed to clone repository', err);
-                return null;
             });
+        } catch (err) {
+            this.logger.error('Failed to clone repository', err);
+            return {
+                success: false,
+                error: {
+                    code: 'CLONE_FAILED' as const,
+                    message: `Failed to clone repository ${directory.getRepoOwner()}/${repo}`,
+                    cause: err instanceof Error ? err : new Error(String(err)),
+                },
+            };
+        }
 
-        const data: DataRepository = await DataRepository.create(dest).catch((err) => {
+        let data: DataRepository;
+        try {
+            data = await DataRepository.create(dest);
+        } catch (err) {
             this.logger.error('Failed to create data repository', err);
-            return null;
-        });
-
-        if (!data || !dest) {
-            this.logger.error('Failed to create data repository');
-            return false;
+            return {
+                success: false,
+                error: {
+                    code: 'DATA_REPO_FAILED' as const,
+                    message: 'Failed to create data repository from cloned directory',
+                    cause: err instanceof Error ? err : new Error(String(err)),
+                },
+            };
         }
 
         this.logger.log(`Cloned repository to ${dest}`);
@@ -215,56 +260,55 @@ export class DataGeneratorService {
                 data.writeTags(this.merge(existingTags, newTags)),
             ];
 
+            const { title: prTitle, body: prBody } = this.getPRDetails(directory);
+
+            const isNewOrRecreate =
+                !existed || createItemsGeneratorDto.generation_method === GenerationMethod.RECREATE;
+
             /**
-             * rewrite meta files only if we are creating new repository or we are recreating it
+             * Rewrite meta files only if we are creating new repository or we are recreating it
              */
-            if (
-                !existed ||
-                createItemsGeneratorDto.generation_method === GenerationMethod.RECREATE
-            ) {
+            if (isNewOrRecreate) {
                 promises.push(
                     data.writeReadme(this.getDefaultReadme(directory)),
                     data.writeLicense(LICENSE_TEXT),
-                    data.mergeConfig({
-                        ...this.withCompanyConfig(createItemsGeneratorDto.company),
-                        metadata: {
-                            initial_prompt: createItemsGeneratorDto.prompt,
-                            generation_method: createItemsGeneratorDto.generation_method,
-                            last_request_data: createItemsGeneratorDto,
-                        },
-                    }),
-                    data.writeMarkdownTemplate(
-                        this.getHeader(directory),
-                        this.getFooter(directory),
-                    ),
                 );
             }
 
-            const { title: prTitle, body: prBody } = this.getPRDetails(directory);
-
-            // Write PR details in config so that others repositories may use it
-            if (newBranchName) {
+            // Write markdown template if new/recreate OR if creating a PR branch
+            if (isNewOrRecreate || newBranchName) {
                 promises.push(
                     data.writeMarkdownTemplate(
                         this.getHeader(directory),
                         this.getFooter(directory),
                     ),
-
-                    data.mergeConfig({
-                        ...this.withCompanyConfig(createItemsGeneratorDto.company),
-
-                        metadata: {
-                            generation_method: createItemsGeneratorDto.generation_method,
-                            last_request_data: createItemsGeneratorDto,
-                            pr_update: {
-                                branch: newBranchName,
-                                title: prTitle,
-                                body: prBody,
-                            },
-                        },
-                    }),
                 );
             }
+
+            // Build metadata - always update last_request_data and generation_method
+            const metadata: Record<string, unknown> = {
+                last_request_data: createItemsGeneratorDto,
+            };
+
+            // Only set initial_prompt if it doesn't exist yet (first creation)
+            if (!existingData.existingConfig?.metadata?.initial_prompt) {
+                metadata.initial_prompt = createItemsGeneratorDto.prompt;
+            }
+
+            if (newBranchName) {
+                metadata.pr_update = {
+                    branch: newBranchName,
+                    title: prTitle,
+                    body: prBody,
+                };
+            }
+
+            promises.push(
+                data.mergeConfig({
+                    ...this.withCompanyConfig(createItemsGeneratorDto.company),
+                    metadata,
+                }),
+            );
 
             // write categories, tags, readme, license, config, markdown template
             await Promise.all(promises);
@@ -289,21 +333,27 @@ export class DataGeneratorService {
                 ),
             );
 
-            let newItemsCount = 0;
-            let updatedItemsCount = 0;
-
-            // Write all items to disk (without committing individually)
-            for (const item of newItems) {
+            // Prepare items with slugs and count new vs updated
+            const itemsWithSlugs = newItems.map((item) => {
                 item.slug = slugifyText(item.slug || item.name);
-                if (existingSlugSet.has(item.slug)) {
-                    updatedItemsCount++;
-                } else {
-                    newItemsCount++;
-                }
-                await this.writeItemToDisk(data, item).catch((err) => {
-                    this.logger.error('Failed to write item', err);
-                });
-            }
+                return item;
+            });
+
+            const newItemsCount = itemsWithSlugs.filter(
+                (item) => !existingSlugSet.has(item.slug),
+            ).length;
+
+            const updatedItemsCount = itemsWithSlugs.length - newItemsCount;
+
+            await pMap(
+                itemsWithSlugs,
+                (item) => {
+                    return this.writeItemToDisk(data, item).catch((err) => {
+                        this.logger.error(`Failed to write item ${item.slug}`, err);
+                    });
+                },
+                { concurrency: PARALLEL_WRITE_CONCURRENCY },
+            );
 
             // Batch commit all items at once
             if (newItems.length > 0) {
@@ -379,13 +429,20 @@ export class DataGeneratorService {
             }
 
             return {
+                success: true,
                 prUpdate,
-                generation_method: createItemsGeneratorDto.generation_method,
                 stats,
             };
         } catch (err) {
             this.logger.error('Failed to initialize data repository', err);
-            throw err;
+            return {
+                success: false,
+                error: {
+                    code: 'GENERATION_FAILED' as const,
+                    message: 'Failed to complete data repository initialization',
+                    cause: err instanceof Error ? err : new Error(String(err)),
+                },
+            };
         }
     }
 
@@ -394,7 +451,7 @@ export class DataGeneratorService {
         user: User,
     ): Promise<UpdateMarkdownTemplateResult> {
         // Use directory owner's Git token (they set up the repos)
-        const directoryOwner = directory.user as User;
+        const directoryOwner = this.getDirectoryOwner(directory);
         const token = directoryOwner.getGitToken();
         const committer = user.asCommitter();
         const owner = directory.getRepoOwner();
@@ -461,10 +518,11 @@ export class DataGeneratorService {
 
     /**
      * Remove repository for a directory
+     * @param _user - Unused, kept for API consistency with other generator services
      */
-    async removeRepository(directory: Directory, user: User): Promise<void> {
+    async removeRepository(directory: Directory, _user: User): Promise<void> {
         // Use directory owner's Git token (they set up the repos)
-        const directoryOwner = directory.user as User;
+        const directoryOwner = this.getDirectoryOwner(directory);
         const token = directoryOwner.getGitToken();
         const repo = directory.getDataRepo();
 
@@ -564,7 +622,7 @@ export class DataGeneratorService {
 
     private async repositoryData(directory: Directory, user: User) {
         // Use directory owner's Git token (they set up the repos)
-        const directoryOwner = directory.user as User;
+        const directoryOwner = this.getDirectoryOwner(directory);
         const token = directoryOwner.getGitToken();
         const committer = user.asCommitter();
 
@@ -596,18 +654,12 @@ export class DataGeneratorService {
      * Gets existing data from the repository if it exists, otherwise returns empty data
      */
     private async getExistingData(directory: Directory, user: User) {
-        this.logger.debug(`Getting existing data for directory: ${directory.slug}`);
-
-        // Use directory owner's Git token (they set up the repos)
-        const directoryOwner = directory.user as User;
+        const directoryOwner = this.getDirectoryOwner(directory);
         const token = directoryOwner.getGitToken();
         const committer = user.asCommitter();
-
         const repo = directory.getDataRepo();
 
         try {
-            // Try to clone or pull the repository using persistent directory
-            this.logger.log(`Checking for existing repository ${directory.getRepoOwner()}/${repo}`);
             const dest = await this.githubService.cloneOrPull({
                 owner: directory.getRepoOwner(),
                 repo,
@@ -615,41 +667,21 @@ export class DataGeneratorService {
                 committer,
             });
             const data = await DataRepository.create(dest);
-            this.logger.log(`Found existing repository at ${dest}`);
 
-            try {
-                // Try to get existing data
-                const [categories, tags, existingItems, config] = await Promise.all([
-                    data.getCategories().catch(() => []),
-                    data.getTags().catch(() => []),
-                    data.getItems().catch(() => []),
-                    data.getConfig().catch(() => null),
-                ]);
+            const [categories, tags, existingItems, config] = await Promise.all([
+                data.getCategories().catch(() => []),
+                data.getTags().catch(() => []),
+                data.getItems().catch(() => []),
+                data.getConfig().catch(() => null),
+            ]);
 
-                this.logger.debug(
-                    `Found existing data: ${categories.length} categories, ${tags.length} tags, ${existingItems.length} items`,
-                );
-
-                return {
-                    existingItems,
-                    existingCategories: categories,
-                    existingTags: tags,
-                    existingConfig: config,
-                };
-            } catch (error) {
-                this.logger.error(`No existing data found in repository: `, error);
-                return {
-                    existingItems: [],
-                    existingCategories: [],
-                    existingTags: [],
-                    existingConfig: null,
-                };
-            }
-        } catch (error) {
-            // Repository doesn't exist or can't be accessed
-            this.logger.debug(
-                `Repository ${directory.getRepoOwner()}/${repo} doesn't exist or can't be accessed: ${error.message}`,
-            );
+            return {
+                existingItems,
+                existingCategories: categories,
+                existingTags: tags,
+                existingConfig: config,
+            };
+        } catch {
             return {
                 existingItems: [],
                 existingCategories: [],
@@ -660,19 +692,9 @@ export class DataGeneratorService {
     }
 
     private async writeItemToDisk(data: DataRepository, item: ItemData) {
-        this.logger.debug(`writeItemToDisk: Writing item ${item.name} (slug: ${item.slug})`);
-
         await data.createItemDir(item);
-        const promises = [data.writeItem(item)];
-
-        // Write item markdown to disk
-        const md =
-            item.markdown ||
-            `#${item.name}\n\n${item.description}\n\n[${item.source_url}](${item.source_url})`;
-
-        promises.push(data.writeItemMarkdown(item, `${md}`));
-
-        await Promise.all(promises);
+        const md = item.markdown || DEFAULT_ITEM_MARKDOWN(item);
+        await Promise.all([data.writeItem(item), data.writeItemMarkdown(item, md)]);
     }
 
     private getPRDetails(directory: Directory) {

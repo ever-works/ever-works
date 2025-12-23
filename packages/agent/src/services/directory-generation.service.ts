@@ -8,7 +8,7 @@ import {
     Optional,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { DataGeneratorService } from '@src/data-generator/data-generator.service';
+import { DataGeneratorService, GenerationStats } from '@src/data-generator/data-generator.service';
 import { MarkdownGeneratorService } from '@src/markdown-generator/markdown-generator.service';
 import { WebsiteGeneratorService } from '@src/website-generator/website-generator.service';
 import { WebsiteUpdateService } from '@src/website-generator/website-update.service';
@@ -19,17 +19,13 @@ import {
 } from '@src/items-generator/dto/create-items-generator.dto';
 import {
     SubmitItemDto,
-    SubmitItemResponseDto,
     RemoveItemDto,
     RemoveItemResponseDto,
     ExtractItemDetailsDto,
     ExtractItemDetailsResponseDto,
     UpdateItemDto,
 } from '@src/items-generator/dto';
-import {
-    ItemsGeneratorMetrics,
-    ItemsGeneratorResponseDto,
-} from '@src/items-generator/dto/items-generator-response.dto';
+import { ItemsGeneratorResponseDto } from '@src/items-generator/dto/items-generator-response.dto';
 import { ItemSubmissionService } from '@src/items-generator/item-submission.service';
 import { ItemsGeneratorService } from '@src/items-generator/items-generator.service';
 import { Directory } from '@src/entities/directory.entity';
@@ -53,13 +49,6 @@ import { DirectorySchedule } from '@src/entities/directory-schedule.entity';
 import { DirectoryScheduleService } from './directory-schedule.service';
 import { UserRepository } from '@src/database/repositories/user.repository';
 
-type GenerationStats = {
-    newItemsCount: number;
-    updatedItemsCount: number;
-    totalItemsCount: number;
-    metrics?: ItemsGeneratorMetrics;
-};
-
 type GenerationTriggerContext = {
     triggeredBy: 'user' | 'schedule' | 'api';
     scheduleId?: string;
@@ -68,6 +57,14 @@ type GenerationTriggerContext = {
 
 const DEFAULT_GENERATION_CONTEXT: GenerationTriggerContext = {
     triggeredBy: 'user',
+};
+
+export type UpdateItemsGeneratorOptions = {
+    directoryId: string;
+    updateDto: UpdateItemsGeneratorDto;
+    user: User;
+    awaitCompletion?: boolean;
+    context?: GenerationTriggerContext;
 };
 
 @Injectable()
@@ -134,12 +131,16 @@ export class DirectoryGenerationService {
     }
 
     async updateItemsGenerator(
-        directoryId: string,
-        updateDto: UpdateItemsGeneratorDto,
-        user: User,
-        awaitCompletion = true,
-        context: GenerationTriggerContext = DEFAULT_GENERATION_CONTEXT,
+        options: UpdateItemsGeneratorOptions,
     ): Promise<ItemsGeneratorResponseDto> {
+        const {
+            directoryId,
+            updateDto,
+            user,
+            awaitCompletion = true,
+            context = DEFAULT_GENERATION_CONTEXT,
+        } = options;
+
         // Require editor role to generate/update items
         const { directory } = await this.ownershipService.ensureCanEdit(directoryId, user.id);
         const triggerContext = this.resolveContext(context);
@@ -175,8 +176,16 @@ export class DirectoryGenerationService {
             });
         }
 
+        // Reset operational flags to safe defaults before merging user overrides
+        // This prevents scheduled runs from inheriting RECREATE mode from manual runs
+        const perRunDefaults = {
+            generation_method: GenerationMethod.CREATE_UPDATE,
+            update_with_pull_request: true,
+        };
+
         const payload = {
             ...lastRequestData,
+            ...perRunDefaults,
             ...updateDto,
         };
 
@@ -486,10 +495,18 @@ export class DirectoryGenerationService {
             return;
         }
 
-        return this.updateItemsGenerator(schedule.directoryId, {}, user, false, {
-            triggeredBy: 'schedule',
-            scheduleId: schedule.id,
-            billingMode: schedule.billingMode,
+        return this.updateItemsGenerator({
+            directoryId: schedule.directoryId,
+            updateDto: {
+                update_with_pull_request: schedule.alwaysCreatePullRequest ?? false,
+            },
+            user,
+            awaitCompletion: false,
+            context: {
+                triggeredBy: 'schedule',
+                scheduleId: schedule.id,
+                billingMode: schedule.billingMode,
+            },
         });
     }
 
@@ -544,6 +561,15 @@ export class DirectoryGenerationService {
         history: DirectoryGenerationHistory,
         context: GenerationTriggerContext,
     ) {
+        // Immediately set status to GENERATING so frontend shows progress UI right away
+        // Don't wait for Trigger.dev to pick up the task - user needs instant feedback
+        await Promise.all([
+            this.directoryRepository.recordGenerationStartTime(directory.id, new Date()),
+            this.directoryRepository.updateGenerateStatus(directory.id, {
+                status: GenerateStatusType.GENERATING,
+            }),
+        ]);
+
         const payload: DirectoryGenerationPayload = {
             directoryId: directory.id,
             userId: user.id,
@@ -606,14 +632,18 @@ export class DirectoryGenerationService {
         try {
             const generated = await this.dataGenerator.initialize(directory, user, dto);
 
-            if (generated !== false && generated?.stats) {
-                generationStats = generated.stats as GenerationStats;
+            if (generated.success === false) {
+                const { error } = generated;
+                this.logger.error(`Data generation failed: ${error.message}`);
+                throw error.cause || new Error(error.message);
             }
 
-            if (generated !== false && (generated.stats?.totalItemsCount ?? 0) > 0) {
+            generationStats = generated.stats;
+
+            if ((generated.stats?.totalItemsCount ?? 0) > 0) {
                 await this.markdownGenerator.initialize(directory, user, {
                     repository_description: dto.repository_description,
-                    generation_method: generated.generation_method,
+                    generation_method: dto.generation_method,
                     pr_update: generated.prUpdate,
                 });
             }
