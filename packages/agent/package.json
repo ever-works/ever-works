@@ -132,7 +132,7 @@
         "typescript-eslint": "^8.46.3"
     },
     "dependencies": {
-        "@langchain/core": "^0.3.79",
+        "@langchain/core": "^0.3.80",
         "@langchain/langgraph": "^0.2.74",
         "@langchain/openai": "0.5.12",
         "@langchain/textsplitters": "^0.1.0",
