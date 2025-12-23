@@ -110,9 +110,8 @@ export class ShowSubCommand extends CommandRunner {
             'ANTHROPIC',
             'OPENROUTER',
             'OLLAMA',
-            'MISTRAL',
-            'DEEPSEEK',
             'GROQ',
+            'CUSTOM',
         ];
 
         for (const provider of providerKeys) {

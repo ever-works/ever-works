@@ -97,9 +97,8 @@ export class SetSubCommand extends CommandRunner {
                 'anthropic',
                 'openrouter',
                 'ollama',
-                'mistral',
-                'deepseek',
                 'groq',
+                'custom',
             ];
             if (!validProviders.includes(value.toLowerCase())) {
                 return {

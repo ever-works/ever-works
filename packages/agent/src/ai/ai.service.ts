@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { HumanMessage } from '@langchain/core/messages';
 import { z } from 'zod';
 
@@ -14,6 +14,7 @@ import {
 } from './ai-provider.interface';
 import { config } from '@src/config';
 import { TokenUsage, TokenUsageTracker } from './token-usage.tracker';
+import { ModelRouterService, RoutingOptions, RoutingDecision } from './model-router';
 
 // Cache TTL for provider health checks (5 minutes)
 const HEALTH_CHECK_CACHE_TTL_MS = 5 * 60 * 1000;
@@ -27,31 +28,18 @@ type HealthCheckResult = {
     response?: string;
 };
 
-/**
- * Type utility to extract variable names from a template string.
- * Example: "Hello {name}, your task is {task}" → "name" | "task"
- */
 type ExtractVariableNames<T extends string> = T extends `${string}{${infer Var}}${infer Rest}`
     ? Var | ExtractVariableNames<Rest>
     : never;
 
-/**
- * Creates a record type from extracted variable names.
- * Example: "Hello {name}" → { name: string }
- * Falls back to Record<string, string> if no variables found.
- */
-type TemplateVariables<T extends string> =
-    ExtractVariableNames<T> extends never
-        ? Record<string, string> | undefined
-        : { [K in ExtractVariableNames<T>]: string };
-
-/**
- * Options type that makes `variables` required when template has placeholders.
- */
 type AskJsonOptions<Template extends string> =
     ExtractVariableNames<Template> extends never
-        ? { temperature?: number; variables?: Record<string, string> }
-        : { temperature?: number; variables: { [K in ExtractVariableNames<Template>]: string } };
+        ? { temperature?: number; variables?: Record<string, string>; routing?: RoutingOptions }
+        : {
+              temperature?: number;
+              variables: { [K in ExtractVariableNames<Template>]: string };
+              routing?: RoutingOptions;
+          };
 
 @Injectable()
 export class AiService {
@@ -60,15 +48,20 @@ export class AiService {
     private readonly providers: Map<AiProviderType, BaseChatModel> = new Map();
     private readonly isConfigured: boolean;
     private readonly isCLI: boolean;
+    private readonly modelRouter: ModelRouterService;
 
     // In-memory cache for health check results
     private healthCheckCache: { result: HealthCheckResult; timestamp: number } | null = null;
 
-    constructor() {
+    constructor(@Optional() modelRouter?: ModelRouterService) {
         this.isCLI = config.isCli();
+        this.modelRouter = modelRouter ?? new ModelRouterService();
 
         this.config = this.loadConfiguration();
         this.isConfigured = this.initializeProviders();
+
+        // Inform the model router about available providers
+        this.modelRouter.setAvailableProviders(this.getAvailableProviders());
 
         if (!this.isConfigured) {
             this.logger.warn('No AI providers configured. AI features will be limited.');
@@ -79,24 +72,6 @@ export class AiService {
         }
     }
 
-    /**
-     * Structured JSON helper with token/cost tracking.
-     * Uses the default provider/model unless temperature override is provided.
-     *
-     * @param promptTemplate - Template string with {variable} placeholders (use `as const` for type safety)
-     * @param schema - Zod schema for response validation
-     * @param options.temperature - Optional temperature override
-     * @param options.variables - Type-safe variables extracted from template placeholders (required if template has placeholders)
-     *
-     * @example
-     * ```typescript
-     * const PROMPT = "Hello {name}, task: {task}" as const;
-     * // Variables are required and type-checked: { name: string; task: string }
-     * await aiService.askJson(PROMPT, schema, {
-     *     variables: { name: "John", task: "Build app" }
-     * });
-     * ```
-     */
     async askJson<T, Template extends string = string>(
         promptTemplate: Template,
         schema: z.ZodSchema<T>,
@@ -109,18 +84,27 @@ export class AiService {
         cost: number | null;
         provider: AiProviderType;
         model: string;
+        routingDecision?: RoutingDecision;
     }> {
         const options = args[0];
         const tracker = new TokenUsageTracker();
-        const providerType = this.config.defaultProvider;
-        const modelName = this.getProviderConfig(providerType)?.modelName || 'unknown';
+
+        // Use model router to select provider/model based on task complexity
+        const defaultModel =
+            this.getProviderConfig(this.config.defaultProvider)?.modelName || 'unknown';
+
+        const routingDecision = this.modelRouter.route(
+            options?.routing ?? {},
+            this.config.defaultProvider,
+            defaultModel,
+        );
+
+        const providerType = routingDecision.selectedConfig.provider;
+        const modelName = routingDecision.selectedConfig.model;
 
         const resolvedPrompt = this.renderTemplate(promptTemplate, options?.variables);
 
-        const llm = this.createLlmWithCriteria({
-            providerType,
-            temperature: options?.temperature,
-        });
+        const llm = this.createLlmForRouting(providerType, modelName, options?.temperature);
 
         try {
             const result = (await llm
@@ -130,10 +114,64 @@ export class AiService {
                 })) as T;
 
             const usage = tracker.usage.totalTokens > 0 ? tracker.usage : null;
-            const cost = usage ? this.calculateCost(providerType, usage) : null;
+            const cost = usage ? this.calculateCost(providerType, usage, modelName) : null;
 
-            return { result, usage, cost, provider: providerType, model: modelName };
+            return {
+                result,
+                usage,
+                cost,
+                provider: providerType,
+                model: modelName,
+                routingDecision,
+            };
         } catch (error) {
+            // Try auto-escalation if enabled
+            if (options?.routing?.autoEscalate !== false) {
+                const escalatedDecision = this.modelRouter.escalate(
+                    routingDecision,
+                    this.config.defaultProvider,
+                    defaultModel,
+                );
+
+                if (escalatedDecision) {
+                    this.logger.warn(
+                        `Escalating from ${providerType}/${modelName} to ${escalatedDecision.selectedConfig.provider}/${escalatedDecision.selectedConfig.model}`,
+                    );
+
+                    const escalatedLlm = this.createLlmForRouting(
+                        escalatedDecision.selectedConfig.provider,
+                        escalatedDecision.selectedConfig.model,
+                        options?.temperature,
+                    );
+
+                    const escalatedTracker = new TokenUsageTracker();
+                    const escalatedResult = (await escalatedLlm
+                        .withStructuredOutput(schema)
+                        .invoke([new HumanMessage(resolvedPrompt)], {
+                            callbacks: [escalatedTracker],
+                        })) as T;
+
+                    const usage =
+                        escalatedTracker.usage.totalTokens > 0 ? escalatedTracker.usage : null;
+                    const cost = usage
+                        ? this.calculateCost(
+                              escalatedDecision.selectedConfig.provider,
+                              usage,
+                              escalatedDecision.selectedConfig.model,
+                          )
+                        : null;
+
+                    return {
+                        result: escalatedResult,
+                        usage,
+                        cost,
+                        provider: escalatedDecision.selectedConfig.provider,
+                        model: escalatedDecision.selectedConfig.model,
+                        routingDecision: escalatedDecision,
+                    };
+                }
+            }
+
             this.logger.error(
                 `askJson failed (${providerType}/${modelName}): ${this.getErrorMessage(error)}`,
             );
@@ -141,17 +179,55 @@ export class AiService {
         }
     }
 
-    private calculateCost(provider: AiProviderType, usage: TokenUsage): number | null {
-        const capabilities = AI_PROVIDER_CAPABILITIES[provider];
-        if (!capabilities?.costPerToken) {
-            this.logger.debug(`No cost table for provider ${provider}, skipping cost calculation.`);
-            return null;
+    private createLlmForRouting(
+        providerType: AiProviderType,
+        modelName: string,
+        temperature?: number,
+    ): BaseChatModel {
+        const providerConfig = this.config.providers[providerType];
+
+        if (!providerConfig || !providerConfig.enabled) {
+            // Fallback to default provider if the routed provider is not available
+            this.logger.warn(
+                `Provider ${providerType} not available for routing, using default provider`,
+            );
+            return this.createLlmWithCriteria({
+                temperature,
+            });
         }
 
-        const inputCost = usage.inputTokens * (capabilities.costPerToken.input || 0);
-        const outputCost = usage.outputTokens * (capabilities.costPerToken.output || 0);
+        // Create a temporary config with the routed model
+        const routedConfig: AiProviderConfig = {
+            ...providerConfig,
+            modelName,
+            temperature: temperature ?? providerConfig.temperature,
+        };
 
-        return inputCost + outputCost;
+        const provider = this.createProvider(routedConfig);
+        if (!provider) {
+            this.logger.warn(`Failed to create provider ${providerType}, using default`);
+            return this.createLlmWithCriteria({ temperature });
+        }
+
+        return provider;
+    }
+
+    private calculateCost(
+        provider: AiProviderType,
+        usage: TokenUsage,
+        model?: string,
+    ): number | null {
+        const providerConfig = this.config.providers[provider];
+        const modelName = model || providerConfig?.modelName || 'unknown';
+
+        const estimate = this.modelRouter.estimateCost(
+            provider,
+            modelName,
+            usage.inputTokens,
+            usage.outputTokens,
+        );
+
+        return estimate.estimatedCostUsd > 0 ? estimate.estimatedCostUsd : null;
     }
 
     private renderTemplate(template: string, variables?: Record<string, any>): string {
@@ -165,9 +241,6 @@ export class AiService {
         });
     }
 
-    /**
-     * Load AI service configuration from environment variables
-     */
     private loadConfiguration(): AiServiceConfig {
         const defaultProvider = config.ai.getDefaultProvider();
 
@@ -222,16 +295,6 @@ export class AiService {
                 maxTokens: config.ai.anthropic.getMaxTokens(),
                 baseURL: config.ai.anthropic.getBaseUrl(),
             },
-            mistral: {
-                type: 'mistral',
-                apiKey: config.ai.mistral.getKey(),
-                modelName: config.ai.mistral.getModel(),
-                embeddingModelName: config.ai.mistral.getEmbeddingModel(),
-                temperature: config.ai.mistral.getTemperature(),
-                enabled: !!config.ai.mistral.getKey(),
-                maxTokens: config.ai.mistral.getMaxTokens(),
-                baseURL: config.ai.mistral.getBaseUrl(),
-            },
             groq: {
                 type: 'groq',
                 apiKey: config.ai.groq.getKey(),
@@ -241,14 +304,14 @@ export class AiService {
                 maxTokens: config.ai.groq.getMaxTokens(),
                 baseURL: config.ai.groq.getBaseUrl(),
             },
-            deepseek: {
-                type: 'deepseek',
-                apiKey: config.ai.deepseek.getKey(),
-                modelName: config.ai.deepseek.getModel(),
-                temperature: config.ai.deepseek.getTemperature(),
-                enabled: !!config.ai.deepseek.getKey(),
-                maxTokens: config.ai.deepseek.getMaxTokens(),
-                baseURL: config.ai.deepseek.getBaseUrl(),
+            custom: {
+                type: 'custom',
+                apiKey: config.ai.custom.getKey(),
+                modelName: config.ai.custom.getModel(),
+                temperature: config.ai.custom.getTemperature(),
+                enabled: !!config.ai.custom.getBaseUrl(),
+                maxTokens: config.ai.custom.getMaxTokens(),
+                baseURL: config.ai.custom.getBaseUrl(),
             },
         };
 
@@ -265,9 +328,6 @@ export class AiService {
         };
     }
 
-    /**
-     * Initialize AI providers based on configuration
-     */
     private initializeProviders(): boolean {
         let hasConfiguredProvider = false;
 
@@ -295,9 +355,6 @@ export class AiService {
         return hasConfiguredProvider;
     }
 
-    /**
-     * Create a provider instance based on configuration
-     */
     private createProvider(config: AiProviderConfig): BaseChatModel | null {
         const defaultConfig = this.getProviderConfig(config.type);
 
@@ -376,16 +433,7 @@ export class AiService {
                     },
                 });
 
-            case 'mistral':
-                return new ChatOpenAI({
-                    ...commonOptions,
-                    model: config.modelName,
-                    configuration: {
-                        baseURL: config.baseURL,
-                    },
-                });
-
-            case 'deepseek':
+            case 'custom':
                 return new ChatOpenAI({
                     ...commonOptions,
                     model: config.modelName,
@@ -404,30 +452,14 @@ export class AiService {
         return new ChatOpenAI();
     }
 
-    /**
-     * Check if any AI provider is configured
-     */
-    isApiKeyConfigured(): boolean {
-        return this.isConfigured;
-    }
-
-    /**
-     * Check if the AI service is properly configured
-     */
     isAiConfigured(): boolean {
         return this.isConfigured;
     }
 
-    /**
-     * Get the default LLM instance
-     */
     getLlm(): BaseChatModel {
         return this.getLlmByProvider(this.config.defaultProvider);
     }
 
-    /**
-     * Get LLM instance by provider type
-     */
     getLlmByProvider(providerType: AiProviderType): BaseChatModel {
         const provider = this.providers.get(providerType);
         if (!provider) {
@@ -465,9 +497,6 @@ export class AiService {
         return provider;
     }
 
-    /**
-     * Create a temporary LLM with a different temperature
-     */
     createLlmWithTemperature(temperature: number, providerType?: AiProviderType): BaseChatModel {
         const targetProvider = providerType || this.config.defaultProvider;
         const config = this.config.providers[targetProvider];
@@ -496,71 +525,46 @@ export class AiService {
         return provider;
     }
 
-    /**
-     * Get available provider types
-     */
     getAvailableProviders(): AiProviderType[] {
         return Array.from(this.providers.keys());
     }
 
-    /**
-     * Get provider configuration
-     */
     getProviderConfig(providerType: AiProviderType): AiProviderConfig | undefined {
         return this.config.providers[providerType];
     }
 
-    /**
-     * Get service configuration
-     */
     getServiceConfig(): AiServiceConfig {
         return { ...this.config };
     }
 
-    /**
-     * Check if a specific provider is available
-     */
     isProviderAvailable(providerType: AiProviderType): boolean {
         return this.providers.has(providerType);
     }
 
-    /**
-     * Get provider capabilities
-     */
-    getProviderCapabilities(providerType: AiProviderType) {
-        return AI_PROVIDER_CAPABILITIES[providerType];
-    }
-
-    /**
-     * Get the most cost-effective provider for a given task
-     */
-    getCostEffectiveProvider(): AiProviderType {
+    private getCostEffectiveProvider(): AiProviderType {
         const availableProviders = this.getAvailableProviders();
 
-        // Sort by cost (input token cost)
         const sortedByCost = availableProviders.sort((a, b) => {
-            const costA = AI_PROVIDER_CAPABILITIES[a].costPerToken?.input || 0;
-            const costB = AI_PROVIDER_CAPABILITIES[b].costPerToken?.input || 0;
+            const configA = this.config.providers[a];
+            const configB = this.config.providers[b];
+            const pricingA = this.modelRouter.getPricing(a, configA?.modelName || '');
+            const pricingB = this.modelRouter.getPricing(b, configB?.modelName || '');
+            const costA = pricingA?.inputPricePerMillion || Infinity;
+            const costB = pricingB?.inputPricePerMillion || Infinity;
             return costA - costB;
         });
 
         return sortedByCost[0] || this.config.defaultProvider;
     }
 
-    /**
-     * Get the fastest provider (typically Groq for inference speed)
-     */
-    getFastestProvider(): AiProviderType {
+    private getFastestProvider(): AiProviderType {
         if (this.isProviderAvailable('groq')) {
             return 'groq';
         }
         return this.config.defaultProvider;
     }
 
-    /**
-     * Get the most capable provider (highest context length)
-     */
-    getMostCapableProvider(): AiProviderType {
+    private getMostCapableProvider(): AiProviderType {
         const availableProviders = this.getAvailableProviders();
 
         const sortedByContext = availableProviders.sort((a, b) => {
@@ -572,10 +576,7 @@ export class AiService {
         return sortedByContext[0] || this.config.defaultProvider;
     }
 
-    /**
-     * Create LLM with automatic provider selection based on criteria
-     */
-    createLlmWithCriteria(criteria: {
+    private createLlmWithCriteria(criteria: {
         preferCostEffective?: boolean;
         preferFast?: boolean;
         preferHighContext?: boolean;
@@ -603,9 +604,6 @@ export class AiService {
         return this.getLlmByProvider(selectedProvider);
     }
 
-    /**
-     * Get Embeddings instance by provider type
-     */
     getEmbeddings(providerType?: AiProviderType): Embeddings {
         const targetProvider = this.getEffectiveEmbeddingProvider(providerType);
         const config = this.config.providers[targetProvider];
@@ -633,9 +631,7 @@ export class AiService {
     }
 
     private supportsEmbeddings(providerType: AiProviderType): boolean {
-        return ['openai', 'openrouter', 'ollama', 'google', 'anthropic', 'mistral'].includes(
-            providerType,
-        );
+        return ['openai', 'openrouter', 'ollama', 'google', 'anthropic'].includes(providerType);
     }
 
     private createEmbeddingProvider(config: AiProviderConfig): Embeddings | null {
@@ -657,7 +653,7 @@ export class AiService {
 
             case 'ollama':
                 return new OpenAIEmbeddings({
-                    apiKey: 'ollama', // Ollama doesn't usually require an API key, but client might need a value
+                    apiKey: config.apiKey || 'ollama',
                     model: config.embeddingModelName,
                     configuration: {
                         baseURL: config.baseURL,
@@ -682,22 +678,12 @@ export class AiService {
                     },
                 });
 
-            case 'mistral':
-                return new OpenAIEmbeddings({
-                    apiKey: config.apiKey,
-                    model: config.embeddingModelName,
-                    configuration: {
-                        baseURL: config.baseURL,
-                    },
-                });
-
             default:
                 return null;
         }
     }
 
     async testDefaultProvider(forceRetest = false): Promise<HealthCheckResult> {
-        // Check in-memory cache first (unless force retest)
         if (!forceRetest && this.healthCheckCache) {
             const { result, timestamp } = this.healthCheckCache;
             if (Date.now() - timestamp < HEALTH_CHECK_CACHE_TTL_MS) {
@@ -725,9 +711,6 @@ export class AiService {
         return result;
     }
 
-    /**
-     * Test a specific AI provider configuration
-     */
     async testProvider(providerConfig: {
         type: AiProviderType;
         apiKey: string;
@@ -791,50 +774,6 @@ export class AiService {
                 error: this.getErrorMessage(error),
             };
         }
-    }
-
-    /**
-     * Test multiple provider configurations
-     */
-    async testMultipleProviders(
-        providerConfigs: Array<{
-            type: AiProviderType;
-            apiKey: string;
-            modelName: string;
-            temperature?: number;
-            maxTokens?: number;
-            baseURL?: string;
-        }>,
-    ): Promise<HealthCheckResult[]> {
-        const results = [];
-
-        for (const config of providerConfigs) {
-            const result = await this.testProvider(config);
-            results.push(result);
-        }
-
-        return results;
-    }
-
-    /**
-     * Log provider usage statistics
-     */
-    logProviderStats(): void {
-        this.logger.log('=== AI Provider Configuration ===');
-        this.logger.log(`Default Provider: ${this.config.defaultProvider}`);
-        this.logger.log(`Available Providers: ${this.getAvailableProviders().join(', ')}`);
-        this.logger.log(
-            `Fallback Providers: ${this.config.fallbackProviders?.join(', ') || 'None'}`,
-        );
-
-        for (const [provider, capabilities] of Object.entries(AI_PROVIDER_CAPABILITIES)) {
-            if (this.isProviderAvailable(provider as AiProviderType)) {
-                this.logger.log(
-                    `${provider}: Context=${capabilities.maxContextLength}, Cost=${capabilities.costPerToken?.input || 'N/A'}/token`,
-                );
-            }
-        }
-        this.logger.log('================================');
     }
 
     private getErrorMessage(error: unknown): string {

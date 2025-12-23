@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { z } from 'zod';
 import { ItemBadges, BadgeEvaluationResult } from '../dto/badge.dto';
 import { ItemData } from '../dto/item-data.dto';
-import { AiService } from '../../ai';
+import { AiService, TaskComplexity } from '../../ai';
 import { DomainType } from '../interfaces/items-generator.interfaces';
 import { GenerationContext } from '../interfaces/pipeline.interface';
 import { accumulateMetrics } from '../utils/metrics.util';
@@ -88,6 +88,10 @@ export class BadgeEvaluationService {
                     source_url: item.source_url,
                     domain_type: domainType,
                     badge_criteria: this.buildBadgeCriteria(domainType),
+                },
+                routing: {
+                    complexity: TaskComplexity.MEDIUM,
+                    taskId: 'badge-evaluation',
                 },
             });
 

@@ -48,17 +48,6 @@ export interface EverWorksConfig {
     OLLAMA_MAX_TOKENS?: string;
     OLLAMA_BASE_URL?: string;
 
-    MISTRAL_API_KEY?: string;
-    MISTRAL_MODEL?: string;
-    MISTRAL_TEMPERATURE?: string;
-    MISTRAL_MAX_TOKENS?: string;
-
-    DEEPSEEK_API_KEY?: string;
-    DEEPSEEK_MODEL?: string;
-    DEEPSEEK_TEMPERATURE?: string;
-    DEEPSEEK_MAX_TOKENS?: string;
-    DEEPSEEK_BASE_URL?: string;
-
     GROQ_API_KEY?: string;
     GROQ_MODEL?: string;
     GROQ_TEMPERATURE?: string;

@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { z } from 'zod';
-import { AiService } from 'src/ai';
+import { AiService, TaskComplexity } from 'src/ai';
 import { IPipelineStep, GenerationContext } from '../interfaces/pipeline.interface';
 import { ItemsGeneratorStep } from '../constants/steps';
 import { DomainAnalysis, DomainType } from '../interfaces/items-generator.interfaces';
@@ -44,6 +44,10 @@ export class DomainDetectionService implements IPipelineStep {
                 {
                     temperature: 0.1,
                     variables: { name, description: prompt },
+                    routing: {
+                        complexity: TaskComplexity.SIMPLE,
+                        taskId: 'domain-detection',
+                    },
                 },
             );
 

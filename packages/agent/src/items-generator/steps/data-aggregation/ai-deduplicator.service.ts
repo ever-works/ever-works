@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { AiService } from 'src/ai';
+import { AiService, TaskComplexity } from 'src/ai';
 import { slugifyText } from '../../utils/text.utils';
 import { extractedItemsSchema } from '../../schemas/item-extraction.schemas';
 import { ItemData } from '../../dto';
@@ -65,6 +65,10 @@ export class AiDeduplicatorService {
                     variables: {
                         task: description,
                         items: JSON.stringify(items.map((item) => this.sharedUtils.itemMap(item))),
+                    },
+                    routing: {
+                        complexity: TaskComplexity.MEDIUM,
+                        taskId: 'ai-deduplication',
                     },
                 },
             );
