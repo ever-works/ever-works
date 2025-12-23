@@ -23,6 +23,18 @@ import { config } from '../config';
 
 const PARALLEL_WRITE_CONCURRENCY = 10;
 
+/**
+ * Default config values for stored request data.
+ * These conservative values are applied when saving last_request_data
+ * to ensure scheduled runs use efficient, cost-effective settings.
+ */
+const STORED_CONFIG_DEFAULTS = {
+    max_search_queries: 10,
+    max_results_per_query: 5,
+    max_pages_to_process: 10,
+    ai_first_generation_enabled: false,
+};
+
 const DEFAULT_ITEM_MARKDOWN = (item: ItemData) =>
     `# ${item.name}\n\n${item.description}\n\n[${item.source_url}](${item.source_url})`;
 
@@ -286,8 +298,18 @@ export class DataGeneratorService {
             }
 
             // Build metadata - always update last_request_data and generation_method
+            // Apply conservative config defaults before storing to ensure scheduled runs
+            // use efficient, cost-effective settings regardless of manual run config
+            const sanitizedDto = {
+                ...createItemsGeneratorDto,
+                config: {
+                    ...createItemsGeneratorDto.config,
+                    ...STORED_CONFIG_DEFAULTS,
+                },
+            };
+
             const metadata: Record<string, unknown> = {
-                last_request_data: createItemsGeneratorDto,
+                last_request_data: sanitizedDto,
             };
 
             // Only set initial_prompt if it doesn't exist yet (first creation)

@@ -189,6 +189,18 @@ export class DirectoryGenerationService {
             ...updateDto,
         };
 
+        // Apply conservative config for scheduled runs to control resource usage
+        // This ensures scheduled updates are efficient and cost-effective
+        if (context.triggeredBy === 'schedule') {
+            payload.config = {
+                ...payload.config,
+                max_search_queries: 10,
+                max_results_per_query: 5,
+                max_pages_to_process: 10,
+                ai_first_generation_enabled: false,
+            };
+        }
+
         const history = await this.createGenerationHistoryRecord(
             directory,
             user,
