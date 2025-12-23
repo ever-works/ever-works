@@ -208,6 +208,16 @@ function ScheduleForm({
         });
     };
 
+    const updateWithPRElement = (
+        <FieldCard label={t('fields.createPullRequest')} helper={t('fields.createPullRequestHelp')}>
+            <Switch
+                checked={form.alwaysCreatePullRequest}
+                onChange={(checked) => updateForm({ alwaysCreatePullRequest: checked })}
+                disabled={!hasLastRequest}
+            />
+        </FieldCard>
+    );
+
     return (
         <section className="rounded-2xl border border-card-border dark:border-card-border-dark bg-card dark:bg-card-dark p-6 shadow-sm space-y-6">
             <header className="space-y-2">
@@ -238,7 +248,7 @@ function ScheduleForm({
                         />
                     </FieldCard>
 
-                    {subscriptionsEnabled && (
+                    {subscriptionsEnabled ? (
                         <FieldCard label={t('fields.billing')} helper={t('fields.billingHelp')}>
                             <Select
                                 value={form.billingMode}
@@ -258,6 +268,8 @@ function ScheduleForm({
                                 </option>
                             </Select>
                         </FieldCard>
+                    ) : (
+                        updateWithPRElement
                     )}
                 </div>
 
@@ -345,18 +357,9 @@ function ScheduleForm({
                     </FieldCard>
                 </div>
 
-                <div className="grid gap-4 md:grid-cols-2">
-                    <FieldCard
-                        label={t('fields.createPullRequest')}
-                        helper={t('fields.createPullRequestHelp')}
-                    >
-                        <Switch
-                            checked={form.alwaysCreatePullRequest}
-                            onChange={(checked) => updateForm({ alwaysCreatePullRequest: checked })}
-                            disabled={!hasLastRequest}
-                        />
-                    </FieldCard>
-                </div>
+                {subscriptionsEnabled && (
+                    <div className="grid gap-4 md:grid-cols-2">{updateWithPRElement}</div>
+                )}
             </div>
 
             <div className="flex flex-wrap gap-3">
