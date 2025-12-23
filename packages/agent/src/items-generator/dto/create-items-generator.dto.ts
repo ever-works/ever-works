@@ -83,7 +83,7 @@ export class ConfigDto {
     @IsOptional()
     @Min(0.01)
     @Max(1.0)
-    prompt_comparison_confidence_threshold: number = 0.8;
+    prompt_comparison_confidence_threshold: number = 0.5;
 }
 
 /**
