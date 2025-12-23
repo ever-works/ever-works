@@ -144,7 +144,7 @@ export class PromptComparisonService implements IPipelineStep {
                     temperature: 0.1,
                     variables: { existing_prompt: existingPrompt, new_prompt: newPrompt },
                     routing: {
-                        complexity: TaskComplexity.SIMPLE,
+                        complexity: TaskComplexity.MEDIUM,
                         taskId: 'prompt-comparison',
                     },
                 },
