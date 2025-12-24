@@ -19,8 +19,8 @@ const REASONING_MODELS: ReasoningConfig[] = [
     },
     {
         pattern: /^o[134]/,
-        openai: { reasoning: { effort: 'low' } },
-        openrouter: { reasoning: { effort: 'low' } },
+        openai: { reasoning: { effort: 'minimal' } },
+        openrouter: { reasoning: { effort: 'minimal' } },
     },
     {
         pattern: /gemini-[23]/,
