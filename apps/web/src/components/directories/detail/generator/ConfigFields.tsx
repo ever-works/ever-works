@@ -33,7 +33,7 @@ export const DEFAULT_CONFIG: ConfigDto = {
     min_content_length_for_extraction: 100,
     ai_first_generation_enabled: false,
     content_filtering_enabled: true,
-    prompt_comparison_confidence_threshold: 0.8,
+    prompt_comparison_confidence_threshold: 0.5,
 };
 
 export function ConfigFields({

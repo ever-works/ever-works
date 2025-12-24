@@ -4,11 +4,10 @@ export type AiProviderType =
     | 'openai'
     | 'google'
     | 'anthropic'
-    | 'mistral'
     | 'groq'
-    | 'deepseek'
     | 'openrouter'
-    | 'ollama';
+    | 'ollama'
+    | 'custom';
 
 export type BaseChatModel = ChatOpenAI;
 
@@ -34,13 +33,8 @@ export interface AiProviderCapabilities {
     supportsStreaming: boolean;
     supportsToolCalling: boolean;
     maxContextLength: number;
-    costPerToken?: {
-        input: number;
-        output: number;
-    };
 }
 
-// CLI-specific interfaces for setup and configuration
 export interface AiProviderDefaults {
     model: string;
     temperature: number;
@@ -80,79 +74,41 @@ export const AI_PROVIDER_CAPABILITIES: Record<AiProviderType, AiProviderCapabili
         supportsStreaming: true,
         supportsToolCalling: true,
         maxContextLength: 128000,
-        costPerToken: {
-            input: 0.0025,
-            output: 0.01,
-        },
     },
     openrouter: {
         supportsStructuredOutput: true,
         supportsStreaming: true,
         supportsToolCalling: true,
         maxContextLength: 128000,
-        costPerToken: {
-            input: 0.0025,
-            output: 0.01,
-        },
     },
     ollama: {
         supportsStructuredOutput: true,
         supportsStreaming: true,
         supportsToolCalling: true,
         maxContextLength: 128000,
-        costPerToken: {
-            input: 0.0025,
-            output: 0.01,
-        },
     },
     google: {
         supportsStructuredOutput: true,
         supportsStreaming: true,
         supportsToolCalling: true,
         maxContextLength: 1000000,
-        costPerToken: {
-            input: 0.00125,
-            output: 0.005,
-        },
     },
     anthropic: {
         supportsStructuredOutput: true,
         supportsStreaming: true,
         supportsToolCalling: true,
         maxContextLength: 200000,
-        costPerToken: {
-            input: 0.003,
-            output: 0.015,
-        },
-    },
-    mistral: {
-        supportsStructuredOutput: true,
-        supportsStreaming: true,
-        supportsToolCalling: true,
-        maxContextLength: 32000,
-        costPerToken: {
-            input: 0.002,
-            output: 0.006,
-        },
     },
     groq: {
         supportsStructuredOutput: true,
         supportsStreaming: true,
         supportsToolCalling: true,
-        maxContextLength: 32000,
-        costPerToken: {
-            input: 0.0001,
-            output: 0.0001,
-        },
+        maxContextLength: 128000,
     },
-    deepseek: {
+    custom: {
         supportsStructuredOutput: true,
         supportsStreaming: true,
         supportsToolCalling: true,
-        maxContextLength: 32000,
-        costPerToken: {
-            input: 0.00014,
-            output: 0.00028,
-        },
+        maxContextLength: 128000,
     },
 };

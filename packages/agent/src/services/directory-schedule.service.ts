@@ -116,6 +116,9 @@ export class DirectoryScheduleService {
             throw new BadRequestException('maxFailureBeforePause must be between 1 and 10');
         }
 
+        const alwaysCreatePullRequest =
+            dto.alwaysCreatePullRequest ?? existing?.alwaysCreatePullRequest ?? false;
+
         const creatingOrActivating =
             enable && (!existing || existing.status !== DirectoryScheduleStatus.ACTIVE);
 
@@ -147,6 +150,7 @@ export class DirectoryScheduleService {
             billingMode,
             status,
             maxFailureBeforePause,
+            alwaysCreatePullRequest,
             nextRunAt,
         });
 
@@ -171,6 +175,7 @@ export class DirectoryScheduleService {
             cadence: null,
             nextRunAt: null,
             billingMode: DirectoryScheduleBillingMode.SUBSCRIPTION,
+            alwaysCreatePullRequest: false,
         });
 
         await this.syncDirectory(directory.id, updated);
@@ -438,6 +443,7 @@ export class DirectoryScheduleService {
             failureCount: schedule?.failureCount ?? 0,
             maxFailureBeforePause:
                 schedule?.maxFailureBeforePause ?? config.subscriptions.getMaxFailureBeforePause(),
+            alwaysCreatePullRequest: schedule?.alwaysCreatePullRequest ?? false,
             allowedCadences: allowances,
             planCode: subscriptionsEnabled ? planCode : undefined,
             subscriptionsEnabled,

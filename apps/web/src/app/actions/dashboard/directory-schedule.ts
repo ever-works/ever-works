@@ -13,6 +13,7 @@ const updateScheduleSchema = z.object({
     cadence: z.nativeEnum(DirectoryScheduleCadence),
     billingMode: z.nativeEnum(DirectoryScheduleBillingMode),
     maxFailureBeforePause: z.number().int().min(1).max(10),
+    alwaysCreatePullRequest: z.boolean().optional(),
 });
 
 export async function updateDirectorySchedule(

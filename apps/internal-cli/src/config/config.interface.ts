@@ -48,17 +48,6 @@ export interface EverWorksConfig {
     OLLAMA_MAX_TOKENS?: string;
     OLLAMA_BASE_URL?: string;
 
-    MISTRAL_API_KEY?: string;
-    MISTRAL_MODEL?: string;
-    MISTRAL_TEMPERATURE?: string;
-    MISTRAL_MAX_TOKENS?: string;
-
-    DEEPSEEK_API_KEY?: string;
-    DEEPSEEK_MODEL?: string;
-    DEEPSEEK_TEMPERATURE?: string;
-    DEEPSEEK_MAX_TOKENS?: string;
-    DEEPSEEK_BASE_URL?: string;
-
     GROQ_API_KEY?: string;
     GROQ_MODEL?: string;
     GROQ_TEMPERATURE?: string;
@@ -66,7 +55,7 @@ export interface EverWorksConfig {
 
     // Search Services
     EXTRACT_CONTENT_SERVICE: 'tavily' | 'local';
-    WEB_SEARCH_SERVICE: 'tavily' | 'google-sr';
+    WEB_SEARCH_SERVICE: 'tavily';
     TAVILY_API_KEY?: string;
 
     // Database Configuration (for future use)

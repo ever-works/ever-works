@@ -3,7 +3,7 @@ import { BasePromptService } from '@packages/cli-shared';
 
 export interface SearchServiceConfig {
     extractContentService: 'tavily' | 'local';
-    webSearchService: 'tavily' | 'google-sr';
+    webSearchService: 'tavily';
     tavilyApiKey?: string;
 }
 
@@ -42,10 +42,6 @@ export class SearchServicePromptService extends BasePromptService {
                 {
                     name: 'Tavily (Recommended) - AI-powered search with high-quality results',
                     value: 'tavily' as const,
-                },
-                {
-                    name: 'Google Search Results - Basic web search (no API key required)',
-                    value: 'google-sr' as const,
                 },
             ],
             existingConfig?.WEB_SEARCH_SERVICE,

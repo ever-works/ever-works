@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigDto } from '../dto/create-items-generator.dto';
 import { WebPageData, RelevanceAssessment } from '../interfaces/items-generator.interfaces';
-import { AiService } from 'src/ai';
+import { AiService, TaskComplexity } from 'src/ai';
 import z from 'zod';
 import { IPipelineStep, GenerationContext } from '../interfaces/pipeline.interface';
 import { ItemsGeneratorStep } from '../constants/steps';
@@ -133,6 +133,10 @@ export class ContentFilteringService implements IPipelineStep {
                         topic_description: topicDescription,
                         snippet_length: String(snippet.length),
                         snippet,
+                    },
+                    routing: {
+                        complexity: TaskComplexity.MEDIUM,
+                        taskId: 'content-filtering',
                     },
                 });
 

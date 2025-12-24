@@ -116,9 +116,8 @@ export class SwitchAiSubCommand extends CommandRunner {
             'ANTHROPIC',
             'OPENROUTER',
             'OLLAMA',
-            'MISTRAL',
-            'DEEPSEEK',
             'GROQ',
+            'CUSTOM',
         ];
 
         for (const provider of providerKeys) {

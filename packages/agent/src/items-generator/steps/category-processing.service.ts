@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { ItemData, Category, Tag, CreateItemsGeneratorDto, Brand } from '../dto';
 import { slugifyText, unSlugifyText } from '../utils/text.utils';
 import { getErrorMessage, getErrorStack } from '../utils/error.util';
-import { AiService } from 'src/ai';
+import { AiService, TaskComplexity } from 'src/ai';
 import { itemDataWithCategoriesAndTagsSchema } from '../schemas/item-extraction.schemas';
 import { IPipelineStep, GenerationContext } from '../interfaces/pipeline.interface';
 import { ItemsGeneratorStep } from '../constants/steps';
@@ -330,12 +330,20 @@ export class CategoryProcessingService implements IPipelineStep {
                           existing_tags: tagsText,
                           category_metrics: JSON.stringify(initialCategoryMetrics),
                       },
+                      routing: {
+                          complexity: TaskComplexity.MEDIUM,
+                          taskId: 'category-processing',
+                      },
                   })
                 : await this.aiService.askJson(CATEGORY_PROMPT, categorizeOutputSchema, {
                       temperature: 0.3,
                       variables: {
                           task: prompt,
                           items: JSON.stringify(items),
+                      },
+                      routing: {
+                          complexity: TaskComplexity.MEDIUM,
+                          taskId: 'category-processing',
                       },
                   });
 
@@ -420,6 +428,10 @@ export class CategoryProcessingService implements IPipelineStep {
                             category_metrics: JSON.stringify(categoryMetrics),
                             existing_categories: categoriesText,
                             existing_tags: tagsText,
+                        },
+                        routing: {
+                            complexity: TaskComplexity.MEDIUM,
+                            taskId: 'category-processing-batch',
                         },
                     },
                 );

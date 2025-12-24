@@ -54,7 +54,7 @@ export class ConfigDto {
     @IsInt()
     @Min(1)
     @Max(100) // Sensible upper limit
-    max_results_per_query: number = 20;
+    max_results_per_query: number = 5;
 
     @IsOptional()
     @IsInt()
@@ -70,11 +70,11 @@ export class ConfigDto {
     @IsOptional()
     @IsInt()
     @Min(0)
-    min_content_length_for_extraction: number = 300;
+    min_content_length_for_extraction: number = 100;
 
     @IsOptional()
     @IsBoolean()
-    ai_first_generation_enabled: boolean = true;
+    ai_first_generation_enabled: boolean = false;
 
     @IsOptional()
     @IsBoolean()
