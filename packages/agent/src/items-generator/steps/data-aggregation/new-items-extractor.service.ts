@@ -187,6 +187,9 @@ export class NewItemsExtractorService {
                     extractedChunks = extractedChunks.concat(extractedChunk);
 
                     totalProcessed += chunk.length;
+                    this.logger.log(
+                        `Progress: ${totalProcessed}/${newItems.length} items processed`,
+                    );
 
                     // Add a small delay between chunks to avoid rate limiting
                     if (i < chunks.length - 1) {
