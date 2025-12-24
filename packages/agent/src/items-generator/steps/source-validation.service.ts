@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import axios from 'axios';
 import { z } from 'zod';
 import { ItemData, ConfigDto } from '../dto';
-import { AiService } from 'src/ai';
+import { AiService, TaskComplexity } from 'src/ai';
 import { SearchService } from '../shared';
 import { IPipelineStep, GenerationContext } from '../interfaces/pipeline.interface';
 import { ItemsGeneratorStep } from '../constants/steps';
@@ -320,6 +320,10 @@ export class SourceValidationService implements IPipelineStep {
                         itemDescription,
                         candidateUrl,
                         pageContent: partialContent,
+                    },
+                    routing: {
+                        complexity: TaskComplexity.SIMPLE,
+                        taskId: 'source-validation',
                     },
                 },
             );

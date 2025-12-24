@@ -22,6 +22,7 @@ export interface DirectoryScheduleDto {
     lastRunStatus: GenerateStatusType | null;
     failureCount: number;
     maxFailureBeforePause: number;
+    alwaysCreatePullRequest: boolean;
     allowedCadences: DirectoryScheduleAllowedCadence[];
     planCode?: string;
     subscriptionsEnabled: boolean;
@@ -45,4 +46,8 @@ export class UpdateDirectoryScheduleDto {
     @Min(1)
     @Max(10)
     maxFailureBeforePause?: number;
+
+    @IsOptional()
+    @IsBoolean()
+    alwaysCreatePullRequest?: boolean;
 }

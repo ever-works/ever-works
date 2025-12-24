@@ -35,16 +35,16 @@
 		"@commitlint/cli": "^19.8.1",
 		"@commitlint/config-conventional": "^19.8.1",
 		"husky": "^9.1.7",
-		"prettier": "^3.6.2",
+		"prettier": "^3.7.4",
 		"prettier-eslint-cli": "^8.0.1",
 		"prettier-plugin-tailwindcss": "^0.5.14",
-		"turbo": "^2.6.3"
+		"turbo": "^2.7.2"
 	},
 	"engines": {
 		"node": ">=20",
 		"pnpm": ">=9.9.0"
 	},
-	"packageManager": "pnpm@10.24.0",
+	"packageManager": "pnpm@10.26.1",
 	"prettier": {
 		"printWidth": 120,
 		"singleQuote": true,

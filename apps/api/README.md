@@ -154,7 +154,7 @@ To generate data and create a GitHub repository for the directory, send a POST r
         "max_pages_to_process": 10,
         "relevance_threshold_content": 0.5,
         "min_content_length_for_extraction": 300,
-        "prompt_comparison_confidence_threshold": 0.6,
+        "prompt_comparison_confidence_threshold": 0.5,
         "content_filtering_enabled": false,
         "ai_first_generation_enabled": true
     }

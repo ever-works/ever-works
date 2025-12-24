@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { formatDate } from 'date-fns';
 import { CreateItemsGeneratorDto } from '../dto/create-items-generator.dto';
-import { AiService } from 'src/ai';
+import { AiService, TaskComplexity } from 'src/ai';
 import { IPipelineStep, GenerationContext } from '../interfaces/pipeline.interface';
 import { ItemsGeneratorStep } from '../constants/steps';
 import z from 'zod';
@@ -100,6 +100,10 @@ export class SearchQueryGenerationService implements IPipelineStep {
                         keywords: keywords.length ? keywords.join(', ') : 'N/A',
                         date: `${formatDate(now, 'cccc')} ${formatDate(now, 'yyyy-MM-dd HH:mm')}`,
                         query_count: String(config.max_search_queries * 2),
+                    },
+                    routing: {
+                        complexity: TaskComplexity.SIMPLE,
+                        taskId: 'search-query-generation',
                     },
                 },
             );

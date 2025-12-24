@@ -85,12 +85,12 @@ export class UpdateSubCommand extends CommandRunner {
                 const user = await this.userRepository.createOrGetLocalUser();
 
                 // Call the agent service method directly
-                const result = await this.directoryGenerationService.updateItemsGenerator(
-                    directory.id,
-                    updateOptions,
+                const result = await this.directoryGenerationService.updateItemsGenerator({
+                    directoryId: directory.id,
+                    updateDto: updateOptions,
                     user,
-                    true,
-                );
+                    awaitCompletion: true,
+                });
 
                 spinner.stop();
 

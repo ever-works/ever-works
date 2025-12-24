@@ -71,7 +71,6 @@ export interface IDataConfig {
     pagination?: PaginationConfig;
     metadata?: {
         initial_prompt?: string;
-        generation_method?: GenerationMethod;
         pr_update?: PRUpdate | null;
         last_request_data?: CreateItemsGeneratorDto;
     } & (Record<string, any> & {});

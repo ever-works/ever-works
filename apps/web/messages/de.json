@@ -843,8 +843,96 @@
                 }
             },
             "schedule": {
+                "page": {
+                    "title": "Geplante Aktualisierungen",
+                    "subtitle": "Automatisieren Sie Aktualisierungen für {name} mit einem dedizierten Rhythmus und Fehlerbehandlung.",
+                    "fallbackName": "dieses Verzeichnis"
+                },
                 "card": {
-                    "requiresGeneration": "Run at least one item generation before enabling schedules."
+                    "title": "Automatisierung",
+                    "subtitle": {
+                        "enabled": "Passen Sie Rhythmus, Abrechnung und Schutzmaßnahmen an, damit geplante Aktualisierungen zuverlässig bleiben.",
+                        "disabled": "Automatisieren Sie Aktualisierungen ohne Abonnementbeschränkungen – legen Sie Rhythmus und Fehlerschutz frei fest."
+                    },
+                    "summary": {
+                        "status": "Status",
+                        "nextRun": "Nächste Ausführung",
+                        "lastRun": "Letzte Ausführung",
+                        "failures": "Fehler",
+                        "notScheduled": "Nicht geplant",
+                        "never": "Nie",
+                        "statusMap": {
+                            "active": "Automatisierung aktiv",
+                            "paused": "Pausiert",
+                            "canceled": "Abgebrochen",
+                            "disabled": "Deaktiviert"
+                        }
+                    },
+                    "fields": {
+                        "automation": "Automatisierung",
+                        "automationHelp": "Pausieren, um zukünftige Ausführungen vorübergehend zu stoppen.",
+                        "billing": "Abrechnungsmodus",
+                        "billingHelp": "Abonnements ermöglichen unbegrenzte Ausführungen. Pay-per-Use berechnet pro Ausführung.",
+                        "cadence": "Rhythmus",
+                        "cadenceHelp": "Aktueller Plan: {plan}",
+                        "cadenceOpen": "Alle Rhythmen sind verfügbar, während Abonnements deaktiviert sind.",
+                        "maxFailures": "Fehlerlimit",
+                        "maxFailuresHelp": "Automatisch pausieren, sobald diese Anzahl von Fehlern auftritt.",
+                        "createPullRequest": "Pull Requests erstellen",
+                        "createPullRequestHelp": "Wenn aktiviert, erstellen geplante Aktualisierungen einen Pull Request anstatt direkt zu committen."
+                    },
+                    "billing": {
+                        "subscription": "Abonnement",
+                        "usage": "Pay-per-Use"
+                    },
+                    "cadence": {
+                        "hourly": "Stündlich",
+                        "daily": "Täglich",
+                        "weekly": "Wöchentlich",
+                        "monthly": "Monatlich"
+                    },
+                    "plans": {
+                        "free": "Kostenlos",
+                        "standard": "Standard",
+                        "premium": "Premium",
+                        "unmetered": "Unbegrenzt"
+                    },
+                    "usageRequired": "Wechseln Sie zu Pay-per-Use, um diesen Rhythmus zu nutzen.",
+                    "cadenceAllowed": "Rhythmus in Ihrem Plan erlaubt.",
+                    "actions": {
+                        "save": "Änderungen speichern",
+                        "saving": "Speichern...",
+                        "runNow": "Jetzt ausführen",
+                        "starting": "Starten...",
+                        "cancel": "Zeitplan abbrechen",
+                        "cancelling": "Abbrechen..."
+                    },
+                    "success": {
+                        "saved": "Zeitplan gespeichert.",
+                        "runStarted": "Geplante Ausführung gestartet.",
+                        "cancelled": "Zeitplan abgebrochen."
+                    },
+                    "errors": {
+                        "requireUsage": "Aktivieren Sie Pay-per-Use-Abrechnung, um diesen Rhythmus zu nutzen.",
+                        "updateFailed": "Zeitplan konnte nicht aktualisiert werden.",
+                        "runFailed": "Ausführung konnte nicht gestartet werden.",
+                        "cancelFailed": "Zeitplan konnte nicht abgebrochen werden."
+                    },
+                    "empty": {
+                        "title": "Führen Sie zuerst eine manuelle Generierung durch",
+                        "description": "Schließen Sie eine erfolgreiche manuelle Ausführung ab, um die automatische Planung freizuschalten. Sobald Ihr Verzeichnis Daten enthält, können wir es für Sie aktuell halten.",
+                        "refresh": "Status aktualisieren"
+                    },
+                    "requiresGeneration": "Führen Sie mindestens eine Elementgenerierung durch, bevor Sie Zeitpläne aktivieren."
+                },
+                "actions": {
+                    "invalid": "Ungültige Daten",
+                    "updated": "Zeitplan aktualisiert.",
+                    "updateFailed": "Zeitplan konnte nicht aktualisiert werden.",
+                    "runStarted": "Geplante Ausführung gestartet.",
+                    "runFailed": "Ausführung konnte nicht ausgelöst werden.",
+                    "cancelled": "Zeitplan abgebrochen.",
+                    "cancelFailed": "Zeitplan konnte nicht abgebrochen werden."
                 }
             }
         },

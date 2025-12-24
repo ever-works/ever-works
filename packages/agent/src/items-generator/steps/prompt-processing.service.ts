@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { z } from 'zod';
-import { AiService } from 'src/ai';
+import { AiService, TaskComplexity } from 'src/ai';
 import { IPipelineStep, GenerationContext } from '../interfaces/pipeline.interface';
 import { ItemsGeneratorStep } from '../constants/steps';
 import { GenerationMethod } from '../dto';
@@ -209,6 +209,10 @@ export class PromptProcessingService implements IPipelineStep {
                 {
                     temperature: 0,
                     variables: { user_prompt: prompt },
+                    routing: {
+                        complexity: TaskComplexity.SIMPLE,
+                        taskId: 'prompt-processing',
+                    },
                 },
             );
 
