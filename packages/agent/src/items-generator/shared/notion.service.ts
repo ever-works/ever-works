@@ -859,7 +859,6 @@ export class NotionService {
             throw new Error(`Could not extract Page ID from URL: ${url}`);
         }
 
-        this.logger.log(`Extracting content from Notion page ID: ${pageId}`);
         return await this.extractTextWithNotionAPI(pageId);
     }
 }

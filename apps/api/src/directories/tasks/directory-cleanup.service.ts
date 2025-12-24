@@ -5,6 +5,7 @@ import { CacheEntryRepository } from '@packages/agent/cache';
 import { DirectoryRepository } from '@packages/agent/database';
 import { Directory, GenerateStatusType } from '@packages/agent/entities';
 import { DirectoryGenerationCompletedEvent } from '@packages/agent/events';
+import { config } from '@src/config/constants';
 
 @Injectable()
 export class DirectoryCleanupService {
@@ -19,10 +20,13 @@ export class DirectoryCleanupService {
     @Cron(CronExpression.EVERY_10_MINUTES)
     async handleStalledGenerations() {
         try {
-            const oneHourAgo = new Date();
-            oneHourAgo.setHours(oneHourAgo.getHours() - 1);
+            const staleThreshold = new Date();
+            staleThreshold.setHours(
+                staleThreshold.getHours() - config.directory.staleTimeoutHours(),
+            );
 
-            const stalledDirectories = await this.repository.getUnfinishedGenerations(oneHourAgo);
+            const stalledDirectories =
+                await this.repository.getUnfinishedGenerations(staleThreshold);
 
             if (stalledDirectories.length > 0) {
                 this.logger.log(`Found ${stalledDirectories.length} stalled generation(s)`);
