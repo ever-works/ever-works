@@ -36,7 +36,6 @@ export class NewItemsExtractorService {
         );
 
         // Phase 1: Fast manual deduplication using multiple strategies
-        this.logger.log('Phase 1: Performing fast manual deduplication...');
         const manuallyFiltered = this.sharedUtils.filterNewItemsManually(existingItems, newItems);
 
         const manualFilteredCount = newItems.length - manuallyFiltered.length;
@@ -53,8 +52,6 @@ export class NewItemsExtractorService {
         }
 
         // Phase 2: AI-based deduplication for remaining items
-        this.logger.log('Phase 2: Performing AI-based deduplication for remaining items...');
-
         // For small arrays, process directly
         if (manuallyFiltered.length <= this.sharedUtils.MAX_CLUSTER_SIZE) {
             const result = await this.processSingleExtractionBatch(
@@ -90,8 +87,8 @@ export class NewItemsExtractorService {
                 40, // Limit to 40 most relevant existing items
             );
 
-            this.logger.log(
-                `AI processing: comparing ${newItems.length} new items against ${relevantExistingItems.length} relevant existing items (filtered from ${existingItems.length} total)`,
+            this.logger.debug(
+                `AI processing: comparing ${newItems.length} new items against ${relevantExistingItems.length} relevant existing items`,
             );
 
             const { result, usage, cost } = await this.aiService.askJson(
@@ -178,7 +175,7 @@ export class NewItemsExtractorService {
                 // Process each chunk
                 for (let i = 0; i < chunks.length; i++) {
                     const chunk = chunks[i];
-                    this.logger.log(
+                    this.logger.debug(
                         `Processing group ${groupIndex + 1}/${groupedItems.length}, chunk ${i + 1}/${chunks.length} (${chunk.length} items)`,
                     );
 
@@ -191,10 +188,6 @@ export class NewItemsExtractorService {
 
                     totalProcessed += chunk.length;
 
-                    this.logger.log(
-                        `Progress: ${totalProcessed}/${newItems.length} items processed`,
-                    );
-
                     // Add a small delay between chunks to avoid rate limiting
                     if (i < chunks.length - 1) {
                         await this.sharedUtils.addProcessingDelay(500);
@@ -204,7 +197,7 @@ export class NewItemsExtractorService {
                 extractedItems = extractedItems.concat(extractedChunks);
             } else {
                 // Process small groups directly
-                this.logger.log(
+                this.logger.debug(
                     `Processing group ${groupIndex + 1}/${groupedItems.length} (${group.length} items)`,
                 );
                 const extractedGroup = await this.processSingleExtractionBatchWithRelevantItems(
@@ -215,7 +208,6 @@ export class NewItemsExtractorService {
                 extractedItems = extractedItems.concat(extractedGroup);
 
                 totalProcessed += group.length;
-                this.logger.log(`Progress: ${totalProcessed}/${newItems.length} items processed.`);
             }
 
             // Add a small delay between groups to avoid rate limiting
@@ -242,10 +234,6 @@ export class NewItemsExtractorService {
         metrics?: MetricsAccumulator,
     ): Promise<ItemData[]> {
         try {
-            this.logger.log(
-                `AI processing: comparing ${newItems.length} new items against ${relevantExistingItems.length} pre-filtered relevant existing items`,
-            );
-
             const { result, usage, cost } = await this.aiService.askJson(
                 EXTRACT_NEW_ITEMS_PROMPT,
                 extractedItemsSchema,

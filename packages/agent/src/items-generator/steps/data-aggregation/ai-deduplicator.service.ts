@@ -132,7 +132,7 @@ export class AiDeduplicatorService {
                 // Process each chunk
                 for (let i = 0; i < chunks.length; i++) {
                     const chunk = chunks[i];
-                    this.logger.log(
+                    this.logger.debug(
                         `Processing group ${groupIndex + 1}/${groupedItems.length}, chunk ${i + 1}/${chunks.length} (${chunk.length} items)`,
                     );
 
@@ -144,10 +144,6 @@ export class AiDeduplicatorService {
                     deduplicatedChunks = deduplicatedChunks.concat(deduplicatedChunk);
 
                     totalProcessed += chunk.length;
-                    const elapsedSeconds = (Date.now() - startTime) / 1000;
-                    this.logger.log(
-                        `Progress: ${totalProcessed}/${items.length} items processed in ${elapsedSeconds.toFixed(1)}s`,
-                    );
 
                     // Add a small delay between chunks to avoid rate limiting
                     if (i < chunks.length - 1) {
@@ -158,7 +154,7 @@ export class AiDeduplicatorService {
                 processedItems = processedItems.concat(deduplicatedChunks);
             } else {
                 // Process small groups directly
-                this.logger.log(
+                this.logger.debug(
                     `Processing group ${groupIndex + 1}/${groupedItems.length} (${group.length} items)`,
                 );
                 const deduplicatedGroup = await this.processSingleDeduplicationBatch(
@@ -169,10 +165,6 @@ export class AiDeduplicatorService {
                 processedItems = processedItems.concat(deduplicatedGroup);
 
                 totalProcessed += group.length;
-                const elapsedSeconds = (Date.now() - startTime) / 1000;
-                this.logger.log(
-                    `Progress: ${totalProcessed}/${items.length} items processed in ${elapsedSeconds.toFixed(1)}s`,
-                );
             }
 
             // Add a small delay between groups to avoid rate limiting

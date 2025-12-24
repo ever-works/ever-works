@@ -57,7 +57,7 @@ export class ModelRouterService {
         );
 
         if (this.config.logRoutingDecisions) {
-            this.logger.log(
+            this.logger.debug(
                 `[ROUTING] Task: ${options.taskId ?? 'unknown'} | Complexity: ${complexity} | ` +
                     `Tier: ${targetTier} | Selected: ${selectedConfig.provider}/${selectedConfig.model}`,
             );

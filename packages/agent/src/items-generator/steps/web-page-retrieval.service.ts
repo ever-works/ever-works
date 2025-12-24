@@ -30,7 +30,7 @@ export class WebPageRetrievalService implements IPipelineStep {
                 extractedUrls,
                 processedSourceUrls,
             );
-            this.logger.log(
+            this.logger.debug(
                 `[${directory.slug}] Retrieved ${initialWebPages.length} web pages from extracted URLs`,
             );
         }
@@ -79,7 +79,7 @@ export class WebPageRetrievalService implements IPipelineStep {
         const searchPromises = queriesToProcess.map(async (query) => {
             try {
                 const documents = await this.webSearch(query, config);
-                this.logger.log(
+                this.logger.debug(
                     `[${slug}] Found ${documents.length} results for query: "${query}"`,
                 );
                 return { query, documents, success: true };
@@ -128,7 +128,9 @@ export class WebPageRetrievalService implements IPipelineStep {
             }
         }
 
-        this.logger.log(`[${slug}] Found ${urlsToFetch.length} unique URLs to fetch content from`);
+        this.logger.debug(
+            `[${slug}] Found ${urlsToFetch.length} unique URLs to fetch content from`,
+        );
 
         // Limit the number of URLs to process based on config
         const urlsToProcess = urlsToFetch.slice(0, config.max_pages_to_process);
@@ -195,7 +197,7 @@ export class WebPageRetrievalService implements IPipelineStep {
         const allFetchedPages: WebPageData[] = [];
 
         if (dedupedUrls.length === 0) {
-            this.logger.log(`[${slug}] All URLs have already been processed. Skipping.`);
+            this.logger.debug(`[${slug}] All URLs have already been processed. Skipping.`);
             return [];
         }
 
@@ -217,7 +219,7 @@ export class WebPageRetrievalService implements IPipelineStep {
 
         // Process Notion URLs
         if (notionUrls.length > 0) {
-            this.logger.log(`[${slug}] Processing ${notionUrls.length} Notion URLs`);
+            this.logger.debug(`[${slug}] Processing ${notionUrls.length} Notion URLs`);
 
             for (const url of notionUrls) {
                 try {
@@ -231,10 +233,6 @@ export class WebPageRetrievalService implements IPipelineStep {
                         raw_content: content,
                         retrieved_at: new Date().toISOString(),
                     });
-
-                    this.logger.log(
-                        `[${slug}] Successfully extracted content from Notion URL: ${url}`,
-                    );
                 } catch (error) {
                     this.logger.error(
                         `[${slug}] Error extracting content from Notion URL ${url}: ${error.message}`,
@@ -245,7 +243,7 @@ export class WebPageRetrievalService implements IPipelineStep {
 
         // Process regular URLs
         if (regularUrls.length > 0) {
-            this.logger.log(`[${slug}] Processing ${regularUrls.length} regular URLs`);
+            this.logger.debug(`[${slug}] Processing ${regularUrls.length} regular URLs`);
             const tavilyResults = await this.processUrls(slug, regularUrls, processedSourceUrls);
             allFetchedPages.push(...tavilyResults);
         }
@@ -267,7 +265,7 @@ export class WebPageRetrievalService implements IPipelineStep {
     ): Promise<WebPageData[]> {
         const allFetchedPages: WebPageData[] = [];
 
-        this.logger.log(`[${slug}] Processing ${urls.length} URLs`);
+        this.logger.debug(`[${slug}] Processing ${urls.length} URLs`);
 
         for (let i = 0; i < urls.length; i += this.BATCH_SIZE) {
             const batch = urls.slice(i, i + this.BATCH_SIZE);

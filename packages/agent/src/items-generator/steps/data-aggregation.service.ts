@@ -38,7 +38,7 @@ export class DataAggregationService implements IPipelineStep {
 
         // Combine AI-generated items and web-extracted items
         const allDiscoveredItems = [...initialAiItems, ...extractedWebItems];
-        this.logger.log(
+        this.logger.debug(
             `[${directory.slug}] Total discovered items (AI + Web before source validation): ${allDiscoveredItems.length}.`,
         );
 
@@ -76,13 +76,13 @@ export class DataAggregationService implements IPipelineStep {
         // Use provided metrics or create a new accumulator
         const metrics: MetricsAccumulator = inputMetrics ?? {};
 
-        this.logger.log(`[${directorySlug}] Starting data aggregation and deduplication.`);
+        this.logger.debug(`[${directorySlug}] Starting data aggregation and deduplication.`);
 
         // Track metrics
         let newItemsAddedToStoreCount = 0;
 
         // Deduplicate by fields first (faster than AI)
-        this.logger.log(`[${directorySlug}] Deduplicating items by fields`);
+        this.logger.debug(`[${directorySlug}] Deduplicating items by fields`);
         let deduplicated = this.sharedUtils.deduplicateByField(
             this.sharedUtils.deduplicateByField(newlyExtractedItemsThisRun, 'slug'),
             'source_url',
@@ -94,7 +94,7 @@ export class DataAggregationService implements IPipelineStep {
 
         // Extract new items (if we have existing items)
         if (existingItems.length > 0 && deduplicated.length > 0) {
-            this.logger.log(`[${directorySlug}] Extracting new items.`);
+            this.logger.debug(`[${directorySlug}] Extracting new items.`);
             const previousCount = deduplicated.length;
 
             deduplicated = await this.newItemsExtractor.extractNewItems(
@@ -111,7 +111,7 @@ export class DataAggregationService implements IPipelineStep {
 
         // Deduplicate with AI (more sophisticated)
         if (deduplicated.length > 0) {
-            this.logger.log(`[${directorySlug}] Deduplicating items with AI.`);
+            this.logger.debug(`[${directorySlug}] Deduplicating items with AI.`);
             deduplicated = await this.aiDeduplicator.deduplicateWithAI(
                 prompt,
                 deduplicated,

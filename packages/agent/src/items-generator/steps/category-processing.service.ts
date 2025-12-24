@@ -454,9 +454,8 @@ export class CategoryProcessingService implements IPipelineStep {
                     }
                 });
 
-                this.logger.log(
-                    `Batch ${batchNumber} complete. Category metrics: ${JSON.stringify(categoryMetrics)} ` +
-                        `Existing tags count: ${existingTags.size}`,
+                this.logger.debug(
+                    `Batch ${batchNumber} complete. Categories: ${existingCategories.size}, Tags: ${existingTags.size}`,
                 );
 
                 allCategorizedItems.push(...batchResults);

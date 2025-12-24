@@ -118,8 +118,6 @@ export class ContentFilteringService implements IPipelineStep {
             error?: any;
         }> => {
             try {
-                this.logger.log(`[${directorySlug}] Assessing relevance for: ${page.source_url}`);
-
                 const snippet = this.buildSnippet(page.raw_content);
 
                 const {
@@ -145,16 +143,6 @@ export class ContentFilteringService implements IPipelineStep {
                 const isRelevant =
                     assessmentResult.relevant &&
                     assessmentResult.relevance_score >= config.relevance_threshold_content;
-
-                if (isRelevant) {
-                    this.logger.log(
-                        `[${directorySlug}] Relevant page (Score: ${assessmentResult.relevance_score}): ${page.source_url} - Reason: ${assessmentResult.reason}`,
-                    );
-                } else {
-                    this.logger.log(
-                        `[${directorySlug}] Discarding page (Not relevant/Score too low: ${assessmentResult.relevance_score}): ${page.source_url} - Reason: ${assessmentResult.reason}`,
-                    );
-                }
 
                 return { page, isRelevant, assessment: assessmentResult };
             } catch (error) {
