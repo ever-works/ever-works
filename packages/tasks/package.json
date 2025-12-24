@@ -12,12 +12,12 @@
         "deploy:trigger": "npx trigger.dev@latest deploy"
     },
     "dependencies": {
-        "@nestjs/cache-manager": "^3.0.1",
-        "@nestjs/common": "^11.1.8",
-        "@nestjs/core": "^11.1.8",
+        "@nestjs/cache-manager": "^3.1.0",
+        "@nestjs/common": "^11.1.10",
+        "@nestjs/core": "^11.1.10",
         "@nestjs/event-emitter": "^3.0.1",
-        "@nestjs/platform-express": "^11.1.8",
-        "@nestjs/websockets": "^11.1.9",
+        "@nestjs/platform-express": "^11.1.10",
+        "@nestjs/websockets": "^11.1.10",
         "@packages/agent": "workspace:*",
         "@trigger.dev/sdk": "^4.3.1",
         "class-transformer": "^0.5.1",
@@ -26,7 +26,7 @@
     },
     "devDependencies": {
         "@trigger.dev/build": "^4.3.1",
-        "@types/node": "^22.19.0",
+        "@types/node": "^22.19.3",
         "typescript": "^5.9.3"
     }
 }
