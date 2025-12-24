@@ -30,6 +30,7 @@ export function PrUpdateInfo({
                     <Button
                         href={mainPR?.url || '#'}
                         target="_blank"
+                        variant="unstyled"
                         rel="noopener noreferrer"
                         className={cn(
                             'text-sm',

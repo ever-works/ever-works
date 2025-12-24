@@ -93,4 +93,8 @@ export const config = {
             return process.env.GH_CALLBACK_URL || `${webUrl}/api/auth/github/callback`;
         },
     },
+
+    directory: {
+        staleTimeoutHours: () => parseInt(process.env.DIRECTORY_STALE_TIMEOUT_HOURS || '2', 10),
+    },
 };

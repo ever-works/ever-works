@@ -208,8 +208,6 @@ export class ItemsGeneratorService {
      * @returns The item with markdown content
      */
     async generateMarkdownForItem(item: ItemData): Promise<ItemData> {
-        this.logger.log(`Generating markdown for item: ${item.name}`);
-
         try {
             const markdown = await this.markdownGenerationService.generateMarkdown(item);
 
@@ -236,8 +234,6 @@ export class ItemsGeneratorService {
      * @returns The item with badges
      */
     async processSingleItemBadges(item: ItemData): Promise<ItemData> {
-        this.logger.log(`Processing badges for item: ${item.name}`);
-
         try {
             return await this.badgeProcessingService.processSingleItemBadges(item);
         } catch (error) {
@@ -290,8 +286,6 @@ export class ItemsGeneratorService {
         sourceUrl: string,
         existingCategories: string[] = [],
     ): Promise<ItemData | null> {
-        this.logger.log(`Extracting item details from URL: ${sourceUrl}`);
-
         try {
             // 1. Retrieve web page content
             const webPages = await this.webPageRetrievalService.retrieveSpecificUrls(
@@ -365,7 +359,6 @@ export class ItemsGeneratorService {
             // // 6. Process badges for the item
             // item = await this.processSingleItemBadges(item);
 
-            this.logger.log(`Successfully extracted item: ${item.name} from ${sourceUrl}`);
             return item;
         } catch (error) {
             this.logger.error(`Error extracting item details from ${sourceUrl}:`, error);

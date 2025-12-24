@@ -58,9 +58,7 @@ export class SetupSubCommand extends CommandRunner {
                 ]);
 
                 if (!overwrite) {
-                    console.log(
-                        chalk.blue('ℹ Setup cancelled. Existing configuration preserved.'),
-                    );
+                    console.log(chalk.blue('ℹ Setup cancelled. Existing configuration preserved.'));
                     console.log(chalk.gray('To modify specific settings, you can:'));
                     console.log(chalk.gray('  • Edit the config file manually'));
                     console.log(
@@ -76,9 +74,7 @@ export class SetupSubCommand extends CommandRunner {
                     return;
                 }
 
-                console.log(
-                    chalk.blue('ℹ Using existing values as defaults where available...\n'),
-                );
+                console.log(chalk.blue('ℹ Using existing values as defaults where available...\n'));
             }
 
             // Start configuration process
