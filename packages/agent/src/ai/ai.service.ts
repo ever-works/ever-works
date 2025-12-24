@@ -3,7 +3,7 @@ import { HumanMessage } from '@langchain/core/messages';
 import { z } from 'zod';
 
 // AI Providers
-import { ChatOpenAI, ChatOpenAIFields, OpenAIEmbeddings } from '@langchain/openai';
+import { ChatOpenAI, OpenAIEmbeddings } from '@langchain/openai';
 import { Embeddings } from '@langchain/core/embeddings';
 import {
     AiProviderType,
@@ -15,8 +15,13 @@ import {
 import { config } from '@src/config';
 import { TokenUsage, TokenUsageTracker } from './token-usage.tracker';
 import { ModelRouterService, RoutingOptions, RoutingDecision } from './model-router';
+import {
+    getOpenAIReasoningConfig,
+    getOpenRouterReasoningConfig,
+    getGoogleReasoningConfig,
+    getGroqReasoningConfig,
+} from './reasoning.utils';
 
-// Cache TTL for provider health checks (5 minutes)
 const HEALTH_CHECK_CACHE_TTL_MS = 5 * 60 * 1000;
 
 type HealthCheckResult = {
@@ -385,13 +390,15 @@ export class AiService {
         config.maxTokens = config.maxTokens || defaultConfig?.maxTokens || 4096;
         config.baseURL = config.baseURL || defaultConfig?.baseURL || '';
 
-        const commonOptions: ChatOpenAIFields = {
+        const openaiConfig = getOpenAIReasoningConfig(config.modelName);
+        const openrouterConfig = getOpenRouterReasoningConfig(config.modelName);
+        const googleConfig = getGoogleReasoningConfig(config.modelName);
+        const groqConfig = getGroqReasoningConfig(config.modelName);
+
+        const commonOptions = {
             apiKey: config.apiKey,
             temperature: config.temperature,
             maxTokens: config.maxTokens,
-            reasoning: {
-                effort: 'low',
-            },
         };
 
         switch (config.type) {
@@ -399,68 +406,52 @@ export class AiService {
                 return new ChatOpenAI({
                     ...commonOptions,
                     model: config.modelName,
+                    ...(openaiConfig && { modelKwargs: openaiConfig }),
                 });
 
             case 'openrouter':
                 return new ChatOpenAI({
                     ...commonOptions,
                     model: config.modelName,
-                    configuration: {
-                        baseURL: config.baseURL,
-                    },
+                    configuration: { baseURL: config.baseURL },
+                    ...(openrouterConfig && { modelKwargs: openrouterConfig }),
                 });
 
             case 'ollama':
                 return new ChatOpenAI({
                     ...commonOptions,
                     model: config.modelName,
-                    configuration: {
-                        baseURL: config.baseURL,
-                    },
+                    configuration: { baseURL: config.baseURL },
                 });
 
             case 'google':
                 return new ChatOpenAI({
                     ...commonOptions,
                     model: config.modelName,
-                    configuration: {
-                        baseURL: config.baseURL,
-                        extra_body: {
-                            google: {
-                                thinking_config: {
-                                    thinking_budget: 0,
-                                    include_thoughts: false,
-                                },
-                            },
-                        },
-                    } as any,
+                    configuration: { baseURL: config.baseURL },
+                    ...(googleConfig && { modelKwargs: googleConfig }),
                 });
 
             case 'anthropic':
                 return new ChatOpenAI({
                     ...commonOptions,
                     model: config.modelName,
-                    configuration: {
-                        baseURL: config.baseURL,
-                    },
+                    configuration: { baseURL: config.baseURL },
                 });
 
             case 'groq':
                 return new ChatOpenAI({
                     ...commonOptions,
                     model: config.modelName,
-                    configuration: {
-                        baseURL: config.baseURL,
-                    },
+                    configuration: { baseURL: config.baseURL },
+                    ...(groqConfig && { modelKwargs: groqConfig }),
                 });
 
             case 'custom':
                 return new ChatOpenAI({
                     ...commonOptions,
                     model: config.modelName,
-                    configuration: {
-                        baseURL: config.baseURL,
-                    },
+                    configuration: { baseURL: config.baseURL },
                 });
 
             default:
