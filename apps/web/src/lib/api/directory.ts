@@ -258,6 +258,65 @@ export interface SyncDirectoryResponse {
     message?: string;
 }
 
+// Import types
+export type ImportSourceType = 'data_repo' | 'awesome_readme';
+
+export interface AnalyzeRepositoryDto {
+    sourceUrl: string;
+}
+
+export interface AnalyzeRepositoryResponseDto {
+    sourceUrl: string;
+    owner: string;
+    repo: string;
+    detectedType: ImportSourceType | null;
+    isPublic: boolean;
+    requiresAuth: boolean;
+    structure?: {
+        hasConfig: boolean;
+        hasDataFolder: boolean;
+        hasReadme: boolean;
+        itemCount?: number;
+        categoryCount?: number;
+    };
+    error?: string;
+}
+
+export interface ImportDirectoryDto {
+    sourceUrl: string;
+    sourceType: ImportSourceType;
+    name: string;
+    owner?: string;
+    organization?: boolean;
+}
+
+export interface ImportDirectoryResponseDto {
+    status: 'pending' | 'success' | 'error';
+    directoryId?: string;
+    historyId?: string;
+    message: string;
+}
+
+export interface GitHubRepoDto {
+    id: number;
+    name: string;
+    full_name: string;
+    owner: string;
+    description: string | null;
+    html_url: string;
+    private: boolean;
+    updated_at: string;
+    default_branch: string;
+}
+
+export interface GetUserRepositoriesResponseDto {
+    repositories: GitHubRepoDto[];
+    total: number;
+    page: number;
+    perPage: number;
+    hasMore: boolean;
+}
+
 export const directoryAPI = {
     // Get all directories with pagination and search
     getAll: async (options?: { limit?: number; offset?: number; search?: string }) => {
@@ -398,5 +457,36 @@ export const directoryAPI = {
             method: 'POST',
             wrapInData: false,
         });
+    },
+
+    // Import methods
+    analyzeRepository: async (data: AnalyzeRepositoryDto) => {
+        return serverMutation<AnalyzeRepositoryResponseDto>({
+            endpoint: '/directories/import/analyze',
+            data,
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    importDirectory: async (data: ImportDirectoryDto) => {
+        return serverMutation<ImportDirectoryResponseDto>({
+            endpoint: '/directories/import',
+            data,
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    getUserRepositories: async (options?: { page?: number; perPage?: number; search?: string }) => {
+        const params = new URLSearchParams();
+        if (options?.page !== undefined) params.append('page', String(options.page));
+        if (options?.perPage !== undefined) params.append('perPage', String(options.perPage));
+        if (options?.search) params.append('search', options.search);
+        const query = params.toString() ? `?${params.toString()}` : '';
+
+        return serverFetch<GetUserRepositoriesResponseDto>(
+            `/directories/import/repositories${query}`,
+        );
     },
 };

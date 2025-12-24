@@ -782,4 +782,129 @@ export class DataGeneratorService {
 
         return additionalFooter + LEGAL_NOTICE;
     }
+
+    /**
+     * Initialize a data repository with pre-existing imported data.
+     * Used when importing from external sources (data repos or awesome READMEs).
+     */
+    async initializeWithImportedData(
+        directory: Directory,
+        user: User,
+        importedData: {
+            items: ItemData[];
+            categories: Identifiable[];
+            tags: Identifiable[];
+            config?: Record<string, any>;
+        },
+    ): Promise<InitializeResult> {
+        const token = user.getGitToken();
+        const committer = user.asCommitter();
+
+        try {
+            // Create the data repository
+            const repoName = directory.getDataRepo();
+            const repoOwner = directory.getRepoOwner();
+
+            this.logger.log(`Creating data repo: ${repoOwner}/${repoName}`);
+
+            if (directory.organization) {
+                await this.githubService.createEmptyRepoAsOrg(
+                    repoOwner,
+                    repoName,
+                    directory.description,
+                    token,
+                );
+            } else {
+                await this.githubService.createEmptyRepo(repoName, directory.description, token);
+            }
+
+            // Clone the repository
+            const dest = await this.githubService.cloneOrPull({
+                owner: repoOwner,
+                repo: repoName,
+                token,
+                committer,
+            });
+
+            const data = await DataRepository.create(dest);
+            await data.ensureDirectoriesExist();
+
+            // Write categories and tags
+            if (importedData.categories.length > 0) {
+                await data.writeCategories(importedData.categories);
+            }
+            if (importedData.tags.length > 0) {
+                await data.writeTags(importedData.tags);
+            }
+
+            // Write config
+            const configData = {
+                ...importedData.config,
+                metadata: {
+                    ...(importedData.config?.metadata || {}),
+                },
+            };
+            await data.mergeConfig(configData);
+
+            // Write README and LICENSE
+            await data.writeReadme(this.getDefaultReadme(directory));
+            await data.writeLicense(LICENSE_TEXT);
+
+            // Write markdown templates
+            await data.writeMarkdownTemplate(this.getHeader(directory), this.getFooter(directory));
+
+            // Commit metadata files
+            await this.githubService.addAll(data.dir);
+            await this.githubService.commit(
+                data.dir,
+                'init repository with imported data',
+                committer,
+            );
+
+            // Write items
+            const itemsWithSlugs = importedData.items.map((item) => ({
+                ...item,
+                slug: item.slug || slugifyText(item.name),
+            }));
+
+            await pMap(itemsWithSlugs, (item) => this.writeItemToDisk(data, item), {
+                concurrency: PARALLEL_WRITE_CONCURRENCY,
+            });
+
+            // Commit items
+            await this.githubService.addAll(data.dir);
+            await this.githubService.commit(
+                data.dir,
+                `add ${itemsWithSlugs.length} imported items`,
+                committer,
+            );
+
+            // Push to remote
+            await this.githubService.push(dest, token);
+
+            this.logger.log(
+                `Successfully initialized data repo with ${itemsWithSlugs.length} imported items`,
+            );
+
+            return {
+                success: true,
+                prUpdate: null,
+                stats: {
+                    newItemsCount: itemsWithSlugs.length,
+                    updatedItemsCount: 0,
+                    totalItemsCount: itemsWithSlugs.length,
+                },
+            };
+        } catch (error) {
+            this.logger.error('Failed to initialize with imported data', error);
+            return {
+                success: false,
+                error: {
+                    code: 'DATA_REPO_FAILED',
+                    message: error.message || 'Failed to initialize data repository',
+                    cause: error,
+                },
+            };
+        }
+    }
 }

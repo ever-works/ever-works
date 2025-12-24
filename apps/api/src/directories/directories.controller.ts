@@ -34,7 +34,16 @@ import {
     DirectoryLifecycleService,
     DirectoryQueryService,
     DirectoryScheduleService,
+    DirectoryImportService,
 } from '@packages/agent/services';
+import {
+    AnalyzeRepositoryDto,
+    AnalyzeRepositoryResponseDto,
+    ImportDirectoryDto,
+    ImportDirectoryResponseDto,
+    GetUserRepositoriesDto,
+    GetUserRepositoriesResponseDto,
+} from '@packages/agent/dto';
 import { UpdateWebsiteRepositoryResponseDto } from '@packages/agent/website-generator';
 import { AuthService, CurrentUser, JwtAuthGuard } from '../auth';
 import { AuthenticatedUser } from '@src/auth/types/jwt.types';
@@ -56,6 +65,7 @@ export class DirectoriesController {
         private readonly authService: AuthService,
         private readonly directoryDetailService: DirectoryDetailService,
         private readonly directoryScheduleService: DirectoryScheduleService,
+        private readonly directoryImportService: DirectoryImportService,
     ) {}
 
     @Get('directories')
@@ -394,5 +404,48 @@ export class DirectoriesController {
         const user = await this.authService.getUser(auth.userId);
 
         return this.directoryLifecycleService.syncFromDataRepository(id, user);
+    }
+
+    // ============================================
+    // Import endpoints
+    // ============================================
+
+    @Post('directories/import/analyze')
+    @HttpCode(HttpStatus.OK)
+    async analyzeRepository(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Body() analyzeDto: AnalyzeRepositoryDto,
+    ): Promise<AnalyzeRepositoryResponseDto> {
+        const user = await this.authService.getUser(auth.userId);
+        return this.directoryImportService.analyzeRepository(analyzeDto, user);
+    }
+
+    @Post('directories/import')
+    @HttpCode(HttpStatus.ACCEPTED)
+    async importDirectory(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Body() importDto: ImportDirectoryDto,
+    ): Promise<ImportDirectoryResponseDto> {
+        const user = await this.authService.getUser(auth.userId);
+        return this.directoryImportService.initiateImport(importDto, user);
+    }
+
+    @Get('directories/import/repositories')
+    @HttpCode(HttpStatus.OK)
+    async getUserRepositories(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Query('page') page?: string,
+        @Query('perPage') perPage?: string,
+        @Query('search') search?: string,
+    ): Promise<GetUserRepositoriesResponseDto> {
+        const user = await this.authService.getUser(auth.userId);
+
+        const dto: GetUserRepositoriesDto = {
+            page: page ? parseInt(page, 10) : undefined,
+            perPage: perPage ? parseInt(perPage, 10) : undefined,
+            search: search || undefined,
+        };
+
+        return this.directoryImportService.getUserRepositories(dto, user);
     }
 }

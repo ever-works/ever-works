@@ -10,6 +10,9 @@ import {
     DeleteDirectoryDto,
     authAPI,
     SyncDirectoryResponse,
+    AnalyzeRepositoryResponseDto,
+    ImportSourceType,
+    GetUserRepositoriesResponseDto,
 } from '@/lib/api';
 import { getAuthFromCookie } from '@/lib/auth';
 import { checkOAuthConnection } from './oauth';
@@ -416,6 +419,166 @@ export async function getDirectories(params: GetDirectoriesParams = {}) {
             directories: [],
             total: 0,
             error: error instanceof Error ? error.message : t('fetchFailed'),
+        };
+    }
+}
+
+// Import actions
+
+export async function analyzeRepository(sourceUrl: string) {
+    const t = await getTranslations('actions.directories');
+
+    const urlSchema = z.string().url(t('import.invalidUrl'));
+
+    try {
+        const validation = urlSchema.safeParse(sourceUrl);
+        if (!validation.success) {
+            return {
+                success: false,
+                error: validation.error.errors[0].message,
+            };
+        }
+
+        // We need to ensure that oauth connection is valid or revoke it if not
+        await authAPI.oauth_connections.ensureConnection(RepoProvider.GITHUB);
+
+        // Check GitHub connection first
+        const oauthCheck = await checkOAuthConnection(RepoProvider.GITHUB);
+        if (!oauthCheck.connected) {
+            return {
+                success: false,
+                error: t('githubRequired'),
+                requiresGitHub: true,
+            };
+        }
+
+        const result = await directoryAPI.analyzeRepository({ sourceUrl: validation.data });
+
+        return {
+            success: true,
+            data: result as AnalyzeRepositoryResponseDto,
+        };
+    } catch (error) {
+        console.error('Failed to analyze repository:', error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : t('import.analyzeFailed'),
+        };
+    }
+}
+
+interface ImportDirectoryRequest {
+    sourceUrl: string;
+    sourceType: ImportSourceType;
+    name: string;
+    organization?: boolean;
+    owner?: string;
+}
+
+export async function importDirectory(data: ImportDirectoryRequest) {
+    const t = await getTranslations('actions.directories');
+
+    const importSchema = z.object({
+        sourceUrl: z.string().url(t('import.invalidUrl')),
+        sourceType: z.enum(['data_repo', 'awesome_readme']),
+        name: z
+            .string()
+            .min(1, t('name.required'))
+            .transform((val) => sanitizeName(val, 100))
+            .pipe(z.string().max(100, t('name.maxLength'))),
+        organization: z.boolean().optional(),
+        owner: z.string().optional(),
+    });
+
+    try {
+        const validation = importSchema.safeParse(data);
+        if (!validation.success) {
+            return {
+                success: false,
+                error: validation.error.errors[0].message,
+            };
+        }
+
+        // We need to ensure that oauth connection is valid or revoke it if not
+        await authAPI.oauth_connections.ensureConnection(RepoProvider.GITHUB);
+
+        // Check GitHub connection first
+        const oauthCheck = await checkOAuthConnection(RepoProvider.GITHUB);
+        if (!oauthCheck.connected) {
+            return {
+                success: false,
+                error: t('githubRequired'),
+                requiresGitHub: true,
+            };
+        }
+
+        const { organization, owner } = checkOrganization(
+            oauthCheck as ConnectionInfo,
+            validation.data,
+        );
+
+        const result = await directoryAPI.importDirectory({
+            sourceUrl: validation.data.sourceUrl,
+            sourceType: validation.data.sourceType,
+            name: validation.data.name,
+            organization,
+            owner: owner || undefined,
+        });
+
+        return {
+            success: result.status !== 'error',
+            directoryId: result.directoryId,
+            historyId: result.historyId,
+            message: result.message || t('import.started'),
+            error: result.status === 'error' ? result.message : undefined,
+        };
+    } catch (error) {
+        console.error('Failed to import directory:', error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : t('import.failed'),
+        };
+    }
+}
+
+interface GetUserRepositoriesParams {
+    page?: number;
+    perPage?: number;
+    search?: string;
+}
+
+export async function getUserRepositories(params: GetUserRepositoriesParams = {}) {
+    const t = await getTranslations('actions.directories');
+
+    try {
+        // We need to ensure that oauth connection is valid or revoke it if not
+        await authAPI.oauth_connections.ensureConnection(RepoProvider.GITHUB);
+
+        // Check GitHub connection first
+        const oauthCheck = await checkOAuthConnection(RepoProvider.GITHUB);
+        if (!oauthCheck.connected) {
+            return {
+                success: false,
+                error: t('githubRequired'),
+                requiresGitHub: true,
+            };
+        }
+
+        const result = await directoryAPI.getUserRepositories({
+            page: params.page,
+            perPage: params.perPage,
+            search: params.search,
+        });
+
+        return {
+            success: true,
+            data: result as GetUserRepositoriesResponseDto,
+        };
+    } catch (error) {
+        console.error('Failed to fetch user repositories:', error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : t('import.fetchReposFailed'),
         };
     }
 }

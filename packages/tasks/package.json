@@ -8,8 +8,8 @@
     "scripts": {
         "build": "tsc -p tsconfig.json",
         "dev": "tsc -p tsconfig.json --watch",
-        "dev:trigger": "npx trigger.dev@latest dev",
-        "deploy:trigger": "npx trigger.dev@latest deploy"
+        "dev:trigger": "npx trigger.dev@4.3.0 dev",
+        "deploy:trigger": "npx trigger.dev@4.3.0 deploy"
     },
     "dependencies": {
         "@nestjs/cache-manager": "^3.1.0",

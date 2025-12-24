@@ -110,6 +110,10 @@ export class Directory {
     @Column({ nullable: true })
     itemsCount?: number;
 
+    // Import Source FIELDS
+    @Column('simple-json', { nullable: true })
+    sourceRepository?: SourceRepository;
+
     // Website Template Auto-Update FIELDS
     @Column({ type: 'boolean', default: false })
     websiteTemplateAutoUpdate: boolean;
@@ -205,4 +209,14 @@ export interface MarkdownReadmeConfig {
 
     footer?: string;
     overwriteDefaultFooter?: boolean;
+}
+
+export type ImportSourceType = 'data_repo' | 'awesome_readme';
+
+export interface SourceRepository {
+    url: string;
+    owner: string;
+    repo: string;
+    type: ImportSourceType;
+    importedAt: Date;
 }
