@@ -5,6 +5,7 @@ import { User } from '../entities/user.entity';
 import { WEBSITE_TEMPLATE_CONFIG } from './config/website-template.config';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
+import { config } from '@src/config';
 
 @Injectable()
 export class WebsiteUpdateService {
@@ -88,7 +89,9 @@ export class WebsiteUpdateService {
     }> {
         const directoryOwner = directory.user as User;
         const token = directoryOwner.getGitToken();
-        const branch = directory.websiteTemplateUseBeta ? 'stage' : WEBSITE_TEMPLATE_CONFIG.branch;
+        const branch = directory.websiteTemplateUseBeta
+            ? config.websiteTemplate.getBetaBranch()
+            : WEBSITE_TEMPLATE_CONFIG.branch;
 
         const latestCommit = await this.githubService.getLatestCommit(
             WEBSITE_TEMPLATE_CONFIG.owner,

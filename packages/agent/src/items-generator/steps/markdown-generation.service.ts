@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { z } from 'zod';
-import { AiService } from 'src/ai';
+import { AiService, TaskComplexity } from 'src/ai';
 import { SearchService } from '../shared';
 import { ItemData } from '../dto';
 import { accumulateMetrics, MetricsAccumulator } from '../utils/metrics.util';
@@ -105,6 +105,10 @@ export class MarkdownGenerationService implements IPipelineStep {
                     variables: {
                         item: JSON.stringify(item),
                         content: rawContent.slice(0, 4000),
+                    },
+                    routing: {
+                        complexity: TaskComplexity.MEDIUM,
+                        taskId: 'markdown-generation',
                     },
                 },
             );

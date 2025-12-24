@@ -1,7 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { tavily, TavilyClient } from '@tavily/core';
 import { ConfigDto } from '../dto/create-items-generator.dto';
-import { search, OrganicResult, DictionaryResult, OrganicResultNode } from 'google-sr';
 import TurndownService from 'turndown';
 import axios from 'axios';
 import { config } from '@src/config';
@@ -48,13 +47,6 @@ export class SearchService {
     }
 
     /**
-     * Check if the Google search service is configured
-     */
-    isGoogleSearchConfigured(): boolean {
-        return config.search.getWebSearchService() === 'google-sr';
-    }
-
-    /**
      * Check if the search service is properly configured
      */
     isTavilySearchConfigured(): boolean {
@@ -74,10 +66,6 @@ export class SearchService {
      * @param config Optional configuration
      */
     async webSearch(query: string, config?: Partial<ConfigDto>): Promise<SearchResult[]> {
-        if (this.isGoogleSearchConfigured() || !this.tavilyClient) {
-            return this.webSearchUsingGoogle(query, config);
-        }
-
         return this.webSearchUsingTavily(query, config);
     }
 
@@ -98,30 +86,6 @@ export class SearchService {
         });
 
         return searches.results.sort((a, b) => b.score - a.score);
-    }
-
-    /**
-     * Perform a web search using Google
-     * @param query The search query
-     * @param config Optional configuration
-     */
-    async webSearchUsingGoogle(
-        query: string,
-        config?: Partial<ConfigDto>,
-    ): Promise<SearchResult[]> {
-        let results = await search({
-            query,
-            parsers: [DictionaryResult, OrganicResult],
-        });
-
-        results = results.slice(0, config?.max_results_per_query || 20);
-
-        return results.map((result: OrganicResultNode) => ({
-            title: result.title,
-            url: result.link,
-            score: 1,
-            publishedDate: new Date().toISOString(),
-        }));
     }
 
     /**

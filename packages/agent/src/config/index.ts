@@ -140,7 +140,7 @@ export const config = {
         // Ollama
         ollama: {
             getKey() {
-                return process.env.OLLAMA_API_KEY;
+                return process.env.OLLAMA_API_KEY || 'ollama';
             },
             getModel() {
                 return process.env.OLLAMA_MODEL || 'llama2';
@@ -203,47 +203,6 @@ export const config = {
             },
         },
 
-        // Mistral AI
-        mistral: {
-            getModel() {
-                return process.env.MISTRAL_MODEL || 'mistral-large-latest';
-            },
-            getKey() {
-                return process.env.MISTRAL_API_KEY;
-            },
-            getTemperature() {
-                return parseFloat(process.env.MISTRAL_TEMPERATURE || '0.7');
-            },
-            getMaxTokens() {
-                return parseInt(process.env.MISTRAL_MAX_TOKENS || '4096');
-            },
-            getBaseUrl() {
-                return process.env.MISTRAL_BASE_URL || 'https://api.mistral.ai/v1';
-            },
-            getEmbeddingModel() {
-                return process.env.MISTRAL_EMBEDDING_MODEL || 'mistral-embed';
-            },
-        },
-
-        // DeepSeek
-        deepseek: {
-            getModel() {
-                return process.env.DEEPSEEK_MODEL || 'deepseek-chat';
-            },
-            getKey() {
-                return process.env.DEEPSEEK_API_KEY;
-            },
-            getTemperature() {
-                return parseFloat(process.env.DEEPSEEK_TEMPERATURE || '0.7');
-            },
-            getMaxTokens() {
-                return parseInt(process.env.DEEPSEEK_MAX_TOKENS || '4096');
-            },
-            getBaseUrl() {
-                return process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com/v1';
-            },
-        },
-
         // Groq
         groq: {
             getModel() {
@@ -262,6 +221,56 @@ export const config = {
                 return process.env.GROQ_BASE_URL || 'https://api.groq.com/openai/v1';
             },
         },
+
+        // Custom OpenAI-compatible provider
+        custom: {
+            getModel() {
+                return process.env.CUSTOM_MODEL || 'default';
+            },
+            getKey() {
+                return process.env.CUSTOM_API_KEY;
+            },
+            getTemperature() {
+                return parseFloat(process.env.CUSTOM_TEMPERATURE || '0.7');
+            },
+            getMaxTokens() {
+                return parseInt(process.env.CUSTOM_MAX_TOKENS || '4096');
+            },
+            getBaseUrl() {
+                return process.env.CUSTOM_BASE_URL || '';
+            },
+        },
+
+        // Model routing configuration
+        routing: {
+            isEnabled() {
+                return process.env.MODEL_ROUTING_ENABLED === 'true';
+            },
+            isAutoEscalationEnabled() {
+                return process.env.MODEL_ROUTING_AUTO_ESCALATION !== 'false';
+            },
+            isLoggingEnabled() {
+                return process.env.MODEL_ROUTING_LOG_DECISIONS === 'true';
+            },
+            getEconomyProvider() {
+                return process.env.MODEL_ROUTING_ECONOMY_PROVIDER as AiProviderType | undefined;
+            },
+            getEconomyModel() {
+                return process.env.MODEL_ROUTING_ECONOMY_MODEL;
+            },
+            getStandardProvider() {
+                return process.env.MODEL_ROUTING_STANDARD_PROVIDER as AiProviderType | undefined;
+            },
+            getStandardModel() {
+                return process.env.MODEL_ROUTING_STANDARD_MODEL;
+            },
+            getPremiumProvider() {
+                return process.env.MODEL_ROUTING_PREMIUM_PROVIDER as AiProviderType | undefined;
+            },
+            getPremiumModel() {
+                return process.env.MODEL_ROUTING_PREMIUM_MODEL;
+            },
+        },
     },
 
     // Search configuration
@@ -270,7 +279,7 @@ export const config = {
             return (process.env.EXTRACT_CONTENT_SERVICE as 'tavily' | 'local') || 'local';
         },
         getWebSearchService() {
-            return (process.env.WEB_SEARCH_SERVICE as 'tavily' | 'google-sr') || 'tavily';
+            return (process.env.WEB_SEARCH_SERVICE as 'tavily') || 'tavily';
         },
     },
 

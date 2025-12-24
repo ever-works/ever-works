@@ -97,9 +97,8 @@ export class SetSubCommand extends CommandRunner {
                 'anthropic',
                 'openrouter',
                 'ollama',
-                'mistral',
-                'deepseek',
                 'groq',
+                'custom',
             ];
             if (!validProviders.includes(value.toLowerCase())) {
                 return {
@@ -123,7 +122,7 @@ export class SetSubCommand extends CommandRunner {
         }
 
         if (key === 'WEB_SEARCH_SERVICE') {
-            const validServices = ['tavily', 'google-sr'];
+            const validServices = ['tavily'];
             if (!validServices.includes(value.toLowerCase())) {
                 return {
                     isValid: false,

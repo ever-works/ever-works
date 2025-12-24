@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { slugifyText } from '../utils/text.utils';
 import { getErrorMessage, getErrorStack } from '../utils/error.util';
-import { AiService } from 'src/ai';
+import { AiService, TaskComplexity } from 'src/ai';
 import { CreateItemsGeneratorDto, ItemData } from '../dto';
 import {
     extractedItemsSchema,
@@ -132,6 +132,10 @@ export class AiItemGenerationService implements IPipelineStep {
                         topicDescription,
                         target_keywords_string: keywordsString,
                     },
+                    routing: {
+                        complexity: TaskComplexity.SIMPLE,
+                        taskId: 'ai-item-generation-assessment',
+                    },
                 },
             );
 
@@ -178,6 +182,10 @@ export class AiItemGenerationService implements IPipelineStep {
                         topicDescription,
                         target_keywords_string: keywordsString,
                         featured_hints_section: featuredHintsSection,
+                    },
+                    routing: {
+                        complexity: TaskComplexity.COMPLEX,
+                        taskId: 'ai-item-generation',
                     },
                 },
             );

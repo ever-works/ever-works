@@ -219,18 +219,12 @@ export class DirectoriesController {
     ): Promise<ItemsGeneratorResponseDto> {
         const user = await this.authService.getUser(auth.userId);
 
-        // We don't await completion here, as the request can take a long time
-        const response = await this.directoryGenerationService.generateItems(
+        return this.directoryGenerationService.generateItems(
             id,
             createItemsGeneratorDto,
             user,
             false,
         );
-
-        // Wait a little while to ensure the process has started.
-        await this.wait(2);
-
-        return response;
     }
 
     @Post('directories/:id/update')
@@ -242,18 +236,12 @@ export class DirectoriesController {
     ): Promise<ItemsGeneratorResponseDto> {
         const user = await this.authService.getUser(auth.userId);
 
-        // We don't await completion here, as the request can take a long time
-        const response = await this.directoryGenerationService.updateItemsGenerator(
-            id,
-            updateItemsGeneratorDto,
+        return this.directoryGenerationService.updateItemsGenerator({
+            directoryId: id,
+            updateDto: updateItemsGeneratorDto,
             user,
-            false,
-        );
-
-        // Wait a little while to ensure the process has started.
-        await this.wait(2);
-
-        return response;
+            awaitCompletion: false,
+        });
     }
 
     @Get('directories/:id/schedule')
@@ -406,9 +394,5 @@ export class DirectoriesController {
         const user = await this.authService.getUser(auth.userId);
 
         return this.directoryLifecycleService.syncFromDataRepository(id, user);
-    }
-
-    private wait(sec = 2) {
-        return new Promise((resolve) => setTimeout(resolve, sec * 1000));
     }
 }

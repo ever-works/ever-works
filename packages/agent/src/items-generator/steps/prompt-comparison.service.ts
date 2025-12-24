@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { z } from 'zod';
-import { AiService } from 'src/ai';
+import { AiService, TaskComplexity } from 'src/ai';
 import { IPipelineStep, GenerationContext } from '../interfaces/pipeline.interface';
 import { ItemsGeneratorStep } from '../constants/steps';
 import { GenerationMethod } from '../dto';
@@ -143,6 +143,10 @@ export class PromptComparisonService implements IPipelineStep {
                 {
                     temperature: 0.1,
                     variables: { existing_prompt: existingPrompt, new_prompt: newPrompt },
+                    routing: {
+                        complexity: TaskComplexity.MEDIUM,
+                        taskId: 'prompt-comparison',
+                    },
                 },
             );
 

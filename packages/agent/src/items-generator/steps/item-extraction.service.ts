@@ -3,7 +3,7 @@ import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
 import { CreateItemsGeneratorDto } from '../dto/create-items-generator.dto';
 import { WebPageData } from '../interfaces/items-generator.interfaces';
 import { slugifyText } from '../utils/text.utils';
-import { AiService } from 'src/ai';
+import { AiService, TaskComplexity } from 'src/ai';
 import { ItemData } from '../dto';
 import {
     extractedItemsSchema,
@@ -206,6 +206,10 @@ export class ItemExtractionService implements IPipelineStep {
                                             page_content_snippet: chunk,
                                             featured_hints_section: featuredHintsSection,
                                         },
+                                        routing: {
+                                            complexity: TaskComplexity.COMPLEX,
+                                            taskId: 'item-extraction-chunk',
+                                        },
                                     },
                                 );
 
@@ -273,6 +277,10 @@ export class ItemExtractionService implements IPipelineStep {
                             topicDescription,
                             page_content_snippet: page.raw_content || '',
                             featured_hints_section: featuredHintsSection,
+                        },
+                        routing: {
+                            complexity: TaskComplexity.COMPLEX,
+                            taskId: 'item-extraction',
                         },
                     });
 

@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { AiService } from 'src/ai';
+import { AiService, TaskComplexity } from 'src/ai';
 import { slugifyText } from '../../utils/text.utils';
 import { accumulateMetrics, MetricsAccumulator } from '../../utils/metrics.util';
 import { getErrorMessage, getErrorStack } from '../../utils/error.util';
@@ -104,6 +104,10 @@ export class NewItemsExtractorService {
                             relevantExistingItems.map(this.sharedUtils.itemMap),
                         ),
                         new: JSON.stringify(newItems.map(this.sharedUtils.itemMap)),
+                    },
+                    routing: {
+                        complexity: TaskComplexity.MEDIUM,
+                        taskId: 'new-items-extraction',
                     },
                 },
             );
@@ -252,6 +256,10 @@ export class NewItemsExtractorService {
                             relevantExistingItems.map(this.sharedUtils.itemMap),
                         ),
                         new: JSON.stringify(newItems.map(this.sharedUtils.itemMap)),
+                    },
+                    routing: {
+                        complexity: TaskComplexity.MEDIUM,
+                        taskId: 'new-items-extraction-batch',
                     },
                 },
             );

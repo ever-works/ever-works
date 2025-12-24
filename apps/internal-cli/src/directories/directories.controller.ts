@@ -93,12 +93,12 @@ export class DirectoriesController {
         const user = await this.userRepository.createOrGetLocalUser();
 
         // We don't await completion here, as the request can take a long time
-        return this.directoryGenerationService.updateItemsGenerator(
-            id,
-            updateItemsGeneratorDto,
+        return this.directoryGenerationService.updateItemsGenerator({
+            directoryId: id,
+            updateDto: updateItemsGeneratorDto,
             user,
-            false,
-        );
+            awaitCompletion: false,
+        });
     }
 
     @Post('directories/:id/submit-item')

@@ -252,16 +252,16 @@ export class TestSubCommand extends CommandRunner {
             'anthropic',
             'openrouter',
             'ollama',
-            'mistral',
-            'deepseek',
             'groq',
+            'custom',
         ];
 
         for (const provider of providerKeys) {
             const upperProvider = provider.toUpperCase();
             if (
                 config[`${upperProvider}_API_KEY`] ||
-                (provider === 'ollama' && config[`${upperProvider}_BASE_URL`])
+                ((provider === 'ollama' || provider === 'custom') &&
+                    config[`${upperProvider}_BASE_URL`])
             ) {
                 providers.push(provider);
             }
@@ -277,9 +277,8 @@ export class TestSubCommand extends CommandRunner {
             anthropic: 'claude-3-5-sonnet-20241022',
             openrouter: 'openai/gpt-4o',
             ollama: 'llama2',
-            mistral: 'mistral-large-latest',
-            deepseek: 'deepseek-chat',
             groq: 'openai/gpt-oss-120b',
+            custom: 'default',
         };
         return defaults[provider] || 'default';
     }
