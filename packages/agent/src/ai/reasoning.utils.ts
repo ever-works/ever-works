@@ -1,7 +1,7 @@
 type ReasoningConfig = {
     pattern: RegExp;
-    openai?: { reasoning: { effort: 'none' | 'low' } };
-    openrouter?: { reasoning: { effort: 'none' | 'low' } };
+    openai?: { reasoning: { effort: 'none' | 'low' | 'minimal' } };
+    openrouter?: { reasoning: { effort: 'none' | 'low' | 'minimal' } };
     google?: { reasoning_effort: 'none' };
     groq?: { reasoning_effort: 'none' | 'low'; reasoning_format?: 'hidden' };
 };
@@ -14,12 +14,12 @@ const REASONING_MODELS: ReasoningConfig[] = [
     },
     {
         pattern: /gpt-5(?!\.\d)/,
-        openai: { reasoning: { effort: 'none' } },
-        openrouter: { reasoning: { effort: 'low' } },
+        openai: { reasoning: { effort: 'minimal' } },
+        openrouter: { reasoning: { effort: 'minimal' } },
     },
     {
         pattern: /^o[134]/,
-        openai: { reasoning: { effort: 'none' } },
+        openai: { reasoning: { effort: 'low' } },
         openrouter: { reasoning: { effort: 'low' } },
     },
     {
@@ -59,13 +59,13 @@ function findReasoningConfig(model?: string): ReasoningConfig | undefined {
 
 export function getOpenAIReasoningConfig(
     model?: string,
-): { reasoning: { effort: 'none' | 'low' } } | undefined {
+): { reasoning: { effort: 'none' | 'low' | 'minimal' } } | undefined {
     return findReasoningConfig(model)?.openai;
 }
 
 export function getOpenRouterReasoningConfig(
     model?: string,
-): { reasoning: { effort: 'none' | 'low' } } | undefined {
+): { reasoning: { effort: 'none' | 'low' | 'minimal' } } | undefined {
     return findReasoningConfig(model)?.openrouter;
 }
 
