@@ -145,6 +145,8 @@ export class AiDeduplicatorService {
 
                     totalProcessed += chunk.length;
 
+                    this.logger.log(`Progress: ${totalProcessed}/${items.length} items processed`);
+
                     // Add a small delay between chunks to avoid rate limiting
                     if (i < chunks.length - 1) {
                         await this.sharedUtils.addProcessingDelay(this.CHUNK_DELAY_MS);
