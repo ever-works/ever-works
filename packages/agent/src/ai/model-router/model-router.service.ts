@@ -20,6 +20,23 @@ export class ModelRouterService {
 
     constructor() {
         this.config = loadModelRouterConfig();
+        this.logConfiguration();
+    }
+
+    private logConfiguration(): void {
+        if (!this.config.enabled) {
+            this.logger.log('Model routing disabled');
+            return;
+        }
+
+        const tierCount = Object.keys(this.config.tierConfigs).length;
+        this.logger.log(`Model routing enabled with ${tierCount} tiers:`);
+
+        Object.entries(this.config.tierConfigs).forEach(([tier, configs]) => {
+            this.logger.log(
+                `  Tier ${tier}: ${configs.map((c) => `${c.provider}/${c.model}`).join(', ')}`,
+            );
+        });
     }
 
     setAvailableProviders(providers: AiProviderType[]): void {
