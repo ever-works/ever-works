@@ -103,7 +103,7 @@ export class AiItemGenerationService implements IPipelineStep {
             target_keywords,
         } = createItemsGeneratorDto;
 
-        this.logger.log(
+        this.logger.debug(
             `[${directorySlug}] AI-First Item Generation - Starting for topic: ${topicName}`,
         );
         const allGeneratedItems: ItemData[] = [];
@@ -156,7 +156,7 @@ export class AiItemGenerationService implements IPipelineStep {
                 return []; // Do not proceed with item generation
             }
 
-            this.logger.log(
+            this.logger.debug(
                 `[${directorySlug}] AI assessment: Prompt for topic "${topicName}" is clear. Proceeding with item generation.`,
             );
         } catch (error) {
@@ -193,7 +193,7 @@ export class AiItemGenerationService implements IPipelineStep {
             accumulateMetrics(metrics, usage, cost);
 
             if (result && result.items && result.items.length > 0) {
-                this.logger.log(
+                this.logger.debug(
                     `[${directorySlug}] AI initially generated ${result.items.length} items.`,
                 );
                 for (const generatedItem of result.items) {
@@ -206,16 +206,9 @@ export class AiItemGenerationService implements IPipelineStep {
 
                         validatedItem.slug = slugifyText(validatedItem.name);
 
-                        if (!validatedItem.source_url) {
-                            this.logger.warn(
-                                `[${directorySlug}] AI generated item "${validatedItem.name}" without a source_url. Deduplication might be affected.`,
-                            );
-                        }
                         allGeneratedItems.push(validatedItem);
-                    } catch (validationError: any) {
-                        this.logger.warn(
-                            `[${directorySlug}] Discarding AI-generated item due to validation error: ${validationError.errors?.map((e: any) => e.message).join(', ') || getErrorMessage(validationError)}. Item: ${JSON.stringify(generatedItem)}`,
-                        );
+                    } catch {
+                        // Skip invalid items silently
                     }
                 }
             } else {

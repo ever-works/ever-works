@@ -53,7 +53,7 @@ type DirectoryCommandDefinition<K extends DirectoryCommandAction> = {
     handler: (payload: DirectoryCommandPayloads[K], ctx: CommandHandlerContext) => Promise<void>;
 };
 
-@SkipThrottle()
+@SkipThrottle({ short: true, medium: true, long: true })
 @Controller('internal/trigger')
 export class TriggerInternalController {
     constructor(

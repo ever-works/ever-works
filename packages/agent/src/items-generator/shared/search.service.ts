@@ -191,7 +191,7 @@ export class SearchService {
 
             return null;
         } catch (error) {
-            this.logger.warn(`Readability extraction failed for ${url}: ${error.message}`);
+            this.logger.debug(`Readability extraction failed for ${url}: ${error.message}`);
             return null;
         }
     }
@@ -227,7 +227,6 @@ export class SearchService {
             bodyHtml = bodyHtml.replace(/\s\s+/g, ' ').trim();
 
             if (bodyHtml.length > 0) {
-                this.logger.debug(`Extracted body HTML as fallback for ${url}`);
                 return this.turndownService.turndown(bodyHtml);
             }
         } catch (error) {

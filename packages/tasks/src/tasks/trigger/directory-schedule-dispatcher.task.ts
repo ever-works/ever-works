@@ -3,6 +3,7 @@ import { NestFactory } from '@nestjs/core';
 import { TriggerInternalModule } from '../../trigger/trigger-internal.module';
 import { config } from '@packages/agent/config';
 import { RemoteDirectoryScheduleService } from '../../trigger/remote-directory-schedule.service';
+import { TriggerLogger } from '../../trigger/trigger-logger';
 
 const interval = Math.max(1, config.subscriptions.getDispatchIntervalMinutes());
 const cronExpression = `*/${interval} * * * *`;
@@ -12,7 +13,7 @@ export const directoryScheduleDispatcherTask = schedules.task({
     cron: cronExpression,
     run: async () => {
         const appContext = await NestFactory.createApplicationContext(TriggerInternalModule, {
-            logger: ['error', 'fatal', 'warn'],
+            logger: new TriggerLogger('ScheduleDispatcher'),
         });
 
         try {
