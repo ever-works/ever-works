@@ -55,7 +55,7 @@ export interface EverWorksConfig {
 
     // Search Services
     EXTRACT_CONTENT_SERVICE: 'tavily' | 'local';
-    WEB_SEARCH_SERVICE: 'tavily' | 'google-sr';
+    WEB_SEARCH_SERVICE: 'tavily';
     TAVILY_API_KEY?: string;
 
     // Database Configuration (for future use)

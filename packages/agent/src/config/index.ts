@@ -279,7 +279,7 @@ export const config = {
             return (process.env.EXTRACT_CONTENT_SERVICE as 'tavily' | 'local') || 'local';
         },
         getWebSearchService() {
-            return (process.env.WEB_SEARCH_SERVICE as 'tavily' | 'google-sr') || 'tavily';
+            return (process.env.WEB_SEARCH_SERVICE as 'tavily') || 'tavily';
         },
     },
 

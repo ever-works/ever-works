@@ -132,7 +132,7 @@
         "typescript-eslint": "^8.46.3"
     },
     "dependencies": {
-        "@langchain/core": "^0.3.79",
+        "@langchain/core": "^0.3.80",
         "@langchain/langgraph": "^0.2.74",
         "@langchain/openai": "0.5.12",
         "@langchain/textsplitters": "^0.1.0",
@@ -153,10 +153,9 @@
         "class-validator": "^0.14.2",
         "date-fns": "^4.1.0",
         "deepmerge": "^4.3.1",
-        "google-sr": "^6.0.0",
         "import-in-the-middle": "^2.0.0",
         "isomorphic-git": "^1.35.0",
-        "langchain": "^0.3.36",
+        "langchain": "^0.3.37",
         "libsodium-wrappers": "^0.7.15",
         "linkedom": "^0.18.12",
         "octokit": "^5.0.5",
