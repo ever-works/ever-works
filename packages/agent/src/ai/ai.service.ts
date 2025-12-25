@@ -3,7 +3,7 @@ import { HumanMessage } from '@langchain/core/messages';
 import { z } from 'zod';
 
 // AI Providers
-import { ChatOpenAI, ChatOpenAIFields, OpenAIEmbeddings } from '@langchain/openai';
+import { ChatOpenAI, OpenAIEmbeddings } from '@langchain/openai';
 import { Embeddings } from '@langchain/core/embeddings';
 import {
     AiProviderType,
@@ -15,8 +15,13 @@ import {
 import { config } from '@src/config';
 import { TokenUsage, TokenUsageTracker } from './token-usage.tracker';
 import { ModelRouterService, RoutingOptions, RoutingDecision } from './model-router';
+import {
+    getOpenAIReasoningConfig,
+    getOpenRouterReasoningConfig,
+    getGoogleReasoningConfig,
+    getGroqReasoningConfig,
+} from './reasoning.utils';
 
-// Cache TTL for provider health checks (5 minutes)
 const HEALTH_CHECK_CACHE_TTL_MS = 5 * 60 * 1000;
 
 type HealthCheckResult = {
@@ -87,9 +92,24 @@ export class AiService {
         routingDecision?: RoutingDecision;
     }> {
         const options = args[0];
-        const tracker = new TokenUsageTracker();
+        const resolvedPrompt = this.renderTemplate(promptTemplate, options?.variables);
 
-        // Use model router to select provider/model based on task complexity
+        // Check if model routing is enabled and routing options are provided
+        const useRouting = this.modelRouter.isEnabled() && options?.routing?.complexity;
+
+        if (!useRouting) {
+            const providerType = this.config.defaultProvider;
+            const modelName = this.getProviderConfig(providerType)?.modelName || 'unknown';
+
+            const llm = this.createLlmWithCriteria({
+                providerType,
+                temperature: options?.temperature,
+            });
+
+            return this.invokeStructuredLlm(llm, schema, resolvedPrompt, providerType, modelName);
+        }
+
+        // Routing path: use model router to select provider/model based on task complexity
         const defaultModel =
             this.getProviderConfig(this.config.defaultProvider)?.modelName || 'unknown';
 
@@ -102,28 +122,17 @@ export class AiService {
         const providerType = routingDecision.selectedConfig.provider;
         const modelName = routingDecision.selectedConfig.model;
 
-        const resolvedPrompt = this.renderTemplate(promptTemplate, options?.variables);
-
         const llm = this.createLlmForRouting(providerType, modelName, options?.temperature);
 
         try {
-            const result = (await llm
-                .withStructuredOutput(schema)
-                .invoke([new HumanMessage(resolvedPrompt)], {
-                    callbacks: [tracker],
-                })) as T;
-
-            const usage = tracker.usage.totalTokens > 0 ? tracker.usage : null;
-            const cost = usage ? this.calculateCost(providerType, usage, modelName) : null;
-
-            return {
-                result,
-                usage,
-                cost,
-                provider: providerType,
-                model: modelName,
-                routingDecision,
-            };
+            const result = await this.invokeStructuredLlm(
+                llm,
+                schema,
+                resolvedPrompt,
+                providerType,
+                modelName,
+            );
+            return { ...result, routingDecision };
         } catch (error) {
             // Try auto-escalation if enabled
             if (options?.routing?.autoEscalate !== false) {
@@ -144,34 +153,51 @@ export class AiService {
                         options?.temperature,
                     );
 
-                    const escalatedTracker = new TokenUsageTracker();
-                    const escalatedResult = (await escalatedLlm
-                        .withStructuredOutput(schema)
-                        .invoke([new HumanMessage(resolvedPrompt)], {
-                            callbacks: [escalatedTracker],
-                        })) as T;
-
-                    const usage =
-                        escalatedTracker.usage.totalTokens > 0 ? escalatedTracker.usage : null;
-                    const cost = usage
-                        ? this.calculateCost(
-                              escalatedDecision.selectedConfig.provider,
-                              usage,
-                              escalatedDecision.selectedConfig.model,
-                          )
-                        : null;
-
-                    return {
-                        result: escalatedResult,
-                        usage,
-                        cost,
-                        provider: escalatedDecision.selectedConfig.provider,
-                        model: escalatedDecision.selectedConfig.model,
-                        routingDecision: escalatedDecision,
-                    };
+                    const result = await this.invokeStructuredLlm(
+                        escalatedLlm,
+                        schema,
+                        resolvedPrompt,
+                        escalatedDecision.selectedConfig.provider,
+                        escalatedDecision.selectedConfig.model,
+                    );
+                    return { ...result, routingDecision: escalatedDecision };
                 }
             }
 
+            throw error;
+        }
+    }
+
+    /**
+     * Helper method to invoke LLM with structured output and track usage/cost
+     */
+    private async invokeStructuredLlm<T>(
+        llm: BaseChatModel,
+        schema: z.ZodSchema<T>,
+        prompt: string,
+        providerType: AiProviderType,
+        modelName: string,
+    ): Promise<{
+        result: T;
+        usage: TokenUsage | null;
+        cost: number | null;
+        provider: AiProviderType;
+        model: string;
+    }> {
+        const tracker = new TokenUsageTracker();
+
+        try {
+            const result = (await llm
+                .withStructuredOutput(schema)
+                .invoke([new HumanMessage(prompt)], {
+                    callbacks: [tracker],
+                })) as T;
+
+            const usage = tracker.usage.totalTokens > 0 ? tracker.usage : null;
+            const cost = usage ? this.calculateCost(providerType, usage, modelName) : null;
+
+            return { result, usage, cost, provider: providerType, model: modelName };
+        } catch (error) {
             this.logger.error(
                 `askJson failed (${providerType}/${modelName}): ${this.getErrorMessage(error)}`,
             );
@@ -364,13 +390,15 @@ export class AiService {
         config.maxTokens = config.maxTokens || defaultConfig?.maxTokens || 4096;
         config.baseURL = config.baseURL || defaultConfig?.baseURL || '';
 
-        const commonOptions: ChatOpenAIFields = {
+        const openaiConfig = getOpenAIReasoningConfig(config.modelName);
+        const openrouterConfig = getOpenRouterReasoningConfig(config.modelName);
+        const googleConfig = getGoogleReasoningConfig(config.modelName);
+        const groqConfig = getGroqReasoningConfig(config.modelName);
+
+        const commonOptions = {
             apiKey: config.apiKey,
             temperature: config.temperature,
             maxTokens: config.maxTokens,
-            reasoning: {
-                effort: 'low',
-            },
         };
 
         switch (config.type) {
@@ -378,68 +406,52 @@ export class AiService {
                 return new ChatOpenAI({
                     ...commonOptions,
                     model: config.modelName,
+                    ...(openaiConfig && { modelKwargs: openaiConfig }),
                 });
 
             case 'openrouter':
                 return new ChatOpenAI({
                     ...commonOptions,
                     model: config.modelName,
-                    configuration: {
-                        baseURL: config.baseURL,
-                    },
+                    configuration: { baseURL: config.baseURL },
+                    ...(openrouterConfig && { modelKwargs: openrouterConfig }),
                 });
 
             case 'ollama':
                 return new ChatOpenAI({
                     ...commonOptions,
                     model: config.modelName,
-                    configuration: {
-                        baseURL: config.baseURL,
-                    },
+                    configuration: { baseURL: config.baseURL },
                 });
 
             case 'google':
                 return new ChatOpenAI({
                     ...commonOptions,
                     model: config.modelName,
-                    configuration: {
-                        baseURL: config.baseURL,
-                        extra_body: {
-                            google: {
-                                thinking_config: {
-                                    thinking_budget: 0,
-                                    include_thoughts: false,
-                                },
-                            },
-                        },
-                    } as any,
+                    configuration: { baseURL: config.baseURL },
+                    ...(googleConfig && { modelKwargs: googleConfig }),
                 });
 
             case 'anthropic':
                 return new ChatOpenAI({
                     ...commonOptions,
                     model: config.modelName,
-                    configuration: {
-                        baseURL: config.baseURL,
-                    },
+                    configuration: { baseURL: config.baseURL },
                 });
 
             case 'groq':
                 return new ChatOpenAI({
                     ...commonOptions,
                     model: config.modelName,
-                    configuration: {
-                        baseURL: config.baseURL,
-                    },
+                    configuration: { baseURL: config.baseURL },
+                    ...(groqConfig && { modelKwargs: groqConfig }),
                 });
 
             case 'custom':
                 return new ChatOpenAI({
                     ...commonOptions,
                     model: config.modelName,
-                    configuration: {
-                        baseURL: config.baseURL,
-                    },
+                    configuration: { baseURL: config.baseURL },
                 });
 
             default:

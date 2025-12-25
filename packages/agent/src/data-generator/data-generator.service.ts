@@ -347,7 +347,7 @@ export class DataGeneratorService {
             this.logger.debug('files written and committed.');
 
             // Items already have markdown from pipeline - write to disk
-            this.logger.log(`Writing ${newItems.length} items to disk...`);
+            this.logger.debug(`Writing ${newItems.length} items to disk...`);
 
             const existingSlugSet = new Set(
                 (existingData.existingItems || []).map((item) =>
@@ -387,7 +387,7 @@ export class DataGeneratorService {
 
                 await this.githubService.commit(data.dir, commitMessage, user.asCommitter());
 
-                this.logger.log(`Batch committed ${newItems.length} items`);
+                this.logger.debug(`Batch committed ${newItems.length} items`);
             }
 
             // Push changes

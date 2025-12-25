@@ -6,7 +6,6 @@ import { GenerationMethod } from '@/lib/api/enums';
 import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
 import { useDirectoryDetail } from '../DirectoryDetailContext';
-import { Link } from '@/i18n/navigation';
 import { PrUpdateInfo } from '../PrUpdateInfo';
 
 interface UpdateItemsFieldsProps {
@@ -78,7 +77,7 @@ export function UpdateItemsFields({
             <PrUpdateInfo
                 mainPR={mainPR}
                 dataPR={dataPR}
-                className="mt-6 border-t border-border dark:border-border-dark"
+                className="pt-6 mt-6 border-t border-border dark:border-border-dark"
             />
         </div>
     );

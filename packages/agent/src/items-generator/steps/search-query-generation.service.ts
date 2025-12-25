@@ -53,7 +53,7 @@ export class SearchQueryGenerationService implements IPipelineStep {
             config,
         } = createItemsGeneratorDto;
 
-        this.logger.log(`[${name}] Generating search queries using LLM...`);
+        this.logger.debug(`[${name}] Generating search queries using LLM...`);
 
         const keywords = targetKeywords || [];
 
@@ -114,7 +114,7 @@ export class SearchQueryGenerationService implements IPipelineStep {
 
             const uniqueQueries = Array.from(new Set(queries));
 
-            this.logger.log(`[${name}] LLM generated ${uniqueQueries.length} unique queries.`);
+            this.logger.debug(`[${name}] LLM generated ${uniqueQueries.length} unique queries.`);
             return uniqueQueries.slice(0, config.max_search_queries);
         } catch (error) {
             this.logger.error(

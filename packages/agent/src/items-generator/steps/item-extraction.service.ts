@@ -153,7 +153,7 @@ export class ItemExtractionService implements IPipelineStep {
                 page.raw_content.length >= config.min_content_length_for_extraction;
 
             if (!hasSufficientContent) {
-                this.logger.log(
+                this.logger.debug(
                     `[${directorySlug}] Skipping item extraction for page (insufficient content): ${page.source_url}`,
                 );
             }
@@ -177,24 +177,13 @@ export class ItemExtractionService implements IPipelineStep {
             try {
                 // Check if content is large enough to require chunking
                 if (page.raw_content && page.raw_content.length > this.MAX_CHUNK_SIZE) {
-                    this.logger.log(
-                        `[${directorySlug}] Content size (${page.raw_content.length} chars) exceeds chunk size limit. Processing in chunks for ${page.source_url}`,
-                    );
-
                     // Split the content into chunks
                     const chunks = await this.textSplitter.splitText(page.raw_content);
-                    this.logger.log(
-                        `[${directorySlug}] Split content into ${chunks.length} chunks for processing from ${page.source_url}`,
-                    );
 
                     // Process each chunk
                     const chunkResults = await Promise.all(
                         chunks.map(async (chunk: string, index: number) => {
                             try {
-                                this.logger.log(
-                                    `[${directorySlug}] Processing chunk ${index + 1}/${chunks.length} (${chunk.length} chars) from ${page.source_url}`,
-                                );
-
                                 const { result, usage, cost } = await this.aiService.askJson(
                                     ITEMS_EXTRACTION_PROMPT,
                                     schema,
@@ -228,10 +217,6 @@ export class ItemExtractionService implements IPipelineStep {
                     const allExtractedItems = chunkResults.flat();
 
                     if (allExtractedItems.length > 0) {
-                        this.logger.log(
-                            `[${directorySlug}] Found ${allExtractedItems.length} potential items across ${chunks.length} chunks in ${page.source_url}`,
-                        );
-
                         // Process and validate each extracted item
                         const validatedItems: ItemData[] = [];
                         for (const extractedItem of allExtractedItems) {
@@ -244,13 +229,8 @@ export class ItemExtractionService implements IPipelineStep {
                                 validatedItem.slug = slugifyText(validatedItem.name);
 
                                 validatedItems.push(validatedItem);
-                                this.logger.log(
-                                    `[${directorySlug}] Extracted item: "${validatedItem.name}" (Slug: ${validatedItem.slug})`,
-                                );
-                            } catch (validationError: any) {
-                                this.logger.warn(
-                                    `[${directorySlug}] Discarding item due to validation error: ${validationError.errors?.map((e: any) => e.message).join(', ') || getErrorMessage(validationError)}. Item: ${JSON.stringify(extractedItem)} from ${page.source_url}`,
-                                );
+                            } catch {
+                                // Skip invalid items silently
                             }
                         }
 
@@ -260,7 +240,7 @@ export class ItemExtractionService implements IPipelineStep {
                         // Add unique items to the result
                         extractedItems.push(...uniqueItems);
                     } else {
-                        this.logger.log(
+                        this.logger.debug(
                             `[${directorySlug}] No items extracted by LLM from any chunks in ${page.source_url}`,
                         );
                     }
@@ -291,10 +271,6 @@ export class ItemExtractionService implements IPipelineStep {
                         extractionResult.items &&
                         extractionResult.items.length > 0
                     ) {
-                        this.logger.log(
-                            `[${directorySlug}] Found ${extractionResult.items.length} potential items in ${page.source_url}`,
-                        );
-
                         // Process and validate each extracted item
                         const validatedItems: ItemData[] = [];
                         for (const extractedItem of extractionResult.items) {
@@ -307,20 +283,15 @@ export class ItemExtractionService implements IPipelineStep {
                                 validatedItem.slug = slugifyText(validatedItem.name);
 
                                 validatedItems.push(validatedItem);
-                                this.logger.log(
-                                    `[${directorySlug}] Extracted item: "${validatedItem.name}" (Slug: ${validatedItem.slug})`,
-                                );
-                            } catch (validationError: any) {
-                                this.logger.warn(
-                                    `[${directorySlug}] Discarding item due to validation error: ${validationError.errors?.map((e: any) => e.message).join(', ') || getErrorMessage(validationError)}. Item: ${JSON.stringify(extractedItem)} from ${page.source_url}`,
-                                );
+                            } catch {
+                                // Skip invalid items silently
                             }
                         }
 
                         // Add validated items to the result
                         extractedItems.push(...validatedItems);
                     } else {
-                        this.logger.log(
+                        this.logger.debug(
                             `[${directorySlug}] No items extracted by LLM from ${page.source_url}`,
                         );
                     }
@@ -338,10 +309,6 @@ export class ItemExtractionService implements IPipelineStep {
         // Process pages in batches to avoid rate limits
         const BATCH_SIZE = 10;
         const allExtractedItems: ItemData[] = [];
-
-        this.logger.log(
-            `[${directorySlug}] Processing item extraction in batches of ${BATCH_SIZE}`,
-        );
 
         // Process pages in batches
         for (let i = 0; i < pagesWithSufficientContent.length; i += BATCH_SIZE) {

@@ -77,8 +77,6 @@ export class MarkdownGenerationService implements IPipelineStep {
             return '';
         }
 
-        this.logger.log(`Generating markdown for: ${item.name} (${item.slug})`);
-
         try {
             // Check cache first for content
             let rawContent = contentCache?.get(item.source_url);
@@ -87,8 +85,6 @@ export class MarkdownGenerationService implements IPipelineStep {
                 // Fall back to fetching if not in cache
                 const content = await this.extractContentFrom(item.source_url);
                 rawContent = content?.rawContent;
-            } else {
-                this.logger.debug(`Using cached content for: ${item.source_url}`);
             }
 
             if (!rawContent) {
@@ -140,8 +136,6 @@ export class MarkdownGenerationService implements IPipelineStep {
             return [];
         }
 
-        this.logger.log(`Generating markdown for ${items.length} items`);
-
         // Process items in batches
         const BATCH_SIZE = 10;
         const processedItems: ItemData[] = [];
@@ -175,8 +169,6 @@ export class MarkdownGenerationService implements IPipelineStep {
      * @returns The extracted content
      */
     private async extractContentFrom(url: string) {
-        this.logger.log(`Extracting content from ${url}`);
-
         try {
             return await this.searchService.extractContent(url);
         } catch (error) {

@@ -8,6 +8,7 @@ import { TriggerGenerationOrchestrator } from '../../trigger/trigger-generation.
 import { DirectoryGenerationPayload } from '@packages/agent/tasks';
 import { Directory, User, GenerateStatusType } from '@packages/agent/entities';
 import { RemoteDirectoryScheduleService } from '../../trigger/remote-directory-schedule.service';
+import { TriggerLogger } from '../../trigger/trigger-logger';
 
 async function createContext(
     appContext: INestApplicationContext,
@@ -32,13 +33,14 @@ async function createContext(
 
 export const directoryGenerationTask = task({
     id: 'directory-generation',
+    maxDuration: 3600 * 5, // 5 hours
     onCancel: async ({ payload }) => {
         if (!payload) {
             return;
         }
 
         const appContext = await NestFactory.createApplicationContext(TriggerWorkerModule, {
-            logger: ['error', 'fatal', 'warn'],
+            logger: new TriggerLogger('DirectoryGeneration:Cancel'),
         });
 
         try {
@@ -62,7 +64,7 @@ export const directoryGenerationTask = task({
     },
     run: async (payload: DirectoryGenerationPayload) => {
         const appContext = await NestFactory.createApplicationContext(TriggerWorkerModule, {
-            logger: ['debug', 'log', 'warn', 'error', 'fatal'],
+            logger: new TriggerLogger('DirectoryGeneration'),
         });
 
         try {
