@@ -397,6 +397,7 @@
                 "overview": "نظرة عامة",
                 "items": "العناصر",
                 "generator": "المولد",
+                "schedule": "الجدولة",
                 "history": "السجل",
                 "deploy": "النشر",
                 "members": "الأعضاء",
@@ -600,6 +601,13 @@
                     "slug": "المعرف (اختياري)",
                     "slugPlaceholder": "custom-item-slug",
                     "slugHelp": "معرف مناسب للرابط. سيتم إنشاؤه تلقائياً إذا تركت فارغاً",
+                    "brand": "العلامة التجارية (اختياري)",
+                    "brandPlaceholder": "أدخل اسم العلامة التجارية",
+                    "brandLogoUrl": "رابط شعار العلامة التجارية (اختياري)",
+                    "brandLogoUrlPlaceholder": "https://example.com/logo.png",
+                    "images": "الصور (اختياري)",
+                    "imagePlaceholder": "https://example.com/screenshot.png",
+                    "imagesHelp": "إضافة روابط الصور (لقطات الشاشة، صور المنتجات)",
                     "featured": "عنصر مميز",
                     "featuredHelp": "ضع علامة على هذا العنصر كمميز في الدليل",
                     "updateWithPR": "إنشاء طلب سحب",
@@ -614,23 +622,24 @@
                     "errors": {
                         "urlRequired": "رابط المصدر مطلوب للاستخراج",
                         "invalidUrl": "يرجى إدخال رابط صالح يتضمن http:// أو https://",
-                        "requiredFields": "يرجى ملء جميع الحقول المطلوبة"
+                        "requiredFields": "يرجى ملء جميع الحقول المطلوبة",
+                        "invalidImageUrl": "يرجى إدخال رابط صورة صالح"
                     }
                 },
                 "updateSuccess": "تم حذف العنصر بنجاح",
                 "updateFailed": "فشل حذف العنصر",
                 "updateError": "حدث خطأ أثناء حذف العنصر",
                 "editDisplay": "حذف",
-                "editDisplayDescription": "Toggle featured status and set display order.",
-                "orderLabel": "Display order (optional)",
-                "orderHelp": "Lower numbers show earlier within featured/non-featured groups.",
+                "editDisplayDescription": "تبديل حالة المميز وتعيين ترتيب العرض.",
+                "orderLabel": "ترتيب العرض (اختياري)",
+                "orderHelp": "الأرقام الأقل تظهر أولاً ضمن المجموعات المميزة/غير المميزة.",
                 "deleteDialogTitle": "حذف",
-                "deleteDialogDescription": "This will remove {name} from the repository.",
-                "createPRLabel": "Create Pull Request",
-                "createPRHelp": "If enabled, changes are proposed via PR instead of direct commit.",
-                "reasonLabel": "Reason (optional)",
-                "reasonPlaceholder": "Why are you removing this item?",
-                "confirmDelete": "Delete item"
+                "deleteDialogDescription": "سيؤدي هذا إلى إزالة {name} من المستودع.",
+                "createPRLabel": "إنشاء طلب سحب",
+                "createPRHelp": "إذا تم التفعيل، يتم اقتراح التغييرات عبر طلب سحب بدلاً من الالتزام المباشر.",
+                "reasonLabel": "السبب (اختياري)",
+                "reasonPlaceholder": "لماذا تزيل هذا العنصر؟",
+                "confirmDelete": "حذف العنصر"
             },
             "generator": {
                 "regenerationWarning": "تحذير إعادة الإنشاء",
@@ -697,11 +706,11 @@
                 "aiFirstGenerationDescription": "تفعيل إنشاء العناصر الأولية بالذكاء الاصطناعي قبل البحث على الويب.",
                 "contentFiltering": "تصفية المحتوى",
                 "contentFilteringDescription": "تفعيل تصفية جودة المحتوى",
-                "recreateConfirmTitle": "Recreate directory data?",
-                "recreateConfirmDescription": "Recreate will delete existing items and regenerate them from scratch. This action cannot be undone.",
-                "confirmRecreate": "Yes, recreate",
-                "recreateInlineTitle": "Recreate will remove existing items",
-                "recreateInlineDescription": "This mode deletes current items and rebuilds them from scratch. Proceed only if you want to replace everything."
+                "recreateConfirmTitle": "إعادة إنشاء بيانات الدليل؟",
+                "recreateConfirmDescription": "إعادة الإنشاء ستحذف العناصر الموجودة وتعيد إنشاءها من الصفر. لا يمكن التراجع عن هذا الإجراء.",
+                "confirmRecreate": "نعم، أعد الإنشاء",
+                "recreateInlineTitle": "إعادة الإنشاء ستزيل العناصر الموجودة",
+                "recreateInlineDescription": "هذا الوضع يحذف العناصر الحالية ويعيد بناءها من الصفر. تابع فقط إذا كنت تريد استبدال كل شيء."
             },
             "progress": {
                 "title": "الإنشاء قيد التنفيذ",
@@ -1429,6 +1438,13 @@
             "fetchFailed": "فشل جلب الأدلة",
             "organization": {
                 "requiredWhenOwnerProvided": "يجب تفعيل المنظمة عند توفير المالك"
+            },
+            "import": {
+                "invalidUrl": "يرجى إدخال رابط صالح",
+                "analyzeFailed": "فشل تحليل المستودع",
+                "started": "تم بدء الاستيراد بنجاح",
+                "failed": "فشل استيراد الدليل",
+                "fetchReposFailed": "فشل جلب المستودعات"
             }
         },
         "generator": {

@@ -397,6 +397,7 @@
                 "overview": "概览",
                 "items": "项目",
                 "generator": "生成器",
+                "schedule": "定时任务",
                 "history": "历史",
                 "deploy": "部署",
                 "members": "成员",
@@ -600,6 +601,13 @@
                     "slug": "标识符（可选）",
                     "slugPlaceholder": "custom-item-slug",
                     "slugHelp": "URL 友好的标识符。如果留空将自动生成",
+                    "brand": "品牌（可选）",
+                    "brandPlaceholder": "输入品牌名称",
+                    "brandLogoUrl": "品牌Logo链接（可选）",
+                    "brandLogoUrlPlaceholder": "https://example.com/logo.png",
+                    "images": "图片（可选）",
+                    "imagePlaceholder": "https://example.com/screenshot.png",
+                    "imagesHelp": "添加图片链接（截图、产品图片）",
                     "featured": "精选项目",
                     "featuredHelp": "将此项目标记为目录中的精选项目",
                     "updateWithPR": "创建拉取请求",
@@ -614,23 +622,24 @@
                     "errors": {
                         "urlRequired": "提取需要来源 URL",
                         "invalidUrl": "请输入包含 http:// 或 https:// 的有效 URL",
-                        "requiredFields": "请填写所有必填字段"
+                        "requiredFields": "请填写所有必填字段",
+                        "invalidImageUrl": "请输入有效的图片链接"
                     }
                 },
                 "updateSuccess": "项目删除成功",
                 "updateFailed": "删除项目失败",
                 "updateError": "删除项目时发生错误",
                 "editDisplay": "删除",
-                "editDisplayDescription": "Toggle featured status and set display order.",
-                "orderLabel": "Display order (optional)",
-                "orderHelp": "Lower numbers show earlier within featured/non-featured groups.",
+                "editDisplayDescription": "切换推荐状态并设置显示顺序。",
+                "orderLabel": "显示顺序（可选）",
+                "orderHelp": "较小的数字在推荐/非推荐组中显示在前面。",
                 "deleteDialogTitle": "删除",
-                "deleteDialogDescription": "This will remove {name} from the repository.",
-                "createPRLabel": "Create Pull Request",
-                "createPRHelp": "If enabled, changes are proposed via PR instead of direct commit.",
-                "reasonLabel": "Reason (optional)",
-                "reasonPlaceholder": "Why are you removing this item?",
-                "confirmDelete": "Delete item"
+                "deleteDialogDescription": "这将从仓库中移除 {name}。",
+                "createPRLabel": "创建拉取请求",
+                "createPRHelp": "如果启用，更改将通过 PR 提议而非直接提交。",
+                "reasonLabel": "原因（可选）",
+                "reasonPlaceholder": "您为什么要移除此项目？",
+                "confirmDelete": "删除项目"
             },
             "generator": {
                 "regenerationWarning": "重新生成警告",
@@ -697,11 +706,11 @@
                 "aiFirstGenerationDescription": "在网页搜索之前启用 AI 生成初始项目。",
                 "contentFiltering": "内容过滤",
                 "contentFilteringDescription": "启用内容质量过滤",
-                "recreateConfirmTitle": "Recreate directory data?",
-                "recreateConfirmDescription": "Recreate will delete existing items and regenerate them from scratch. This action cannot be undone.",
-                "confirmRecreate": "Yes, recreate",
-                "recreateInlineTitle": "Recreate will remove existing items",
-                "recreateInlineDescription": "This mode deletes current items and rebuilds them from scratch. Proceed only if you want to replace everything."
+                "recreateConfirmTitle": "重新创建目录数据？",
+                "recreateConfirmDescription": "重新创建将删除现有项目并从头开始重新生成。此操作无法撤销。",
+                "confirmRecreate": "是的，重新创建",
+                "recreateInlineTitle": "重新创建将删除现有项目",
+                "recreateInlineDescription": "此模式会删除当前项目并从头开始重建。仅在您想要替换所有内容时继续。"
             },
             "progress": {
                 "title": "生成进行中",
@@ -1429,6 +1438,13 @@
             "fetchFailed": "获取目录失败",
             "organization": {
                 "requiredWhenOwnerProvided": "提供所有者时必须启用组织"
+            },
+            "import": {
+                "invalidUrl": "请输入有效的链接",
+                "analyzeFailed": "分析仓库失败",
+                "started": "导入已成功启动",
+                "failed": "导入目录失败",
+                "fetchReposFailed": "获取仓库失败"
             }
         },
         "generator": {
