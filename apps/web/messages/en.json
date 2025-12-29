@@ -1132,21 +1132,56 @@
                     "yesterday": "Yesterday",
                     "daysAgo": "{days} days ago",
                     "weeksAgo": "{weeks} weeks ago",
+                    "repositoriesLoaded": "repositories loaded",
+                    "moreAvailable": "more available",
                     "errors": {
                         "fetchFailed": "Failed to load repositories"
                     }
+                },
+                "chooseMode": {
+                    "title": "Choose Import Method",
+                    "repository": "Repository: {owner}/{repo}",
+                    "repositoryWithItems": "Repository: {owner}/{repo} ({itemCount} items)",
+                    "importCopy": {
+                        "title": "Import & Copy",
+                        "description": "Create new repositories with a copy of the data. Best for forking or starting fresh."
+                    },
+                    "linkExisting": {
+                        "title": "Link Existing",
+                        "description": "Use your existing repository directly. No copying, changes sync automatically."
+                    },
+                    "back": "Back"
+                },
+                "linkConfirm": {
+                    "title": "Link Repository",
+                    "descriptionMissing": "Some repositories were not found. You can continue without them or create them now.",
+                    "descriptionReady": "All repositories found. Ready to link.",
+                    "dataRepo": "Data Repository",
+                    "markdownRepo": "Markdown Repository",
+                    "websiteRepo": "Website Repository",
+                    "found": "Found",
+                    "notFound": "Not found",
+                    "cancel": "Cancel",
+                    "continueWithout": "Continue without",
+                    "createMissing": "Create missing",
+                    "creating": "Creating...",
+                    "linking": "Linking...",
+                    "linkRepos": "Link repositories"
                 },
                 "errors": {
                     "urlRequired": "Please enter a GitHub repository URL",
                     "unsupportedFormat": "This repository format is not supported. Please use a Data Repository or Awesome List format.",
                     "analyzeFailed": "Failed to analyze repository",
+                    "analyzeForLinkingFailed": "Failed to analyze for linking",
                     "nameRequired": "Directory name is required",
                     "noAnalysis": "Please analyze a repository first",
                     "githubRequired": "Please connect your GitHub account first",
-                    "importFailed": "Failed to import directory"
+                    "importFailed": "Failed to import directory",
+                    "linkFailed": "Failed to link directory"
                 },
                 "success": {
-                    "started": "Import started! Redirecting to your directory..."
+                    "started": "Import started! Redirecting to your directory...",
+                    "linked": "Directory linked successfully"
                 }
             }
         },

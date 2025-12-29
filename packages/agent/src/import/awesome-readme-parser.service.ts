@@ -8,7 +8,7 @@ import { slugifyText } from '@src/items-generator/utils/text.utils';
 const categorySchema = z.object({
     id: z.string().describe('URL-friendly ID for the category, lowercase with hyphens'),
     name: z.string().describe('Human-readable name of the category'),
-    description: z.string().optional().describe('Brief description of what items belong here'),
+    description: z.string().nullable().describe('Brief description of what items belong here'),
 });
 
 const extractedCategoriesSchema = z.object({
@@ -20,7 +20,7 @@ const awesomeItemSchema = z.object({
     description: z.string().describe('Description of the item'),
     source_url: z.string().nullable().describe('URL of the item'),
     category: z.string().describe('Category this item belongs to'),
-    tags: z.array(z.string()).optional().describe('Tags extracted from brackets or context'),
+    tags: z.array(z.string()).nullable().describe('Tags extracted from brackets or context'),
 });
 
 type AwesomeItem = z.infer<typeof awesomeItemSchema>;

@@ -39,6 +39,7 @@ import {
 import {
     AnalyzeRepositoryDto,
     AnalyzeRepositoryResponseDto,
+    AnalyzeForLinkingResponseDto,
     ImportDirectoryDto,
     ImportDirectoryResponseDto,
     GetUserRepositoriesDto,
@@ -418,6 +419,16 @@ export class DirectoriesController {
     ): Promise<AnalyzeRepositoryResponseDto> {
         const user = await this.authService.getUser(auth.userId);
         return this.directoryImportService.analyzeRepository(analyzeDto, user);
+    }
+
+    @Post('directories/import/analyze-for-linking')
+    @HttpCode(HttpStatus.OK)
+    async analyzeForLinking(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Body() analyzeDto: AnalyzeRepositoryDto,
+    ): Promise<AnalyzeForLinkingResponseDto> {
+        const user = await this.authService.getUser(auth.userId);
+        return this.directoryImportService.analyzeForLinking(analyzeDto, user);
     }
 
     @Post('directories/import')

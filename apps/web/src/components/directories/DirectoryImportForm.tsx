@@ -17,22 +17,27 @@ import {
     Link,
     FolderGit2,
     Loader2,
-    AlertCircle,
     CheckCircle2,
     FileText,
     Database,
     ArrowLeft,
     ArrowRight,
 } from 'lucide-react';
-import { analyzeRepository, importDirectory } from '@/app/actions/dashboard/directories';
+import {
+    analyzeRepository,
+    importDirectory,
+    analyzeForLinking,
+} from '@/app/actions/dashboard/directories';
+import { ImportModeSelector, LinkExistingConfirm, type ImportMode } from './import';
+import type { AnalyzeForLinkingResponseDto } from '@/lib/api/directory';
 
 interface DirectoryImportFormProps {
     user: AuthUser;
 }
 
-type ImportStep = 'source' | 'analyzing' | 'configure' | 'importing';
+type ImportStep = 'source' | 'analyzing' | 'choose_mode' | 'configure' | 'importing';
 type SourceMethod = 'url' | 'repository';
-type DetectedType = 'data_repo' | 'awesome_readme' | null;
+type DetectedType = 'data_repo' | 'awesome_readme' | 'link_existing' | null;
 
 interface AnalysisResult {
     sourceUrl: string;
@@ -60,6 +65,8 @@ export function DirectoryImportForm({ user }: DirectoryImportFormProps) {
     const [owner, setOwner] = useState('');
     const [showAdvanced, setShowAdvanced] = useState(false);
     const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
+    const [linkAnalysis, setLinkAnalysis] = useState<AnalyzeForLinkingResponseDto | null>(null);
+    const [showLinkConfirm, setShowLinkConfirm] = useState(false);
     const [isPending, startTransition] = useTransition();
     const router = useRouter();
     const t = useTranslations('dashboard.directoryCreation.import');
@@ -98,11 +105,64 @@ export function DirectoryImportForm({ user }: DirectoryImportFormProps) {
                                 .replace(/\b\w/g, (c) => c.toUpperCase()),
                         );
                     }
-                    setStep('configure');
+                    // For data_repo, show mode selection
+                    if (result.data.detectedType === 'data_repo') {
+                        setStep('choose_mode');
+                    } else {
+                        setStep('configure');
+                    }
                 }
             } else {
                 toast.error(result.error || t('errors.analyzeFailed'));
                 setStep('source');
+            }
+        });
+    };
+
+    const handleModeSelect = async (mode: ImportMode) => {
+        if (mode === 'import') {
+            setStep('configure');
+        } else if (mode === 'link_existing' && analysisResult) {
+            // Analyze for linking
+            startTransition(async () => {
+                const result = await analyzeForLinking(analysisResult.sourceUrl);
+                if (result.success && result.data) {
+                    setLinkAnalysis(result.data);
+                    setShowLinkConfirm(true);
+                } else {
+                    toast.error(result.error || t('errors.analyzeForLinkingFailed'));
+                    setStep('choose_mode');
+                }
+            });
+        }
+    };
+
+    const handleLinkConfirm = async (createMissingRepos: boolean) => {
+        if (!analysisResult) return;
+
+        setShowLinkConfirm(false);
+        setStep('importing');
+
+        startTransition(async () => {
+            const result = await importDirectory({
+                sourceUrl,
+                sourceType: 'link_existing',
+                name: directoryName,
+                organization,
+                owner: organization ? owner : undefined,
+                createMissingRepos,
+            });
+
+            if (result.success) {
+                toast.success(result.message || t('success.linked'));
+                if (result.directoryId) {
+                    router.push(ROUTES.DASHBOARD_DIRECTORY(result.directoryId));
+                } else {
+                    router.push(ROUTES.DASHBOARD_DIRECTORIES);
+                }
+            } else {
+                toast.error(result.error || t('errors.linkFailed'));
+                setStep('choose_mode');
             }
         });
     };
@@ -282,6 +342,45 @@ export function DirectoryImportForm({ user }: DirectoryImportFormProps) {
             <p className="text-text-secondary dark:text-text-secondary-dark text-center max-w-md">
                 {t('analyzing.subtitle')}
             </p>
+        </div>
+    );
+
+    const renderChooseModeStep = () => (
+        <div className="space-y-6">
+            <ImportModeSelector
+                repoInfo={{
+                    owner: analysisResult?.owner || '',
+                    repo: analysisResult?.repo || '',
+                    itemCount: analysisResult?.structure?.itemCount,
+                    categoryCount: analysisResult?.structure?.categoryCount,
+                }}
+                onSelectMode={handleModeSelect}
+                disabled={isPending}
+            />
+            <div className="flex justify-center">
+                <Button
+                    onClick={() => {
+                        setStep('source');
+                        setAnalysisResult(null);
+                    }}
+                    disabled={isPending}
+                    variant="ghost"
+                >
+                    <ArrowLeft className="w-4 h-4" />
+                    {t('chooseMode.back')}
+                </Button>
+            </div>
+
+            {/* Link Existing Confirm Dialog */}
+            {linkAnalysis && (
+                <LinkExistingConfirm
+                    open={showLinkConfirm}
+                    onOpenChange={setShowLinkConfirm}
+                    repoStatus={linkAnalysis.relatedRepos}
+                    onConfirm={handleLinkConfirm}
+                    isLoading={isPending}
+                />
+            )}
         </div>
     );
 
@@ -486,6 +585,7 @@ export function DirectoryImportForm({ user }: DirectoryImportFormProps) {
             >
                 {step === 'source' && renderSourceStep()}
                 {step === 'analyzing' && renderAnalyzingStep()}
+                {step === 'choose_mode' && renderChooseModeStep()}
                 {step === 'configure' && renderConfigureStep()}
                 {step === 'importing' && renderImportingStep()}
             </div>

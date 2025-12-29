@@ -1046,6 +1046,134 @@
                 "success": {
                     "created": "Verzeichnis erfolgreich erstellt!"
                 }
+            },
+            "import": {
+                "title": "Existierendes importieren",
+                "subtitle": "Importieren Sie ein Verzeichnis aus einem bestehenden GitHub-Repository",
+                "importNow": "Jetzt importieren",
+                "formTitle": "Verzeichnis von GitHub importieren",
+                "formSubtitle": "Importieren Sie Einträge aus einem bestehenden GitHub-Repository, um Ihr Verzeichnis zu erstellen",
+                "sourceMethod": {
+                    "url": {
+                        "title": "URL einfügen",
+                        "description": "Geben Sie eine GitHub-Repository-URL direkt ein"
+                    },
+                    "repository": {
+                        "title": "Meine Repositories",
+                        "description": "Wählen Sie aus Ihren GitHub-Repositories"
+                    }
+                },
+                "urlLabel": "GitHub-Repository-URL",
+                "urlPlaceholder": "https://github.com/owner/repository",
+                "urlHelp": "Geben Sie die vollständige URL eines GitHub-Repositorys ein",
+                "supportedFormats": {
+                    "title": "Unterstützte Repository-Formate",
+                    "dataRepo": {
+                        "title": "Daten-Repository",
+                        "description": "Repositories mit config.yml und data/-Ordnerstruktur"
+                    },
+                    "awesomeReadme": {
+                        "title": "Awesome-Liste",
+                        "description": "Kuratierte Listen-Repositories mit Markdown-README"
+                    }
+                },
+                "analyzing": {
+                    "title": "Repository wird analysiert",
+                    "subtitle": "Repository-Typ und -Struktur werden erkannt..."
+                },
+                "detectedType": {
+                    "dataRepo": "Daten-Repository erkannt",
+                    "awesomeReadme": "Awesome-Liste erkannt"
+                },
+                "badges": {
+                    "dataRepo": "Daten-Repo",
+                    "awesomeReadme": "Awesome-Liste"
+                },
+                "preview": {
+                    "items": "Einträge",
+                    "categories": "Kategorien"
+                },
+                "nameLabel": "Verzeichnisname",
+                "namePlaceholder": "z.B. Mein Awesome-Verzeichnis",
+                "advancedSettings": "Erweiterte Einstellungen",
+                "advancedSubtitle": "Organisations- und Repository-Einstellungen konfigurieren",
+                "attribution": {
+                    "title": "Quellenangabe:",
+                    "text": "Dieses Verzeichnis wird {url} als Quelle referenzieren"
+                },
+                "analyzeButton": "Repository analysieren",
+                "importButton": "Verzeichnis importieren",
+                "importingButton": "Importiert...",
+                "backButton": "Zurück",
+                "cancelButton": "Abbrechen",
+                "importing": {
+                    "title": "Verzeichnis wird importiert",
+                    "subtitle": "Ihr Verzeichnis wird aus dem Quell-Repository eingerichtet..."
+                },
+                "repositorySelector": {
+                    "title": "Repository auswählen",
+                    "searchPlaceholder": "Repositories durchsuchen...",
+                    "loading": "Repositories werden geladen...",
+                    "noRepositories": "Keine Repositories gefunden",
+                    "noResults": "Keine Repositories entsprechen Ihrer Suche",
+                    "tryAgain": "Erneut versuchen",
+                    "loadMore": "Mehr laden",
+                    "showing": "Zeige {shown} von {total} Repositories",
+                    "today": "Heute",
+                    "yesterday": "Gestern",
+                    "daysAgo": "vor {days} Tagen",
+                    "weeksAgo": "vor {weeks} Wochen",
+                    "repositoriesLoaded": "Repositories geladen",
+                    "moreAvailable": "weitere verfügbar",
+                    "errors": {
+                        "fetchFailed": "Repositories konnten nicht geladen werden"
+                    }
+                },
+                "chooseMode": {
+                    "title": "Import-Methode wählen",
+                    "repository": "Repository: {owner}/{repo}",
+                    "repositoryWithItems": "Repository: {owner}/{repo} ({itemCount} Einträge)",
+                    "importCopy": {
+                        "title": "Importieren & Kopieren",
+                        "description": "Neue Repositories mit einer Kopie der Daten erstellen. Ideal zum Forken oder Neustarten."
+                    },
+                    "linkExisting": {
+                        "title": "Existierendes verknüpfen",
+                        "description": "Ihr bestehendes Repository direkt nutzen. Keine Kopie, Änderungen werden automatisch synchronisiert."
+                    },
+                    "back": "Zurück"
+                },
+                "linkConfirm": {
+                    "title": "Repository verknüpfen",
+                    "descriptionMissing": "Einige Repositories wurden nicht gefunden. Sie können ohne sie fortfahren oder sie jetzt erstellen.",
+                    "descriptionReady": "Alle Repositories gefunden. Bereit zum Verknüpfen.",
+                    "dataRepo": "Daten-Repository",
+                    "markdownRepo": "Markdown-Repository",
+                    "websiteRepo": "Website-Repository",
+                    "found": "Gefunden",
+                    "notFound": "Nicht gefunden",
+                    "cancel": "Abbrechen",
+                    "continueWithout": "Ohne fortfahren",
+                    "createMissing": "Fehlende erstellen",
+                    "creating": "Wird erstellt...",
+                    "linking": "Wird verknüpft...",
+                    "linkRepos": "Repositories verknüpfen"
+                },
+                "errors": {
+                    "urlRequired": "Bitte geben Sie eine GitHub-Repository-URL ein",
+                    "unsupportedFormat": "Dieses Repository-Format wird nicht unterstützt. Bitte verwenden Sie ein Daten-Repository oder Awesome-Listen-Format.",
+                    "analyzeFailed": "Repository-Analyse fehlgeschlagen",
+                    "analyzeForLinkingFailed": "Analyse zum Verknüpfen fehlgeschlagen",
+                    "nameRequired": "Verzeichnisname ist erforderlich",
+                    "noAnalysis": "Bitte analysieren Sie zuerst ein Repository",
+                    "githubRequired": "Bitte verbinden Sie zuerst Ihr GitHub-Konto",
+                    "importFailed": "Verzeichnisimport fehlgeschlagen",
+                    "linkFailed": "Verzeichnisverknüpfung fehlgeschlagen"
+                },
+                "success": {
+                    "started": "Import gestartet! Weiterleitung zu Ihrem Verzeichnis...",
+                    "linked": "Verzeichnis erfolgreich verknüpft"
+                }
             }
         },
         "github": {

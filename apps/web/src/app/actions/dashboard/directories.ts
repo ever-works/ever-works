@@ -473,6 +473,7 @@ interface ImportDirectoryRequest {
     name: string;
     organization?: boolean;
     owner?: string;
+    createMissingRepos?: boolean;
 }
 
 export async function importDirectory(data: ImportDirectoryRequest) {
@@ -480,7 +481,7 @@ export async function importDirectory(data: ImportDirectoryRequest) {
 
     const importSchema = z.object({
         sourceUrl: z.string().url(t('import.invalidUrl')),
-        sourceType: z.enum(['data_repo', 'awesome_readme']),
+        sourceType: z.enum(['data_repo', 'awesome_readme', 'link_existing']),
         name: z
             .string()
             .min(1, t('name.required'))
@@ -488,6 +489,7 @@ export async function importDirectory(data: ImportDirectoryRequest) {
             .pipe(z.string().max(100, t('name.maxLength'))),
         organization: z.boolean().optional(),
         owner: z.string().optional(),
+        createMissingRepos: z.boolean().optional(),
     });
 
     try {
@@ -523,6 +525,7 @@ export async function importDirectory(data: ImportDirectoryRequest) {
             name: validation.data.name,
             organization,
             owner: owner || undefined,
+            createMissingRepos: validation.data.createMissingRepos,
         });
 
         return {
@@ -545,6 +548,48 @@ interface GetUserRepositoriesParams {
     page?: number;
     perPage?: number;
     search?: string;
+}
+
+export async function analyzeForLinking(sourceUrl: string) {
+    const t = await getTranslations('actions.directories');
+
+    const urlSchema = z.string().url(t('import.invalidUrl'));
+
+    try {
+        const validation = urlSchema.safeParse(sourceUrl);
+        if (!validation.success) {
+            return {
+                success: false,
+                error: validation.error.errors[0].message,
+            };
+        }
+
+        // We need to ensure that oauth connection is valid or revoke it if not
+        await authAPI.oauth_connections.ensureConnection(RepoProvider.GITHUB);
+
+        // Check GitHub connection first
+        const oauthCheck = await checkOAuthConnection(RepoProvider.GITHUB);
+        if (!oauthCheck.connected) {
+            return {
+                success: false,
+                error: t('githubRequired'),
+                requiresGitHub: true,
+            };
+        }
+
+        const result = await directoryAPI.analyzeForLinking({ sourceUrl: validation.data });
+
+        return {
+            success: true,
+            data: result,
+        };
+    } catch (error) {
+        console.error('Failed to analyze for linking:', error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : t('import.analyzeFailed'),
+        };
+    }
 }
 
 export async function getUserRepositories(params: GetUserRepositoriesParams = {}) {

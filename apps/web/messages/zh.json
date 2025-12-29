@@ -1046,6 +1046,134 @@
                 "success": {
                     "created": "目录创建成功！"
                 }
+            },
+            "import": {
+                "title": "导入已有",
+                "subtitle": "从现有 GitHub 仓库导入目录",
+                "importNow": "立即导入",
+                "formTitle": "从 GitHub 导入目录",
+                "formSubtitle": "从现有 GitHub 仓库导入项目来创建您的目录",
+                "sourceMethod": {
+                    "url": {
+                        "title": "粘贴链接",
+                        "description": "直接输入 GitHub 仓库链接"
+                    },
+                    "repository": {
+                        "title": "我的仓库",
+                        "description": "从您的 GitHub 仓库中选择"
+                    }
+                },
+                "urlLabel": "GitHub 仓库链接",
+                "urlPlaceholder": "https://github.com/owner/repository",
+                "urlHelp": "输入 GitHub 仓库的完整链接",
+                "supportedFormats": {
+                    "title": "支持的仓库格式",
+                    "dataRepo": {
+                        "title": "数据仓库",
+                        "description": "包含 config.yml 和 data/ 文件夹结构的仓库"
+                    },
+                    "awesomeReadme": {
+                        "title": "Awesome 列表",
+                        "description": "包含 markdown README 的精选列表仓库"
+                    }
+                },
+                "analyzing": {
+                    "title": "分析仓库中",
+                    "subtitle": "检测仓库类型和结构..."
+                },
+                "detectedType": {
+                    "dataRepo": "检测到数据仓库",
+                    "awesomeReadme": "检测到 Awesome 列表"
+                },
+                "badges": {
+                    "dataRepo": "数据仓库",
+                    "awesomeReadme": "Awesome 列表"
+                },
+                "preview": {
+                    "items": "项目",
+                    "categories": "分类"
+                },
+                "nameLabel": "目录名称",
+                "namePlaceholder": "例如：我的精选目录",
+                "advancedSettings": "高级设置",
+                "advancedSubtitle": "配置组织和仓库设置",
+                "attribution": {
+                    "title": "来源归属：",
+                    "text": "此目录将引用 {url} 作为其来源"
+                },
+                "analyzeButton": "分析仓库",
+                "importButton": "导入目录",
+                "importingButton": "导入中...",
+                "backButton": "返回",
+                "cancelButton": "取消",
+                "importing": {
+                    "title": "导入目录中",
+                    "subtitle": "正在从源仓库设置您的目录..."
+                },
+                "repositorySelector": {
+                    "title": "选择仓库",
+                    "searchPlaceholder": "搜索仓库...",
+                    "loading": "加载仓库中...",
+                    "noRepositories": "未找到仓库",
+                    "noResults": "没有仓库匹配您的搜索",
+                    "tryAgain": "重试",
+                    "loadMore": "加载更多",
+                    "showing": "显示 {shown} 个，共 {total} 个仓库",
+                    "today": "今天",
+                    "yesterday": "昨天",
+                    "daysAgo": "{days} 天前",
+                    "weeksAgo": "{weeks} 周前",
+                    "repositoriesLoaded": "个仓库已加载",
+                    "moreAvailable": "更多可用",
+                    "errors": {
+                        "fetchFailed": "加载仓库失败"
+                    }
+                },
+                "chooseMode": {
+                    "title": "选择导入方式",
+                    "repository": "仓库：{owner}/{repo}",
+                    "repositoryWithItems": "仓库：{owner}/{repo}（{itemCount} 个项目）",
+                    "importCopy": {
+                        "title": "导入并复制",
+                        "description": "创建新仓库并复制数据。适合 fork 或全新开始。"
+                    },
+                    "linkExisting": {
+                        "title": "链接已有",
+                        "description": "直接使用您现有的仓库。无需复制，更改自动同步。"
+                    },
+                    "back": "返回"
+                },
+                "linkConfirm": {
+                    "title": "链接仓库",
+                    "descriptionMissing": "未找到部分仓库。您可以继续而不使用它们，或立即创建。",
+                    "descriptionReady": "已找到所有仓库。准备链接。",
+                    "dataRepo": "数据仓库",
+                    "markdownRepo": "Markdown 仓库",
+                    "websiteRepo": "网站仓库",
+                    "found": "已找到",
+                    "notFound": "未找到",
+                    "cancel": "取消",
+                    "continueWithout": "继续而不创建",
+                    "createMissing": "创建缺失的",
+                    "creating": "创建中...",
+                    "linking": "链接中...",
+                    "linkRepos": "链接仓库"
+                },
+                "errors": {
+                    "urlRequired": "请输入 GitHub 仓库链接",
+                    "unsupportedFormat": "不支持此仓库格式。请使用数据仓库或 Awesome 列表格式。",
+                    "analyzeFailed": "分析仓库失败",
+                    "analyzeForLinkingFailed": "链接分析失败",
+                    "nameRequired": "目录名称是必需的",
+                    "noAnalysis": "请先分析一个仓库",
+                    "githubRequired": "请先连接您的 GitHub 账户",
+                    "importFailed": "导入目录失败",
+                    "linkFailed": "链接目录失败"
+                },
+                "success": {
+                    "started": "导入已开始！正在跳转到您的目录...",
+                    "linked": "目录链接成功"
+                }
             }
         },
         "github": {

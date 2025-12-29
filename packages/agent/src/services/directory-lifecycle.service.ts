@@ -162,12 +162,12 @@ export class DirectoryLifecycleService {
             const markdownTemplate = snapshot.readmeTemplate;
             if (markdownTemplate?.header && !directory.readmeConfig?.header) {
                 updates.readmeConfig.header = markdownTemplate.header;
-                updates.readmeConfig.overwriteDefaultHeader = false;
+                updates.readmeConfig.overwriteDefaultHeader = true;
             }
 
             if (markdownTemplate?.footer && !directory.readmeConfig?.footer) {
                 updates.readmeConfig.footer = markdownTemplate.footer;
-                updates.readmeConfig.overwriteDefaultFooter = false;
+                updates.readmeConfig.overwriteDefaultFooter = true;
             }
 
             if (Object.keys(updates).length > 0) {

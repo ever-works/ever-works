@@ -1046,6 +1046,134 @@
                 "success": {
                     "created": "Répertoire créé avec succès !"
                 }
+            },
+            "import": {
+                "title": "Importer existant",
+                "subtitle": "Importez un répertoire depuis un dépôt GitHub existant",
+                "importNow": "Importer maintenant",
+                "formTitle": "Importer un répertoire depuis GitHub",
+                "formSubtitle": "Importez des éléments depuis un dépôt GitHub existant pour créer votre répertoire",
+                "sourceMethod": {
+                    "url": {
+                        "title": "Coller l'URL",
+                        "description": "Entrez directement l'URL d'un dépôt GitHub"
+                    },
+                    "repository": {
+                        "title": "Mes dépôts",
+                        "description": "Sélectionnez parmi vos dépôts GitHub"
+                    }
+                },
+                "urlLabel": "URL du dépôt GitHub",
+                "urlPlaceholder": "https://github.com/owner/repository",
+                "urlHelp": "Entrez l'URL complète d'un dépôt GitHub",
+                "supportedFormats": {
+                    "title": "Formats de dépôt supportés",
+                    "dataRepo": {
+                        "title": "Dépôt de données",
+                        "description": "Dépôts avec structure config.yml et dossier data/"
+                    },
+                    "awesomeReadme": {
+                        "title": "Liste Awesome",
+                        "description": "Dépôts de listes curées avec README markdown"
+                    }
+                },
+                "analyzing": {
+                    "title": "Analyse du dépôt",
+                    "subtitle": "Détection du type et de la structure du dépôt..."
+                },
+                "detectedType": {
+                    "dataRepo": "Dépôt de données détecté",
+                    "awesomeReadme": "Liste Awesome détectée"
+                },
+                "badges": {
+                    "dataRepo": "Dépôt données",
+                    "awesomeReadme": "Liste Awesome"
+                },
+                "preview": {
+                    "items": "éléments",
+                    "categories": "catégories"
+                },
+                "nameLabel": "Nom du répertoire",
+                "namePlaceholder": "ex. Mon répertoire Awesome",
+                "advancedSettings": "Paramètres avancés",
+                "advancedSubtitle": "Configurer les paramètres d'organisation et de dépôt",
+                "attribution": {
+                    "title": "Attribution de source :",
+                    "text": "Ce répertoire référencera {url} comme source"
+                },
+                "analyzeButton": "Analyser le dépôt",
+                "importButton": "Importer le répertoire",
+                "importingButton": "Importation...",
+                "backButton": "Retour",
+                "cancelButton": "Annuler",
+                "importing": {
+                    "title": "Importation du répertoire",
+                    "subtitle": "Configuration de votre répertoire depuis le dépôt source..."
+                },
+                "repositorySelector": {
+                    "title": "Sélectionner un dépôt",
+                    "searchPlaceholder": "Rechercher des dépôts...",
+                    "loading": "Chargement des dépôts...",
+                    "noRepositories": "Aucun dépôt trouvé",
+                    "noResults": "Aucun dépôt ne correspond à votre recherche",
+                    "tryAgain": "Réessayer",
+                    "loadMore": "Charger plus",
+                    "showing": "Affichage de {shown} sur {total} dépôts",
+                    "today": "Aujourd'hui",
+                    "yesterday": "Hier",
+                    "daysAgo": "il y a {days} jours",
+                    "weeksAgo": "il y a {weeks} semaines",
+                    "repositoriesLoaded": "dépôts chargés",
+                    "moreAvailable": "plus disponibles",
+                    "errors": {
+                        "fetchFailed": "Échec du chargement des dépôts"
+                    }
+                },
+                "chooseMode": {
+                    "title": "Choisir la méthode d'import",
+                    "repository": "Dépôt : {owner}/{repo}",
+                    "repositoryWithItems": "Dépôt : {owner}/{repo} ({itemCount} éléments)",
+                    "importCopy": {
+                        "title": "Importer et copier",
+                        "description": "Créer de nouveaux dépôts avec une copie des données. Idéal pour forker ou repartir de zéro."
+                    },
+                    "linkExisting": {
+                        "title": "Lier l'existant",
+                        "description": "Utiliser directement votre dépôt existant. Pas de copie, les modifications se synchronisent automatiquement."
+                    },
+                    "back": "Retour"
+                },
+                "linkConfirm": {
+                    "title": "Lier le dépôt",
+                    "descriptionMissing": "Certains dépôts n'ont pas été trouvés. Vous pouvez continuer sans eux ou les créer maintenant.",
+                    "descriptionReady": "Tous les dépôts trouvés. Prêt à lier.",
+                    "dataRepo": "Dépôt de données",
+                    "markdownRepo": "Dépôt Markdown",
+                    "websiteRepo": "Dépôt site web",
+                    "found": "Trouvé",
+                    "notFound": "Non trouvé",
+                    "cancel": "Annuler",
+                    "continueWithout": "Continuer sans",
+                    "createMissing": "Créer les manquants",
+                    "creating": "Création...",
+                    "linking": "Liaison...",
+                    "linkRepos": "Lier les dépôts"
+                },
+                "errors": {
+                    "urlRequired": "Veuillez entrer une URL de dépôt GitHub",
+                    "unsupportedFormat": "Ce format de dépôt n'est pas supporté. Veuillez utiliser un dépôt de données ou un format de liste Awesome.",
+                    "analyzeFailed": "Échec de l'analyse du dépôt",
+                    "analyzeForLinkingFailed": "Échec de l'analyse pour la liaison",
+                    "nameRequired": "Le nom du répertoire est requis",
+                    "noAnalysis": "Veuillez d'abord analyser un dépôt",
+                    "githubRequired": "Veuillez d'abord connecter votre compte GitHub",
+                    "importFailed": "Échec de l'importation du répertoire",
+                    "linkFailed": "Échec de la liaison du répertoire"
+                },
+                "success": {
+                    "started": "Importation démarrée ! Redirection vers votre répertoire...",
+                    "linked": "Répertoire lié avec succès"
+                }
             }
         },
         "github": {

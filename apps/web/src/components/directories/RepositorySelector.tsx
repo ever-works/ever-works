@@ -41,7 +41,6 @@ export function RepositorySelector({ onSelect, selectedUrl }: RepositorySelector
     const [search, setSearch] = useState('');
     const [page, setPage] = useState(1);
     const [hasMore, setHasMore] = useState(false);
-    const [total, setTotal] = useState(0);
     const [expanded, setExpanded] = useState(true);
     const t = useTranslations('dashboard.directoryCreation.import.repositorySelector');
 
@@ -66,7 +65,6 @@ export function RepositorySelector({ onSelect, selectedUrl }: RepositorySelector
                         setRepositories(result.data.repositories);
                     }
                     setHasMore(result.data.hasMore);
-                    setTotal(result.data.total);
                 } else {
                     setError(result.error || t('errors.fetchFailed'));
                 }
@@ -229,12 +227,12 @@ export function RepositorySelector({ onSelect, selectedUrl }: RepositorySelector
                                                     ) : (
                                                         <Globe className="w-4 h-4 text-success shrink-0" />
                                                     )}
-                                                    <span className="font-medium text-text dark:text-text-dark truncate">
+                                                    <span className="font-medium text-text dark:text-text-dark">
                                                         {repo.name}
                                                     </span>
                                                 </div>
                                                 {repo.description && (
-                                                    <p className="text-xs text-text-secondary dark:text-text-secondary-dark mt-1 truncate">
+                                                    <p className="text-xs text-text-secondary dark:text-text-secondary-dark mt-1">
                                                         {repo.description}
                                                     </p>
                                                 )}
@@ -270,10 +268,11 @@ export function RepositorySelector({ onSelect, selectedUrl }: RepositorySelector
                     </div>
 
                     {/* Footer */}
-                    {total > 0 && (
+                    {repositories.length > 0 && (
                         <div className="p-2 text-center border-t border-border dark:border-border-dark">
                             <span className="text-xs text-text-muted dark:text-text-muted-dark">
-                                {t('showing', { shown: repositories.length, total })}
+                                {repositories.length} {t('repositoriesLoaded')}
+                                {hasMore && ` (${t('moreAvailable')})`}
                             </span>
                         </div>
                     )}

@@ -259,7 +259,7 @@ export interface SyncDirectoryResponse {
 }
 
 // Import types
-export type ImportSourceType = 'data_repo' | 'awesome_readme';
+export type ImportSourceType = 'data_repo' | 'awesome_readme' | 'link_existing';
 
 export interface AnalyzeRepositoryDto {
     sourceUrl: string;
@@ -288,6 +288,7 @@ export interface ImportDirectoryDto {
     name: string;
     owner?: string;
     organization?: boolean;
+    createMissingRepos?: boolean;
 }
 
 export interface ImportDirectoryResponseDto {
@@ -315,6 +316,25 @@ export interface GetUserRepositoriesResponseDto {
     page: number;
     perPage: number;
     hasMore: boolean;
+}
+
+export interface RelatedRepoStatus {
+    exists: boolean;
+    name: string | null;
+    hasWriteAccess?: boolean;
+}
+
+export interface AnalyzeForLinkingResponseDto {
+    canLink: boolean;
+    hasWriteAccess: boolean;
+    relatedRepos: {
+        data: RelatedRepoStatus & { exists: true; name: string };
+        markdown: RelatedRepoStatus;
+        website: RelatedRepoStatus;
+    };
+    itemCount?: number;
+    categoryCount?: number;
+    error?: string;
 }
 
 export const directoryAPI = {
@@ -463,6 +483,15 @@ export const directoryAPI = {
     analyzeRepository: async (data: AnalyzeRepositoryDto) => {
         return serverMutation<AnalyzeRepositoryResponseDto>({
             endpoint: '/directories/import/analyze',
+            data,
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    analyzeForLinking: async (data: AnalyzeRepositoryDto) => {
+        return serverMutation<AnalyzeForLinkingResponseDto>({
+            endpoint: '/directories/import/analyze-for-linking',
             data,
             method: 'POST',
             wrapInData: false,

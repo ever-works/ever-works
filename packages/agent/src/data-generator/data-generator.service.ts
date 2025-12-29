@@ -783,10 +783,6 @@ export class DataGeneratorService {
         return additionalFooter + LEGAL_NOTICE;
     }
 
-    /**
-     * Initialize a data repository with pre-existing imported data.
-     * Used when importing from external sources (data repos or awesome READMEs).
-     */
     async initializeWithImportedData(
         directory: Directory,
         user: User,
@@ -795,6 +791,12 @@ export class DataGeneratorService {
             categories: Identifiable[];
             tags: Identifiable[];
             config?: Record<string, any>;
+            importRequest?: {
+                sourceUrl: string;
+                sourceType: string;
+                sourceOwner: string;
+                sourceRepo: string;
+            };
         },
     ): Promise<InitializeResult> {
         const token = user.getGitToken();
@@ -837,11 +839,23 @@ export class DataGeneratorService {
                 await data.writeTags(importedData.tags);
             }
 
-            // Write config
+            const initialCategories = importedData.categories.map((c) => c.id);
+            const initialPrompt = `Directory imported from ${importedData.importRequest?.sourceOwner || 'external'}/${importedData.importRequest?.sourceRepo || 'source'}. Contains ${importedData.items.length} items across ${importedData.categories.length} categories.`;
+
+            const initialRequestData = new CreateItemsGeneratorDto();
+            initialRequestData.name = directory.name;
+            initialRequestData.prompt = initialPrompt;
+            initialRequestData.initial_categories = initialCategories;
+            if (importedData.importRequest?.sourceUrl) {
+                initialRequestData.source_urls = [importedData.importRequest.sourceUrl];
+            }
+
             const configData = {
                 ...importedData.config,
                 metadata: {
                     ...(importedData.config?.metadata || {}),
+                    initial_prompt: initialPrompt,
+                    last_request_data: initialRequestData,
                 },
             };
             await data.mergeConfig(configData);

@@ -13,6 +13,7 @@ import { AwesomeReadmeParserService } from '@src/import/awesome-readme-parser.se
 import {
     AnalyzeRepositoryDto,
     AnalyzeRepositoryResponseDto,
+    AnalyzeForLinkingResponseDto,
     ImportDirectoryDto,
     ImportDirectoryResponseDto,
     ImportSourceTypeEnum,
@@ -53,6 +54,26 @@ export class DirectoryImportService {
     ): Promise<AnalyzeRepositoryResponseDto> {
         const token = this.getGitHubToken(user);
         return this.sourceRepoAnalyzer.analyzeRepository(dto.sourceUrl, token);
+    }
+
+    async analyzeForLinking(
+        dto: AnalyzeRepositoryDto,
+        user: User,
+    ): Promise<AnalyzeForLinkingResponseDto> {
+        const token = this.getGitHubToken(user);
+        if (!token) {
+            return {
+                canLink: false,
+                hasWriteAccess: false,
+                relatedRepos: {
+                    data: { exists: true, name: '' },
+                    markdown: { exists: false, name: null },
+                    website: { exists: false, name: null },
+                },
+                error: 'GitHub token not available',
+            };
+        }
+        return this.sourceRepoAnalyzer.analyzeForLinking(dto.sourceUrl, token);
     }
 
     /**
@@ -119,7 +140,6 @@ export class DirectoryImportService {
      * Initiate a directory import
      */
     async initiateImport(dto: ImportDirectoryDto, user: User): Promise<ImportDirectoryResponseDto> {
-        // Parse the source URL
         const parsed = this.sourceRepoAnalyzer.parseGitHubUrl(dto.sourceUrl);
         if (!parsed) {
             return {
@@ -128,10 +148,8 @@ export class DirectoryImportService {
             };
         }
 
-        // Create the slug from directory name
         const slug = slugifyText(dto.name);
 
-        // Check if directory with this slug already exists
         const existingDir = await this.directoryRepository.findByOwnerAndSlug({
             userId: user.id,
             owner: dto.owner || user.username,
@@ -146,7 +164,6 @@ export class DirectoryImportService {
         }
 
         try {
-            // Create the directory record
             const directory = await this.directoryRepository.create(
                 {
                     slug,
@@ -160,7 +177,6 @@ export class DirectoryImportService {
                 user,
             );
 
-            // Set the source repository info
             const sourceRepository: SourceRepository = {
                 url: dto.sourceUrl,
                 owner: parsed.owner,
@@ -177,7 +193,6 @@ export class DirectoryImportService {
                 },
             });
 
-            // Create generation history record
             const history = await this.generationHistoryRepository.createEntry({
                 directoryId: directory.id,
                 userId: user.id,
@@ -193,19 +208,23 @@ export class DirectoryImportService {
                 startedAt: new Date(),
             });
 
-            // Run import in-process for now (can be moved to Trigger.dev later)
-            this.runImportInBackground(directory.id, user, dto, parsed, history.id).catch(
-                (error) => {
-                    this.logger.error(`Import failed for directory ${directory.id}`, error);
-                },
-            );
+            const result = await this.runImport(directory.id, user, dto, parsed, history.id);
 
-            return {
-                status: 'pending',
-                directoryId: directory.id,
-                historyId: history.id,
-                message: 'Import started. You will be redirected to the directory page.',
-            };
+            if (result.success) {
+                return {
+                    status: 'success',
+                    directoryId: directory.id,
+                    historyId: history.id,
+                    message: `Successfully imported ${result.itemsImported} items.`,
+                };
+            } else {
+                await this.cleanupFailedImport(directory.id, history.id);
+
+                return {
+                    status: 'error',
+                    message: result.error || 'Import failed',
+                };
+            }
         } catch (error) {
             this.logger.error('Failed to initiate import', error);
 
@@ -221,33 +240,46 @@ export class DirectoryImportService {
     }
 
     /**
-     * Run import in background (can be converted to Trigger.dev task)
+     * Run the import process
      */
-    private async runImportInBackground(
+    private async runImport(
         directoryId: string,
         user: User,
         dto: ImportDirectoryDto,
         parsed: { owner: string; repo: string },
         historyId: string,
-    ): Promise<void> {
+    ): Promise<DirectoryImportResult> {
         const startTime = Date.now();
         let result: DirectoryImportResult;
 
         try {
             const directory = await this.directoryRepository.findById(directoryId);
             if (!directory) {
-                throw new Error('Directory not found');
+                return {
+                    success: false,
+                    directoryId,
+                    error: 'Directory not found',
+                    errorCode: DirectoryImportErrorCode.CLONE_FAILED,
+                };
             }
 
             if (dto.sourceType === ImportSourceTypeEnum.DATA_REPO) {
                 result = await this.importFromDataRepo(directory, user, parsed);
             } else if (dto.sourceType === ImportSourceTypeEnum.AWESOME_README) {
                 result = await this.importFromAwesomeReadme(directory, user, dto.sourceUrl);
+            } else if (dto.sourceType === ImportSourceTypeEnum.LINK_EXISTING) {
+                result = await this.linkExistingDataRepo(directory, user, parsed, {
+                    createMissingRepos: dto.createMissingRepos ?? false,
+                });
             } else {
-                throw new Error(`Unsupported source type: ${dto.sourceType}`);
+                return {
+                    success: false,
+                    directoryId,
+                    error: `Unsupported source type: ${dto.sourceType}`,
+                    errorCode: DirectoryImportErrorCode.PARSE_FAILED,
+                };
             }
 
-            // Update directory status
             if (result.success) {
                 await this.directoryRepository.update(directoryId, {
                     generateStatus: {
@@ -257,7 +289,6 @@ export class DirectoryImportService {
                     itemsCount: result.itemsImported,
                 });
 
-                // Update history
                 await this.generationHistoryRepository.updateEntry(historyId, {
                     status: GenerateStatusType.GENERATED,
                     finishedAt: new Date(),
@@ -266,22 +297,22 @@ export class DirectoryImportService {
                     totalItemsCount: result.itemsImported,
                 });
 
-                // Emit completion event
                 this.eventEmitter.emit(
                     'directory.generation.completed',
                     new DirectoryGenerationCompletedEvent(directory),
                 );
-            } else {
-                await this.handleImportFailure(
-                    directoryId,
-                    historyId,
-                    result.error || 'Unknown error',
-                    startTime,
-                );
             }
+
+            return result;
         } catch (error) {
             this.logger.error(`Import failed for directory ${directoryId}`, error);
-            await this.handleImportFailure(directoryId, historyId, error.message, startTime);
+
+            return {
+                success: false,
+                directoryId,
+                error: error.message,
+                errorCode: DirectoryImportErrorCode.CLONE_FAILED,
+            };
         }
     }
 
@@ -305,7 +336,6 @@ export class DirectoryImportService {
         }
 
         try {
-            // Clone the source repository
             this.logger.log(`Cloning source repo: ${source.owner}/${source.repo}`);
 
             const sourceDir = await this.githubService.cloneOrPull({
@@ -315,10 +345,7 @@ export class DirectoryImportService {
                 committer: user.asCommitter(),
             });
 
-            // Create DataRepository instance to read source data
             const sourceData = await DataRepository.create(sourceDir);
-
-            // Read items, categories, and tags
             const items = await sourceData.getItems();
             const categories = await sourceData.getCategories().catch(() => []);
             const tags = await sourceData.getTags().catch(() => []);
@@ -337,7 +364,6 @@ export class DirectoryImportService {
                 };
             }
 
-            // Initialize user's data repository with imported content
             const configWithMeta = config as Record<string, any>;
             const initResult = await this.dataGenerator.initializeWithImportedData(
                 directory,
@@ -352,7 +378,14 @@ export class DirectoryImportService {
                             ...(configWithMeta.metadata || {}),
                             imported_from: `${source.owner}/${source.repo}`,
                             imported_at: new Date().toISOString(),
+                            import_type: 'data_repo',
                         },
+                    },
+                    importRequest: {
+                        sourceUrl: `https://github.com/${source.owner}/${source.repo}`,
+                        sourceType: ImportSourceTypeEnum.DATA_REPO,
+                        sourceOwner: source.owner,
+                        sourceRepo: source.repo,
                     },
                 },
             );
@@ -366,9 +399,7 @@ export class DirectoryImportService {
                 };
             }
 
-            // Generate markdown and website
             await this.markdownGenerator.initialize(directory, user);
-
             await this.websiteGenerator.initialize(directory, user);
 
             return {
@@ -400,9 +431,7 @@ export class DirectoryImportService {
         const token = this.getGitHubToken(user);
 
         try {
-            // Fetch README content
             const readme = await this.sourceRepoAnalyzer.getReadmeContent(sourceUrl, token);
-
             if (!readme) {
                 return {
                     success: false,
@@ -413,8 +442,6 @@ export class DirectoryImportService {
             }
 
             this.logger.log(`Parsing README from ${sourceUrl}`);
-
-            // Parse README using AI
             const parsedData = await this.awesomeReadmeParser.parseReadme(readme.content);
 
             this.logger.log(
@@ -431,8 +458,6 @@ export class DirectoryImportService {
             }
 
             const parsed = this.sourceRepoAnalyzer.parseGitHubUrl(sourceUrl);
-
-            // Initialize user's data repository with parsed content
             const initResult = await this.dataGenerator.initializeWithImportedData(
                 directory,
                 user,
@@ -447,6 +472,12 @@ export class DirectoryImportService {
                             import_type: 'awesome_readme',
                         },
                     },
+                    importRequest: {
+                        sourceUrl,
+                        sourceType: ImportSourceTypeEnum.AWESOME_README,
+                        sourceOwner: parsed?.owner || '',
+                        sourceRepo: parsed?.repo || '',
+                    },
                 },
             );
 
@@ -459,9 +490,7 @@ export class DirectoryImportService {
                 };
             }
 
-            // Generate markdown and website
             await this.markdownGenerator.initialize(directory, user);
-
             await this.websiteGenerator.initialize(directory, user);
 
             return {
@@ -482,34 +511,97 @@ export class DirectoryImportService {
         }
     }
 
-    /**
-     * Handle import failure
-     */
-    private async handleImportFailure(
-        directoryId: string,
-        historyId: string,
-        errorMessage: string,
-        startTime: number,
-    ): Promise<void> {
-        await this.directoryRepository.update(directoryId, {
-            generateStatus: {
-                status: GenerateStatusType.ERROR,
-                error: errorMessage,
-            },
-            generationFinishedAt: new Date(),
-        });
+    private async linkExistingDataRepo(
+        directory: Directory,
+        user: User,
+        source: { owner: string; repo: string },
+        options: { createMissingRepos: boolean },
+    ): Promise<DirectoryImportResult> {
+        const token = this.getGitHubToken(user);
 
-        await this.generationHistoryRepository.updateEntry(historyId, {
-            status: GenerateStatusType.ERROR,
-            finishedAt: new Date(),
-            durationInSeconds: Math.round((Date.now() - startTime) / 1000),
-            errorMessage,
-        });
+        if (!token) {
+            return {
+                success: false,
+                directoryId: directory.id,
+                error: 'GitHub token not available',
+                errorCode: DirectoryImportErrorCode.REPO_ACCESS_DENIED,
+            };
+        }
+
+        try {
+            const linkAnalysis = await this.sourceRepoAnalyzer.analyzeForLinking(
+                `https://github.com/${source.owner}/${source.repo}`,
+                token,
+            );
+
+            if (!linkAnalysis.canLink) {
+                return {
+                    success: false,
+                    directoryId: directory.id,
+                    error: linkAnalysis.error || 'Cannot link to this repository',
+                    errorCode: DirectoryImportErrorCode.REPO_ACCESS_DENIED,
+                };
+            }
+
+            this.logger.log(`Linking to existing data repo: ${source.owner}/${source.repo}`);
+
+            const dataRepoDir = await this.githubService.cloneOrPull({
+                owner: source.owner,
+                repo: source.repo,
+                token,
+                committer: user.asCommitter(),
+            });
+
+            const sourceData = await DataRepository.create(dataRepoDir);
+            const items = await sourceData.getItems();
+            const categories = await sourceData.getCategories().catch(() => []);
+            const tags = await sourceData.getTags().catch(() => []);
+
+            this.logger.log(
+                `Linked repo has ${items.length} items, ${categories.length} categories, ${tags.length} tags`,
+            );
+
+            if (!linkAnalysis.relatedRepos.markdown.exists && options.createMissingRepos) {
+                await this.markdownGenerator.initialize(directory, user);
+            }
+
+            if (!linkAnalysis.relatedRepos.website.exists && options.createMissingRepos) {
+                await this.websiteGenerator.initialize(directory, user);
+            }
+
+            await this.directoryRepository.update(directory.id, {
+                owner: source.owner,
+                itemsCount: items.length,
+            });
+
+            return {
+                success: true,
+                directoryId: directory.id,
+                itemsImported: items.length,
+                categoriesImported: categories.length,
+                tagsImported: tags.length,
+            };
+        } catch (error) {
+            this.logger.error('Failed to link existing data repo', error);
+            return {
+                success: false,
+                directoryId: directory.id,
+                error: error.message,
+                errorCode: DirectoryImportErrorCode.CLONE_FAILED,
+            };
+        }
     }
 
-    /**
-     * Get GitHub token from user
-     */
+    private async cleanupFailedImport(directoryId: string, historyId: string): Promise<void> {
+        try {
+            await this.generationHistoryRepository.deleteEntry(historyId);
+            await this.directoryRepository.delete(directoryId);
+            this.logger.log(`Cleaned up failed import: directory ${directoryId}`);
+        } catch (error) {
+            this.logger.error(`Failed to cleanup after import failure: ${error.message}`);
+        }
+    }
+
     private getGitHubToken(user: User): string | undefined {
         const oauthToken = user.oauthTokens?.find((t) => t.provider === 'github');
         return oauthToken?.accessToken;

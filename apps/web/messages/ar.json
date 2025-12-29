@@ -1046,6 +1046,134 @@
                 "success": {
                     "created": "تم إنشاء الدليل بنجاح!"
                 }
+            },
+            "import": {
+                "title": "استيراد موجود",
+                "subtitle": "استورد دليلاً من مستودع GitHub موجود",
+                "importNow": "استيراد الآن",
+                "formTitle": "استيراد دليل من GitHub",
+                "formSubtitle": "استورد عناصر من مستودع GitHub موجود لإنشاء دليلك",
+                "sourceMethod": {
+                    "url": {
+                        "title": "لصق الرابط",
+                        "description": "أدخل رابط مستودع GitHub مباشرة"
+                    },
+                    "repository": {
+                        "title": "مستودعاتي",
+                        "description": "اختر من مستودعات GitHub الخاصة بك"
+                    }
+                },
+                "urlLabel": "رابط مستودع GitHub",
+                "urlPlaceholder": "https://github.com/owner/repository",
+                "urlHelp": "أدخل الرابط الكامل لمستودع GitHub",
+                "supportedFormats": {
+                    "title": "تنسيقات المستودعات المدعومة",
+                    "dataRepo": {
+                        "title": "مستودع البيانات",
+                        "description": "مستودعات مع config.yml وهيكل مجلد data/"
+                    },
+                    "awesomeReadme": {
+                        "title": "قائمة Awesome",
+                        "description": "مستودعات القوائم المنسقة مع README markdown"
+                    }
+                },
+                "analyzing": {
+                    "title": "تحليل المستودع",
+                    "subtitle": "جارٍ اكتشاف نوع وهيكل المستودع..."
+                },
+                "detectedType": {
+                    "dataRepo": "تم اكتشاف مستودع بيانات",
+                    "awesomeReadme": "تم اكتشاف قائمة Awesome"
+                },
+                "badges": {
+                    "dataRepo": "مستودع بيانات",
+                    "awesomeReadme": "قائمة Awesome"
+                },
+                "preview": {
+                    "items": "عناصر",
+                    "categories": "فئات"
+                },
+                "nameLabel": "اسم الدليل",
+                "namePlaceholder": "مثال: دليلي الرائع",
+                "advancedSettings": "إعدادات متقدمة",
+                "advancedSubtitle": "تكوين إعدادات المنظمة والمستودع",
+                "attribution": {
+                    "title": "إسناد المصدر:",
+                    "text": "سيشير هذا الدليل إلى {url} كمصدره"
+                },
+                "analyzeButton": "تحليل المستودع",
+                "importButton": "استيراد الدليل",
+                "importingButton": "جارٍ الاستيراد...",
+                "backButton": "رجوع",
+                "cancelButton": "إلغاء",
+                "importing": {
+                    "title": "جارٍ استيراد الدليل",
+                    "subtitle": "جارٍ إعداد دليلك من المستودع المصدر..."
+                },
+                "repositorySelector": {
+                    "title": "اختيار مستودع",
+                    "searchPlaceholder": "البحث في المستودعات...",
+                    "loading": "جارٍ تحميل المستودعات...",
+                    "noRepositories": "لم يتم العثور على مستودعات",
+                    "noResults": "لا توجد مستودعات تطابق بحثك",
+                    "tryAgain": "حاول مرة أخرى",
+                    "loadMore": "تحميل المزيد",
+                    "showing": "عرض {shown} من {total} مستودع",
+                    "today": "اليوم",
+                    "yesterday": "أمس",
+                    "daysAgo": "منذ {days} أيام",
+                    "weeksAgo": "منذ {weeks} أسابيع",
+                    "repositoriesLoaded": "مستودعات محملة",
+                    "moreAvailable": "المزيد متاح",
+                    "errors": {
+                        "fetchFailed": "فشل تحميل المستودعات"
+                    }
+                },
+                "chooseMode": {
+                    "title": "اختر طريقة الاستيراد",
+                    "repository": "المستودع: {owner}/{repo}",
+                    "repositoryWithItems": "المستودع: {owner}/{repo} ({itemCount} عناصر)",
+                    "importCopy": {
+                        "title": "استيراد ونسخ",
+                        "description": "إنشاء مستودعات جديدة بنسخة من البيانات. مثالي للتفريع أو البدء من جديد."
+                    },
+                    "linkExisting": {
+                        "title": "ربط موجود",
+                        "description": "استخدم مستودعك الموجود مباشرة. بدون نسخ، التغييرات تتزامن تلقائياً."
+                    },
+                    "back": "رجوع"
+                },
+                "linkConfirm": {
+                    "title": "ربط المستودع",
+                    "descriptionMissing": "لم يتم العثور على بعض المستودعات. يمكنك المتابعة بدونها أو إنشائها الآن.",
+                    "descriptionReady": "تم العثور على جميع المستودعات. جاهز للربط.",
+                    "dataRepo": "مستودع البيانات",
+                    "markdownRepo": "مستودع Markdown",
+                    "websiteRepo": "مستودع الموقع",
+                    "found": "موجود",
+                    "notFound": "غير موجود",
+                    "cancel": "إلغاء",
+                    "continueWithout": "متابعة بدون",
+                    "createMissing": "إنشاء المفقودة",
+                    "creating": "جارٍ الإنشاء...",
+                    "linking": "جارٍ الربط...",
+                    "linkRepos": "ربط المستودعات"
+                },
+                "errors": {
+                    "urlRequired": "يرجى إدخال رابط مستودع GitHub",
+                    "unsupportedFormat": "تنسيق المستودع هذا غير مدعوم. يرجى استخدام مستودع بيانات أو تنسيق قائمة Awesome.",
+                    "analyzeFailed": "فشل تحليل المستودع",
+                    "analyzeForLinkingFailed": "فشل التحليل للربط",
+                    "nameRequired": "اسم الدليل مطلوب",
+                    "noAnalysis": "يرجى تحليل مستودع أولاً",
+                    "githubRequired": "يرجى ربط حساب GitHub الخاص بك أولاً",
+                    "importFailed": "فشل استيراد الدليل",
+                    "linkFailed": "فشل ربط الدليل"
+                },
+                "success": {
+                    "started": "بدأ الاستيراد! جارٍ التوجيه إلى دليلك...",
+                    "linked": "تم ربط الدليل بنجاح"
+                }
             }
         },
         "github": {

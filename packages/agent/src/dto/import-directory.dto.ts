@@ -16,6 +16,7 @@ import { ImportSourceType } from '../entities/directory.entity';
 export enum ImportSourceTypeEnum {
     DATA_REPO = 'data_repo',
     AWESOME_README = 'awesome_readme',
+    LINK_EXISTING = 'link_existing',
 }
 
 export class AnalyzeRepositoryDto {
@@ -63,6 +64,10 @@ export class ImportDirectoryDto {
     @IsOptional()
     @IsBoolean()
     organization?: boolean;
+
+    @IsOptional()
+    @IsBoolean()
+    createMissingRepos?: boolean;
 }
 
 export class ImportDirectoryResponseDto {
@@ -116,4 +121,23 @@ export class GetUserRepositoriesResponseDto {
     page: number;
     perPage: number;
     hasMore: boolean;
+}
+
+export interface RelatedRepoStatus {
+    exists: boolean;
+    name: string | null;
+    hasWriteAccess?: boolean;
+}
+
+export class AnalyzeForLinkingResponseDto {
+    canLink: boolean;
+    hasWriteAccess: boolean;
+    relatedRepos: {
+        data: RelatedRepoStatus & { exists: true; name: string };
+        markdown: RelatedRepoStatus;
+        website: RelatedRepoStatus;
+    };
+    itemCount?: number;
+    categoryCount?: number;
+    error?: string;
 }
