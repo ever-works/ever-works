@@ -3,3 +3,4 @@ export * from './generate-data.dto';
 export * from './update-directory.dto';
 export * from './directory-generation-history.dto';
 export * from './directory-schedule.dto';
+export * from './import-directory.dto';
