@@ -257,7 +257,11 @@ export class AwesomeReadmeParserService {
             const name = match[1].trim();
             const normalizedName = name.toLowerCase();
 
-            if (!nonCategoryHeaders.some((nc) => normalizedName.includes(nc))) {
+            if (
+                !nonCategoryHeaders.some(
+                    (nc) => normalizedName === nc || normalizedName.startsWith(`${nc} `),
+                )
+            ) {
                 categories.push({
                     id: slugifyText(name),
                     name,
