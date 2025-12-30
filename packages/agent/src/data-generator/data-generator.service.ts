@@ -782,4 +782,143 @@ export class DataGeneratorService {
 
         return additionalFooter + LEGAL_NOTICE;
     }
+
+    async initializeWithImportedData(
+        directory: Directory,
+        user: User,
+        importedData: {
+            items: ItemData[];
+            categories: Identifiable[];
+            tags: Identifiable[];
+            config?: Record<string, any>;
+            importRequest?: {
+                sourceUrl: string;
+                sourceType: string;
+                sourceOwner: string;
+                sourceRepo: string;
+            };
+        },
+    ): Promise<InitializeResult> {
+        const token = user.getGitToken();
+        const committer = user.asCommitter();
+
+        try {
+            // Create the data repository
+            const repoName = directory.getDataRepo();
+            const repoOwner = directory.getRepoOwner();
+
+            this.logger.log(`Creating data repo: ${repoOwner}/${repoName}`);
+
+            if (directory.organization) {
+                await this.githubService.createEmptyRepoAsOrg(
+                    repoOwner,
+                    repoName,
+                    directory.description,
+                    token,
+                );
+            } else {
+                await this.githubService.createEmptyRepo(repoName, directory.description, token);
+            }
+
+            // Clone the repository
+            const dest = await this.githubService.cloneOrPull({
+                owner: repoOwner,
+                repo: repoName,
+                token,
+                committer,
+            });
+
+            const data = await DataRepository.create(dest);
+            await data.ensureDirectoriesExist();
+
+            // Write categories and tags
+            if (importedData.categories.length > 0) {
+                await data.writeCategories(importedData.categories);
+            }
+            if (importedData.tags.length > 0) {
+                await data.writeTags(importedData.tags);
+            }
+
+            const initialCategories = importedData.categories.map((c) => c.id);
+            const initialPrompt = `Directory imported from ${importedData.importRequest?.sourceOwner || 'external'}/${importedData.importRequest?.sourceRepo || 'source'}. Contains ${importedData.items.length} items across ${importedData.categories.length} categories.`;
+
+            const initialRequestData = new CreateItemsGeneratorDto();
+            initialRequestData.name = directory.name;
+            initialRequestData.prompt = initialPrompt;
+            initialRequestData.initial_categories = initialCategories;
+            if (importedData.importRequest?.sourceUrl) {
+                initialRequestData.source_urls = [importedData.importRequest.sourceUrl];
+            }
+
+            const configData = {
+                ...importedData.config,
+                metadata: {
+                    ...(importedData.config?.metadata || {}),
+                    initial_prompt: initialPrompt,
+                    last_request_data: initialRequestData,
+                },
+            };
+            await data.mergeConfig(configData);
+
+            // Write README and LICENSE
+            await data.writeReadme(this.getDefaultReadme(directory));
+            await data.writeLicense(LICENSE_TEXT);
+
+            // Write markdown templates
+            await data.writeMarkdownTemplate(this.getHeader(directory), this.getFooter(directory));
+
+            // Commit metadata files
+            await this.githubService.addAll(data.dir);
+            await this.githubService.commit(
+                data.dir,
+                'init repository with imported data',
+                committer,
+            );
+
+            // Write items
+            const itemsWithSlugs = importedData.items.map((item) => ({
+                ...item,
+                slug: item.slug || slugifyText(item.name),
+            }));
+
+            await pMap(itemsWithSlugs, (item) => this.writeItemToDisk(data, item), {
+                concurrency: PARALLEL_WRITE_CONCURRENCY,
+            });
+
+            // Commit items
+            await this.githubService.addAll(data.dir);
+            await this.githubService.commit(
+                data.dir,
+                `add ${itemsWithSlugs.length} imported items`,
+                committer,
+            );
+
+            // Push to remote
+            await this.githubService.push(dest, token);
+
+            this.logger.log(
+                `Successfully initialized data repo with ${itemsWithSlugs.length} imported items`,
+            );
+
+            return {
+                success: true,
+                prUpdate: null,
+                stats: {
+                    newItemsCount: itemsWithSlugs.length,
+                    updatedItemsCount: 0,
+                    totalItemsCount: itemsWithSlugs.length,
+                },
+            };
+        } catch (error) {
+            this.logger.error('Failed to initialize with imported data', error);
+            return {
+                success: false,
+                error: {
+                    code: 'DATA_REPO_FAILED',
+                    message: error.message || 'Failed to initialize data repository',
+                    cause: error,
+                },
+            };
+        }
+    }
 }

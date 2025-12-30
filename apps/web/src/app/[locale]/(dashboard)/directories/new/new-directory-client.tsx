@@ -5,6 +5,7 @@ import { AuthUser } from '@/lib/auth';
 import { cn } from '@/lib/utils/cn';
 import { DirectoryAICreator } from '@/components/directories/DirectoryAICreator';
 import { DirectoryManualForm } from '@/components/directories/DirectoryManualForm';
+import { DirectoryImportForm } from '@/components/directories/DirectoryImportForm';
 import { GitHubConnectionAlert } from './github-connection-alert';
 import { GitHubStatusSidebar } from './github-status-sidebar';
 import { useTranslations } from 'next-intl';
@@ -16,7 +17,7 @@ interface NewDirectoryClientProps {
 }
 
 export default function NewDirectoryClient({ user, githubConnection }: NewDirectoryClientProps) {
-    const [creationMode, setCreationMode] = useState<'ai' | 'manual' | null>(null);
+    const [creationMode, setCreationMode] = useState<'ai' | 'manual' | 'import' | null>(null);
     const t = useTranslations('dashboard.directoryCreation');
 
     if (creationMode === null) {
@@ -34,7 +35,7 @@ export default function NewDirectoryClient({ user, githubConnection }: NewDirect
                     </p>
                 </div>
 
-                <div className="grid md:grid-cols-2 gap-6">
+                <div className="grid md:grid-cols-3 gap-6">
                     {/* AI Creation Card */}
                     <button
                         onClick={() => setCreationMode('ai')}
@@ -148,6 +149,63 @@ export default function NewDirectoryClient({ user, githubConnection }: NewDirect
                             </svg>
                         </div>
                     </button>
+
+                    {/* Import Existing Card */}
+                    <button
+                        onClick={() => setCreationMode('import')}
+                        className={cn(
+                            'p-6 rounded-lg border-2 text-left transition-all',
+                            'bg-card dark:bg-card-dark',
+                            'border-card-border dark:border-card-border-dark',
+                            'hover:border-primary hover:shadow-lg',
+                            'group',
+                        )}
+                    >
+                        <div className="mb-4">
+                            <div
+                                className={cn(
+                                    'w-12 h-12 rounded-lg flex items-center justify-center',
+                                    'bg-warning/10 group-hover:bg-warning/20 transition-colors',
+                                )}
+                            >
+                                <svg
+                                    className="w-6 h-6 text-warning"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
+                                    />
+                                </svg>
+                            </div>
+                        </div>
+                        <h3 className="text-xl font-semibold text-text dark:text-text-dark mb-2">
+                            {t('import.title')}
+                        </h3>
+                        <p className="text-text-secondary dark:text-text-secondary-dark mb-4">
+                            {t('import.subtitle')}
+                        </p>
+                        <div className="flex items-center gap-2 text-warning font-medium">
+                            <span>{t('import.importNow')}</span>
+                            <svg
+                                className="w-4 h-4 group-hover:translate-x-1 transition-transform"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M9 5l7 7-7 7"
+                                />
+                            </svg>
+                        </div>
+                    </button>
                 </div>
             </div>
         );
@@ -179,11 +237,9 @@ export default function NewDirectoryClient({ user, githubConnection }: NewDirect
                     </button>
                 </div>
 
-                {creationMode === 'ai' ? (
-                    <DirectoryAICreator user={user} />
-                ) : (
-                    <DirectoryManualForm user={user} />
-                )}
+                {creationMode === 'ai' && <DirectoryAICreator user={user} />}
+                {creationMode === 'manual' && <DirectoryManualForm user={user} />}
+                {creationMode === 'import' && <DirectoryImportForm user={user} />}
             </div>
 
             {/* GitHub Status Sidebar */}

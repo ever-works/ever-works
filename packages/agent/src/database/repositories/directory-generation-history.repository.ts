@@ -77,4 +77,12 @@ export class DirectoryGenerationHistoryRepository {
     async findById(id: string): Promise<DirectoryGenerationHistory | null> {
         return this.repository.findOne({ where: { id } });
     }
+
+    async deleteEntry(id: string): Promise<void> {
+        await this.repository.delete(id);
+    }
+
+    async deleteByDirectory(directoryId: string): Promise<void> {
+        await this.repository.delete({ directoryId });
+    }
 }

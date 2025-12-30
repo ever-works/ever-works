@@ -397,6 +397,7 @@
                 "overview": "Resumen",
                 "items": "Elementos",
                 "generator": "Generador",
+                "schedule": "Programación",
                 "history": "Historial",
                 "deploy": "Desplegar",
                 "members": "Miembros",
@@ -600,6 +601,13 @@
                     "slug": "Slug (Opcional)",
                     "slugPlaceholder": "slug-personalizado-elemento",
                     "slugHelp": "Identificador amigable para URL. Se generará automáticamente si se deja vacío",
+                    "brand": "Marca (Opcional)",
+                    "brandPlaceholder": "Ingresa el nombre de la marca",
+                    "brandLogoUrl": "URL del Logo de Marca (Opcional)",
+                    "brandLogoUrlPlaceholder": "https://ejemplo.com/logo.png",
+                    "images": "Imágenes (Opcional)",
+                    "imagePlaceholder": "https://ejemplo.com/captura.png",
+                    "imagesHelp": "Añade URLs de imágenes (capturas de pantalla, imágenes de productos)",
                     "featured": "Elemento Destacado",
                     "featuredHelp": "Marca este elemento como destacado en el directorio",
                     "updateWithPR": "Crear Pull Request",
@@ -614,23 +622,24 @@
                     "errors": {
                         "urlRequired": "La URL de origen es requerida para la extracción",
                         "invalidUrl": "Por favor, ingresa una URL válida que incluya http:// o https://",
-                        "requiredFields": "Por favor, completa todos los campos requeridos"
+                        "requiredFields": "Por favor, completa todos los campos requeridos",
+                        "invalidImageUrl": "Por favor, ingresa una URL de imagen válida"
                     }
                 },
                 "updateSuccess": "Elemento eliminado exitosamente",
                 "updateFailed": "No se pudo eliminar el elemento",
                 "updateError": "Ocurrió un error al eliminar el elemento",
                 "editDisplay": "Eliminar",
-                "editDisplayDescription": "Toggle featured status and set display order.",
-                "orderLabel": "Display order (optional)",
-                "orderHelp": "Lower numbers show earlier within featured/non-featured groups.",
+                "editDisplayDescription": "Alternar estado destacado y establecer orden de visualización.",
+                "orderLabel": "Orden de visualización (opcional)",
+                "orderHelp": "Los números más bajos aparecen primero en los grupos destacados/no destacados.",
                 "deleteDialogTitle": "Eliminar",
-                "deleteDialogDescription": "This will remove {name} from the repository.",
-                "createPRLabel": "Create Pull Request",
-                "createPRHelp": "If enabled, changes are proposed via PR instead of direct commit.",
-                "reasonLabel": "Reason (optional)",
-                "reasonPlaceholder": "Why are you removing this item?",
-                "confirmDelete": "Delete item"
+                "deleteDialogDescription": "Esto eliminará {name} del repositorio.",
+                "createPRLabel": "Crear Pull Request",
+                "createPRHelp": "Si está habilitado, los cambios se proponen mediante PR en lugar de commit directo.",
+                "reasonLabel": "Motivo (opcional)",
+                "reasonPlaceholder": "¿Por qué está eliminando este elemento?",
+                "confirmDelete": "Eliminar elemento"
             },
             "generator": {
                 "regenerationWarning": "Advertencia de Regeneración",
@@ -697,11 +706,11 @@
                 "aiFirstGenerationDescription": "Habilita la generación con IA de elementos iniciales antes de la búsqueda web.",
                 "contentFiltering": "Filtrado de Contenido",
                 "contentFilteringDescription": "Habilita el filtrado de calidad del contenido",
-                "recreateConfirmTitle": "Recreate directory data?",
-                "recreateConfirmDescription": "Recreate will delete existing items and regenerate them from scratch. This action cannot be undone.",
-                "confirmRecreate": "Yes, recreate",
-                "recreateInlineTitle": "Recreate will remove existing items",
-                "recreateInlineDescription": "This mode deletes current items and rebuilds them from scratch. Proceed only if you want to replace everything."
+                "recreateConfirmTitle": "¿Recrear datos del directorio?",
+                "recreateConfirmDescription": "Recrear eliminará los elementos existentes y los regenerará desde cero. Esta acción no se puede deshacer.",
+                "confirmRecreate": "Sí, recrear",
+                "recreateInlineTitle": "Recrear eliminará los elementos existentes",
+                "recreateInlineDescription": "Este modo elimina los elementos actuales y los reconstruye desde cero. Proceda solo si desea reemplazar todo."
             },
             "progress": {
                 "title": "Generación en Progreso",
@@ -1046,6 +1055,134 @@
                 "success": {
                     "created": "¡Directorio creado exitosamente!"
                 }
+            },
+            "import": {
+                "title": "Importar Existente",
+                "subtitle": "Importa un directorio desde un repositorio GitHub existente",
+                "importNow": "Importar ahora",
+                "formTitle": "Importar Directorio desde GitHub",
+                "formSubtitle": "Importa elementos desde un repositorio GitHub existente para crear tu directorio",
+                "sourceMethod": {
+                    "url": {
+                        "title": "Pegar URL",
+                        "description": "Ingresa directamente una URL de repositorio GitHub"
+                    },
+                    "repository": {
+                        "title": "Mis Repositorios",
+                        "description": "Selecciona de tus repositorios GitHub"
+                    }
+                },
+                "urlLabel": "URL del Repositorio GitHub",
+                "urlPlaceholder": "https://github.com/owner/repository",
+                "urlHelp": "Ingresa la URL completa de un repositorio GitHub",
+                "supportedFormats": {
+                    "title": "Formatos de Repositorio Soportados",
+                    "dataRepo": {
+                        "title": "Repositorio de Datos",
+                        "description": "Repositorios con estructura config.yml y carpeta data/"
+                    },
+                    "awesomeReadme": {
+                        "title": "Lista Awesome",
+                        "description": "Repositorios de listas curadas con README markdown"
+                    }
+                },
+                "analyzing": {
+                    "title": "Analizando Repositorio",
+                    "subtitle": "Detectando tipo y estructura del repositorio..."
+                },
+                "detectedType": {
+                    "dataRepo": "Repositorio de Datos Detectado",
+                    "awesomeReadme": "Lista Awesome Detectada"
+                },
+                "badges": {
+                    "dataRepo": "Repo Datos",
+                    "awesomeReadme": "Lista Awesome"
+                },
+                "preview": {
+                    "items": "elementos",
+                    "categories": "categorías"
+                },
+                "nameLabel": "Nombre del Directorio",
+                "namePlaceholder": "ej. Mi Directorio Awesome",
+                "advancedSettings": "Configuración Avanzada",
+                "advancedSubtitle": "Configurar ajustes de organización y repositorio",
+                "attribution": {
+                    "title": "Atribución de Fuente:",
+                    "text": "Este directorio referenciará {url} como su fuente"
+                },
+                "analyzeButton": "Analizar Repositorio",
+                "importButton": "Importar Directorio",
+                "importingButton": "Importando...",
+                "backButton": "Atrás",
+                "cancelButton": "Cancelar",
+                "importing": {
+                    "title": "Importando Directorio",
+                    "subtitle": "Configurando tu directorio desde el repositorio fuente..."
+                },
+                "repositorySelector": {
+                    "title": "Seleccionar Repositorio",
+                    "searchPlaceholder": "Buscar repositorios...",
+                    "loading": "Cargando repositorios...",
+                    "noRepositories": "No se encontraron repositorios",
+                    "noResults": "Ningún repositorio coincide con tu búsqueda",
+                    "tryAgain": "Intentar de nuevo",
+                    "loadMore": "Cargar más",
+                    "showing": "Mostrando {shown} de {total} repositorios",
+                    "today": "Hoy",
+                    "yesterday": "Ayer",
+                    "daysAgo": "hace {days} días",
+                    "weeksAgo": "hace {weeks} semanas",
+                    "repositoriesLoaded": "repositorios cargados",
+                    "moreAvailable": "más disponibles",
+                    "errors": {
+                        "fetchFailed": "Error al cargar repositorios"
+                    }
+                },
+                "chooseMode": {
+                    "title": "Elegir Método de Importación",
+                    "repository": "Repositorio: {owner}/{repo}",
+                    "repositoryWithItems": "Repositorio: {owner}/{repo} ({itemCount} elementos)",
+                    "importCopy": {
+                        "title": "Importar y Copiar",
+                        "description": "Crear nuevos repositorios con una copia de los datos. Ideal para hacer fork o empezar desde cero."
+                    },
+                    "linkExisting": {
+                        "title": "Vincular Existente",
+                        "description": "Usar tu repositorio existente directamente. Sin copias, los cambios se sincronizan automáticamente."
+                    },
+                    "back": "Atrás"
+                },
+                "linkConfirm": {
+                    "title": "Vincular Repositorio",
+                    "descriptionMissing": "Algunos repositorios no fueron encontrados. Puedes continuar sin ellos o crearlos ahora.",
+                    "descriptionReady": "Todos los repositorios encontrados. Listo para vincular.",
+                    "dataRepo": "Repositorio de Datos",
+                    "markdownRepo": "Repositorio Markdown",
+                    "websiteRepo": "Repositorio Web",
+                    "found": "Encontrado",
+                    "notFound": "No encontrado",
+                    "cancel": "Cancelar",
+                    "continueWithout": "Continuar sin",
+                    "createMissing": "Crear faltantes",
+                    "creating": "Creando...",
+                    "linking": "Vinculando...",
+                    "linkRepos": "Vincular repositorios"
+                },
+                "errors": {
+                    "urlRequired": "Por favor ingresa una URL de repositorio GitHub",
+                    "unsupportedFormat": "Este formato de repositorio no es soportado. Por favor usa un Repositorio de Datos o formato de Lista Awesome.",
+                    "analyzeFailed": "Error al analizar repositorio",
+                    "analyzeForLinkingFailed": "Error al analizar para vinculación",
+                    "nameRequired": "El nombre del directorio es requerido",
+                    "noAnalysis": "Por favor analiza un repositorio primero",
+                    "githubRequired": "Por favor conecta tu cuenta GitHub primero",
+                    "importFailed": "Error al importar directorio",
+                    "linkFailed": "Error al vincular directorio"
+                },
+                "success": {
+                    "started": "¡Importación iniciada! Redirigiendo a tu directorio...",
+                    "linked": "Directorio vinculado exitosamente"
+                }
             }
         },
         "github": {
@@ -1301,6 +1438,13 @@
             "fetchFailed": "No se pudieron obtener los directorios",
             "organization": {
                 "requiredWhenOwnerProvided": "La organización debe estar habilitada cuando se proporciona un propietario"
+            },
+            "import": {
+                "invalidUrl": "Por favor, ingresa una URL válida",
+                "analyzeFailed": "No se pudo analizar el repositorio",
+                "started": "Importación iniciada correctamente",
+                "failed": "No se pudo importar el directorio",
+                "fetchReposFailed": "No se pudieron obtener los repositorios"
             }
         },
         "generator": {

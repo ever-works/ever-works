@@ -7,6 +7,7 @@ import { WebsiteGeneratorModule } from '../website-generator/website-generator.m
 import { DeployModule } from '../deploy/deploy.module';
 import { DatabaseModule } from '../database/database.module';
 import { AiModule } from '../ai/ai.module';
+import { ImportModule } from '../import/import.module';
 import { DirectoryDetailService } from './directory-detail.service';
 import { DirectoryOwnershipService } from './directory-ownership.service';
 import { DirectoryQueryService } from './directory-query.service';
@@ -15,6 +16,7 @@ import { DirectoryGenerationService } from './directory-generation.service';
 import { DirectoryScheduleService } from './directory-schedule.service';
 import { DirectoryScheduleDispatcherService } from './directory-schedule-dispatcher.service';
 import { DirectoryMemberService } from './directory-member.service';
+import { DirectoryImportService } from './directory-import.service';
 import { SubscriptionsModule } from '@src/subscriptions';
 
 @Module({
@@ -27,6 +29,7 @@ import { SubscriptionsModule } from '@src/subscriptions';
         WebsiteGeneratorModule,
         DeployModule,
         AiModule,
+        ImportModule,
         SubscriptionsModule,
     ],
     providers: [
@@ -38,6 +41,7 @@ import { SubscriptionsModule } from '@src/subscriptions';
         DirectoryScheduleService,
         DirectoryScheduleDispatcherService,
         DirectoryMemberService,
+        DirectoryImportService,
     ],
     exports: [
         DirectoryOwnershipService,
@@ -48,6 +52,7 @@ import { SubscriptionsModule } from '@src/subscriptions';
         DirectoryScheduleService,
         DirectoryScheduleDispatcherService,
         DirectoryMemberService,
+        DirectoryImportService,
     ],
 })
 export class DirectoryModule {}
