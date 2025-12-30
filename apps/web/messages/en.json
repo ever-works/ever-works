@@ -1055,6 +1055,134 @@
                 "success": {
                     "created": "Directory created successfully!"
                 }
+            },
+            "import": {
+                "title": "Import Existing",
+                "subtitle": "Import a directory from an existing GitHub repository",
+                "importNow": "Import now",
+                "formTitle": "Import Directory from GitHub",
+                "formSubtitle": "Import items from an existing GitHub repository to create your directory",
+                "sourceMethod": {
+                    "url": {
+                        "title": "Paste URL",
+                        "description": "Enter a GitHub repository URL directly"
+                    },
+                    "repository": {
+                        "title": "My Repositories",
+                        "description": "Select from your GitHub repositories"
+                    }
+                },
+                "urlLabel": "GitHub Repository URL",
+                "urlPlaceholder": "https://github.com/owner/repository",
+                "urlHelp": "Enter the full URL of a GitHub repository",
+                "supportedFormats": {
+                    "title": "Supported Repository Formats",
+                    "dataRepo": {
+                        "title": "Data Repository",
+                        "description": "Repositories with config.yml and data/ folder structure"
+                    },
+                    "awesomeReadme": {
+                        "title": "Awesome List",
+                        "description": "Curated list repositories with markdown README"
+                    }
+                },
+                "analyzing": {
+                    "title": "Analyzing Repository",
+                    "subtitle": "Detecting repository type and structure..."
+                },
+                "detectedType": {
+                    "dataRepo": "Data Repository Detected",
+                    "awesomeReadme": "Awesome List Detected"
+                },
+                "badges": {
+                    "dataRepo": "Data Repo",
+                    "awesomeReadme": "Awesome List"
+                },
+                "preview": {
+                    "items": "items",
+                    "categories": "categories"
+                },
+                "nameLabel": "Directory Name",
+                "namePlaceholder": "e.g., My Awesome Directory",
+                "advancedSettings": "Advanced Settings",
+                "advancedSubtitle": "Configure organization and repository settings",
+                "attribution": {
+                    "title": "Source Attribution:",
+                    "text": "This directory will reference {url} as its source"
+                },
+                "analyzeButton": "Analyze Repository",
+                "importButton": "Import Directory",
+                "importingButton": "Importing...",
+                "backButton": "Back",
+                "cancelButton": "Cancel",
+                "importing": {
+                    "title": "Importing Directory",
+                    "subtitle": "Setting up your directory from the source repository..."
+                },
+                "repositorySelector": {
+                    "title": "Select Repository",
+                    "searchPlaceholder": "Search repositories...",
+                    "loading": "Loading repositories...",
+                    "noRepositories": "No repositories found",
+                    "noResults": "No repositories match your search",
+                    "tryAgain": "Try again",
+                    "loadMore": "Load more",
+                    "showing": "Showing {shown} of {total} repositories",
+                    "today": "Today",
+                    "yesterday": "Yesterday",
+                    "daysAgo": "{days} days ago",
+                    "weeksAgo": "{weeks} weeks ago",
+                    "repositoriesLoaded": "repositories loaded",
+                    "moreAvailable": "more available",
+                    "errors": {
+                        "fetchFailed": "Failed to load repositories"
+                    }
+                },
+                "chooseMode": {
+                    "title": "Choose Import Method",
+                    "repository": "Repository: {owner}/{repo}",
+                    "repositoryWithItems": "Repository: {owner}/{repo} ({itemCount} items)",
+                    "importCopy": {
+                        "title": "Import & Copy",
+                        "description": "Create new repositories with a copy of the data. Best for forking or starting fresh."
+                    },
+                    "linkExisting": {
+                        "title": "Link Existing",
+                        "description": "Use your existing repository directly. No copying, changes sync automatically."
+                    },
+                    "back": "Back"
+                },
+                "linkConfirm": {
+                    "title": "Link Repository",
+                    "descriptionMissing": "Some repositories were not found. You can continue without them or create them now.",
+                    "descriptionReady": "All repositories found. Ready to link.",
+                    "dataRepo": "Data Repository",
+                    "markdownRepo": "Markdown Repository",
+                    "websiteRepo": "Website Repository",
+                    "found": "Found",
+                    "notFound": "Not found",
+                    "cancel": "Cancel",
+                    "continueWithout": "Continue without",
+                    "createMissing": "Create missing",
+                    "creating": "Creating...",
+                    "linking": "Linking...",
+                    "linkRepos": "Link repositories"
+                },
+                "errors": {
+                    "urlRequired": "Please enter a GitHub repository URL",
+                    "unsupportedFormat": "This repository format is not supported. Please use a Data Repository or Awesome List format.",
+                    "analyzeFailed": "Failed to analyze repository",
+                    "analyzeForLinkingFailed": "Failed to analyze for linking",
+                    "nameRequired": "Directory name is required",
+                    "noAnalysis": "Please analyze a repository first",
+                    "githubRequired": "Please connect your GitHub account first",
+                    "importFailed": "Failed to import directory",
+                    "linkFailed": "Failed to link directory"
+                },
+                "success": {
+                    "started": "Import started! Redirecting to your directory...",
+                    "linked": "Directory linked successfully"
+                }
             }
         },
         "github": {
@@ -1310,6 +1438,13 @@
             "fetchFailed": "Failed to fetch directories",
             "organization": {
                 "requiredWhenOwnerProvided": "Organization must be enabled when owner is provided"
+            },
+            "import": {
+                "invalidUrl": "Please enter a valid URL",
+                "analyzeFailed": "Failed to analyze repository",
+                "started": "Import started successfully",
+                "failed": "Failed to import directory",
+                "fetchReposFailed": "Failed to fetch repositories"
             }
         },
         "generator": {

@@ -80,30 +80,30 @@
             }
         },
         "forgotPassword": {
-            "title": "Forgot your password?",
-            "subtitle": "No worries, we'll send you reset instructions",
-            "successTitle": "Check your email",
-            "successSubtitle": "We've sent you password reset instructions",
+            "title": "Mot de passe oublié ?",
+            "subtitle": "Pas de souci, nous vous enverrons les instructions de réinitialisation",
+            "successTitle": "Vérifiez votre e-mail",
+            "successSubtitle": "Nous vous avons envoyé les instructions de réinitialisation du mot de passe",
             "form": {
                 "email": {
-                    "label": "Email address",
-                    "placeholder": "Enter your email"
+                    "label": "Adresse e-mail",
+                    "placeholder": "Entrez votre e-mail"
                 },
-                "submit": "Send Reset Link",
-                "submitting": "Sending..."
+                "submit": "Envoyer le lien de réinitialisation",
+                "submitting": "Envoi en cours..."
             },
             "success": {
-                "title": "Email sent successfully",
-                "message": "We've sent password reset instructions to {email}",
-                "checkSpam": "If you don't see the email, check your spam folder."
+                "title": "E-mail envoyé avec succès",
+                "message": "Nous avons envoyé les instructions de réinitialisation du mot de passe à {email}",
+                "checkSpam": "Si vous ne voyez pas l'e-mail, vérifiez votre dossier spam."
             },
             "errors": {
-                "failed": "Failed to send reset email. Please try again."
+                "failed": "Échec de l'envoi de l'e-mail de réinitialisation. Veuillez réessayer."
             },
-            "backToLogin": "Back to login",
+            "backToLogin": "Retour à la connexion",
             "noAccount": {
-                "text": "Don't have an account?",
-                "link": "Sign up"
+                "text": "Vous n'avez pas de compte ?",
+                "link": "S'inscrire"
             }
         },
         "resetPassword": {
@@ -397,6 +397,7 @@
                 "overview": "Vue d'ensemble",
                 "items": "Éléments",
                 "generator": "Générateur",
+                "schedule": "Planification",
                 "history": "Historique",
                 "deploy": "Déployer",
                 "members": "Membres",
@@ -600,6 +601,13 @@
                     "slug": "Slug (Optionnel)",
                     "slugPlaceholder": "slug-element-personnalise",
                     "slugHelp": "Identifiant compatible URL. Sera généré automatiquement si laissé vide",
+                    "brand": "Marque (Optionnel)",
+                    "brandPlaceholder": "Entrez le nom de la marque",
+                    "brandLogoUrl": "URL du logo de marque (Optionnel)",
+                    "brandLogoUrlPlaceholder": "https://exemple.com/logo.png",
+                    "images": "Images (Optionnel)",
+                    "imagePlaceholder": "https://exemple.com/capture.png",
+                    "imagesHelp": "Ajoutez des URLs d'images (captures d'écran, images produits)",
                     "featured": "Élément mis en avant",
                     "featuredHelp": "Marquez cet élément comme mis en avant dans le répertoire",
                     "updateWithPR": "Créer une demande de tirage",
@@ -614,6 +622,7 @@
                     "errors": {
                         "urlRequired": "L'URL source est requise pour l'extraction",
                         "invalidUrl": "Veuillez entrer une URL valide incluant http:// ou https://",
+                        "invalidImageUrl": "Veuillez entrer une URL d'image valide",
                         "requiredFields": "Veuillez remplir tous les champs requis"
                     }
                 },
@@ -621,16 +630,16 @@
                 "updateFailed": "Échec de la mise à jour de l'élément",
                 "updateError": "Une erreur s'est produite lors de la mise à jour de l'élément",
                 "editDisplay": "Supprimer",
-                "editDisplayDescription": "Toggle featured status and set display order.",
-                "orderLabel": "Display order (optional)",
-                "orderHelp": "Lower numbers show earlier within featured/non-featured groups.",
+                "editDisplayDescription": "Basculer le statut mis en avant et définir l'ordre d'affichage.",
+                "orderLabel": "Ordre d'affichage (optionnel)",
+                "orderHelp": "Les nombres plus bas apparaissent en premier dans les groupes mis en avant/non mis en avant.",
                 "deleteDialogTitle": "Supprimer",
-                "deleteDialogDescription": "This will remove {name} from the repository.",
-                "createPRLabel": "Create Pull Request",
-                "createPRHelp": "If enabled, changes are proposed via PR instead of direct commit.",
-                "reasonLabel": "Reason (optional)",
-                "reasonPlaceholder": "Why are you removing this item?",
-                "confirmDelete": "Delete item"
+                "deleteDialogDescription": "Ceci supprimera {name} du dépôt.",
+                "createPRLabel": "Créer une Pull Request",
+                "createPRHelp": "Si activé, les modifications sont proposées via PR au lieu d'un commit direct.",
+                "reasonLabel": "Raison (optionnel)",
+                "reasonPlaceholder": "Pourquoi supprimez-vous cet élément ?",
+                "confirmDelete": "Supprimer l'élément"
             },
             "generator": {
                 "regenerationWarning": "Avertissement de régénération",
@@ -697,11 +706,11 @@
                 "aiFirstGenerationDescription": "Activer la génération IA des éléments initiaux avant la recherche Web.",
                 "contentFiltering": "Filtrage du contenu",
                 "contentFilteringDescription": "Activer le filtrage de qualité du contenu",
-                "recreateConfirmTitle": "Recreate directory data?",
-                "recreateConfirmDescription": "Recreate will delete existing items and regenerate them from scratch. This action cannot be undone.",
-                "confirmRecreate": "Yes, recreate",
-                "recreateInlineTitle": "Recreate will remove existing items",
-                "recreateInlineDescription": "This mode deletes current items and rebuilds them from scratch. Proceed only if you want to replace everything."
+                "recreateConfirmTitle": "Recréer les données du répertoire ?",
+                "recreateConfirmDescription": "Recréer supprimera les éléments existants et les régénérera à partir de zéro. Cette action ne peut pas être annulée.",
+                "confirmRecreate": "Oui, recréer",
+                "recreateInlineTitle": "Recréer supprimera les éléments existants",
+                "recreateInlineDescription": "Ce mode supprime les éléments actuels et les reconstruit à partir de zéro. Procédez uniquement si vous souhaitez tout remplacer."
             },
             "progress": {
                 "title": "Génération en cours",
@@ -1046,6 +1055,134 @@
                 "success": {
                     "created": "Répertoire créé avec succès !"
                 }
+            },
+            "import": {
+                "title": "Importer existant",
+                "subtitle": "Importez un répertoire depuis un dépôt GitHub existant",
+                "importNow": "Importer maintenant",
+                "formTitle": "Importer un répertoire depuis GitHub",
+                "formSubtitle": "Importez des éléments depuis un dépôt GitHub existant pour créer votre répertoire",
+                "sourceMethod": {
+                    "url": {
+                        "title": "Coller l'URL",
+                        "description": "Entrez directement l'URL d'un dépôt GitHub"
+                    },
+                    "repository": {
+                        "title": "Mes dépôts",
+                        "description": "Sélectionnez parmi vos dépôts GitHub"
+                    }
+                },
+                "urlLabel": "URL du dépôt GitHub",
+                "urlPlaceholder": "https://github.com/owner/repository",
+                "urlHelp": "Entrez l'URL complète d'un dépôt GitHub",
+                "supportedFormats": {
+                    "title": "Formats de dépôt supportés",
+                    "dataRepo": {
+                        "title": "Dépôt de données",
+                        "description": "Dépôts avec structure config.yml et dossier data/"
+                    },
+                    "awesomeReadme": {
+                        "title": "Liste Awesome",
+                        "description": "Dépôts de listes curées avec README markdown"
+                    }
+                },
+                "analyzing": {
+                    "title": "Analyse du dépôt",
+                    "subtitle": "Détection du type et de la structure du dépôt..."
+                },
+                "detectedType": {
+                    "dataRepo": "Dépôt de données détecté",
+                    "awesomeReadme": "Liste Awesome détectée"
+                },
+                "badges": {
+                    "dataRepo": "Dépôt données",
+                    "awesomeReadme": "Liste Awesome"
+                },
+                "preview": {
+                    "items": "éléments",
+                    "categories": "catégories"
+                },
+                "nameLabel": "Nom du répertoire",
+                "namePlaceholder": "ex. Mon répertoire Awesome",
+                "advancedSettings": "Paramètres avancés",
+                "advancedSubtitle": "Configurer les paramètres d'organisation et de dépôt",
+                "attribution": {
+                    "title": "Attribution de source :",
+                    "text": "Ce répertoire référencera {url} comme source"
+                },
+                "analyzeButton": "Analyser le dépôt",
+                "importButton": "Importer le répertoire",
+                "importingButton": "Importation...",
+                "backButton": "Retour",
+                "cancelButton": "Annuler",
+                "importing": {
+                    "title": "Importation du répertoire",
+                    "subtitle": "Configuration de votre répertoire depuis le dépôt source..."
+                },
+                "repositorySelector": {
+                    "title": "Sélectionner un dépôt",
+                    "searchPlaceholder": "Rechercher des dépôts...",
+                    "loading": "Chargement des dépôts...",
+                    "noRepositories": "Aucun dépôt trouvé",
+                    "noResults": "Aucun dépôt ne correspond à votre recherche",
+                    "tryAgain": "Réessayer",
+                    "loadMore": "Charger plus",
+                    "showing": "Affichage de {shown} sur {total} dépôts",
+                    "today": "Aujourd'hui",
+                    "yesterday": "Hier",
+                    "daysAgo": "il y a {days} jours",
+                    "weeksAgo": "il y a {weeks} semaines",
+                    "repositoriesLoaded": "dépôts chargés",
+                    "moreAvailable": "plus disponibles",
+                    "errors": {
+                        "fetchFailed": "Échec du chargement des dépôts"
+                    }
+                },
+                "chooseMode": {
+                    "title": "Choisir la méthode d'import",
+                    "repository": "Dépôt : {owner}/{repo}",
+                    "repositoryWithItems": "Dépôt : {owner}/{repo} ({itemCount} éléments)",
+                    "importCopy": {
+                        "title": "Importer et copier",
+                        "description": "Créer de nouveaux dépôts avec une copie des données. Idéal pour forker ou repartir de zéro."
+                    },
+                    "linkExisting": {
+                        "title": "Lier l'existant",
+                        "description": "Utiliser directement votre dépôt existant. Pas de copie, les modifications se synchronisent automatiquement."
+                    },
+                    "back": "Retour"
+                },
+                "linkConfirm": {
+                    "title": "Lier le dépôt",
+                    "descriptionMissing": "Certains dépôts n'ont pas été trouvés. Vous pouvez continuer sans eux ou les créer maintenant.",
+                    "descriptionReady": "Tous les dépôts trouvés. Prêt à lier.",
+                    "dataRepo": "Dépôt de données",
+                    "markdownRepo": "Dépôt Markdown",
+                    "websiteRepo": "Dépôt site web",
+                    "found": "Trouvé",
+                    "notFound": "Non trouvé",
+                    "cancel": "Annuler",
+                    "continueWithout": "Continuer sans",
+                    "createMissing": "Créer les manquants",
+                    "creating": "Création...",
+                    "linking": "Liaison...",
+                    "linkRepos": "Lier les dépôts"
+                },
+                "errors": {
+                    "urlRequired": "Veuillez entrer une URL de dépôt GitHub",
+                    "unsupportedFormat": "Ce format de dépôt n'est pas supporté. Veuillez utiliser un dépôt de données ou un format de liste Awesome.",
+                    "analyzeFailed": "Échec de l'analyse du dépôt",
+                    "analyzeForLinkingFailed": "Échec de l'analyse pour la liaison",
+                    "nameRequired": "Le nom du répertoire est requis",
+                    "noAnalysis": "Veuillez d'abord analyser un dépôt",
+                    "githubRequired": "Veuillez d'abord connecter votre compte GitHub",
+                    "importFailed": "Échec de l'importation du répertoire",
+                    "linkFailed": "Échec de la liaison du répertoire"
+                },
+                "success": {
+                    "started": "Importation démarrée ! Redirection vers votre répertoire...",
+                    "linked": "Répertoire lié avec succès"
+                }
             }
         },
         "github": {
@@ -1301,6 +1438,13 @@
             "fetchFailed": "Échec de la récupération des répertoires",
             "organization": {
                 "requiredWhenOwnerProvided": "L'organisation doit être activée lorsque le propriétaire est fourni"
+            },
+            "import": {
+                "invalidUrl": "Veuillez entrer une URL valide",
+                "analyzeFailed": "Échec de l'analyse du dépôt",
+                "started": "Import démarré avec succès",
+                "failed": "Échec de l'import du répertoire",
+                "fetchReposFailed": "Échec de la récupération des dépôts"
             }
         },
         "generator": {

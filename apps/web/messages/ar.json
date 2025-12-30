@@ -397,6 +397,7 @@
                 "overview": "نظرة عامة",
                 "items": "العناصر",
                 "generator": "المولد",
+                "schedule": "الجدولة",
                 "history": "السجل",
                 "deploy": "النشر",
                 "members": "الأعضاء",
@@ -600,6 +601,13 @@
                     "slug": "المعرف (اختياري)",
                     "slugPlaceholder": "custom-item-slug",
                     "slugHelp": "معرف مناسب للرابط. سيتم إنشاؤه تلقائياً إذا تركت فارغاً",
+                    "brand": "العلامة التجارية (اختياري)",
+                    "brandPlaceholder": "أدخل اسم العلامة التجارية",
+                    "brandLogoUrl": "رابط شعار العلامة التجارية (اختياري)",
+                    "brandLogoUrlPlaceholder": "https://example.com/logo.png",
+                    "images": "الصور (اختياري)",
+                    "imagePlaceholder": "https://example.com/screenshot.png",
+                    "imagesHelp": "إضافة روابط الصور (لقطات الشاشة، صور المنتجات)",
                     "featured": "عنصر مميز",
                     "featuredHelp": "ضع علامة على هذا العنصر كمميز في الدليل",
                     "updateWithPR": "إنشاء طلب سحب",
@@ -614,23 +622,24 @@
                     "errors": {
                         "urlRequired": "رابط المصدر مطلوب للاستخراج",
                         "invalidUrl": "يرجى إدخال رابط صالح يتضمن http:// أو https://",
-                        "requiredFields": "يرجى ملء جميع الحقول المطلوبة"
+                        "requiredFields": "يرجى ملء جميع الحقول المطلوبة",
+                        "invalidImageUrl": "يرجى إدخال رابط صورة صالح"
                     }
                 },
                 "updateSuccess": "تم حذف العنصر بنجاح",
                 "updateFailed": "فشل حذف العنصر",
                 "updateError": "حدث خطأ أثناء حذف العنصر",
                 "editDisplay": "حذف",
-                "editDisplayDescription": "Toggle featured status and set display order.",
-                "orderLabel": "Display order (optional)",
-                "orderHelp": "Lower numbers show earlier within featured/non-featured groups.",
+                "editDisplayDescription": "تبديل حالة المميز وتعيين ترتيب العرض.",
+                "orderLabel": "ترتيب العرض (اختياري)",
+                "orderHelp": "الأرقام الأقل تظهر أولاً ضمن المجموعات المميزة/غير المميزة.",
                 "deleteDialogTitle": "حذف",
-                "deleteDialogDescription": "This will remove {name} from the repository.",
-                "createPRLabel": "Create Pull Request",
-                "createPRHelp": "If enabled, changes are proposed via PR instead of direct commit.",
-                "reasonLabel": "Reason (optional)",
-                "reasonPlaceholder": "Why are you removing this item?",
-                "confirmDelete": "Delete item"
+                "deleteDialogDescription": "سيؤدي هذا إلى إزالة {name} من المستودع.",
+                "createPRLabel": "إنشاء طلب سحب",
+                "createPRHelp": "إذا تم التفعيل، يتم اقتراح التغييرات عبر طلب سحب بدلاً من الالتزام المباشر.",
+                "reasonLabel": "السبب (اختياري)",
+                "reasonPlaceholder": "لماذا تزيل هذا العنصر؟",
+                "confirmDelete": "حذف العنصر"
             },
             "generator": {
                 "regenerationWarning": "تحذير إعادة الإنشاء",
@@ -697,11 +706,11 @@
                 "aiFirstGenerationDescription": "تفعيل إنشاء العناصر الأولية بالذكاء الاصطناعي قبل البحث على الويب.",
                 "contentFiltering": "تصفية المحتوى",
                 "contentFilteringDescription": "تفعيل تصفية جودة المحتوى",
-                "recreateConfirmTitle": "Recreate directory data?",
-                "recreateConfirmDescription": "Recreate will delete existing items and regenerate them from scratch. This action cannot be undone.",
-                "confirmRecreate": "Yes, recreate",
-                "recreateInlineTitle": "Recreate will remove existing items",
-                "recreateInlineDescription": "This mode deletes current items and rebuilds them from scratch. Proceed only if you want to replace everything."
+                "recreateConfirmTitle": "إعادة إنشاء بيانات الدليل؟",
+                "recreateConfirmDescription": "إعادة الإنشاء ستحذف العناصر الموجودة وتعيد إنشاءها من الصفر. لا يمكن التراجع عن هذا الإجراء.",
+                "confirmRecreate": "نعم، أعد الإنشاء",
+                "recreateInlineTitle": "إعادة الإنشاء ستزيل العناصر الموجودة",
+                "recreateInlineDescription": "هذا الوضع يحذف العناصر الحالية ويعيد بناءها من الصفر. تابع فقط إذا كنت تريد استبدال كل شيء."
             },
             "progress": {
                 "title": "الإنشاء قيد التنفيذ",
@@ -1046,6 +1055,134 @@
                 "success": {
                     "created": "تم إنشاء الدليل بنجاح!"
                 }
+            },
+            "import": {
+                "title": "استيراد موجود",
+                "subtitle": "استورد دليلاً من مستودع GitHub موجود",
+                "importNow": "استيراد الآن",
+                "formTitle": "استيراد دليل من GitHub",
+                "formSubtitle": "استورد عناصر من مستودع GitHub موجود لإنشاء دليلك",
+                "sourceMethod": {
+                    "url": {
+                        "title": "لصق الرابط",
+                        "description": "أدخل رابط مستودع GitHub مباشرة"
+                    },
+                    "repository": {
+                        "title": "مستودعاتي",
+                        "description": "اختر من مستودعات GitHub الخاصة بك"
+                    }
+                },
+                "urlLabel": "رابط مستودع GitHub",
+                "urlPlaceholder": "https://github.com/owner/repository",
+                "urlHelp": "أدخل الرابط الكامل لمستودع GitHub",
+                "supportedFormats": {
+                    "title": "تنسيقات المستودعات المدعومة",
+                    "dataRepo": {
+                        "title": "مستودع البيانات",
+                        "description": "مستودعات مع config.yml وهيكل مجلد data/"
+                    },
+                    "awesomeReadme": {
+                        "title": "قائمة Awesome",
+                        "description": "مستودعات القوائم المنسقة مع README markdown"
+                    }
+                },
+                "analyzing": {
+                    "title": "تحليل المستودع",
+                    "subtitle": "جارٍ اكتشاف نوع وهيكل المستودع..."
+                },
+                "detectedType": {
+                    "dataRepo": "تم اكتشاف مستودع بيانات",
+                    "awesomeReadme": "تم اكتشاف قائمة Awesome"
+                },
+                "badges": {
+                    "dataRepo": "مستودع بيانات",
+                    "awesomeReadme": "قائمة Awesome"
+                },
+                "preview": {
+                    "items": "عناصر",
+                    "categories": "فئات"
+                },
+                "nameLabel": "اسم الدليل",
+                "namePlaceholder": "مثال: دليلي الرائع",
+                "advancedSettings": "إعدادات متقدمة",
+                "advancedSubtitle": "تكوين إعدادات المنظمة والمستودع",
+                "attribution": {
+                    "title": "إسناد المصدر:",
+                    "text": "سيشير هذا الدليل إلى {url} كمصدره"
+                },
+                "analyzeButton": "تحليل المستودع",
+                "importButton": "استيراد الدليل",
+                "importingButton": "جارٍ الاستيراد...",
+                "backButton": "رجوع",
+                "cancelButton": "إلغاء",
+                "importing": {
+                    "title": "جارٍ استيراد الدليل",
+                    "subtitle": "جارٍ إعداد دليلك من المستودع المصدر..."
+                },
+                "repositorySelector": {
+                    "title": "اختيار مستودع",
+                    "searchPlaceholder": "البحث في المستودعات...",
+                    "loading": "جارٍ تحميل المستودعات...",
+                    "noRepositories": "لم يتم العثور على مستودعات",
+                    "noResults": "لا توجد مستودعات تطابق بحثك",
+                    "tryAgain": "حاول مرة أخرى",
+                    "loadMore": "تحميل المزيد",
+                    "showing": "عرض {shown} من {total} مستودع",
+                    "today": "اليوم",
+                    "yesterday": "أمس",
+                    "daysAgo": "منذ {days} أيام",
+                    "weeksAgo": "منذ {weeks} أسابيع",
+                    "repositoriesLoaded": "مستودعات محملة",
+                    "moreAvailable": "المزيد متاح",
+                    "errors": {
+                        "fetchFailed": "فشل تحميل المستودعات"
+                    }
+                },
+                "chooseMode": {
+                    "title": "اختر طريقة الاستيراد",
+                    "repository": "المستودع: {owner}/{repo}",
+                    "repositoryWithItems": "المستودع: {owner}/{repo} ({itemCount} عناصر)",
+                    "importCopy": {
+                        "title": "استيراد ونسخ",
+                        "description": "إنشاء مستودعات جديدة بنسخة من البيانات. مثالي للتفريع أو البدء من جديد."
+                    },
+                    "linkExisting": {
+                        "title": "ربط موجود",
+                        "description": "استخدم مستودعك الموجود مباشرة. بدون نسخ، التغييرات تتزامن تلقائياً."
+                    },
+                    "back": "رجوع"
+                },
+                "linkConfirm": {
+                    "title": "ربط المستودع",
+                    "descriptionMissing": "لم يتم العثور على بعض المستودعات. يمكنك المتابعة بدونها أو إنشائها الآن.",
+                    "descriptionReady": "تم العثور على جميع المستودعات. جاهز للربط.",
+                    "dataRepo": "مستودع البيانات",
+                    "markdownRepo": "مستودع Markdown",
+                    "websiteRepo": "مستودع الموقع",
+                    "found": "موجود",
+                    "notFound": "غير موجود",
+                    "cancel": "إلغاء",
+                    "continueWithout": "متابعة بدون",
+                    "createMissing": "إنشاء المفقودة",
+                    "creating": "جارٍ الإنشاء...",
+                    "linking": "جارٍ الربط...",
+                    "linkRepos": "ربط المستودعات"
+                },
+                "errors": {
+                    "urlRequired": "يرجى إدخال رابط مستودع GitHub",
+                    "unsupportedFormat": "تنسيق المستودع هذا غير مدعوم. يرجى استخدام مستودع بيانات أو تنسيق قائمة Awesome.",
+                    "analyzeFailed": "فشل تحليل المستودع",
+                    "analyzeForLinkingFailed": "فشل التحليل للربط",
+                    "nameRequired": "اسم الدليل مطلوب",
+                    "noAnalysis": "يرجى تحليل مستودع أولاً",
+                    "githubRequired": "يرجى ربط حساب GitHub الخاص بك أولاً",
+                    "importFailed": "فشل استيراد الدليل",
+                    "linkFailed": "فشل ربط الدليل"
+                },
+                "success": {
+                    "started": "بدأ الاستيراد! جارٍ التوجيه إلى دليلك...",
+                    "linked": "تم ربط الدليل بنجاح"
+                }
             }
         },
         "github": {
@@ -1301,6 +1438,13 @@
             "fetchFailed": "فشل جلب الأدلة",
             "organization": {
                 "requiredWhenOwnerProvided": "يجب تفعيل المنظمة عند توفير المالك"
+            },
+            "import": {
+                "invalidUrl": "يرجى إدخال رابط صالح",
+                "analyzeFailed": "فشل تحليل المستودع",
+                "started": "تم بدء الاستيراد بنجاح",
+                "failed": "فشل استيراد الدليل",
+                "fetchReposFailed": "فشل جلب المستودعات"
             }
         },
         "generator": {
