@@ -4,6 +4,7 @@ import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
 import { AiService, TaskComplexity } from '@src/ai';
 import { Category, ItemData, Tag } from '@src/items-generator/dto';
 import { slugifyText } from '@src/items-generator/utils/text.utils';
+import { accumulateMetrics, MetricsAccumulator } from '@src/items-generator/utils/metrics.util';
 
 const categorySchema = z.object({
     id: z.string().describe('URL-friendly ID for the category, lowercase with hyphens'),
@@ -37,6 +38,10 @@ export interface ParsedAwesomeData {
         totalItemsFound: number;
         categoriesFound: number;
         parseErrors: string[];
+    };
+    metrics: {
+        total_tokens_used: number;
+        total_cost: number;
     };
 }
 
@@ -135,10 +140,14 @@ export class AwesomeReadmeParserService {
 
     async parseReadme(content: string): Promise<ParsedAwesomeData> {
         const parseErrors: string[] = [];
+        const metrics: MetricsAccumulator = {
+            total_tokens_used: 0,
+            total_cost: 0,
+        };
 
         let categories: Category[];
         try {
-            categories = await this.extractCategories(content);
+            categories = await this.extractCategories(content, metrics);
         } catch (error) {
             this.logger.error('Failed to extract categories', error);
             parseErrors.push(`Category extraction failed: ${error.message}`);
@@ -155,6 +164,7 @@ export class AwesomeReadmeParserService {
                     section.content,
                     section.categoryName,
                     section.categoryId,
+                    metrics,
                 );
                 allItems.push(...items);
             } catch (error) {
@@ -181,12 +191,19 @@ export class AwesomeReadmeParserService {
                 categoriesFound: categories.length,
                 parseErrors,
             },
+            metrics: {
+                total_tokens_used: metrics.total_tokens_used || 0,
+                total_cost: metrics.total_cost || 0,
+            },
         };
     }
 
-    private async extractCategories(content: string): Promise<Category[]> {
+    private async extractCategories(
+        content: string,
+        metrics: MetricsAccumulator,
+    ): Promise<Category[]> {
         if (content.length <= this.CATEGORY_CHUNK_SIZE) {
-            return this.extractCategoriesFromChunk(content);
+            return this.extractCategoriesFromChunk(content, metrics);
         }
 
         const chunks = await this.categoryTextSplitter.splitText(content);
@@ -195,7 +212,7 @@ export class AwesomeReadmeParserService {
 
         for (let i = 0; i < chunks.length; i++) {
             try {
-                const chunkCategories = await this.extractCategoriesFromChunk(chunks[i]);
+                const chunkCategories = await this.extractCategoriesFromChunk(chunks[i], metrics);
                 for (const cat of chunkCategories) {
                     if (!seenIds.has(cat.id)) {
                         seenIds.add(cat.id);
@@ -214,8 +231,11 @@ export class AwesomeReadmeParserService {
         return allCategories;
     }
 
-    private async extractCategoriesFromChunk(content: string): Promise<Category[]> {
-        const { result } = await this.aiService.askJson(
+    private async extractCategoriesFromChunk(
+        content: string,
+        metrics: MetricsAccumulator,
+    ): Promise<Category[]> {
+        const { result, usage, cost } = await this.aiService.askJson(
             CATEGORY_EXTRACTION_PROMPT,
             extractedCategoriesSchema,
             {
@@ -227,6 +247,8 @@ export class AwesomeReadmeParserService {
                 },
             },
         );
+
+        accumulateMetrics(metrics, usage, cost);
 
         return result.categories.map((cat) => ({
             id: cat.id || slugifyText(cat.name),
@@ -322,6 +344,7 @@ export class AwesomeReadmeParserService {
         sectionContent: string,
         categoryName: string,
         categoryId: string,
+        metrics: MetricsAccumulator,
     ): Promise<ItemData[]> {
         const extractedItems: ItemData[] = [];
 
@@ -330,7 +353,7 @@ export class AwesomeReadmeParserService {
 
             for (let i = 0; i < chunks.length; i++) {
                 try {
-                    const { result } = await this.aiService.askJson(
+                    const { result, usage, cost } = await this.aiService.askJson(
                         ITEM_EXTRACTION_PROMPT,
                         extractedItemsSchema,
                         {
@@ -342,6 +365,8 @@ export class AwesomeReadmeParserService {
                             },
                         },
                     );
+
+                    accumulateMetrics(metrics, usage, cost);
 
                     for (const item of result.items || []) {
                         extractedItems.push(this.mapToItemData(item, categoryId));
@@ -355,7 +380,7 @@ export class AwesomeReadmeParserService {
                 }
             }
         } else {
-            const { result } = await this.aiService.askJson(
+            const { result, usage, cost } = await this.aiService.askJson(
                 ITEM_EXTRACTION_PROMPT,
                 extractedItemsSchema,
                 {
@@ -367,6 +392,8 @@ export class AwesomeReadmeParserService {
                     },
                 },
             );
+
+            accumulateMetrics(metrics, usage, cost);
 
             for (const item of result.items) {
                 extractedItems.push(this.mapToItemData(item, categoryId));
