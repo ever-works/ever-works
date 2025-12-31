@@ -24,9 +24,11 @@ function formatDate(value: string | undefined | null, locale: string) {
 export function ShowDateTime({
     value,
     default: defaultValue,
+    customFormatter,
 }: {
     value?: string | null;
     default?: React.ReactNode | string;
+    customFormatter?: (date: string, locale: string) => string;
 }) {
     const locale = useLocale();
     const mounted = useMounted();
@@ -35,5 +37,7 @@ export function ShowDateTime({
         return null;
     }
 
-    return <>{value ? formatDate(value, locale) : defaultValue}</>;
+    const formatDateFn = customFormatter || formatDate;
+
+    return <>{value ? formatDateFn(value, locale) : defaultValue}</>;
 }

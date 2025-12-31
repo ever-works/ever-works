@@ -99,10 +99,14 @@ export function DirectoryImportForm({ user }: DirectoryImportFormProps) {
                 } else {
                     // Pre-fill directory name from repo name
                     if (!directoryName && result.data.repo) {
+                        let repoName = result.data.repo;
+                        // Strip -data suffix for data repos to avoid naming conflicts
+                        // (e.g., my-dir-data would create my-dir-data-data for the data repo)
+                        if (repoName.endsWith('-data')) {
+                            repoName = repoName.slice(0, -5);
+                        }
                         setDirectoryName(
-                            result.data.repo
-                                .replace(/-/g, ' ')
-                                .replace(/\b\w/g, (c) => c.toUpperCase()),
+                            repoName.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
                         );
                     }
                     // For data_repo, show mode selection
