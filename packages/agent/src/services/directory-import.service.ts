@@ -298,6 +298,14 @@ export class DirectoryImportService {
                     durationInSeconds: Math.round((Date.now() - startTime) / 1000),
                     newItemsCount: result.itemsImported,
                     totalItemsCount: result.itemsImported,
+                    metrics: result.metrics
+                        ? {
+                              total_tokens_used: result.metrics.total_tokens_used,
+                              total_cost: result.metrics.total_cost,
+                              new_items_added_to_store: result.itemsImported,
+                              total_items_in_store: result.itemsImported,
+                          }
+                        : undefined,
                 });
 
                 this.eventEmitter.emit(
@@ -502,6 +510,7 @@ export class DirectoryImportService {
                 itemsImported: parsedData.items.length,
                 categoriesImported: parsedData.categories.length,
                 tagsImported: parsedData.tags.length,
+                metrics: parsedData.metrics,
             };
         } catch (error) {
             this.logger.error('Failed to import from awesome readme', error);
