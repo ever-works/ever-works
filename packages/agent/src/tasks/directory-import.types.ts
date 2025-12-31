@@ -11,12 +11,18 @@ export type DirectoryImportPayload = {
     historyStartedAt?: string;
 };
 
+export type DirectoryImportMetrics = {
+    total_tokens_used?: number;
+    total_cost?: number;
+};
+
 export type DirectoryImportResult = {
     success: boolean;
     directoryId: string;
     itemsImported?: number;
     categoriesImported?: number;
     tagsImported?: number;
+    metrics?: DirectoryImportMetrics;
     error?: string;
     errorCode?: DirectoryImportErrorCode;
 };

@@ -148,7 +148,10 @@ export class DirectoryImportService {
             };
         }
 
-        const slug = slugifyText(dto.name);
+        // Strip -data suffix from name for data_repo/link_existing imports
+        // to avoid naming conflicts (e.g., my-dir-data would create my-dir-data-data)
+        const normalizedName = this.normalizeDirectoryName(dto.name, dto.sourceType);
+        const slug = slugifyText(normalizedName);
 
         const existingDir = await this.directoryRepository.findByOwnerAndSlug({
             userId: user.id,
@@ -167,7 +170,7 @@ export class DirectoryImportService {
             const directory = await this.directoryRepository.create(
                 {
                     slug,
-                    name: dto.name,
+                    name: normalizedName,
                     description: `Imported from ${dto.sourceUrl}`,
                     userId: user.id,
                     owner: dto.owner,
@@ -295,6 +298,14 @@ export class DirectoryImportService {
                     durationInSeconds: Math.round((Date.now() - startTime) / 1000),
                     newItemsCount: result.itemsImported,
                     totalItemsCount: result.itemsImported,
+                    metrics: result.metrics
+                        ? {
+                              total_tokens_used: result.metrics.total_tokens_used,
+                              total_cost: result.metrics.total_cost,
+                              new_items_added_to_store: result.itemsImported,
+                              total_items_in_store: result.itemsImported,
+                          }
+                        : undefined,
                 });
 
                 this.eventEmitter.emit(
@@ -499,6 +510,7 @@ export class DirectoryImportService {
                 itemsImported: parsedData.items.length,
                 categoriesImported: parsedData.categories.length,
                 tagsImported: parsedData.tags.length,
+                metrics: parsedData.metrics,
             };
         } catch (error) {
             this.logger.error('Failed to import from awesome readme', error);
@@ -605,5 +617,47 @@ export class DirectoryImportService {
     private getGitHubToken(user: User): string | undefined {
         const oauthToken = user.oauthTokens?.find((t) => t.provider === 'github');
         return oauthToken?.accessToken;
+    }
+
+    /**
+     * Normalize directory name by stripping -data suffix for data repo imports.
+     * This prevents naming conflicts where a repo like "my-dir-data" would
+     * result in "my-dir-data-data" for the data repository.
+     */
+    private normalizeDirectoryName(name: string, sourceType: ImportSourceTypeEnum): string {
+        // Only normalize for data_repo and link_existing imports
+        if (
+            sourceType !== ImportSourceTypeEnum.DATA_REPO &&
+            sourceType !== ImportSourceTypeEnum.LINK_EXISTING
+        ) {
+            return name;
+        }
+
+        // Check both the original name and slugified version for -data suffix
+        const slugified = slugifyText(name);
+
+        if (slugified.endsWith('-data')) {
+            // Handle different name formats:
+            // "my-dir-data" -> "my-dir"
+            // "My Dir Data" -> "My Dir"
+            // "My-Dir-Data" -> "My-Dir"
+            const trimmed = name.trim();
+
+            // Check for " Data" suffix (case-insensitive)
+            if (/\s+data$/i.test(trimmed)) {
+                return trimmed.replace(/\s+data$/i, '');
+            }
+
+            // Check for "-Data" or "-data" suffix
+            if (/-data$/i.test(trimmed)) {
+                return trimmed.replace(/-data$/i, '');
+            }
+
+            // Fallback: strip from slugified and convert back to title case
+            const baseSlug = slugified.slice(0, -5);
+            return baseSlug.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+        }
+
+        return name;
     }
 }
