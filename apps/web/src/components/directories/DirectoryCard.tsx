@@ -7,6 +7,7 @@ import { useTranslations, useLocale } from 'next-intl';
 import type { Directory } from '@/lib/api/directory';
 import { DirectoryMemberRole, GenerateStatusType } from '@/lib/api/enums';
 import { Users } from 'lucide-react';
+import { ShowDateTime } from '../ui/show-datetime';
 
 interface DirectoryCardProps {
     directory: Directory;
@@ -99,7 +100,7 @@ export function DirectoryCard({ directory }: DirectoryCardProps) {
                 </span>
                 {directory.updatedAt && (
                     <span className="text-xs text-text-muted dark:text-text-muted-dark">
-                        {formatDate(directory.updatedAt, locale)}
+                        <ShowDateTime value={directory.updatedAt} customFormatter={formatDate} />
                     </span>
                 )}
             </div>
