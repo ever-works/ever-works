@@ -159,19 +159,12 @@ export class BranchSyncService {
         let tempDir: string | null = null;
 
         try {
-            const uniqueRepoName = `${WEBSITE_TEMPLATE_CONFIG.repo}-sync-${branchName}-${Date.now()}`;
-            await this.githubService.removeDir(WEBSITE_TEMPLATE_CONFIG.owner, uniqueRepoName);
-
-            tempDir = await this.githubService.cloneOrPull({
+            tempDir = await this.githubService.cloneBranch({
                 owner: WEBSITE_TEMPLATE_CONFIG.owner,
                 repo: WEBSITE_TEMPLATE_CONFIG.repo,
                 branch: branchName,
                 token,
-                committer: this.githubService.getCommitter(committer),
-                autoSwitchToMainBranch: false,
             });
-
-            await this.githubService.switchToBranch(tempDir, branchName);
 
             if (targetBranch !== branchName) {
                 await this.githubService.renameBranch(tempDir, branchName, targetBranch);

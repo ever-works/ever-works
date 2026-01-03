@@ -384,4 +384,34 @@ export abstract class GitProvider {
     getDir(owner: string, repo: string) {
         return path.join(os.tmpdir(), 'ever-works-repos', slugifyText(`${owner}-${repo}`));
     }
+
+    /** Clone a specific branch to a unique temp directory */
+    async cloneBranch(params: {
+        owner: string;
+        repo: string;
+        branch: string;
+        token: string;
+    }): Promise<string> {
+        const { owner, repo, branch, token } = params;
+        const url = this.getURL(owner, repo);
+        const auth = this.getAuth(token);
+
+        const uniqueName = `${repo}-${branch}-${Date.now()}`;
+        const dir = path.join(os.tmpdir(), 'ever-works-repos', uniqueName);
+
+        await fs.promises.rm(dir, { recursive: true, force: true }).catch(() => {});
+        await fs.promises.mkdir(dir, { recursive: true });
+
+        await git.clone({
+            fs,
+            http,
+            dir,
+            url,
+            ref: branch,
+            singleBranch: true,
+            onAuth: () => auth,
+        });
+
+        return dir;
+    }
 }
