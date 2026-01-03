@@ -28,7 +28,8 @@ export class BranchSyncService {
     constructor(private readonly githubService: GithubService) {}
 
     /**
-     * Sync all branches from template repository to target repository
+     * Sync branches from template repository to target repository
+     * @param params.branchMapping - Optional mapping to also push source branch to different target (e.g., { 'stage': 'main' })
      */
     async syncAllBranches(params: {
         targetOwner: string;
@@ -36,7 +37,7 @@ export class BranchSyncService {
         token: string;
         committer: ICommitter;
         forcePush?: boolean;
-        excludeBranches?: string[];
+        branchMapping?: { [sourceBranch: string]: string };
     }): Promise<BranchSyncSummary> {
         const {
             targetOwner,
@@ -44,33 +45,47 @@ export class BranchSyncService {
             token,
             committer,
             forcePush = true,
-            excludeBranches = [],
+            branchMapping = {},
         } = params;
 
-        // 1. List all branches from template repository
-        const templateBranches = await this.githubService.listBranches(
-            WEBSITE_TEMPLATE_CONFIG.owner,
-            WEBSITE_TEMPLATE_CONFIG.repo,
-            token,
-        );
+        const branchesToSync = [...WEBSITE_TEMPLATE_CONFIG.syncBranches];
+        const mappedTargets = Object.values(branchMapping);
 
         this.logger.log(
-            `Found ${templateBranches.length} branches in template repository to sync to ${targetOwner}/${targetRepo}`,
+            `Syncing branches [${branchesToSync.join(', ')}] to ${targetOwner}/${targetRepo}`,
         );
 
-        // 2. Filter out excluded branches
-        const branchesToSync = templateBranches.filter((b) => !excludeBranches.includes(b.name));
+        // Build sync operations
+        const syncOperations: Array<{ branchName: string; targetBranch: string }> = [];
 
-        // 3. Sync branches with controlled parallelism
+        for (const branchName of branchesToSync) {
+            // Skip if this branch would be overwritten by a mapped branch
+            if (mappedTargets.includes(branchName) && !branchMapping[branchName]) {
+                this.logger.log(`Skipping '${branchName}' - will be overwritten by mapped branch`);
+                continue;
+            }
+
+            syncOperations.push({ branchName, targetBranch: branchName });
+
+            // If mapped, also sync to the mapped target
+            const mappedTarget = branchMapping[branchName];
+            if (mappedTarget && mappedTarget !== branchName) {
+                syncOperations.push({ branchName, targetBranch: mappedTarget });
+                this.logger.log(`Branch '${branchName}' will also sync to '${mappedTarget}'`);
+            }
+        }
+
+        // Sync with controlled parallelism
         const results: BranchSyncResult[] = [];
 
-        for (let i = 0; i < branchesToSync.length; i += this.MAX_CONCURRENT_SYNCS) {
-            const batch = branchesToSync.slice(i, i + this.MAX_CONCURRENT_SYNCS);
+        for (let i = 0; i < syncOperations.length; i += this.MAX_CONCURRENT_SYNCS) {
+            const batch = syncOperations.slice(i, i + this.MAX_CONCURRENT_SYNCS);
 
             const batchResults = await Promise.allSettled(
-                batch.map((branch) =>
+                batch.map((op) =>
                     this.syncBranch({
-                        branchName: branch.name,
+                        branchName: op.branchName,
+                        targetBranch: op.targetBranch,
                         targetOwner,
                         targetRepo,
                         token,
@@ -82,13 +97,13 @@ export class BranchSyncService {
 
             for (let j = 0; j < batchResults.length; j++) {
                 const result = batchResults[j];
-                const branch = batch[j];
+                const op = batch[j];
 
                 if (result.status === 'fulfilled') {
                     results.push(result.value);
                 } else {
                     results.push({
-                        branch: branch.name,
+                        branch: op.branchName,
                         status: 'error',
                         message: result.reason?.message || 'Unknown error',
                     });
@@ -96,13 +111,13 @@ export class BranchSyncService {
             }
 
             // Small delay between batches to avoid rate limiting
-            if (i + this.MAX_CONCURRENT_SYNCS < branchesToSync.length) {
+            if (i + this.MAX_CONCURRENT_SYNCS < syncOperations.length) {
                 await new Promise((r) => setTimeout(r, 1000));
             }
         }
 
         const summary: BranchSyncSummary = {
-            totalBranches: templateBranches.length,
+            totalBranches: branchesToSync.length,
             synced: results.filter((r) => r.status === 'synced').length,
             skipped: results.filter((r) => r.status === 'skipped').length,
             errors: results.filter((r) => r.status === 'error').length,
@@ -116,31 +131,37 @@ export class BranchSyncService {
         return summary;
     }
 
-    /**
-     * Sync a single branch from template to target repository
-     */
+    /** Sync a single branch from template to target repository */
     async syncBranch(params: {
         branchName: string;
+        targetBranch?: string;
         targetOwner: string;
         targetRepo: string;
         token: string;
         committer: ICommitter;
         forcePush?: boolean;
     }): Promise<BranchSyncResult> {
-        const { branchName, targetOwner, targetRepo, token, committer, forcePush = true } = params;
+        const {
+            branchName,
+            targetBranch = branchName,
+            targetOwner,
+            targetRepo,
+            token,
+            committer,
+            forcePush = true,
+        } = params;
 
-        this.logger.log(`Syncing branch '${branchName}' to ${targetOwner}/${targetRepo}`);
+        const mappingInfo = targetBranch !== branchName ? ` (mapped to '${targetBranch}')` : '';
+        this.logger.log(
+            `Syncing branch '${branchName}'${mappingInfo} to ${targetOwner}/${targetRepo}`,
+        );
 
         let tempDir: string | null = null;
 
         try {
-            // Use unique directory for each branch sync to avoid conflicts
             const uniqueRepoName = `${WEBSITE_TEMPLATE_CONFIG.repo}-sync-${branchName}-${Date.now()}`;
-
-            // Clean up any existing directory
             await this.githubService.removeDir(WEBSITE_TEMPLATE_CONFIG.owner, uniqueRepoName);
 
-            // Clone template repo at specific branch
             tempDir = await this.githubService.cloneOrPull({
                 owner: WEBSITE_TEMPLATE_CONFIG.owner,
                 repo: WEBSITE_TEMPLATE_CONFIG.repo,
@@ -150,21 +171,22 @@ export class BranchSyncService {
                 autoSwitchToMainBranch: false,
             });
 
-            // Switch to the specific branch
             await this.githubService.switchToBranch(tempDir, branchName);
 
-            // Update remote to point to target repo
+            if (targetBranch !== branchName) {
+                await this.githubService.renameBranch(tempDir, branchName, targetBranch);
+            }
+
             const targetRepoUrl = this.githubService.getURL(targetOwner, targetRepo);
             await this.githubService.remoteRemove(tempDir, 'origin');
             await this.githubService.remoteAdd(tempDir, 'origin', targetRepoUrl);
 
-            // Push to target repository
             await this.githubService.push(tempDir, token, forcePush);
 
             return {
                 branch: branchName,
                 status: 'synced',
-                message: `Successfully synced branch '${branchName}'`,
+                message: `Successfully synced branch '${branchName}'${mappingInfo}`,
             };
         } catch (error) {
             this.logger.error(`Failed to sync branch '${branchName}':`, error.message);
@@ -175,7 +197,6 @@ export class BranchSyncService {
                 message: error.message,
             };
         } finally {
-            // Cleanup temp directory
             if (tempDir) {
                 await fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
             }

@@ -1,11 +1,8 @@
-/**
- * Configuration for the website template repository
- * This is the source template used for creating and updating website repositories
- */
 export const WEBSITE_TEMPLATE_CONFIG = {
     owner: 'ever-works',
     repo: 'ever-works-website-template',
     branch: 'main',
+    syncBranches: ['main', 'stage', 'develop'],
 } as const;
 
 export type WebsiteTemplateConfig = typeof WEBSITE_TEMPLATE_CONFIG;

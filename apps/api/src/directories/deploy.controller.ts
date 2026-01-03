@@ -1,21 +1,16 @@
 import { BadRequestException, Body, Controller, Param, Post, UseGuards } from '@nestjs/common';
-import { DeployVercelDto, VercelService, BatchDeployService } from '@packages/agent/deploy';
+import { DeployVercelDto, VercelService } from '@packages/agent/deploy';
 import { DirectoryOwnershipService } from '@packages/agent/services';
 import { AuthService, CurrentUser, JwtAuthGuard } from '../auth';
 import { AuthenticatedUser } from '../auth/types/jwt.types';
 import { VercelDeploymentVerifierService } from './tasks/vercel-deployment-verifier.service';
 import { VercelTokenDto } from './dto/deploy.dto';
-import {
-    BatchDeployVercelDto,
-    BatchDeployResponseDto,
-} from './dto/batch-deploy.dto';
 
 @Controller('api/deploy')
 @UseGuards(JwtAuthGuard)
 export class DeployController {
     constructor(
         private readonly vercelService: VercelService,
-        private readonly batchDeployService: BatchDeployService,
         private readonly ownershipService: DirectoryOwnershipService,
         private readonly authService: AuthService,
         private readonly vercelDeploymentVerifierService: VercelDeploymentVerifierService,
@@ -190,73 +185,6 @@ export class DeployController {
             website: existingDeployment.website,
             deploymentState: existingDeployment.deploymentState,
             found: existingDeployment.found,
-        };
-    }
-
-    /**
-     * Batch deploy multiple directories to Vercel.
-     * This endpoint syncs all branches from the template and deploys each directory.
-     */
-    @Post('/batch/vercel')
-    async batchDeployToVercel(
-        @CurrentUser() auth: AuthenticatedUser,
-        @Body() batchDeployDto: BatchDeployVercelDto,
-    ): Promise<BatchDeployResponseDto> {
-        const user = await this.authService.getUser(auth.userId);
-
-        // Use user's tokens if not provided
-        const vercelToken = batchDeployDto.VERCEL_TOKEN || user.vercelToken;
-        const ghToken = batchDeployDto.GITHUB_TOKEN || user.getGitToken();
-
-        if (!vercelToken) {
-            throw new BadRequestException({
-                status: 'error',
-                message: 'Vercel token is required. Please configure it in your settings.',
-            });
-        }
-
-        // Validate Vercel token
-        const valid = await this.vercelService.validateToken(vercelToken);
-        if (!valid) {
-            throw new BadRequestException({
-                status: 'error',
-                message: 'Invalid Vercel token',
-            });
-        }
-
-        // Validate ownership for all directories before starting
-        for (const item of batchDeployDto.directories) {
-            await this.ownershipService.ensureCanEdit(item.directoryId, user.id);
-        }
-
-        // Execute batch deployment
-        const result = await this.batchDeployService.deployBatch(
-            {
-                directories: batchDeployDto.directories,
-                vercelToken,
-                ghToken,
-                defaultTeamScope: batchDeployDto.vercelTeamScope,
-            },
-            user,
-        );
-
-        // Determine overall status
-        let status: 'success' | 'partial' | 'error';
-        if (result.failed === 0) {
-            status = 'success';
-        } else if (result.successfullyStarted > 0) {
-            status = 'partial';
-        } else {
-            status = 'error';
-        }
-
-        return {
-            status,
-            message: `Batch deployment: ${result.successfullyStarted} started, ${result.failed} failed`,
-            totalRequested: result.totalRequested,
-            successfullyStarted: result.successfullyStarted,
-            failed: result.failed,
-            results: result.results,
         };
     }
 }

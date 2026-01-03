@@ -1,13 +1,12 @@
 import { Module } from '@nestjs/common';
 import { VercelService } from './vercel.service';
-import { BatchDeployService } from './batch-deploy.service';
 import { GitModule } from '../git/git.module';
 import { WebsiteGeneratorModule } from '../website-generator/website-generator.module';
 import { DatabaseModule } from '../database/database.module';
 
 @Module({
     imports: [DatabaseModule, GitModule, WebsiteGeneratorModule],
-    providers: [VercelService, BatchDeployService],
-    exports: [VercelService, BatchDeployService],
+    providers: [VercelService],
+    exports: [VercelService],
 })
 export class DeployModule {}

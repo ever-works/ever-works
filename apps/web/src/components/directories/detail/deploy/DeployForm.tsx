@@ -184,7 +184,7 @@ export function DeployForm({ directory, isDeploying }: DeployFormProps) {
             <WebsiteTemplateSettings directory={directory} />
 
             {/* Info Section */}
-            <div className="p-6 rounded-lg bg-info/5 dark:bg-info-dark/5 border border-info/20 dark:border-info-dark/20">
+            <div className="p-6 rounded-lg bg-info/5 dark:bg-info-dark/5 border border-info/20 dark:border-info-dark/20 hidden">
                 <div className="flex gap-3">
                     <Info className="shrink-0 w-5 h-5 text-info dark:text-info-dark mt-0.5" />
                     <div className="space-y-2 text-sm text-text-secondary dark:text-text-secondary-dark">

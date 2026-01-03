@@ -5,6 +5,7 @@ import { WebsiteRepositoryCreationMethod } from '../items-generator/dto/create-i
 import { Directory } from '../entities/directory.entity';
 import { User } from '../entities/user.entity';
 import { WEBSITE_TEMPLATE_CONFIG } from './config/website-template.config';
+import { config } from '@src/config';
 import * as fs from 'node:fs/promises';
 
 @Injectable()
@@ -108,15 +109,18 @@ export class WebsiteGeneratorService {
         }
     }
 
-    /**
-     * Sync all branches from the website template to the directory's website repo
-     */
+    /** Sync all branches from template to directory's website repo */
     async syncAllBranchesFromTemplate(directory: Directory, user: User) {
         const directoryOwner = directory.user as User;
         const token = directoryOwner.getGitToken();
 
+        const branchMapping = directory.websiteTemplateUseBeta
+            ? { [config.websiteTemplate.getBetaBranch()]: 'main' }
+            : undefined;
+
         this.logger.log(
-            `Syncing all branches from template to ${directory.getRepoOwner()}/${directory.getWebsiteRepo()}`,
+            `Syncing all branches from template to ${directory.getRepoOwner()}/${directory.getWebsiteRepo()}` +
+                (branchMapping ? ` (beta: ${Object.keys(branchMapping)[0]}→main)` : ''),
         );
 
         try {
@@ -126,6 +130,7 @@ export class WebsiteGeneratorService {
                 token,
                 committer: user.asCommitter(),
                 forcePush: true,
+                branchMapping,
             });
 
             this.logger.log(
