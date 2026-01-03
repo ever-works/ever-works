@@ -1,5 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { GithubService } from '../git/github.service';
+import { BranchSyncService } from '../git/branch-sync.service';
 import { WebsiteRepositoryCreationMethod } from '../items-generator/dto/create-items-generator.dto';
 import { Directory } from '../entities/directory.entity';
 import { User } from '../entities/user.entity';
@@ -8,7 +9,12 @@ import * as fs from 'node:fs/promises';
 
 @Injectable()
 export class WebsiteGeneratorService {
-    constructor(private readonly githubService: GithubService) {}
+    private readonly logger = new Logger(WebsiteGeneratorService.name);
+
+    constructor(
+        private readonly githubService: GithubService,
+        private readonly branchSyncService: BranchSyncService,
+    ) {}
 
     private async duplicate(directory: Directory, user: User) {
         // Use directory owner's Git token (they set up the repos)
@@ -91,11 +97,46 @@ export class WebsiteGeneratorService {
                 // Default to duplicate if an unknown operation is somehow passed
                 path = await this.duplicate(directory, user);
             }
+
+            // Sync all branches from template after initial setup
+            await this.syncAllBranchesFromTemplate(directory, user);
         } finally {
             if (path && typeof path === 'string') {
                 // cleanup
                 await fs.rm(path, { recursive: true, force: true });
             }
+        }
+    }
+
+    /**
+     * Sync all branches from the website template to the directory's website repo
+     */
+    async syncAllBranchesFromTemplate(directory: Directory, user: User) {
+        const directoryOwner = directory.user as User;
+        const token = directoryOwner.getGitToken();
+
+        this.logger.log(
+            `Syncing all branches from template to ${directory.getRepoOwner()}/${directory.getWebsiteRepo()}`,
+        );
+
+        try {
+            const result = await this.branchSyncService.syncAllBranches({
+                targetOwner: directory.getRepoOwner(),
+                targetRepo: directory.getWebsiteRepo(),
+                token,
+                committer: user.asCommitter(),
+                forcePush: true,
+            });
+
+            this.logger.log(
+                `Branch sync completed: ${result.synced} synced, ${result.errors} errors`,
+            );
+
+            return result;
+        } catch (error) {
+            this.logger.error(`Failed to sync branches from template: ${error.message}`);
+            // Don't throw - branch sync failure shouldn't fail the entire initialization
+            return null;
         }
     }
 

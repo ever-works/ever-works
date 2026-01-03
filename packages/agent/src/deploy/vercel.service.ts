@@ -1,7 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { randomBytes } from 'crypto';
 import { DeployProvider, VercelInput } from './deploy.types';
 import { GithubService } from '../git/github.service';
+import { BranchSyncService } from '../git/branch-sync.service';
 import { Directory } from '../entities/directory.entity';
 import { User } from '../entities/user.entity';
 import { WebsiteUpdateService } from '../website-generator/website-update.service';
@@ -18,16 +19,22 @@ export type { Vercel } from '@vercel/sdk';
 
 @Injectable()
 export class VercelService {
+    private readonly logger = new Logger(VercelService.name);
     private readonly PROVIDER_ID: DeployProvider = 'vercel';
     private readonly CRON_SECRET_LENGTH = 32;
 
     constructor(
         private readonly githubService: GithubService,
         private readonly websiteUpdateService: WebsiteUpdateService,
+        private readonly branchSyncService: BranchSyncService,
     ) {}
 
     async deploy(vercelInput: VercelInput, directory: Directory, user: User) {
         const token = user.getGitToken();
+
+        // Sync all branches from template before deployment
+        await this.syncAllBranchesBeforeDeploy(vercelInput.owner, vercelInput.repo, token, user);
+
         const ctx = await this.createRepoContext(vercelInput.owner, vercelInput.repo, token);
 
         await this.githubService.enableWorkflows({
@@ -42,6 +49,38 @@ export class VercelService {
         await this.ensureCronSecret(ctx);
 
         return this.dispatchWithRetry(vercelInput, directory, user, token);
+    }
+
+    /**
+     * Sync all branches from template repository before deployment
+     */
+    private async syncAllBranchesBeforeDeploy(
+        owner: string,
+        repo: string,
+        token: string,
+        user: User,
+    ) {
+        this.logger.log(`Syncing all branches from template to ${owner}/${repo} before deployment`);
+
+        try {
+            const result = await this.branchSyncService.syncAllBranches({
+                targetOwner: owner,
+                targetRepo: repo,
+                token,
+                committer: user.asCommitter(),
+                forcePush: true,
+            });
+
+            this.logger.log(
+                `Branch sync before deploy completed: ${result.synced} synced, ${result.errors} errors`,
+            );
+
+            return result;
+        } catch (error) {
+            this.logger.error(`Failed to sync branches before deploy: ${error.message}`);
+            // Don't throw - branch sync failure shouldn't fail the deployment
+            return null;
+        }
     }
 
     async getAccountTeams(vercelToken: string) {
