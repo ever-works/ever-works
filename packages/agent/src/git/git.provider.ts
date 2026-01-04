@@ -307,6 +307,45 @@ export abstract class GitProvider {
     }
 
     /**
+     * Renames a local branch from oldName to newName
+     * Creates a new branch with the new name at the same commit, switches to it, and deletes the old branch
+     */
+    async renameBranch(dir: string, oldName: string, newName: string): Promise<void> {
+        try {
+            const branches = await git.listBranches({ fs, dir });
+
+            if (!branches.includes(oldName)) {
+                throw new Error(`Branch '${oldName}' does not exist`);
+            }
+
+            if (branches.includes(newName)) {
+                // If newName already exists, just checkout to it and delete oldName if different
+                if (oldName !== newName) {
+                    await git.checkout({ fs, dir, ref: newName });
+                    await git.deleteBranch({ fs, dir, ref: oldName });
+                }
+                return;
+            }
+
+            // Get the commit SHA of the old branch
+            const commitSha = await git.resolveRef({ fs, dir, ref: oldName });
+
+            // Create new branch at the same commit
+            await git.branch({ fs, dir, ref: newName, object: commitSha });
+
+            // Switch to the new branch
+            await git.checkout({ fs, dir, ref: newName });
+
+            // Delete the old branch
+            await git.deleteBranch({ fs, dir, ref: oldName });
+        } catch (error) {
+            throw new Error(
+                `Failed to rename branch from '${oldName}' to '${newName}': ${error.message}`,
+            );
+        }
+    }
+
+    /**
      * Generates a random unique branch name and switches to it
      * Ensures the branch name doesn't conflict with existing branches
      */
@@ -344,5 +383,35 @@ export abstract class GitProvider {
 
     getDir(owner: string, repo: string) {
         return path.join(os.tmpdir(), 'ever-works-repos', slugifyText(`${owner}-${repo}`));
+    }
+
+    /** Clone a specific branch to a unique temp directory */
+    async cloneBranch(params: {
+        owner: string;
+        repo: string;
+        branch: string;
+        token: string;
+    }): Promise<string> {
+        const { owner, repo, branch, token } = params;
+        const url = this.getURL(owner, repo);
+        const auth = this.getAuth(token);
+
+        const uniqueName = `${repo}-${branch}-${Date.now()}`;
+        const dir = path.join(os.tmpdir(), 'ever-works-repos', uniqueName);
+
+        await fs.promises.rm(dir, { recursive: true, force: true }).catch(() => {});
+        await fs.promises.mkdir(dir, { recursive: true });
+
+        await git.clone({
+            fs,
+            http,
+            dir,
+            url,
+            ref: branch,
+            singleBranch: true,
+            onAuth: () => auth,
+        });
+
+        return dir;
     }
 }
