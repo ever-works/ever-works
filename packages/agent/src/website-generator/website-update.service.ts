@@ -1,5 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { GithubService } from '../git/github.service';
+import { BranchSyncService, BranchSyncSummary } from '../git/branch-sync.service';
 import { Directory } from '../entities/directory.entity';
 import { User } from '../entities/user.entity';
 import { WEBSITE_TEMPLATE_CONFIG } from './config/website-template.config';
@@ -11,7 +12,10 @@ import { config } from '@src/config';
 export class WebsiteUpdateService {
     private readonly logger = new Logger(WebsiteUpdateService.name);
 
-    constructor(private readonly githubService: GithubService) {}
+    constructor(
+        private readonly githubService: GithubService,
+        private readonly branchSyncService: BranchSyncService,
+    ) {}
 
     /**
      * Updates an existing website repository based on the original creation method
@@ -23,7 +27,12 @@ export class WebsiteUpdateService {
         directory: Directory,
         user: User,
         options?: { branch?: string },
-    ): Promise<{ method: string; message: string; commitSha?: string }> {
+    ): Promise<{
+        method: string;
+        message: string;
+        commitSha?: string;
+        branchSync?: BranchSyncSummary;
+    }> {
         // Use directory owner's Git token (they set up the repos)
         const directoryOwner = directory.user as User;
         const token = directoryOwner.getGitToken();
@@ -50,29 +59,78 @@ export class WebsiteUpdateService {
             token,
         );
 
+        let updateResult: { method: string; message: string; commitSha?: string };
+
         try {
             // If fork fails, try duplicate method (clone original, replace remote)
             await this.updateDuplicate(directory, user, branch);
-            return {
+            updateResult = {
                 method: 'duplicate',
                 message: 'Successfully updated using duplicate method',
                 commitSha: latestCommit?.sha,
             };
         } catch (error) {
             this.logger.warn(`Duplicate update failed: ${error.message}`);
+
+            try {
+                // If duplicate fails, try template method (clone both, replace files)
+                await this.updateTemplate(directory, user, branch);
+                updateResult = {
+                    method: 'create-using-template',
+                    message: 'Successfully updated using template method',
+                    commitSha: latestCommit?.sha,
+                };
+            } catch (templateError) {
+                this.logger.error(`Template update failed: ${templateError.message}`);
+                throw new Error(`All update methods failed. Last error: ${templateError.message}`);
+            }
         }
 
+        // Sync all branches from template to website repo
+        const branchSync = await this.syncAllBranchesFromTemplate(directory, user);
+
+        return {
+            ...updateResult,
+            branchSync: branchSync || undefined,
+        };
+    }
+
+    /** Sync all branches from template to directory's website repo */
+    async syncAllBranchesFromTemplate(
+        directory: Directory,
+        user: User,
+    ): Promise<BranchSyncSummary | null> {
+        const directoryOwner = directory.user as User;
+        const token = directoryOwner.getGitToken();
+
+        const branchMapping = directory.websiteTemplateUseBeta
+            ? { [config.websiteTemplate.getBetaBranch()]: 'main' }
+            : undefined;
+
+        this.logger.log(
+            `Syncing all branches from template to ${directory.getRepoOwner()}/${directory.getWebsiteRepo()}` +
+                (branchMapping ? ` (beta: ${Object.keys(branchMapping)[0]}→main)` : ''),
+        );
+
         try {
-            // If duplicate fails, try template method (clone both, replace files)
-            await this.updateTemplate(directory, user, branch);
-            return {
-                method: 'create-using-template',
-                message: 'Successfully updated using template method',
-                commitSha: latestCommit?.sha,
-            };
+            const result = await this.branchSyncService.syncAllBranches({
+                targetOwner: directory.getRepoOwner(),
+                targetRepo: directory.getWebsiteRepo(),
+                token,
+                committer: user.asCommitter(),
+                forcePush: true,
+                branchMapping,
+            });
+
+            this.logger.log(
+                `Branch sync completed: ${result.synced} synced, ${result.errors} errors`,
+            );
+
+            return result;
         } catch (error) {
-            this.logger.error(`Template update failed: ${error.message}`);
-            throw new Error(`All update methods failed. Last error: ${error.message}`);
+            this.logger.error(`Failed to sync branches from template: ${error.message}`);
+            // Don't throw - branch sync failure shouldn't fail the entire update
+            return null;
         }
     }
 
@@ -256,7 +314,7 @@ export class WebsiteUpdateService {
             committer,
         );
 
-        await this.githubService.push(targetDir, token);
+        await this.githubService.push(targetDir, token, true);
 
         this.logger.log(
             `Successfully updated ${directory.getRepoOwner()}/${websiteRepo} using template method (branch: ${branch})`,
