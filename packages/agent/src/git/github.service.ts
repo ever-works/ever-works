@@ -648,6 +648,42 @@ export class GithubService extends GitProvider {
     }
 
     /**
+     * Lists all branches in a repository
+     */
+    async listBranches(
+        owner: string,
+        repo: string,
+        token: string,
+    ): Promise<Array<{ name: string; sha: string; protected: boolean }>> {
+        const octokit = new Octokit({ auth: token });
+        const branches: Array<{ name: string; sha: string; protected: boolean }> = [];
+
+        try {
+            for await (const response of octokit.paginate.iterator(
+                octokit.rest.repos.listBranches,
+                {
+                    owner,
+                    repo,
+                    per_page: 100,
+                },
+            )) {
+                for (const branch of response.data) {
+                    branches.push({
+                        name: branch.name,
+                        sha: branch.commit.sha,
+                        protected: branch.protected,
+                    });
+                }
+            }
+
+            return branches;
+        } catch (err) {
+            this.logger.error(`Failed to list branches for ${owner}/${repo}`, err.message);
+            throw err;
+        }
+    }
+
+    /**
      * Deletes a repository
      */
     async deleteRepository(owner: string, repo: string, token: string): Promise<void> {
