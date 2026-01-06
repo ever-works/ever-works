@@ -333,6 +333,7 @@ export class DirectoryQueryService {
             parameters: record.parameters ?? null,
             createdAt: record.createdAt.toISOString(),
             updatedAt: record.updatedAt.toISOString(),
+            triggerRunId: record.triggerRunId,
         };
     }
 }

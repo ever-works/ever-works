@@ -596,11 +596,17 @@ export class DirectoryGenerationService {
             scheduleId: context.scheduleId,
         };
 
-        const dispatched = this.generationDispatcher
+        const dispatchedId = this.generationDispatcher
             ? await this.generationDispatcher.dispatchDirectoryGeneration(payload)
-            : false;
+            : null;
 
-        if (!dispatched) {
+        if (dispatchedId) {
+            await this.generationHistoryRepository.updateEntry(historyId, {
+                triggerRunId: dispatchedId,
+            });
+        }
+
+        if (!dispatchedId) {
             this.logger.warn(
                 `Trigger dispatch failed, falling back to in-process generation for directory ${directory.id} (${mode})`,
             );

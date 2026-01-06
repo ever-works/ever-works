@@ -243,6 +243,7 @@ export interface DirectoryGenerationHistoryEntry {
     parameters?: CreateItemsGeneratorDto | null;
     createdAt: string;
     updatedAt: string;
+    triggerRunId?: string;
 }
 
 export interface DirectoryGenerationHistoryResponse {
