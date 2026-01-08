@@ -66,6 +66,20 @@ export type GetProjectsReadyState =
     | 'CANCELED'
     | 'TIMEOUT';
 
+export interface SourceRepository {
+    url: string;
+    owner: string;
+    repo: string;
+    type: ImportSourceType;
+    importedAt: string;
+}
+
+export interface RepoVisibility {
+    data: boolean;
+    website: boolean;
+    directory: boolean;
+}
+
 // Response Types
 export interface Directory {
     id: string;
@@ -98,6 +112,9 @@ export interface Directory {
     websiteTemplateLastError?: string | null;
     websiteTemplateLastUpdatedAt?: string | null;
     websiteTemplateLastCheckedAt?: string | null;
+    // Import Source FIELDS
+    sourceRepository?: SourceRepository;
+    repoVisibility?: RepoVisibility;
 }
 
 export interface DirectoryScheduleAllowedCadence {
@@ -290,6 +307,7 @@ export interface ImportDirectoryDto {
     owner?: string;
     organization?: boolean;
     createMissingRepos?: boolean;
+    sync?: boolean;
 }
 
 export interface ImportDirectoryResponseDto {
@@ -336,6 +354,16 @@ export interface AnalyzeForLinkingResponseDto {
     itemCount?: number;
     categoryCount?: number;
     error?: string;
+}
+
+export type RepositoryType = 'data' | 'directory' | 'website';
+
+export interface RepositoryStatus {
+    type: RepositoryType;
+    name: string;
+    url: string;
+    isPrivate: boolean;
+    exists: boolean;
 }
 
 export const directoryAPI = {
@@ -518,5 +546,22 @@ export const directoryAPI = {
         return serverFetch<GetUserRepositoriesResponseDto>(
             `/directories/import/repositories${query}`,
         );
+    },
+
+    // Repository Visibility
+    getRepositoryVisibility: async (id: string) => {
+        return serverFetch<RepositoryStatus[]>(`/directories/${id}/repositories/visibility`);
+    },
+
+    updateRepositoryVisibility: async (
+        id: string,
+        data: { repoType: RepositoryType; isPrivate: boolean },
+    ) => {
+        return serverMutation<RepositoryStatus>({
+            endpoint: `/directories/${id}/repositories/visibility`,
+            data,
+            method: 'PUT',
+            wrapInData: false,
+        });
     },
 };

@@ -13,6 +13,7 @@ import {
     AnalyzeRepositoryResponseDto,
     ImportSourceType,
     GetUserRepositoriesResponseDto,
+    UpdateDirectorySchedulePayload,
 } from '@/lib/api';
 import { getAuthFromCookie } from '@/lib/auth';
 import { checkOAuthConnection } from './oauth';
@@ -474,6 +475,7 @@ interface ImportDirectoryRequest {
     organization?: boolean;
     owner?: string;
     createMissingRepos?: boolean;
+    sync?: boolean;
 }
 
 export async function importDirectory(data: ImportDirectoryRequest) {
@@ -490,6 +492,7 @@ export async function importDirectory(data: ImportDirectoryRequest) {
         organization: z.boolean().optional(),
         owner: z.string().optional(),
         createMissingRepos: z.boolean().optional(),
+        sync: z.boolean().optional(),
     });
 
     try {
@@ -526,6 +529,7 @@ export async function importDirectory(data: ImportDirectoryRequest) {
             organization,
             owner: owner || undefined,
             createMissingRepos: validation.data.createMissingRepos,
+            sync: validation.data.sync,
         });
 
         return {
@@ -624,6 +628,81 @@ export async function getUserRepositories(params: GetUserRepositoriesParams = {}
         return {
             success: false,
             error: error instanceof Error ? error.message : t('import.fetchReposFailed'),
+        };
+    }
+}
+
+export async function updateDirectorySchedule(
+    directoryId: string,
+    data: UpdateDirectorySchedulePayload,
+) {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    try {
+        const result = await directoryAPI.updateSchedule(directoryId, data);
+        revalidatePath(`/directories/${directoryId}/settings`);
+        return {
+            success: true,
+            data: result,
+        };
+    } catch (error) {
+        console.error('Failed to update directory schedule:', error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to update schedule',
+        };
+    }
+}
+
+export async function getRepositoryVisibility(directoryId: string) {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    try {
+        const result = await directoryAPI.getRepositoryVisibility(directoryId);
+        return {
+            success: true,
+            data: result,
+        };
+    } catch (error) {
+        console.error('Failed to get repository visibility:', error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to get repository visibility',
+        };
+    }
+}
+
+export async function toggleRepositoryVisibility(
+    directoryId: string,
+    repoType: 'data' | 'directory' | 'website',
+    isPrivate: boolean,
+) {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    try {
+        await directoryAPI.updateRepositoryVisibility(directoryId, {
+            repoType,
+            isPrivate,
+        });
+        revalidatePath(`/directories/${directoryId}/settings`);
+        return {
+            success: true,
+        };
+    } catch (error) {
+        console.error('Failed to update repository visibility:', error);
+        return {
+            success: false,
+            error:
+                error instanceof Error ? error.message : 'Failed to update repository visibility',
         };
     }
 }

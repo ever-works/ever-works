@@ -921,4 +921,164 @@ export class DataGeneratorService {
             };
         }
     }
+
+    async updateWithImportedData(
+        directory: Directory,
+        user: User,
+        importedData: {
+            items: ItemData[];
+            categories: Identifiable[];
+            tags: Identifiable[];
+            config?: Record<string, any>;
+        },
+        options: {
+            updateWithPullRequest: boolean;
+            commitMessage?: string;
+        } = { updateWithPullRequest: true },
+    ): Promise<InitializeResult> {
+        const token = user.getGitToken();
+        const committer = user.asCommitter();
+        const repoName = directory.getDataRepo();
+        const repoOwner = directory.getRepoOwner();
+
+        try {
+            this.logger.log(`Syncing imported data for: ${repoOwner}/${repoName}`);
+
+            // Clone/Pull the repository
+            const dest = await this.githubService.cloneOrPull({
+                owner: repoOwner,
+                repo: repoName,
+                token,
+                committer,
+            });
+
+            const data = await DataRepository.create(dest);
+            await data.ensureDirectoriesExist();
+            await data.ensureDefaultConfig();
+
+            // Get existing data to compare
+            const existingItems = await data.getItems().catch(() => []);
+            const existingSlugSet = new Set(
+                existingItems.map((item) => slugifyText(item.slug || item.name)),
+            );
+
+            // Handle branching
+            let newBranchName: string | null = null;
+            const defaultBranch = await this.githubService.getMainBranch(dest).catch(() => 'main');
+
+            if (options.updateWithPullRequest) {
+                await this.githubService.switchToMainBranch(dest).catch(() => {});
+                newBranchName = await this.githubService.createAndSwitchToRandomBranch(dest);
+                this.logger.log(`Created sync branch: ${newBranchName}`);
+            } else {
+                await this.githubService.switchToMainBranch(dest).catch(() => {});
+            }
+
+            // Write categories and tags (merge)
+            if (importedData.categories.length > 0) {
+                const existingCategories = await data.getCategories().catch(() => []);
+                await data.writeCategories(this.merge(existingCategories, importedData.categories));
+            }
+            if (importedData.tags.length > 0) {
+                const existingTags = await data.getTags().catch(() => []);
+                await data.writeTags(this.merge(existingTags, importedData.tags));
+            }
+
+            // Prepare items
+            const itemsWithSlugs = importedData.items.map((item) => ({
+                ...item,
+                slug: item.slug || slugifyText(item.name),
+            }));
+
+            // Calculate stats
+            const newItemsCount = itemsWithSlugs.filter(
+                (item) => !existingSlugSet.has(item.slug),
+            ).length;
+            const updatedItemsCount = itemsWithSlugs.length - newItemsCount;
+
+            if (newItemsCount === 0 && updatedItemsCount === 0) {
+                this.logger.log('No new or updated items found during sync.');
+                return {
+                    success: true,
+                    prUpdate: null,
+                    stats: {
+                        newItemsCount: 0,
+                        updatedItemsCount: 0,
+                        totalItemsCount: existingItems.length,
+                    },
+                };
+            }
+
+            // Write items
+            await pMap(itemsWithSlugs, (item) => this.writeItemToDisk(data, item), {
+                concurrency: PARALLEL_WRITE_CONCURRENCY,
+            });
+
+            // Commit
+            await this.githubService.addAll(data.dir);
+            const commitMsg =
+                options.commitMessage ||
+                `sync: ${newItemsCount} new, ${updatedItemsCount} updated items`;
+
+            await this.githubService.commit(data.dir, commitMsg, committer);
+
+            // Push
+            await this.githubService.push(dest, token);
+
+            // Update DB stats
+            await this.directoryOperations.updateDirectory(directory.id, {
+                itemsCount: itemsWithSlugs.length, // Approximation, assuming we keep all existing + new
+            });
+
+            const stats: GenerationStats = {
+                newItemsCount,
+                updatedItemsCount,
+                totalItemsCount: itemsWithSlugs.length, // Note: this might be inaccurate if we didn't fetch ALL existing items to merge, but usually import fetches full state
+            };
+
+            let prUpdate: PRUpdate | null = null;
+
+            if (newBranchName && defaultBranch) {
+                const pr = await this.githubService.createPR(
+                    {
+                        owner: repoOwner,
+                        repo: repoName,
+                        head: newBranchName,
+                        base: defaultBranch,
+                        title: `Sync with source - ${format(new Date(), 'MM/dd/yyyy')}`,
+                        body: `Automated sync from source repository.\n\nNew items: ${newItemsCount}\nUpdated items: ${updatedItemsCount}`,
+                    },
+                    token,
+                );
+
+                prUpdate = {
+                    branch: newBranchName,
+                    title: pr.title,
+                    body: pr.body || '',
+                    number: pr.number,
+                    url: pr.html_url,
+                };
+
+                await this.directoryOperations.updateLastPullRequest(directory.id, {
+                    data: prUpdate,
+                });
+            }
+
+            return {
+                success: true,
+                prUpdate,
+                stats,
+            };
+        } catch (error) {
+            this.logger.error('Failed to sync with imported data', error);
+            return {
+                success: false,
+                error: {
+                    code: 'GENERATION_FAILED',
+                    message: error.message || 'Failed to sync data repository',
+                    cause: error,
+                },
+            };
+        }
+    }
 }

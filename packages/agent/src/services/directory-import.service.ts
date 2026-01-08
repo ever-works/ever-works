@@ -25,9 +25,11 @@ import { Directory, ImportSourceType, SourceRepository } from '@src/entities/dir
 import { User } from '@src/entities/user.entity';
 import { DirectoryGenerationCompletedEvent } from '@src/events';
 import { DirectoryImportResult, DirectoryImportErrorCode } from '@src/tasks/directory-import.types';
-import { GenerateStatusType } from '@src/entities/types';
+import { DirectoryScheduleService } from './directory-schedule.service';
+import { DirectoryScheduleCadence, GenerateStatusType } from '@src/entities/types';
 import { normalizeGeneratorError } from './utils/error.utils';
 import { slugifyText } from '@src/items-generator/utils/text.utils';
+import { GenerationMethod } from '@src/items-generator/dto';
 
 @Injectable()
 export class DirectoryImportService {
@@ -42,6 +44,7 @@ export class DirectoryImportService {
         private readonly githubService: GithubService,
         private readonly sourceRepoAnalyzer: SourceRepoAnalyzerService,
         private readonly awesomeReadmeParser: AwesomeReadmeParserService,
+        private readonly directoryScheduleService: DirectoryScheduleService,
         private readonly eventEmitter: EventEmitter2,
     ) {}
 
@@ -214,6 +217,27 @@ export class DirectoryImportService {
             const result = await this.runImport(directory.id, user, dto, parsed, history.id);
 
             if (result.success) {
+                // Enable sync schedule by default (sync defaults to true per requirements)
+                if (dto.sync !== false) {
+                    try {
+                        await this.directoryScheduleService.updateSchedule(
+                            directory.id,
+                            {
+                                enable: true,
+                                cadence: DirectoryScheduleCadence.WEEKLY,
+                                alwaysCreatePullRequest: true,
+                            },
+                            user,
+                        );
+                        this.logger.log(`Created sync schedule for directory ${directory.id}`);
+                    } catch (err) {
+                        this.logger.warn(
+                            `Failed to create sync schedule for directory ${directory.id}: ${err.message}`,
+                        );
+                        // Don't fail the import if scheduling fails
+                    }
+                }
+
                 return {
                     status: 'success',
                     directoryId: directory.id,
@@ -600,6 +624,229 @@ export class DirectoryImportService {
                 directoryId: directory.id,
                 error: error.message,
                 errorCode: DirectoryImportErrorCode.CLONE_FAILED,
+            };
+        }
+    }
+
+    /**
+     * Sync directory from original source
+     */
+    async syncDirectory(
+        directory: Directory,
+        user: User,
+        historyId?: string,
+    ): Promise<DirectoryImportResult> {
+        const startTime = Date.now();
+        const sourceRepo = directory.sourceRepository;
+
+        if (!sourceRepo) {
+            return {
+                success: false,
+                directoryId: directory.id,
+                error: 'No source repository configured',
+                errorCode: DirectoryImportErrorCode.PARSE_FAILED,
+            };
+        }
+
+        try {
+            let result: DirectoryImportResult;
+
+            if (sourceRepo.type === ImportSourceTypeEnum.DATA_REPO) {
+                result = await this.syncFromDataRepo(directory, user, {
+                    owner: sourceRepo.owner,
+                    repo: sourceRepo.repo,
+                });
+            } else if (sourceRepo.type === ImportSourceTypeEnum.AWESOME_README) {
+                result = await this.syncFromAwesomeReadme(directory, user, sourceRepo.url);
+            } else {
+                // For LINK_EXISTING or others, we assume it's up to date via direct git operations
+                return {
+                    success: true,
+                    directoryId: directory.id,
+                    itemsImported: 0,
+                };
+            }
+
+            if (result.success && historyId) {
+                await this.generationHistoryRepository.updateEntry(historyId, {
+                    status: GenerateStatusType.GENERATED,
+                    finishedAt: new Date(),
+                    durationInSeconds: Math.round((Date.now() - startTime) / 1000),
+                    newItemsCount: result.stats?.newItemsCount ?? 0,
+                    updatedItemsCount: result.stats?.updatedItemsCount ?? 0,
+                    totalItemsCount: result.stats?.totalItemsCount ?? 0,
+                    metrics: result.metrics
+                        ? {
+                              total_tokens_used: result.metrics.total_tokens_used,
+                              total_cost: result.metrics.total_cost,
+                              new_items_added_to_store: result.stats?.newItemsCount ?? 0,
+                              total_items_in_store: result.stats?.totalItemsCount ?? 0,
+                          }
+                        : undefined,
+                });
+
+                this.eventEmitter.emit(
+                    'directory.generation.completed',
+                    new DirectoryGenerationCompletedEvent(directory),
+                );
+            }
+
+            return result;
+        } catch (error) {
+            this.logger.error(`Sync failed for directory ${directory.id}`, error);
+            return {
+                success: false,
+                directoryId: directory.id,
+                error: error.message,
+                errorCode: DirectoryImportErrorCode.CLONE_FAILED,
+            };
+        }
+    }
+
+    private async syncFromDataRepo(
+        directory: Directory,
+        user: User,
+        source: { owner: string; repo: string },
+    ): Promise<DirectoryImportResult> {
+        const token = this.getGitHubToken(user);
+
+        if (!token) {
+            return {
+                success: false,
+                directoryId: directory.id,
+                error: 'GitHub token not available',
+                errorCode: DirectoryImportErrorCode.REPO_ACCESS_DENIED,
+            };
+        }
+
+        try {
+            const sourceDir = await this.githubService.cloneOrPull({
+                owner: source.owner,
+                repo: source.repo,
+                token,
+                committer: user.asCommitter(),
+            });
+
+            const sourceData = await DataRepository.create(sourceDir);
+            const items = await sourceData.getItems();
+            const categories = await sourceData.getCategories().catch(() => []);
+            const tags = await sourceData.getTags().catch(() => []);
+
+            const syncResult = await this.dataGenerator.updateWithImportedData(
+                directory,
+                user,
+                { items, categories, tags },
+                { updateWithPullRequest: true },
+            );
+
+            if (syncResult.success === false) {
+                return {
+                    success: false,
+                    directoryId: directory.id,
+                    error: syncResult.error.message,
+                    errorCode: DirectoryImportErrorCode.GENERATION_FAILED,
+                };
+            }
+
+            // Regenerate markdown and website if there were changes
+            if (syncResult.stats.newItemsCount > 0 || syncResult.stats.updatedItemsCount > 0) {
+                await this.markdownGenerator.initialize(directory, user, {
+                    generation_method: GenerationMethod.CREATE_UPDATE,
+                    pr_update: syncResult.prUpdate
+                        ? {
+                              branch: syncResult.prUpdate.branch,
+                              title: syncResult.prUpdate.title,
+                              body: syncResult.prUpdate.body,
+                          }
+                        : undefined,
+                });
+                await this.websiteGenerator.initialize(directory, user);
+            }
+
+            return {
+                success: true,
+                directoryId: directory.id,
+                itemsImported: syncResult.stats.newItemsCount,
+                stats: syncResult.stats,
+            };
+        } catch (error) {
+            return {
+                success: false,
+                directoryId: directory.id,
+                error: error.message,
+                errorCode: DirectoryImportErrorCode.CLONE_FAILED,
+            };
+        }
+    }
+
+    private async syncFromAwesomeReadme(
+        directory: Directory,
+        user: User,
+        sourceUrl: string,
+    ): Promise<DirectoryImportResult> {
+        const token = this.getGitHubToken(user);
+
+        try {
+            const readme = await this.sourceRepoAnalyzer.getReadmeContent(sourceUrl, token);
+            if (!readme) {
+                return {
+                    success: false,
+                    directoryId: directory.id,
+                    error: 'README.md not found in repository',
+                    errorCode: DirectoryImportErrorCode.PARSE_FAILED,
+                };
+            }
+
+            const parsedData = await this.awesomeReadmeParser.parseReadme(readme.content);
+
+            const syncResult = await this.dataGenerator.updateWithImportedData(
+                directory,
+                user,
+                {
+                    items: parsedData.items,
+                    categories: parsedData.categories,
+                    tags: parsedData.tags,
+                },
+                { updateWithPullRequest: true },
+            );
+
+            if (syncResult.success === false) {
+                return {
+                    success: false,
+                    directoryId: directory.id,
+                    error: syncResult.error.message,
+                    errorCode: DirectoryImportErrorCode.GENERATION_FAILED,
+                };
+            }
+
+            // Regenerate markdown and website if there were changes
+            if (syncResult.stats.newItemsCount > 0 || syncResult.stats.updatedItemsCount > 0) {
+                await this.markdownGenerator.initialize(directory, user, {
+                    generation_method: GenerationMethod.CREATE_UPDATE,
+                    pr_update: syncResult.prUpdate
+                        ? {
+                              branch: syncResult.prUpdate.branch,
+                              title: syncResult.prUpdate.title,
+                              body: syncResult.prUpdate.body,
+                          }
+                        : undefined,
+                });
+                await this.websiteGenerator.initialize(directory, user);
+            }
+
+            return {
+                success: true,
+                directoryId: directory.id,
+                itemsImported: syncResult.stats.newItemsCount,
+                stats: syncResult.stats,
+                metrics: parsedData.metrics,
+            };
+        } catch (error) {
+            return {
+                success: false,
+                directoryId: directory.id,
+                error: error.message,
+                errorCode: DirectoryImportErrorCode.AI_EXTRACTION_FAILED,
             };
         }
     }

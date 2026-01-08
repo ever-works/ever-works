@@ -25,7 +25,7 @@ export class GithubService extends GitProvider {
         return `https://github.com/${owner}/${repo}`;
     }
 
-    private async getRepository(owner: string, repo: string, token: string) {
+    public async getRepository(owner: string, repo: string, token: string): Promise<any> {
         const octokit = new Octokit({ auth: token });
         try {
             const data = await octokit.rest.repos.get({
@@ -37,6 +37,26 @@ export class GithubService extends GitProvider {
             if (err instanceof RequestError && err.status === 404) {
                 return undefined;
             }
+            throw err;
+        }
+    }
+
+    async updateRepository(
+        owner: string,
+        repo: string,
+        data: { private?: boolean },
+        token: string,
+    ) {
+        const octokit = new Octokit({ auth: token });
+        try {
+            const response = await octokit.rest.repos.update({
+                owner,
+                repo,
+                private: data.private,
+            });
+            return response.data;
+        } catch (err) {
+            this.logger.error(`Failed to update repository ${owner}/${repo}`, err.message);
             throw err;
         }
     }
