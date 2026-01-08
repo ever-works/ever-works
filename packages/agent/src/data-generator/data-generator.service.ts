@@ -842,22 +842,33 @@ export class DataGeneratorService {
             const initialCategories = importedData.categories.map((c) => c.id);
             const initialPrompt = `Directory imported from ${importedData.importRequest?.sourceOwner || 'external'}/${importedData.importRequest?.sourceRepo || 'source'}. Contains ${importedData.items.length} items across ${importedData.categories.length} categories.`;
 
-            const initialRequestData = new CreateItemsGeneratorDto();
-            initialRequestData.name = directory.name;
-            initialRequestData.prompt = initialPrompt;
-            initialRequestData.initial_categories = initialCategories;
-            if (importedData.importRequest?.sourceUrl) {
-                initialRequestData.source_urls = [importedData.importRequest.sourceUrl];
-            }
+            // Preserve existing metadata from imported config (data_repo/link_existing already have config)
+            // For awesome_readme imports, we don't need last_request_data (sync will be used)
+            const existingMetadata = importedData.config?.metadata || {};
+            const isAwesomeReadme = importedData.importRequest?.sourceType === 'awesome_readme';
 
             const configData = {
                 ...importedData.config,
                 metadata: {
-                    ...(importedData.config?.metadata || {}),
+                    ...existingMetadata,
                     initial_prompt: initialPrompt,
-                    last_request_data: initialRequestData,
                 },
             };
+
+            // Only create default last_request_data if:
+            // 1. Not an awesome_readme import (they use sync, not AI)
+            // 2. The imported config doesn't already have one
+            if (!isAwesomeReadme && !existingMetadata.last_request_data) {
+                const initialRequestData = new CreateItemsGeneratorDto();
+                initialRequestData.name = directory.name;
+                initialRequestData.prompt = initialPrompt;
+                initialRequestData.initial_categories = initialCategories;
+                if (importedData.importRequest?.sourceUrl) {
+                    initialRequestData.source_urls = [importedData.importRequest.sourceUrl];
+                }
+                configData.metadata.last_request_data = initialRequestData;
+            }
+
             await data.mergeConfig(configData);
 
             // Write README and LICENSE

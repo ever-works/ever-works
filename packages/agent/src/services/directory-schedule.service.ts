@@ -461,6 +461,12 @@ export class DirectoryScheduleService {
     }
 
     private async ensureDirectoryConfigReady(directory: Directory, user: User) {
+        // Skip validation for sync directories (they don't need AI config)
+        // Sync directories have a sourceRepository and sync from external source
+        if (directory.sourceRepository) {
+            return;
+        }
+
         try {
             const config = await this.dataGeneratorService
                 .config(directory, user)

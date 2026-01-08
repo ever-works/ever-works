@@ -183,21 +183,26 @@ export class DirectoryImportService {
                 user,
             );
 
-            const sourceRepository: SourceRepository = {
-                url: dto.sourceUrl,
-                owner: parsed.owner,
-                repo: parsed.repo,
-                type: dto.sourceType as ImportSourceType,
-                importedAt: new Date(),
-            };
-
-            await this.directoryRepository.update(directory.id, {
-                sourceRepository,
+            // Only set sourceRepository for awesome_readme imports
+            // Data repos and link_existing are Ever Works structured repos - they run AI, not sync
+            const updateData: Partial<Directory> = {
                 generateStatus: {
                     status: GenerateStatusType.GENERATING,
                     step: 'import_started',
                 },
-            });
+            };
+
+            if (dto.sourceType === ImportSourceTypeEnum.AWESOME_README) {
+                updateData.sourceRepository = {
+                    url: dto.sourceUrl,
+                    owner: parsed.owner,
+                    repo: parsed.repo,
+                    type: dto.sourceType as ImportSourceType,
+                    importedAt: new Date(),
+                };
+            }
+
+            await this.directoryRepository.update(directory.id, updateData);
 
             const history = await this.generationHistoryRepository.createEntry({
                 directoryId: directory.id,
@@ -217,8 +222,12 @@ export class DirectoryImportService {
             const result = await this.runImport(directory.id, user, dto, parsed, history.id);
 
             if (result.success) {
-                // Enable sync schedule by default (sync defaults to true per requirements)
-                if (dto.sync !== false) {
+                // Enable sync schedule only for awesome_readme imports
+                // Data repos and link_existing run AI generation, not sync
+                if (
+                    dto.sync !== false &&
+                    dto.sourceType === ImportSourceTypeEnum.AWESOME_README
+                ) {
                     try {
                         await this.directoryScheduleService.updateSchedule(
                             directory.id,
