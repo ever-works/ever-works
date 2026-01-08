@@ -4,6 +4,7 @@ import { DirectoryGenerationHistoryEntry } from '@/lib/api/types-only';
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils/cn';
 import { ShowDateTime } from '@/components/ui/show-datetime';
+import { ExternalLink } from 'lucide-react';
 
 interface HistoryTableProps {
     entries: DirectoryGenerationHistoryEntry[];
@@ -120,14 +121,27 @@ export function HistoryTable({ entries, locale }: HistoryTableProps) {
                         return (
                             <tr key={entry.id} className="bg-background dark:bg-background-dark">
                                 <td className="px-4 py-4 align-top">
-                                    <span
-                                        className={cn(
-                                            'inline-flex items-center rounded-full px-3 py-1 text-xs font-medium capitalize',
-                                            statusClass,
+                                    <div className="flex flex-col gap-2">
+                                        <span
+                                            className={cn(
+                                                'inline-flex w-fit items-center rounded-full px-3 py-1 text-xs font-medium capitalize',
+                                                statusClass,
+                                            )}
+                                        >
+                                            {getStatusLabel(statusKey, t)}
+                                        </span>
+                                        {entry.triggerRunId && (
+                                            <a
+                                                href={`https://cloud.trigger.dev/runs/${entry.triggerRunId}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="flex items-center gap-1 text-xs text-primary hover:underline dark:text-primary-dark"
+                                            >
+                                                <span>Trigger.dev</span>
+                                                <ExternalLink className="h-3 w-3" />
+                                            </a>
                                         )}
-                                    >
-                                        {getStatusLabel(statusKey, t)}
-                                    </span>
+                                    </div>
                                 </td>
 
                                 <td className={tdClass}>

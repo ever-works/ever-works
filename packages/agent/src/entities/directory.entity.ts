@@ -107,6 +107,9 @@ export class Directory {
     @Column('simple-json', { nullable: true })
     lastPullRequest?: { main?: PRUpdate; data?: PRUpdate };
 
+    @Column('simple-json', { nullable: true })
+    repoVisibility?: RepoVisibility;
+
     @Column({ nullable: true })
     itemsCount?: number;
 
@@ -219,4 +222,10 @@ export interface SourceRepository {
     repo: string;
     type: ImportSourceType;
     importedAt: Date;
+}
+
+export interface RepoVisibility {
+    data: boolean; // true = private, false = public
+    website: boolean;
+    directory: boolean;
 }

@@ -3,6 +3,7 @@ import { SettingsForm } from '@/components/directories/detail/settings/SettingsF
 import { getAuthFromCookie } from '@/lib/auth';
 import { canAccessSettings } from '@/lib/permissions';
 import { notFound } from 'next/navigation';
+import { getRepositoryVisibility } from '@/app/actions/dashboard/directories';
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -18,9 +19,16 @@ export default async function DirectorySettingsPage({ params }: Params) {
         notFound();
     }
 
+    const repoVisibilityRes = await getRepositoryVisibility(id);
+    const initialRepositories = repoVisibilityRes.success ? repoVisibilityRes.data : [];
+
     return (
         <div className="max-w-4xl">
-            <SettingsForm directory={directory} user={user!} />
+            <SettingsForm
+                directory={directory}
+                user={user!}
+                initialRepositories={initialRepositories || []}
+            />
         </div>
     );
 }

@@ -736,6 +736,12 @@
                 "closeNote": "这可能需要几分钟。您可以关闭此页面稍后再回来。"
             },
             "settings": {
+                "sourceSettings": "源仓库",
+                "originalSource": "原始来源",
+                "syncEnabled": "同步已启用",
+                "syncDescription": "自动从源仓库拉取更新。",
+                "syncUpdateFailed": "更新同步设置失败",
+                "syncDisabled": "同步已禁用",
                 "generalSettings": "常规设置",
                 "generalTitle": "常规设置",
                 "directoryName": "目录名称",
@@ -1062,6 +1068,10 @@
                 "importNow": "立即导入",
                 "formTitle": "从 GitHub 导入目录",
                 "formSubtitle": "从现有 GitHub 仓库导入项目来创建您的目录",
+                "sync": {
+                    "title": "保持同步",
+                    "description": "自动从源仓库拉取更新。"
+                },
                 "sourceMethod": {
                     "url": {
                         "title": "粘贴链接",

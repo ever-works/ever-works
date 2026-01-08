@@ -38,6 +38,8 @@ export type {
     DirectoryScheduleAllowedCadence,
     UpdateReadmeResponse,
     SyncDirectoryResponse,
+    RepositoryStatus,
+    RepositoryType,
 } from './directory';
 
 export type {

@@ -736,6 +736,12 @@
                 "closeNote": "قد يستغرق هذا بضع دقائق. يمكنك إغلاق هذه الصفحة والعودة لاحقاً."
             },
             "settings": {
+                "sourceSettings": "المستودع المصدر",
+                "originalSource": "المصدر الأصلي",
+                "syncEnabled": "المزامنة مفعلة",
+                "syncDescription": "سحب التحديثات تلقائياً من المستودع المصدر.",
+                "syncUpdateFailed": "فشل تحديث إعدادات المزامنة",
+                "syncDisabled": "المزامنة معطلة",
                 "generalSettings": "الإعدادات العامة",
                 "generalTitle": "الإعدادات العامة",
                 "directoryName": "اسم الدليل",
@@ -1062,6 +1068,10 @@
                 "importNow": "استيراد الآن",
                 "formTitle": "استيراد دليل من GitHub",
                 "formSubtitle": "استورد عناصر من مستودع GitHub موجود لإنشاء دليلك",
+                "sync": {
+                    "title": "إبقاء متزامن",
+                    "description": "سحب التحديثات تلقائياً من المستودع المصدر."
+                },
                 "sourceMethod": {
                     "url": {
                         "title": "لصق الرابط",

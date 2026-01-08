@@ -35,6 +35,10 @@ import {
     DirectoryQueryService,
     DirectoryScheduleService,
     DirectoryImportService,
+    RepositoryManagementService,
+    RepositoryStatus,
+    RepositoryType,
+    DirectoryOwnershipService,
 } from '@packages/agent/services';
 import {
     AnalyzeRepositoryDto,
@@ -67,6 +71,8 @@ export class DirectoriesController {
         private readonly directoryDetailService: DirectoryDetailService,
         private readonly directoryScheduleService: DirectoryScheduleService,
         private readonly directoryImportService: DirectoryImportService,
+        private readonly repositoryManagementService: RepositoryManagementService,
+        private readonly directoryOwnershipService: DirectoryOwnershipService,
     ) {}
 
     @Get('directories')
@@ -405,6 +411,40 @@ export class DirectoriesController {
         const user = await this.authService.getUser(auth.userId);
 
         return this.directoryLifecycleService.syncFromDataRepository(id, user);
+    }
+
+    // ============================================
+    // Repository Visibility Endpoints
+    // ============================================
+
+    @Get('directories/:id/repositories/visibility')
+    @HttpCode(HttpStatus.OK)
+    async getRepositoryVisibility(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') id: string,
+    ): Promise<RepositoryStatus[]> {
+        const user = await this.authService.getUser(auth.userId);
+        const { directory } = await this.directoryOwnershipService.ensureAccess(id, user.id);
+
+        return this.repositoryManagementService.getRepositoriesStatus(directory, user);
+    }
+
+    @Put('directories/:id/repositories/visibility')
+    @HttpCode(HttpStatus.OK)
+    async updateRepositoryVisibility(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') id: string,
+        @Body() body: { repoType: RepositoryType; isPrivate: boolean },
+    ): Promise<RepositoryStatus> {
+        const user = await this.authService.getUser(auth.userId);
+        const { directory } = await this.directoryOwnershipService.ensureAccess(id, user.id);
+
+        return this.repositoryManagementService.updateRepositoryVisibility(
+            directory,
+            user,
+            body.repoType,
+            body.isPrivate,
+        );
     }
 
     // ============================================
