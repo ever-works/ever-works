@@ -48,6 +48,7 @@ import { normalizeGeneratorError } from './utils/error.utils';
 import { DirectorySchedule } from '@src/entities/directory-schedule.entity';
 import { DirectoryScheduleService } from './directory-schedule.service';
 import { UserRepository } from '@src/database/repositories/user.repository';
+import { DirectoryImportService } from './directory-import.service';
 
 type GenerationTriggerContext = {
     triggeredBy: 'user' | 'schedule' | 'api';
@@ -83,6 +84,7 @@ export class DirectoryGenerationService {
         private readonly generationHistoryRepository: DirectoryGenerationHistoryRepository,
         private readonly ownershipService: DirectoryOwnershipService,
         private readonly directoryScheduleService: DirectoryScheduleService,
+        private readonly directoryImportService: DirectoryImportService,
         private readonly userRepository: UserRepository,
         @Optional()
         @Inject(DIRECTORY_GENERATION_DISPATCHER)
@@ -507,6 +509,16 @@ export class DirectoryGenerationService {
             return;
         }
 
+        const directory =
+            (schedule.directory as Directory) ||
+            (await this.directoryRepository.findById(schedule.directoryId));
+
+        // Handle sync for directories with a source repository
+        if (directory?.sourceRepository) {
+            return this.runScheduledSync(directory, user, schedule);
+        }
+
+        // Regular scheduled update (AI-powered generation)
         return this.updateItemsGenerator({
             directoryId: schedule.directoryId,
             updateDto: {
@@ -520,6 +532,96 @@ export class DirectoryGenerationService {
                 billingMode: schedule.billingMode,
             },
         });
+    }
+
+    /**
+     * Run a scheduled sync for a directory that has a source repository.
+     * This pulls updates from the original source (e.g., awesome-list or data repo).
+     */
+    private async runScheduledSync(
+        directory: Directory,
+        user: User,
+        schedule: DirectorySchedule,
+    ): Promise<void> {
+        // Create history record for Sync
+        const history = await this.generationHistoryRepository.createEntry({
+            directoryId: directory.id,
+            userId: user.id,
+            generationMethod: null,
+            parameters: {
+                type: 'sync',
+                sourceUrl: directory.sourceRepository!.url,
+            },
+            status: GenerateStatusType.GENERATING,
+            startedAt: new Date(),
+            triggeredBy: 'schedule',
+            scheduleId: schedule.id,
+        });
+
+        // Update directory status
+        await this.directoryRepository.recordGenerationStartTime(directory.id, new Date());
+        await this.directoryRepository.updateGenerateStatus(directory.id, {
+            status: GenerateStatusType.GENERATING,
+            step: 'syncing',
+        });
+
+        try {
+            const result = await this.directoryImportService.syncDirectory(
+                directory,
+                user,
+                history.id,
+            );
+
+            if (result.success) {
+                await this.handleSyncSuccess(directory.id, schedule.id, history.id);
+            } else {
+                await this.handleSyncFailure(directory.id, schedule.id, history.id, result.error);
+            }
+        } catch (error) {
+            const errorMessage = (error as Error)?.message || 'Unknown sync error';
+            await this.handleSyncFailure(directory.id, schedule.id, history.id, errorMessage);
+            throw error;
+        }
+    }
+
+    private async handleSyncSuccess(
+        directoryId: string,
+        scheduleId: string,
+        historyId: string,
+    ): Promise<void> {
+        await Promise.all([
+            this.directoryScheduleService.markRunCompleted({
+                scheduleId,
+                historyId,
+                status: GenerateStatusType.GENERATED,
+            }),
+            this.directoryRepository.recordGenerationFinishTime(directoryId, new Date()),
+            this.directoryRepository.updateGenerateStatus(directoryId, {
+                status: GenerateStatusType.GENERATED,
+                step: null,
+            }),
+        ]);
+    }
+
+    private async handleSyncFailure(
+        directoryId: string,
+        scheduleId: string,
+        historyId: string,
+        errorMessage?: string,
+    ): Promise<void> {
+        await Promise.all([
+            this.directoryScheduleService.markRunFailed(scheduleId, errorMessage),
+            this.generationHistoryRepository.updateEntry(historyId, {
+                status: GenerateStatusType.ERROR,
+                errorMessage,
+                finishedAt: new Date(),
+            }),
+            this.directoryRepository.recordGenerationFinishTime(directoryId, new Date()),
+            this.directoryRepository.updateGenerateStatus(directoryId, {
+                status: GenerateStatusType.ERROR,
+                error: errorMessage,
+            }),
+        ]);
     }
 
     private async runInProcessGeneration(
@@ -596,11 +698,17 @@ export class DirectoryGenerationService {
             scheduleId: context.scheduleId,
         };
 
-        const dispatched = this.generationDispatcher
+        const dispatchedId = this.generationDispatcher
             ? await this.generationDispatcher.dispatchDirectoryGeneration(payload)
-            : false;
+            : null;
 
-        if (!dispatched) {
+        if (dispatchedId) {
+            await this.generationHistoryRepository.updateEntry(historyId, {
+                triggerRunId: dispatchedId,
+            });
+        }
+
+        if (!dispatchedId) {
             this.logger.warn(
                 `Trigger dispatch failed, falling back to in-process generation for directory ${directory.id} (${mode})`,
             );

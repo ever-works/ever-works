@@ -68,6 +68,10 @@ export class ImportDirectoryDto {
     @IsOptional()
     @IsBoolean()
     createMissingRepos?: boolean;
+
+    @IsOptional()
+    @IsBoolean()
+    sync?: boolean;
 }
 
 export class ImportDirectoryResponseDto {

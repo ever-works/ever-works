@@ -18,6 +18,7 @@ import { DirectoryScheduleDispatcherService } from './directory-schedule-dispatc
 import { DirectoryMemberService } from './directory-member.service';
 import { DirectoryImportService } from './directory-import.service';
 import { SubscriptionsModule } from '@src/subscriptions';
+import { RepositoryManagementService } from './repository-management.service';
 
 @Module({
     imports: [
@@ -42,6 +43,7 @@ import { SubscriptionsModule } from '@src/subscriptions';
         DirectoryScheduleDispatcherService,
         DirectoryMemberService,
         DirectoryImportService,
+        RepositoryManagementService,
     ],
     exports: [
         DirectoryOwnershipService,
@@ -53,6 +55,7 @@ import { SubscriptionsModule } from '@src/subscriptions';
         DirectoryScheduleDispatcherService,
         DirectoryMemberService,
         DirectoryImportService,
+        RepositoryManagementService,
     ],
 })
 export class DirectoryModule {}

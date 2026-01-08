@@ -9,6 +9,7 @@ import { useRouter } from '@/i18n/navigation';
 import { useTranslations } from 'next-intl';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 import { OrganizationSelector } from './OrganizationSelector';
 import { RepositorySelector, GitHubRepo } from './RepositorySelector';
 import {
@@ -63,6 +64,7 @@ export function DirectoryImportForm({ user }: DirectoryImportFormProps) {
     const [directoryName, setDirectoryName] = useState('');
     const [organization, setOrganization] = useState(false);
     const [owner, setOwner] = useState('');
+    const [sync, setSync] = useState(true);
     const [showAdvanced, setShowAdvanced] = useState(false);
     const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
     const [linkAnalysis, setLinkAnalysis] = useState<AnalyzeForLinkingResponseDto | null>(null);
@@ -191,6 +193,7 @@ export function DirectoryImportForm({ user }: DirectoryImportFormProps) {
                 name: directoryName,
                 organization,
                 owner: organization ? owner : undefined,
+                sync,
             });
 
             if (result.success) {
@@ -462,6 +465,21 @@ export function DirectoryImportForm({ user }: DirectoryImportFormProps) {
                 placeholder={t('namePlaceholder')}
                 variant="form"
             />
+
+            {/* Sync Toggle */}
+            <div className="flex items-center justify-between p-4 rounded-lg bg-surface dark:bg-surface-dark border border-border dark:border-border-dark">
+                <div>
+                    <h3 className="font-medium text-text dark:text-text-dark">
+                        {t('sync.title', { fallback: 'Keep synchronized' })}
+                    </h3>
+                    <p className="text-sm text-text-muted dark:text-text-muted-dark">
+                        {t('sync.description', {
+                            fallback: 'Automatically pull updates from the source repository.',
+                        })}
+                    </p>
+                </div>
+                <Switch checked={sync} onChange={setSync} disabled={isPending} />
+            </div>
 
             {/* Advanced Settings Toggle */}
             <Button

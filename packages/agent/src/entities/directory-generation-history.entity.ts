@@ -67,6 +67,9 @@ export class DirectoryGenerationHistory {
     triggeredBy: 'user' | 'schedule' | 'api';
 
     @Column({ nullable: true })
+    triggerRunId?: string;
+
+    @Column({ nullable: true })
     scheduleId?: string | null;
 
     @ManyToOne(() => DirectorySchedule, { nullable: true })

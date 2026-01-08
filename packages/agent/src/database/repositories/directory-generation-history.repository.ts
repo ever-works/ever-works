@@ -26,6 +26,7 @@ type HistoryUpdateParams = {
     errorMessage?: string | null;
     metrics?: GenerationMetrics | null;
     parameters?: Record<string, any> | null;
+    triggerRunId?: string;
 };
 
 @Injectable()

@@ -829,6 +829,12 @@
                 "closeNote": "This may take a few minutes. You can close this page and come back later."
             },
             "settings": {
+                "sourceSettings": "Source Repository",
+                "originalSource": "Original Source",
+                "syncEnabled": "Sync Enabled",
+                "syncDescription": "Automatically pull updates from the source repository.",
+                "syncUpdateFailed": "Failed to update sync settings",
+                "syncDisabled": "Sync Disabled",
                 "generalSettings": "General Settings",
                 "generalTitle": "General Settings",
                 "directoryName": "Directory Name",
@@ -1062,6 +1068,10 @@
                 "importNow": "Import now",
                 "formTitle": "Import Directory from GitHub",
                 "formSubtitle": "Import items from an existing GitHub repository to create your directory",
+                "sync": {
+                    "title": "Keep synchronized",
+                    "description": "Automatically pull updates from the source repository."
+                },
                 "sourceMethod": {
                     "url": {
                         "title": "Paste URL",
