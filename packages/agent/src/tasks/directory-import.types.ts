@@ -16,6 +16,12 @@ export type DirectoryImportMetrics = {
     total_cost?: number;
 };
 
+export type DirectoryImportStats = {
+    newItemsCount: number;
+    updatedItemsCount: number;
+    totalItemsCount: number;
+};
+
 export type DirectoryImportResult = {
     success: boolean;
     directoryId: string;
@@ -23,6 +29,7 @@ export type DirectoryImportResult = {
     categoriesImported?: number;
     tagsImported?: number;
     metrics?: DirectoryImportMetrics;
+    stats?: DirectoryImportStats;
     error?: string;
     errorCode?: DirectoryImportErrorCode;
 };
@@ -35,6 +42,7 @@ export enum DirectoryImportErrorCode {
     PARSE_FAILED = 'PARSE_FAILED',
     CLONE_FAILED = 'CLONE_FAILED',
     CREATE_REPO_FAILED = 'CREATE_REPO_FAILED',
+    GENERATION_FAILED = 'GENERATION_FAILED',
     AI_EXTRACTION_FAILED = 'AI_EXTRACTION_FAILED',
     UNKNOWN_ERROR = 'UNKNOWN_ERROR',
 }

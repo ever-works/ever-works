@@ -17,6 +17,7 @@ export interface DirectoryGenerationHistoryDto {
     parameters?: Record<string, any> | null;
     createdAt: string;
     updatedAt: string;
+    triggerRunId?: string;
 }
 
 export interface DirectoryGenerationHistoryListDto {

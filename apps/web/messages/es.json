@@ -736,6 +736,12 @@
                 "closeNote": "Esto puede tomar unos minutos. Puedes cerrar esta página y volver más tarde."
             },
             "settings": {
+                "sourceSettings": "Repositorio de Origen",
+                "originalSource": "Fuente Original",
+                "syncEnabled": "Sincronización Activada",
+                "syncDescription": "Obtener actualizaciones automáticamente del repositorio de origen.",
+                "syncUpdateFailed": "Error al actualizar la configuración de sincronización",
+                "syncDisabled": "Sincronización Desactivada",
                 "generalSettings": "Configuración General",
                 "generalTitle": "Configuración General",
                 "directoryName": "Nombre del Directorio",
@@ -1062,6 +1068,10 @@
                 "importNow": "Importar ahora",
                 "formTitle": "Importar Directorio desde GitHub",
                 "formSubtitle": "Importa elementos desde un repositorio GitHub existente para crear tu directorio",
+                "sync": {
+                    "title": "Mantener sincronizado",
+                    "description": "Obtener actualizaciones automáticamente del repositorio de origen."
+                },
                 "sourceMethod": {
                     "url": {
                         "title": "Pegar URL",

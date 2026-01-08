@@ -49,21 +49,21 @@ export class TriggerService implements DirectoryGenerationDispatcher {
         return undefined;
     }
 
-    async dispatchDirectoryGeneration(payload: DirectoryGenerationPayload): Promise<boolean> {
+    async dispatchDirectoryGeneration(payload: DirectoryGenerationPayload): Promise<string | null> {
         if (!this.ensureConfigured()) {
-            return false;
+            return null;
         }
 
         try {
-            await directoryGenerationTask.trigger(payload, {
+            const handle = await directoryGenerationTask.trigger(payload, {
                 tags: ['directory-generation', payload.mode, payload.directoryId],
                 machine: this.machine() as any,
             });
 
-            return true;
+            return handle.id;
         } catch (error) {
             this.logger.error('Failed to dispatch directory-generation task', error as Error);
-            return false;
+            return null;
         }
     }
 }

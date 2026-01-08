@@ -736,6 +736,12 @@
                 "closeNote": "Dies kann einige Minuten dauern. Sie können diese Seite schließen und später zurückkommen."
             },
             "settings": {
+                "sourceSettings": "Quell-Repository",
+                "originalSource": "Originalquelle",
+                "syncEnabled": "Synchronisierung aktiviert",
+                "syncDescription": "Aktualisierungen automatisch aus dem Quell-Repository abrufen.",
+                "syncUpdateFailed": "Aktualisierung der Synchronisierungseinstellungen fehlgeschlagen",
+                "syncDisabled": "Synchronisierung deaktiviert",
                 "generalSettings": "Allgemeine Einstellungen",
                 "generalTitle": "Allgemeine Einstellungen",
                 "directoryName": "Verzeichnisname",
@@ -1062,6 +1068,10 @@
                 "importNow": "Jetzt importieren",
                 "formTitle": "Verzeichnis von GitHub importieren",
                 "formSubtitle": "Importieren Sie Einträge aus einem bestehenden GitHub-Repository, um Ihr Verzeichnis zu erstellen",
+                "sync": {
+                    "title": "Synchron halten",
+                    "description": "Aktualisierungen automatisch aus dem Quell-Repository abrufen."
+                },
                 "sourceMethod": {
                     "url": {
                         "title": "URL einfügen",
