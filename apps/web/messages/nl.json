@@ -1,0 +1,1543 @@
+{
+    "auth": {
+        "error": {
+            "title": "Authenticatiefout",
+            "subtitle": "Er is een probleem met uw authenticatie",
+            "errorOccurred": "Er is een fout opgetreden",
+            "somethingWentWrong": "Er is iets misgegaan",
+            "generic": "Er is een onverwachte fout opgetreden. Probeer het later opnieuw.",
+            "invalidCredentials": "Het ingevoerde e-mailadres of wachtwoord is onjuist.",
+            "emailNotVerified": "Verifieer uw e-mailadres voordat u inlogt.",
+            "accountLocked": "Uw account is om veiligheidsredenen geblokkeerd.",
+            "sessionExpired": "Uw sessie is verlopen. Log opnieuw in.",
+            "networkError": "Kan geen verbinding maken. Controleer uw internetverbinding.",
+            "oauth": {
+                "missingCode": "Autorisatiecode ontbreekt. Probeer opnieuw in te loggen.",
+                "invalidState": "Ongeldige autorisatiestatus. Probeer opnieuw in te loggen.",
+                "unsupportedProvider": "Deze authenticatieprovider wordt niet ondersteund.",
+                "callbackFailed": "Authenticatie kon niet worden voltooid. Probeer het opnieuw."
+            },
+            "resetPassword": {
+                "missingToken": "Link voor wachtwoordreset is ongeldig. Verificatietoken ontbreekt.",
+                "invalidToken": "Link voor wachtwoordreset is ongeldig of is aangepast.",
+                "expiredToken": "Link voor wachtwoordreset is verlopen. Vraag een nieuwe aan.",
+                "failed": "Wachtwoord resetten mislukt. Probeer het opnieuw of vraag een nieuwe resetlink aan."
+            },
+            "verifyEmail": {
+                "missingToken": "E-mailverificatielink is ongeldig. Verificatietoken ontbreekt.",
+                "invalidToken": "E-mailverificatielink is ongeldig of is al gebruikt.",
+                "expiredToken": "E-mailverificatielink is verlopen. Vraag een nieuwe aan.",
+                "failed": "E-mail verifiëren mislukt. Probeer het opnieuw of vraag een nieuwe verificatielink aan."
+            },
+            "authorize": {
+                "invalidRedirectUrl": "De doorverwijzings-URL is ongeldig of niet toegestaan. Neem contact op met ondersteuning als u denkt dat dit een fout is."
+            },
+            "actions": {
+                "backToLogin": "Terug naar Inloggen",
+                "tryRegister": "Probeer te Registreren",
+                "resendVerification": "Verificatie-e-mail opnieuw verzenden",
+                "contactSupport": "Contact met Ondersteuning",
+                "requestNewReset": "Nieuwe Resetlink Aanvragen"
+            },
+            "helpText": "Als u problemen blijft ervaren, raadpleeg dan onze hulpbronnen hieronder.",
+            "links": {
+                "help": "Helpcentrum",
+                "systemStatus": "Systeemstatus"
+            }
+        },
+        "login": {
+            "title": "Welkom terug",
+            "subtitle": "Log in op uw account om verder te gaan",
+            "form": {
+                "email": {
+                    "label": "E-mailadres",
+                    "placeholder": "u@voorbeeld.nl"
+                },
+                "password": {
+                    "label": "Wachtwoord",
+                    "placeholder": "Voer uw wachtwoord in"
+                },
+                "forgotPassword": "Wachtwoord vergeten?",
+                "rememberMe": "Onthoud mij voor 30 dagen",
+                "submit": "Inloggen",
+                "submitting": "Inloggen..."
+            },
+            "socialLogin": {
+                "divider": "Of ga verder met",
+                "google": "Google",
+                "github": "GitHub"
+            },
+            "signUp": {
+                "text": "Nog geen account?",
+                "link": "Aanmelden"
+            },
+            "errors": {
+                "invalidCredentials": "Ongeldig e-mailadres of wachtwoord"
+            },
+            "passwordReset": {
+                "success": "Wachtwoord succesvol gereset!",
+                "canLogin": "U kunt nu inloggen met uw nieuwe wachtwoord."
+            }
+        },
+        "forgotPassword": {
+            "title": "Wachtwoord vergeten?",
+            "subtitle": "Geen probleem, wij sturen u resetinstructies",
+            "successTitle": "Controleer uw e-mail",
+            "successSubtitle": "We hebben u wachtwoordresetinstructies gestuurd",
+            "form": {
+                "email": {
+                    "label": "E-mailadres",
+                    "placeholder": "Voer uw e-mail in"
+                },
+                "submit": "Resetlink Verzenden",
+                "submitting": "Verzenden..."
+            },
+            "success": {
+                "title": "E-mail succesvol verzonden",
+                "message": "We hebben wachtwoordresetinstructies gestuurd naar {email}",
+                "checkSpam": "Als u de e-mail niet ziet, controleer dan uw spam-map."
+            },
+            "errors": {
+                "failed": "Reset-e-mail verzenden mislukt. Probeer het opnieuw."
+            },
+            "backToLogin": "Terug naar inloggen",
+            "noAccount": {
+                "text": "Nog geen account?",
+                "link": "Aanmelden"
+            }
+        },
+        "resetPassword": {
+            "title": "Reset uw wachtwoord",
+            "subtitle": "Voer hieronder uw nieuwe wachtwoord in",
+            "successTitle": "Wachtwoord succesvol gereset",
+            "successSubtitle": "Uw wachtwoord is bijgewerkt",
+            "form": {
+                "password": {
+                    "label": "Nieuw wachtwoord",
+                    "placeholder": "Voer uw nieuwe wachtwoord in",
+                    "helperText": "Moet minimaal 6 tekens bevatten met kleine letters en cijfer/speciaal teken",
+                    "errors": {
+                        "minLength": "Wachtwoord moet minimaal 6 tekens bevatten",
+                        "lowercase": "Wachtwoord moet minimaal één kleine letter bevatten",
+                        "numberOrSpecial": "Wachtwoord moet minimaal één cijfer of speciaal teken bevatten",
+                        "cannotStartWith": "Wachtwoord mag niet beginnen met een punt of nieuwe regel"
+                    }
+                },
+                "confirmPassword": {
+                    "label": "Bevestig nieuw wachtwoord",
+                    "placeholder": "Bevestig uw nieuwe wachtwoord",
+                    "errors": {
+                        "noMatch": "Wachtwoorden komen niet overeen"
+                    }
+                },
+                "submit": "Wachtwoord Resetten",
+                "submitting": "Resetten..."
+            },
+            "success": {
+                "title": "Wachtwoord succesvol gereset",
+                "message": "Uw wachtwoord is succesvol bijgewerkt. U kunt nu inloggen met uw nieuwe wachtwoord.",
+                "loginButton": "Naar Inloggen"
+            },
+            "errors": {
+                "failed": "Wachtwoord resetten mislukt. Probeer het opnieuw of vraag een nieuwe resetlink aan.",
+                "noToken": "Ongeldige resetlink",
+                "invalidLink": "Ongeldige Resetlink",
+                "missingTokenMessage": "De wachtwoordresetlink is ongeldig of onvolledig. Vraag een nieuwe wachtwoordreset aan.",
+                "requestNewLink": "Nieuwe Resetlink Aanvragen"
+            },
+            "backToLogin": "Terug naar inloggen"
+        },
+        "register": {
+            "title": "Maak uw account aan",
+            "subtitle": "Begin vandaag nog met het bouwen van geweldige directory's",
+            "form": {
+                "name": {
+                    "label": "Volledige naam",
+                    "placeholder": "Jan Jansen"
+                },
+                "email": {
+                    "label": "E-mailadres",
+                    "placeholder": "u@voorbeeld.nl"
+                },
+                "password": {
+                    "label": "Wachtwoord",
+                    "placeholder": "Maak een sterk wachtwoord",
+                    "hint": "Moet minimaal 8 tekens bevatten"
+                },
+                "confirmPassword": {
+                    "label": "Bevestig wachtwoord",
+                    "placeholder": "Bevestig uw wachtwoord"
+                },
+                "terms": {
+                    "text": "Ik ga akkoord met de",
+                    "termsLink": "Servicevoorwaarden",
+                    "and": "en",
+                    "privacyLink": "Privacybeleid"
+                },
+                "submit": "Account Aanmaken",
+                "submitting": "Account aanmaken..."
+            },
+            "socialSignUp": {
+                "divider": "Of maak aan met",
+                "google": "Google",
+                "github": "GitHub"
+            },
+            "signIn": {
+                "text": "Heeft u al een account?",
+                "link": "Inloggen"
+            },
+            "errors": {
+                "passwordsDoNotMatch": "Wachtwoorden komen niet overeen",
+                "passwordTooShort": "Wachtwoord moet minimaal 8 tekens bevatten",
+                "generic": "Er is een fout opgetreden. Probeer het opnieuw."
+            }
+        }
+    },
+    "dashboard": {
+        "title": "Dashboard",
+        "toasts": {
+            "newUser": {
+                "title": "Welkom bij {companyName}! 🎉",
+                "description": "Uw account is succesvol aangemaakt. Controleer uw e-mail om uw account te verifiëren."
+            },
+            "emailVerification": {
+                "title": "Verifieer uw e-mail",
+                "description": "We hebben een verificatielink naar uw e-mailadres gestuurd. Controleer uw inbox en spam-map.",
+                "action": "E-mail opnieuw verzenden"
+            },
+            "verified": {
+                "title": "E-mail succesvol geverifieerd! ✅",
+                "description": "Uw e-mailadres is geverifieerd. U heeft nu volledige toegang tot alle functies."
+            },
+            "oauthConnected": {
+                "title": "Account verbonden met GitHub",
+                "description": "Uw account is succesvol verbonden met GitHub."
+            }
+        },
+        "header": {
+            "welcome": "Welkom terug, {username}!",
+            "subtitle": "Beheer uw AI-gestuurde directory's en volg hun prestaties",
+            "notifications": {
+                "title": "Meldingen",
+                "empty": "Geen nieuwe meldingen"
+            }
+        },
+        "directories": {
+            "title": "Directory's",
+            "subtitle": "Beheer en organiseer uw AI-gestuurde directory's",
+            "recent": "Recente Directory's",
+            "viewAll": "Bekijk alle ({count})",
+            "search": "Zoek directory's...",
+            "create": "Directory Aanmaken",
+            "showing": "Toont {current} van {total} directory's",
+            "pagination": {
+                "previous": "Vorige",
+                "next": "Volgende"
+            },
+            "empty": {
+                "title": "Nog geen directory's",
+                "description": "Maak uw eerste AI-gestuurde directory om te beginnen met het organiseren en presenteren van uw inhoud.",
+                "action": "Maak Uw Eerste Directory",
+                "notFound": {
+                    "title": "Geen directory's gevonden",
+                    "withSearch": "Probeer uw zoektermen aan te passen",
+                    "withoutSearch": "Maak uw eerste AI-gestuurde directory om te beginnen"
+                }
+            }
+        },
+        "settings": {
+            "title": "Instellingen",
+            "subtitle": "Beheer uw accountinstellingen en voorkeuren",
+            "tabs": {
+                "profile": "Profiel",
+                "security": "Beveiliging",
+                "apiTokens": "API & Tokens",
+                "oauth": "Verbonden Accounts",
+                "notifications": "Meldingen",
+                "dangerZone": "Gevarenzone"
+            },
+            "profile": {
+                "title": "Profielinstellingen",
+                "subtitle": "Werk uw profielinformatie en avatar bij",
+                "fields": {
+                    "name": "Naam",
+                    "username": "Gebruikersnaam",
+                    "email": "E-mail",
+                    "emailHelperText": "E-mail kan niet worden gewijzigd"
+                },
+                "placeholders": {
+                    "name": "Voer uw naam in",
+                    "username": "Voer uw gebruikersnaam in"
+                },
+                "actions": {
+                    "save": "Wijzigingen Opslaan"
+                },
+                "messages": {
+                    "success": "Profiel succesvol bijgewerkt",
+                    "usernameRequired": "Gebruikersnaam is vereist",
+                    "error": "Profiel bijwerken mislukt",
+                    "unexpectedError": "Er is een onverwachte fout opgetreden"
+                }
+            },
+            "security": {
+                "title": "Beveiligingsinstellingen",
+                "subtitle": "Beheer uw accountbeveiliging en authenticatie",
+                "changePassword": {
+                    "title": "Wachtwoord Wijzigen",
+                    "currentPassword": "Huidig Wachtwoord",
+                    "newPassword": "Nieuw Wachtwoord",
+                    "confirmPassword": "Bevestig Nieuw Wachtwoord",
+                    "showPasswords": "Wachtwoorden tonen",
+                    "placeholders": {
+                        "current": "Voer huidig wachtwoord in",
+                        "new": "Voer nieuw wachtwoord in (min 8 tekens)",
+                        "confirm": "Bevestig nieuw wachtwoord"
+                    },
+                    "actions": {
+                        "update": "Wachtwoord Bijwerken"
+                    },
+                    "messages": {
+                        "success": "Wachtwoord succesvol bijgewerkt",
+                        "fillAllFields": "Vul alle wachtwoordvelden in",
+                        "minLength": "Nieuw wachtwoord moet minimaal 8 tekens bevatten",
+                        "mismatch": "Nieuwe wachtwoorden komen niet overeen",
+                        "sameAsCurrent": "Nieuw wachtwoord moet verschillen van huidig wachtwoord",
+                        "error": "Wachtwoord bijwerken mislukt",
+                        "unexpectedError": "Er is een onverwachte fout opgetreden"
+                    }
+                },
+                "twoFactor": {
+                    "title": "Twee-Factor Authenticatie",
+                    "subtitle": "Voeg een extra beveiligingslaag toe aan uw account",
+                    "action": "Binnenkort Beschikbaar"
+                },
+                "sessions": {
+                    "title": "Actieve Sessies",
+                    "subtitle": "Beheer uw actieve sessies op verschillende apparaten",
+                    "action": "Sessies Bekijken (Binnenkort)"
+                }
+            },
+            "oauth": {
+                "title": "Verbonden Accounts",
+                "subtitle": "Verbind uw externe accounts voor verbeterde functionaliteit",
+                "github": {
+                    "name": "GitHub",
+                    "connected": "Maak en beheer directory's met GitHub repositories",
+                    "disconnected": "Verbind om directory's van repositories te maken",
+                    "scopes": "Bereiken",
+                    "actions": {
+                        "connect": "Verbinden",
+                        "disconnect": "Verbinding Verbreken",
+                        "confirmDisconnect": "Weet u zeker dat u uw GitHub-account wilt verbreken?"
+                    },
+                    "messages": {
+                        "disconnected": "GitHub-account verbinding verbroken",
+                        "connectError": "GitHub verbinden mislukt",
+                        "disconnectError": "GitHub verbinding verbreken mislukt"
+                    }
+                }
+            }
+        },
+        "stats": {
+            "totalDirectories": "Totaal Directory's",
+            "totalItems": "Totaal Items",
+            "activeWebsites": "Actieve Websites",
+            "fromLastMonth": "van vorige maand"
+        },
+        "directoryCard": {
+            "status": {
+                "active": "Actief",
+                "notStarted": "Niet Gestart",
+                "generating": "Genereren",
+                "generated": "Gegenereerd",
+                "error": "Fout",
+                "cancelled": "Geannuleerd",
+                "idle": "Inactief"
+            },
+            "role": {
+                "owner": "Eigenaar",
+                "manager": "Beheerder",
+                "editor": "Editor",
+                "viewer": "Kijker"
+            },
+            "shared": {
+                "tooltip": "Gedeeld met u als {role}"
+            },
+            "noDescription": "Geen beschrijving opgegeven",
+            "items": "{count} items",
+            "views": "{count} weergaven",
+            "updated": "Bijgewerkt op {date}",
+            "viewAction": "Bekijken →"
+        },
+        "directoryList": {
+            "title": "Uw Directory's",
+            "createButton": "Directory Aanmaken"
+        },
+        "directoryDetail": {
+            "failedToGenerateItems": "Items genereren mislukt. Probeer het opnieuw.",
+            "generationCompleted": "Generatie succesvol voltooid",
+            "generationCancelled": "Generatie is geannuleerd",
+            "role": {
+                "owner": "Eigenaar",
+                "manager": "Beheerder",
+                "editor": "Editor",
+                "viewer": "Kijker"
+            },
+            "shared": {
+                "tooltip": "Gedeeld met u als {role}"
+            },
+            "status": {
+                "notStarted": "Niet Gestart",
+                "generating": "Genereren",
+                "generated": "Gegenereerd",
+                "error": "Fout",
+                "cancelled": "Geannuleerd"
+            },
+            "tabs": {
+                "overview": "Overzicht",
+                "items": "Items",
+                "generator": "Generator",
+                "schedule": "Planning",
+                "history": "Geschiedenis",
+                "deploy": "Implementeren",
+                "members": "Leden",
+                "settings": "Instellingen"
+            },
+            "members": {
+                "title": "Teamleden",
+                "subtitle": "Beheer wie toegang heeft tot deze directory en hun rechten.",
+                "inviteMember": "Lid Uitnodigen",
+                "noMembers": "Nog geen teamleden. Nodig iemand uit om samen te werken.",
+                "roles": {
+                    "creator": "Maker",
+                    "owner": "Eigenaar",
+                    "manager": "Beheerder",
+                    "editor": "Editor",
+                    "viewer": "Kijker"
+                },
+                "roleDescriptions": {
+                    "owner": "Volledige controle inclusief verwijderen en ledenbeheer.",
+                    "manager": "Kan directory bewerken en leden beheren, maar niet verwijderen.",
+                    "editor": "Kan directory-inhoud bewerken en generaties uitvoeren.",
+                    "viewer": "Alleen-lezen toegang om de directory te bekijken."
+                },
+                "invite": {
+                    "title": "Teamlid Uitnodigen",
+                    "description": "Voeg een nieuw lid toe om samen te werken aan deze directory.",
+                    "emailLabel": "E-mailadres",
+                    "emailPlaceholder": "collega@voorbeeld.nl",
+                    "roleLabel": "Rol",
+                    "submit": "Uitnodiging Verzenden",
+                    "cancel": "Annuleren",
+                    "success": "Lid succesvol uitgenodigd.",
+                    "errors": {
+                        "emailRequired": "E-mailadres is vereist.",
+                        "failed": "Lid uitnodigen mislukt. Probeer het opnieuw."
+                    }
+                },
+                "confirmRemove": {
+                    "title": "Lid Verwijderen",
+                    "description": "Weet u zeker dat u {username} uit deze directory wilt verwijderen? Ze verliezen alle toegang.",
+                    "confirm": "Verwijderen",
+                    "cancel": "Annuleren"
+                },
+                "roleUpdated": "Lidrol bijgewerkt.",
+                "memberRemoved": "Lid succesvol verwijderd.",
+                "errors": {
+                    "updateFailed": "Lidrol bijwerken mislukt.",
+                    "removeFailed": "Lid verwijderen mislukt."
+                }
+            },
+            "schedule": {
+                "page": {
+                    "title": "Geplande updates",
+                    "subtitle": "Automatiseer verversingen voor {name} met een vast tijdschema en foutafhandeling.",
+                    "fallbackName": "deze directory"
+                },
+                "card": {
+                    "title": "Automatisering",
+                    "subtitle": {
+                        "enabled": "Pas tijdschema, facturering en veiligheidsmaatregelen aan zodat geplande verversingen betrouwbaar blijven.",
+                        "disabled": "Automatiseer verversingen zonder abonnementslimieten - stel vrijelijk tijdschema en foutafhandeling in."
+                    },
+                    "summary": {
+                        "status": "Status",
+                        "nextRun": "Volgende uitvoering",
+                        "lastRun": "Laatste uitvoering",
+                        "failures": "Fouten",
+                        "notScheduled": "Niet gepland",
+                        "never": "Nooit",
+                        "statusMap": {
+                            "active": "Automatisering actief",
+                            "paused": "Gepauzeerd",
+                            "canceled": "Geannuleerd",
+                            "disabled": "Uitgeschakeld"
+                        }
+                    },
+                    "fields": {
+                        "automation": "Automatisering",
+                        "automationHelp": "Pauzeer om toekomstige uitvoeringen tijdelijk te stoppen.",
+                        "billing": "Factureringswijze",
+                        "billingHelp": "Abonnementen ontgrendelen onbeperkte uitvoeringen. Pay-per-use factureert per uitvoering.",
+                        "cadence": "Tijdschema",
+                        "cadenceHelp": "Huidig plan: {plan}",
+                        "cadenceOpen": "Alle tijdschema's zijn beschikbaar terwijl abonnementen zijn uitgeschakeld.",
+                        "maxFailures": "Foutlimiet",
+                        "maxFailuresHelp": "Automatisch pauzeren zodra dit aantal fouten optreedt.",
+                        "createPullRequest": "Pull Requests Aanmaken",
+                        "createPullRequestHelp": "Indien ingeschakeld, maken geplande updates een pull request aan in plaats van direct te committen."
+                    },
+                    "billing": {
+                        "subscription": "Abonnement",
+                        "usage": "Pay-per-use"
+                    },
+                    "cadence": {
+                        "hourly": "Elk uur",
+                        "daily": "Elke dag",
+                        "weekly": "Elke week",
+                        "monthly": "Elke maand"
+                    },
+                    "plans": {
+                        "free": "Gratis",
+                        "standard": "Standaard",
+                        "premium": "Premium",
+                        "unmetered": "Ongelimiteerd"
+                    },
+                    "usageRequired": "Schakel over naar pay-per-use om dit tijdschema te gebruiken.",
+                    "cadenceAllowed": "Tijdschema toegestaan op uw plan.",
+                    "actions": {
+                        "save": "Wijzigingen Opslaan",
+                        "saving": "Opslaan...",
+                        "runNow": "Nu uitvoeren",
+                        "starting": "Starten...",
+                        "cancel": "Planning Annuleren",
+                        "cancelling": "Annuleren..."
+                    },
+                    "success": {
+                        "saved": "Planning opgeslagen.",
+                        "runStarted": "Geplande uitvoering gestart.",
+                        "cancelled": "Planning geannuleerd."
+                    },
+                    "errors": {
+                        "requireUsage": "Schakel pay-per-use facturering in om dit tijdschema te gebruiken.",
+                        "updateFailed": "Planning bijwerken mislukt.",
+                        "runFailed": "Uitvoering starten mislukt.",
+                        "cancelFailed": "Planning annuleren mislukt."
+                    },
+                    "empty": {
+                        "title": "Voer eerst een handmatige generatie uit",
+                        "description": "Voltooi één succesvolle handmatige uitvoering om geautomatiseerde planning te ontgrendelen. Zodra uw directory gegevens heeft, kunnen we deze voor u actueel houden.",
+                        "refresh": "Status Verversen"
+                    },
+                    "requiresGeneration": "Voer minimaal één itemgeneratie uit voordat u planning inschakelt."
+                },
+                "actions": {
+                    "invalid": "Ongeldige gegevens",
+                    "updated": "Planning bijgewerkt.",
+                    "updateFailed": "Planning bijwerken mislukt.",
+                    "runStarted": "Geplande uitvoering gestart.",
+                    "runFailed": "Uitvoering activeren mislukt.",
+                    "cancelled": "Planning geannuleerd.",
+                    "cancelFailed": "Planning annuleren mislukt."
+                }
+            },
+            "statusCard": {
+                "notStarted": {
+                    "title": "Generatie Niet Gestart",
+                    "description": "Start met het genereren van items voor uw directory om deze met inhoud te vullen.",
+                    "action": "Generatie Starten"
+                },
+                "generating": {
+                    "title": "Generatie in Uitvoering",
+                    "description": "Uw verzoek wordt verwerkt...",
+                    "processing": "Verwerken..."
+                },
+                "generated": {
+                    "title": "Generatie Voltooid",
+                    "description": "Uw directory is succesvol gevuld met items.",
+                    "viewItems": "Items Bekijken",
+                    "regenerate": "Opnieuw Genereren"
+                },
+                "error": {
+                    "title": "Generatie Mislukt",
+                    "description": "Er is een fout opgetreden tijdens het genereren.",
+                    "retry": "Generatie Opnieuw Proberen"
+                },
+                "cancelled": {
+                    "title": "Generatie Geannuleerd",
+                    "description": "De vorige generatie is gestopt voordat deze voltooid was.",
+                    "restart": "Generatie Herstarten"
+                }
+            },
+            "stats": {
+                "totalItems": "Totaal Items",
+                "categories": "Categorieën",
+                "generationStatus": "Generatiestatus",
+                "daysActive": "Dagen Actief"
+            },
+            "history": {
+                "title": "Generatiegeschiedenis",
+                "subtitle": "Volg eerdere generatieruns, aangemaakte items en uitvoeringsdetails.",
+                "error": "Meer items laden mislukt",
+                "empty": {
+                    "title": "Nog geen geschiedenis",
+                    "description": "Vraag een generatie aan om voortgang en resultaten hier te zien."
+                },
+                "status": {
+                    "generating": "In uitvoering",
+                    "generated": "Voltooid",
+                    "error": "Mislukt",
+                    "cancelled": "Geannuleerd"
+                },
+                "table": {
+                    "run": "Run",
+                    "status": "Status",
+                    "newItems": "Nieuwe Items",
+                    "updatedItems": "Bijgewerkt",
+                    "totalItems": "Totaal",
+                    "duration": "Duur",
+                    "startedAt": "Gestart",
+                    "tokens": "Tokens",
+                    "cost": "Kosten"
+                },
+                "loadMore": "Meer laden",
+                "noMore": "Geen verdere gegevens",
+                "unknown": "Onbekend"
+            },
+            "info": {
+                "title": "Directory Informatie",
+                "yourRole": "Uw Rol",
+                "role": {
+                    "owner": "Eigenaar",
+                    "manager": "Beheerder",
+                    "editor": "Editor",
+                    "viewer": "Kijker"
+                },
+                "slug": "Slug",
+                "repositories": "Repositories",
+                "dataRepo": "Data Repository",
+                "websiteRepo": "Website Repository",
+                "mainRepo": "Hoofd Repository",
+                "repoProvider": "Repository Provider",
+                "organization": "Organisatie",
+                "created": "Aangemaakt",
+                "lastUpdated": "Laatst Bijgewerkt",
+                "readmeHeader": "README Header",
+                "readmeFooter": "README Footer",
+                "custom": "Aangepast",
+                "customOverwrite": "Aangepast (Overschrijven)",
+                "yes": "Ja",
+                "no": "Nee"
+            },
+            "config": {
+                "title": "Configuratiedetails",
+                "initialPrompt": "Initiële Generatie Prompt",
+                "companyDetails": "Bedrijfsinformatie",
+                "companyName": "Bedrijfsnaam",
+                "companyWebsite": "Website",
+                "generationSettings": "Generatie-instellingen",
+                "generationMethod": "Generatiemethode",
+                "autoApproval": "Auto-goedkeuring",
+                "pagingMode": "Paginamodus",
+                "contentTable": "Inhoudstabel",
+                "enabled": "Ingeschakeld",
+                "disabled": "Uitgeschakeld",
+                "pullRequestUpdate": "Pull Request Details",
+                "branch": "Branch",
+                "prTitle": "PR Titel",
+                "mainRepository": "Hoofd Repository",
+                "dataRepository": "Data Repository"
+            },
+            "activity": {
+                "title": "Recente Activiteit",
+                "noActivity": "Nog geen activiteit",
+                "created": "Directory Aangemaakt",
+                "directoryCreated": "Directory is succesvol aangemaakt",
+                "justNow": "Zojuist"
+            },
+            "items": {
+                "title": "Directory Items",
+                "subtitle": "Beheer en organiseer de items in uw directory",
+                "noItemsTitle": "Nog Geen Items",
+                "noItemsDescription": "Uw directory heeft nog geen items. Genereer items om uw directory met inhoud te vullen.",
+                "generateItems": "Items Genereren",
+                "searchPlaceholder": "Zoek items...",
+                "allCategories": "Alle Categorieën",
+                "showing": "Toont {current} van {total} items",
+                "noMatch": "Geen items voldoen aan uw zoekcriteria",
+                "source": "Bron",
+                "addItem": "Item Toevoegen",
+                "delete": "Verwijderen",
+                "deleteWithPR": "Verwijderen met Pull Request",
+                "deleteConfirm": "Weet u zeker dat u \"{name}\" wilt verwijderen?",
+                "deleteSuccess": "Item succesvol verwijderd",
+                "deleteFailed": "Item verwijderen mislukt",
+                "deleteError": "Er is een fout opgetreden bij het verwijderen van het item",
+                "updateSuccess": "Item succesvol bijgewerkt",
+                "updateFailed": "Item bijwerken mislukt",
+                "updateError": "Er is een fout opgetreden bij het bijwerken van het item",
+                "updateItem": "Item bijwerken",
+                "loadingMore": "Meer laden... ({current} van {total})",
+                "addModal": {
+                    "title": "Nieuw Item Toevoegen",
+                    "sourceUrl": "Bron-URL",
+                    "sourceUrlPlaceholder": "https://voorbeeld.nl/product",
+                    "sourceUrlHelp": "Klik op 'Extraheren' om automatisch itemdetails van de URL op te halen",
+                    "extract": "Extraheren",
+                    "extractSuccess": "Itemdetails succesvol geëxtraheerd",
+                    "extractFailed": "Itemdetails extraheren mislukt",
+                    "extractError": "Er is een fout opgetreden bij het extraheren van details",
+                    "name": "Naam",
+                    "namePlaceholder": "Voer itemnaam in",
+                    "description": "Beschrijving",
+                    "descriptionPlaceholder": "Voer een korte beschrijving van het item in",
+                    "category": "Categorie",
+                    "tags": "Tags",
+                    "tagPlaceholder": "Voeg een tag toe en druk op Enter",
+                    "slug": "Slug (Optioneel)",
+                    "slugPlaceholder": "aangepaste-item-slug",
+                    "slugHelp": "URL-vriendelijke identificatie. Wordt automatisch gegenereerd indien leeg gelaten",
+                    "brand": "Merk (Optioneel)",
+                    "brandPlaceholder": "Voer merknaam in",
+                    "brandLogoUrl": "Merk Logo URL (Optioneel)",
+                    "brandLogoUrlPlaceholder": "https://voorbeeld.nl/logo.png",
+                    "images": "Afbeeldingen (Optioneel)",
+                    "imagePlaceholder": "https://voorbeeld.nl/screenshot.png",
+                    "imagesHelp": "Voeg afbeeldings-URL's toe (screenshots, productafbeeldingen)",
+                    "featured": "Uitgelicht Item",
+                    "featuredHelp": "Markeer dit item als uitgelicht in de directory",
+                    "updateWithPR": "Pull Request Aanmaken",
+                    "updateWithPRHelp": "Dien wijzigingen in als een pull request in plaats van direct committen",
+                    "cancel": "Annuleren",
+                    "adding": "Toevoegen...",
+                    "addItem": "Item Toevoegen",
+                    "success": "Item succesvol toegevoegd",
+                    "successDescription": "Het item is toegevoegd aan uw directory",
+                    "failed": "Item toevoegen mislukt",
+                    "error": "Er is een fout opgetreden bij het toevoegen van het item",
+                    "errors": {
+                        "urlRequired": "Bron-URL is vereist voor extractie",
+                        "invalidUrl": "Voer een geldige URL in die http:// of https:// bevat",
+                        "invalidImageUrl": "Voer een geldige afbeeldings-URL in",
+                        "requiredFields": "Vul alle vereiste velden in"
+                    }
+                },
+                "editDisplay": "Weergave bewerken",
+                "editDisplayDescription": "Uitgelicht status aan/uitzetten en weergavevolgorde instellen.",
+                "orderLabel": "Weergavevolgorde (optioneel)",
+                "orderHelp": "Lagere nummers tonen eerder binnen uitgelichte/niet-uitgelichte groepen.",
+                "deleteDialogTitle": "Item verwijderen",
+                "deleteDialogDescription": "Dit verwijdert {name} uit de repository.",
+                "createPRLabel": "Pull Request Aanmaken",
+                "createPRHelp": "Indien ingeschakeld, worden wijzigingen voorgesteld via PR in plaats van direct commit.",
+                "reasonLabel": "Reden (optioneel)",
+                "reasonPlaceholder": "Waarom verwijdert u dit item?",
+                "confirmDelete": "Item verwijderen"
+            },
+            "generator": {
+                "regenerationWarning": "Her-generatie Waarschuwing",
+                "regenerationWarningDescription": "Deze directory is al gegenereerd. Een nieuwe generatie starten zal bestaande items vervangen.",
+                "requiredInfo": "Vereiste Informatie",
+                "updateConfiguration": "Configuratie Bijwerken",
+                "promptRequired": "Prompt is vereist",
+                "operationStartedSuccessfully": "Operatie succesvol gestart",
+                "failedToStartOperation": "Operatie starten mislukt",
+                "directoryName": "Directory Naam",
+                "generationPrompt": "Generatie Prompt",
+                "recommended": "Aanbevolen",
+                "promptPlaceholder": "Beschrijf welke items voor deze directory gegenereerd moeten worden...",
+                "promptHelperText": "Wees specifiek over het type inhoud dat u wilt genereren",
+                "repositoryDescription": "Repository Beschrijving",
+                "repositoryPlaceholder": "Korte beschrijving van de repository (optioneel)",
+                "startGeneration": "Generatie Starten",
+                "regenerateItems": "Items Opnieuw Genereren",
+                "updateItems": "Items Bijwerken",
+                "recreateDirectory": "Directory Opnieuw Aanmaken",
+                "showAdvancedOptions": "Geavanceerde Opties Tonen",
+                "hideAdvancedOptions": "Geavanceerde Opties Verbergen",
+                "cancel": "Annuleren",
+                "companyInformation": "Bedrijfsinformatie",
+                "companyInfoDescription": "Optionele bedrijfsdetails voor gebrandmerkte inhoud",
+                "companyName": "Bedrijfsnaam",
+                "companyNamePlaceholder": "Voer bedrijfsnaam in",
+                "companyWebsite": "Bedrijfswebsite",
+                "companyWebsitePlaceholder": "https://voorbeeld.nl",
+                "categoriesKeywords": "Categorieën & Trefwoorden",
+                "categoriesDescription": "Definieer categorieën en trefwoorden voor inhoudsorganisatie",
+                "initialCategories": "Initiële Categorieën",
+                "priorityCategories": "Prioriteit Categorieën",
+                "targetKeywords": "Doeltrefwoorden",
+                "addCategoryPlaceholder": "Categorie toevoegen",
+                "addPriorityCategoryPlaceholder": "Prioriteit categorie toevoegen",
+                "addKeywordPlaceholder": "Trefwoord toevoegen",
+                "add": "Toevoegen",
+                "sourceUrls": "Bron-URL's",
+                "sourceUrlsDescription": "Voeg specifieke URL's toe om inhoud van te extraheren",
+                "sourceUrlPlaceholder": "https://voorbeeld.nl/pagina",
+                "addUrl": "URL Toevoegen",
+                "noSourceUrlsMessage": "Geen bron-URL's toegevoegd. De generator gebruikt zoeken om inhoud te vinden.",
+                "advancedConfig": "Geavanceerde Configuratie",
+                "advancedConfigDescription": "Verfijn generatieparameters en gedrag",
+                "generationMethod": "Generatiemethode",
+                "methodCreateUpdate": "Aanmaken of Bijwerken",
+                "methodRecreate": "Opnieuw Aanmaken (Alles Vervangen)",
+                "updateWithPullRequest": "Bijwerken met Pull Request",
+                "updateWithPullRequestDescription": "Maak een pull request aan in plaats van direct committen",
+                "enableBadgeEvaluation": "Badge Evaluatie Inschakelen",
+                "enableBadgeEvaluationDescription": "Evalueer en voeg kwaliteitsbadges toe aan items",
+                "websiteRepositoryCreationMethod": "Website Repository Aanmaakmethode",
+                "methodDuplicate": "Dupliceren",
+                "methodFork": "Forken",
+                "directoryNamePlaceholder": "Voer directorynaam in",
+                "methodCreateFromTemplate": "Aanmaken van Template",
+                "aiProcessingConfiguration": "AI Verwerkingsconfiguratie",
+                "maxSearchQueries": "Max Zoekqueries",
+                "resultsPerQuery": "Resultaten per Query",
+                "maxPagesToProcess": "Max Pagina's om te Verwerken",
+                "relevanceThreshold": "Relevantiedrempel",
+                "aiFirstGeneration": "AI-Eerste Generatie",
+                "aiFirstGenerationDescription": "AI-generatie van initiële items inschakelen voordat webzoeken.",
+                "contentFiltering": "Inhoudsfiltering",
+                "contentFilteringDescription": "Inhoudskwaliteitsfiltering inschakelen",
+                "recreateConfirmTitle": "Directory data opnieuw aanmaken?",
+                "recreateConfirmDescription": "Opnieuw aanmaken verwijdert bestaande items en genereert ze opnieuw van scratch. Deze actie kan niet ongedaan worden gemaakt.",
+                "confirmRecreate": "Ja, opnieuw aanmaken",
+                "recreateInlineTitle": "Opnieuw aanmaken verwijdert bestaande items",
+                "recreateInlineDescription": "Deze modus verwijdert huidige items en bouwt ze opnieuw op van scratch. Ga alleen verder als u alles wilt vervangen."
+            },
+            "progress": {
+                "title": "Generatie in Uitvoering",
+                "processingRequest": "Uw verzoek wordt verwerkt...",
+                "steps": {
+                    "promptComparison": "Prompts vergelijken",
+                    "promptProcessing": "Uw prompt verwerken",
+                    "domainDetection": "Domeintype detecteren",
+                    "aiFirstItemsGeneration": "Initiële AI-items genereren",
+                    "searchQueriesGeneration": "Zoekqueries aanmaken",
+                    "webSearch": "Web zoeken",
+                    "contentRetrieval": "Inhoud ophalen",
+                    "contentFiltering": "Relevante inhoud filteren",
+                    "itemsExtraction": "Items uit inhoud extraheren",
+                    "deduplicationDataAggregation": "Duplicaten verwijderen en gegevens aggregeren",
+                    "categoriesTagsProcessing": "Categorieën en tags verwerken",
+                    "sourcesValidation": "Bronnen valideren",
+                    "badgesProcessing": "Kwaliteitsbadges verwerken",
+                    "markdownGeneration": "Markdown-inhoud genereren",
+                    "processing": "Verwerken..."
+                },
+                "progress": "Voortgang",
+                "closeNote": "Dit kan een paar minuten duren. U kunt deze pagina sluiten en later terugkomen."
+            },
+            "settings": {
+                "sourceSettings": "Bron Repository",
+                "originalSource": "Oorspronkelijke Bron",
+                "syncEnabled": "Synchronisatie Ingeschakeld",
+                "syncDescription": "Automatisch updates van de bronrepository ophalen.",
+                "syncUpdateFailed": "Synchronisatie-instellingen bijwerken mislukt",
+                "syncDisabled": "Synchronisatie Uitgeschakeld",
+                "generalSettings": "Algemene Instellingen",
+                "generalTitle": "Algemene Instellingen",
+                "directoryName": "Directory Naam",
+                "description": "Beschrijving",
+                "organizationRepository": "Organisatie Repository",
+                "organizationHelp": "Maak repositories aan onder een organisatie in plaats van uw persoonlijke account",
+                "organizationName": "Organisatienaam",
+                "organizationNamePlaceholder": "Voer organisatienaam in",
+                "readmeConfiguration": "README Configuratie",
+                "readmeTitle": "README Configuratie",
+                "customHeader": "Aangepaste Header",
+                "customHeaderPlaceholder": "Voeg aangepaste inhoud toe aan de README header",
+                "overwriteDefaultHeader": "Standaard header overschrijven",
+                "customFooter": "Aangepaste Footer",
+                "cantDeleteWhileGenerating": "Kan de directory niet verwijderen terwijl items worden gegenereerd.",
+                "customFooterPlaceholder": "Voeg aangepaste inhoud toe aan de README footer",
+                "overwriteDefaultFooter": "Standaard footer overschrijven",
+                "dangerZone": "Gevarenzone",
+                "dangerTitle": "Gevarenzone",
+                "deleteWarning": "Zodra u een directory verwijdert, is er geen weg terug. Wees alstublieft zeker.",
+                "dangerDescription": "Zodra u een directory verwijdert, is er geen weg terug. Wees alstublieft zeker.",
+                "deleteOptions": "Selecteer wat te verwijderen:",
+                "deleteDataRepository": "Data repository verwijderen",
+                "deleteDataRepositoryDescription": "Verwijder de JSON data repository van GitHub",
+                "deleteMarkdownRepository": "Markdown repository verwijderen",
+                "deleteMarkdownRepositoryDescription": "Verwijder de markdown repository met de README",
+                "deleteWebsiteRepository": "Website repository verwijderen",
+                "deleteWebsiteRepositoryDescription": "Verwijder de geïmplementeerde website repository",
+                "deleteConfirm": "Bent u absoluut zeker?",
+                "deleteConfirmDetail": "Deze actie kan niet ongedaan worden gemaakt. De directory en geselecteerde repositories worden permanent verwijderd.",
+                "confirmDirectoryName": "Typ directorynaam om te bevestigen",
+                "confirmDirectoryNameDescription": "Typ \"{name}\" om verwijdering te bevestigen",
+                "deleteNameMismatch": "Directorynaam komt niet overeen",
+                "deleteButton": "Directory Verwijderen",
+                "deleteConfirmButton": "Ja, Verwijderen",
+                "deleteSuccess": "Directory succesvol verwijderd",
+                "deleteFailed": "Directory verwijderen mislukt",
+                "yesDelete": "Ja, Verwijderen",
+                "cancel": "Annuleren",
+                "saveChanges": "Wijzigingen Opslaan",
+                "updateReadme": "README Bijwerken",
+                "updateSuccess": "Instellingen succesvol bijgewerkt",
+                "updateFailed": "Instellingen bijwerken mislukt"
+            },
+            "deploy": {
+                "noTokenAlert": {
+                    "title": "Vercel Token Vereist",
+                    "description": "Om uw directory op Vercel te implementeren, moet u uw Vercel API-token configureren in uw accountinstellingen.",
+                    "configureButton": "Ga naar API Tokens Instellingen",
+                    "getTokenButton": "Vercel Token Ophalen",
+                    "howTo": {
+                        "title": "Hoe u uw Vercel token configureert:",
+                        "step1": "Klik op 'Vercel Token Ophalen' om het Vercel dashboard te openen",
+                        "step2": "Maak een nieuwe token met implementatiemachtigingen",
+                        "step3": "Kopieer de gegenereerde token",
+                        "step4": "Ga naar API Tokens Instellingen en plak uw token in het Vercel gedeelte"
+                    }
+                },
+                "sharedNoTokenAlert": {
+                    "title": "Implementatie Niet Beschikbaar",
+                    "description": "De directory-eigenaar heeft geen Vercel-token geconfigureerd voor implementatie. Neem contact op met de directory-eigenaar om implementatie in te stellen.",
+                    "hint": "Als medewerker kunt u implementaties activeren zodra de eigenaar zijn Vercel-integratie heeft geconfigureerd."
+                },
+                "form": {
+                    "deployToVercel": {
+                        "title": "Implementeren op Vercel",
+                        "description": "Implementeer uw directory website repository op Vercel.",
+                        "deployButton": "Nu Implementeren",
+                        "deployingButton": "Implementeren...",
+                        "deployingStateButton": "Implementeren ({state})...",
+                        "successMessage": "Uw website is succesvol geïmplementeerd!",
+                        "teamSelection": {
+                            "title": "Selecteer Vercel Team",
+                            "description": "Kies het Vercel team waarop deze directory geïmplementeerd moet worden.",
+                            "label": "Team",
+                            "placeholder": "Selecteer een team",
+                            "confirmButton": "Implementeren naar team",
+                            "cancelButton": "Annuleren"
+                        }
+                    },
+                    "updateRepository": {
+                        "title": "Website Repository Bijwerken",
+                        "description": "Sync de laatste wijzigingen van de template naar de",
+                        "websiteRepository": "website repository",
+                        "updateButton": "Repository Bijwerken",
+                        "updatingButton": "Bijwerken..."
+                    },
+                    "messages": {
+                        "deploySuccess": "Implementatie succesvol gestart",
+                        "deployPending": "Implementatie is in de wachtrij en start binnenkort",
+                        "deployFailed": "Implementeren op Vercel mislukt",
+                        "deployError": "Er is een fout opgetreden tijdens implementatie",
+                        "updateSuccess": "Repository succesvol bijgewerkt",
+                        "updateFailed": "Repository bijwerken mislukt",
+                        "updateError": "Er is een fout opgetreden bij het bijwerken van de repository"
+                    },
+                    "info": {
+                        "deployInfo": "Implementatie duurt meestal 1-3 minuten. U ontvangt een URL zodra deze voltooid is.",
+                        "updateInfo": "Updates synchroniseren uw directory-inhoud naar de website repository voor de volgende implementatie."
+                    },
+                    "websiteTemplate": {
+                        "title": "Automatische Template Updates",
+                        "description": "Houd uw website automatisch gesynchroniseerd met de laatste templatewijzigingen.",
+                        "autoUpdate": "Automatisch bijwerken",
+                        "autoUpdateDescription": "Controleer elk uur op template-updates en pas automatisch toe.",
+                        "useBeta": "Beta-versie van template gebruiken",
+                        "useBetaDescription": "Gebruik de stage branch in plaats van de stabiele main branch.",
+                        "lastUpdated": "Laatst bijgewerkt",
+                        "lastChecked": "Laatst gecontroleerd",
+                        "lastError": "Laatste fout",
+                        "updateSuccess": "Instellingen succesvol bijgewerkt",
+                        "updateFailed": "Instellingen bijwerken mislukt"
+                    }
+                }
+            }
+        },
+        "directoryCreation": {
+            "title": "Nieuwe Directory Aanmaken",
+            "subtitle": "Kies hoe u uw directory wilt aanmaken",
+            "backToOptions": "Terug naar opties",
+            "organizationSelector": {
+                "label": "Repository Eigenaar",
+                "loading": "Organisaties laden...",
+                "personal": "Persoonlijk Account",
+                "personalAccount": "Repository wordt aangemaakt onder uw persoonlijke account",
+                "organizations": "Organisaties",
+                "personalHelp": "De repository wordt aangemaakt onder uw persoonlijke GitHub-account",
+                "organizationHelp": "De repository wordt aangemaakt onder de {org} organisatie"
+            },
+            "ai": {
+                "title": "Aanmaken met AI",
+                "subtitle": "Beschrijf uw directory-idee in natuurlijke taal en laat AI de setup afhandelen",
+                "getStarted": "Aan de slag",
+                "formTitle": "Directory Aanmaken met AI",
+                "formSubtitle": "Beschrijf uw directory-idee en laat AI de setup en initiële inhoudsgeneratie afhandelen",
+                "directoryNameLabel": "Directory Naam",
+                "directoryNamePlaceholder": "bijv., Geweldige AI Tools",
+                "directoryNameHelp": "AI zal een naam voorstellen als u dit leeg laat",
+                "promptLabel": "Beschrijf Uw Directory",
+                "githubRequired": "Verbind alstublieft eerst uw GitHub-account.",
+                "promptPlaceholder": "Beschrijf wat voor soort directory u wilt maken, welke items deze moet bevatten, en eventuele specifieke vereisten...",
+                "inspirationText": "Inspiratie nodig? Probeer een van deze:",
+                "examplePrompts": {
+                    "0": {
+                        "name": "AI Developer Tools",
+                        "prompt": "Maak een directory van de beste AI tools voor ontwikkelaars"
+                    },
+                    "1": {
+                        "name": "React Components Hub",
+                        "prompt": "Bouw een gecureerde lijst van open-source React componenten"
+                    },
+                    "2": {
+                        "name": "Remote Team Tools",
+                        "prompt": "Genereer een directory van productiviteitsapps voor remote teams"
+                    },
+                    "3": {
+                        "name": "Sustainable Fashion",
+                        "prompt": "Maak een verzameling van duurzame modemerken"
+                    }
+                },
+                "featuresTitle": "Wat AI voor u zal doen:",
+                "features": {
+                    "0": "Een gepaste naam en beschrijving genereren",
+                    "1": "Initiële categorieën en structuur aanmaken",
+                    "2": "Relevante items automatisch vinden en toevoegen",
+                    "3": "GitHub repository opzetten met de juiste documentatie"
+                },
+                "generateButton": "Genereren met AI",
+                "generatingButton": "Directory Genereren...",
+                "cancelButton": "Annuleren",
+                "noteTitle": "Opmerking:",
+                "noteText": "AI-generatie duurt meestal 2-5 minuten, afhankelijk van de complexiteit van uw verzoek. U wordt op de hoogte gesteld wanneer uw directory klaar is.",
+                "errors": {
+                    "promptRequired": "Beschrijf alstublieft wat voor soort directory u wilt maken",
+                    "nameRequired": "Directorynaam is vereist",
+                    "slugRequired": "Directory slug is vereist",
+                    "descriptionRequired": "Directorybeschrijving is vereist"
+                },
+                "success": {
+                    "started": "Directory aanmaken gestart!",
+                    "generating": "AI genereert inhoud. Dit kan een paar minuten duren...",
+                    "created": "Directory succesvol aangemaakt!"
+                },
+                "advancedSettings": "Geavanceerde Instellingen",
+                "advancedSubtitle": "Configureer organisatie- en repository-instellingen",
+                "organizationLabel": "Organisatie Repository",
+                "organizationHelp": "Maak repositories aan onder een organisatie in plaats van uw persoonlijke account",
+                "organizationNameLabel": "Organisatienaam",
+                "organizationNamePlaceholder": "Voer organisatienaam in"
+            },
+            "manual": {
+                "title": "Handmatig Aanmaken",
+                "subtitle": "Configureer uw directory met volledige controle over elke instelling en optie",
+                "configureNow": "Nu Configureren",
+                "formTitle": "Directory Handmatig Aanmaken",
+                "formSubtitle": "Configureer uw directory met volledige controle over elke instelling",
+                "basicInfo": "Basisinformatie",
+                "nameLabel": "Directory Naam *",
+                "namePlaceholder": "bijv., Geweldige AI Tools",
+                "slugLabel": "Directory Slug *",
+                "slugPlaceholder": "geweldige-ai-tools",
+                "githubRequired": "Verbind alstublieft eerst uw GitHub-account.",
+                "slugHelp": "URL-vriendelijke identificatie (alleen kleine letters, cijfers en streepjes)",
+                "descriptionLabel": "Beschrijving *",
+                "descriptionPlaceholder": "Een gecureerde lijst van de beste AI tools en bronnen voor ontwikkelaars",
+                "advancedSettings": "Geavanceerde Instellingen",
+                "advancedSubtitle": "Organisatie, aangepaste headers, en meer",
+                "organizationLabel": "Aanmaken onder organisatie",
+                "organizationHelp": "Maak deze directory aan onder een GitHub-organisatie in plaats van uw persoonlijke account",
+                "organizationNameLabel": "Organisatienaam",
+                "organizationNamePlaceholder": "mijn-organisatie",
+                "headerLabel": "Aangepaste README Header",
+                "headerPlaceholder": "Voeg aangepaste inhoud toe aan de bovenkant van uw README-bestand",
+                "headerOverwrite": "Standaard header volledig vervangen",
+                "footerLabel": "Aangepaste README Footer",
+                "footerPlaceholder": "Voeg aangepaste inhoud toe aan de onderkant van uw README-bestand",
+                "footerOverwrite": "Standaard footer volledig vervangen",
+                "createButton": "Directory Aanmaken",
+                "creatingButton": "Directory Aanmaken...",
+                "cancelButton": "Annuleren",
+                "nameRequired": "Directorynaam is vereist",
+                "slugRequired": "Directory slug is vereist",
+                "descriptionRequired": "Directorybeschrijving is vereist",
+                "success": {
+                    "created": "Directory succesvol aangemaakt!"
+                }
+            },
+            "import": {
+                "title": "Bestaande Importeren",
+                "subtitle": "Importeer een directory van een bestaande GitHub repository",
+                "importNow": "Nu Importeren",
+                "formTitle": "Directory Importeren van GitHub",
+                "formSubtitle": "Importeer items van een bestaande GitHub repository om uw directory te maken",
+                "sync": {
+                    "title": "Gesynchroniseerd houden",
+                    "description": "Automatisch updates van de bronrepository ophalen."
+                },
+                "sourceMethod": {
+                    "url": {
+                        "title": "URL Plakken",
+                        "description": "Voer een GitHub repository URL direct in"
+                    },
+                    "repository": {
+                        "title": "Mijn Repositories",
+                        "description": "Selecteer uit uw GitHub repositories"
+                    }
+                },
+                "urlLabel": "GitHub Repository URL",
+                "urlPlaceholder": "https://github.com/eigenaar/repository",
+                "urlHelp": "Voer de volledige URL van een GitHub repository in",
+                "supportedFormats": {
+                    "title": "Ondersteunde Repository Formaten",
+                    "dataRepo": {
+                        "title": "Data Repository",
+                        "description": "Repositories met config.yml en data/ mapstructuur"
+                    },
+                    "awesomeReadme": {
+                        "title": "Awesome Lijst",
+                        "description": "Gecureerde lijst repositories met markdown README"
+                    }
+                },
+                "analyzing": {
+                    "title": "Repository Analyseren",
+                    "subtitle": "Repositorytype en structuur detecteren..."
+                },
+                "detectedType": {
+                    "dataRepo": "Data Repository Gedetecteerd",
+                    "awesomeReadme": "Awesome Lijst Gedetecteerd"
+                },
+                "badges": {
+                    "dataRepo": "Data Repo",
+                    "awesomeReadme": "Awesome Lijst"
+                },
+                "preview": {
+                    "items": "items",
+                    "categories": "categorieën"
+                },
+                "nameLabel": "Directory Naam",
+                "namePlaceholder": "bijv., Mijn Geweldige Directory",
+                "advancedSettings": "Geavanceerde Instellingen",
+                "advancedSubtitle": "Configureer organisatie- en repository-instellingen",
+                "attribution": {
+                    "title": "Bronvermelding:",
+                    "text": "Deze directory zal {url} als bron vermelden"
+                },
+                "analyzeButton": "Repository Analyseren",
+                "importButton": "Directory Importeren",
+                "importingButton": "Importeren...",
+                "backButton": "Terug",
+                "cancelButton": "Annuleren",
+                "importing": {
+                    "title": "Directory Importeren",
+                    "subtitle": "Uw directory instellen vanuit de bronrepository..."
+                },
+                "repositorySelector": {
+                    "title": "Selecteer Repository",
+                    "searchPlaceholder": "Zoek repositories...",
+                    "loading": "Repositories laden...",
+                    "noRepositories": "Geen repositories gevonden",
+                    "noResults": "Geen repositories voldoen aan uw zoekopdracht",
+                    "tryAgain": "Opnieuw proberen",
+                    "loadMore": "Meer laden",
+                    "showing": "Toont {shown} van {total} repositories",
+                    "today": "Vandaag",
+                    "yesterday": "Gisteren",
+                    "daysAgo": "{days} dagen geleden",
+                    "weeksAgo": "{weeks} weken geleden",
+                    "repositoriesLoaded": "repositories geladen",
+                    "moreAvailable": "meer beschikbaar",
+                    "errors": {
+                        "fetchFailed": "Repositories laden mislukt"
+                    }
+                },
+                "chooseMode": {
+                    "title": "Kies Importmethode",
+                    "repository": "Repository: {owner}/{repo}",
+                    "repositoryWithItems": "Repository: {owner}/{repo} ({itemCount} items)",
+                    "importCopy": {
+                        "title": "Importeren & Kopiëren",
+                        "description": "Maak nieuwe repositories met een kopie van de data. Best voor forken of vers beginnen."
+                    },
+                    "linkExisting": {
+                        "title": "Bestaande Koppelen",
+                        "description": "Gebruik uw bestaande repository direct. Geen kopiëren, wijzigingen synchroniseren automatisch."
+                    },
+                    "back": "Terug"
+                },
+                "linkConfirm": {
+                    "title": "Repository Koppelen",
+                    "descriptionMissing": "Sommige repositories werden niet gevonden. U kunt doorgaan zonder ze of ze nu aanmaken.",
+                    "descriptionReady": "Alle repositories gevonden. Klaar om te koppelen.",
+                    "dataRepo": "Data Repository",
+                    "markdownRepo": "Markdown Repository",
+                    "websiteRepo": "Website Repository",
+                    "found": "Gevonden",
+                    "notFound": "Niet gevonden",
+                    "cancel": "Annuleren",
+                    "continueWithout": "Doorgaan zonder",
+                    "createMissing": "Ontbrekende aanmaken",
+                    "creating": "Aanmaken...",
+                    "linking": "Koppelen...",
+                    "linkRepos": "Repositories koppelen"
+                },
+                "errors": {
+                    "urlRequired": "Voer alstublieft een GitHub repository URL in",
+                    "unsupportedFormat": "Dit repositoryformaat wordt niet ondersteund. Gebruik alstublieft een Data Repository of Awesome Lijst formaat.",
+                    "analyzeFailed": "Repository analyseren mislukt",
+                    "analyzeForLinkingFailed": "Analyseren voor koppelen mislukt",
+                    "nameRequired": "Directorynaam is vereist",
+                    "noAnalysis": "Analyseer alstublieft eerst een repository",
+                    "githubRequired": "Verbind alstublieft eerst uw GitHub-account",
+                    "importFailed": "Directory importeren mislukt",
+                    "linkFailed": "Directory koppelen mislukt"
+                },
+                "success": {
+                    "started": "Import gestart! Doorverwijzen naar uw directory...",
+                    "linked": "Directory succesvol gekoppeld"
+                }
+            }
+        },
+        "github": {
+            "connection": {
+                "alert": {
+                    "title": "GitHub niet verbonden",
+                    "subtitle": "Verbind uw GitHub-account om directory's aan te maken en te beheren",
+                    "connectButton": "GitHub Verbinden",
+                    "connectingButton": "Verbinden..."
+                },
+                "status": {
+                    "title": "GitHub Status",
+                    "connected": "Verbonden",
+                    "notConnected": "Niet verbonden",
+                    "connectedDescription": "Uw directory's worden opgeslagen als GitHub repositories in uw account.",
+                    "notConnectedDescription": "Verbind uw GitHub-account om directory's aan te maken en te beheren.",
+                    "connectedAccount": "Verbonden account:",
+                    "requiredNote": "Vereist om directory's aan te maken",
+                    "connectButton": "GitHub Verbinden",
+                    "connectingButton": "Verbinden...",
+                    "failedToConnect": "GitHub verbinden mislukt"
+                }
+            }
+        },
+        "apiTokens": {
+            "title": "API & Tokens",
+            "subtitle": "Beheer uw API-sleutels en integraties van derden",
+            "vercel": {
+                "title": "Vercel Integratie",
+                "subtitle": "Verbind uw Vercel-account om directory's als websites te implementeren",
+                "connected": "Verbonden",
+                "notConnected": "Niet Verbonden",
+                "connectedMessage": "Uw Vercel-account is verbonden. U kunt nu directory's op Vercel implementeren.",
+                "disconnect": "Vercel Verbinding Verbreken",
+                "disconnecting": "Verwijderen...",
+                "apiTokenLabel": "Vercel API Token",
+                "placeholder": "vc_...",
+                "showToken": "Tonen",
+                "hideToken": "Verbergen",
+                "getTokenHelp": "U kunt uw API-token ophalen van",
+                "vercelDashboard": "Vercel Dashboard",
+                "save": "Token Opslaan",
+                "saving": "Opslaan...",
+                "messages": {
+                    "tokenRequired": "Voer een geldige Vercel token in",
+                    "saveSuccess": "Vercel token succesvol opgeslagen",
+                    "saveFailed": "Vercel token opslaan mislukt",
+                    "removeSuccess": "Vercel token succesvol verwijderd",
+                    "removeFailed": "Vercel token verwijderen mislukt",
+                    "unexpectedError": "Er is een onverwachte fout opgetreden"
+                }
+            },
+            "apiKeys": {
+                "title": "API Sleutels",
+                "subtitle": "Genereer en beheer API-sleutels voor programmatische toegang",
+                "generate": "API Sleutel Genereren (Binnenkort)"
+            },
+            "webhooks": {
+                "title": "Webhooks",
+                "subtitle": "Configureer webhooks om real-time updates te ontvangen",
+                "configure": "Webhooks Configureren (Binnenkort)"
+            }
+        },
+        "notifications": {
+            "title": "Meldingsvoorkeuren",
+            "subtitle": "Kies hoe u op de hoogte wilt worden gesteld van belangrijke updates",
+            "email": {
+                "title": "E-mailmeldingen",
+                "directoryUpdates": {
+                    "label": "Directory Updates",
+                    "description": "Word op de hoogte gesteld van belangrijke updates aan uw directory's"
+                },
+                "newItems": {
+                    "label": "Nieuwe Items",
+                    "description": "Word op de hoogte gesteld wanneer nieuwe items aan uw directory's worden toegevoegd"
+                },
+                "weeklyDigest": {
+                    "label": "Wekelijkse Samenvatting",
+                    "description": "Ontvang een wekelijkse samenvatting van uw directory-activiteit"
+                },
+                "marketing": {
+                    "label": "Marketing & Promoties",
+                    "description": "Ontvang updates over nieuwe functies en aanbiedingen"
+                }
+            },
+            "app": {
+                "title": "In-App Meldingen",
+                "newItems": {
+                    "label": "Nieuwe Items",
+                    "description": "Toon meldingen voor nieuwe directory-items"
+                },
+                "comments": {
+                    "label": "Reacties",
+                    "description": "Word op de hoogte gesteld van reacties op uw directory's"
+                },
+                "mentions": {
+                    "label": "Vermeldingen",
+                    "description": "Word op de hoogte gesteld wanneer iemand u vermeldt"
+                },
+                "systemUpdates": {
+                    "label": "Systeemupdates",
+                    "description": "Belangrijke systeemmeldingen en onderhoudswaarschuwingen"
+                }
+            },
+            "actions": {
+                "save": "Voorkeuren Opslaan",
+                "saving": "Opslaan..."
+            },
+            "messages": {
+                "success": "Meldingsvoorkeuren bijgewerkt",
+                "error": "Voorkeuren bijwerken mislukt",
+                "unexpectedError": "Er is een onverwachte fout opgetreden"
+            }
+        },
+        "sidebar": {
+            "menu": "Menu",
+            "aiChat": "AI Chat",
+            "newDirectory": "Nieuwe Directory",
+            "navigation": {
+                "dashboard": "Dashboard",
+                "directories": "Directory's",
+                "settings": "Instellingen"
+            },
+            "signOut": "Uitloggen",
+            "signingOut": "Uitloggen..."
+        },
+        "dangerZone": {
+            "title": "Gevarenzone",
+            "subtitle": "Onomkeerbare en destructieve acties",
+            "export": {
+                "title": "Uw Gegevens Exporteren",
+                "subtitle": "Download al uw directory's, items en instellingen",
+                "action": "Gegevens Exporteren (Binnenkort)"
+            },
+            "delete": {
+                "title": "Account Verwijderen",
+                "subtitle": "Verwijder uw account en alle bijbehorende gegevens permanent. Deze actie kan niet ongedaan worden gemaakt.",
+                "button": "Mijn Account Verwijderen",
+                "confirmTitle": "⚠️ Dit zal permanent verwijderen:",
+                "confirmItems": [
+                    "Uw account en profiel",
+                    "Al uw directory's",
+                    "Alle directory-items en gegevens",
+                    "API-sleutels en integraties",
+                    "Alle bijbehorende websites"
+                ],
+                "confirmLabel": "Typ uw e-mail {email} om te bevestigen",
+                "confirmPlaceholder": "Voer uw e-mail in",
+                "confirmButton": "Ja, Verwijder Mijn Account",
+                "deleting": "Verwijderen...",
+                "cancel": "Annuleren"
+            },
+            "messages": {
+                "confirmEmail": "Voer uw e-mail correct in om te bevestigen",
+                "deleteSuccess": "Account succesvol verwijderd",
+                "deleteFailed": "Account verwijderen mislukt",
+                "unexpectedError": "Er is een onverwachte fout opgetreden"
+            }
+        },
+        "aiChat": {
+            "title": "AI Assistent",
+            "subtitle": "Maak directory's met natuurlijke taal",
+            "newChat": "Nieuwe chat",
+            "loadingConversation": "Gesprek laden…",
+            "inputPlaceholder": "Beschrijf de directory die u wilt maken...",
+            "sendButton": "Verzenden"
+        }
+    },
+    "layout": {
+        "auth": {
+            "backToHome": "Terug naar home",
+            "feature": {
+                "title": "Bouw Directory's met AI",
+                "subtitle": "Maak in minuten prachtige, doorzoekbare directory's met natuurlijke taal. Geen codering vereist.",
+                "benefits": {
+                    "ai": {
+                        "title": "AI-gestuurde Creatie",
+                        "description": "Beschrijf wat u wilt en laat AI het werk doen"
+                    },
+                    "templates": {
+                        "title": "Professionele Templates",
+                        "description": "Begin met prachtige, aanpasbare ontwerpen"
+                    },
+                    "management": {
+                        "title": "Eenvoudig Beheer",
+                        "description": "Werk uw inhoud bij en organiseer moeiteloos"
+                    }
+                }
+            },
+            "footer": {
+                "copyright": "© {year} {companyName}. Alle rechten voorbehouden.",
+                "terms": "Servicevoorwaarden",
+                "privacy": "Privacybeleid",
+                "help": "Help"
+            }
+        }
+    },
+    "errors": {
+        "global": {
+            "title": "Er is iets misgegaan!",
+            "tryAgain": "Opnieuw proberen"
+        }
+    },
+    "metadata": {
+        "title": "{companyName} - Directory Builder",
+        "description": "Een SaaS-platform voor het bouwen en beheren van directory's"
+    },
+    "api": {
+        "errors": {
+            "unauthorized": "U bent niet geautoriseerd om deze actie uit te voeren",
+            "unauthorizedLogin": "Niet geautoriseerd: Log alstublieft opnieuw in.",
+            "forbidden": "Verboden: U heeft geen toestemming om deze actie uit te voeren.",
+            "serverError": "Serverfout: {message}",
+            "unexpected": "Er is een onverwachte serverfout opgetreden.",
+            "apiError": "API Fout: {status} {statusText}",
+            "loginFailed": "Inloggen mislukt",
+            "registerFailed": "Registreren mislukt",
+            "unsupportedProvider": "Niet-ondersteunde provider",
+            "providerConnectFailed": "Provider verbinden mislukt",
+            "forgotPasswordFailed": "Wachtwoordreset-e-mail verzenden mislukt",
+            "resetPasswordFailed": "Wachtwoord resetten mislukt"
+        }
+    },
+    "actions": {
+        "directories": {
+            "slug": {
+                "required": "Slug is vereist",
+                "format": "Slug mag alleen kleine letters, cijfers en streepjes bevatten"
+            },
+            "name": {
+                "required": "Naam is vereist",
+                "maxLength": "Naam moet minder dan 100 tekens bevatten"
+            },
+            "description": {
+                "required": "Beschrijving is vereist",
+                "maxLength": "Beschrijving moet minder dan 500 tekens bevatten"
+            },
+            "prompt": {
+                "minLength": "Prompt moet minimaal 10 tekens bevatten",
+                "maxLength": "Prompt moet minder dan 1000 tekens bevatten"
+            },
+            "oauthRequired": "OAuth-verbinding vereist. Verbind alstublieft eerst uw {provider}-account.",
+            "githubRequired": "GitHub-verbinding vereist. Verbind alstublieft eerst uw GitHub-account.",
+            "createSuccess": "Directory succesvol aangemaakt!",
+            "createFailed": "Directory aanmaken mislukt",
+            "updateSuccess": "Directory succesvol bijgewerkt!",
+            "updateFailed": "Directory bijwerken mislukt",
+            "invalidGeneratedData": "Geldige directorygegevens genereren mislukt",
+            "aiGenerationStarted": "Directory aanmaken gestart! AI genereert inhoud...",
+            "invalidId": "Ongeldige directory ID",
+            "deleteSuccess": "Directory succesvol verwijderd",
+            "deleteFailed": "Directory verwijderen mislukt",
+            "fetchFailed": "Directory's ophalen mislukt",
+            "organization": {
+                "requiredWhenOwnerProvided": "Organisatie moet zijn ingeschakeld wanneer eigenaar is opgegeven"
+            },
+            "import": {
+                "invalidUrl": "Voer een geldige URL in",
+                "analyzeFailed": "Repository analyseren mislukt",
+                "started": "Import succesvol gestart",
+                "failed": "Directory importeren mislukt",
+                "fetchReposFailed": "Repositories ophalen mislukt"
+            }
+        },
+        "generator": {
+            "promptRequired": "Prompt is vereist",
+            "nameRequired": "Naam is vereist",
+            "generationStartedSuccessfully": "Generatie succesvol gestart",
+            "updateStartedSuccessfully": "Bijwerken succesvol gestart",
+            "failedToGenerateItems": "Items genereren mislukt",
+            "failedToUpdateItems": "Items bijwerken mislukt",
+            "markdownRegeneratedSuccessfully": "Markdown succesvol opnieuw gegenereerd",
+            "failedToRegenerateMarkdown": "Markdown opnieuw genereren mislukt",
+            "notAuthorizedToAccessOrganization": "U bent niet geautoriseerd om deze organisatie te benaderen. Neem contact op met de eigenaar ({owner}) voor assistentie."
+        },
+        "settings": {
+            "profile": {
+                "usernameRequired": "Gebruikersnaam is vereist",
+                "usernameMaxLength": "Gebruikersnaam moet minder dan 50 tekens bevatten",
+                "usernameFormat": "Gebruikersnaam mag alleen letters, cijfers, streepjes en underscores bevatten",
+                "updateFailed": "Profiel bijwerken mislukt",
+                "notAuthenticated": "Niet geauthenticeerd"
+            },
+            "password": {
+                "currentRequired": "Huidig wachtwoord is vereist",
+                "newMinLength": "Wachtwoord moet minimaal 8 tekens bevatten",
+                "newMaxLength": "Wachtwoord moet minder dan 100 tekens bevatten",
+                "updateFailed": "Wachtwoord bijwerken mislukt",
+                "updateSuccess": "Wachtwoord succesvol bijgewerkt",
+                "notAuthenticated": "Niet geauthenticeerd"
+            },
+            "vercel": {
+                "notAuthenticated": "Niet geauthenticeerd",
+                "tokenRequired": "Token is vereist",
+                "invalidFormat": "Ongeldig Vercel tokenformaat",
+                "saveFailed": "Vercel token opslaan mislukt",
+                "saveSuccess": "Vercel token succesvol opgeslagen",
+                "validationFailed": "De opgegeven Vercel token is ongeldig. Controleer alstublieft dubbel en probeer opnieuw.",
+                "removeFailed": "Vercel token verwijderen mislukt",
+                "removeSuccess": "Vercel token succesvol verwijderd"
+            },
+            "github": {
+                "notAuthenticated": "Niet geauthenticeerd",
+                "disconnectFailed": "GitHub verbinding verbreken mislukt",
+                "disconnectSuccess": "GitHub-account succesvol verbinding verbroken"
+            },
+            "notifications": {
+                "notAuthenticated": "Niet geauthenticeerd",
+                "updateFailed": "Voorkeuren bijwerken mislukt",
+                "updateSuccess": "Meldingsvoorkeuren succesvol bijgewerkt"
+            },
+            "danger": {
+                "notAuthenticated": "Niet geauthenticeerd",
+                "deleteFailed": "Account verwijderen mislukt",
+                "deleteDisabled": "Accountverwijdering is uitgeschakeld in demo"
+            }
+        },
+        "deploy": {
+            "deployVercelFailed": "Implementeren op Vercel mislukt",
+            "updateRepositoryFailed": "Repository bijwerken mislukt",
+            "updateSettingsFailed": "Website template-instellingen bijwerken mislukt"
+        }
+    },
+    "validation": {
+        "auth": {
+            "invalidCredentials": "Ongeldig e-mailadres of wachtwoord",
+            "account": {
+                "suspended": "Account is geschorst"
+            },
+            "email": {
+                "required": "E-mail kan niet leeg zijn",
+                "invalid": "Ongeldig e-mailadres",
+                "emailAlreadyRegistered": "E-mail is al geregistreerd"
+            },
+            "password": {
+                "required": "Wachtwoord kan niet leeg zijn",
+                "minLength": "Wachtwoord moet minimaal {length} tekens bevatten",
+                "lowercase": "Wachtwoord moet minimaal één kleine letter bevatten",
+                "numberOrSpecial": "Wachtwoord moet minimaal één cijfer of speciaal teken bevatten",
+                "cannotStartWith": "Wachtwoord mag niet beginnen met een punt of nieuwe regel",
+                "digit": "Wachtwoord moet minimaal één cijfer bevatten"
+            },
+            "username": {
+                "minLength": "Gebruikersnaam moet minimaal {length} tekens bevatten"
+            }
+        }
+    }
+}

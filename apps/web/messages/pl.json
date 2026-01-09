@@ -1,0 +1,1543 @@
+{
+    "auth": {
+        "error": {
+            "title": "Błąd uwierzytelniania",
+            "subtitle": "Wystąpił problem z Twoim uwierzytelnieniem",
+            "errorOccurred": "Wystąpił błąd",
+            "somethingWentWrong": "Coś poszło nie tak",
+            "generic": "Wystąpił nieoczekiwany błąd. Spróbuj ponownie później.",
+            "invalidCredentials": "Wprowadzony email lub hasło są nieprawidłowe.",
+            "emailNotVerified": "Zweryfikuj swój adres email przed zalogowaniem.",
+            "accountLocked": "Twoje konto zostało zablokowane ze względów bezpieczeństwa.",
+            "sessionExpired": "Twoja sesja wygasła. Zaloguj się ponownie.",
+            "networkError": "Nie można połączyć. Sprawdź swoje połączenie internetowe.",
+            "oauth": {
+                "missingCode": "Brak kodu autoryzacji. Spróbuj zalogować się ponownie.",
+                "invalidState": "Nieprawidłowy stan autoryzacji. Spróbuj zalogować się ponownie.",
+                "unsupportedProvider": "Ten dostawca uwierzytelniania nie jest obsługiwany.",
+                "callbackFailed": "Nie udało się ukończyć uwierzytelniania. Spróbuj ponownie."
+            },
+            "resetPassword": {
+                "missingToken": "Link do resetowania hasła jest nieprawidłowy. Brak tokenu weryfikacyjnego.",
+                "invalidToken": "Link do resetowania hasła jest nieprawidłowy lub został naruszony.",
+                "expiredToken": "Link do resetowania hasła wygasł. Poproś o nowy.",
+                "failed": "Nie udało się zresetować hasła. Spróbuj ponownie lub poproś o nowy link resetujący."
+            },
+            "verifyEmail": {
+                "missingToken": "Link weryfikacyjny email jest nieprawidłowy. Brak tokenu weryfikacyjnego.",
+                "invalidToken": "Link weryfikacyjny email jest nieprawidłowy lub został już użyty.",
+                "expiredToken": "Link weryfikacyjny email wygasł. Poproś o nowy.",
+                "failed": "Nie udało się zweryfikować emaila. Spróbuj ponownie lub poproś o nowy link weryfikacyjny."
+            },
+            "authorize": {
+                "invalidRedirectUrl": "Adres URL przekierowania jest nieprawidłowy lub niedozwolony. Skontaktuj się z pomocą techniczną, jeśli uważasz, że to błąd."
+            },
+            "actions": {
+                "backToLogin": "Powrót do logowania",
+                "tryRegister": "Spróbuj się zarejestrować",
+                "resendVerification": "Wyślij ponownie email weryfikacyjny",
+                "contactSupport": "Skontaktuj się z pomocą techniczną",
+                "requestNewReset": "Poproś o nowy link resetujący"
+            },
+            "helpText": "Jeśli problemy nadal występują, sprawdź nasze zasoby pomocy poniżej.",
+            "links": {
+                "help": "Centrum pomocy",
+                "systemStatus": "Status systemu"
+            }
+        },
+        "login": {
+            "title": "Witaj ponownie",
+            "subtitle": "Zaloguj się na swoje konto, aby kontynuować",
+            "form": {
+                "email": {
+                    "label": "Adres email",
+                    "placeholder": "ty@przyklad.com"
+                },
+                "password": {
+                    "label": "Hasło",
+                    "placeholder": "Wprowadź swoje hasło"
+                },
+                "forgotPassword": "Zapomniałeś hasła?",
+                "rememberMe": "Zapamiętaj mnie na 30 dni",
+                "submit": "Zaloguj się",
+                "submitting": "Logowanie..."
+            },
+            "socialLogin": {
+                "divider": "Lub kontynuuj przez",
+                "google": "Google",
+                "github": "GitHub"
+            },
+            "signUp": {
+                "text": "Nie masz konta?",
+                "link": "Zarejestruj się"
+            },
+            "errors": {
+                "invalidCredentials": "Nieprawidłowy email lub hasło"
+            },
+            "passwordReset": {
+                "success": "Hasło zostało pomyślnie zresetowane!",
+                "canLogin": "Możesz się teraz zalogować za pomocą nowego hasła."
+            }
+        },
+        "forgotPassword": {
+            "title": "Zapomniałeś hasła?",
+            "subtitle": "Bez obaw, wyślemy Ci instrukcje resetowania",
+            "successTitle": "Sprawdź swoją pocztę",
+            "successSubtitle": "Wysłaliśmy Ci instrukcje resetowania hasła",
+            "form": {
+                "email": {
+                    "label": "Adres email",
+                    "placeholder": "Wprowadź swój email"
+                },
+                "submit": "Wyślij link resetujący",
+                "submitting": "Wysyłanie..."
+            },
+            "success": {
+                "title": "Email wysłany pomyślnie",
+                "message": "Wysłaliśmy instrukcje resetowania hasła na adres {email}",
+                "checkSpam": "Jeśli nie widzisz emaila, sprawdź folder spam."
+            },
+            "errors": {
+                "failed": "Nie udało się wysłać emaila resetującego. Spróbuj ponownie."
+            },
+            "backToLogin": "Powrót do logowania",
+            "noAccount": {
+                "text": "Nie masz konta?",
+                "link": "Zarejestruj się"
+            }
+        },
+        "resetPassword": {
+            "title": "Zresetuj swoje hasło",
+            "subtitle": "Wprowadź poniżej swoje nowe hasło",
+            "successTitle": "Hasło zostało zresetowane pomyślnie",
+            "successSubtitle": "Twoje hasło zostało zaktualizowane",
+            "form": {
+                "password": {
+                    "label": "Nowe hasło",
+                    "placeholder": "Wprowadź nowe hasło",
+                    "helperText": "Co najmniej 6 znaków, małe litery i cyfry/znaki specjalne",
+                    "errors": {
+                        "minLength": "Hasło musi mieć co najmniej 6 znaków",
+                        "lowercase": "Hasło musi zawierać co najmniej jedną małą literę",
+                        "numberOrSpecial": "Hasło musi zawierać co najmniej jedną cyfrę lub znak specjalny",
+                        "cannotStartWith": "Hasło nie może zaczynać się od kropki lub nowej linii"
+                    }
+                },
+                "confirmPassword": {
+                    "label": "Potwierdź nowe hasło",
+                    "placeholder": "Potwierdź nowe hasło",
+                    "errors": {
+                        "noMatch": "Hasła nie pasują do siebie"
+                    }
+                },
+                "submit": "Zresetuj hasło",
+                "submitting": "Resetowanie..."
+            },
+            "success": {
+                "title": "Hasło zostało zresetowane pomyślnie",
+                "message": "Twoje hasło zostało pomyślnie zaktualizowane. Możesz się teraz zalogować za pomocą nowego hasła.",
+                "loginButton": "Przejdź do logowania"
+            },
+            "errors": {
+                "failed": "Nie udało się zresetować hasła. Spróbuj ponownie lub poproś o nowy link resetujący.",
+                "noToken": "Nieprawidłowy link resetujący",
+                "invalidLink": "Nieprawidłowy link resetujący",
+                "missingTokenMessage": "Link do resetowania hasła jest nieprawidłowy lub niekompletny. Poproś o nowe resetowanie hasła.",
+                "requestNewLink": "Poproś o nowy link resetujący"
+            },
+            "backToLogin": "Powrót do logowania"
+        },
+        "register": {
+            "title": "Utwórz swoje konto",
+            "subtitle": "Zacznij tworzyć niesamowite katalogi już dziś",
+            "form": {
+                "name": {
+                    "label": "Pełne imię i nazwisko",
+                    "placeholder": "Jan Kowalski"
+                },
+                "email": {
+                    "label": "Adres email",
+                    "placeholder": "ty@przyklad.com"
+                },
+                "password": {
+                    "label": "Hasło",
+                    "placeholder": "Utwórz silne hasło",
+                    "hint": "Co najmniej 8 znaków"
+                },
+                "confirmPassword": {
+                    "label": "Potwierdź hasło",
+                    "placeholder": "Potwierdź swoje hasło"
+                },
+                "terms": {
+                    "text": "Akceptuję",
+                    "termsLink": "Regulamin serwisu",
+                    "and": "oraz",
+                    "privacyLink": "Politykę prywatności"
+                },
+                "submit": "Utwórz konto",
+                "submitting": "Tworzenie konta..."
+            },
+            "socialSignUp": {
+                "divider": "Lub zarejestruj się przez",
+                "google": "Google",
+                "github": "GitHub"
+            },
+            "signIn": {
+                "text": "Masz już konto?",
+                "link": "Zaloguj się"
+            },
+            "errors": {
+                "passwordsDoNotMatch": "Hasła nie pasują do siebie",
+                "passwordTooShort": "Hasło musi mieć co najmniej 8 znaków",
+                "generic": "Wystąpił błąd. Spróbuj ponownie."
+            }
+        }
+    },
+    "dashboard": {
+        "title": "Panel główny",
+        "toasts": {
+            "newUser": {
+                "title": "Witamy w {companyName}! 🎉",
+                "description": "Twoje konto zostało pomyślnie utworzone. Sprawdź swój email, aby zweryfikować konto."
+            },
+            "emailVerification": {
+                "title": "Zweryfikuj swój email",
+                "description": "Wysłaliśmy link weryfikacyjny na Twój adres email. Sprawdź skrzynkę odbiorczą i folder spam.",
+                "action": "Wyślij ponownie email"
+            },
+            "verified": {
+                "title": "Email zweryfikowany pomyślnie! ✅",
+                "description": "Twój adres email został zweryfikowany. Masz teraz pełny dostęp do wszystkich funkcji."
+            },
+            "oauthConnected": {
+                "title": "Konto połączone z GitHub",
+                "description": "Twoje konto zostało pomyślnie połączone z GitHub."
+            }
+        },
+        "header": {
+            "welcome": "Witaj ponownie, {username}!",
+            "subtitle": "Zarządzaj swoimi katalogami wspieranymi przez AI i śledź ich wydajność",
+            "notifications": {
+                "title": "Powiadomienia",
+                "empty": "Brak nowych powiadomień"
+            }
+        },
+        "directories": {
+            "title": "Katalogi",
+            "subtitle": "Zarządzaj i organizuj swoje katalogi wspierane przez AI",
+            "recent": "Ostatnie katalogi",
+            "viewAll": "Zobacz wszystkie ({count})",
+            "search": "Szukaj katalogów...",
+            "create": "Utwórz katalog",
+            "showing": "Wyświetlanie {current} z {total} katalogów",
+            "pagination": {
+                "previous": "Poprzednia",
+                "next": "Następna"
+            },
+            "empty": {
+                "title": "Brak jeszcze katalogów",
+                "description": "Utwórz swój pierwszy katalog wspierany przez AI, aby zacząć organizować i prezentować swoje treści.",
+                "action": "Utwórz swój pierwszy katalog",
+                "notFound": {
+                    "title": "Nie znaleziono katalogów",
+                    "withSearch": "Spróbuj zmienić swoje kryteria wyszukiwania",
+                    "withoutSearch": "Utwórz swój pierwszy katalog wspierany przez AI, aby rozpocząć"
+                }
+            }
+        },
+        "settings": {
+            "title": "Ustawienia",
+            "subtitle": "Zarządzaj ustawieniami konta i preferencjami",
+            "tabs": {
+                "profile": "Profil",
+                "security": "Bezpieczeństwo",
+                "apiTokens": "API i tokeny",
+                "oauth": "Połączone konta",
+                "notifications": "Powiadomienia",
+                "dangerZone": "Strefa zagrożenia"
+            },
+            "profile": {
+                "title": "Ustawienia profilu",
+                "subtitle": "Zaktualizuj informacje profilowe i awatar",
+                "fields": {
+                    "name": "Imię i nazwisko",
+                    "username": "Nazwa użytkownika",
+                    "email": "Email",
+                    "emailHelperText": "Email nie może zostać zmieniony"
+                },
+                "placeholders": {
+                    "name": "Wprowadź swoje imię i nazwisko",
+                    "username": "Wprowadź nazwę użytkownika"
+                },
+                "actions": {
+                    "save": "Zapisz zmiany"
+                },
+                "messages": {
+                    "success": "Profil zaktualizowany pomyślnie",
+                    "usernameRequired": "Nazwa użytkownika jest wymagana",
+                    "error": "Nie udało się zaktualizować profilu",
+                    "unexpectedError": "Wystąpił nieoczekiwany błąd"
+                }
+            },
+            "security": {
+                "title": "Ustawienia bezpieczeństwa",
+                "subtitle": "Zarządzaj bezpieczeństwem konta i uwierzytelnianiem",
+                "changePassword": {
+                    "title": "Zmień hasło",
+                    "currentPassword": "Aktualne hasło",
+                    "newPassword": "Nowe hasło",
+                    "confirmPassword": "Potwierdź nowe hasło",
+                    "showPasswords": "Pokaż hasła",
+                    "placeholders": {
+                        "current": "Wprowadź aktualne hasło",
+                        "new": "Wprowadź nowe hasło (min. 8 znaków)",
+                        "confirm": "Potwierdź nowe hasło"
+                    },
+                    "actions": {
+                        "update": "Zaktualizuj hasło"
+                    },
+                    "messages": {
+                        "success": "Hasło zaktualizowane pomyślnie",
+                        "fillAllFields": "Wypełnij wszystkie pola hasła",
+                        "minLength": "Nowe hasło musi mieć co najmniej 8 znaków",
+                        "mismatch": "Nowe hasła nie pasują do siebie",
+                        "sameAsCurrent": "Nowe hasło musi różnić się od aktualnego",
+                        "error": "Nie udało się zaktualizować hasła",
+                        "unexpectedError": "Wystąpił nieoczekiwany błąd"
+                    }
+                },
+                "twoFactor": {
+                    "title": "Uwierzytelnianie dwuetapowe",
+                    "subtitle": "Dodaj dodatkową warstwę bezpieczeństwa do swojego konta",
+                    "action": "Wkrótce"
+                },
+                "sessions": {
+                    "title": "Aktywne sesje",
+                    "subtitle": "Zarządzaj aktywnymi sesjami na różnych urządzeniach",
+                    "action": "Zobacz sesje (wkrótce)"
+                }
+            },
+            "oauth": {
+                "title": "Połączone konta",
+                "subtitle": "Połącz swoje zewnętrzne konta dla lepszej funkcjonalności",
+                "github": {
+                    "name": "GitHub",
+                    "connected": "Twórz i zarządzaj katalogami z repozytoriami GitHub",
+                    "disconnected": "Połącz, aby tworzyć katalogi z repozytoriów",
+                    "scopes": "Zakresy",
+                    "actions": {
+                        "connect": "Połącz",
+                        "disconnect": "Rozłącz",
+                        "confirmDisconnect": "Czy na pewno chcesz rozłączyć swoje konto GitHub?"
+                    },
+                    "messages": {
+                        "disconnected": "Konto GitHub zostało rozłączone",
+                        "connectError": "Nie udało się połączyć z GitHub",
+                        "disconnectError": "Nie udało się rozłączyć z GitHub"
+                    }
+                }
+            }
+        },
+        "stats": {
+            "totalDirectories": "Wszystkie katalogi",
+            "totalItems": "Wszystkie pozycje",
+            "activeWebsites": "Aktywne strony",
+            "fromLastMonth": "w porównaniu z zeszłym miesiącem"
+        },
+        "directoryCard": {
+            "status": {
+                "active": "Aktywny",
+                "notStarted": "Nie rozpoczęto",
+                "generating": "Generowanie",
+                "generated": "Wygenerowany",
+                "error": "Błąd",
+                "cancelled": "Anulowany",
+                "idle": "Bezczynny"
+            },
+            "role": {
+                "owner": "Właściciel",
+                "manager": "Menedżer",
+                "editor": "Edytor",
+                "viewer": "Przeglądający"
+            },
+            "shared": {
+                "tooltip": "Udostępniony Tobie jako {role}"
+            },
+            "noDescription": "Brak opisu",
+            "items": "{count} pozycji",
+            "views": "{count} wyświetleń",
+            "updated": "Zaktualizowano {date}",
+            "viewAction": "Zobacz →"
+        },
+        "directoryList": {
+            "title": "Twoje katalogi",
+            "createButton": "Utwórz katalog"
+        },
+        "directoryDetail": {
+            "failedToGenerateItems": "Nie udało się wygenerować pozycji. Spróbuj ponownie.",
+            "generationCompleted": "Generowanie zakończone pomyślnie",
+            "generationCancelled": "Generowanie zostało anulowane",
+            "role": {
+                "owner": "Właściciel",
+                "manager": "Menedżer",
+                "editor": "Edytor",
+                "viewer": "Przeglądający"
+            },
+            "shared": {
+                "tooltip": "Udostępniony Tobie jako {role}"
+            },
+            "status": {
+                "notStarted": "Nie rozpoczęto",
+                "generating": "Generowanie",
+                "generated": "Wygenerowany",
+                "error": "Błąd",
+                "cancelled": "Anulowany"
+            },
+            "tabs": {
+                "overview": "Przegląd",
+                "items": "Pozycje",
+                "generator": "Generator",
+                "schedule": "Harmonogram",
+                "history": "Historia",
+                "deploy": "Wdrażanie",
+                "members": "Członkowie",
+                "settings": "Ustawienia"
+            },
+            "members": {
+                "title": "Członkowie zespołu",
+                "subtitle": "Zarządzaj, kto ma dostęp do tego katalogu i jakie ma uprawnienia.",
+                "inviteMember": "Zaproś członka",
+                "noMembers": "Brak jeszcze członków zespołu. Zaproś kogoś do współpracy.",
+                "roles": {
+                    "creator": "Twórca",
+                    "owner": "Właściciel",
+                    "manager": "Menedżer",
+                    "editor": "Edytor",
+                    "viewer": "Przeglądający"
+                },
+                "roleDescriptions": {
+                    "owner": "Pełna kontrola, w tym usuwanie i zarządzanie członkami.",
+                    "manager": "Może edytować katalog i zarządzać członkami, ale nie może usuwać.",
+                    "editor": "Może edytować zawartość katalogu i uruchamiać generowanie.",
+                    "viewer": "Dostęp tylko do odczytu do przeglądania katalogu."
+                },
+                "invite": {
+                    "title": "Zaproś członka zespołu",
+                    "description": "Dodaj nowego członka do współpracy nad tym katalogiem.",
+                    "emailLabel": "Adres email",
+                    "emailPlaceholder": "kolega@przyklad.com",
+                    "roleLabel": "Rola",
+                    "submit": "Wyślij zaproszenie",
+                    "cancel": "Anuluj",
+                    "success": "Członek zaproszony pomyślnie.",
+                    "errors": {
+                        "emailRequired": "Adres email jest wymagany.",
+                        "failed": "Nie udało się zaprosić członka. Spróbuj ponownie."
+                    }
+                },
+                "confirmRemove": {
+                    "title": "Usuń członka",
+                    "description": "Czy na pewno chcesz usunąć {username} z tego katalogu? Straci on wszelki dostęp.",
+                    "confirm": "Usuń",
+                    "cancel": "Anuluj"
+                },
+                "roleUpdated": "Rola członka zaktualizowana.",
+                "memberRemoved": "Członek usunięty pomyślnie.",
+                "errors": {
+                    "updateFailed": "Nie udało się zaktualizować roli członka.",
+                    "removeFailed": "Nie udało się usunąć członka."
+                }
+            },
+            "schedule": {
+                "page": {
+                    "title": "Zaplanowane aktualizacje",
+                    "subtitle": "Automatyzuj odświeżania dla {name} z dedykowaną częstotliwością i obsługą błędów.",
+                    "fallbackName": "tego katalogu"
+                },
+                "card": {
+                    "title": "Automatyzacja",
+                    "subtitle": {
+                        "enabled": "Dostosuj częstotliwość, rozliczenia i zabezpieczenia, aby zaplanowane odświeżania pozostawały niezawodne.",
+                        "disabled": "Automatyzuj odświeżania bez limitów subskrypcji — ustaw częstotliwość i zabezpieczenia przed błędami swobodnie."
+                    },
+                    "summary": {
+                        "status": "Status",
+                        "nextRun": "Następne uruchomienie",
+                        "lastRun": "Ostatnie uruchomienie",
+                        "failures": "Błędy",
+                        "notScheduled": "Niezapisane",
+                        "never": "Nigdy",
+                        "statusMap": {
+                            "active": "Automatyzacja aktywna",
+                            "paused": "Wstrzymana",
+                            "canceled": "Anulowana",
+                            "disabled": "Wyłączona"
+                        }
+                    },
+                    "fields": {
+                        "automation": "Automatyzacja",
+                        "automationHelp": "Wstrzymaj, aby tymczasowo zatrzymać przyszłe uruchomienia.",
+                        "billing": "Tryb rozliczeń",
+                        "billingHelp": "Subskrypcje odblokowują nieograniczone uruchomienia. Płatność za użycie rozlicza za każde wykonanie.",
+                        "cadence": "Częstotliwość",
+                        "cadenceHelp": "Aktualny plan: {plan}",
+                        "cadenceOpen": "Wszystkie częstotliwości są dostępne, gdy subskrypcje są wyłączone.",
+                        "maxFailures": "Limit błędów",
+                        "maxFailuresHelp": "Automatycznie wstrzymaj po osiągnięciu tej liczby błędów.",
+                        "createPullRequest": "Utwórz Pull Request",
+                        "createPullRequestHelp": "Po włączeniu zaplanowane aktualizacje tworzą pull request zamiast commitować bezpośrednio."
+                    },
+                    "billing": {
+                        "subscription": "Subskrypcja",
+                        "usage": "Płatność za użycie"
+                    },
+                    "cadence": {
+                        "hourly": "Co godzinę",
+                        "daily": "Codziennie",
+                        "weekly": "Co tydzień",
+                        "monthly": "Co miesiąc"
+                    },
+                    "plans": {
+                        "free": "Darmowy",
+                        "standard": "Standardowy",
+                        "premium": "Premium",
+                        "unmetered": "Bez limitu"
+                    },
+                    "usageRequired": "Przejdź na płatność za użycie, aby używać tej częstotliwości.",
+                    "cadenceAllowed": "Częstotliwość dozwolona na Twoim planie.",
+                    "actions": {
+                        "save": "Zapisz zmiany",
+                        "saving": "Zapisywanie...",
+                        "runNow": "Uruchom teraz",
+                        "starting": "Uruchamianie...",
+                        "cancel": "Anuluj harmonogram",
+                        "cancelling": "Anulowanie..."
+                    },
+                    "success": {
+                        "saved": "Harmonogram zapisany.",
+                        "runStarted": "Zaplanowane uruchomienie rozpoczęte.",
+                        "cancelled": "Harmonogram anulowany."
+                    },
+                    "errors": {
+                        "requireUsage": "Włącz rozliczenia za użycie, aby używać tej częstotliwości.",
+                        "updateFailed": "Nie udało się zaktualizować harmonogramu.",
+                        "runFailed": "Nie udało się uruchomić.",
+                        "cancelFailed": "Nie udało się anulować harmonogramu."
+                    },
+                    "empty": {
+                        "title": "Najpierw wykonaj ręczne generowanie",
+                        "description": "Wykonaj jedno pomyślne ręczne uruchomienie, aby odblokować automatyczne planowanie. Gdy Twój katalog będzie miał dane, możemy je odświeżać za Ciebie.",
+                        "refresh": "Odśwież status"
+                    },
+                    "requiresGeneration": "Wykonaj co najmniej jedno generowanie pozycji przed włączeniem harmonogramów."
+                },
+                "actions": {
+                    "invalid": "Nieprawidłowe dane",
+                    "updated": "Harmonogram zaktualizowany.",
+                    "updateFailed": "Nie udało się zaktualizować harmonogramu.",
+                    "runStarted": "Zaplanowane uruchomienie rozpoczęte.",
+                    "runFailed": "Nie udało się wyzwolić uruchomienia.",
+                    "cancelled": "Harmonogram anulowany.",
+                    "cancelFailed": "Nie udało się anulować harmonogramu."
+                }
+            },
+            "statusCard": {
+                "notStarted": {
+                    "title": "Generowanie nie rozpoczęte",
+                    "description": "Rozpocznij generowanie pozycji dla swojego katalogu, aby wypełnić go treścią.",
+                    "action": "Rozpocznij generowanie"
+                },
+                "generating": {
+                    "title": "Generowanie w toku",
+                    "description": "Przetwarzanie Twojego żądania...",
+                    "processing": "Przetwarzanie..."
+                },
+                "generated": {
+                    "title": "Generowanie zakończone",
+                    "description": "Twój katalog został pomyślnie wypełniony pozycjami.",
+                    "viewItems": "Zobacz pozycje",
+                    "regenerate": "Wygeneruj ponownie"
+                },
+                "error": {
+                    "title": "Generowanie nie powiodło się",
+                    "description": "Wystąpił błąd podczas generowania.",
+                    "retry": "Spróbuj ponownie"
+                },
+                "cancelled": {
+                    "title": "Generowanie anulowane",
+                    "description": "Poprzednie generowanie zostało zatrzymane przed ukończeniem.",
+                    "restart": "Uruchom ponownie"
+                }
+            },
+            "stats": {
+                "totalItems": "Wszystkie pozycje",
+                "categories": "Kategorie",
+                "generationStatus": "Status generowania",
+                "daysActive": "Dni aktywności"
+            },
+            "history": {
+                "title": "Historia generowania",
+                "subtitle": "Śledź przeszłe uruchomienia generowania, utworzone pozycje i szczegóły wykonania.",
+                "error": "Nie udało się załadować więcej wpisów",
+                "empty": {
+                    "title": "Brak jeszcze historii",
+                    "description": "Zażądaj generowania, aby zobaczyć postęp i wyniki tutaj."
+                },
+                "status": {
+                    "generating": "W toku",
+                    "generated": "Zakończone",
+                    "error": "Nie powiodło się",
+                    "cancelled": "Anulowane"
+                },
+                "table": {
+                    "run": "Uruchomienie",
+                    "status": "Status",
+                    "newItems": "Nowe pozycje",
+                    "updatedItems": "Zaktualizowane",
+                    "totalItems": "Wszystkie",
+                    "duration": "Czas trwania",
+                    "startedAt": "Rozpoczęto",
+                    "tokens": "Tokeny",
+                    "cost": "Koszt"
+                },
+                "loadMore": "Załaduj więcej",
+                "noMore": "Brak więcej rekordów",
+                "unknown": "Nieznany"
+            },
+            "info": {
+                "title": "Informacje o katalogu",
+                "yourRole": "Twoja rola",
+                "role": {
+                    "owner": "Właściciel",
+                    "manager": "Menedżer",
+                    "editor": "Edytor",
+                    "viewer": "Przeglądający"
+                },
+                "slug": "Slug",
+                "repositories": "Repozytoria",
+                "dataRepo": "Repozytorium danych",
+                "websiteRepo": "Repozytorium strony",
+                "mainRepo": "Główne repozytorium",
+                "repoProvider": "Dostawca repozytorium",
+                "organization": "Organizacja",
+                "created": "Utworzono",
+                "lastUpdated": "Ostatnia aktualizacja",
+                "readmeHeader": "Nagłówek README",
+                "readmeFooter": "Stopka README",
+                "custom": "Niestandardowe",
+                "customOverwrite": "Niestandardowe (nadpisanie)",
+                "yes": "Tak",
+                "no": "Nie"
+            },
+            "config": {
+                "title": "Szczegóły konfiguracji",
+                "initialPrompt": "Początkowe polecenie generowania",
+                "companyDetails": "Informacje o firmie",
+                "companyName": "Nazwa firmy",
+                "companyWebsite": "Strona internetowa",
+                "generationSettings": "Ustawienia generowania",
+                "generationMethod": "Metoda generowania",
+                "autoApproval": "Automatyczna akceptacja",
+                "pagingMode": "Tryb stronicowania",
+                "contentTable": "Spis treści",
+                "enabled": "Włączone",
+                "disabled": "Wyłączone",
+                "pullRequestUpdate": "Szczegóły Pull Request",
+                "branch": "Gałąź",
+                "prTitle": "Tytuł PR",
+                "mainRepository": "Główne repozytorium",
+                "dataRepository": "Repozytorium danych"
+            },
+            "activity": {
+                "title": "Ostatnia aktywność",
+                "noActivity": "Brak jeszcze aktywności",
+                "created": "Katalog utworzony",
+                "directoryCreated": "Katalog został pomyślnie utworzony",
+                "justNow": "Właśnie teraz"
+            },
+            "items": {
+                "title": "Pozycje katalogu",
+                "subtitle": "Zarządzaj i organizuj pozycje w swoim katalogu",
+                "noItemsTitle": "Brak jeszcze pozycji",
+                "noItemsDescription": "Twój katalog nie ma jeszcze żadnych pozycji. Wygeneruj pozycje, aby wypełnić katalog treścią.",
+                "generateItems": "Wygeneruj pozycje",
+                "searchPlaceholder": "Szukaj pozycji...",
+                "allCategories": "Wszystkie kategorie",
+                "showing": "Wyświetlanie {current} z {total} pozycji",
+                "noMatch": "Żadne pozycje nie spełniają kryteriów wyszukiwania",
+                "source": "Źródło",
+                "addItem": "Dodaj pozycję",
+                "delete": "Usuń",
+                "deleteWithPR": "Usuń z Pull Request",
+                "deleteConfirm": "Czy na pewno chcesz usunąć \"{name}\"?",
+                "deleteSuccess": "Pozycja usunięta pomyślnie",
+                "deleteFailed": "Nie udało się usunąć pozycji",
+                "deleteError": "Wystąpił błąd podczas usuwania pozycji",
+                "updateSuccess": "Pozycja zaktualizowana pomyślnie",
+                "updateFailed": "Nie udało się zaktualizować pozycji",
+                "updateError": "Wystąpił błąd podczas aktualizacji pozycji",
+                "updateItem": "Zaktualizuj pozycję",
+                "loadingMore": "Ładowanie więcej... ({current} z {total})",
+                "addModal": {
+                    "title": "Dodaj nową pozycję",
+                    "sourceUrl": "URL źródła",
+                    "sourceUrlPlaceholder": "https://przyklad.com/produkt",
+                    "sourceUrlHelp": "Kliknij 'Wyodrębnij', aby automatycznie pobrać szczegóły pozycji z URL",
+                    "extract": "Wyodrębnij",
+                    "extractSuccess": "Szczegóły pozycji wyodrębnione pomyślnie",
+                    "extractFailed": "Nie udało się wyodrębnić szczegółów pozycji",
+                    "extractError": "Wystąpił błąd podczas wyodrębniania szczegółów",
+                    "name": "Nazwa",
+                    "namePlaceholder": "Wprowadź nazwę pozycji",
+                    "description": "Opis",
+                    "descriptionPlaceholder": "Wprowadź krótki opis pozycji",
+                    "category": "Kategoria",
+                    "tags": "Tagi",
+                    "tagPlaceholder": "Dodaj tag i naciśnij Enter",
+                    "slug": "Slug (opcjonalnie)",
+                    "slugPlaceholder": "niestandardowy-slug",
+                    "slugHelp": "Przyjazny dla URL identyfikator. Będzie automatycznie generowany, jeśli pozostawisz pusty",
+                    "brand": "Marka (opcjonalnie)",
+                    "brandPlaceholder": "Wprowadź nazwę marki",
+                    "brandLogoUrl": "URL logo marki (opcjonalnie)",
+                    "brandLogoUrlPlaceholder": "https://przyklad.com/logo.png",
+                    "images": "Obrazy (opcjonalnie)",
+                    "imagePlaceholder": "https://przyklad.com/zrzut-ekranu.png",
+                    "imagesHelp": "Dodaj URL obrazów (zrzuty ekranu, zdjęcia produktów)",
+                    "featured": "Wyróżniona pozycja",
+                    "featuredHelp": "Oznacz tę pozycję jako wyróżnioną w katalogu",
+                    "updateWithPR": "Utwórz Pull Request",
+                    "updateWithPRHelp": "Prześlij zmiany jako pull request zamiast bezpośredniego commita",
+                    "cancel": "Anuluj",
+                    "adding": "Dodawanie...",
+                    "addItem": "Dodaj pozycję",
+                    "success": "Pozycja dodana pomyślnie",
+                    "successDescription": "Pozycja została dodana do Twojego katalogu",
+                    "failed": "Nie udało się dodać pozycji",
+                    "error": "Wystąpił błąd podczas dodawania pozycji",
+                    "errors": {
+                        "urlRequired": "URL źródła jest wymagany do wyodrębnienia",
+                        "invalidUrl": "Wprowadź prawidłowy URL zawierający http:// lub https://",
+                        "invalidImageUrl": "Wprowadź prawidłowy URL obrazu",
+                        "requiredFields": "Wypełnij wszystkie wymagane pola"
+                    }
+                },
+                "editDisplay": "Edytuj wyświetlanie",
+                "editDisplayDescription": "Przełącz status wyróżnienia i ustaw kolejność wyświetlania.",
+                "orderLabel": "Kolejność wyświetlania (opcjonalnie)",
+                "orderHelp": "Niższe liczby pokazują wcześniej w grupach wyróżnionych/nie wyróżnionych.",
+                "deleteDialogTitle": "Usuń pozycję",
+                "deleteDialogDescription": "To usunie {name} z repozytorium.",
+                "createPRLabel": "Utwórz Pull Request",
+                "createPRHelp": "Jeśli włączone, zmiany są proponowane przez PR zamiast bezpośredniego commita.",
+                "reasonLabel": "Powód (opcjonalnie)",
+                "reasonPlaceholder": "Dlaczego usuwasz tę pozycję?",
+                "confirmDelete": "Usuń pozycję"
+            },
+            "generator": {
+                "regenerationWarning": "Ostrzeżenie o ponownym generowaniu",
+                "regenerationWarningDescription": "Ten katalog został już wygenerowany. Rozpoczęcie nowego generowania zastąpi istniejące pozycje.",
+                "requiredInfo": "Wymagane informacje",
+                "updateConfiguration": "Zaktualizuj konfigurację",
+                "promptRequired": "Polecenie jest wymagane",
+                "operationStartedSuccessfully": "Operacja rozpoczęta pomyślnie",
+                "failedToStartOperation": "Nie udało się rozpocząć operacji",
+                "directoryName": "Nazwa katalogu",
+                "generationPrompt": "Polecenie generowania",
+                "recommended": "Zalecane",
+                "promptPlaceholder": "Opisz, jakie pozycje powinny być wygenerowane dla tego katalogu...",
+                "promptHelperText": "Bądź konkretny co do typu treści, którą chcesz wygenerować",
+                "repositoryDescription": "Opis repozytorium",
+                "repositoryPlaceholder": "Krótki opis repozytorium (opcjonalnie)",
+                "startGeneration": "Rozpocznij generowanie",
+                "regenerateItems": "Wygeneruj pozycje ponownie",
+                "updateItems": "Zaktualizuj pozycje",
+                "recreateDirectory": "Utwórz katalog ponownie",
+                "showAdvancedOptions": "Pokaż zaawansowane opcje",
+                "hideAdvancedOptions": "Ukryj zaawansowane opcje",
+                "cancel": "Anuluj",
+                "companyInformation": "Informacje o firmie",
+                "companyInfoDescription": "Opcjonalne szczegóły firmy dla treści marki",
+                "companyName": "Nazwa firmy",
+                "companyNamePlaceholder": "Wprowadź nazwę firmy",
+                "companyWebsite": "Strona internetowa firmy",
+                "companyWebsitePlaceholder": "https://przyklad.com",
+                "categoriesKeywords": "Kategorie i słowa kluczowe",
+                "categoriesDescription": "Zdefiniuj kategorie i słowa kluczowe dla organizacji treści",
+                "initialCategories": "Początkowe kategorie",
+                "priorityCategories": "Priorytetowe kategorie",
+                "targetKeywords": "Docelowe słowa kluczowe",
+                "addCategoryPlaceholder": "Dodaj kategorię",
+                "addPriorityCategoryPlaceholder": "Dodaj priorytetową kategorię",
+                "addKeywordPlaceholder": "Dodaj słowo kluczowe",
+                "add": "Dodaj",
+                "sourceUrls": "URL źródeł",
+                "sourceUrlsDescription": "Dodaj konkretne URL, z których wyodrębnić treść",
+                "sourceUrlPlaceholder": "https://przyklad.com/strona",
+                "addUrl": "Dodaj URL",
+                "noSourceUrlsMessage": "Brak dodanych URL źródeł. Generator użyje wyszukiwania, aby znaleźć treść.",
+                "advancedConfig": "Zaawansowana konfiguracja",
+                "advancedConfigDescription": "Dostosuj parametry i zachowanie generowania",
+                "generationMethod": "Metoda generowania",
+                "methodCreateUpdate": "Utwórz lub zaktualizuj",
+                "methodRecreate": "Utwórz ponownie (zastąp wszystko)",
+                "updateWithPullRequest": "Zaktualizuj z Pull Request",
+                "updateWithPullRequestDescription": "Utwórz pull request zamiast bezpośrednich commitów",
+                "enableBadgeEvaluation": "Włącz ocenę odznak",
+                "enableBadgeEvaluationDescription": "Oceń i dodaj odznaki jakości do pozycji",
+                "websiteRepositoryCreationMethod": "Metoda tworzenia repozytorium strony",
+                "methodDuplicate": "Duplikuj",
+                "methodFork": "Forkuj",
+                "directoryNamePlaceholder": "Wprowadź nazwę katalogu",
+                "methodCreateFromTemplate": "Utwórz z szablonu",
+                "aiProcessingConfiguration": "Konfiguracja przetwarzania AI",
+                "maxSearchQueries": "Maks. zapytań wyszukiwania",
+                "resultsPerQuery": "Wyników na zapytanie",
+                "maxPagesToProcess": "Maks. stron do przetworzenia",
+                "relevanceThreshold": "Próg istotności",
+                "aiFirstGeneration": "Generowanie AI-pierwsze",
+                "aiFirstGenerationDescription": "Włącz AI-generowanie początkowych pozycji przed wyszukiwaniem internetowym.",
+                "contentFiltering": "Filtrowanie treści",
+                "contentFilteringDescription": "Włącz filtrowanie jakości treści",
+                "recreateConfirmTitle": "Utworzyć ponownie dane katalogu?",
+                "recreateConfirmDescription": "Utworzenie ponownie usunie istniejące pozycje i wygeneruje je od nowa. Tej akcji nie można cofnąć.",
+                "confirmRecreate": "Tak, utwórz ponownie",
+                "recreateInlineTitle": "Utworzenie ponownie usunie istniejące pozycje",
+                "recreateInlineDescription": "Ten tryb usuwa obecne pozycje i odbudowuje je od nowa. Kontynuuj tylko, jeśli chcesz zastąpić wszystko."
+            },
+            "progress": {
+                "title": "Generowanie w toku",
+                "processingRequest": "Przetwarzanie Twojego żądania...",
+                "steps": {
+                    "promptComparison": "Porównywanie poleceń",
+                    "promptProcessing": "Przetwarzanie Twojego polecenia",
+                    "domainDetection": "Wykrywanie typu domeny",
+                    "aiFirstItemsGeneration": "Generowanie początkowych pozycji AI",
+                    "searchQueriesGeneration": "Tworzenie zapytań wyszukiwania",
+                    "webSearch": "Wyszukiwanie w sieci",
+                    "contentRetrieval": "Pobieranie treści",
+                    "contentFiltering": "Filtrowanie istotnych treści",
+                    "itemsExtraction": "Wyodrębnianie pozycji z treści",
+                    "deduplicationDataAggregation": "Usuwanie duplikatów i agregacja danych",
+                    "categoriesTagsProcessing": "Przetwarzanie kategorii i tagów",
+                    "sourcesValidation": "Weryfikacja źródeł",
+                    "badgesProcessing": "Przetwarzanie odznak jakości",
+                    "markdownGeneration": "Generowanie treści markdown",
+                    "processing": "Przetwarzanie..."
+                },
+                "progress": "Postęp",
+                "closeNote": "To może zająć kilka minut. Możesz zamknąć tę stronę i wrócić później."
+            },
+            "settings": {
+                "sourceSettings": "Repozytorium źródłowe",
+                "originalSource": "Oryginalne źródło",
+                "syncEnabled": "Synchronizacja włączona",
+                "syncDescription": "Automatycznie pobieraj aktualizacje z repozytorium źródłowego.",
+                "syncUpdateFailed": "Nie udało się zaktualizować ustawień synchronizacji",
+                "syncDisabled": "Synchronizacja wyłączona",
+                "generalSettings": "Ustawienia ogólne",
+                "generalTitle": "Ustawienia ogólne",
+                "directoryName": "Nazwa katalogu",
+                "description": "Opis",
+                "organizationRepository": "Repozytorium organizacji",
+                "organizationHelp": "Utwórz repozytoria pod organizacją zamiast osobistego konta",
+                "organizationName": "Nazwa organizacji",
+                "organizationNamePlaceholder": "Wprowadź nazwę organizacji",
+                "readmeConfiguration": "Konfiguracja README",
+                "readmeTitle": "Konfiguracja README",
+                "customHeader": "Niestandardowy nagłówek",
+                "customHeaderPlaceholder": "Dodaj niestandardową treść do nagłówka README",
+                "overwriteDefaultHeader": "Nadpisz domyślny nagłówek",
+                "customFooter": "Niestandardowa stopka",
+                "cantDeleteWhileGenerating": "Nie można usunąć katalogu podczas generowania pozycji.",
+                "customFooterPlaceholder": "Dodaj niestandardową treść do stopki README",
+                "overwriteDefaultFooter": "Nadpisz domyślną stopkę",
+                "dangerZone": "Strefa zagrożenia",
+                "dangerTitle": "Strefa zagrożenia",
+                "deleteWarning": "Po usunięciu katalogu nie ma powrotu. Proszę być pewnym.",
+                "dangerDescription": "Po usunięciu katalogu nie ma powrotu. Proszę być pewnym.",
+                "deleteOptions": "Wybierz, co usunąć:",
+                "deleteDataRepository": "Usuń repozytorium danych",
+                "deleteDataRepositoryDescription": "Usuń repozytorium danych JSON z GitHub",
+                "deleteMarkdownRepository": "Usuń repozytorium markdown",
+                "deleteMarkdownRepositoryDescription": "Usuń repozytorium markdown zawierające README",
+                "deleteWebsiteRepository": "Usuń repozytorium strony",
+                "deleteWebsiteRepositoryDescription": "Usuń wdrożone repozytorium strony",
+                "deleteConfirm": "Czy jesteś absolutnie pewien?",
+                "deleteConfirmDetail": "Tej akcji nie można cofnąć. Katalog i wybrane repozytoria zostaną trwale usunięte.",
+                "confirmDirectoryName": "Wpisz nazwę katalogu, aby potwierdzić",
+                "confirmDirectoryNameDescription": "Wpisz \"{name}\", aby potwierdzić usunięcie",
+                "deleteNameMismatch": "Nazwa katalogu nie pasuje",
+                "deleteButton": "Usuń katalog",
+                "deleteConfirmButton": "Tak, usuń",
+                "deleteSuccess": "Katalog usunięty pomyślnie",
+                "deleteFailed": "Nie udało się usunąć katalogu",
+                "yesDelete": "Tak, usuń",
+                "cancel": "Anuluj",
+                "saveChanges": "Zapisz zmiany",
+                "updateReadme": "Zaktualizuj README",
+                "updateSuccess": "Ustawienia zaktualizowane pomyślnie",
+                "updateFailed": "Nie udało się zaktualizować ustawień"
+            },
+            "deploy": {
+                "noTokenAlert": {
+                    "title": "Wymagany token Vercel",
+                    "description": "Aby wdrożyć katalog na Vercel, musisz skonfigurować swój token API Vercel w ustawieniach konta.",
+                    "configureButton": "Przejdź do ustawień tokenów API",
+                    "getTokenButton": "Pobierz token Vercel",
+                    "howTo": {
+                        "title": "Jak skonfigurować token Vercel:",
+                        "step1": "Kliknij 'Pobierz token Vercel', aby otworzyć panel Vercel",
+                        "step2": "Utwórz nowy token z uprawnieniami do wdrażania",
+                        "step3": "Skopiuj wygenerowany token",
+                        "step4": "Przejdź do ustawień tokenów API i wklej token w sekcji Vercel"
+                    }
+                },
+                "sharedNoTokenAlert": {
+                    "title": "Wdrażanie niedostępne",
+                    "description": "Właściciel katalogu nie skonfigurował tokenu Vercel do wdrażania. Skontaktuj się z właścicielem katalogu, aby skonfigurować wdrażanie.",
+                    "hint": "Jako współpracownik możesz uruchamiać wdrożenia, gdy właściciel skonfiguruje integrację Vercel."
+                },
+                "form": {
+                    "deployToVercel": {
+                        "title": "Wdróż na Vercel",
+                        "description": "Wdróż repozytorium strony katalogu na Vercel.",
+                        "deployButton": "Wdróż teraz",
+                        "deployingButton": "Wdrażanie...",
+                        "deployingStateButton": "Wdrażanie ({state})...",
+                        "successMessage": "Twoja strona została pomyślnie wdrożona!",
+                        "teamSelection": {
+                            "title": "Wybierz zespół Vercel",
+                            "description": "Wybierz zespół Vercel, do którego wdrożyć ten katalog.",
+                            "label": "Zespół",
+                            "placeholder": "Wybierz zespół",
+                            "confirmButton": "Wdróż do zespołu",
+                            "cancelButton": "Anuluj"
+                        }
+                    },
+                    "updateRepository": {
+                        "title": "Zaktualizuj repozytorium strony",
+                        "description": "Zsynchronizuj najnowsze zmiany z szablonu do",
+                        "websiteRepository": "repozytorium strony",
+                        "updateButton": "Zaktualizuj repozytorium",
+                        "updatingButton": "Aktualizowanie..."
+                    },
+                    "messages": {
+                        "deploySuccess": "Wdrażanie rozpoczęte pomyślnie",
+                        "deployPending": "Wdrażanie jest w kolejce i rozpocznie się wkrótce",
+                        "deployFailed": "Nie udało się wdrożyć na Vercel",
+                        "deployError": "Wystąpił błąd podczas wdrażania",
+                        "updateSuccess": "Repozytorium zaktualizowane pomyślnie",
+                        "updateFailed": "Nie udało się zaktualizować repozytorium",
+                        "updateError": "Wystąpił błąd podczas aktualizacji repozytorium"
+                    },
+                    "info": {
+                        "deployInfo": "Wdrażanie zazwyczaj zajmuje 1-3 minuty. Otrzymasz URL po zakończeniu.",
+                        "updateInfo": "Aktualizacje synchronizują zawartość Twojego katalogu do repozytorium strony na następne wdrożenie."
+                    },
+                    "websiteTemplate": {
+                        "title": "Automatyczne aktualizacje szablonu",
+                        "description": "Utrzymuj swoją stronę automatycznie zsynchronizowaną z najnowszymi zmianami szablonu.",
+                        "autoUpdate": "Aktualizuj automatycznie",
+                        "autoUpdateDescription": "Sprawdzaj aktualizacje szablonu co godzinę i stosuj automatycznie.",
+                        "useBeta": "Użyj wersji beta szablonu",
+                        "useBetaDescription": "Użyj gałęzi stage zamiast stabilnej gałęzi main.",
+                        "lastUpdated": "Ostatnio zaktualizowano",
+                        "lastChecked": "Ostatnio sprawdzono",
+                        "lastError": "Ostatni błąd",
+                        "updateSuccess": "Ustawienia zaktualizowane pomyślnie",
+                        "updateFailed": "Nie udało się zaktualizować ustawień"
+                    }
+                }
+            }
+        },
+        "directoryCreation": {
+            "title": "Utwórz nowy katalog",
+            "subtitle": "Wybierz sposób tworzenia katalogu",
+            "backToOptions": "Powrót do opcji",
+            "organizationSelector": {
+                "label": "Właściciel repozytorium",
+                "loading": "Ładowanie organizacji...",
+                "personal": "Konto osobiste",
+                "personalAccount": "Repozytorium zostanie utworzone pod Twoim osobistym kontem",
+                "organizations": "Organizacje",
+                "personalHelp": "Repozytorium zostanie utworzone pod Twoim osobistym kontem GitHub",
+                "organizationHelp": "Repozytorium zostanie utworzone pod organizacją {org}"
+            },
+            "ai": {
+                "title": "Utwórz z AI",
+                "subtitle": "Opisz swój pomysł na katalog w języku naturalnym i pozwól AI zająć się konfiguracją",
+                "getStarted": "Rozpocznij",
+                "formTitle": "Utwórz katalog z AI",
+                "formSubtitle": "Opisz swój pomysł na katalog i pozwól AI zająć się konfiguracją i początkowym generowaniem treści",
+                "directoryNameLabel": "Nazwa katalogu",
+                "directoryNamePlaceholder": "np. Niesamowite narzędzia AI",
+                "directoryNameHelp": "AI zasugeruje nazwę, jeśli pozostawisz to puste",
+                "promptLabel": "Opisz swój katalog",
+                "githubRequired": "Najpierw połącz swoje konto GitHub.",
+                "promptPlaceholder": "Opisz, jaki rodzaj katalogu chcesz utworzyć, jakie powinien zawierać pozycje i wszelkie konkretne wymagania...",
+                "inspirationText": "Potrzebujesz inspiracji? Spróbuj jednego z tych:",
+                "examplePrompts": {
+                    "0": {
+                        "name": "Narzędzia AI dla deweloperów",
+                        "prompt": "Utwórz katalog najlepszych narzędzi AI dla deweloperów"
+                    },
+                    "1": {
+                        "name": "Hub komponentów React",
+                        "prompt": "Zbuduj starannie dobraną listę komponentów React open-source"
+                    },
+                    "2": {
+                        "name": "Narzędzia dla zespołów zdalnych",
+                        "prompt": "Wygeneruj katalog aplikacji produktywności dla zespołów zdalnych"
+                    },
+                    "3": {
+                        "name": "Zrównoważona moda",
+                        "prompt": "Utwórz kolekcję marek zrównoważonej mody"
+                    }
+                },
+                "featuresTitle": "Co AI zrobi dla Ciebie:",
+                "features": {
+                    "0": "Wygeneruje odpowiednią nazwę i opis",
+                    "1": "Utworzy początkowe kategorie i strukturę",
+                    "2": "Znajdzie i doda odpowiednie pozycje automatycznie",
+                    "3": "Skonfiguruje repozytorium GitHub z odpowiednią dokumentacją"
+                },
+                "generateButton": "Wygeneruj z AI",
+                "generatingButton": "Generowanie katalogu...",
+                "cancelButton": "Anuluj",
+                "noteTitle": "Uwaga:",
+                "noteText": "Generowanie AI zazwyczaj zajmuje 2-5 minut w zależności od złożoności żądania. Otrzymasz powiadomienie, gdy Twój katalog będzie gotowy.",
+                "errors": {
+                    "promptRequired": "Opisz, jaki rodzaj katalogu chcesz utworzyć",
+                    "nameRequired": "Nazwa katalogu jest wymagana",
+                    "slugRequired": "Slug katalogu jest wymagany",
+                    "descriptionRequired": "Opis katalogu jest wymagany"
+                },
+                "success": {
+                    "started": "Tworzenie katalogu rozpoczęte!",
+                    "generating": "AI generuje treści. To może zająć kilka minut...",
+                    "created": "Katalog utworzony pomyślnie!"
+                },
+                "advancedSettings": "Zaawansowane ustawienia",
+                "advancedSubtitle": "Skonfiguruj organizację i ustawienia repozytorium",
+                "organizationLabel": "Repozytorium organizacji",
+                "organizationHelp": "Utwórz repozytoria pod organizacją zamiast osobistego konta",
+                "organizationNameLabel": "Nazwa organizacji",
+                "organizationNamePlaceholder": "Wprowadź nazwę organizacji"
+            },
+            "manual": {
+                "title": "Utwórz ręcznie",
+                "subtitle": "Skonfiguruj swój katalog z pełną kontrolą nad każdym ustawieniem i opcją",
+                "configureNow": "Skonfiguruj teraz",
+                "formTitle": "Utwórz katalog ręcznie",
+                "formSubtitle": "Skonfiguruj swój katalog z pełną kontrolą nad każdym ustawieniem",
+                "basicInfo": "Podstawowe informacje",
+                "nameLabel": "Nazwa katalogu *",
+                "namePlaceholder": "np. Niesamowite narzędzia AI",
+                "slugLabel": "Slug katalogu *",
+                "slugPlaceholder": "niesamowite-narzedzia-ai",
+                "githubRequired": "Najpierw połącz swoje konto GitHub.",
+                "slugHelp": "Przyjazny dla URL identyfikator (tylko małe litery, cyfry i myślniki)",
+                "descriptionLabel": "Opis *",
+                "descriptionPlaceholder": "Starannie dobrana lista najlepszych narzędzi i zasobów AI dla deweloperów",
+                "advancedSettings": "Zaawansowane ustawienia",
+                "advancedSubtitle": "Organizacja, niestandardowe nagłówki i więcej",
+                "organizationLabel": "Utwórz pod organizacją",
+                "organizationHelp": "Utwórz ten katalog pod organizacją GitHub zamiast osobistego konta",
+                "organizationNameLabel": "Nazwa organizacji",
+                "organizationNamePlaceholder": "moja-organizacja",
+                "headerLabel": "Niestandardowy nagłówek README",
+                "headerPlaceholder": "Dodaj niestandardową treść na górę pliku README",
+                "headerOverwrite": "Zastąp domyślny nagłówek całkowicie",
+                "footerLabel": "Niestandardowa stopka README",
+                "footerPlaceholder": "Dodaj niestandardową treść na dół pliku README",
+                "footerOverwrite": "Zastąp domyślną stopkę całkowicie",
+                "createButton": "Utwórz katalog",
+                "creatingButton": "Tworzenie katalogu...",
+                "cancelButton": "Anuluj",
+                "nameRequired": "Nazwa katalogu jest wymagana",
+                "slugRequired": "Slug katalogu jest wymagany",
+                "descriptionRequired": "Opis katalogu jest wymagany",
+                "success": {
+                    "created": "Katalog utworzony pomyślnie!"
+                }
+            },
+            "import": {
+                "title": "Importuj istniejący",
+                "subtitle": "Importuj katalog z istniejącego repozytorium GitHub",
+                "importNow": "Importuj teraz",
+                "formTitle": "Importuj katalog z GitHub",
+                "formSubtitle": "Importuj pozycje z istniejącego repozytorium GitHub, aby utworzyć katalog",
+                "sync": {
+                    "title": "Utrzymuj zsynchronizowany",
+                    "description": "Automatycznie pobieraj aktualizacje z repozytorium źródłowego."
+                },
+                "sourceMethod": {
+                    "url": {
+                        "title": "Wklej URL",
+                        "description": "Wprowadź bezpośrednio URL repozytorium GitHub"
+                    },
+                    "repository": {
+                        "title": "Moje repozytoria",
+                        "description": "Wybierz z repozytoriów GitHub"
+                    }
+                },
+                "urlLabel": "URL repozytorium GitHub",
+                "urlPlaceholder": "https://github.com/wlasciciel/repozytorium",
+                "urlHelp": "Wprowadź pełny URL repozytorium GitHub",
+                "supportedFormats": {
+                    "title": "Obsługiwane formaty repozytoriów",
+                    "dataRepo": {
+                        "title": "Repozytorium danych",
+                        "description": "Repozytoria z config.yml i strukturą folderu data/"
+                    },
+                    "awesomeReadme": {
+                        "title": "Lista Awesome",
+                        "description": "Repozytoria starannie dobranych list z markdown README"
+                    }
+                },
+                "analyzing": {
+                    "title": "Analizowanie repozytorium",
+                    "subtitle": "Wykrywanie typu i struktury repozytorium..."
+                },
+                "detectedType": {
+                    "dataRepo": "Wykryto repozytorium danych",
+                    "awesomeReadme": "Wykryto listę Awesome"
+                },
+                "badges": {
+                    "dataRepo": "Repozytorium danych",
+                    "awesomeReadme": "Lista Awesome"
+                },
+                "preview": {
+                    "items": "pozycji",
+                    "categories": "kategorii"
+                },
+                "nameLabel": "Nazwa katalogu",
+                "namePlaceholder": "np. Mój niesamowity katalog",
+                "advancedSettings": "Zaawansowane ustawienia",
+                "advancedSubtitle": "Skonfiguruj organizację i ustawienia repozytorium",
+                "attribution": {
+                    "title": "Atrybucja źródła:",
+                    "text": "Ten katalog będzie odnosił się do {url} jako źródło"
+                },
+                "analyzeButton": "Analizuj repozytorium",
+                "importButton": "Importuj katalog",
+                "importingButton": "Importowanie...",
+                "backButton": "Wstecz",
+                "cancelButton": "Anuluj",
+                "importing": {
+                    "title": "Importowanie katalogu",
+                    "subtitle": "Konfigurowanie Twojego katalogu z repozytorium źródłowego..."
+                },
+                "repositorySelector": {
+                    "title": "Wybierz repozytorium",
+                    "searchPlaceholder": "Szukaj repozytoriów...",
+                    "loading": "Ładowanie repozytoriów...",
+                    "noRepositories": "Nie znaleziono repozytoriów",
+                    "noResults": "Żadne repozytoria nie pasują do wyszukiwania",
+                    "tryAgain": "Spróbuj ponownie",
+                    "loadMore": "Załaduj więcej",
+                    "showing": "Wyświetlanie {shown} z {total} repozytoriów",
+                    "today": "Dzisiaj",
+                    "yesterday": "Wczoraj",
+                    "daysAgo": "{days} dni temu",
+                    "weeksAgo": "{weeks} tygodni temu",
+                    "repositoriesLoaded": "repozytoriów załadowanych",
+                    "moreAvailable": "więcej dostępnych",
+                    "errors": {
+                        "fetchFailed": "Nie udało się załadować repozytoriów"
+                    }
+                },
+                "chooseMode": {
+                    "title": "Wybierz metodę importu",
+                    "repository": "Repozytorium: {owner}/{repo}",
+                    "repositoryWithItems": "Repozytorium: {owner}/{repo} ({itemCount} pozycji)",
+                    "importCopy": {
+                        "title": "Importuj i kopiuj",
+                        "description": "Utwórz nowe repozytoria z kopią danych. Najlepsze do forkowania lub zaczynania od nowa."
+                    },
+                    "linkExisting": {
+                        "title": "Połącz istniejące",
+                        "description": "Użyj swojego istniejącego repozytorium bezpośrednio. Bez kopiowania, zmiany synchronizują się automatycznie."
+                    },
+                    "back": "Wstecz"
+                },
+                "linkConfirm": {
+                    "title": "Połącz repozytorium",
+                    "descriptionMissing": "Nie znaleziono niektórych repozytoriów. Możesz kontynuować bez nich lub utworzyć je teraz.",
+                    "descriptionReady": "Wszystkie repozytoria znalezione. Gotowy do połączenia.",
+                    "dataRepo": "Repozytorium danych",
+                    "markdownRepo": "Repozytorium markdown",
+                    "websiteRepo": "Repozytorium strony",
+                    "found": "Znaleziono",
+                    "notFound": "Nie znaleziono",
+                    "cancel": "Anuluj",
+                    "continueWithout": "Kontynuuj bez",
+                    "createMissing": "Utwórz brakujące",
+                    "creating": "Tworzenie...",
+                    "linking": "Łączenie...",
+                    "linkRepos": "Połącz repozytoria"
+                },
+                "errors": {
+                    "urlRequired": "Wprowadź URL repozytorium GitHub",
+                    "unsupportedFormat": "Ten format repozytorium nie jest obsługiwany. Użyj formatu repozytorium danych lub listy Awesome.",
+                    "analyzeFailed": "Nie udało się przeanalizować repozytorium",
+                    "analyzeForLinkingFailed": "Nie udało się przeanalizować do łączenia",
+                    "nameRequired": "Nazwa katalogu jest wymagana",
+                    "noAnalysis": "Najpierw przeanalizuj repozytorium",
+                    "githubRequired": "Najpierw połącz swoje konto GitHub",
+                    "importFailed": "Nie udało się zaimportować katalogu",
+                    "linkFailed": "Nie udało się połączyć katalogu"
+                },
+                "success": {
+                    "started": "Import rozpoczęty! Przekierowywanie do Twojego katalogu...",
+                    "linked": "Katalog pomyślnie połączony"
+                }
+            }
+        },
+        "github": {
+            "connection": {
+                "alert": {
+                    "title": "GitHub nie połączony",
+                    "subtitle": "Połącz swoje konto GitHub, aby tworzyć i zarządzać katalogami",
+                    "connectButton": "Połącz GitHub",
+                    "connectingButton": "Łączenie..."
+                },
+                "status": {
+                    "title": "Status GitHub",
+                    "connected": "Połączony",
+                    "notConnected": "Nie połączony",
+                    "connectedDescription": "Twoje katalogi będą przechowywane jako repozytoria GitHub na Twoim koncie.",
+                    "notConnectedDescription": "Połącz swoje konto GitHub, aby tworzyć i zarządzać katalogami.",
+                    "connectedAccount": "Połączone konto:",
+                    "requiredNote": "Wymagane do tworzenia katalogów",
+                    "connectButton": "Połącz GitHub",
+                    "connectingButton": "Łączenie...",
+                    "failedToConnect": "Nie udało się połączyć z GitHub"
+                }
+            }
+        },
+        "apiTokens": {
+            "title": "API i tokeny",
+            "subtitle": "Zarządzaj kluczami API i integracjami stron trzecich",
+            "vercel": {
+                "title": "Integracja Vercel",
+                "subtitle": "Połącz konto Vercel, aby wdrażać katalogi jako strony internetowe",
+                "connected": "Połączony",
+                "notConnected": "Nie połączony",
+                "connectedMessage": "Twoje konto Vercel jest połączone. Możesz teraz wdrażać katalogi na Vercel.",
+                "disconnect": "Rozłącz Vercel",
+                "disconnecting": "Usuwanie...",
+                "apiTokenLabel": "Token API Vercel",
+                "placeholder": "vc_...",
+                "showToken": "Pokaż",
+                "hideToken": "Ukryj",
+                "getTokenHelp": "Możesz pobrać token API z",
+                "vercelDashboard": "Panelu Vercel",
+                "save": "Zapisz token",
+                "saving": "Zapisywanie...",
+                "messages": {
+                    "tokenRequired": "Wprowadź prawidłowy token Vercel",
+                    "saveSuccess": "Token Vercel zapisany pomyślnie",
+                    "saveFailed": "Nie udało się zapisać tokenu Vercel",
+                    "removeSuccess": "Token Vercel usunięty pomyślnie",
+                    "removeFailed": "Nie udało się usunąć tokenu Vercel",
+                    "unexpectedError": "Wystąpił nieoczekiwany błąd"
+                }
+            },
+            "apiKeys": {
+                "title": "Klucze API",
+                "subtitle": "Generuj i zarządzaj kluczami API dla dostępu programowego",
+                "generate": "Wygeneruj klucz API (wkrótce)"
+            },
+            "webhooks": {
+                "title": "Webhooki",
+                "subtitle": "Konfiguruj webhooki, aby otrzymywać aktualizacje w czasie rzeczywistym",
+                "configure": "Konfiguruj webhooki (wkrótce)"
+            }
+        },
+        "notifications": {
+            "title": "Preferencje powiadomień",
+            "subtitle": "Wybierz, jak chcesz być powiadamiany o ważnych aktualizacjach",
+            "email": {
+                "title": "Powiadomienia email",
+                "directoryUpdates": {
+                    "label": "Aktualizacje katalogów",
+                    "description": "Otrzymuj powiadomienia o ważnych aktualizacjach Twoich katalogów"
+                },
+                "newItems": {
+                    "label": "Nowe pozycje",
+                    "description": "Otrzymuj powiadomienia, gdy dodawane są nowe pozycje do katalogów"
+                },
+                "weeklyDigest": {
+                    "label": "Cotygodniowe podsumowanie",
+                    "description": "Otrzymuj cotygodniowe podsumowanie aktywności katalogów"
+                },
+                "marketing": {
+                    "label": "Marketing i promocje",
+                    "description": "Otrzymuj aktualizacje o nowych funkcjach i ofertach"
+                }
+            },
+            "app": {
+                "title": "Powiadomienia w aplikacji",
+                "newItems": {
+                    "label": "Nowe pozycje",
+                    "description": "Pokazuj powiadomienia o nowych pozycjach katalogów"
+                },
+                "comments": {
+                    "label": "Komentarze",
+                    "description": "Otrzymuj powiadomienia o komentarzach do Twoich katalogów"
+                },
+                "mentions": {
+                    "label": "Wzmianki",
+                    "description": "Otrzymuj powiadomienia, gdy ktoś Cię wspomni"
+                },
+                "systemUpdates": {
+                    "label": "Aktualizacje systemu",
+                    "description": "Ważne powiadomienia systemowe i alerty o konserwacji"
+                }
+            },
+            "actions": {
+                "save": "Zapisz preferencje",
+                "saving": "Zapisywanie..."
+            },
+            "messages": {
+                "success": "Preferencje powiadomień zaktualizowane",
+                "error": "Nie udało się zaktualizować preferencji",
+                "unexpectedError": "Wystąpił nieoczekiwany błąd"
+            }
+        },
+        "sidebar": {
+            "menu": "Menu",
+            "aiChat": "Czat AI",
+            "newDirectory": "Nowy katalog",
+            "navigation": {
+                "dashboard": "Panel główny",
+                "directories": "Katalogi",
+                "settings": "Ustawienia"
+            },
+            "signOut": "Wyloguj się",
+            "signingOut": "Wylogowywanie..."
+        },
+        "dangerZone": {
+            "title": "Strefa zagrożenia",
+            "subtitle": "Działania nieodwracalne i destrukcyjne",
+            "export": {
+                "title": "Eksportuj swoje dane",
+                "subtitle": "Pobierz wszystkie katalogi, pozycje i ustawienia",
+                "action": "Eksportuj dane (wkrótce)"
+            },
+            "delete": {
+                "title": "Usuń konto",
+                "subtitle": "Trwale usuń swoje konto i wszystkie powiązane dane. Tej akcji nie można cofnąć.",
+                "button": "Usuń moje konto",
+                "confirmTitle": "⚠️ To trwale usunie:",
+                "confirmItems": [
+                    "Twoje konto i profil",
+                    "Wszystkie Twoje katalogi",
+                    "Wszystkie pozycje i dane katalogów",
+                    "Klucze API i integracje",
+                    "Wszystkie powiązane strony"
+                ],
+                "confirmLabel": "Wpisz swój email {email}, aby potwierdzić",
+                "confirmPlaceholder": "Wprowadź swój email",
+                "confirmButton": "Tak, usuń moje konto",
+                "deleting": "Usuwanie...",
+                "cancel": "Anuluj"
+            },
+            "messages": {
+                "confirmEmail": "Wprowadź poprawnie swój email, aby potwierdzić",
+                "deleteSuccess": "Konto usunięte pomyślnie",
+                "deleteFailed": "Nie udało się usunąć konta",
+                "unexpectedError": "Wystąpił nieoczekiwany błąd"
+            }
+        },
+        "aiChat": {
+            "title": "Asystent AI",
+            "subtitle": "Twórz katalogi językiem naturalnym",
+            "newChat": "Nowy czat",
+            "loadingConversation": "Ładowanie rozmowy...",
+            "inputPlaceholder": "Opisz katalog, który chcesz utworzyć...",
+            "sendButton": "Wyślij"
+        }
+    },
+    "layout": {
+        "auth": {
+            "backToHome": "Powrót do strony głównej",
+            "feature": {
+                "title": "Buduj katalogi z AI",
+                "subtitle": "Twórz piękne, przeszukiwalne katalogi w kilka minut, używając języka naturalnego. Nie wymaga kodowania.",
+                "benefits": {
+                    "ai": {
+                        "title": "Tworzenie wspierane przez AI",
+                        "description": "Opisz, co chcesz, a AI zrobi resztę"
+                    },
+                    "templates": {
+                        "title": "Profesjonalne szablony",
+                        "description": "Zacznij z pięknymi, dostosowywalnymi projektami"
+                    },
+                    "management": {
+                        "title": "Łatwe zarządzanie",
+                        "description": "Aktualizuj i organizuj swoją treść bez wysiłku"
+                    }
+                }
+            },
+            "footer": {
+                "copyright": "© {year} {companyName}. Wszystkie prawa zastrzeżone.",
+                "terms": "Regulamin serwisu",
+                "privacy": "Polityka prywatności",
+                "help": "Pomoc"
+            }
+        }
+    },
+    "errors": {
+        "global": {
+            "title": "Coś poszło nie tak!",
+            "tryAgain": "Spróbuj ponownie"
+        }
+    },
+    "metadata": {
+        "title": "{companyName} - Kreator katalogów",
+        "description": "Platforma SaaS do budowania i zarządzania katalogami"
+    },
+    "api": {
+        "errors": {
+            "unauthorized": "Nie jesteś upoważniony do wykonania tej akcji",
+            "unauthorizedLogin": "Nieautoryzowany: Zaloguj się ponownie.",
+            "forbidden": "Zabroniony: Nie masz uprawnień do wykonania tej akcji.",
+            "serverError": "Błąd serwera: {message}",
+            "unexpected": "Wystąpił nieoczekiwany błąd serwera.",
+            "apiError": "Błąd API: {status} {statusText}",
+            "loginFailed": "Logowanie nie powiodło się",
+            "registerFailed": "Nie udało się zarejestrować",
+            "unsupportedProvider": "Nieobsługiwany dostawca",
+            "providerConnectFailed": "Nie udało się połączyć dostawcy",
+            "forgotPasswordFailed": "Nie udało się wysłać emaila resetującego hasło",
+            "resetPasswordFailed": "Nie udało się zresetować hasła"
+        }
+    },
+    "actions": {
+        "directories": {
+            "slug": {
+                "required": "Slug jest wymagany",
+                "format": "Slug musi zawierać tylko małe litery, cyfry i myślniki"
+            },
+            "name": {
+                "required": "Nazwa jest wymagana",
+                "maxLength": "Nazwa musi mieć mniej niż 100 znaków"
+            },
+            "description": {
+                "required": "Opis jest wymagany",
+                "maxLength": "Opis musi mieć mniej niż 500 znaków"
+            },
+            "prompt": {
+                "minLength": "Polecenie musi mieć co najmniej 10 znaków",
+                "maxLength": "Polecenie musi mieć mniej niż 1000 znaków"
+            },
+            "oauthRequired": "Połączenie OAuth wymagane. Najpierw połącz swoje konto {provider}.",
+            "githubRequired": "Połączenie GitHub wymagane. Najpierw połącz swoje konto GitHub.",
+            "createSuccess": "Katalog utworzony pomyślnie!",
+            "createFailed": "Nie udało się utworzyć katalogu",
+            "updateSuccess": "Katalog zaktualizowany pomyślnie!",
+            "updateFailed": "Nie udało się zaktualizować katalogu",
+            "invalidGeneratedData": "Nie udało się wygenerować prawidłowych danych katalogu",
+            "aiGenerationStarted": "Tworzenie katalogu rozpoczęte! AI generuje treści...",
+            "invalidId": "Nieprawidłowy ID katalogu",
+            "deleteSuccess": "Katalog usunięty pomyślnie",
+            "deleteFailed": "Nie udało się usunąć katalogu",
+            "fetchFailed": "Nie udało się pobrać katalogów",
+            "organization": {
+                "requiredWhenOwnerProvided": "Organizacja musi być włączona, gdy podano właściciela"
+            },
+            "import": {
+                "invalidUrl": "Wprowadź prawidłowy URL",
+                "analyzeFailed": "Nie udało się przeanalizować repozytorium",
+                "started": "Import rozpoczęty pomyślnie",
+                "failed": "Nie udało się zaimportować katalogu",
+                "fetchReposFailed": "Nie udało się pobrać repozytoriów"
+            }
+        },
+        "generator": {
+            "promptRequired": "Polecenie jest wymagane",
+            "nameRequired": "Nazwa jest wymagana",
+            "generationStartedSuccessfully": "Generowanie rozpoczęte pomyślnie",
+            "updateStartedSuccessfully": "Aktualizacja rozpoczęta pomyślnie",
+            "failedToGenerateItems": "Nie udało się wygenerować pozycji",
+            "failedToUpdateItems": "Nie udało się zaktualizować pozycji",
+            "markdownRegeneratedSuccessfully": "Markdown wygenerowany ponownie pomyślnie",
+            "failedToRegenerateMarkdown": "Nie udało się wygenerować ponownie markdown",
+            "notAuthorizedToAccessOrganization": "Nie masz uprawnień dostępu do tej organizacji. Skontaktuj się z właścicielem ({owner}) w celu uzyskania pomocy."
+        },
+        "settings": {
+            "profile": {
+                "usernameRequired": "Nazwa użytkownika jest wymagana",
+                "usernameMaxLength": "Nazwa użytkownika musi mieć mniej niż 50 znaków",
+                "usernameFormat": "Nazwa użytkownika może zawierać tylko litery, cyfry, myślniki i podkreślniki",
+                "updateFailed": "Nie udało się zaktualizować profilu",
+                "notAuthenticated": "Nieuwierzytelniony"
+            },
+            "password": {
+                "currentRequired": "Aktualne hasło jest wymagane",
+                "newMinLength": "Hasło musi mieć co najmniej 8 znaków",
+                "newMaxLength": "Hasło musi mieć mniej niż 100 znaków",
+                "updateFailed": "Nie udało się zaktualizować hasła",
+                "updateSuccess": "Hasło zaktualizowane pomyślnie",
+                "notAuthenticated": "Nieuwierzytelniony"
+            },
+            "vercel": {
+                "notAuthenticated": "Nieuwierzytelniony",
+                "tokenRequired": "Token jest wymagany",
+                "invalidFormat": "Nieprawidłowy format tokenu Vercel",
+                "saveFailed": "Nie udało się zapisać tokenu Vercel",
+                "saveSuccess": "Token Vercel zapisany pomyślnie",
+                "validationFailed": "Podany token Vercel jest nieprawidłowy. Sprawdź ponownie i spróbuj.",
+                "removeFailed": "Nie udało się usunąć tokenu Vercel",
+                "removeSuccess": "Token Vercel usunięty pomyślnie"
+            },
+            "github": {
+                "notAuthenticated": "Nieuwierzytelniony",
+                "disconnectFailed": "Nie udało się rozłączyć GitHub",
+                "disconnectSuccess": "Konto GitHub pomyślnie rozłączone"
+            },
+            "notifications": {
+                "notAuthenticated": "Nieuwierzytelniony",
+                "updateFailed": "Nie udało się zaktualizować preferencji",
+                "updateSuccess": "Preferencje powiadomień zaktualizowane pomyślnie"
+            },
+            "danger": {
+                "notAuthenticated": "Nieuwierzytelniony",
+                "deleteFailed": "Nie udało się usunąć konta",
+                "deleteDisabled": "Usuwanie konta jest wyłączone w wersji demo"
+            }
+        },
+        "deploy": {
+            "deployVercelFailed": "Nie udało się wdrożyć na Vercel",
+            "updateRepositoryFailed": "Nie udało się zaktualizować repozytorium",
+            "updateSettingsFailed": "Nie udało się zaktualizować ustawień szablonu strony"
+        }
+    },
+    "validation": {
+        "auth": {
+            "invalidCredentials": "Nieprawidłowy email lub hasło",
+            "account": {
+                "suspended": "Konto jest zawieszone"
+            },
+            "email": {
+                "required": "Email nie może być pusty",
+                "invalid": "Nieprawidłowy email",
+                "emailAlreadyRegistered": "Email jest już zarejestrowany"
+            },
+            "password": {
+                "required": "Hasło nie może być puste",
+                "minLength": "Hasło musi mieć co najmniej {length} znaków",
+                "lowercase": "Hasło musi zawierać co najmniej jedną małą literę",
+                "numberOrSpecial": "Hasło musi zawierać co najmniej jedną cyfrę lub znak specjalny",
+                "cannotStartWith": "Hasło nie może zaczynać się od kropki lub nowej linii",
+                "digit": "Hasło musi zawierać co najmniej jedną cyfrę"
+            },
+            "username": {
+                "minLength": "Nazwa użytkownika musi zawierać co najmniej {length} znaków"
+            }
+        }
+    }
+}

@@ -1,0 +1,1543 @@
+{
+    "auth": {
+        "error": {
+            "title": "ข้อผิดพลาดการยืนยันตัวตน",
+            "subtitle": "เราพบปัญหาเกี่ยวกับการยืนยันตัวตนของคุณ",
+            "errorOccurred": "เกิดข้อผิดพลาด",
+            "somethingWentWrong": "มีบางอย่างผิดพลาด",
+            "generic": "เกิดข้อผิดพลาดที่ไม่คาดคิด กรุณาลองใหม่อีกครั้งในภายหลัง",
+            "invalidCredentials": "อีเมลหรือรหัสผ่านที่คุณป้อนไม่ถูกต้อง",
+            "emailNotVerified": "กรุณายืนยันที่อยู่อีเมลของคุณก่อนเข้าสู่ระบบ",
+            "accountLocked": "บัญชีของคุณถูกระงับเนื่องจากเหตุผลด้านความปลอดภัย",
+            "sessionExpired": "เซสชันของคุณหมดอายุแล้ว กรุณาเข้าสู่ระบบอีกครั้ง",
+            "networkError": "ไม่สามารถเชื่อมต่อได้ กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ตของคุณ",
+            "oauth": {
+                "missingCode": "ไม่มีรหัสการอนุญาต กรุณาลองเข้าสู่ระบบอีกครั้ง",
+                "invalidState": "สถานะการอนุญาตไม่ถูกต้อง กรุณาลองเข้าสู่ระบบอีกครั้ง",
+                "unsupportedProvider": "ผู้ให้บริการการยืนยันตัวตนนี้ไม่ได้รับการสนับสนุน",
+                "callbackFailed": "ไม่สามารถดำเนินการยืนยันตัวตนให้เสร็จสิ้นได้ กรุณาลองอีกครั้ง"
+            },
+            "resetPassword": {
+                "missingToken": "ลิงก์รีเซ็ตรหัสผ่านไม่ถูกต้อง ไม่พบโทเค็นยืนยัน",
+                "invalidToken": "ลิงก์รีเซ็ตรหัสผ่านไม่ถูกต้องหรือถูกแก้ไข",
+                "expiredToken": "ลิงก์รีเซ็ตรหัสผ่านหมดอายุแล้ว กรุณาขอใหม่",
+                "failed": "ไม่สามารถรีเซ็ตรหัสผ่านได้ กรุณาลองอีกครั้งหรือขอลิงก์ใหม่"
+            },
+            "verifyEmail": {
+                "missingToken": "ลิงก์ยืนยันอีเมลไม่ถูกต้อง ไม่พบโทเค็นยืนยัน",
+                "invalidToken": "ลิงก์ยืนยันอีเมลไม่ถูกต้องหรือถูกใช้ไปแล้ว",
+                "expiredToken": "ลิงก์ยืนยันอีเมลหมดอายุแล้ว กรุณาขอใหม่",
+                "failed": "ไม่สามารถยืนยันอีเมลได้ กรุณาลองอีกครั้งหรือขอลิงก์ใหม่"
+            },
+            "authorize": {
+                "invalidRedirectUrl": "URL การเปลี่ยนเส้นทางไม่ถูกต้องหรือไม่อนุญาต กรุณาติดต่อฝ่ายสนับสนุนหากคุณคิดว่านี่เป็นข้อผิดพลาด"
+            },
+            "actions": {
+                "backToLogin": "กลับไปที่หน้าเข้าสู่ระบบ",
+                "tryRegister": "ลองสมัครสมาชิก",
+                "resendVerification": "ส่งอีเมลยืนยันอีกครั้ง",
+                "contactSupport": "ติดต่อฝ่ายสนับสนุน",
+                "requestNewReset": "ขอลิงก์รีเซ็ตใหม่"
+            },
+            "helpText": "หากคุณยังคงพบปัญหา โปรดตรวจสอบแหล่งข้อมูลช่วยเหลือด้านล่าง",
+            "links": {
+                "help": "ศูนย์ช่วยเหลือ",
+                "systemStatus": "สถานะระบบ"
+            }
+        },
+        "login": {
+            "title": "ยินดีต้อนรับกลับ",
+            "subtitle": "เข้าสู่ระบบบัญชีของคุณเพื่อดำเนินการต่อ",
+            "form": {
+                "email": {
+                    "label": "ที่อยู่อีเมล",
+                    "placeholder": "you@example.com"
+                },
+                "password": {
+                    "label": "รหัสผ่าน",
+                    "placeholder": "ป้อนรหัสผ่านของคุณ"
+                },
+                "forgotPassword": "ลืมรหัสผ่าน?",
+                "rememberMe": "จำฉันไว้ 30 วัน",
+                "submit": "เข้าสู่ระบบ",
+                "submitting": "กำลังเข้าสู่ระบบ..."
+            },
+            "socialLogin": {
+                "divider": "หรือดำเนินการต่อด้วย",
+                "google": "Google",
+                "github": "GitHub"
+            },
+            "signUp": {
+                "text": "ยังไม่มีบัญชี?",
+                "link": "สมัครสมาชิก"
+            },
+            "errors": {
+                "invalidCredentials": "อีเมลหรือรหัสผ่านไม่ถูกต้อง"
+            },
+            "passwordReset": {
+                "success": "รีเซ็ตรหัสผ่านสำเร็จ!",
+                "canLogin": "ตอนนี้คุณสามารถเข้าสู่ระบบด้วยรหัสผ่านใหม่ของคุณได้แล้ว"
+            }
+        },
+        "forgotPassword": {
+            "title": "ลืมรหัสผ่านของคุณ?",
+            "subtitle": "ไม่ต้องกังวล เราจะส่งคำแนะนำการรีเซ็ตให้คุณ",
+            "successTitle": "ตรวจสอบอีเมลของคุณ",
+            "successSubtitle": "เราได้ส่งคำแนะนำการรีเซ็ตรหัสผ่านให้คุณแล้ว",
+            "form": {
+                "email": {
+                    "label": "ที่อยู่อีเมล",
+                    "placeholder": "ป้อนอีเมลของคุณ"
+                },
+                "submit": "ส่งลิงก์รีเซ็ต",
+                "submitting": "กำลังส่ง..."
+            },
+            "success": {
+                "title": "ส่งอีเมลสำเร็จ",
+                "message": "เราได้ส่งคำแนะนำการรีเซ็ตรหัสผ่านไปที่ {email}",
+                "checkSpam": "หากคุณไม่เห็นอีเมล โปรดตรวจสอบโฟลเดอร์สแปมของคุณ"
+            },
+            "errors": {
+                "failed": "ไม่สามารถส่งอีเมลรีเซ็ตได้ กรุณาลองอีกครั้ง"
+            },
+            "backToLogin": "กลับไปที่หน้าเข้าสู่ระบบ",
+            "noAccount": {
+                "text": "ยังไม่มีบัญชี?",
+                "link": "สมัครสมาชิก"
+            }
+        },
+        "resetPassword": {
+            "title": "รีเซ็ตรหัสผ่านของคุณ",
+            "subtitle": "ป้อนรหัสผ่านใหม่ของคุณด้านล่าง",
+            "successTitle": "รีเซ็ตรหัสผ่านสำเร็จ",
+            "successSubtitle": "รหัสผ่านของคุณได้รับการอัปเดตแล้ว",
+            "form": {
+                "password": {
+                    "label": "รหัสผ่านใหม่",
+                    "placeholder": "ป้อนรหัสผ่านใหม่ของคุณ",
+                    "helperText": "ต้องมีอย่างน้อย 6 ตัวอักษร พร้อมตัวพิมพ์เล็กและตัวเลข/อักขระพิเศษ",
+                    "errors": {
+                        "minLength": "รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร",
+                        "lowercase": "รหัสผ่านต้องมีอย่างน้อยหนึ่งตัวอักษรพิมพ์เล็ก",
+                        "numberOrSpecial": "รหัสผ่านต้องมีอย่างน้อยหนึ่งตัวเลขหรืออักขระพิเศษ",
+                        "cannotStartWith": "รหัสผ่านไม่สามารถขึ้นต้นด้วยจุดหรือบรรทัดใหม่"
+                    }
+                },
+                "confirmPassword": {
+                    "label": "ยืนยันรหัสผ่านใหม่",
+                    "placeholder": "ยืนยันรหัสผ่านใหม่ของคุณ",
+                    "errors": {
+                        "noMatch": "รหัสผ่านไม่ตรงกัน"
+                    }
+                },
+                "submit": "รีเซ็ตรหัสผ่าน",
+                "submitting": "กำลังรีเซ็ต..."
+            },
+            "success": {
+                "title": "รีเซ็ตรหัสผ่านสำเร็จ",
+                "message": "รหัสผ่านของคุณได้รับการอัปเดตสำเร็จแล้ว ตอนนี้คุณสามารถเข้าสู่ระบบด้วยรหัสผ่านใหม่ของคุณได้",
+                "loginButton": "ไปที่หน้าเข้าสู่ระบบ"
+            },
+            "errors": {
+                "failed": "ไม่สามารถรีเซ็ตรหัสผ่านได้ กรุณาลองอีกครั้งหรือขอลิงก์รีเซ็ตใหม่",
+                "noToken": "ลิงก์รีเซ็ตไม่ถูกต้อง",
+                "invalidLink": "ลิงก์รีเซ็ตไม่ถูกต้อง",
+                "missingTokenMessage": "ลิงก์รีเซ็ตรหัสผ่านไม่ถูกต้องหรือไม่สมบูรณ์ กรุณาขอการรีเซ็ตรหัสผ่านใหม่",
+                "requestNewLink": "ขอลิงก์รีเซ็ตใหม่"
+            },
+            "backToLogin": "กลับไปที่หน้าเข้าสู่ระบบ"
+        },
+        "register": {
+            "title": "สร้างบัญชีของคุณ",
+            "subtitle": "เริ่มสร้างไดเรกทอรีที่น่าทึ่งได้ทันที",
+            "form": {
+                "name": {
+                    "label": "ชื่อ-นามสกุล",
+                    "placeholder": "John Doe"
+                },
+                "email": {
+                    "label": "ที่อยู่อีเมล",
+                    "placeholder": "you@example.com"
+                },
+                "password": {
+                    "label": "รหัสผ่าน",
+                    "placeholder": "สร้างรหัสผ่านที่แข็งแกร่ง",
+                    "hint": "ต้องมีอย่างน้อย 8 ตัวอักษร"
+                },
+                "confirmPassword": {
+                    "label": "ยืนยันรหัสผ่าน",
+                    "placeholder": "ยืนยันรหัสผ่านของคุณ"
+                },
+                "terms": {
+                    "text": "ฉันยอมรับ",
+                    "termsLink": "ข้อกำหนดการให้บริการ",
+                    "and": "และ",
+                    "privacyLink": "นโยบายความเป็นส่วนตัว"
+                },
+                "submit": "สร้างบัญชี",
+                "submitting": "กำลังสร้างบัญชี..."
+            },
+            "socialSignUp": {
+                "divider": "หรือสมัครสมาชิกด้วย",
+                "google": "Google",
+                "github": "GitHub"
+            },
+            "signIn": {
+                "text": "มีบัญชีอยู่แล้ว?",
+                "link": "เข้าสู่ระบบ"
+            },
+            "errors": {
+                "passwordsDoNotMatch": "รหัสผ่านไม่ตรงกัน",
+                "passwordTooShort": "รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร",
+                "generic": "เกิดข้อผิดพลาด กรุณาลองอีกครั้ง"
+            }
+        }
+    },
+    "dashboard": {
+        "title": "แดชบอร์ด",
+        "toasts": {
+            "newUser": {
+                "title": "ยินดีต้อนรับสู่ {companyName}! 🎉",
+                "description": "บัญชีของคุณถูกสร้างขึ้นสำเร็จแล้ว กรุณาตรวจสอบอีเมลของคุณเพื่อยืนยันบัญชี"
+            },
+            "emailVerification": {
+                "title": "ยืนยันอีเมลของคุณ",
+                "description": "เราได้ส่งลิงก์ยืนยันไปยังที่อยู่อีเมลของคุณแล้ว กรุณาตรวจสอบกล่องขาเข้าและโฟลเดอร์สแปม",
+                "action": "ส่งอีเมลอีกครั้ง"
+            },
+            "verified": {
+                "title": "ยืนยันอีเมลสำเร็จ! ✅",
+                "description": "ที่อยู่อีเมลของคุณได้รับการยืนยันแล้ว ตอนนี้คุณมีสิทธิ์เข้าถึงฟีเจอร์ทั้งหมด"
+            },
+            "oauthConnected": {
+                "title": "เชื่อมต่อบัญชีกับ GitHub สำเร็จ",
+                "description": "บัญชีของคุณถูกเชื่อมต่อกับ GitHub สำเร็จแล้ว"
+            }
+        },
+        "header": {
+            "welcome": "ยินดีต้อนรับกลับ, {username}!",
+            "subtitle": "จัดการไดเรกทอรีที่ขับเคลื่อนด้วย AI และติดตามประสิทธิภาพของพวกเขา",
+            "notifications": {
+                "title": "การแจ้งเตือน",
+                "empty": "ไม่มีการแจ้งเตือนใหม่"
+            }
+        },
+        "directories": {
+            "title": "ไดเรกทอรี",
+            "subtitle": "จัดการและจัดระเบียบไดเรกทอรีที่ขับเคลื่อนด้วย AI ของคุณ",
+            "recent": "ไดเรกทอรีล่าสุด",
+            "viewAll": "ดูทั้งหมด ({count})",
+            "search": "ค้นหาไดเรกทอรี...",
+            "create": "สร้างไดเรกทอรี",
+            "showing": "แสดง {current} จาก {total} ไดเรกทอรี",
+            "pagination": {
+                "previous": "ก่อนหน้า",
+                "next": "ถัดไป"
+            },
+            "empty": {
+                "title": "ยังไม่มีไดเรกทอรี",
+                "description": "สร้างไดเรกทอรีแรกที่ขับเคลื่อนด้วย AI ของคุณเพื่อเริ่มจัดระเบียบและแสดงเนื้อหาของคุณ",
+                "action": "สร้างไดเรกทอรีแรกของคุณ",
+                "notFound": {
+                    "title": "ไม่พบไดเรกทอรี",
+                    "withSearch": "ลองปรับเปลี่ยนคำค้นหาของคุณ",
+                    "withoutSearch": "สร้างไดเรกทอรีแรกที่ขับเคลื่อนด้วย AI ของคุณเพื่อเริ่มต้น"
+                }
+            }
+        },
+        "settings": {
+            "title": "การตั้งค่า",
+            "subtitle": "จัดการการตั้งค่าบัญชีและค่ากำหนดของคุณ",
+            "tabs": {
+                "profile": "โปรไฟล์",
+                "security": "ความปลอดภัย",
+                "apiTokens": "API & โทเค็น",
+                "oauth": "บัญชีที่เชื่อมต่อ",
+                "notifications": "การแจ้งเตือน",
+                "dangerZone": "โซนอันตราย"
+            },
+            "profile": {
+                "title": "ตั้งค่าโปรไฟล์",
+                "subtitle": "อัปเดตข้อมูลโปรไฟล์และรูปโปรไฟล์ของคุณ",
+                "fields": {
+                    "name": "ชื่อ",
+                    "username": "ชื่อผู้ใช้",
+                    "email": "อีเมล",
+                    "emailHelperText": "ไม่สามารถเปลี่ยนอีเมลได้"
+                },
+                "placeholders": {
+                    "name": "ป้อนชื่อของคุณ",
+                    "username": "ป้อนชื่อผู้ใช้ของคุณ"
+                },
+                "actions": {
+                    "save": "บันทึกการเปลี่ยนแปลง"
+                },
+                "messages": {
+                    "success": "อัปเดตโปรไฟล์สำเร็จ",
+                    "usernameRequired": "ต้องระบุชื่อผู้ใช้",
+                    "error": "ไม่สามารถอัปเดตโปรไฟล์ได้",
+                    "unexpectedError": "เกิดข้อผิดพลาดที่ไม่คาดคิด"
+                }
+            },
+            "security": {
+                "title": "ตั้งค่าความปลอดภัย",
+                "subtitle": "จัดการความปลอดภัยบัญชีและการยืนยันตัวตนของคุณ",
+                "changePassword": {
+                    "title": "เปลี่ยนรหัสผ่าน",
+                    "currentPassword": "รหัสผ่านปัจจุบัน",
+                    "newPassword": "รหัสผ่านใหม่",
+                    "confirmPassword": "ยืนยันรหัสผ่านใหม่",
+                    "showPasswords": "แสดงรหัสผ่าน",
+                    "placeholders": {
+                        "current": "ป้อนรหัสผ่านปัจจุบัน",
+                        "new": "ป้อนรหัสผ่านใหม่ (อย่างน้อย 8 ตัวอักษร)",
+                        "confirm": "ยืนยันรหัสผ่านใหม่"
+                    },
+                    "actions": {
+                        "update": "อัปเดตรหัสผ่าน"
+                    },
+                    "messages": {
+                        "success": "อัปเดตรหัสผ่านสำเร็จ",
+                        "fillAllFields": "กรุณากรอกช่องรหัสผ่านทั้งหมด",
+                        "minLength": "รหัสผ่านใหม่ต้องมีอย่างน้อย 8 ตัวอักษร",
+                        "mismatch": "รหัสผ่านใหม่ไม่ตรงกัน",
+                        "sameAsCurrent": "รหัสผ่านใหม่ต้องแตกต่างจากรหัสผ่านปัจจุบัน",
+                        "error": "ไม่สามารถอัปเดตรหัสผ่านได้",
+                        "unexpectedError": "เกิดข้อผิดพลาดที่ไม่คาดคิด"
+                    }
+                },
+                "twoFactor": {
+                    "title": "การยืนยันตัวตนสองขั้นตอน",
+                    "subtitle": "เพิ่มชั้นความปลอดภัยเพิ่มเติมให้กับบัญชีของคุณ",
+                    "action": "เร็วๆ นี้"
+                },
+                "sessions": {
+                    "title": "เซสชันที่ใช้งานอยู่",
+                    "subtitle": "จัดการเซสชันที่ใช้งานอยู่ของคุณในอุปกรณ์ต่างๆ",
+                    "action": "ดูเซสชัน (เร็วๆ นี้)"
+                }
+            },
+            "oauth": {
+                "title": "บัญชีที่เชื่อมต่อ",
+                "subtitle": "เชื่อมต่อบัญชีภายนอกของคุณเพื่อเพิ่มประสิทธิภาพการทำงาน",
+                "github": {
+                    "name": "GitHub",
+                    "connected": "สร้างและจัดการไดเรกทอรีด้วยรีโพสิทอรี GitHub",
+                    "disconnected": "เชื่อมต่อเพื่อสร้างไดเรกทอรีจากรีโพสิทอรี",
+                    "scopes": "ขอบเขต",
+                    "actions": {
+                        "connect": "เชื่อมต่อ",
+                        "disconnect": "ยกเลิกการเชื่อมต่อ",
+                        "confirmDisconnect": "คุณแน่ใจหรือไม่ว่าต้องการยกเลิกการเชื่อมต่อบัญชี GitHub ของคุณ?"
+                    },
+                    "messages": {
+                        "disconnected": "ยกเลิกการเชื่อมต่อบัญชี GitHub แล้ว",
+                        "connectError": "ไม่สามารถเชื่อมต่อ GitHub ได้",
+                        "disconnectError": "ไม่สามารถยกเลิกการเชื่อมต่อ GitHub ได้"
+                    }
+                }
+            }
+        },
+        "stats": {
+            "totalDirectories": "ไดเรกทอรีทั้งหมด",
+            "totalItems": "รายการทั้งหมด",
+            "activeWebsites": "เว็บไซต์ที่ใช้งานอยู่",
+            "fromLastMonth": "จากเดือนที่แล้ว"
+        },
+        "directoryCard": {
+            "status": {
+                "active": "ใช้งานอยู่",
+                "notStarted": "ยังไม่เริ่ม",
+                "generating": "กำลังสร้าง",
+                "generated": "สร้างแล้ว",
+                "error": "ข้อผิดพลาด",
+                "cancelled": "ยกเลิกแล้ว",
+                "idle": "ไม่มีการใช้งาน"
+            },
+            "role": {
+                "owner": "เจ้าของ",
+                "manager": "ผู้จัดการ",
+                "editor": "ผู้แก้ไข",
+                "viewer": "ผู้ดู"
+            },
+            "shared": {
+                "tooltip": "แชร์กับคุณในฐานะ {role}"
+            },
+            "noDescription": "ไม่ได้ระบุคำอธิบาย",
+            "items": "{count} รายการ",
+            "views": "{count} มุมมอง",
+            "updated": "อัปเดต {date}",
+            "viewAction": "ดู →"
+        },
+        "directoryList": {
+            "title": "ไดเรกทอรีของคุณ",
+            "createButton": "สร้างไดเรกทอรี"
+        },
+        "directoryDetail": {
+            "failedToGenerateItems": "ไม่สามารถสร้างรายการได้ กรุณาลองอีกครั้ง",
+            "generationCompleted": "สร้างเสร็จสมบูรณ์สำเร็จ",
+            "generationCancelled": "การสร้างถูกยกเลิก",
+            "role": {
+                "owner": "เจ้าของ",
+                "manager": "ผู้จัดการ",
+                "editor": "ผู้แก้ไข",
+                "viewer": "ผู้ดู"
+            },
+            "shared": {
+                "tooltip": "แชร์กับคุณในฐานะ {role}"
+            },
+            "status": {
+                "notStarted": "ยังไม่เริ่ม",
+                "generating": "กำลังสร้าง",
+                "generated": "สร้างแล้ว",
+                "error": "ข้อผิดพลาด",
+                "cancelled": "ยกเลิกแล้ว"
+            },
+            "tabs": {
+                "overview": "ภาพรวม",
+                "items": "รายการ",
+                "generator": "ตัวสร้าง",
+                "schedule": "กำหนดการ",
+                "history": "ประวัติ",
+                "deploy": "เผยแพร่",
+                "members": "สมาชิก",
+                "settings": "การตั้งค่า"
+            },
+            "members": {
+                "title": "สมาชิกทีม",
+                "subtitle": "จัดการผู้ที่มีสิทธิ์เข้าถึงไดเรกทอรีนี้และสิทธิ์ของพวกเขา",
+                "inviteMember": "เชิญสมาชิก",
+                "noMembers": "ยังไม่มีสมาชิกทีม เชิญใครสักคนมาทำงานร่วมกัน",
+                "roles": {
+                    "creator": "ผู้สร้าง",
+                    "owner": "เจ้าของ",
+                    "manager": "ผู้จัดการ",
+                    "editor": "ผู้แก้ไข",
+                    "viewer": "ผู้ดู"
+                },
+                "roleDescriptions": {
+                    "owner": "ควบคุมเต็มที่รวมถึงการลบและการจัดการสมาชิก",
+                    "manager": "สามารถแก้ไขไดเรกทอรีและจัดการสมาชิกได้ แต่ไม่สามารถลบได้",
+                    "editor": "สามารถแก้ไขเนื้อหาไดเรกทอรีและรันการสร้างได้",
+                    "viewer": "สิทธิ์การอ่านอย่างเดียวเพื่อดูไดเรกทอรี"
+                },
+                "invite": {
+                    "title": "เชิญสมาชิกทีม",
+                    "description": "เพิ่มสมาชิกใหม่เพื่อทำงานร่วมกันในไดเรกทอรีนี้",
+                    "emailLabel": "ที่อยู่อีเมล",
+                    "emailPlaceholder": "colleague@example.com",
+                    "roleLabel": "บทบาท",
+                    "submit": "ส่งคำเชิญ",
+                    "cancel": "ยกเลิก",
+                    "success": "เชิญสมาชิกสำเร็จ",
+                    "errors": {
+                        "emailRequired": "ต้องระบุที่อยู่อีเมล",
+                        "failed": "ไม่สามารถเชิญสมาชิกได้ กรุณาลองอีกครั้ง"
+                    }
+                },
+                "confirmRemove": {
+                    "title": "ลบสมาชิก",
+                    "description": "คุณแน่ใจหรือไม่ว่าต้องการลบ {username} ออกจากไดเรกทอรีนี้? พวกเขาจะสูญเสียการเข้าถึงทั้งหมด",
+                    "confirm": "ลบ",
+                    "cancel": "ยกเลิก"
+                },
+                "roleUpdated": "อัปเดตบทบาทสมาชิกแล้ว",
+                "memberRemoved": "ลบสมาชิกสำเร็จแล้ว",
+                "errors": {
+                    "updateFailed": "ไม่สามารถอัปเดตบทบาทสมาชิกได้",
+                    "removeFailed": "ไม่สามารถลบสมาชิกได้"
+                }
+            },
+            "schedule": {
+                "page": {
+                    "title": "การอัปเดตตามกำหนดการ",
+                    "subtitle": "ทำให้การรีเฟรชสำหรับ {name} เป็นอัตโนมัติด้วยความถี่เฉพาะและจัดการความล้มเหลว",
+                    "fallbackName": "ไดเรกทอรีนี้"
+                },
+                "card": {
+                    "title": "ระบบอัตโนมัติ",
+                    "subtitle": {
+                        "enabled": "ปรับความถี่ การเรียกเก็บเงิน และมาตรการป้องกันเพื่อให้การรีเฟรชตามกำหนดการมีความน่าเชื่อถือ",
+                        "disabled": "ทำให้การรีเฟรชเป็นอัตโนมัติโดยไม่มีขีดจำกัดการสมัครสมาชิก—ตั้งค่าความถี่และป้องกันความล้มเหลวได้อย่างอิสระ"
+                    },
+                    "summary": {
+                        "status": "สถานะ",
+                        "nextRun": "รันครั้งถัดไป",
+                        "lastRun": "รันล่าสุด",
+                        "failures": "ความล้มเหลว",
+                        "notScheduled": "ไม่ได้กำหนดเวลา",
+                        "never": "ไม่เคย",
+                        "statusMap": {
+                            "active": "ระบบอัตโนมัติทำงานอยู่",
+                            "paused": "หยุดชั่วคราว",
+                            "canceled": "ยกเลิกแล้ว",
+                            "disabled": "ปิดใช้งาน"
+                        }
+                    },
+                    "fields": {
+                        "automation": "ระบบอัตโนมัติ",
+                        "automationHelp": "หยุดชั่วคราวเพื่อหยุดรันในอนาคตชั่วคราว",
+                        "billing": "โหมดการเรียกเก็บเงิน",
+                        "billingHelp": "การสมัครสมาชิกปลดล็อกรันแบบไม่จำกัด การชำระตามการใช้งานเรียกเก็บเงินต่อการดำเนินการ",
+                        "cadence": "ความถี่",
+                        "cadenceHelp": "แผนปัจจุบัน: {plan}",
+                        "cadenceOpen": "ความถี่ทั้งหมดพร้อมใช้งานในขณะที่การสมัครสมาชิกถูกปิดใช้งาน",
+                        "maxFailures": "ขีดจำกัดความล้มเหลว",
+                        "maxFailuresHelp": "หยุดชั่วคราวโดยอัตโนมัติเมื่อเกิดความล้มเหลวครบจำนวนนี้",
+                        "createPullRequest": "สร้าง Pull Requests",
+                        "createPullRequestHelp": "เมื่อเปิดใช้งาน การอัปเดตตามกำหนดการจะสร้าง pull request แทนที่จะ commit โดยตรง"
+                    },
+                    "billing": {
+                        "subscription": "การสมัครสมาชิก",
+                        "usage": "ชำระตามการใช้งาน"
+                    },
+                    "cadence": {
+                        "hourly": "ทุกชั่วโมง",
+                        "daily": "ทุกวัน",
+                        "weekly": "ทุกสัปดาห์",
+                        "monthly": "ทุกเดือน"
+                    },
+                    "plans": {
+                        "free": "ฟรี",
+                        "standard": "มาตรฐาน",
+                        "premium": "พรีเมียม",
+                        "unmetered": "ไม่จำกัด"
+                    },
+                    "usageRequired": "เปลี่ยนเป็นการชำระตามการใช้งานเพื่อใช้ความถี่นี้",
+                    "cadenceAllowed": "ความถี่ที่อนุญาตในแผนของคุณ",
+                    "actions": {
+                        "save": "บันทึกการเปลี่ยนแปลง",
+                        "saving": "กำลังบันทึก...",
+                        "runNow": "รันทันที",
+                        "starting": "กำลังเริ่ม...",
+                        "cancel": "ยกเลิกกำหนดการ",
+                        "cancelling": "กำลังยกเลิก..."
+                    },
+                    "success": {
+                        "saved": "บันทึกกำหนดการแล้ว",
+                        "runStarted": "เริ่มรันตามกำหนดการแล้ว",
+                        "cancelled": "ยกเลิกกำหนดการแล้ว"
+                    },
+                    "errors": {
+                        "requireUsage": "เปิดใช้งานการเรียกเก็บเงินตามการใช้งานเพื่อใช้ความถี่นี้",
+                        "updateFailed": "ไม่สามารถอัปเดตกำหนดการได้",
+                        "runFailed": "ไม่สามารถเริ่มรันได้",
+                        "cancelFailed": "ไม่สามารถยกเลิกกำหนดการได้"
+                    },
+                    "empty": {
+                        "title": "รันการสร้างด้วยตนเองก่อน",
+                        "description": "ทำการรันด้วยตนเองสำเร็จหนึ่งครั้งเพื่อปลดล็อคการกำหนดเวลาอัตโนมัติ เมื่อไดเรกทอรีของคุณมีข้อมูล เราจะช่วยให้ข้อมูลของคุณสดใหม่อยู่เสมอ",
+                        "refresh": "รีเฟรชสถานะ"
+                    },
+                    "requiresGeneration": "รันการสร้างรายการอย่างน้อยหนึ่งครั้งก่อนเปิดใช้งานกำหนดการ"
+                },
+                "actions": {
+                    "invalid": "ข้อมูลไม่ถูกต้อง",
+                    "updated": "อัปเดตกำหนดการแล้ว",
+                    "updateFailed": "ไม่สามารถอัปเดตกำหนดการได้",
+                    "runStarted": "เริ่มรันตามกำหนดการแล้ว",
+                    "runFailed": "ไม่สามารถเริ่มรันได้",
+                    "cancelled": "ยกเลิกกำหนดการแล้ว",
+                    "cancelFailed": "ไม่สามารถยกเลิกกำหนดการได้"
+                }
+            },
+            "statusCard": {
+                "notStarted": {
+                    "title": "ยังไม่ได้เริ่มการสร้าง",
+                    "description": "เริ่มสร้างรายการสำหรับไดเรกทอรีของคุณเพื่อเติมข้อมูลด้วยเนื้อหา",
+                    "action": "เริ่มการสร้าง"
+                },
+                "generating": {
+                    "title": "กำลังสร้าง",
+                    "description": "กำลังประมวลผลคำขอของคุณ...",
+                    "processing": "กำลังประมวลผล..."
+                },
+                "generated": {
+                    "title": "สร้างเสร็จสมบูรณ์",
+                    "description": "ไดเรกทอรีของคุณถูกเติมข้อมูลด้วยรายการสำเร็จแล้ว",
+                    "viewItems": "ดูรายการ",
+                    "regenerate": "สร้างใหม่"
+                },
+                "error": {
+                    "title": "สร้างไม่สำเร็จ",
+                    "description": "เกิดข้อผิดพลาดระหว่างการสร้าง",
+                    "retry": "ลองสร้างอีกครั้ง"
+                },
+                "cancelled": {
+                    "title": "ยกเลิกการสร้าง",
+                    "description": "การสร้างครั้งก่อนถูกหยุดก่อนเสร็จสิ้น",
+                    "restart": "เริ่มการสร้างใหม่"
+                }
+            },
+            "stats": {
+                "totalItems": "รายการทั้งหมด",
+                "categories": "หมวดหมู่",
+                "generationStatus": "สถานะการสร้าง",
+                "daysActive": "วันที่ใช้งาน"
+            },
+            "history": {
+                "title": "ประวัติการสร้าง",
+                "subtitle": "ติดตามการรันการสร้างในอดีต รายการที่สร้าง และรายละเอียดการดำเนินการ",
+                "error": "ไม่สามารถโหลดรายการเพิ่มเติมได้",
+                "empty": {
+                    "title": "ยังไม่มีประวัติ",
+                    "description": "ร้องขอการสร้างเพื่อดูความคืบหน้าและผลลัพธ์ที่นี่"
+                },
+                "status": {
+                    "generating": "กำลังดำเนินการ",
+                    "generated": "เสร็จสิ้น",
+                    "error": "ล้มเหลว",
+                    "cancelled": "ยกเลิกแล้ว"
+                },
+                "table": {
+                    "run": "รัน",
+                    "status": "สถานะ",
+                    "newItems": "รายการใหม่",
+                    "updatedItems": "อัปเดตแล้ว",
+                    "totalItems": "ทั้งหมด",
+                    "duration": "ระยะเวลา",
+                    "startedAt": "เริ่มเมื่อ",
+                    "tokens": "โทเค็น",
+                    "cost": "ค่าใช้จ่าย"
+                },
+                "loadMore": "โหลดเพิ่ม",
+                "noMore": "ไม่มีบันทึกเพิ่มเติม",
+                "unknown": "ไม่ทราบ"
+            },
+            "info": {
+                "title": "ข้อมูลไดเรกทอรี",
+                "yourRole": "บทบาทของคุณ",
+                "role": {
+                    "owner": "เจ้าของ",
+                    "manager": "ผู้จัดการ",
+                    "editor": "ผู้แก้ไข",
+                    "viewer": "ผู้ดู"
+                },
+                "slug": "Slug",
+                "repositories": "รีโพสิทอรี",
+                "dataRepo": "รีโพสิทอรีข้อมูล",
+                "websiteRepo": "รีโพสิทอรีเว็บไซต์",
+                "mainRepo": "รีโพสิทอรีหลัก",
+                "repoProvider": "ผู้ให้บริการรีโพสิทอรี",
+                "organization": "องค์กร",
+                "created": "สร้างเมื่อ",
+                "lastUpdated": "อัปเดตล่าสุด",
+                "readmeHeader": "หัวข้อ README",
+                "readmeFooter": "ส่วนท้าย README",
+                "custom": "กำหนดเอง",
+                "customOverwrite": "กำหนดเอง (เขียนทับ)",
+                "yes": "ใช่",
+                "no": "ไม่"
+            },
+            "config": {
+                "title": "รายละเอียดการกำหนดค่า",
+                "initialPrompt": "พรอมต์การสร้างเริ่มต้น",
+                "companyDetails": "ข้อมูลบริษัท",
+                "companyName": "ชื่อบริษัท",
+                "companyWebsite": "เว็บไซต์",
+                "generationSettings": "ตั้งค่าการสร้าง",
+                "generationMethod": "วิธีการสร้าง",
+                "autoApproval": "อนุมัติอัตโนมัติ",
+                "pagingMode": "โหมดเพจ",
+                "contentTable": "ตารางเนื้อหา",
+                "enabled": "เปิดใช้งาน",
+                "disabled": "ปิดใช้งาน",
+                "pullRequestUpdate": "รายละเอียด Pull Request",
+                "branch": "สาขา",
+                "prTitle": "หัวข้อ PR",
+                "mainRepository": "รีโพสิทอรีหลัก",
+                "dataRepository": "รีโพสิทอรีข้อมูล"
+            },
+            "activity": {
+                "title": "กิจกรรมล่าสุด",
+                "noActivity": "ยังไม่มีกิจกรรม",
+                "created": "สร้างไดเรกทอรีแล้ว",
+                "directoryCreated": "สร้างไดเรกทอรีสำเร็จแล้ว",
+                "justNow": "เมื่อสักครู่"
+            },
+            "items": {
+                "title": "รายการไดเรกทอรี",
+                "subtitle": "จัดการและจัดระเบียบรายการในไดเรกทอรีของคุณ",
+                "noItemsTitle": "ยังไม่มีรายการ",
+                "noItemsDescription": "ไดเรกทอรีของคุณยังไม่มีรายการใดๆ สร้างรายการเพื่อเติมไดเรกทอรีของคุณด้วยเนื้อหา",
+                "generateItems": "สร้างรายการ",
+                "searchPlaceholder": "ค้นหารายการ...",
+                "allCategories": "หมวดหมู่ทั้งหมด",
+                "showing": "แสดง {current} จาก {total} รายการ",
+                "noMatch": "ไม่มีรายการที่ตรงกับเงื่อนไขการค้นหาของคุณ",
+                "source": "แหล่งที่มา",
+                "addItem": "เพิ่มรายการ",
+                "delete": "ลบ",
+                "deleteWithPR": "ลบพร้อม Pull Request",
+                "deleteConfirm": "คุณแน่ใจหรือไม่ว่าต้องการลบ \"{name}\"?",
+                "deleteSuccess": "ลบรายการสำเร็จแล้ว",
+                "deleteFailed": "ไม่สามารถลบรายการได้",
+                "deleteError": "เกิดข้อผิดพลาดขณะลบรายการ",
+                "updateSuccess": "อัปเดตรายการสำเร็จแล้ว",
+                "updateFailed": "ไม่สามารถอัปเดตรายการได้",
+                "updateError": "เกิดข้อผิดพลาดขณะอัปเดตรายการ",
+                "updateItem": "อัปเดตรายการ",
+                "loadingMore": "กำลังโหลดเพิ่ม... ({current} จาก {total})",
+                "addModal": {
+                    "title": "เพิ่มรายการใหม่",
+                    "sourceUrl": "URL แหล่งที่มา",
+                    "sourceUrlPlaceholder": "https://example.com/product",
+                    "sourceUrlHelp": "คลิก 'ดึงข้อมูล' เพื่อดึงรายละเอียดรายการจาก URL โดยอัตโนมัติ",
+                    "extract": "ดึงข้อมูล",
+                    "extractSuccess": "ดึงรายละเอียดรายการสำเร็จแล้ว",
+                    "extractFailed": "ไม่สามารถดึงรายละเอียดรายการได้",
+                    "extractError": "เกิดข้อผิดพลาดขณะดึงรายละเอียด",
+                    "name": "ชื่อ",
+                    "namePlaceholder": "ป้อนชื่อรายการ",
+                    "description": "คำอธิบาย",
+                    "descriptionPlaceholder": "ป้อนคำอธิบายสั้นๆ เกี่ยวกับรายการ",
+                    "category": "หมวดหมู่",
+                    "tags": "แท็ก",
+                    "tagPlaceholder": "เพิ่มแท็กแล้วกด Enter",
+                    "slug": "Slug (ไม่จำเป็น)",
+                    "slugPlaceholder": "custom-item-slug",
+                    "slugHelp": "ตัวระบุที่เป็นมิตรกับ URL จะถูกสร้างอัตโนมัติหากเว้นว่างไว้",
+                    "brand": "แบรนด์ (ไม่จำเป็น)",
+                    "brandPlaceholder": "ป้อนชื่อแบรนด์",
+                    "brandLogoUrl": "URL โลโก้แบรนด์ (ไม่จำเป็น)",
+                    "brandLogoUrlPlaceholder": "https://example.com/logo.png",
+                    "images": "รูปภาพ (ไม่จำเป็น)",
+                    "imagePlaceholder": "https://example.com/screenshot.png",
+                    "imagesHelp": "เพิ่ม URL รูปภาพ (ภาพหน้าจอ รูปภาพผลิตภัณฑ์)",
+                    "featured": "รายการแนะนำ",
+                    "featuredHelp": "ทำเครื่องว่ารายการนี้เป็นรายการแนะนำในไดเรกทอรี",
+                    "updateWithPR": "สร้าง Pull Request",
+                    "updateWithPRHelp": "ส่งการเปลี่ยนแปลงเป็น pull request แทนที่จะ commit โดยตรง",
+                    "cancel": "ยกเลิก",
+                    "adding": "กำลังเพิ่ม...",
+                    "addItem": "เพิ่มรายการ",
+                    "success": "เพิ่มรายการสำเร็จแล้ว",
+                    "successDescription": "เพิ่มรายการในไดเรกทอรีของคุณแล้ว",
+                    "failed": "ไม่สามารถเพิ่มรายการได้",
+                    "error": "เกิดข้อผิดพลาดขณะเพิ่มรายการ",
+                    "errors": {
+                        "urlRequired": "ต้องระบุ URL แหล่งที่มาเพื่อดึงข้อมูล",
+                        "invalidUrl": "กรุณาป้อน URL ที่ถูกต้องซึ่งรวมถึง http:// หรือ https://",
+                        "invalidImageUrl": "กรุณาป้อน URL รูปภาพที่ถูกต้อง",
+                        "requiredFields": "กรุณากรอกข้อมูลในช่องที่จำเป็นทั้งหมด"
+                    }
+                },
+                "editDisplay": "แก้ไขการแสดงผล",
+                "editDisplayDescription": "สลับสถานะแนะนำและกำหนดลำดับการแสดงผล",
+                "orderLabel": "ลำดับการแสดงผล (ไม่จำเป็น)",
+                "orderHelp": "ตัวเลขที่น้อยกว่าจะแสดงก่อนหน้ากลุ่มรายการแนะนำ/ไม่แนะนำ",
+                "deleteDialogTitle": "ลบรายการ",
+                "deleteDialogDescription": "นี่จะลบ {name} ออกจากรีโพสิทอรี",
+                "createPRLabel": "สร้าง Pull Request",
+                "createPRHelp": "หากเปิดใช้งาน การเปลี่ยนแปลงจะถูกเสนอผ่าน PR แทนที่จะ commit โดยตรง",
+                "reasonLabel": "เหตุผล (ไม่จำเป็น)",
+                "reasonPlaceholder": "ทำไมคุณถึงลบรายการนี้?",
+                "confirmDelete": "ลบรายการ"
+            },
+            "generator": {
+                "regenerationWarning": "คำเตือนการสร้างใหม่",
+                "regenerationWarningDescription": "ไดเรกทอรีนี้ถูกสร้างแล้ว เริ่มการสร้างใหม่จะแทนที่รายการที่มีอยู่",
+                "requiredInfo": "ข้อมูลที่จำเป็น",
+                "updateConfiguration": "อัปเดตการกำหนดค่า",
+                "promptRequired": "ต้องระบุพรอมต์",
+                "operationStartedSuccessfully": "เริ่มการดำเนินการสำเร็จแล้ว",
+                "failedToStartOperation": "ไม่สามารถเริ่มการดำเนินการได้",
+                "directoryName": "ชื่อไดเรกทอรี",
+                "generationPrompt": "พรอมต์การสร้าง",
+                "recommended": "แนะนำ",
+                "promptPlaceholder": "อธิบายว่ารายการใดควรถูกสร้างสำหรับไดเรกทอรีนี้...",
+                "promptHelperText": "ระบุให้ชัดเจนเกี่ยวกับประเภทของเนื้อหาที่คุณต้องการสร้าง",
+                "repositoryDescription": "คำอธิบายรีโพสิทอรี",
+                "repositoryPlaceholder": "คำอธิบายสั้นๆ ของรีโพสิทอรี (ไม่จำเป็น)",
+                "startGeneration": "เริ่มการสร้าง",
+                "regenerateItems": "สร้างรายการใหม่",
+                "updateItems": "อัปเดตรายการ",
+                "recreateDirectory": "สร้างไดเรกทอรีใหม่",
+                "showAdvancedOptions": "แสดงตัวเลือกขั้นสูง",
+                "hideAdvancedOptions": "ซ่อนตัวเลือกขั้นสูง",
+                "cancel": "ยกเลิก",
+                "companyInformation": "ข้อมูลบริษัท",
+                "companyInfoDescription": "รายละเอียดบริษัทเพิ่มเติมสำหรับเนื้อหาแบรนด์ (ไม่จำเป็น)",
+                "companyName": "ชื่อบริษัท",
+                "companyNamePlaceholder": "ป้อนชื่อบริษัท",
+                "companyWebsite": "เว็บไซต์บริษัท",
+                "companyWebsitePlaceholder": "https://example.com",
+                "categoriesKeywords": "หมวดหมู่ & คำสำคัญ",
+                "categoriesDescription": "กำหนดหมวดหมู่และคำสำคัญสำหรับการจัดระเบียบเนื้อหา",
+                "initialCategories": "หมวดหมู่เริ่มต้น",
+                "priorityCategories": "หมวดหมู่สำคัญ",
+                "targetKeywords": "คำสำคัญเป้าหมาย",
+                "addCategoryPlaceholder": "เพิ่มหมวดหมู่",
+                "addPriorityCategoryPlaceholder": "เพิ่มหมวดหมู่สำคัญ",
+                "addKeywordPlaceholder": "เพิ่มคำสำคัญ",
+                "add": "เพิ่ม",
+                "sourceUrls": "URL แหล่งที่มา",
+                "sourceUrlsDescription": "เพิ่ม URL เฉพาะเพื่อดึงเนื้อหาจาก",
+                "sourceUrlPlaceholder": "https://example.com/page",
+                "addUrl": "เพิ่ม URL",
+                "noSourceUrlsMessage": "ไม่ได้เพิ่ม URL แหล่งที่มา ตัวสร้างจะใช้การค้นหาเพื่อหาเนื้อหา",
+                "advancedConfig": "การกำหนดค่าขั้นสูง",
+                "advancedConfigDescription": "ปรับแต่งพารามิเตอร์และพฤติกรรมการสร้าง",
+                "generationMethod": "วิธีการสร้าง",
+                "methodCreateUpdate": "สร้างหรืออัปเดต",
+                "methodRecreate": "สร้างใหม่ (แทนที่ทั้งหมด)",
+                "updateWithPullRequest": "อัปเดตด้วย Pull Request",
+                "updateWithPullRequestDescription": "สร้าง pull request แทนที่จะ commit โดยตรง",
+                "enableBadgeEvaluation": "เปิดใช้งานการประเมินป้าย",
+                "enableBadgeEvaluationDescription": "ประเมินและเพิ่มป้ายคุณภาพให้กับรายการ",
+                "websiteRepositoryCreationMethod": "วิธีการสร้างรีโพสิทอรีเว็บไซต์",
+                "methodDuplicate": "ทำซ้ำ",
+                "methodFork": "Fork",
+                "directoryNamePlaceholder": "ป้อนชื่อไดเรกทอรี",
+                "methodCreateFromTemplate": "สร้างจากเทมเพลต",
+                "aiProcessingConfiguration": "การกำหนดค่าการประมวลผล AI",
+                "maxSearchQueries": "คำค้นหาสูงสุด",
+                "resultsPerQuery": "ผลลัพธ์ต่อคำค้นหา",
+                "maxPagesToProcess": "จำนวนหน้าสูงสุดที่ประมวลผล",
+                "relevanceThreshold": "เกณฑ์ความเกี่ยวข้อง",
+                "aiFirstGeneration": "การสร้างด้วย AI แรก",
+                "aiFirstGenerationDescription": "เปิดใช้งานการสร้างรายการเริ่มต้นด้วย AI ก่อนการค้นหาเว็บ",
+                "contentFiltering": "การกรองเนื้อหา",
+                "contentFilteringDescription": "เปิดใช้งานการกรองคุณภาพเนื้อหา",
+                "recreateConfirmTitle": "สร้างข้อมูลไดเรกทอรีใหม่?",
+                "recreateConfirmDescription": "การสร้างใหม่จะลบรายการที่มีอยู่และสร้างใหม่ตั้งแต่ต้น การดำเนินการนี้ไม่สามารถย้อนกลับได้",
+                "confirmRecreate": "ใช่ สร้างใหม่",
+                "recreateInlineTitle": "การสร้างใหม่จะลบรายการที่มีอยู่",
+                "recreateInlineDescription": "โหมดนี้จะลบรายการปัจจุบันและสร้างใหม่ตั้งแต่ต้น ดำเนินการต่อเฉพาะเมื่อคุณต้องการแทนที่ทุกอย่าง"
+            },
+            "progress": {
+                "title": "กำลังสร้าง",
+                "processingRequest": "กำลังประมวลผลคำขอของคุณ...",
+                "steps": {
+                    "promptComparison": "กำลังเปรียบเทียบพรอมต์",
+                    "promptProcessing": "กำลังประมวลผลพรอมต์ของคุณ",
+                    "domainDetection": "กำลังตรวจจับประเภทโดเมน",
+                    "aiFirstItemsGeneration": "กำลังสร้างรายการ AI เริ่มต้น",
+                    "searchQueriesGeneration": "กำลังสร้างคำค้นหา",
+                    "webSearch": "กำลังค้นหาเว็บ",
+                    "contentRetrieval": "กำลังดึงเนื้อหา",
+                    "contentFiltering": "กำลังกรองเนื้อหาที่เกี่ยวข้อง",
+                    "itemsExtraction": "กำลังแยกรายการจากเนื้อหา",
+                    "deduplicationDataAggregation": "กำลังลบรายการซ้ำและรวบรวมข้อมูล",
+                    "categoriesTagsProcessing": "กำลังประมวลผลหมวดหมู่และแท็ก",
+                    "sourcesValidation": "กำลังตรวจสอบแหล่งที่มา",
+                    "badgesProcessing": "กำลังประมวลผลป้ายคุณภาพ",
+                    "markdownGeneration": "กำลังสร้างเนื้อหา Markdown",
+                    "processing": "กำลังประมวลผล..."
+                },
+                "progress": "ความคืบหน้า",
+                "closeNote": "อาจใช้เวลาสองสามนาที คุณสามารถปิดหน้านี้และกลับมาใหม่ในภายหลังได้"
+            },
+            "settings": {
+                "sourceSettings": "รีโพสิทอรีแหล่งที่มา",
+                "originalSource": "แหล่งที่มาดั้งเดิม",
+                "syncEnabled": "เปิดใช้งานการซิงค์",
+                "syncDescription": "ดึงการอัปเดตจากรีโพสิทอรีแหล่งที่มาโดยอัตโนมัติ",
+                "syncUpdateFailed": "ไม่สามารถอัปเดตการตั้งค่าการซิงค์ได้",
+                "syncDisabled": "ปิดใช้งานการซิงค์",
+                "generalSettings": "การตั้งค่าทั่วไป",
+                "generalTitle": "การตั้งค่าทั่วไป",
+                "directoryName": "ชื่อไดเรกทอรี",
+                "description": "คำอธิบาย",
+                "organizationRepository": "รีโพสิทอรีองค์กร",
+                "organizationHelp": "สร้างรีโพสิทอรีภายใต้องค์กรแทนบัญชีส่วนตัวของคุณ",
+                "organizationName": "ชื่อองค์กร",
+                "organizationNamePlaceholder": "ป้อนชื่อองค์กร",
+                "readmeConfiguration": "การกำหนดค่า README",
+                "readmeTitle": "การกำหนดค่า README",
+                "customHeader": "หัวข้อกำหนดเอง",
+                "customHeaderPlaceholder": "เพิ่มเนื้อหาที่กำหนดเองในส่วนหัวของ README",
+                "overwriteDefaultHeader": "เขียนทับหัวข้อเริ่มต้น",
+                "customFooter": "ส่วนท้ายกำหนดเอง",
+                "cantDeleteWhileGenerating": "ไม่สามารถลบไดเรกทอรีในขณะที่กำลังสร้างรายการ",
+                "customFooterPlaceholder": "เพิ่มเนื้อหาที่กำหนดเองในส่วนท้ายของ README",
+                "overwriteDefaultFooter": "เขียนทับส่วนท้ายเริ่มต้น",
+                "dangerZone": "โซนอันตราย",
+                "dangerTitle": "โซนอันตราย",
+                "deleteWarning": "เมื่อคุณลบไดเรกทอรีแล้ว จะไม่สามารถย้อนกลับได้ โปรดตรวจสอบให้แน่ใจ",
+                "dangerDescription": "เมื่อคุณลบไดเรกทอรีแล้ว จะไม่สามารถย้อนกลับได้ โปรดตรวจสอบให้แน่ใจ",
+                "deleteOptions": "เลือกสิ่งที่ต้องการลบ:",
+                "deleteDataRepository": "ลบรีโพสิทอรีข้อมูล",
+                "deleteDataRepositoryDescription": "ลบรีโพสิทอรีข้อมูล JSON ออกจาก GitHub",
+                "deleteMarkdownRepository": "ลบรีโพสิทอรี markdown",
+                "deleteMarkdownRepositoryDescription": "ลบรีโพสิทอรี markdown ที่มี README",
+                "deleteWebsiteRepository": "ลบรีโพสิทอรีเว็บไซต์",
+                "deleteWebsiteRepositoryDescription": "ลบรีโพสิทอรีเว็บไซต์ที่เผยแพร่แล้ว",
+                "deleteConfirm": "คุณแน่ใจอย่างแน่นอนหรือไม่?",
+                "deleteConfirmDetail": "การดำเนินการนี้ไม่สามารถย้อนกลับได้ ไดเรกทอรีและรีโพสิทอรีที่เลือกจะถูกลบอย่างถาวร",
+                "confirmDirectoryName": "พิมพ์ชื่อไดเรกทอรีเพื่อยืนยัน",
+                "confirmDirectoryNameDescription": "พิมพ์ \"{name}\" เพื่อยืนยันการลบ",
+                "deleteNameMismatch": "ชื่อไดเรกทอรีไม่ตรงกัน",
+                "deleteButton": "ลบไดเรกทอรี",
+                "deleteConfirmButton": "ใช่ ลบ",
+                "deleteSuccess": "ลบไดเรกทอรีสำเร็จแล้ว",
+                "deleteFailed": "ไม่สามารถลบไดเรกทอรีได้",
+                "yesDelete": "ใช่ ลบ",
+                "cancel": "ยกเลิก",
+                "saveChanges": "บันทึกการเปลี่ยนแปลง",
+                "updateReadme": "อัปเดต README",
+                "updateSuccess": "อัปเดตการตั้งค่าสำเร็จแล้ว",
+                "updateFailed": "ไม่สามารถอัปเดตการตั้งค่าได้"
+            },
+            "deploy": {
+                "noTokenAlert": {
+                    "title": "ต้องใช้โทเค็น Vercel",
+                    "description": "เพื่อเผยแพร่ไดเรกทอรีของคุณไปยัง Vercel คุณต้องกำหนดค่าโทเค็น API Vercel ของคุณในการตั้งค่าบัญชี",
+                    "configureButton": "ไปที่การตั้งค่าโทเค็น API",
+                    "getTokenButton": "รับโทเค็น Vercel",
+                    "howTo": {
+                        "title": "วิธีกำหนดค่าโทเค็น Vercel ของคุณ:",
+                        "step1": "คลิก 'รับโทเค็น Vercel' เพื่อเปิดแดชบอร์ด Vercel",
+                        "step2": "สร้างโทเค็นใหม่ด้วยสิทธิ์การเผยแพร่",
+                        "step3": "คัดลอกโทเค็นที่สร้างขึ้น",
+                        "step4": "ไปที่การตั้งค่าโทเค็น API และวางโทเค็นของคุณในส่วน Vercel"
+                    }
+                },
+                "sharedNoTokenAlert": {
+                    "title": "ไม่สามารถเผยแพร่ได้",
+                    "description": "เจ้าของไดเรกทอรีไม่ได้กำหนดค่าโทเค็น Vercel สำหรับการเผยแพร่ โปรดติดต่อเจ้าของไดเรกทอรีเพื่อตั้งค่าการเผยแพร่",
+                    "hint": "ในฐานะผู้ทำงานร่วมกัน คุณสามารถเริ่มการเผยแพร่ได้เมื่อเจ้าของกำหนดค่าการรวม Vercel ของพวกเขาแล้ว"
+                },
+                "form": {
+                    "deployToVercel": {
+                        "title": "เผยแพร่ไปยัง Vercel",
+                        "description": "เผยแพร่รีโพสิทอรีเว็บไซต์ไดเรกทอรีของคุณบน Vercel",
+                        "deployButton": "เผยแพร่ตอนนี้",
+                        "deployingButton": "กำลังเผยแพร่...",
+                        "deployingStateButton": "กำลังเผยแพร่ ({state})...",
+                        "successMessage": "เผยแพร่เว็บไซต์ของคุณสำเร็จแล้ว!",
+                        "teamSelection": {
+                            "title": "เลือกทีม Vercel",
+                            "description": "เลือกทีม Vercel เพื่อเผยแพร่ไดเรกทอรีนี้ไปยัง",
+                            "label": "ทีม",
+                            "placeholder": "เลือกทีม",
+                            "confirmButton": "เผยแพร่ไปยังทีม",
+                            "cancelButton": "ยกเลิก"
+                        }
+                    },
+                    "updateRepository": {
+                        "title": "อัปเดตรีโพสิทอรีเว็บไซต์",
+                        "description": "ซิงค์การเปลี่ยนแปลงล่าสุดจากเทมเพลตไปยัง",
+                        "websiteRepository": "รีโพสิทอรีเว็บไซต์",
+                        "updateButton": "อัปเดตรีโพสิทอรี",
+                        "updatingButton": "กำลังอัปเดต..."
+                    },
+                    "messages": {
+                        "deploySuccess": "เริ่มการเผยแพร่สำเร็จแล้ว",
+                        "deployPending": "การเผยแพร่อยู่ในคิวและจะเริ่มในไม่ช้า",
+                        "deployFailed": "ไม่สามารถเผยแพร่ไปยัง Vercel ได้",
+                        "deployError": "เกิดข้อผิดพลาดระหว่างการเผยแพร่",
+                        "updateSuccess": "อัปเดตรีโพสิทอรีสำเร็จแล้ว",
+                        "updateFailed": "ไม่สามารถอัปเดตรีโพสิทอรีได้",
+                        "updateError": "เกิดข้อผิดพลาดขณะอัปเดตรีโพสิทอรี"
+                    },
+                    "info": {
+                        "deployInfo": "การเผยแพร่มักใช้เวลา 1-3 นาที คุณจะได้รับ URL เมื่อเสร็จสิ้น",
+                        "updateInfo": "การอัปเดตซิงค์เนื้อหาไดเรกทอรีของคุณไปยังรีโพสิทอรีเว็บไซต์สำหรับการเผยแพร่ครั้งต่อไป"
+                    },
+                    "websiteTemplate": {
+                        "title": "การอัปเดตเทมเพลตอัตโนมัติ",
+                        "description": "ให้เว็บไซต์ของคุณซิงค์กับเทมเพลตล่าสุดโดยอัตโนมัติ",
+                        "autoUpdate": "อัปเดตอัตโนมัติ",
+                        "autoUpdateDescription": "ตรวจสอบการอัปเดตเทมเพลตทุกชั่วโมงและนำไปใช้โดยอัตโนมัติ",
+                        "useBeta": "ใช้เวอร์ชันเบตาของเทมเพลต",
+                        "useBetaDescription": "ใช้สาขา stage แทนสาขา main ที่เสถียร",
+                        "lastUpdated": "อัปเดตล่าสุด",
+                        "lastChecked": "ตรวจสอบล่าสุด",
+                        "lastError": "ข้อผิดพลาดล่าสุด",
+                        "updateSuccess": "อัปเดตการตั้งค่าสำเร็จแล้ว",
+                        "updateFailed": "ไม่สามารถอัปเดตการตั้งค่าได้"
+                    }
+                }
+            }
+        },
+        "directoryCreation": {
+            "title": "สร้างไดเรกทอรีใหม่",
+            "subtitle": "เลือกวิธีที่คุณต้องการสร้างไดเรกทอรีของคุณ",
+            "backToOptions": "กลับไปที่ตัวเลือก",
+            "organizationSelector": {
+                "label": "เจ้าของรีโพสิทอรี",
+                "loading": "กำลังโหลดองค์กร...",
+                "personal": "บัญชีส่วนตัว",
+                "personalAccount": "รีโพสิทอรีจะถูกสร้างภายใต้บัญชีส่วนตัวของคุณ",
+                "organizations": "องค์กร",
+                "personalHelp": "รีโพสิทอรีจะถูกสร้างภายใต้บัญชี GitHub ส่วนตัวของคุณ",
+                "organizationHelp": "รีโพสิทอรีจะถูกสร้างภายใต้องค์กร {org}"
+            },
+            "ai": {
+                "title": "สร้างด้วย AI",
+                "subtitle": "อธิบายแนวคิดไดเรกทอรีของคุณด้วยภาษาธรรมชาติและให้ AI จัดการการตั้งค่า",
+                "getStarted": "เริ่มต้น",
+                "formTitle": "สร้างไดเรกทอรีด้วย AI",
+                "formSubtitle": "อธิบายแนวคิดไดเรกทอรีของคุณและให้ AI จัดการการตั้งค่าและการสร้างเนื้อหาเริ่มต้น",
+                "directoryNameLabel": "ชื่อไดเรกทอรี",
+                "directoryNamePlaceholder": "เช่น, เครื่องมือ AI ที่น่าทึ่ง",
+                "directoryNameHelp": "AI จะแนะนำชื่อหากคุณเว้นว่างไว้",
+                "promptLabel": "อธิบายไดเรกทอรีของคุณ",
+                "githubRequired": "กรุณาเชื่อมต่อบัญชี GitHub ของคุณก่อน",
+                "promptPlaceholder": "อธิบายว่าคุณต้องการสร้างไดเรกทอรีประเภทใด ควรมีรายการอะไรบ้าง และข้อกำหนดเฉพาะใดๆ...",
+                "inspirationText": "ต้องการแรงบันดาลใจ? ลองใช้หนึ่งในสิ่งเหล่านี้:",
+                "examplePrompts": {
+                    "0": {
+                        "name": "เครื่องมือ AI สำหรับนักพัฒนา",
+                        "prompt": "สร้างไดเรกทอรีของเครื่องมือ AI ที่ดีที่สุดสำหรับนักพัฒนา"
+                    },
+                    "1": {
+                        "name": "ศูนย์ React Components",
+                        "prompt": "สร้างรายการ React components โอเพนซอร์สที่คัดสรรแล้ว"
+                    },
+                    "2": {
+                        "name": "เครื่องมือทีมรีโมท",
+                        "prompt": "สร้างไดเรกทอรีของแอปพลิเคชันเพิ่มประสิทธิภาพสำหรับทีมรีโมท"
+                    },
+                    "3": {
+                        "name": "แฟชั่นที่ยั่งยืน",
+                        "prompt": "สร้างชุดรวบรวมแบรนด์แฟชั่นที่ยั่งยืน"
+                    }
+                },
+                "featuresTitle": "AI จะทำอะไรให้คุณ:",
+                "features": {
+                    "0": "สร้างชื่อและคำอธิบายที่เหมาะสม",
+                    "1": "สร้างหมวดหมู่และโครงสร้างเริ่มต้น",
+                    "2": "ค้นหาและเพิ่มรายการที่เกี่ยวข้องโดยอัตโนมัติ",
+                    "3": "ตั้งค่ารีโพสิทอรี GitHub พร้อมเอกสารประกอบที่เหมาะสม"
+                },
+                "generateButton": "สร้างด้วย AI",
+                "generatingButton": "กำลังสร้างไดเรกทอรี...",
+                "cancelButton": "ยกเลิก",
+                "noteTitle": "หมายเหตุ:",
+                "noteText": "การสร้างด้วย AI มักใช้เวลา 2-5 นาที ขึ้นอยู่กับความซับซ้อนของคำขอของคุณ คุณจะได้รับการแจ้งเตือนเมื่อไดเรกทอรีของคุณพร้อม",
+                "errors": {
+                    "promptRequired": "กรุณาอธิบายว่าคุณต้องการสร้างไดเรกทอรีประเภทใด",
+                    "nameRequired": "ต้องระบุชื่อไดเรกทอรี",
+                    "slugRequired": "ต้องระบุ slug ไดเรกทอรี",
+                    "descriptionRequired": "ต้องระบุคำอธิบายไดเรกทอรี"
+                },
+                "success": {
+                    "started": "เริ่มสร้างไดเรกทอรีแล้ว!",
+                    "generating": "AI กำลังสร้างเนื้อหา อาจใช้เวลาสองสามนาที...",
+                    "created": "สร้างไดเรกทอรีสำเร็จแล้ว!"
+                },
+                "advancedSettings": "การตั้งค่าขั้นสูง",
+                "advancedSubtitle": "กำหนดค่าองค์กรและการตั้งค่ารีโพสิทอรี",
+                "organizationLabel": "รีโพสิทอรีองค์กร",
+                "organizationHelp": "สร้างรีโพสิทอรีภายใต้องค์กรแทนบัญชีส่วนตัวของคุณ",
+                "organizationNameLabel": "ชื่อองค์กร",
+                "organizationNamePlaceholder": "ป้อนชื่อองค์กร"
+            },
+            "manual": {
+                "title": "สร้างด้วยตนเอง",
+                "subtitle": "กำหนดค่าไดเรกทอรีของคุณด้วยการควบคุมเต็มที่ทุกการตั้งค่าและตัวเลือก",
+                "configureNow": "กำหนดค่าตอนนี้",
+                "formTitle": "สร้างไดเรกทอรีด้วยตนเอง",
+                "formSubtitle": "กำหนดค่าไดเรกทอรีของคุณด้วยการควบคุมเต็มที่ทุกการตั้งค่า",
+                "basicInfo": "ข้อมูลพื้นฐาน",
+                "nameLabel": "ชื่อไดเรกทอรี *",
+                "namePlaceholder": "เช่น, เครื่องมือ AI ที่น่าทึ่ง",
+                "slugLabel": "Slug ไดเรกทอรี *",
+                "slugPlaceholder": "awesome-ai-tools",
+                "githubRequired": "กรุณาเชื่อมต่อบัญชี GitHub ของคุณก่อน",
+                "slugHelp": "ตัวระบุที่เป็นมิตรกับ URL (ตัวอักษรพิมพ์เล็ก ตัวเลข และขีดกลางเท่านั้น)",
+                "descriptionLabel": "คำอธิบาย *",
+                "descriptionPlaceholder": "รายการที่คัดสรรแล้วของเครื่องมือและทรัพยากร AI ที่ดีที่สุดสำหรับนักพัฒนา",
+                "advancedSettings": "การตั้งค่าขั้นสูง",
+                "advancedSubtitle": "องค์กร หัวข้อกำหนดเอง และอื่นๆ",
+                "organizationLabel": "สร้างภายใต้องค์กร",
+                "organizationHelp": "สร้างไดเรกทอรีนี้ภายใต้องค์กร GitHub แทนบัญชีส่วนตัวของคุณ",
+                "organizationNameLabel": "ชื่อองค์กร",
+                "organizationNamePlaceholder": "my-organization",
+                "headerLabel": "หัวข้อ README กำหนดเอง",
+                "headerPlaceholder": "เพิ่มเนื้อหาที่กำหนดเองที่ด้านบนของไฟล์ README ของคุณ",
+                "headerOverwrite": "แทนที่หัวข้อเริ่มต้นทั้งหมด",
+                "footerLabel": "ส่วนท้าย README กำหนดเอง",
+                "footerPlaceholder": "เพิ่มเนื้อหาที่กำหนดเองที่ด้านล่างของไฟล์ README ของคุณ",
+                "footerOverwrite": "แทนที่ส่วนท้ายเริ่มต้นทั้งหมด",
+                "createButton": "สร้างไดเรกทอรี",
+                "creatingButton": "กำลังสร้างไดเรกทอรี...",
+                "cancelButton": "ยกเลิก",
+                "nameRequired": "ต้องระบุชื่อไดเรกทอรี",
+                "slugRequired": "ต้องระบุ slug ไดเรกทอรี",
+                "descriptionRequired": "ต้องระบุคำอธิบายไดเรกทอรี",
+                "success": {
+                    "created": "สร้างไดเรกทอรีสำเร็จแล้ว!"
+                }
+            },
+            "import": {
+                "title": "นำเข้าจากที่มีอยู่",
+                "subtitle": "นำเข้าไดเรกทอรีจากรีโพสิทอรี GitHub ที่มีอยู่",
+                "importNow": "นำเข้าตอนนี้",
+                "formTitle": "นำเข้าไดเรกทอรีจาก GitHub",
+                "formSubtitle": "นำเข้ารายการจากรีโพสิทอรี GitHub ที่มีอยู่เพื่อสร้างไดเรกทอรีของคุณ",
+                "sync": {
+                    "title": "คงการซิงค์ไว้",
+                    "description": "ดึงการอัปเดตจากรีโพสิทอรีแหล่งที่มาโดยอัตโนมัติ"
+                },
+                "sourceMethod": {
+                    "url": {
+                        "title": "วาง URL",
+                        "description": "ป้อน URL รีโพสิทอรี GitHub โดยตรง"
+                    },
+                    "repository": {
+                        "title": "รีโพสิทอรีของฉัน",
+                        "description": "เลือกจากรีโพสิทอรี GitHub ของคุณ"
+                    }
+                },
+                "urlLabel": "URL รีโพสิทอรี GitHub",
+                "urlPlaceholder": "https://github.com/owner/repository",
+                "urlHelp": "ป้อน URL เต็มของรีโพสิทอรี GitHub",
+                "supportedFormats": {
+                    "title": "รูปแบบรีโพสิทอรีที่รองรับ",
+                    "dataRepo": {
+                        "title": "รีโพสิทอรีข้อมูล",
+                        "description": "รีโพสิทอรีที่มีโครงสร้าง config.yml และโฟลเดอร์ data/"
+                    },
+                    "awesomeReadme": {
+                        "title": "รายการ Awesome",
+                        "description": "รีโพสิทอรีรายการที่คัดสรรแล้วด้วย README แบบ markdown"
+                    }
+                },
+                "analyzing": {
+                    "title": "กำลังวิเคราะห์รีโพสิทอรี",
+                    "subtitle": "กำลังตรวจจับประเภทรีโพสิทอรีและโครงสร้าง..."
+                },
+                "detectedType": {
+                    "dataRepo": "ตรวจจับรีโพสิทอรีข้อมูลแล้ว",
+                    "awesomeReadme": "ตรวจจับรายการ Awesome แล้ว"
+                },
+                "badges": {
+                    "dataRepo": "รีโพสิทอรีข้อมูล",
+                    "awesomeReadme": "รายการ Awesome"
+                },
+                "preview": {
+                    "items": "รายการ",
+                    "categories": "หมวดหมู่"
+                },
+                "nameLabel": "ชื่อไดเรกทอรี",
+                "namePlaceholder": "เช่น, ไดเรกทอรีที่น่าทึ่งของฉัน",
+                "advancedSettings": "การตั้งค่าขั้นสูง",
+                "advancedSubtitle": "กำหนดค่าองค์กรและการตั้งค่ารีโพสิทอรี",
+                "attribution": {
+                    "title": "แหล่งที่มาอ้างอิง:",
+                    "text": "ไดเรกทอรีนี้จะอ้างอิง {url} เป็นแหล่งที่มา"
+                },
+                "analyzeButton": "วิเคราะห์รีโพสิทอรี",
+                "importButton": "นำเข้าไดเรกทอรี",
+                "importingButton": "กำลังนำเข้า...",
+                "backButton": "กลับ",
+                "cancelButton": "ยกเลิก",
+                "importing": {
+                    "title": "กำลังนำเข้าไดเรกทอรี",
+                    "subtitle": "กำลังตั้งค่าไดเรกทอรีของคุณจากรีโพสิทอรีแหล่งที่มา..."
+                },
+                "repositorySelector": {
+                    "title": "เลือกรีโพสิทอรี",
+                    "searchPlaceholder": "ค้นหารีโพสิทอรี...",
+                    "loading": "กำลังโหลดรีโพสิทอรี...",
+                    "noRepositories": "ไม่พบรีโพสิทอรี",
+                    "noResults": "ไม่มีรีโพสิทอรีที่ตรงกับการค้นหาของคุณ",
+                    "tryAgain": "ลองอีกครั้ง",
+                    "loadMore": "โหลดเพิ่ม",
+                    "showing": "แสดง {shown} จาก {total} รีโพสิทอรี",
+                    "today": "วันนี้",
+                    "yesterday": "เมื่อวาน",
+                    "daysAgo": "{days} วันที่แล้ว",
+                    "weeksAgo": "{weeks} สัปดาห์ที่แล้ว",
+                    "repositoriesLoaded": "รีโพสิทอรีโหลดแล้ว",
+                    "moreAvailable": "มีเพิ่มเติม",
+                    "errors": {
+                        "fetchFailed": "ไม่สามารถโหลดรีโพสิทอรีได้"
+                    }
+                },
+                "chooseMode": {
+                    "title": "เลือกรูปแบบการนำเข้า",
+                    "repository": "รีโพสิทอรี: {owner}/{repo}",
+                    "repositoryWithItems": "รีโพสิทอรี: {owner}/{repo} ({itemCount} รายการ)",
+                    "importCopy": {
+                        "title": "นำเข้า & คัดลอก",
+                        "description": "สร้างรีโพสิทอรีใหม่ด้วยการคัดลอกข้อมูล เหมาะสำหรับการ fork หรือเริ่มใหม่"
+                    },
+                    "linkExisting": {
+                        "title": "เชื่อมโยงที่มีอยู่",
+                        "description": "ใช้รีโพสิทอรีที่มีอยู่ของคุณโดยตรง ไม่มีการคัดลอก การเปลี่ยนแปลงจะซิงค์โดยอัตโนมัติ"
+                    },
+                    "back": "กลับ"
+                },
+                "linkConfirm": {
+                    "title": "เชื่อมโยงรีโพสิทอรี",
+                    "descriptionMissing": "ไม่พบรีโพสิทอรีบางส่วน คุณสามารถดำเนินการต่อโดยไม่มีหรือสร้างตอนนี้",
+                    "descriptionReady": "พบรีโพสิทอรีทั้งหมดแล้ว พร้อมเชื่อมโยง",
+                    "dataRepo": "รีโพสิทอรีข้อมูล",
+                    "markdownRepo": "รีโพสิทอรี Markdown",
+                    "websiteRepo": "รีโพสิทอรีเว็บไซต์",
+                    "found": "พบแล้ว",
+                    "notFound": "ไม่พบ",
+                    "cancel": "ยกเลิก",
+                    "continueWithout": "ดำเนินการต่อโดยไม่มี",
+                    "createMissing": "สร้างที่ขาดหาย",
+                    "creating": "กำลังสร้าง...",
+                    "linking": "กำลังเชื่อมโยง...",
+                    "linkRepos": "เชื่อมโยงรีโพสิทอรี"
+                },
+                "errors": {
+                    "urlRequired": "กรุณาป้อน URL รีโพสิทอรี GitHub",
+                    "unsupportedFormat": "ไม่รองรับรูปแบบรีโพสิทอรีนี้ กรุณาใช้รูปแบบรีโพสิทอรีข้อมูลหรือรายการ Awesome",
+                    "analyzeFailed": "ไม่สามารถวิเคราะห์รีโพสิทอรีได้",
+                    "analyzeForLinkingFailed": "ไม่สามารถวิเคราะห์สำหรับการเชื่อมโยงได้",
+                    "nameRequired": "ต้องระบุชื่อไดเรกทอรี",
+                    "noAnalysis": "กรุณาวิเคราะห์รีโพสิทอรีก่อน",
+                    "githubRequired": "กรุณาเชื่อมต่อบัญชี GitHub ของคุณก่อน",
+                    "importFailed": "ไม่สามารถนำเข้าไดเรกทอรีได้",
+                    "linkFailed": "ไม่สามารถเชื่อมโยงไดเรกทอรีได้"
+                },
+                "success": {
+                    "started": "เริ่มนำเข้าแล้ว! กำลังเปลี่ยนเส้นทางไปยังไดเรกทอรีของคุณ...",
+                    "linked": "เชื่อมโยงไดเรกทอรีสำเร็จแล้ว"
+                }
+            }
+        },
+        "github": {
+            "connection": {
+                "alert": {
+                    "title": "ไม่ได้เชื่อมต่อ GitHub",
+                    "subtitle": "เชื่อมต่อบัญชี GitHub ของคุณเพื่อสร้างและจัดการไดเรกทอรี",
+                    "connectButton": "เชื่อมต่อ GitHub",
+                    "connectingButton": "กำลังเชื่อมต่อ..."
+                },
+                "status": {
+                    "title": "สถานะ GitHub",
+                    "connected": "เชื่อมต่อแล้ว",
+                    "notConnected": "ยังไม่ได้เชื่อมต่อ",
+                    "connectedDescription": "ไดเรกทอรีของคุณจะถูกเก็บเป็นรีโพสิทอรี GitHub ในบัญชีของคุณ",
+                    "notConnectedDescription": "เชื่อมต่อบัญชี GitHub ของคุณเพื่อสร้างและจัดการไดเรกทอรี",
+                    "connectedAccount": "บัญชีที่เชื่อมต่อ:",
+                    "requiredNote": "จำเป็นต้องใช้เพื่อสร้างไดเรกทอรี",
+                    "connectButton": "เชื่อมต่อ GitHub",
+                    "connectingButton": "กำลังเชื่อมต่อ...",
+                    "failedToConnect": "ไม่สามารถเชื่อมต่อ GitHub ได้"
+                }
+            }
+        },
+        "apiTokens": {
+            "title": "API & โทเค็น",
+            "subtitle": "จัดการคีย์ API และการรวมบริการของบุคคลที่สาม",
+            "vercel": {
+                "title": "การรวม Vercel",
+                "subtitle": "เชื่อมต่อบัญชี Vercel ของคุณเพื่อเผยแพร่ไดเรกทอรีเป็นเว็บไซต์",
+                "connected": "เชื่อมต่อแล้ว",
+                "notConnected": "ยังไม่ได้เชื่อมต่อ",
+                "connectedMessage": "บัญชี Vercel ของคุณเชื่อมต่อแล้ว ตอนนี้คุณสามารถเผยแพร่ไดเรกทอรีไปยัง Vercel ได้แล้ว",
+                "disconnect": "ยกเลิกการเชื่อมต่อ Vercel",
+                "disconnecting": "กำลังลบ...",
+                "apiTokenLabel": "โทเค็น API Vercel",
+                "placeholder": "vc_...",
+                "showToken": "แสดง",
+                "hideToken": "ซ่อน",
+                "getTokenHelp": "คุณสามารถรับโทเค็น API ของคุณจาก",
+                "vercelDashboard": "แดชบอร์ด Vercel",
+                "save": "บันทึกโทเค็น",
+                "saving": "กำลังบันทึก...",
+                "messages": {
+                    "tokenRequired": "กรุณาป้อนโทเค็น Vercel ที่ถูกต้อง",
+                    "saveSuccess": "บันทึกโทเค็น Vercel สำเร็จแล้ว",
+                    "saveFailed": "ไม่สามารถบันทึกโทเค็น Vercel ได้",
+                    "removeSuccess": "ลบโทเค็น Vercel สำเร็จแล้ว",
+                    "removeFailed": "ไม่สามารถลบโทเค็น Vercel ได้",
+                    "unexpectedError": "เกิดข้อผิดพลาดที่ไม่คาดคิด"
+                }
+            },
+            "apiKeys": {
+                "title": "คีย์ API",
+                "subtitle": "สร้างและจัดการคีย์ API สำหรับการเข้าถึงแบบโปรแกรม",
+                "generate": "สร้างคีย์ API (เร็วๆ นี้)"
+            },
+            "webhooks": {
+                "title": "Webhooks",
+                "subtitle": "กำหนดค่า Webhooks เพื่อรับการอัปเดตแบบเรียลไทม์",
+                "configure": "กำหนดค่า Webhooks (เร็วๆ นี้)"
+            }
+        },
+        "notifications": {
+            "title": "ค่ากำหนดการแจ้งเตือน",
+            "subtitle": "เลือกวิธีที่คุณต้องการได้รับการแจ้งเตือนเกี่ยวกับการอัปเดตที่สำคัญ",
+            "email": {
+                "title": "การแจ้งเตือนทางอีเมล",
+                "directoryUpdates": {
+                    "label": "การอัปเดตไดเรกทอรี",
+                    "description": "รับการแจ้งเตือนเกี่ยวกับการอัปเดตที่สำคัญในไดเรกทอรีของคุณ"
+                },
+                "newItems": {
+                    "label": "รายการใหม่",
+                    "description": "รับการแจ้งเตือนเมื่อมีรายการใหม่เพิ่มในไดเรกทอรีของคุณ"
+                },
+                "weeklyDigest": {
+                    "label": "สรุปรายสัปดาห์",
+                    "description": "รับสรุปประจำสัปดาห์เกี่ยวกับกิจกรรมไดเรกทอรีของคุณ"
+                },
+                "marketing": {
+                    "label": "การตลาด & โปรโมชัน",
+                    "description": "รับการอัปเดตเกี่ยวกับฟีเจอร์ใหม่และข้อเสนอ"
+                }
+            },
+            "app": {
+                "title": "การแจ้งเตือนในแอป",
+                "newItems": {
+                    "label": "รายการใหม่",
+                    "description": "แสดงการแจ้งเตือนสำหรับรายการไดเรกทอรีใหม่"
+                },
+                "comments": {
+                    "label": "ความคิดเห็น",
+                    "description": "รับการแจ้งเตือนเกี่ยวกับความคิดเห็นในไดเรกทอรีของคุณ"
+                },
+                "mentions": {
+                    "label": "ถูกกล่าวถึง",
+                    "description": "รับการแจ้งเตือนเมื่อมีใครกล่าวถึงคุณ"
+                },
+                "systemUpdates": {
+                    "label": "อัปเดตระบบ",
+                    "description": "การแจ้งเตือนระบบที่สำคัญและการแจ้งเตือนการบำรุงรักษา"
+                }
+            },
+            "actions": {
+                "save": "บันทึกค่ากำหนด",
+                "saving": "กำลังบันทึก..."
+            },
+            "messages": {
+                "success": "อัปเดตค่ากำหนดการแจ้งเตือนแล้ว",
+                "error": "ไม่สามารถอัปเดตค่ากำหนดได้",
+                "unexpectedError": "เกิดข้อผิดพลาดที่ไม่คาดคิด"
+            }
+        },
+        "sidebar": {
+            "menu": "เมนู",
+            "aiChat": "แชท AI",
+            "newDirectory": "ไดเรกทอรีใหม่",
+            "navigation": {
+                "dashboard": "แดชบอร์ด",
+                "directories": "ไดเรกทอรี",
+                "settings": "การตั้งค่า"
+            },
+            "signOut": "ออกจากระบบ",
+            "signingOut": "กำลังออกจากระบบ..."
+        },
+        "dangerZone": {
+            "title": "โซนอันตราย",
+            "subtitle": "การดำเนินการที่ไม่สามารถย้อนกลับได้และการทำลายล้าง",
+            "export": {
+                "title": "ส่งออกข้อมูลของคุณ",
+                "subtitle": "ดาวน์โหลดไดเรกทอรีทั้งหมด รายการ และการตั้งค่าของคุณ",
+                "action": "ส่งออกข้อมูล (เร็วๆ นี้)"
+            },
+            "delete": {
+                "title": "ลบบัญชี",
+                "subtitle": "ลบบัญชีและข้อมูลที่เกี่ยวข้องทั้งหมดอย่างถาวร การดำเนินการนี้ไม่สามารถย้อนกลับได้",
+                "button": "ลบบัญชีของฉัน",
+                "confirmTitle": "⚠️ นี่จะลบอย่างถาวร:",
+                "confirmItems": [
+                    "บัญชีและโปรไฟล์ของคุณ",
+                    "ไดเรกทอรีทั้งหมดของคุณ",
+                    "รายการไดเรกทอรีและข้อมูลทั้งหมด",
+                    "คีย์ API และการรวม",
+                    "เว็บไซต์ที่เกี่ยวข้องทั้งหมด"
+                ],
+                "confirmLabel": "พิมพ์อีเมลของคุณ {email} เพื่อยืนยัน",
+                "confirmPlaceholder": "ป้อนอีเมลของคุณ",
+                "confirmButton": "ใช่ ลบบัญชีของฉัน",
+                "deleting": "กำลังลบ...",
+                "cancel": "ยกเลิก"
+            },
+            "messages": {
+                "confirmEmail": "กรุณาป้อนอีเมลของคุณอย่างถูกต้องเพื่อยืนยัน",
+                "deleteSuccess": "ลบบัญชีสำเร็จแล้ว",
+                "deleteFailed": "ไม่สามารถลบบัญชีได้",
+                "unexpectedError": "เกิดข้อผิดพลาดที่ไม่คาดคิด"
+            }
+        },
+        "aiChat": {
+            "title": "ผู้ช่วย AI",
+            "subtitle": "สร้างไดเรกทอรีด้วยภาษาธรรมชาติ",
+            "newChat": "แชทใหม่",
+            "loadingConversation": "กำลังโหลดบทสนทนา…",
+            "inputPlaceholder": "อธิบายไดเรกทอรีที่คุณต้องการสร้าง...",
+            "sendButton": "ส่ง"
+        }
+    },
+    "layout": {
+        "auth": {
+            "backToHome": "กลับไปที่หน้าแรก",
+            "feature": {
+                "title": "สร้างไดเรกทอรีด้วย AI",
+                "subtitle": "สร้างไดเรกทอรีที่สวยงามและค้นหาได้ภายในไม่กี่นาทีโดยใช้ภาษาธรรมชาติ ไม่ต้องเขียนโค้ด",
+                "benefits": {
+                    "ai": {
+                        "title": "การสร้างด้วย AI",
+                        "description": "อธิบายสิ่งที่คุณต้องการและให้ AI ทำหน้าที่"
+                    },
+                    "templates": {
+                        "title": "เทมเพลตระดับมืออาชีพ",
+                        "description": "เริ่มต้นด้วยการออกแบบที่สวยงามและปรับแต่งได้"
+                    },
+                    "management": {
+                        "title": "การจัดการที่ง่ายดาย",
+                        "description": "อัปเดตและจัดระเบียบเนื้อหาของคุณได้อย่างง่ายดาย"
+                    }
+                }
+            },
+            "footer": {
+                "copyright": "© {year} {companyName}. สงวนลิขสิทธิ์.",
+                "terms": "ข้อกำหนดการให้บริการ",
+                "privacy": "นโยบายความเป็นส่วนตัว",
+                "help": "ช่วยเหลือ"
+            }
+        }
+    },
+    "errors": {
+        "global": {
+            "title": "มีบางอย่างผิดพลาด!",
+            "tryAgain": "ลองอีกครั้ง"
+        }
+    },
+    "metadata": {
+        "title": "{companyName} - ตัวสร้างไดเรกทอรี",
+        "description": "แพลตฟอร์ม SaaS สำหรับการสร้างและจัดการไดเรกทอรี"
+    },
+    "api": {
+        "errors": {
+            "unauthorized": "คุณไม่ได้รับอนุญาตให้ดำเนินการนี้",
+            "unauthorizedLogin": "ไม่ได้รับอนุญาต: กรุณาเข้าสู่ระบบอีกครั้ง",
+            "forbidden": "ห้าม: คุณไม่มีสิทธิ์ดำเนินการนี้",
+            "serverError": "ข้อผิดพลาดเซิร์ฟเวอร์: {message}",
+            "unexpected": "เกิดข้อผิดพลาดเซิร์ฟเวอร์ที่ไม่คาดคิด",
+            "apiError": "ข้อผิดพลาด API: {status} {statusText}",
+            "loginFailed": "เข้าสู่ระบบล้มเหลว",
+            "registerFailed": "ไม่สามารถสมัครสมาชิกได้",
+            "unsupportedProvider": "ผู้ให้บริการไม่รองรับ",
+            "providerConnectFailed": "ไม่สามารถเชื่อมต่อผู้ให้บริการได้",
+            "forgotPasswordFailed": "ไม่สามารถส่งอีเมลรีเซ็ตรหัสผ่านได้",
+            "resetPasswordFailed": "ไม่สามารถรีเซ็ตรหัสผ่านได้"
+        }
+    },
+    "actions": {
+        "directories": {
+            "slug": {
+                "required": "ต้องระบุ slug",
+                "format": "slug ต้องเป็นตัวอักษรพิมพ์เล็ก ตัวเลข และขีดกลางเท่านั้น"
+            },
+            "name": {
+                "required": "ต้องระบุชื่อ",
+                "maxLength": "ชื่อต้องน้อยกว่า 100 ตัวอักษร"
+            },
+            "description": {
+                "required": "ต้องระบุคำอธิบาย",
+                "maxLength": "คำอธิบายต้องน้อยกว่า 500 ตัวอักษร"
+            },
+            "prompt": {
+                "minLength": "พรอมต์ต้องมีอย่างน้อย 10 ตัวอักษร",
+                "maxLength": "พรอมต์ต้องน้อยกว่า 1000 ตัวอักษร"
+            },
+            "oauthRequired": "จำเป็นต้องเชื่อมต่อ OAuth กรุณาเชื่อมต่อบัญชี {provider} ของคุณก่อน",
+            "githubRequired": "จำเป็นต้องเชื่อมต่อ GitHub กรุณาเชื่อมต่อบัญชี GitHub ของคุณก่อน",
+            "createSuccess": "สร้างไดเรกทอรีสำเร็จแล้ว!",
+            "createFailed": "ไม่สามารถสร้างไดเรกทอรีได้",
+            "updateSuccess": "อัปเดตไดเรกทอรีสำเร็จแล้ว!",
+            "updateFailed": "ไม่สามารถอัปเดตไดเรกทอรีได้",
+            "invalidGeneratedData": "ไม่สามารถสร้างข้อมูลไดเรกทอรีที่ถูกต้องได้",
+            "aiGenerationStarted": "เริ่มสร้างไดเรกทอรีแล้ว! AI กำลังสร้างเนื้อหา...",
+            "invalidId": "รหัสไดเรกทอรีไม่ถูกต้อง",
+            "deleteSuccess": "ลบไดเรกทอรีสำเร็จแล้ว",
+            "deleteFailed": "ไม่สามารถลบไดเรกทอรีได้",
+            "fetchFailed": "ไม่สามารถดึงไดเรกทอรีได้",
+            "organization": {
+                "requiredWhenOwnerProvided": "ต้องเปิดใช้งานองค์กรเมื่อระบุเจ้าของ"
+            },
+            "import": {
+                "invalidUrl": "กรุณาป้อน URL ที่ถูกต้อง",
+                "analyzeFailed": "ไม่สามารถวิเคราะห์รีโพสิทอรีได้",
+                "started": "เริ่มนำเข้าสำเร็จแล้ว",
+                "failed": "ไม่สามารถนำเข้าไดเรกทอรีได้",
+                "fetchReposFailed": "ไม่สามารถดึงรีโพสิทอรีได้"
+            }
+        },
+        "generator": {
+            "promptRequired": "ต้องระบุพรอมต์",
+            "nameRequired": "ต้องระบุชื่อ",
+            "generationStartedSuccessfully": "เริ่มการสร้างสำเร็จแล้ว",
+            "updateStartedSuccessfully": "เริ่มการอัปเดตสำเร็จแล้ว",
+            "failedToGenerateItems": "ไม่สามารถสร้างรายการได้",
+            "failedToUpdateItems": "ไม่สามารถอัปเดตรายการได้",
+            "markdownRegeneratedSuccessfully": "สร้าง Markdown ใหม่สำเร็จแล้ว",
+            "failedToRegenerateMarkdown": "ไม่สามารถสร้าง Markdown ใหม่ได้",
+            "notAuthorizedToAccessOrganization": "คุณไม่ได้รับอนุญาตให้เข้าถึงองค์กรนี้ กรุณาติดต่อเจ้าของ ({owner}) สำหรับความช่วยเหลือ"
+        },
+        "settings": {
+            "profile": {
+                "usernameRequired": "ต้องระบุชื่อผู้ใช้",
+                "usernameMaxLength": "ชื่อผู้ใช้ต้องน้อยกว่า 50 ตัวอักษร",
+                "usernameFormat": "ชื่อผู้ใช้สามารถมีได้เฉพาะตัวอักษร ตัวเลข ขีด และขีดล่าง",
+                "updateFailed": "ไม่สามารถอัปเดตโปรไฟล์ได้",
+                "notAuthenticated": "ไม่ได้รับการยืนยันตัวตน"
+            },
+            "password": {
+                "currentRequired": "ต้องระบุรหัสผ่านปัจจุบัน",
+                "newMinLength": "รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร",
+                "newMaxLength": "รหัสผ่านต้องน้อยกว่า 100 ตัวอักษร",
+                "updateFailed": "ไม่สามารถอัปเดตรหัสผ่านได้",
+                "updateSuccess": "อัปเดตรหัสผ่านสำเร็จแล้ว",
+                "notAuthenticated": "ไม่ได้รับการยืนยันตัวตน"
+            },
+            "vercel": {
+                "notAuthenticated": "ไม่ได้รับการยืนยันตัวตน",
+                "tokenRequired": "ต้องระบุโทเค็น",
+                "invalidFormat": "รูปแบบโทเค็น Vercel ไม่ถูกต้อง",
+                "saveFailed": "ไม่สามารถบันทึกโทเค็น Vercel ได้",
+                "saveSuccess": "บันทึกโทเค็น Vercel สำเร็จแล้ว",
+                "validationFailed": "โทเค็น Vercel ที่ให้มาไม่ถูกต้อง กรุณาตรวจสอบและลองอีกครั้ง",
+                "removeFailed": "ไม่สามารถลบโทเค็น Vercel ได้",
+                "removeSuccess": "ลบโทเค็น Vercel สำเร็จแล้ว"
+            },
+            "github": {
+                "notAuthenticated": "ไม่ได้รับการยืนยันตัวตน",
+                "disconnectFailed": "ไม่สามารถยกเลิกการเชื่อมต่อ GitHub ได้",
+                "disconnectSuccess": "ยกเลิกการเชื่อมต่อบัญชี GitHub สำเร็จแล้ว"
+            },
+            "notifications": {
+                "notAuthenticated": "ไม่ได้รับการยืนยันตัวตน",
+                "updateFailed": "ไม่สามารถอัปเดตค่ากำหนดได้",
+                "updateSuccess": "อัปเดตค่ากำหนดการแจ้งเตือนสำเร็จแล้ว"
+            },
+            "danger": {
+                "notAuthenticated": "ไม่ได้รับการยืนยันตัวตน",
+                "deleteFailed": "ไม่สามารถลบบัญชีได้",
+                "deleteDisabled": "การลบบัญชีถูกปิดใช้งานในการสาธิต"
+            }
+        },
+        "deploy": {
+            "deployVercelFailed": "ไม่สามารถเผยแพร่ไปยัง Vercel ได้",
+            "updateRepositoryFailed": "ไม่สามารถอัปเดตรีโพสิทอรีได้",
+            "updateSettingsFailed": "ไม่สามารถอัปเดตการตั้งค่าเทมเพลตเว็บไซต์ได้"
+        }
+    },
+    "validation": {
+        "auth": {
+            "invalidCredentials": "อีเมลหรือรหัสผ่านไม่ถูกต้อง",
+            "account": {
+                "suspended": "บัญชีถูกระงับ"
+            },
+            "email": {
+                "required": "อีเมลไม่สามารถเว้นว่างได้",
+                "invalid": "อีเมลไม่ถูกต้อง",
+                "emailAlreadyRegistered": "อีเมลถูกสมัครแล้ว"
+            },
+            "password": {
+                "required": "รหัสผ่านไม่สามารถเว้นว่างได้",
+                "minLength": "รหัสผ่านต้องมีอย่างน้อย {length} ตัวอักษร",
+                "lowercase": "รหัสผ่านต้องมีอย่างน้อยหนึ่งตัวอักษรพิมพ์เล็ก",
+                "numberOrSpecial": "รหัสผ่านต้องมีอย่างน้อยหนึ่งตัวเลขหรืออักขระพิเศษ",
+                "cannotStartWith": "รหัสผ่านไม่สามารถขึ้นต้นด้วยจุดหรือบรรทัดใหม่",
+                "digit": "รหัสผ่านต้องมีอย่างน้อยหนึ่งตัวเลข"
+            },
+            "username": {
+                "minLength": "ชื่อผู้ใช้ต้องมีอย่างน้อย {length} ตัวอักษร"
+            }
+        }
+    }
+}

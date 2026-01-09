@@ -10,7 +10,29 @@ export const COMPANY_OWNER_WEBSITE =
     'https://ever.works';
 
 // i18n
-export const LOCALES = ['en', 'ar', 'de', 'es', 'fr', 'zh'] as const;
+export const LOCALES = [
+    'en',
+    'ar',
+    'bg',
+    'de',
+    'es',
+    'fr',
+    'he',
+    'hi',
+    'id',
+    'it',
+    'ja',
+    'ko',
+    'nl',
+    'pl',
+    'pt',
+    'ru',
+    'th',
+    'tr',
+    'uk',
+    'vi',
+    'zh',
+] as const;
 
 export const DEFAULT_LOCALE = (process.env.NEXT_PUBLIC_DEFAULT_LOCALE ||
     'en') as (typeof LOCALES)[number];
