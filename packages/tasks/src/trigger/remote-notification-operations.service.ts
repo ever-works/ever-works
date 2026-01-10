@@ -30,7 +30,7 @@ export class RemoteNotificationOperationsService implements NotificationOperatio
             actionUrl: '/settings',
             actionLabel: 'Add Credits',
             isPersistent: true,
-            deduplicationKey: `ai_credits_depleted_${provider}`,
+            deduplicationKey: `ai_credits_depleted_${provider.toLowerCase()}`,
         });
     }
 
@@ -47,7 +47,7 @@ export class RemoteNotificationOperationsService implements NotificationOperatio
             message: `Error with ${provider}: ${errorMessage}`,
             actionUrl: '/settings',
             actionLabel: 'Check Settings',
-            deduplicationKey: `ai_provider_error_${provider}`,
+            deduplicationKey: `ai_provider_error_${provider.toLowerCase()}`,
         });
     }
 
@@ -99,7 +99,7 @@ export class RemoteNotificationOperationsService implements NotificationOperatio
             actionUrl: '/settings/oauth',
             actionLabel: 'Reconnect',
             isPersistent: true,
-            deduplicationKey: `git_auth_expired_${provider}`,
+            deduplicationKey: `git_auth_expired_${provider.toLowerCase()}`,
         });
     }
 

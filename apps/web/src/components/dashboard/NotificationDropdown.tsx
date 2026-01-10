@@ -13,6 +13,7 @@ import {
 } from '@/app/actions/notifications';
 import { useRouter } from 'next/navigation';
 import { formatDistanceToNow } from 'date-fns';
+import { toast } from 'sonner';
 
 interface NotificationDropdownProps {
     className?: string;
@@ -303,6 +304,8 @@ export function NotificationDropdown({ className }: NotificationDropdownProps) {
             if (notification && !notification.isRead) {
                 setUnreadCount((prev) => Math.max(0, prev - 1));
             }
+        } else {
+            toast.error(result.error || 'Failed to dismiss notification');
         }
     };
 

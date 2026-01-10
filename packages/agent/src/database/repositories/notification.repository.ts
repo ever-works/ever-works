@@ -96,13 +96,16 @@ export class NotificationRepository {
     }
 
     async getUnreadCount(userId: string): Promise<number> {
-        return await this.repository.count({
-            where: {
-                userId,
-                isRead: false,
-                isDismissed: false,
-            },
-        });
+        // Use query builder to filter expired notifications (expiresAt is bigint)
+        return await this.repository
+            .createQueryBuilder('notification')
+            .where('notification.userId = :userId', { userId })
+            .andWhere('notification.isRead = :isRead', { isRead: false })
+            .andWhere('notification.isDismissed = :isDismissed', { isDismissed: false })
+            .andWhere('(notification.expiresAt IS NULL OR notification.expiresAt > :now)', {
+                now: Date.now(),
+            })
+            .getCount();
     }
 
     async deleteExpired(): Promise<number> {
@@ -138,14 +141,17 @@ export class NotificationRepository {
     }
 
     async getPersistentNotifications(userId: string): Promise<Notification[]> {
-        return await this.repository.find({
-            where: {
-                userId,
-                isPersistent: true,
-                isDismissed: false,
-            },
-            order: { createdAt: 'DESC' },
-        });
+        // Use query builder to filter expired notifications (expiresAt is bigint)
+        return await this.repository
+            .createQueryBuilder('notification')
+            .where('notification.userId = :userId', { userId })
+            .andWhere('notification.isPersistent = :isPersistent', { isPersistent: true })
+            .andWhere('notification.isDismissed = :isDismissed', { isDismissed: false })
+            .andWhere('(notification.expiresAt IS NULL OR notification.expiresAt > :now)', {
+                now: Date.now(),
+            })
+            .orderBy('notification.createdAt', 'DESC')
+            .getMany();
     }
 
     async clearDeduplicationKey(userId: string, deduplicationKey: string): Promise<void> {

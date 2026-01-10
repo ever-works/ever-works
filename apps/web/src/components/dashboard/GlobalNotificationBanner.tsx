@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils/cn';
 import { Notification, NotificationType } from '@/lib/api/notifications';
 import { getPersistentNotifications, dismissNotification } from '@/app/actions/notifications';
 import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 
 interface GlobalNotificationBannerProps {
     className?: string;
@@ -199,6 +200,8 @@ export function GlobalNotificationBanner({ className }: GlobalNotificationBanner
         const result = await dismissNotification(notificationId);
         if (result.success) {
             setNotifications((prev) => prev.filter((n) => n.id !== notificationId));
+        } else {
+            toast.error(result.error || 'Failed to dismiss notification');
         }
     };
 
