@@ -51,6 +51,7 @@ interface AnalysisResult {
         hasConfig: boolean;
         hasDataFolder: boolean;
         hasReadme: boolean;
+        isMultiFile?: boolean;
         itemCount?: number;
         categoryCount?: number;
     };
@@ -69,6 +70,9 @@ export function DirectoryImportForm({ user }: DirectoryImportFormProps) {
     const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
     const [linkAnalysis, setLinkAnalysis] = useState<AnalyzeForLinkingResponseDto | null>(null);
     const [showLinkConfirm, setShowLinkConfirm] = useState(false);
+    const [manualSourceType, setManualSourceType] = useState<'data_repo' | 'awesome_readme' | null>(
+        null,
+    );
     const [isPending, startTransition] = useTransition();
     const router = useRouter();
     const t = useTranslations('dashboard.directoryCreation.import');
@@ -95,15 +99,11 @@ export function DirectoryImportForm({ user }: DirectoryImportFormProps) {
                 if (result.data.error) {
                     toast.error(result.data.error);
                     setStep('source');
-                } else if (!result.data.detectedType) {
-                    toast.error(t('errors.unsupportedFormat'));
-                    setStep('source');
                 } else {
                     // Pre-fill directory name from repo name
                     if (!directoryName && result.data.repo) {
                         let repoName = result.data.repo;
                         // Strip -data suffix for data repos to avoid naming conflicts
-                        // (e.g., my-dir-data would create my-dir-data-data for the data repo)
                         if (repoName.endsWith('-data')) {
                             repoName = repoName.slice(0, -5);
                         }
@@ -111,8 +111,19 @@ export function DirectoryImportForm({ user }: DirectoryImportFormProps) {
                             repoName.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
                         );
                     }
-                    // For data_repo, show mode selection
-                    if (result.data.detectedType === 'data_repo') {
+
+                    // Reset manual source type when detection succeeds
+                    setManualSourceType(null);
+
+                    if (!result.data.detectedType) {
+                        // Format not auto-detected, allow manual selection
+                        // Default to awesome_readme if there's a README
+                        if (result.data.structure?.hasReadme) {
+                            setManualSourceType('awesome_readme');
+                        }
+                        setStep('configure');
+                    } else if (result.data.detectedType === 'data_repo') {
+                        // For data_repo, show mode selection
                         setStep('choose_mode');
                     } else {
                         setStep('configure');
@@ -179,7 +190,8 @@ export function DirectoryImportForm({ user }: DirectoryImportFormProps) {
             return;
         }
 
-        if (!analysisResult || !analysisResult.detectedType) {
+        const sourceType = analysisResult?.detectedType || manualSourceType;
+        if (!analysisResult || !sourceType) {
             toast.error(t('errors.noAnalysis'));
             return;
         }
@@ -189,7 +201,7 @@ export function DirectoryImportForm({ user }: DirectoryImportFormProps) {
         startTransition(async () => {
             const result = await importDirectory({
                 sourceUrl,
-                sourceType: analysisResult.detectedType!,
+                sourceType,
                 name: directoryName,
                 organization,
                 owner: organization ? owner : undefined,
@@ -391,10 +403,12 @@ export function DirectoryImportForm({ user }: DirectoryImportFormProps) {
         </div>
     );
 
+    const effectiveSourceType = analysisResult?.detectedType || manualSourceType;
+
     const renderConfigureStep = () => (
         <div className="space-y-6">
-            {/* Analysis Result */}
-            {analysisResult && (
+            {/* Analysis Result - Auto-detected */}
+            {analysisResult && analysisResult.detectedType && (
                 <div
                     className={cn(
                         'p-4 rounded-lg',
@@ -452,6 +466,63 @@ export function DirectoryImportForm({ user }: DirectoryImportFormProps) {
                                 </div>
                             )}
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Manual Format Selection - When auto-detection failed */}
+            {analysisResult && !analysisResult.detectedType && (
+                <div className="space-y-4">
+                    <div className="p-4 rounded-lg bg-info/5 border border-info/20">
+                        <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
+                            We could not automatically detect the format. Please select how to
+                            import this repository.
+                        </p>
+                        <p className="text-sm text-text-muted dark:text-text-muted-dark mt-1">
+                            {analysisResult.owner}/{analysisResult.repo}
+                        </p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <button
+                            type="button"
+                            onClick={() => setManualSourceType('awesome_readme')}
+                            className={cn(
+                                'p-4 rounded-lg border-2 text-left transition-all',
+                                'bg-card dark:bg-card-dark',
+                                manualSourceType === 'awesome_readme'
+                                    ? 'border-warning shadow-md'
+                                    : 'border-card-border dark:border-card-border-dark hover:border-warning/50',
+                            )}
+                        >
+                            <FileText className="w-6 h-6 text-warning mb-2" />
+                            <h4 className="font-medium text-text dark:text-text-dark">
+                                {t('supportedFormats.awesomeReadme.title')}
+                            </h4>
+                            <p className="text-xs text-text-secondary dark:text-text-secondary-dark">
+                                {t('supportedFormats.awesomeReadme.description')}
+                            </p>
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={() => setManualSourceType('data_repo')}
+                            className={cn(
+                                'p-4 rounded-lg border-2 text-left transition-all',
+                                'bg-card dark:bg-card-dark',
+                                manualSourceType === 'data_repo'
+                                    ? 'border-primary shadow-md'
+                                    : 'border-card-border dark:border-card-border-dark hover:border-primary/50',
+                            )}
+                        >
+                            <Database className="w-6 h-6 text-primary mb-2" />
+                            <h4 className="font-medium text-text dark:text-text-dark">
+                                {t('supportedFormats.dataRepo.title')}
+                            </h4>
+                            <p className="text-xs text-text-secondary dark:text-text-secondary-dark">
+                                {t('supportedFormats.dataRepo.description')}
+                            </p>
+                        </button>
                     </div>
                 </div>
             )}
@@ -545,6 +616,7 @@ export function DirectoryImportForm({ user }: DirectoryImportFormProps) {
                     onClick={() => {
                         setStep('source');
                         setAnalysisResult(null);
+                        setManualSourceType(null);
                     }}
                     disabled={isPending}
                     variant="secondary"
@@ -556,7 +628,7 @@ export function DirectoryImportForm({ user }: DirectoryImportFormProps) {
                 </Button>
                 <Button
                     onClick={handleImport}
-                    disabled={isPending || !directoryName.trim()}
+                    disabled={isPending || !directoryName.trim() || !effectiveSourceType}
                     loading={isPending}
                     variant="primary"
                     size="lg"

@@ -489,15 +489,6 @@ export class DirectoryImportService {
                 `Parsed ${parsedData.items.length} items, ${parsedData.categories.length} categories`,
             );
 
-            if (parsedData.items.length === 0) {
-                return {
-                    success: false,
-                    directoryId: directory.id,
-                    error: 'No items could be extracted from README',
-                    errorCode: DirectoryImportErrorCode.AI_EXTRACTION_FAILED,
-                };
-            }
-
             const parsed = this.sourceRepoAnalyzer.parseGitHubUrl(sourceUrl);
             const initResult = await this.dataGenerator.initializeWithImportedData(
                 directory,

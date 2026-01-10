@@ -281,12 +281,10 @@ export class SourceRepoAnalyzerService {
                     structure.isMultiFile = isMultiFile;
 
                     if (isMultiFile) {
-                        // For multi-file structures, count subdirectories with README as potential item sources
                         const subDirs = contents.filter((c) => c.type === 'dir');
                         structure.categoryCount = subDirs.length;
 
-                        // Try to estimate item count from table of contents or subdirectory names
-                        // e.g., "ai-apis-1208" -> extract 1208
+                        // Extract item counts from directory names if available (e.g., "category-123")
                         let estimatedItems = 0;
                         for (const dir of subDirs) {
                             const countMatch = dir.name.match(/-(\d+)$/);
@@ -294,8 +292,7 @@ export class SourceRepoAnalyzerService {
                                 estimatedItems += parseInt(countMatch[1], 10);
                             }
                         }
-                        structure.itemCount =
-                            estimatedItems > 0 ? estimatedItems : subDirs.length * 50; // Estimate ~50 items per category
+                        structure.itemCount = estimatedItems > 0 ? estimatedItems : undefined;
                     } else {
                         const listItems = this.countListItems(readmeContent);
                         structure.itemCount = listItems > 0 ? listItems : undefined;
