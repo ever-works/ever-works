@@ -36,6 +36,7 @@ export class AnalyzeRepositoryResponseDto {
         hasConfig: boolean;
         hasDataFolder: boolean;
         hasReadme: boolean;
+        isMultiFile?: boolean;
         itemCount?: number;
         categoryCount?: number;
     };

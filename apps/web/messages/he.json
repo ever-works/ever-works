@@ -1,0 +1,1543 @@
+{
+    "auth": {
+        "error": {
+            "title": "שגיאת אימות",
+            "subtitle": "מצאנו בעיה בתהליך האימות שלך",
+            "errorOccurred": "אירעה שגיאה",
+            "somethingWentWrong": "משהו השתבש",
+            "generic": "אירעה שגיאה בלתי צפויה. אנא נסה שוב מאוחר יותר.",
+            "invalidCredentials": "כתובת האימייל או הסיסמה שהזנת אינם נכונים.",
+            "emailNotVerified": "אנא אמת את כתובת האימייל שלך לפני ההתחברות.",
+            "accountLocked": "החשבון שלך ננעל מסיבות אבטחה.",
+            "sessionExpired": "הסשן שלך פג תוקף. אנא התחבר שוב.",
+            "networkError": "לא ניתן להתחבר. אנא בדוק את חיבור האינטרנט שלך.",
+            "oauth": {
+                "missingCode": "קוד ההרשאה חסר. אנא נסה להתחבר שוב.",
+                "invalidState": "מצב הרשאה לא חוקי. אנא נסה להתחבר שוב.",
+                "unsupportedProvider": "ספק אימות זה אינו נתמך.",
+                "callbackFailed": "אימות נכשל. אנא נסה שוב."
+            },
+            "resetPassword": {
+                "missingToken": "קישור איפוס הסיסמה אינו תקין. אסימון אימות חסר.",
+                "invalidToken": "קישור איפוס הסיסמה אינו תקין או זויף.",
+                "expiredToken": "קישור איפוס הסיסמה פג תוקף. אנא בקש קישור חדש.",
+                "failed": "איפוס הסיסמה נכשל. אנא נסה שוב או בקש קישור איפוס חדש."
+            },
+            "verifyEmail": {
+                "missingToken": "קישור אימות האימייל אינו תקין. אסימון אימות חסר.",
+                "invalidToken": "קישור אימות האימייל אינו תקין או שכבר נעשה בו שימוש.",
+                "expiredToken": "קישור אימות האימייל פג תוקף. אנא בקש קישור חדש.",
+                "failed": "אימות האימייל נכשל. אנא נסה שוב או בקש קישור אימות חדש."
+            },
+            "authorize": {
+                "invalidRedirectUrl": "כתובת ההפניה אינה תקינה או מורשה. אנא צור קשר עם התמיכה אם אתה סבור שמדובר בשגיאה."
+            },
+            "actions": {
+                "backToLogin": "חזרה להתחברות",
+                "tryRegister": "נסה להירשם",
+                "resendVerification": "שלח שוב מייל אימות",
+                "contactSupport": "צור קשר עם התמיכה",
+                "requestNewReset": "בקש קישור איפוס חדש"
+            },
+            "helpText": "אם אתה ממשיך להיתקל בבעיות, אנא עיין במשאבי העזרה שלנו למטה.",
+            "links": {
+                "help": "מרכז עזרה",
+                "systemStatus": "מצב המערכת"
+            }
+        },
+        "login": {
+            "title": "ברוך שובך",
+            "subtitle": "התחבר לחשבונך כדי להמשיך",
+            "form": {
+                "email": {
+                    "label": "כתובת אימייל",
+                    "placeholder": "you@example.com"
+                },
+                "password": {
+                    "label": "סיסמה",
+                    "placeholder": "הזן את הסיסמה שלך"
+                },
+                "forgotPassword": "שכחת סיסמה?",
+                "rememberMe": "זכור אותי למשך 30 יום",
+                "submit": "התחבר",
+                "submitting": "מתחבר..."
+            },
+            "socialLogin": {
+                "divider": "או המשך עם",
+                "google": "Google",
+                "github": "GitHub"
+            },
+            "signUp": {
+                "text": "אין לך חשבון?",
+                "link": "הירשם"
+            },
+            "errors": {
+                "invalidCredentials": "כתובת אימייל או סיסמה לא חוקיים"
+            },
+            "passwordReset": {
+                "success": "איפוס הסיסמה הצליח!",
+                "canLogin": "אתה יכול כעת להתחבר עם הסיסמה החדשה שלך."
+            }
+        },
+        "forgotPassword": {
+            "title": "שכחת סיסמה?",
+            "subtitle": "אין בעיה, נשלח לך הוראות לאיפוס",
+            "successTitle": "בדוק את האימייל שלך",
+            "successSubtitle": "שלחנו לך את הוראות איפוס הסיסמה",
+            "form": {
+                "email": {
+                    "label": "כתובת אימייל",
+                    "placeholder": "הזן את האימייל שלך"
+                },
+                "submit": "שלח קישור איפוס",
+                "submitting": "שולח..."
+            },
+            "success": {
+                "title": "האימייל נשלח בהצלחה",
+                "message": "שלחנו הוראות איפוס סיסמה ל-{email}",
+                "checkSpam": "אם אינך רואה את האימייל, בדוק את תיקיית הספאם שלך."
+            },
+            "errors": {
+                "failed": "שליחת מייל איפוס סיסמה נכשלה. אנא נסה שוב."
+            },
+            "backToLogin": "חזרה להתחברות",
+            "noAccount": {
+                "text": "אין לך חשבון?",
+                "link": "הירשם"
+            }
+        },
+        "resetPassword": {
+            "title": "אפס את הסיסמה שלך",
+            "subtitle": "הזן את הסיסמה החדשה שלך למטה",
+            "successTitle": "איפוס הסיסמה הצליח",
+            "successSubtitle": "הסיסמה שלך עודכנה",
+            "form": {
+                "password": {
+                    "label": "סיסמה חדשה",
+                    "placeholder": "הזן את הסיסמה החדשה שלך",
+                    "helperText": "חייבת להכיל לפחות 6 תווים עם אות קטנה וספרה/תו מיוחד",
+                    "errors": {
+                        "minLength": "הסיסמה חייבת להכיל לפחות 6 תווים",
+                        "lowercase": "הסיסמה חייבת להכיל לפחות אות קטנה אחת",
+                        "numberOrSpecial": "הסיסמה חייבת להכיל לפחות ספרה או תו מיוחד אחד",
+                        "cannotStartWith": "הסיסמה לא יכולה להתחיל בנקודה או בשורה חדשה"
+                    }
+                },
+                "confirmPassword": {
+                    "label": "אשר סיסמה חדשה",
+                    "placeholder": "אשר את הסיסמה החדשה שלך",
+                    "errors": {
+                        "noMatch": "הסיסמאות אינן תואמות"
+                    }
+                },
+                "submit": "אפס סיסמה",
+                "submitting": "מאפס..."
+            },
+            "success": {
+                "title": "איפוס הסיסמה הצליח",
+                "message": "הסיסמה שלך עודכנה בהצלחה. כעת תוכל להתחבר עם הסיסמה החדשה שלך.",
+                "loginButton": "עבור להתחברות"
+            },
+            "errors": {
+                "failed": "איפוס הסיסמה נכשל. אנא נסה שוב או בקש קישור איפוס חדש.",
+                "noToken": "קישור איפוס לא חוקי",
+                "invalidLink": "קישור איפוס לא חוקי",
+                "missingTokenMessage": "קישור איפוס הסיסמה אינו תקין או לא שלם. אנא בקש איפוס סיסמה חדש.",
+                "requestNewLink": "בקש קישור איפוס חדש"
+            },
+            "backToLogin": "חזרה להתחברות"
+        },
+        "register": {
+            "title": "צור את חשבונך",
+            "subtitle": "התחל ליצור מדריכים מדהימים עוד היום",
+            "form": {
+                "name": {
+                    "label": "שם מלא",
+                    "placeholder": "יוסף לוי"
+                },
+                "email": {
+                    "label": "כתובת אימייל",
+                    "placeholder": "you@example.com"
+                },
+                "password": {
+                    "label": "סיסמה",
+                    "placeholder": "צור סיסמה חזקה",
+                    "hint": "חייבת להכיל לפחות 8 תווים"
+                },
+                "confirmPassword": {
+                    "label": "אשר סיסמה",
+                    "placeholder": "אשר את הסיסמה שלך"
+                },
+                "terms": {
+                    "text": "אני מסכים",
+                    "termsLink": "לתנאי השימוש",
+                    "and": "ול-",
+                    "privacyLink": "מדיניות הפרטיות"
+                },
+                "submit": "צור חשבון",
+                "submitting": "יוצר חשבון..."
+            },
+            "socialSignUp": {
+                "divider": "או הירשם עם",
+                "google": "Google",
+                "github": "GitHub"
+            },
+            "signIn": {
+                "text": "כבר יש לך חשבון?",
+                "link": "התחבר"
+            },
+            "errors": {
+                "passwordsDoNotMatch": "הסיסמאות אינן תואמות",
+                "passwordTooShort": "הסיסמה חייבת להכיל לפחות 8 תווים",
+                "generic": "אירעה שגיאה. אנא נסה שוב."
+            }
+        }
+    },
+    "dashboard": {
+        "title": "לוח בקרה",
+        "toasts": {
+            "newUser": {
+                "title": "ברוך הבא ל-{companyName}! 🎉",
+                "description": "חשבונך נוצר בהצלחה. אנא אמת את חשבונך על ידי בדיקת האימייל שלך."
+            },
+            "emailVerification": {
+                "title": "אמת את האימייל שלך",
+                "description": "שלחנו קישור אימות לכתובת האימייל שלך. אנא בדוק את תיבת הדואר הנכנס ותיקיית הספאם שלך.",
+                "action": "שלח שוב אימייל"
+            },
+            "verified": {
+                "title": "האימייל אומת בהצלחה! ✅",
+                "description": "כתובת האימייל שלך אומתה. כעת יש לך גישה לכל התכונות."
+            },
+            "oauthConnected": {
+                "title": "חשבון חובר ל-GitHub",
+                "description": "חשבונך חובר בהצלחה ל-GitHub."
+            }
+        },
+        "header": {
+            "welcome": "ברוך שובך, {username}!",
+            "subtitle": "נהל את המדריכים המונחים ב-AI שלך ועקוב אחר הביצועים שלהם",
+            "notifications": {
+                "title": "התראות",
+                "empty": "אין התראות חדשות"
+            }
+        },
+        "directories": {
+            "title": "מדריכים",
+            "subtitle": "נהל וארגן את המדריכים המונחים ב-AI שלך",
+            "recent": "מדריכים אחרונים",
+            "viewAll": "הצג הכל ({count})",
+            "search": "חפש מדריכים...",
+            "create": "צור מדריך",
+            "showing": "מציג {current} מתוך {total} מדריכים",
+            "pagination": {
+                "previous": "קודם",
+                "next": "הבא"
+            },
+            "empty": {
+                "title": "אין עדיין מדריכים",
+                "description": "צור את המדריך המונחה ב-AI הראשון שלך כדי להתחיל לארגן ולהציג את התוכן שלך.",
+                "action": "צור את המדריך הראשון שלך",
+                "notFound": {
+                    "title": "לא נמצאו מדריכים",
+                    "withSearch": "נסה להתאים את מונחי החיפוש שלך",
+                    "withoutSearch": "צור את המדריך המונחה ב-AI הראשון שלך כדי להתחיל"
+                }
+            }
+        },
+        "settings": {
+            "title": "הגדרות",
+            "subtitle": "נהל הגדרות והעדפות חשבון",
+            "tabs": {
+                "profile": "פרופיל",
+                "security": "אבטחה",
+                "apiTokens": "API ואסימונים",
+                "oauth": "חשבונות מחוברים",
+                "notifications": "התראות",
+                "dangerZone": "אזור מסוכן"
+            },
+            "profile": {
+                "title": "הגדרות פרופיל",
+                "subtitle": "עדכן את פרטי הפרופיל והתמונת שלך",
+                "fields": {
+                    "name": "שם",
+                    "username": "שם משתמש",
+                    "email": "אימייל",
+                    "emailHelperText": "לא ניתן לשנות את האימייל"
+                },
+                "placeholders": {
+                    "name": "הזן את שמך",
+                    "username": "הזן את שם המשתמש שלך"
+                },
+                "actions": {
+                    "save": "שמור שינויים"
+                },
+                "messages": {
+                    "success": "הפרופיל עודכן בהצלחה",
+                    "usernameRequired": "שם משתמש נדרש",
+                    "error": "עדכון הפרופיל נכשל",
+                    "unexpectedError": "אירעה שגיאה בלתי צפויה"
+                }
+            },
+            "security": {
+                "title": "הגדרות אבטחה",
+                "subtitle": "נהל אבטחה ואימות חשבון",
+                "changePassword": {
+                    "title": "שנה סיסמה",
+                    "currentPassword": "סיסמה נוכחית",
+                    "newPassword": "סיסמה חדשה",
+                    "confirmPassword": "אשר סיסמה חדשה",
+                    "showPasswords": "הצג סיסמאות",
+                    "placeholders": {
+                        "current": "הזן את הסיסמה הנוכחית",
+                        "new": "הזן סיסמה חדשה (מינימום 8 תווים)",
+                        "confirm": "אשר סיסמה חדשה"
+                    },
+                    "actions": {
+                        "update": "עדכן סיסמה"
+                    },
+                    "messages": {
+                        "success": "הסיסמה עודכנה בהצלחה",
+                        "fillAllFields": "אנא מלא את כל שדות הסיסמה",
+                        "minLength": "הסיסמה החדשה חייבת להכיל לפחות 8 תווים",
+                        "mismatch": "הסיסמאות החדשות אינן תואמות",
+                        "sameAsCurrent": "הסיסמה החדשה חייבת להיות שונה מהסיסמה הנוכחית",
+                        "error": "עדכון הסיסמה נכשל",
+                        "unexpectedError": "אירעה שגיאה בלתי צפויה"
+                    }
+                },
+                "twoFactor": {
+                    "title": "אימות דו-שלבי",
+                    "subtitle": "הוסף שכבת אבטחה נוספת לחשבונך",
+                    "action": "בקרוב יהיה זמין"
+                },
+                "sessions": {
+                    "title": "סשנים פעילים",
+                    "subtitle": "נהל את הסשנים הפעילים שלך בכל המכשירים שלך",
+                    "action": "הצג סשנים (בקרוב זמין)"
+                }
+            },
+            "oauth": {
+                "title": "חשבונות מחוברים",
+                "subtitle": "חבר את החשבונות החיצוניים שלך לתכונות משופרות",
+                "github": {
+                    "name": "GitHub",
+                    "connected": "צור ונהל מדריכים עם מאגרי GitHub",
+                    "disconnected": "התחבר כדי ליצור מדריכים ממאגרים",
+                    "scopes": "היקפים",
+                    "actions": {
+                        "connect": "חבר",
+                        "disconnect": "נתק",
+                        "confirmDisconnect": "האם אתה בטוח שברצונך לנתק את חשבון ה-GitHub שלך?"
+                    },
+                    "messages": {
+                        "disconnected": "חשבון GitHub נותק",
+                        "connectError": "החיבור ל-GitHub נכשל",
+                        "disconnectError": "הניתוק מ-GitHub נכשל"
+                    }
+                }
+            }
+        },
+        "stats": {
+            "totalDirectories": "סך המדריכים",
+            "totalItems": "סך הפריטים",
+            "activeWebsites": "אתרים פעילים",
+            "fromLastMonth": "מהחודש שעבר"
+        },
+        "directoryCard": {
+            "role": {
+                "owner": "בעלים",
+                "manager": "מנהל",
+                "editor": "עורך",
+                "viewer": "צופה"
+            },
+            "shared": {
+                "tooltip": "שותף איתך בתור {role}"
+            },
+            "status": {
+                "active": "פעיל",
+                "notStarted": "לא התחיל",
+                "generating": "מייצר",
+                "generated": "נוצר",
+                "error": "שגיאה",
+                "cancelled": "בוטל",
+                "idle": "לא פעיל"
+            },
+            "noDescription": "לא סופק תיאור",
+            "items": "{count} פריטים",
+            "views": "{count} צפיות",
+            "updated": "עודכן בתאריך {date}",
+            "viewAction": "הצג →"
+        },
+        "directoryList": {
+            "title": "המדריכים שלך",
+            "createButton": "צור מדריך"
+        },
+        "directoryDetail": {
+            "failedToGenerateItems": "יצירת הפריטים נכשלה. אנא נסה שוב.",
+            "generationCompleted": "היצירה הושלמה בהצלחה",
+            "generationCancelled": "היצירה בוטלה",
+            "role": {
+                "owner": "בעלים",
+                "manager": "מנהל",
+                "editor": "עורך",
+                "viewer": "צופה"
+            },
+            "shared": {
+                "tooltip": "שותף איתך בתור {role}"
+            },
+            "status": {
+                "notStarted": "לא התחיל",
+                "generating": "מייצר",
+                "generated": "נוצר",
+                "error": "שגיאה",
+                "cancelled": "בוטל"
+            },
+            "tabs": {
+                "overview": "סקירה כללית",
+                "items": "פריטים",
+                "generator": "מחולל",
+                "schedule": "תזמון",
+                "history": "היסטוריה",
+                "deploy": "פריסה",
+                "members": "חברים",
+                "settings": "הגדרות"
+            },
+            "members": {
+                "title": "חברי צוות",
+                "subtitle": "נהל מי יכול לגשת למדריך זה והרשאותיהם.",
+                "inviteMember": "הזמן חבר",
+                "noMembers": "אין עדיין חברים. הזמן מישהו לשתף פעולה.",
+                "roles": {
+                    "creator": "יוצר",
+                    "owner": "בעלים",
+                    "manager": "מנהל",
+                    "editor": "עורך",
+                    "viewer": "קורא"
+                },
+                "roleDescriptions": {
+                    "owner": "שליטה מלאה כולל מחיקה וניהול חברים.",
+                    "manager": "יכול לערוך את המדריך ולנהל חברים, אך לא יכול למחוק.",
+                    "editor": "יכול לערוך את תוכן המדריך ולהפעיל יצירות.",
+                    "viewer": "גישת קריאה בלבד לצפייה במדריך."
+                },
+                "invite": {
+                    "title": "הזמן חבר",
+                    "description": "הוסף חבר חדש לשתף פעולה במדריך זה.",
+                    "emailLabel": "כתובת אימייל",
+                    "emailPlaceholder": "colleague@example.com",
+                    "roleLabel": "תפקיד",
+                    "submit": "שלח הזמנה",
+                    "cancel": "בטל",
+                    "success": "חבר הוזמן בהצלחה.",
+                    "errors": {
+                        "emailRequired": "כתובת אימייל נדרשת.",
+                        "failed": "הזמנת החבר נכשלה. אנא נסה שוב."
+                    }
+                },
+                "confirmRemove": {
+                    "title": "הסר חבר",
+                    "description": "האם אתה בטוח שברצונך להסיר את {username} ממדריך זה? הם יאבדו כל גישה.",
+                    "confirm": "הסר",
+                    "cancel": "בטל"
+                },
+                "roleUpdated": "תפקיד החבר עודכן.",
+                "memberRemoved": "חבר הוסר בהצלחה.",
+                "errors": {
+                    "updateFailed": "עדכון תפקיד החבר נכשל.",
+                    "removeFailed": "הסרת החבר נכשלה."
+                }
+            },
+            "statusCard": {
+                "notStarted": {
+                    "title": "יצירה לא התחילה",
+                    "description": "התחל ליצור פריטים עבור המדריך שלך כדי למלא אותו בתוכן.",
+                    "action": "התחל יצירה"
+                },
+                "generating": {
+                    "title": "יוצר כעת",
+                    "description": "מעבד את בקשתך...",
+                    "processing": "מעבד..."
+                },
+                "generated": {
+                    "title": "יצירה הושלמה",
+                    "description": "המדריך שלך מולא בהצלחה בפריטים.",
+                    "viewItems": "הצג פריטים",
+                    "regenerate": "צור מחדש"
+                },
+                "error": {
+                    "title": "יצירה נכשלה",
+                    "description": "אירעה שגיאה במהלך היצירה.",
+                    "retry": "נסה ליצור שוב"
+                },
+                "cancelled": {
+                    "title": "יצירה בוטלה",
+                    "description": "היצירה הקודמת הופסקה לפני השלמתה.",
+                    "restart": "הפעל מחדש יצירה"
+                }
+            },
+            "stats": {
+                "totalItems": "סך הפריטים",
+                "categories": "קטגוריות",
+                "generationStatus": "מצב יצירה",
+                "daysActive": "ימים פעילים"
+            },
+            "history": {
+                "title": "היסטוריית יצירה",
+                "subtitle": "עקוב אחר הרצות יצירה קודמות, פריטים שנוצרו ופרטי הרצה.",
+                "error": "טעינת רשומות נוספות נכשלה",
+                "empty": {
+                    "title": "אין עדיין היסטוריה",
+                    "description": "בקש יצירה כדי לראות את ההתקדמות והתוצאות כאן."
+                },
+                "status": {
+                    "generating": "בתהליך",
+                    "generated": "הושלם",
+                    "error": "נכשל",
+                    "cancelled": "בוטל"
+                },
+                "table": {
+                    "run": "הרצה",
+                    "status": "מצב",
+                    "newItems": "פריטים חדשים",
+                    "updatedItems": "עודכנו",
+                    "totalItems": "סך הכל",
+                    "duration": "משך",
+                    "startedAt": "התחיל",
+                    "tokens": "אסימונים",
+                    "cost": "עלות"
+                },
+                "loadMore": "טען עוד",
+                "noMore": "אין רשומות נוספות",
+                "unknown": "לא ידוע"
+            },
+            "info": {
+                "title": "פרטי מדריך",
+                "yourRole": "התפקיד שלך",
+                "role": {
+                    "owner": "בעלים",
+                    "manager": "מנהל",
+                    "editor": "עורך",
+                    "viewer": "צופה"
+                },
+                "slug": "Slug",
+                "repositories": "מאגרים",
+                "dataRepo": "מאגר נתונים",
+                "websiteRepo": "מאגר אתר אינטרנט",
+                "mainRepo": "מאגר ראשי",
+                "repoProvider": "ספק מאגר",
+                "organization": "ארגון",
+                "created": "נוצר",
+                "lastUpdated": "עודכן לאחרונה",
+                "readmeHeader": "כותרת README",
+                "readmeFooter": "כותרת תחתונה README",
+                "custom": "מותאם אישית",
+                "customOverwrite": "מותאם אישית (דריסה)",
+                "yes": "כן",
+                "no": "לא"
+            },
+            "config": {
+                "title": "פרטי הגדרה",
+                "initialPrompt": "פקודת יצירה ראשונית",
+                "companyDetails": "פרטי חברה",
+                "companyName": "שם החברה",
+                "companyWebsite": "אתר אינטרנט",
+                "generationSettings": "הגדרות יצירה",
+                "generationMethod": "שיטת יצירה",
+                "autoApproval": "אישור אוטומטי",
+                "pagingMode": "מצב עימוד",
+                "contentTable": "תוכן עניינים",
+                "enabled": "מופעל",
+                "disabled": "מושבת",
+                "pullRequestUpdate": "פרטי בקשת משיכה",
+                "branch": "ענף",
+                "prTitle": "כותרת PR",
+                "mainRepository": "מאגר ראשי",
+                "dataRepository": "מאגר נתונים"
+            },
+            "activity": {
+                "title": "פעילות אחרונה",
+                "noActivity": "אין עדיין פעילות",
+                "created": "מדריך נוצר",
+                "directoryCreated": "המדריך נוצר בהצלחה",
+                "justNow": "עכשיו"
+            },
+            "items": {
+                "title": "פריטי מדריך",
+                "subtitle": "נהל וארגן את הפריטים במדריך שלך",
+                "noItemsTitle": "אין עדיין פריטים",
+                "noItemsDescription": "למדריך שלך עדיין אין פריטים. צור פריטים כדי למלא את המדריך שלך בתוכן.",
+                "generateItems": "צור פריטים",
+                "searchPlaceholder": "חפש פריטים...",
+                "allCategories": "כל הקטגוריות",
+                "showing": "מציג {current} מתוך {total} פריטים",
+                "noMatch": "אין פריטים התואמים את קריטריוני החיפוש שלך",
+                "source": "מקור",
+                "addItem": "הוסף פריט",
+                "delete": "מחק",
+                "deleteWithPR": "מחק עם בקשת משיכה",
+                "deleteConfirm": "האם אתה בטוח שברצונך למחוק את \"{name}\"?",
+                "deleteSuccess": "הפריט נמחק בהצלחה",
+                "deleteFailed": "מחיקת הפריט נכשלה",
+                "deleteError": "אירעה שגיאה במחיקת הפריט",
+                "updateItem": "עדכן פריט",
+                "loadingMore": "טוען... ({current} מתוך {total})",
+                "addModal": {
+                    "title": "הוסף פריט חדש",
+                    "sourceUrl": "כתובת URL מקור",
+                    "sourceUrlPlaceholder": "https://example.com/product",
+                    "sourceUrlHelp": "לחץ על 'חלץ' כדי לאחזר אוטומטית פרטי פריט מכתובת ה-URL",
+                    "extract": "חלץ",
+                    "extractSuccess": "פרטי הפריט חולצו בהצלחה",
+                    "extractFailed": "חילוץ פרטי הפריט נכשל",
+                    "extractError": "אירעה שגיאה בחילוץ הפרטים",
+                    "name": "שם",
+                    "namePlaceholder": "הזן את שם הפריט",
+                    "description": "תיאור",
+                    "descriptionPlaceholder": "הזן תיאור קצר של הפריט",
+                    "category": "קטגוריה",
+                    "tags": "תגיות",
+                    "tagPlaceholder": "הוסף תגית והקש Enter",
+                    "slug": "Slug (אופציונלי)",
+                    "slugPlaceholder": "custom-item-slug",
+                    "slugHelp": "מזהה תואם URL. ייווצר אוטומטית אם יישאר ריק",
+                    "brand": "מותג (אופציונלי)",
+                    "brandPlaceholder": "הזן את שם המותג",
+                    "brandLogoUrl": "כתובת URL לוגו מותג (אופציונלי)",
+                    "brandLogoUrlPlaceholder": "https://example.com/logo.png",
+                    "images": "תמונות (אופציונלי)",
+                    "imagePlaceholder": "https://example.com/screenshot.png",
+                    "imagesHelp": "הוסף כתובות URL לתמונות (צילומי מסך, תמונות מוצר)",
+                    "featured": "פריט מוצג",
+                    "featuredHelp": "סמן פריט זה כמוצג במדריך",
+                    "updateWithPR": "צור בקשת משיכה",
+                    "updateWithPRHelp": "שלח שינויים כבקשת משיכה במקום קומיט ישיר",
+                    "cancel": "בטל",
+                    "adding": "מוסיף...",
+                    "addItem": "הוסף פריט",
+                    "success": "הפריט נוסף בהצלחה",
+                    "successDescription": "הפריט נוסף למדריך שלך",
+                    "failed": "הוספת הפריט נכשלה",
+                    "error": "אירעה שגיאה בהוספת הפריט",
+                    "errors": {
+                        "urlRequired": "נדרשת כתובת URL מקור לחילוץ",
+                        "invalidUrl": "אנא הזן כתובת URL חוקית הכוללת http:// או https://",
+                        "invalidImageUrl": "אנא הזן כתובת URL תמונה חוקית",
+                        "requiredFields": "אנא מלא את כל השדות הנדרשים"
+                    }
+                },
+                "updateSuccess": "הפריט עודכן בהצלחה",
+                "updateFailed": "עדכון הפריט נכשל",
+                "updateError": "אירעה שגיאה בעדכון הפריט",
+                "editDisplay": "מחק",
+                "editDisplayDescription": "החלף סטטוס מוצג והגדר סדר תצוגה.",
+                "orderLabel": "סדר תצוגה (אופציונלי)",
+                "orderHelp": "מספרים נמוכים יותר מופיעים קודם בקבוצות המוצגות/לא מוצגות.",
+                "deleteDialogTitle": "מחק",
+                "deleteDialogDescription": "פעולה זו תמחק את {name} מהמאגר.",
+                "createPRLabel": "צור Pull Request",
+                "createPRHelp": "אם מופעל, השינויים מוצעים באמצעות PR במקום קומיט ישיר.",
+                "reasonLabel": "סיבה (אופציונלית)",
+                "reasonPlaceholder": "למה אתה מוחק פריט זה?",
+                "confirmDelete": "מחק פריט"
+            },
+            "generator": {
+                "regenerationWarning": "אזהרת יצירה מחדש",
+                "regenerationWarningDescription": "מדריך זה כבר נוצר. התחלת יצירה חדשה תחליף את הפריטים הקיימים.",
+                "requiredInfo": "מידע נדרש",
+                "updateConfiguration": "עדכן הגדרה",
+                "promptRequired": "הפקודה נדרשת",
+                "operationStartedSuccessfully": "הפעולה החלה בהצלחה",
+                "failedToStartOperation": "הפעלת הפעולה נכשלה",
+                "directoryName": "שם מדריך",
+                "generationPrompt": "פקודת יצירה",
+                "recommended": "מומלץ",
+                "promptPlaceholder": "תאר אילו פריטים יש ליצור עבור מדריך זה...",
+                "promptHelperText": "היה מדויק לגבי סוג התוכן שברצונך ליצור",
+                "repositoryDescription": "תיאור מאגר",
+                "repositoryPlaceholder": "תיאור קצר של המאגר (אופציונלי)",
+                "startGeneration": "התחל יצירה",
+                "regenerateItems": "צור מחדש פריטים",
+                "updateItems": "עדכן פריטים",
+                "recreateDirectory": "צור מחדש מדריך",
+                "showAdvancedOptions": "הצג אפשרויות מתקדמות",
+                "hideAdvancedOptions": "הסתר אפשרויות מתקדמות",
+                "cancel": "בטל",
+                "companyInformation": "פרטי חברה",
+                "companyInfoDescription": "פרטי חברה אופציונליים לתוכן מותג",
+                "companyName": "שם החברה",
+                "companyNamePlaceholder": "הזן את שם החברה",
+                "companyWebsite": "אתר אינטרנט של החברה",
+                "companyWebsitePlaceholder": "https://example.com",
+                "categoriesKeywords": "קטגוריות ומילות מפתח",
+                "categoriesDescription": "הגדר קטגוריות ומילות מפתח לארגון תוכן",
+                "initialCategories": "קטגוריות ראשוניות",
+                "priorityCategories": "קטגוריות עדיפות",
+                "targetKeywords": "מילות מפתח יעד",
+                "addCategoryPlaceholder": "הוסף קטגוריה",
+                "addPriorityCategoryPlaceholder": "הוסף קטגוריה עדיפות",
+                "addKeywordPlaceholder": "הוסף מילת מפתח",
+                "add": "הוסף",
+                "sourceUrls": "כתובות URL מקור",
+                "sourceUrlsDescription": "הוסף כתובות URL ספציפיות לחילוץ תוכן",
+                "sourceUrlPlaceholder": "https://example.com/page",
+                "addUrl": "הוסף כתובת URL",
+                "noSourceUrlsMessage": "לא נוספו כתובות URL מקור. המחולל ישתמש בחיפוש כדי למצוא תוכן.",
+                "advancedConfig": "הגדרה מתקדמת",
+                "advancedConfigDescription": "כוונן עדין הגדרות והתנהגות יצירה",
+                "generationMethod": "שיטת יצירה",
+                "methodCreateUpdate": "צור או עדכן",
+                "methodRecreate": "צור מחדש (החלף הכל)",
+                "updateWithPullRequest": "עדכן עם בקשת משיכה",
+                "updateWithPullRequestDescription": "צור בקשת משיכה במקום קומיטים ישירים",
+                "enableBadgeEvaluation": "הפעל הערכת תגים",
+                "enableBadgeEvaluationDescription": "הערך והוסף תגי איכות לפריטים",
+                "websiteRepositoryCreationMethod": "שיטת יצירת מאגר אתר אינטרנט",
+                "methodDuplicate": "שכפול",
+                "methodFork": "Fork",
+                "directoryNamePlaceholder": "הזן את שם המדריך",
+                "methodCreateFromTemplate": "צור מתבנית",
+                "aiProcessingConfiguration": "הגדרת עיבוד AI",
+                "maxSearchQueries": "מספר שאילתות חיפוש מרבי",
+                "resultsPerQuery": "תוצאות לשאילתה",
+                "maxPagesToProcess": "מספר דפים מרבי לעיבוד",
+                "relevanceThreshold": "סף רלוונטיות",
+                "aiFirstGeneration": "יצירת AI ראשונה",
+                "aiFirstGenerationDescription": "הפעל יצירת AI של פריטים ראשוניים לפני חיפוש אינטרנט.",
+                "contentFiltering": "סינון תוכן",
+                "contentFilteringDescription": "הפעל סינון איכות תוכן",
+                "recreateConfirmTitle": "צור מחדש נתוני מדריך?",
+                "recreateConfirmDescription": "יצירה מחדש תמחק פריטים קיימים ותיצור אותם מחדש מאפס. פעולה זו אינה ניתנת לביטול.",
+                "confirmRecreate": "כן, צור מחדש",
+                "recreateInlineTitle": "יצירה מחדש תמחק פריטים קיימים",
+                "recreateInlineDescription": "מצב זה מוחק את הפריטים הנוכחיים ובונה מחדש מאפס. המשך רק אם אתה רוצה להחליף הכל."
+            },
+            "progress": {
+                "title": "יוצר כעת",
+                "processingRequest": "מעבד את בקשתך...",
+                "steps": {
+                    "promptComparison": "השוואת פקודות",
+                    "promptProcessing": "מעבד את הפקודה שלך",
+                    "domainDetection": "זיהוי סוג דומיין",
+                    "aiFirstItemsGeneration": "יצירת פריטי AI ראשוניים",
+                    "searchQueriesGeneration": "יצירת שאילתות חיפוש",
+                    "webSearch": "חיפוש אינטרנט",
+                    "contentRetrieval": "אחזור תוכן",
+                    "contentFiltering": "סינון תוכן רלוונטי",
+                    "itemsExtraction": "חילוץ פריטים מתוכן",
+                    "deduplicationDataAggregation": "הסרת כפילויות ואיסוף נתונים",
+                    "categoriesTagsProcessing": "עיבוד קטגוריות ותגיות",
+                    "sourcesValidation": "אימות מקורות",
+                    "badgesProcessing": "עיבוד תגי איכות",
+                    "markdownGeneration": "יצירת תוכן Markdown",
+                    "processing": "מעבד..."
+                },
+                "progress": "התקדמות",
+                "closeNote": "זה יכול לקחת כמה דקות. אתה יכול לסגור דף זה ולחזור מאוחר יותר."
+            },
+            "settings": {
+                "sourceSettings": "מאגר מקור",
+                "originalSource": "מקור מקורי",
+                "syncEnabled": "סנכרון מופעל",
+                "syncDescription": "אחזר אוטומטית עדכונים ממאגר המקור.",
+                "syncUpdateFailed": "עדכון הגדרות הסנכרון נכשל",
+                "syncDisabled": "סנכרון מושבת",
+                "generalSettings": "הגדרות כלליות",
+                "generalTitle": "הגדרות כלליות",
+                "directoryName": "שם מדריך",
+                "description": "תיאור",
+                "organizationRepository": "מאגר ארגון",
+                "organizationHelp": "צור מאגרים תחת ארגון במקום חשבונך האישי",
+                "organizationName": "שם ארגון",
+                "organizationNamePlaceholder": "הזן את שם הארגון",
+                "readmeConfiguration": "הגדרת README",
+                "readmeTitle": "הגדרת README",
+                "customHeader": "כותרת מותאמת אישית",
+                "customHeaderPlaceholder": "הוסף תוכן מותאם אישית לכותרת ה-README",
+                "overwriteDefaultHeader": "דרוס כותרת ברירת מחדל",
+                "customFooter": "כותרת תחתונה מותאמת אישית",
+                "cantDeleteWhileGenerating": "לא ניתן למחוק את המדריך במהלך יצירת פריטים.",
+                "customFooterPlaceholder": "הוסף תוכן מותאם אישית לכותרת התחתונה של ה-README",
+                "overwriteDefaultFooter": "דרוס כותרת תחתונה ברירת מחדל",
+                "dangerZone": "אזור מסוכן",
+                "dangerTitle": "אזור מסוכן",
+                "deleteWarning": "ברגע שתמחק מדריך, אין דרך חזרה. אנא ודא שאתה בטוח.",
+                "dangerDescription": "ברגע שתמחק מדריך, אין דרך חזרה. אנא ודא שאתה בטוח.",
+                "deleteOptions": "בחר מה למחוק:",
+                "deleteDataRepository": "מחק מאגר נתונים",
+                "deleteDataRepositoryDescription": "מחק את מאגר ה-JSON נתונים מ-GitHub",
+                "deleteMarkdownRepository": "מחק מאגר markdown",
+                "deleteMarkdownRepositoryDescription": "מחק את מאגר ה-markdown המכיל את ה-README",
+                "deleteWebsiteRepository": "מחק מאגר אתר אינטרנט",
+                "deleteWebsiteRepositoryDescription": "מחק את מאגר אתר האינטרנט הפרוס",
+                "deleteConfirm": "האם אתה בטוח לחלוטין?",
+                "deleteConfirmDetail": "פעולה זו אינה ניתנת לביטול. המדריך והמאגרים שנבחרו יימחקו לצמיתות.",
+                "confirmDirectoryName": "הקלד את שם המדריך לאישור",
+                "confirmDirectoryNameDescription": "הקלד \"{name}\" כדי לאשר את המחיקה",
+                "deleteNameMismatch": "שם המדריך אינו תואם",
+                "deleteButton": "מחק מדריך",
+                "deleteConfirmButton": "כן, מחק",
+                "deleteSuccess": "המדריך נמחק בהצלחה",
+                "deleteFailed": "מחיקת המדריך נכשלה",
+                "yesDelete": "כן, מחק",
+                "cancel": "בטל",
+                "saveChanges": "שמור שינויים",
+                "updateReadme": "עדכן README",
+                "updateSuccess": "ההגדרות עודכנו בהצלחה",
+                "updateFailed": "עדכון ההגדרות נכשל"
+            },
+            "deploy": {
+                "noTokenAlert": {
+                    "title": "נדרש אסימון Vercel",
+                    "description": "כדי לפרוס את המדריך שלך ב-Vercel, עליך להגדיר את אסימון ה-API של Vercel שלך בהגדרות החשבון שלך.",
+                    "configureButton": "עבור להגדרות אסימוני API",
+                    "getTokenButton": "קבל אסימון Vercel",
+                    "howTo": {
+                        "title": "כיצד להגדיר את אסימון ה-Vercel שלך:",
+                        "step1": "לחץ על 'קבל אסימון Vercel' כדי לפתוח את לוח הבקרה של Vercel",
+                        "step2": "צור אסימון חדש עם הרשאות פריסה",
+                        "step3": "העתק את האסימון שנוצר",
+                        "step4": "עבור להגדרות אסימוני API והדבק את האסימון שלך בקטע Vercel"
+                    }
+                },
+                "sharedNoTokenAlert": {
+                    "title": "פריסה לא זמינה",
+                    "description": "בעל המדריך לא הגדיר אסימון Vercel לפריסה. אנא צור קשר עם בעל המדריך כדי להגדיר פריסה.",
+                    "hint": "כמשתף פעולה, תוכל להפעיל פריסות ברגע שבעל המדריך יקבל את שילוב ה-Vercel שלו."
+                },
+                "form": {
+                    "deployToVercel": {
+                        "title": "פרוס ל-Vercel",
+                        "description": "פרוס את מאגר אתר האינטרנט של המדריך שלך ב-Vercel.",
+                        "deployButton": "פרוס עכשיו",
+                        "deployingButton": "פורס...",
+                        "deployingStateButton": "פורס ({state})...",
+                        "successMessage": "אתר האינטרנט שלך נפרס בהצלחה!",
+                        "teamSelection": {
+                            "title": "בחר צוות Vercel",
+                            "description": "בחר את צוות ה-Vercel עליו לפרוס מדריך זה.",
+                            "label": "צוות",
+                            "placeholder": "בחר צוות",
+                            "confirmButton": "פרוס על הצוות",
+                            "cancelButton": "בטל"
+                        }
+                    },
+                    "updateRepository": {
+                        "title": "עדכן מאגר אתר אינטרנט",
+                        "description": "סנכרן את השינויים האחרונים מהתבנית ל-",
+                        "websiteRepository": "מאגר אתר אינטרנט",
+                        "updateButton": "עדכן מאגר",
+                        "updatingButton": "מעדכן..."
+                    },
+                    "messages": {
+                        "deploySuccess": "הפריסה החלה בהצלחה",
+                        "deployPending": "הפריסה בתור ותתחיל בקרוב",
+                        "deployFailed": "הפריסה ל-Vercel נכשלה",
+                        "deployError": "אירעה שגיאה במהלך הפריסה",
+                        "updateSuccess": "המאגר עודכן בהצלחה",
+                        "updateFailed": "עדכון המאגר נכשל",
+                        "updateError": "אירעה שגיאה בעדכון המאגר"
+                    },
+                    "info": {
+                        "deployInfo": "פריסה אורכת בדרך כלל 1-3 דקות. תקבל כתובת URL לאחר השלמה.",
+                        "updateInfo": "עדכונים מסנכרנים את תוכן המדריך שלך למאגר אתר האינטרנט לפריסה הבאה."
+                    },
+                    "websiteTemplate": {
+                        "title": "עדכוני תבנית אוטומטיים",
+                        "description": "שמור את אתר האינטרנט שלך מסונכרן אוטומטית עם השינויים האחרונים בתבנית.",
+                        "autoUpdate": "עדכן אוטומטית",
+                        "autoUpdateDescription": "בדוק עדכוני תבנית כל שעה והחל אותם אוטומטית.",
+                        "useBeta": "השתמש בגרסת בטא של התבנית",
+                        "useBetaDescription": "השתמש בענף stage במקום בענף main היציב.",
+                        "lastUpdated": "עודכן לאחרונה",
+                        "lastChecked": "נבדק לאחרונה",
+                        "lastError": "שגיאה אחרונה",
+                        "updateSuccess": "ההגדרות עודכנו בהצלחה",
+                        "updateFailed": "עדכון ההגדרות נכשל"
+                    }
+                }
+            },
+            "schedule": {
+                "page": {
+                    "title": "עדכונים מתוזמנים",
+                    "subtitle": "הפוך עדכונים ל-{name} לאוטומטיים עם קצב ייעודי וניהול שגיאות.",
+                    "fallbackName": "מדריך זה"
+                },
+                "card": {
+                    "title": "אוטומציה",
+                    "subtitle": {
+                        "enabled": "התאם קצב, חיוב והגנות כדי שהעדכונים המתוזמנים יישארו אמינים.",
+                        "disabled": "הפוך עדכונים לאוטומטיים ללא מגבלות מנוי - הגדר בחופשיות קצב והגנות."
+                    },
+                    "summary": {
+                        "status": "מצב",
+                        "nextRun": "הרצה הבאה",
+                        "lastRun": "הרצה אחרונה",
+                        "failures": "כשלים",
+                        "notScheduled": "לא מתוזמן",
+                        "never": "מעולם לא",
+                        "statusMap": {
+                            "active": "אוטומציה פעילה",
+                            "paused": "מושהה",
+                            "canceled": "בוטל",
+                            "disabled": "מושבת"
+                        }
+                    },
+                    "fields": {
+                        "automation": "אוטומציה",
+                        "automationHelp": "השהה כדי לעצור זמנית הרצות עתידיות.",
+                        "billing": "מצב חיוב",
+                        "billingHelp": "מנויים משחררים הרצות בלתי מוגבלות. תשלום לפי שימוש מחייב לפי הרצה.",
+                        "cadence": "קצב",
+                        "cadenceHelp": "תוכנית נוכחית: {plan}",
+                        "cadenceOpen": "כל הקצבים זמינים כל עוד המנויים מושבתים.",
+                        "maxFailures": "מגבלת כשלים",
+                        "maxFailuresHelp": "השהה אוטומטית לאחר מספר זה של כשלים.",
+                        "createPullRequest": "צור Pull Requests",
+                        "createPullRequestHelp": "כאשר מופעל, עדכונים מתוזמנים יוצרים בקשת משיכה במקום קומיט ישיר."
+                    },
+                    "billing": {
+                        "subscription": "מנוי",
+                        "usage": "תשלום לפי שימוש"
+                    },
+                    "cadence": {
+                        "hourly": "כל שעה",
+                        "daily": "כל יום",
+                        "weekly": "כל שבוע",
+                        "monthly": "כל חודש"
+                    },
+                    "plans": {
+                        "free": "חינם",
+                        "standard": "סטנדרטי",
+                        "premium": "פרימיום",
+                        "unmetered": "בלתי מוגבל"
+                    },
+                    "usageRequired": "עבור לתשלום לפי שימוש כדי להשתמש בקצב זה.",
+                    "cadenceAllowed": "קצב מותר בתוכנית שלך.",
+                    "actions": {
+                        "save": "שמור שינויים",
+                        "saving": "שומר...",
+                        "runNow": "הרץ עכשיו",
+                        "starting": "מתחיל...",
+                        "cancel": "בטל תזמון",
+                        "cancelling": "מבטל..."
+                    },
+                    "success": {
+                        "saved": "התזמון נשמר.",
+                        "runStarted": "הרצה מתוזמנת החלה.",
+                        "cancelled": "התזמון בוטל."
+                    },
+                    "errors": {
+                        "requireUsage": "הפעל חיוב לפי שימוש כדי להשתמש בקצב זה.",
+                        "updateFailed": "עדכון התזמון נכשל.",
+                        "runFailed": "הפעלת ההרצה נכשלה.",
+                        "cancelFailed": "ביטול התזמון נכשל."
+                    },
+                    "empty": {
+                        "title": "בצע קודם יצירה ידנית",
+                        "description": "השלם הרצה ידנית מוצלחת כדי לשחרר תזמון אוטומטי. ברגע שהמדריך שלך מכיל נתונים, נוכל לתחזק אותו מעודכן.",
+                        "refresh": "רענן מצב"
+                    },
+                    "requiresGeneration": "בצע לפחות יצירת פריטים אחת לפני הפעלת תזמונים."
+                },
+                "actions": {
+                    "invalid": "נתונים לא חוקיים",
+                    "updated": "התזמון עודכן.",
+                    "updateFailed": "עדכון התזמון נכשל.",
+                    "runStarted": "הרצה מתוזמנת החלה.",
+                    "runFailed": "הפעלת ההרצה נכשלה.",
+                    "cancelled": "התזמון בוטל.",
+                    "cancelFailed": "ביטול התזמון נכשל."
+                }
+            }
+        },
+        "directoryCreation": {
+            "title": "צור מדריך חדש",
+            "subtitle": "בחר כיצד ברצונך ליצור את המדריך שלך",
+            "backToOptions": "חזרה לאפשרויות",
+            "organizationSelector": {
+                "label": "בעלים מאגר",
+                "loading": "טוען ארגונים...",
+                "personal": "חשבון אישי",
+                "personalAccount": "המאגר ייווצר תחת חשבון GitHub האישי שלך",
+                "organizations": "ארגונים",
+                "personalHelp": "המאגר ייווצר תחת חשבון GitHub האישי שלך",
+                "organizationHelp": "המאגר ייווצר תחת הארגון {org}"
+            },
+            "ai": {
+                "title": "צור עם AI",
+                "subtitle": "תאר את רעיון המדריך שלך בשפה טבעית ותן ל-AI לטפל בהגדרה",
+                "getStarted": "התחל",
+                "formTitle": "צור מדריך עם AI",
+                "formSubtitle": "תאר את רעיון המדריך שלך ותן ל-AI לטפל בהגדרה וביצירת תוכן ראשוני",
+                "directoryNameLabel": "שם מדריך",
+                "directoryNamePlaceholder": "לדוגמה: כלי AI מגניבים",
+                "directoryNameHelp": "ה-AI יציע שם אם תשאיר שדה זה ריק",
+                "promptLabel": "תאר את המדריך שלך",
+                "githubRequired": "אנא חבר תחילה את חשבון ה-GitHub שלך.",
+                "promptPlaceholder": "תאר את סוג המדריך שברצונך ליצור, אילו פריטים הוא צריך להכיל וכל דרישה ספציפית...",
+                "inspirationText": "צריך השראה? נסה אחת מהדוגמאות האלה:",
+                "examplePrompts": {
+                    "0": {
+                        "name": "כלי AI למפתחים",
+                        "prompt": "צור מדריך של הכלים הטובים ביותר של AI למפתחים"
+                    },
+                    "1": {
+                        "name": "מרכז רכיבי React",
+                        "prompt": "בנה רשימה מאורגנת של רכיבי React בקוד פתוח"
+                    },
+                    "2": {
+                        "name": "כלים לצוותים מרוחקים",
+                        "prompt": "צור מדריך של יישומי פרודוקטיביות לצוותים מרוחקים"
+                    },
+                    "3": {
+                        "name": "אופנה בת קיימא",
+                        "prompt": "צור אוסף של מותגי אופנה בת קיימא"
+                    }
+                },
+                "featuresTitle": "מה שה-AI יעשה עבורך:",
+                "features": {
+                    "0": "יצור שם ותיאור מתאימים",
+                    "1": "יצור קטגוריות ומבנה ראשוניים",
+                    "2": "ימצא ויוסיף אוטומטית פריטים רלוונטיים",
+                    "3": "יגדיר מאגר GitHub עם תיעוד מתאים"
+                },
+                "generateButton": "צור עם AI",
+                "generatingButton": "יוצר מדריך...",
+                "cancelButton": "בטל",
+                "noteTitle": "הערה:",
+                "noteText": "יצירה עם AI אורכת בדרך כלל 2-5 דקות בהתאם למורכבות הבקשה שלך. תתקבל הודעה כשהמדריך שלך יהיה מוכן.",
+                "errors": {
+                    "promptRequired": "אנא תאר את סוג המדריך שברצונך ליצור",
+                    "nameRequired": "נדרש שם מדריך",
+                    "slugRequired": "נדרש slug מדריך",
+                    "descriptionRequired": "נדרש תיאור מדריך"
+                },
+                "success": {
+                    "started": "יצירת המדריך החלה!",
+                    "generating": "ה-AI יוצר תוכן. זה יכול לקחת כמה דקות...",
+                    "created": "המדריך נוצר בהצלחה!"
+                },
+                "advancedSettings": "הגדרות מתקדמות",
+                "advancedSubtitle": "הגדר הגדרות ארגון ומאגר",
+                "organizationLabel": "מאגר ארגון",
+                "organizationHelp": "צור מאגרים תחת ארגון במקום חשבונך האישי",
+                "organizationNameLabel": "שם ארגון",
+                "organizationNamePlaceholder": "הזן את שם הארגון"
+            },
+            "manual": {
+                "title": "צור ידנית",
+                "subtitle": "הגדר את המדריך שלך עם שליטה מלאה בכל הגדרה ואפשרות",
+                "configureNow": "הגדר עכשיו",
+                "formTitle": "צור מדריך ידנית",
+                "formSubtitle": "הגדר את המדריך שלך עם שליטה מלאה בכל הגדרה",
+                "basicInfo": "מידע בסיסי",
+                "nameLabel": "שם מדריך *",
+                "namePlaceholder": "לדוגמה: כלי AI מגניבים",
+                "slugLabel": "Slug מדריך *",
+                "slugPlaceholder": "cool-ai-tools",
+                "githubRequired": "אנא חבר תחילה את חשבון ה-GitHub שלך.",
+                "slugHelp": "מזהה תואם URL (רק אותיות קטנות, מספרים ומקפים)",
+                "descriptionLabel": "תיאור *",
+                "descriptionPlaceholder": "רשימה מאורגנת של כלי AI ומשאבים הטובים ביותר למפתחים",
+                "advancedSettings": "הגדרות מתקדמות",
+                "advancedSubtitle": "ארגון, כותרות מותאמות אישית ועוד",
+                "organizationLabel": "צור תחת ארגון",
+                "organizationHelp": "צור מדריך זה תחת ארגון GitHub במקום חשבונך האישי",
+                "organizationNameLabel": "שם ארגון",
+                "organizationNamePlaceholder": "my-organization",
+                "headerLabel": "כותרת README מותאמת אישית",
+                "headerPlaceholder": "הוסף תוכן מותאם אישית לחלק העליון של קובץ ה-README שלך",
+                "headerOverwrite": "דרוס לחלוטין את כותרת ברירת המחדל",
+                "footerLabel": "כותרת תחתונה README מותאמת אישית",
+                "footerPlaceholder": "הוסף תוכן מותאם אישית לחלק התחתון של קובץ ה-README שלך",
+                "footerOverwrite": "דרוס לחלוטין את כותרת התחתונה ברירת המחדל",
+                "createButton": "צור מדריך",
+                "creatingButton": "יוצר מדריך...",
+                "cancelButton": "בטל",
+                "nameRequired": "נדרש שם מדריך",
+                "slugRequired": "נדרש slug מדריך",
+                "descriptionRequired": "נדרש תיאור מדריך",
+                "success": {
+                    "created": "המדריך נוצר בהצלחה!"
+                }
+            },
+            "import": {
+                "title": "ייבא קיים",
+                "subtitle": "ייבא מדריך ממאגר GitHub קיים",
+                "importNow": "ייבא עכשיו",
+                "formTitle": "ייבא מדריך מ-GitHub",
+                "formSubtitle": "ייבא פריטים ממאגר GitHub קיים כדי ליצור את המדריך שלך",
+                "sync": {
+                    "title": "שמור מסונכרן",
+                    "description": "אחזר אוטומטית עדכונים ממאגר המקור."
+                },
+                "sourceMethod": {
+                    "url": {
+                        "title": "הדבק URL",
+                        "description": "הזן ישירות את ה-URL של מאגר GitHub"
+                    },
+                    "repository": {
+                        "title": "המאגרים שלי",
+                        "description": "בחר מהמאגרים שלך ב-GitHub"
+                    }
+                },
+                "urlLabel": "URL מאגר GitHub",
+                "urlPlaceholder": "https://github.com/owner/repository",
+                "urlHelp": "הזן את ה-URL המלא של מאגר GitHub",
+                "supportedFormats": {
+                    "title": "פורמטים נתמכים",
+                    "dataRepo": {
+                        "title": "מאגר נתונים",
+                        "description": "מאגרים עם מבנה config.yml ותיקיית data/"
+                    },
+                    "awesomeReadme": {
+                        "title": "רשימת Awesome",
+                        "description": "מאגרי רשימות מעוצבות עם README markdown"
+                    }
+                },
+                "analyzing": {
+                    "title": "ניתוח מאגר",
+                    "subtitle": "מזהה סוג ומבנה מאגר..."
+                },
+                "detectedType": {
+                    "dataRepo": "מאגר נתונים זוהה",
+                    "awesomeReadme": "רשימת Awesome זוהתה"
+                },
+                "badges": {
+                    "dataRepo": "מאגר נתונים",
+                    "awesomeReadme": "רשימת Awesome"
+                },
+                "preview": {
+                    "items": "פריטים",
+                    "categories": "קטגוריות"
+                },
+                "nameLabel": "שם מדריך",
+                "namePlaceholder": "לדוגמה: המדריך המדהים שלי",
+                "advancedSettings": "הגדרות מתקדמות",
+                "advancedSubtitle": "הגדר הגדרות ארגון ומאגר",
+                "attribution": {
+                    "title": "ייחוס מקור:",
+                    "text": "מדריך זה יתייחס ל-{url} כמקור"
+                },
+                "analyzeButton": "נַתֵחַ מַאֲגָר",
+                "importButton": "ייבא מדריך",
+                "importingButton": "מייבא...",
+                "backButton": "חזור",
+                "cancelButton": "בטל",
+                "importing": {
+                    "title": "מייבא מדריך",
+                    "subtitle": "מגדיר את המדריך שלך ממאגר המקור..."
+                },
+                "repositorySelector": {
+                    "title": "בחר מאגר",
+                    "searchPlaceholder": "חפש מאגרים...",
+                    "loading": "טוען מאגרים...",
+                    "noRepositories": "לא נמצאו מאגרים",
+                    "noResults": "אין מאגרים התואמים לחיפוש שלך",
+                    "tryAgain": "נסה שוב",
+                    "loadMore": "טען עוד",
+                    "showing": "מציג {shown} מתוך {total} מאגרים",
+                    "today": "היום",
+                    "yesterday": "אתמול",
+                    "daysAgo": "לפני {days} ימים",
+                    "weeksAgo": "לפני {weeks} שבועות",
+                    "repositoriesLoaded": "מאגרים נטענו",
+                    "moreAvailable": "נוספים זמינים",
+                    "errors": {
+                        "fetchFailed": "טעינת המאגרים נכשלה"
+                    }
+                },
+                "chooseMode": {
+                    "title": "בחר שיטת ייבוא",
+                    "repository": "מאגר: {owner}/{repo}",
+                    "repositoryWithItems": "מאגר: {owner}/{repo} ({itemCount} פריטים)",
+                    "importCopy": {
+                        "title": "ייבא והעתק",
+                        "description": "צור מאגרים חדשים עם עותק של הנתונים. אידיאלי לפיצול או התחלה מחדש."
+                    },
+                    "linkExisting": {
+                        "title": "קשר קיים",
+                        "description": "השתמש ישירות במאגר הקיים שלך. אין העתקה, שינויים מסתנכרנים אוטומטית."
+                    },
+                    "back": "חזור"
+                },
+                "linkConfirm": {
+                    "title": "קשר מאגר",
+                    "descriptionMissing": "חלק מהמאגרים לא נמצאו. אתה יכול להמשיך בלעדיהם או ליצור אותם עכשיו.",
+                    "descriptionReady": "כל המאגרים נמצאו. מוכן לקישור.",
+                    "dataRepo": "מאגר נתונים",
+                    "markdownRepo": "מאגר Markdown",
+                    "websiteRepo": "מאגר אתר אינטרנט",
+                    "found": "נמצא",
+                    "notFound": "לא נמצא",
+                    "cancel": "בטל",
+                    "continueWithout": "המשך בלי",
+                    "createMissing": "צור חסרים",
+                    "creating": "יוצר...",
+                    "linking": "מקשר...",
+                    "linkRepos": "קשר מאגרים"
+                },
+                "errors": {
+                    "urlRequired": "אנא הזן כתובת URL של מאגר GitHub",
+                    "unsupportedFormat": "פורמט מאגר זה אינו נתמך. אנא השתמש במאגר נתונים או בפורמט רשימת Awesome.",
+                    "analyzeFailed": "ניתוח המאגר נכשל",
+                    "analyzeForLinkingFailed": "הניתוח לקישור נכשל",
+                    "nameRequired": "נדרש שם מדריך",
+                    "noAnalysis": "אנא נַתֵחַ קודם מאגר",
+                    "githubRequired": "אנא חבר תחילה את חשבון ה-GitHub שלך",
+                    "importFailed": "ייבוא המדריך נכשל",
+                    "linkFailed": "קישור המדריך נכשל"
+                },
+                "success": {
+                    "started": "היבוא התחיל! מפנה אותך למדריך שלך...",
+                    "linked": "המדריך נקשר בהצלחה"
+                }
+            }
+        },
+        "github": {
+            "connection": {
+                "alert": {
+                    "title": "GitHub לא מחובר",
+                    "subtitle": "חבר את חשבון ה-GitHub שלך כדי ליצור ולנהל מדריכים",
+                    "connectButton": "חבר GitHub",
+                    "connectingButton": "מתחבר..."
+                },
+                "status": {
+                    "title": "מצב GitHub",
+                    "connected": "מחובר",
+                    "notConnected": "לא מחובר",
+                    "connectedDescription": "המדריכים שלך יאוחסנו כמאגרי GitHub בחשבונך.",
+                    "notConnectedDescription": "חבר את חשבון ה-GitHub שלך כדי ליצור ולנהל מדריכים.",
+                    "connectedAccount": "חשבון מחובר:",
+                    "requiredNote": "נדרש ליצירת מדריכים",
+                    "connectButton": "חבר GitHub",
+                    "connectingButton": "מתחבר...",
+                    "failedToConnect": "החיבור ל-GitHub נכשל"
+                }
+            }
+        },
+        "apiTokens": {
+            "title": "API ואסימונים",
+            "subtitle": "נהל מפתחות API ואינטגרציות צד שלישי",
+            "vercel": {
+                "title": "אינטגרציית Vercel",
+                "subtitle": "חבר את חשבון ה-Vercel שלך כדי לפרוס מדריכים כאתרי אינטרנט",
+                "connected": "מחובר",
+                "notConnected": "לא מחובר",
+                "connectedMessage": "חשבון ה-Vercel שלך מחובר. כעת תוכל לפרוס מדריכים ב-Vercel.",
+                "disconnect": "נתק Vercel",
+                "disconnecting": "מסיר...",
+                "apiTokenLabel": "אסימון API של Vercel",
+                "placeholder": "vc_...",
+                "showToken": "הצג",
+                "hideToken": "הסתר",
+                "getTokenHelp": "אתה יכול לקבל את אסימון ה-API שלך מ-",
+                "vercelDashboard": "לוח בקרה של Vercel",
+                "save": "שמור אסימון",
+                "saving": "שומר...",
+                "messages": {
+                    "tokenRequired": "אנא הזן אסימון Vercel חוקי",
+                    "saveSuccess": "אסימון ה-Vercel נשמר בהצלחה",
+                    "saveFailed": "שמירת אסימון ה-Vercel נכשלה",
+                    "removeSuccess": "אסימון ה-Vercel הוסר בהצלחה",
+                    "removeFailed": "הסרת אסימון ה-Vercel נכשלה",
+                    "unexpectedError": "אירעה שגיאה בלתי צפויה"
+                }
+            },
+            "apiKeys": {
+                "title": "מפתחות API",
+                "subtitle": "צור ונהל מפתחות API לגישה תוכניתית",
+                "generate": "צור מפתח API (בקרוב זמין)"
+            },
+            "webhooks": {
+                "title": "Webhooks",
+                "subtitle": "הגדר webhooks לקבלת עדכונים בזמן אמת",
+                "configure": "הגדר webhooks (בקרוב זמין)"
+            }
+        },
+        "notifications": {
+            "title": "העדפות התראות",
+            "subtitle": "בחר כיצד תרצה לקבל התראות על עדכונים חשובים",
+            "email": {
+                "title": "התראות בדוא\"ל",
+                "directoryUpdates": {
+                    "label": "עדכוני מדריכים",
+                    "description": "קבל התראות על עדכונים חשובים במדריכים שלך"
+                },
+                "newItems": {
+                    "label": "פריטים חדשים",
+                    "description": "קבל התראות כאשר מתווספים פריטים חדשים למדריכים שלך"
+                },
+                "weeklyDigest": {
+                    "label": "סיכום שבועי",
+                    "description": "קבל סיכום שבועי של פעילות המדריכים שלך"
+                },
+                "marketing": {
+                    "label": "שיווק וקידומים",
+                    "description": "קבל עדכונים על תכונות חדשות והצעות"
+                }
+            },
+            "app": {
+                "title": "התראות באפליקציה",
+                "newItems": {
+                    "label": "פריטים חדשים",
+                    "description": "הצג התראות עבור פריטי מדריך חדשים"
+                },
+                "comments": {
+                    "label": "תגובות",
+                    "description": "קבל התראות על תגובות במדריכים שלך"
+                },
+                "mentions": {
+                    "label": "אזכורים",
+                    "description": "קבל התראות כשמישהו מזכיר אותך"
+                },
+                "systemUpdates": {
+                    "label": "עדכוני מערכת",
+                    "description": "התראות מערכת חשובות והתראות תחזוקה"
+                }
+            },
+            "actions": {
+                "save": "שמור העדפות",
+                "saving": "שומר..."
+            },
+            "messages": {
+                "success": "העדפות ההתראות עודכנו",
+                "error": "עדכון ההעדפות נכשל",
+                "unexpectedError": "אירעה שגיאה בלתי צפויה"
+            }
+        },
+        "sidebar": {
+            "menu": "תפריט",
+            "aiChat": "צ'אט AI",
+            "newDirectory": "מדריך חדש",
+            "navigation": {
+                "dashboard": "לוח בקרה",
+                "directories": "מדריכים",
+                "settings": "הגדרות"
+            },
+            "signOut": "התנתק",
+            "signingOut": "מתנתק..."
+        },
+        "dangerZone": {
+            "title": "אזור מסוכן",
+            "subtitle": "פעולות בלתי הפיכות והרסניות",
+            "export": {
+                "title": "ייצא את הנתונים שלך",
+                "subtitle": "הורד את כל המדריכים, הפריטים וההגדרות שלך",
+                "action": "ייצא נתונים (בקרוב זמין)"
+            },
+            "delete": {
+                "title": "מחק חשבון",
+                "subtitle": "מחק לצמיתות את החשבון שלך וכל הנתונים המשויכים. פעולה זו אינה ניתנת לביטול.",
+                "button": "מחק את החשבון שלי",
+                "confirmTitle": "⚠️ פעולה זו תמחק לצמיתות:",
+                "confirmItems": [
+                    "החשבון והפרופיל שלך",
+                    "כל המדריכים שלך",
+                    "כל הפריטים ונתוני המדריכים",
+                    "מפתחות ה-API והאינטגרציות",
+                    "כל אתרי האינטרנט המשויכים"
+                ],
+                "confirmLabel": "הקלד את האימייל שלך {email} לאישור",
+                "confirmPlaceholder": "הזן את האימייל שלך",
+                "confirmButton": "כן, מחק את החשבון שלי",
+                "deleting": "מוחק...",
+                "cancel": "בטל"
+            },
+            "messages": {
+                "confirmEmail": "אנא הזן את האימייל שלך כראוי לאישור",
+                "deleteSuccess": "החשבון נמחק בהצלחה",
+                "deleteFailed": "מחיקת החשבון נכשלה",
+                "unexpectedError": "אירעה שגיאה בלתי צפויה"
+            }
+        },
+        "aiChat": {
+            "title": "עוזר AI",
+            "subtitle": "צור מדריכים בשפה טבעית",
+            "newChat": "צ'אט חדש",
+            "loadingConversation": "טוען שיחה...",
+            "inputPlaceholder": "תאר את המדריך שברצונך ליצור...",
+            "sendButton": "שלח"
+        }
+    },
+    "layout": {
+        "auth": {
+            "backToHome": "חזרה לדף הבית",
+            "feature": {
+                "title": "בנה מדריכים עם AI",
+                "subtitle": "צור מדריכים יפים וניתנים לחיפוש תוך דקות באמצעות שפה טבעית. ללא צורך בקידוד.",
+                "benefits": {
+                    "ai": {
+                        "title": "יצירה מונחית AI",
+                        "description": "תאר מה אתה רוצה ותן ל-AI לעשות את העבודה"
+                    },
+                    "templates": {
+                        "title": "תבניות מקצועיות",
+                        "description": "התחל עם עיצובים יפים הניתנים להתאמה אישית"
+                    },
+                    "management": {
+                        "title": "ניהול קל",
+                        "description": "עדכן וארגן את התוכן שלך ללא מאמץ"
+                    }
+                }
+            },
+            "footer": {
+                "copyright": "© {year} {companyName}. כל הזכויות שמורות.",
+                "terms": "תנאי שימוש",
+                "privacy": "מדיניות פרטיות",
+                "help": "עזרה"
+            }
+        }
+    },
+    "errors": {
+        "global": {
+            "title": "משהו השתבש!",
+            "tryAgain": "נסה שוב"
+        }
+    },
+    "metadata": {
+        "title": "{companyName} - יוצר מדריכים",
+        "description": "פלטפורמת SaaS ליצירה וניהול מדריכים"
+    },
+    "api": {
+        "errors": {
+            "unauthorized": "אינך מורשה לבצע פעולה זו",
+            "unauthorizedLogin": "לא מורשה: אנא התחבר שוב.",
+            "forbidden": "אסור: אין לך הרשאה לבצע פעולה זו.",
+            "serverError": "שגיאת שרת: {message}",
+            "unexpected": "אירעה שגיאת שרת בלתי צפויה.",
+            "apiError": "שגיאת API: {status} {statusText}",
+            "loginFailed": "ההתחברות נכשלה",
+            "registerFailed": "ההרשמה נכשלה",
+            "unsupportedProvider": "ספק לא נתמך",
+            "providerConnectFailed": "החיבור לספק נכשל",
+            "forgotPasswordFailed": "שליחת מייל איפוס סיסמה נכשלה",
+            "resetPasswordFailed": "איפוס הסיסמה נכשל"
+        }
+    },
+    "actions": {
+        "directories": {
+            "slug": {
+                "required": "ה-slug נדרש",
+                "format": "ה-slug חייב להכיל רק אותיות קטנות, מספרים ומקפים"
+            },
+            "name": {
+                "required": "השם נדרש",
+                "maxLength": "השם חייב להכיל פחות מ-100 תווים"
+            },
+            "description": {
+                "required": "התיאור נדרש",
+                "maxLength": "התיאור חייב להכיל פחות מ-500 תווים"
+            },
+            "prompt": {
+                "minLength": "הפקודה חייבת להכיל לפחות 10 תווים",
+                "maxLength": "הפקודה חייבת להכיל פחות מ-1000 תווים"
+            },
+            "oauthRequired": "נדרשת התחברות OAuth. אנא חבר תחילה את חשבון ה-{provider} שלך.",
+            "githubRequired": "נדרשת התחברות GitHub. אנא חבר תחילה את חשבון ה-GitHub שלך.",
+            "createSuccess": "המדריך נוצר בהצלחה!",
+            "createFailed": "יצירת המדריך נכשלה",
+            "updateSuccess": "המדריך עודכן בהצלחה!",
+            "updateFailed": "עדכון המדריך נכשל",
+            "invalidGeneratedData": "יצירת נתוני מדריך תקינים נכשלה",
+            "aiGenerationStarted": "יצירת המדריך החלה! ה-AI יוצר תוכן...",
+            "invalidId": "מזהה מדריך לא חוקי",
+            "deleteSuccess": "המדריך נמחק בהצלחה",
+            "deleteFailed": "מחיקת המדריך נכשלה",
+            "fetchFailed": "אחזור המדריכים נכשל",
+            "organization": {
+                "requiredWhenOwnerProvided": "יש להפעיל ארגון כאשר ניתנו פרטי בעלים"
+            },
+            "import": {
+                "invalidUrl": "אנא הזן כתובת URL חוקית",
+                "analyzeFailed": "ניתוח המאגר נכשל",
+                "started": "היבוא החל בהצלחה",
+                "failed": "ייבוא המדריך נכשל",
+                "fetchReposFailed": "אחזור המאגרים נכשל"
+            }
+        },
+        "generator": {
+            "promptRequired": "הפקודה נדרשת",
+            "nameRequired": "השם נדרש",
+            "generationStartedSuccessfully": "היצירה החלה בהצלחה",
+            "updateStartedSuccessfully": "העדכון החל בהצלחה",
+            "failedToGenerateItems": "יצירת הפריטים נכשלה",
+            "failedToUpdateItems": "עדכון הפריטים נכשל",
+            "markdownRegeneratedSuccessfully": "ה-Markdown נוצר מחדש בהצלחה",
+            "failedToRegenerateMarkdown": "יצירה מחדש של ה-Markdown נכשלה",
+            "notAuthorizedToAccessOrganization": "אינך מורשה לגשת לארגון זה. אנא צור קשר עם הבעלים ({owner}) לקבלת עזרה."
+        },
+        "settings": {
+            "profile": {
+                "usernameRequired": "שם משתמש נדרש",
+                "usernameMaxLength": "שם המשתמש חייב להכיל פחות מ-50 תווים",
+                "usernameFormat": "שם המשתמש יכול להכיל רק אותיות, מספרים, מקפים וקווים תחתונים",
+                "updateFailed": "עדכון הפרופיל נכשל",
+                "notAuthenticated": "לא מאומת"
+            },
+            "password": {
+                "currentRequired": "הסיסמה הנוכחית נדרשת",
+                "newMinLength": "הסיסמה חייבת להכיל לפחות 8 תווים",
+                "newMaxLength": "הסיסמה חייבת להכיל פחות מ-100 תווים",
+                "updateFailed": "עדכון הסיסמה נכשל",
+                "updateSuccess": "הסיסמה עודכנה בהצלחה",
+                "notAuthenticated": "לא מאומת"
+            },
+            "vercel": {
+                "notAuthenticated": "לא מאומת",
+                "tokenRequired": "האסימון נדרש",
+                "invalidFormat": "פורמט אסימון Vercel לא חוקי",
+                "saveFailed": "שמירת אסימון ה-Vercel נכשלה",
+                "saveSuccess": "אסימון ה-Vercel נשמר בהצלחה",
+                "validationFailed": "אסימון ה-Vercel שסופק אינו חוקי. אנא בדוק ונסה שוב.",
+                "removeFailed": "הסרת אסימון ה-Vercel נכשלה",
+                "removeSuccess": "אסימון ה-Vercel הוסר בהצלחה"
+            },
+            "github": {
+                "notAuthenticated": "לא מאומת",
+                "disconnectFailed": "הניתוק מ-GitHub נכשל",
+                "disconnectSuccess": "חשבון GitHub נותק בהצלחה"
+            },
+            "notifications": {
+                "notAuthenticated": "לא מאומת",
+                "updateFailed": "עדכון ההעדפות נכשל",
+                "updateSuccess": "העדפות ההתראות עודכנו בהצלחה"
+            },
+            "danger": {
+                "notAuthenticated": "לא מאומת",
+                "deleteFailed": "מחיקת החשבון נכשלה",
+                "deleteDisabled": "מחיקת חשבון מושבתת בהדגמה"
+            }
+        },
+        "deploy": {
+            "deployVercelFailed": "הפריסה ל-Vercel נכשלה",
+            "updateRepositoryFailed": "עדכון המאגר נכשל",
+            "updateSettingsFailed": "עדכון הגדרות תבנית אתר האינטרנט נכשל"
+        }
+    },
+    "validation": {
+        "auth": {
+            "invalidCredentials": "אימייל או סיסמה לא חוקיים",
+            "account": {
+                "suspended": "החשבון מושעה"
+            },
+            "email": {
+                "required": "האימייל לא יכול להיות ריק",
+                "invalid": "אימייל לא חוקי",
+                "emailAlreadyRegistered": "האימייל כבר רשום"
+            },
+            "password": {
+                "required": "הסיסמה לא יכולה להיות ריקה",
+                "minLength": "הסיסמה חייבת להכיל לפחות {length} תווים",
+                "lowercase": "הסיסמה חייבת להכיל לפחות אות קטנה אחת",
+                "numberOrSpecial": "הסיסמה חייבת להכיל לפחות ספרה או תו מיוחד אחד",
+                "cannotStartWith": "הסיסמה לא יכולה להתחיל בנקודה או בשורה חדשה",
+                "digit": "הסיסמה חייבת להכיל לפחות ספרה אחת"
+            },
+            "username": {
+                "minLength": "שם המשתמש חייב להכיל לפחות {length} תווים"
+            }
+        }
+    }
+}

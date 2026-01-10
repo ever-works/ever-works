@@ -14,6 +14,7 @@ import { SubscriptionPlanRepository } from './repositories/subscription-plan.rep
 import { UserSubscriptionRepository } from './repositories/user-subscription.repository';
 import { DirectoryScheduleRepository } from './repositories/directory-schedule.repository';
 import { UsageLedgerRepository } from './repositories/usage-ledger.repository';
+import { NotificationRepository } from './repositories/notification.repository';
 
 @Module({
     imports: [
@@ -43,6 +44,7 @@ import { UsageLedgerRepository } from './repositories/usage-ledger.repository';
         UserSubscriptionRepository,
         DirectoryScheduleRepository,
         UsageLedgerRepository,
+        NotificationRepository,
     ],
     exports: [
         TypeOrmModule,
@@ -58,6 +60,7 @@ import { UsageLedgerRepository } from './repositories/usage-ledger.repository';
         UserSubscriptionRepository,
         DirectoryScheduleRepository,
         UsageLedgerRepository,
+        NotificationRepository,
     ],
 })
 export class DatabaseModule {}

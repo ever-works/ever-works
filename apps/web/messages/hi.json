@@ -1,0 +1,1543 @@
+{
+    "auth": {
+        "error": {
+            "title": "प्रमाणीकरण त्रुटि",
+            "subtitle": "हमें आपके प्रमाणीकरण में एक समस्या आई है",
+            "errorOccurred": "एक त्रुटि हुई",
+            "somethingWentWrong": "कुछ गलत हो गया",
+            "generic": "एक अनपेक्षित त्रुटि हुई। कृपया बाद में पुनः प्रयास करें।",
+            "invalidCredentials": "आपके द्वारा दर्ज किया गया ईमेल या पासवर्ड गलत है।",
+            "emailNotVerified": "साइन इन करने से पहले कृपया अपना ईमेल पता सत्यापित करें।",
+            "accountLocked": "सुरक्षा कारणों से आपका खाता लॉक कर दिया गया है।",
+            "sessionExpired": "आपका सत्र समाप्त हो गया है। कृपया पुनः साइन इन करें।",
+            "networkError": "कनेक्ट नहीं हो पा रहा है। कृपया अपना इंटरनेट कनेक्शन जांचें।",
+            "oauth": {
+                "missingCode": "प्राधिकरण कोड गायब है। कृपया पुनः साइन इन करने का प्रयास करें।",
+                "invalidState": "अमान्य प्राधिकरण स्थिति। कृपया पुनः साइन इन करने का प्रयास करें।",
+                "unsupportedProvider": "यह प्रमाणीकरण प्रदाता समर्थित नहीं है।",
+                "callbackFailed": "प्रमाणीकरण पूरा करने में विफल। कृपया पुनः प्रयास करें।"
+            },
+            "resetPassword": {
+                "missingToken": "पासवर्ड रीसेट लिंक अमान्य है। सत्यापन टोकन गायब है।",
+                "invalidToken": "पासवर्ड रीसेट लिंक अमान्य है या उसके साथ छेड़छाड़ की गई है।",
+                "expiredToken": "पासवर्ड रीसेट लिंक की समय सीमा समाप्त हो गई है। कृपया एक नया अनुरोध करें।",
+                "failed": "पासवर्ड रीसेट करने में विफल। कृपया पुनः प्रयास करें या एक नया रीसेट लिंक अनुरोध करें।"
+            },
+            "verifyEmail": {
+                "missingToken": "ईमेल सत्यापन लिंक अमान्य है। सत्यापन टोकन गायब है।",
+                "invalidToken": "ईमेल सत्यापन लिंक अमान्य है या पहले ही प्रयोग किया जा चुका है।",
+                "expiredToken": "ईमेल सत्यापन लिंक की समय सीमा समाप्त हो गई है। कृपया एक नया अनुरोध करें।",
+                "failed": "ईमेल सत्यापित करने में विफल। कृपया पुनः प्रयास करें या एक नया सत्यापन लिंक अनुरोध करें।"
+            },
+            "authorize": {
+                "invalidRedirectUrl": "रीडायरेक्ट URL अमान्य है या अनुमति नहीं है। यदि आपको लगता है कि यह एक त्रुटि है तो कृपया सहायता से संपर्क करें।"
+            },
+            "actions": {
+                "backToLogin": "लॉगिन पर वापस जाएं",
+                "tryRegister": "पंजीकरण करने का प्रयास करें",
+                "resendVerification": "सत्यापन ईमेल पुनः भेजें",
+                "contactSupport": "सहायता से संपर्क करें",
+                "requestNewReset": "नया रीसेट लिंक अनुरोध करें"
+            },
+            "helpText": "यदि आपको अभी भी समस्याओं का सामना करना पड़ रहा है, तो कृपया हमारे सहायता संसाधन नीचे देखें।",
+            "links": {
+                "help": "सहायता केंद्र",
+                "systemStatus": "सिस्टम स्थिति"
+            }
+        },
+        "login": {
+            "title": "वापसी पर स्वागत है",
+            "subtitle": "जारी रखने के लिए अपने खाते में साइन इन करें",
+            "form": {
+                "email": {
+                    "label": "ईमेल पता",
+                    "placeholder": "you@example.com"
+                },
+                "password": {
+                    "label": "पासवर्ड",
+                    "placeholder": "अपना पासवर्ड दर्ज करें"
+                },
+                "forgotPassword": "पासवर्ड भूल गए?",
+                "rememberMe": "मुझे 30 दिनों के लिए याद रखें",
+                "submit": "साइन इन करें",
+                "submitting": "साइन इन हो रहा है..."
+            },
+            "socialLogin": {
+                "divider": "या इसके साथ जारी रखें",
+                "google": "Google",
+                "github": "GitHub"
+            },
+            "signUp": {
+                "text": "खाता नहीं है?",
+                "link": "साइन अप करें"
+            },
+            "errors": {
+                "invalidCredentials": "अमान्य ईमेल या पासवर्ड"
+            },
+            "passwordReset": {
+                "success": "पासवर्ड रीसेट सफल!",
+                "canLogin": "अब आप अपने नए पासवर्ड के साथ साइन इन कर सकते हैं।"
+            }
+        },
+        "forgotPassword": {
+            "title": "पासवर्ड भूल गए?",
+            "subtitle": "कोई चिंता नहीं, हम आपको रीसेट निर्देश भेजेंगे",
+            "successTitle": "अपना ईमेल जांचें",
+            "successSubtitle": "हमने आपको पासवर्ड रीसेट निर्देश भेज दिए हैं",
+            "form": {
+                "email": {
+                    "label": "ईमेल पता",
+                    "placeholder": "अपना ईमेल दर्ज करें"
+                },
+                "submit": "रीसेट लिंक भेजें",
+                "submitting": "भेज रहा है..."
+            },
+            "success": {
+                "title": "ईमेल सफलतापूर्वक भेजा गया",
+                "message": "हमने पासवर्ड रीसेट निर्देश {email} पर भेज दिए हैं",
+                "checkSpam": "यदि आपको ईमेल नहीं दिख रहा है, तो अपना स्पैम फ़ोल्डर जांचें।"
+            },
+            "errors": {
+                "failed": "रीसेट ईमेल भेजने में विफल। कृपया पुनः प्रयास करें।"
+            },
+            "backToLogin": "लॉगिन पर वापस जाएं",
+            "noAccount": {
+                "text": "खाता नहीं है?",
+                "link": "साइन अप करें"
+            }
+        },
+        "resetPassword": {
+            "title": "अपना पासवर्ड रीसेट करें",
+            "subtitle": "नीचे अपना नया पासवर्ड दर्ज करें",
+            "successTitle": "पासवर्ड रीसेट सफल",
+            "successSubtitle": "आपका पासवर्ड अपडेट कर दिया गया है",
+            "form": {
+                "password": {
+                    "label": "नया पासवर्ड",
+                    "placeholder": "अपना नया पासवर्ड दर्ज करें",
+                    "helperText": "कम से कम 6 अक्षर होने चाहिए जिसमें लोअरकेस और नंबर/विशेष वर्ण हों",
+                    "errors": {
+                        "minLength": "पासवर्ड कम से कम 6 अक्षरों का होना चाहिए",
+                        "lowercase": "पासवर्ड में कम से कम एक लोअरकेस अक्षर होना चाहिए",
+                        "numberOrSpecial": "पासवर्ड में कम से कम एक नंबर या विशेष वर्ण होना चाहिए",
+                        "cannotStartWith": "पासवर्ड डॉट या न्यूलाइन से शुरू नहीं हो सकता"
+                    }
+                },
+                "confirmPassword": {
+                    "label": "नया पासवर्ड पुष्टि करें",
+                    "placeholder": "अपने नए पासवर्ड की पुष्टि करें",
+                    "errors": {
+                        "noMatch": "पासवर्ड मेल नहीं खाते"
+                    }
+                },
+                "submit": "पासवर्ड रीसेट करें",
+                "submitting": "रीसेट हो रहा है..."
+            },
+            "success": {
+                "title": "पासवर्ड रीसेट सफल",
+                "message": "आपका पासवर्ड सफलतापूर्वक अपडेट कर दिया गया है। अब आप अपने नए पासवर्ड के साथ लॉगिन कर सकते हैं।",
+                "loginButton": "लॉगिन पर जाएं"
+            },
+            "errors": {
+                "failed": "पासवर्ड रीसेट करने में विफल। कृपया पुनः प्रयास करें या एक नया रीसेट लिंक अनुरोध करें।",
+                "noToken": "अमान्य रीसेट लिंक",
+                "invalidLink": "अमान्य रीसेट लिंक",
+                "missingTokenMessage": "पासवर्ड रीसेट लिंक अमान्य या अपूर्ण है। कृपया एक नया पासवर्ड रीसेट अनुरोध करें।",
+                "requestNewLink": "नया रीसेट लिंक अनुरोध करें"
+            },
+            "backToLogin": "लॉगिन पर वापस जाएं"
+        },
+        "register": {
+            "title": "अपना खाता बनाएं",
+            "subtitle": "आज ही अद्भुत निर्देशिकाएँ बनाना शुरू करें",
+            "form": {
+                "name": {
+                    "label": "पूरा नाम",
+                    "placeholder": "जॉन डो"
+                },
+                "email": {
+                    "label": "ईमेल पता",
+                    "placeholder": "you@example.com"
+                },
+                "password": {
+                    "label": "पासवर्ड",
+                    "placeholder": "एक मजबूत पासवर्ड बनाएं",
+                    "hint": "कम से कम 8 अक्षर होने चाहिए"
+                },
+                "confirmPassword": {
+                    "label": "पासवर्ड पुष्टि करें",
+                    "placeholder": "अपने पासवर्ड की पुष्टि करें"
+                },
+                "terms": {
+                    "text": "मैं सहमत हूं",
+                    "termsLink": "सेवा की शर्तें",
+                    "and": "और",
+                    "privacyLink": "गोपनीयता नीति"
+                },
+                "submit": "खाता बनाएं",
+                "submitting": "खाता बन रहा है..."
+            },
+            "socialSignUp": {
+                "divider": "या इसके साथ साइन अप करें",
+                "google": "Google",
+                "github": "GitHub"
+            },
+            "signIn": {
+                "text": "पहले से ही एक खाता है?",
+                "link": "साइन इन करें"
+            },
+            "errors": {
+                "passwordsDoNotMatch": "पासवर्ड मेल नहीं खाते",
+                "passwordTooShort": "पासवर्ड कम से कम 8 अक्षरों का होना चाहिए",
+                "generic": "एक त्रुटि हुई। कृपया पुनः प्रयास करें।"
+            }
+        }
+    },
+    "dashboard": {
+        "title": "डैशबोर्ड",
+        "toasts": {
+            "newUser": {
+                "title": "{companyName} में आपका स्वागत है! 🎉",
+                "description": "आपका खाता सफलतापूर्वक बनाया गया है। कृपया अपना खाता सत्यापित करने के लिए अपना ईमेल जांचें।"
+            },
+            "emailVerification": {
+                "title": "अपना ईमेल सत्यापित करें",
+                "description": "हमने आपके ईमेल पते पर एक सत्यापन लिंक भेजा है। कृपया अपना इनबॉक्स और स्पैम फ़ोल्डर जांचें।",
+                "action": "ईमेल पुनः भेजें"
+            },
+            "verified": {
+                "title": "ईमेल सफलतापूर्वक सत्यापित! ✅",
+                "description": "आपका ईमेल पता सत्यापित कर दिया गया है। अब आपके पास सभी सुविधाओं की पूर्ण पहुंच है।"
+            },
+            "oauthConnected": {
+                "title": "GitHub से खाता जुड़ा",
+                "description": "आपका खाता GitHub से सफलतापूर्वक जुड़ गया है।"
+            }
+        },
+        "header": {
+            "welcome": "वापसी पर स्वागत है, {username}!",
+            "subtitle": "अपनी AI-संचालित निर्देशिकाओं को प्रबंधित करें और उनके प्रदर्शन को ट्रैक करें",
+            "notifications": {
+                "title": "सूचनाएं",
+                "empty": "कोई नई सूचना नहीं"
+            }
+        },
+        "directories": {
+            "title": "निर्देशिकाएँ",
+            "subtitle": "अपनी AI-संचालित निर्देशिकाओं को प्रबंधित और व्यवस्थित करें",
+            "recent": "हाल की निर्देशिकाएँ",
+            "viewAll": "सभी देखें ({count})",
+            "search": "निर्देशिकाएँ खोजें...",
+            "create": "निर्देशिका बनाएं",
+            "showing": "{total} में से {current} निर्देशिकाएँ दिखाई जा रही हैं",
+            "pagination": {
+                "previous": "पिछला",
+                "next": "अगला"
+            },
+            "empty": {
+                "title": "अभी तक कोई निर्देशिका नहीं",
+                "description": "अपनी सामग्री को व्यवस्थित और प्रदर्शित करने के लिए अपनी पहली AI-संचालित निर्देशिका बनाएं।",
+                "action": "अपनी पहली निर्देशिका बनाएं",
+                "notFound": {
+                    "title": "कोई निर्देशिका नहीं मिली",
+                    "withSearch": "अपनी खोज शर्तों को समायोजित करने का प्रयास करें",
+                    "withoutSearch": "आरंभ करने के लिए अपनी पहली AI-संचालित निर्देशिका बनाएं"
+                }
+            }
+        },
+        "settings": {
+            "title": "सेटिंग्स",
+            "subtitle": "अपनी खाता सेटिंग्स और प्राथमिकताएं प्रबंधित करें",
+            "tabs": {
+                "profile": "प्रोफ़ाइल",
+                "security": "सुरक्षा",
+                "apiTokens": "API और टोकन",
+                "oauth": "जुड़े हुए खाते",
+                "notifications": "सूचनाएं",
+                "dangerZone": "खतरा क्षेत्र"
+            },
+            "profile": {
+                "title": "प्रोफ़ाइल सेटिंग्स",
+                "subtitle": "अपनी प्रोफ़ाइल जानकारी और अवतार अपडेट करें",
+                "fields": {
+                    "name": "नाम",
+                    "username": "उपयोगकर्ता नाम",
+                    "email": "ईमेल",
+                    "emailHelperText": "ईमेल बदला नहीं जा सकता"
+                },
+                "placeholders": {
+                    "name": "अपना नाम दर्ज करें",
+                    "username": "अपना उपयोगकर्ता नाम दर्ज करें"
+                },
+                "actions": {
+                    "save": "परिवर्तन सहेजें"
+                },
+                "messages": {
+                    "success": "प्रोफ़ाइल सफलतापूर्वक अपडेट की गई",
+                    "usernameRequired": "उपयोगकर्ता नाम आवश्यक है",
+                    "error": "प्रोफ़ाइल अपडेट करने में विफल",
+                    "unexpectedError": "एक अनपेक्षित त्रुटि हुई"
+                }
+            },
+            "security": {
+                "title": "सुरक्षा सेटिंग्स",
+                "subtitle": "अपनी खाता सुरक्षा और प्रमाणीकरण प्रबंधित करें",
+                "changePassword": {
+                    "title": "पासवर्ड बदलें",
+                    "currentPassword": "वर्तमान पासवर्ड",
+                    "newPassword": "नया पासवर्ड",
+                    "confirmPassword": "नया पासवर्ड पुष्टि करें",
+                    "showPasswords": "पासवर्ड दिखाएं",
+                    "placeholders": {
+                        "current": "वर्तमान पासवर्ड दर्ज करें",
+                        "new": "नया पासवर्ड दर्ज करें (न्यूनतम 8 अक्षर)",
+                        "confirm": "नया पासवर्ड पुष्टि करें"
+                    },
+                    "actions": {
+                        "update": "पासवर्ड अपडेट करें"
+                    },
+                    "messages": {
+                        "success": "पासवर्ड सफलतापूर्वक अपडेट किया गया",
+                        "fillAllFields": "कृपया सभी पासवर्ड फ़ील्ड भरें",
+                        "minLength": "नया पासवर्ड कम से कम 8 अक्षरों का होना चाहिए",
+                        "mismatch": "नए पासवर्ड मेल नहीं खाते",
+                        "sameAsCurrent": "नया पासवर्ड वर्तमान पासवर्ड से अलग होना चाहिए",
+                        "error": "पासवर्ड अपडेट करने में विफल",
+                        "unexpectedError": "एक अनपेक्षित त्रुटि हुई"
+                    }
+                },
+                "twoFactor": {
+                    "title": "दो-चरणीय प्रमाणीकरण",
+                    "subtitle": "अपने खाते में सुरक्षा की एक अतिरिक्त परत जोड़ें",
+                    "action": "जल्द आ रहा है"
+                },
+                "sessions": {
+                    "title": "सक्रिय सत्र",
+                    "subtitle": "डिवाइसों में अपने सक्रिय सत्र प्रबंधित करें",
+                    "action": "सत्र देखें (जल्द आ रहा है)"
+                }
+            },
+            "oauth": {
+                "title": "जुड़े हुए खाते",
+                "subtitle": "विस्तारित कार्यक्षमता के लिए अपने बाहरी खाते कनेक्ट करें",
+                "github": {
+                    "name": "GitHub",
+                    "connected": "GitHub रिपॉजिटरी के साथ निर्देशिकाएँ बनाएं और प्रबंधित करें",
+                    "disconnected": "रिपॉजिटरी से निर्देशिकाएँ बनाने के लिए कनेक्ट करें",
+                    "scopes": "स्कोप",
+                    "actions": {
+                        "connect": "कनेक्ट करें",
+                        "disconnect": "डिस्कनेक्ट करें",
+                        "confirmDisconnect": "क्या आप वाकई अपना GitHub खाता डिस्कनेक्ट करना चाहते हैं?"
+                    },
+                    "messages": {
+                        "disconnected": "GitHub खाता डिस्कनेक्ट कर दिया गया",
+                        "connectError": "GitHub कनेक्ट करने में विफल",
+                        "disconnectError": "GitHub डिस्कनेक्ट करने में विफल"
+                    }
+                }
+            }
+        },
+        "stats": {
+            "totalDirectories": "कुल निर्देशिकाएँ",
+            "totalItems": "कुल आइटम",
+            "activeWebsites": "सक्रिय वेबसाइटें",
+            "fromLastMonth": "पिछले महीने से"
+        },
+        "directoryCard": {
+            "status": {
+                "active": "सक्रिय",
+                "notStarted": "शुरू नहीं हुआ",
+                "generating": "जनरेट हो रहा है",
+                "generated": "जनरेट किया गया",
+                "error": "त्रुटि",
+                "cancelled": "रद्द किया गया",
+                "idle": "निष्क्रिय"
+            },
+            "role": {
+                "owner": "मालिक",
+                "manager": "प्रबंधक",
+                "editor": "संपादक",
+                "viewer": "दर्शक"
+            },
+            "shared": {
+                "tooltip": "आपके साथ {role} के रूप में साझा किया गया"
+            },
+            "noDescription": "कोई विवरण प्रदान नहीं किया गया",
+            "items": "{count} आइटम",
+            "views": "{count} दृश्य",
+            "updated": "अपडेट किया गया {date}",
+            "viewAction": "देखें →"
+        },
+        "directoryList": {
+            "title": "आपकी निर्देशिकाएँ",
+            "createButton": "निर्देशिका बनाएं"
+        },
+        "directoryDetail": {
+            "failedToGenerateItems": "आइटम जनरेट करने में विफल। कृपया पुनः प्रयास करें।",
+            "generationCompleted": "जनरेशन सफलतापूर्वक पूरा हुआ",
+            "generationCancelled": "जनरेशन रद्द कर दिया गया था",
+            "role": {
+                "owner": "मालिक",
+                "manager": "प्रबंधक",
+                "editor": "संपादक",
+                "viewer": "दर्शक"
+            },
+            "shared": {
+                "tooltip": "आपके साथ {role} के रूप में साझा किया गया"
+            },
+            "status": {
+                "notStarted": "शुरू नहीं हुआ",
+                "generating": "जनरेट हो रहा है",
+                "generated": "जनरेट किया गया",
+                "error": "त्रुटि",
+                "cancelled": "रद्द किया गया"
+            },
+            "tabs": {
+                "overview": "अवलोकन",
+                "items": "आइटम",
+                "generator": "जेनरेटर",
+                "schedule": "शेड्यूल",
+                "history": "इतिहास",
+                "deploy": "डिप्लॉय",
+                "members": "सदस्य",
+                "settings": "सेटिंग्स"
+            },
+            "members": {
+                "title": "टीम के सदस्य",
+                "subtitle": "प्रबंधित करें कि इस निर्देशिका तक किसकी पहुंच है और उनकी अनुमतियां क्या हैं।",
+                "inviteMember": "सदस्य आमंत्रित करें",
+                "noMembers": "अभी तक कोई टीम सदस्य नहीं। सहयोग के लिए किसी को आमंत्रित करें।",
+                "roles": {
+                    "creator": "निर्माता",
+                    "owner": "मालिक",
+                    "manager": "प्रबंधक",
+                    "editor": "संपादक",
+                    "viewer": "दर्शक"
+                },
+                "roleDescriptions": {
+                    "owner": "हटाने और सदस्य प्रबंधन सहित पूर्ण नियंत्रण।",
+                    "manager": "निर्देशिका संपादित कर सकता है और सदस्य प्रबंधित कर सकता है, लेकिन हटा नहीं सकता।",
+                    "editor": "निर्देशिका सामग्री संपादित कर सकता है और जनरेशन चला सकता है।",
+                    "viewer": "निर्देशिका देखने के लिए केवल पढ़ने की पहुंच।"
+                },
+                "invite": {
+                    "title": "टीम सदस्य आमंत्रित करें",
+                    "description": "इस निर्देशिका पर सहयोग करने के लिए एक नया सदस्य जोड़ें।",
+                    "emailLabel": "ईमेल पता",
+                    "emailPlaceholder": "colleague@example.com",
+                    "roleLabel": "भूमिका",
+                    "submit": "आमंत्रण भेजें",
+                    "cancel": "रद्द करें",
+                    "success": "सदस्य सफलतापूर्वक आमंत्रित किया गया।",
+                    "errors": {
+                        "emailRequired": "ईमेल पता आवश्यक है।",
+                        "failed": "सदस्य आमंत्रित करने में विफल। कृपया पुनः प्रयास करें।"
+                    }
+                },
+                "confirmRemove": {
+                    "title": "सदस्य हटाएं",
+                    "description": "क्या आप वाकई {username} को इस निर्देशिका से हटाना चाहते हैं? उनकी सभी पहुंच समाप्त हो जाएगी।",
+                    "confirm": "हटाएं",
+                    "cancel": "रद्द करें"
+                },
+                "roleUpdated": "सदस्य भूमिका अपडेट की गई।",
+                "memberRemoved": "सदस्य सफलतापूर्वक हटा दिया गया।",
+                "errors": {
+                    "updateFailed": "सदस्य भूमिका अपडेट करने में विफल।",
+                    "removeFailed": "सदस्य हटाने में विफल।"
+                }
+            },
+            "schedule": {
+                "page": {
+                    "title": "शेड्यूल्ड अपडेट",
+                    "subtitle": "एक समर्पित कैडेंस और विफलता हैंडलिंग के साथ {name} के लिए रिफ्रेश को स्वचालित करें।",
+                    "fallbackName": "इस निर्देशिका"
+                },
+                "card": {
+                    "title": "ऑटोमेशन",
+                    "subtitle": {
+                        "enabled": "कैडेंस, बिलिंग और सुरक्षा उपाय समायोजित करें ताकि शेड्यूल्ड रिफ्रेश विश्वसनीय बने रहें।",
+                        "disabled": "सब्सक्रिप्शन सीमाओं के बिना रिफ्रेश को स्वचालित करें—कैडेंस और विफलता गार्ड स्वतंत्र रूप से सेट करें।"
+                    },
+                    "summary": {
+                        "status": "स्थिति",
+                        "nextRun": "अगला रन",
+                        "lastRun": "पिछला रन",
+                        "failures": "विफलताएं",
+                        "notScheduled": "शेड्यूल नहीं",
+                        "never": "कभी नहीं",
+                        "statusMap": {
+                            "active": "ऑटोमेशन सक्रिय",
+                            "paused": "रोका गया",
+                            "canceled": "रद्द किया गया",
+                            "disabled": "अक्षम"
+                        }
+                    },
+                    "fields": {
+                        "automation": "ऑटोमेशन",
+                        "automationHelp": "भविष्य के रनों को अस्थायी रूप से रोकने के लिए रोकें।",
+                        "billing": "बिलिंग मोड",
+                        "billingHelp": "सब्सक्रिप्शन असीमित रन अनलॉक करते हैं। पे-पर-यूज़ प्रति निष्पादन बिल करता है।",
+                        "cadence": "कैडेंस",
+                        "cadenceHelp": "वर्तमान योजना: {plan}",
+                        "cadenceOpen": "सब्सक्रिप्शन अक्षम होने पर सभी कैडेंस उपलब्ध हैं।",
+                        "maxFailures": "विफलता सीमा",
+                        "maxFailuresHelp": "इतनी विफलताएं होने पर स्वचालित रूप से रोकें।",
+                        "createPullRequest": "पुल रिक्वेस्ट बनाएं",
+                        "createPullRequestHelp": "जब सक्षम हो, तो शेड्यूल्ड अपडेट सीधे कमिट करने के बजाय एक पुल रिक्वेस्ट बनाते हैं।"
+                    },
+                    "billing": {
+                        "subscription": "सब्सक्रिप्शन",
+                        "usage": "पे-पर-यूज़"
+                    },
+                    "cadence": {
+                        "hourly": "हर घंटे",
+                        "daily": "हर दिन",
+                        "weekly": "हर सप्ताह",
+                        "monthly": "हर महीने"
+                    },
+                    "plans": {
+                        "free": "मुफ़्त",
+                        "standard": "मानक",
+                        "premium": "प्रीमियम",
+                        "unmetered": "असीमित"
+                    },
+                    "usageRequired": "इस कैडेंस का उपयोग करने के लिए पे-पर-यूज़ पर स्विच करें।",
+                    "cadenceAllowed": "आपकी योजना पर कैडेंस की अनुमति है।",
+                    "actions": {
+                        "save": "परिवर्तन सहेजें",
+                        "saving": "सहेजा जा रहा है...",
+                        "runNow": "अभी चलाएं",
+                        "starting": "शुरू हो रहा है...",
+                        "cancel": "शेड्यूल रद्द करें",
+                        "cancelling": "रद्द किया जा रहा है..."
+                    },
+                    "success": {
+                        "saved": "शेड्यूल सहेजा गया।",
+                        "runStarted": "शेड्यूल्ड रन शुरू हुआ।",
+                        "cancelled": "शेड्यूल रद्द किया गया।"
+                    },
+                    "errors": {
+                        "requireUsage": "इस कैडेंस का उपयोग करने के लिए पे-पर-यूज़ बिलिंग सक्षम करें।",
+                        "updateFailed": "शेड्यूल अपडेट करने में विफल।",
+                        "runFailed": "रन शुरू करने में विफल।",
+                        "cancelFailed": "शेड्यूल रद्द करने में विफल।"
+                    },
+                    "empty": {
+                        "title": "पहले एक मैनुअल जनरेशन चलाएं",
+                        "description": "स्वचालित शेड्यूलिंग अनलॉक करने के लिए एक सफल मैनुअल रन पूरा करें। एक बार आपकी निर्देशिका में डेटा हो जाने पर हम इसे आपके लिए ताजा रख सकते हैं।",
+                        "refresh": "स्थिति रिफ्रेश करें"
+                    },
+                    "requiresGeneration": "शेड्यूल सक्षम करने से पहले कम से कम एक आइटम जनरेशन चलाएं।"
+                },
+                "actions": {
+                    "invalid": "अमान्य डेटा",
+                    "updated": "शेड्यूल अपडेट किया गया।",
+                    "updateFailed": "शेड्यूल अपडेट करने में विफल।",
+                    "runStarted": "शेड्यूल्ड रन शुरू हुआ।",
+                    "runFailed": "रन ट्रिगर करने में विफल।",
+                    "cancelled": "शेड्यूल रद्द किया गया।",
+                    "cancelFailed": "शेड्यूल रद्द करने में विफल।"
+                }
+            },
+            "statusCard": {
+                "notStarted": {
+                    "title": "जनरेशन शुरू नहीं हुआ",
+                    "description": "अपनी निर्देशिका को सामग्री से भरने के लिए आइटम जनरेट करना शुरू करें।",
+                    "action": "जनरेशन शुरू करें"
+                },
+                "generating": {
+                    "title": "जनरेशन प्रगति पर है",
+                    "description": "आपका अनुरोध प्रोसेस किया जा रहा है...",
+                    "processing": "प्रोसेस हो रहा है..."
+                },
+                "generated": {
+                    "title": "जनरेशन पूरा हुआ",
+                    "description": "आपकी निर्देशिका सफलतापूर्वक आइटमों से भर गई है।",
+                    "viewItems": "आइटम देखें",
+                    "regenerate": "पुनः जनरेट करें"
+                },
+                "error": {
+                    "title": "जनरेशन विफल",
+                    "description": "जनरेशन के दौरान एक त्रुटि हुई।",
+                    "retry": "जनरेशन पुनः प्रयास करें"
+                },
+                "cancelled": {
+                    "title": "जनरेशन रद्द किया गया",
+                    "description": "पिछला जनरेशन पूरा होने से पहले रोक दिया गया था।",
+                    "restart": "जनरेशन पुनः शुरू करें"
+                }
+            },
+            "stats": {
+                "totalItems": "कुल आइटम",
+                "categories": "श्रेणियाँ",
+                "generationStatus": "जनरेशन स्थिति",
+                "daysActive": "सक्रिय दिन"
+            },
+            "history": {
+                "title": "जनरेशन इतिहास",
+                "subtitle": "पिछले जनरेशन रन, बनाए गए आइटम और निष्पादन विवरण ट्रैक करें।",
+                "error": "अधिक प्रविष्टियाँ लोड करने में विफल",
+                "empty": {
+                    "title": "अभी तक कोई इतिहास नहीं",
+                    "description": "प्रगति और परिणाम यहाँ देखने के लिए एक जनरेशन अनुरोध करें।"
+                },
+                "status": {
+                    "generating": "प्रगति पर",
+                    "generated": "पूरा हुआ",
+                    "error": "विफल",
+                    "cancelled": "रद्द किया गया"
+                },
+                "table": {
+                    "run": "रन",
+                    "status": "स्थिति",
+                    "newItems": "नए आइटम",
+                    "updatedItems": "अपडेट किए गए",
+                    "totalItems": "कुल",
+                    "duration": "अवधि",
+                    "startedAt": "शुरू हुआ",
+                    "tokens": "टोकन",
+                    "cost": "लागत"
+                },
+                "loadMore": "अधिक लोड करें",
+                "noMore": "और रिकॉर्ड नहीं",
+                "unknown": "अज्ञात"
+            },
+            "info": {
+                "title": "निर्देशिका जानकारी",
+                "yourRole": "आपकी भूमिका",
+                "role": {
+                    "owner": "मालिक",
+                    "manager": "प्रबंधक",
+                    "editor": "संपादक",
+                    "viewer": "दर्शक"
+                },
+                "slug": "स्लग",
+                "repositories": "रिपॉजिटरी",
+                "dataRepo": "डेटा रिपॉजिटरी",
+                "websiteRepo": "वेबसाइट रिपॉजिटरी",
+                "mainRepo": "मुख्य रिपॉजिटरी",
+                "repoProvider": "रिपॉजिटरी प्रदाता",
+                "organization": "संगठन",
+                "created": "बनाई गई",
+                "lastUpdated": "अंतिम अपडेट",
+                "readmeHeader": "README हेडर",
+                "readmeFooter": "README फ़ुटर",
+                "custom": "कस्टम",
+                "customOverwrite": "कस्टम (ओवरराइट)",
+                "yes": "हाँ",
+                "no": "नहीं"
+            },
+            "config": {
+                "title": "कॉन्फ़िगरेशन विवरण",
+                "initialPrompt": "प्रारंभिक जनरेशन प्रॉम्प्ट",
+                "companyDetails": "कंपनी जानकारी",
+                "companyName": "कंपनी का नाम",
+                "companyWebsite": "वेबसाइट",
+                "generationSettings": "जनरेशन सेटिंग्स",
+                "generationMethod": "जनरेशन विधि",
+                "autoApproval": "स्वतः स्वीकृति",
+                "pagingMode": "पेजिंग मोड",
+                "contentTable": "सामग्री तालिका",
+                "enabled": "सक्षम",
+                "disabled": "अक्षम",
+                "pullRequestUpdate": "पुल रिक्वेस्ट विवरण",
+                "branch": "ब्रांच",
+                "prTitle": "PR शीर्षक",
+                "mainRepository": "मुख्य रिपॉजिटरी",
+                "dataRepository": "डेटा रिपॉजिटरी"
+            },
+            "activity": {
+                "title": "हाल की गतिविधि",
+                "noActivity": "अभी तक कोई गतिविधि नहीं",
+                "created": "निर्देशिका बनाई गई",
+                "directoryCreated": "निर्देशिका सफलतापूर्वक बनाई गई",
+                "justNow": "अभी अभी"
+            },
+            "items": {
+                "title": "निर्देशिका आइटम",
+                "subtitle": "अपनी निर्देशिका में आइटमों को प्रबंधित और व्यवस्थित करें",
+                "noItemsTitle": "अभी तक कोई आइटम नहीं",
+                "noItemsDescription": "आपकी निर्देशिका में अभी तक कोई आइटम नहीं है। अपनी निर्देशिका को सामग्री से भरने के लिए आइटम जनरेट करें।",
+                "generateItems": "आइटम जनरेट करें",
+                "searchPlaceholder": "आइटम खोजें...",
+                "allCategories": "सभी श्रेणियाँ",
+                "showing": "{total} में से {current} आइटम दिखाई जा रही हैं",
+                "noMatch": "आपकी खोज मानदंडों से कोई आइटम मेल नहीं खाता",
+                "source": "स्रोत",
+                "addItem": "आइटम जोड़ें",
+                "delete": "हटाएं",
+                "deleteWithPR": "पुल रिक्वेस्ट के साथ हटाएं",
+                "deleteConfirm": "क्या आप वाकई \"{name}\" को हटाना चाहते हैं?",
+                "deleteSuccess": "आइटम सफलतापूर्वक हटा दिया गया",
+                "deleteFailed": "आइटम हटाने में विफल",
+                "deleteError": "आइटम हटाते समय एक त्रुटि हुई",
+                "updateSuccess": "आइटम सफलतापूर्वक अपडेट किया गया",
+                "updateFailed": "आइटम अपडेट करने में विफल",
+                "updateError": "आइटम अपडेट करते समय एक त्रुटि हुई",
+                "updateItem": "आइटम अपडेट करें",
+                "loadingMore": "अधिक लोड हो रहे हैं... ({total} में से {current})",
+                "addModal": {
+                    "title": "नया आइटम जोड़ें",
+                    "sourceUrl": "स्रोत URL",
+                    "sourceUrlPlaceholder": "https://example.com/product",
+                    "sourceUrlHelp": "URL से आइटम विवरण स्वतः प्राप्त करने के लिए 'निकालें' पर क्लिक करें",
+                    "extract": "निकालें",
+                    "extractSuccess": "आइटम विवरण सफलतापूर्वक निकाले गए",
+                    "extractFailed": "आइटम विवरण निकालने में विफल",
+                    "extractError": "विवरण निकालते समय एक त्रुटि हुई",
+                    "name": "नाम",
+                    "namePlaceholder": "आइटम का नाम दर्ज करें",
+                    "description": "विवरण",
+                    "descriptionPlaceholder": "आइटम का संक्षिप्त विवरण दर्ज करें",
+                    "category": "श्रेणी",
+                    "tags": "टैग",
+                    "tagPlaceholder": "एक टैग जोड़ें और एंटर दबाएं",
+                    "slug": "स्लग (वैकल्पिक)",
+                    "slugPlaceholder": "custom-item-slug",
+                    "slugHelp": "URL-अनुकूल पहचानकर्ता। खाली छोड़ने पर स्वतः जनरेट हो जाएगा",
+                    "brand": "ब्रांड (वैकल्पिक)",
+                    "brandPlaceholder": "ब्रांड नाम दर्ज करें",
+                    "brandLogoUrl": "ब्रांड लोगो URL (वैकल्पिक)",
+                    "brandLogoUrlPlaceholder": "https://example.com/logo.png",
+                    "images": "छवियाँ (वैकल्पिक)",
+                    "imagePlaceholder": "https://example.com/screenshot.png",
+                    "imagesHelp": "छवि URL जोड़ें (स्क्रीनशॉट, उत्पाद छवियाँ)",
+                    "featured": "फ़ीचर्ड आइटम",
+                    "featuredHelp": "इस आइटम को निर्देशिका में फ़ीचर्ड के रूप में चिह्नित करें",
+                    "updateWithPR": "पुल रिक्वेस्ट बनाएं",
+                    "updateWithPRHelp": "सीधे कमिट करने के बजाय परिवर्तन एक पुल रिक्वेस्ट के रूप में सबमिट करें",
+                    "cancel": "रद्द करें",
+                    "adding": "जोड़ा जा रहा है...",
+                    "addItem": "आइटम जोड़ें",
+                    "success": "आइटम सफलतापूर्वक जोड़ा गया",
+                    "successDescription": "आइटम आपकी निर्देशिका में जोड़ दिया गया है",
+                    "failed": "आइटम जोड़ने में विफल",
+                    "error": "आइटम जोड़ते समय एक त्रुटि हुई",
+                    "errors": {
+                        "urlRequired": "निष्कर्षण के लिए स्रोत URL आवश्यक है",
+                        "invalidUrl": "कृपया एक मान्य URL दर्ज करें जिसमें http:// या https:// शामिल हो",
+                        "invalidImageUrl": "कृपया एक मान्य छवि URL दर्ज करें",
+                        "requiredFields": "कृपया सभी आवश्यक फ़ील्ड भरें"
+                    }
+                },
+                "editDisplay": "प्रदर्शन संपादित करें",
+                "editDisplayDescription": "फ़ीचर्ड स्थिति टॉगल करें और प्रदर्शन क्रम सेट करें।",
+                "orderLabel": "प्रदर्शन क्रम (वैकल्पिक)",
+                "orderHelp": "फ़ीचर्ड/गैर-फ़ीचर्ड समूहों के भीतर कम संख्या वाले पहले दिखाई देते हैं।",
+                "deleteDialogTitle": "आइटम हटाएं",
+                "deleteDialogDescription": "यह {name} को रिपॉजिटरी से हटा देगा।",
+                "createPRLabel": "पुल रिक्वेस्ट बनाएं",
+                "createPRHelp": "यदि सक्षम है, तो परिवर्तन सीधे कमिट करने के बजाय PR के माध्यम से प्रस्तावित किए जाते हैं।",
+                "reasonLabel": "कारण (वैकल्पिक)",
+                "reasonPlaceholder": "आप यह आइटम क्यों हटा रहे हैं?",
+                "confirmDelete": "आइटम हटाएं"
+            },
+            "generator": {
+                "regenerationWarning": "पुनर्जनरेशन चेतावनी",
+                "regenerationWarningDescription": "यह निर्देशिका पहले ही जनरेट की जा चुकी है। एक नया जनरेशन शुरू करने से मौजूदा आइटम बदल जाएंगे।",
+                "requiredInfo": "आवश्यक जानकारी",
+                "updateConfiguration": "कॉन्फ़िगरेशन अपडेट करें",
+                "promptRequired": "प्रॉम्प्ट आवश्यक है",
+                "operationStartedSuccessfully": "ऑपरेशन सफलतापूर्वक शुरू हुआ",
+                "failedToStartOperation": "ऑपरेशन शुरू करने में विफल",
+                "directoryName": "निर्देशिका नाम",
+                "generationPrompt": "जनरेशन प्रॉम्प्ट",
+                "recommended": "अनुशंसित",
+                "promptPlaceholder": "बताएं कि इस निर्देशिका के लिए किस प्रकार के आइटम जनरेट किए जाने चाहिए...",
+                "promptHelperText": "जिस प्रकार की सामग्री आप जनरेट करना चाहते हैं, उसके बारे में विशिष्ट बनें",
+                "repositoryDescription": "रिपॉजिटरी विवरण",
+                "repositoryPlaceholder": "रिपॉजिटरी का संक्षिप्त विवरण (वैकल्पिक)",
+                "startGeneration": "जनरेशन शुरू करें",
+                "regenerateItems": "आइटम पुनः जनरेट करें",
+                "updateItems": "आइटम अपडेट करें",
+                "recreateDirectory": "निर्देशिका पुनः बनाएं",
+                "showAdvancedOptions": "उन्नत विकल्प दिखाएं",
+                "hideAdvancedOptions": "उन्नत विकल्प छिपाएं",
+                "cancel": "रद्द करें",
+                "companyInformation": "कंपनी जानकारी",
+                "companyInfoDescription": "ब्रांडेड सामग्री के लिए वैकल्पिक कंपनी विवरण",
+                "companyName": "कंपनी का नाम",
+                "companyNamePlaceholder": "कंपनी का नाम दर्ज करें",
+                "companyWebsite": "कंपनी वेबसाइट",
+                "companyWebsitePlaceholder": "https://example.com",
+                "categoriesKeywords": "श्रेणियाँ और कीवर्ड",
+                "categoriesDescription": "सामग्री व्यवस्था के लिए श्रेणियाँ और कीवर्ड परिभाषित करें",
+                "initialCategories": "प्रारंभिक श्रेणियाँ",
+                "priorityCategories": "प्राथमिकता श्रेणियाँ",
+                "targetKeywords": "लक्षित कीवर्ड",
+                "addCategoryPlaceholder": "श्रेणी जोड़ें",
+                "addPriorityCategoryPlaceholder": "प्राथमिकता श्रेणी जोड़ें",
+                "addKeywordPlaceholder": "कीवर्ड जोड़ें",
+                "add": "जोड़ें",
+                "sourceUrls": "स्रोत URL",
+                "sourceUrlsDescription": "सामग्री निकालने के लिए विशिष्ट URL जोड़ें",
+                "sourceUrlPlaceholder": "https://example.com/page",
+                "addUrl": "URL जोड़ें",
+                "noSourceUrlsMessage": "कोई स्रोत URL नहीं जोड़ा गया। जनरेटर सामग्री खोजने के लिए खोज का उपयोग करेगा।",
+                "advancedConfig": "उन्नत कॉन्फ़िगरेशन",
+                "advancedConfigDescription": "जनरेशन पैरामीटर और व्यवहार को परिष्कृत करें",
+                "generationMethod": "जनरेशन विधि",
+                "methodCreateUpdate": "बनाएं या अपडेट करें",
+                "methodRecreate": "पुनः बनाएं (सभी प्रतिस्थापित करें)",
+                "updateWithPullRequest": "पुल रिक्वेस्ट के साथ अपडेट करें",
+                "updateWithPullRequestDescription": "सीधे कमिट करने के बजाय एक पुल रिक्वेस्ट बनाएं",
+                "enableBadgeEvaluation": "बैज मूल्यांकन सक्षम करें",
+                "enableBadgeEvaluationDescription": "आइटमों को गुणवत्ता बैज का मूल्यांकन और जोड़ें",
+                "websiteRepositoryCreationMethod": "वेबसाइट रिपॉजिटरी निर्माण विधि",
+                "methodDuplicate": "डुप्लिकेट",
+                "methodFork": "फ़ोर्क",
+                "directoryNamePlaceholder": "निर्देशिका नाम दर्ज करें",
+                "methodCreateFromTemplate": "टेम्प्लेट से बनाएं",
+                "aiProcessingConfiguration": "AI प्रोसेसिंग कॉन्फ़िगरेशन",
+                "maxSearchQueries": "अधिकतम खोज क्वेरी",
+                "resultsPerQuery": "प्रति क्वेरी परिणाम",
+                "maxPagesToProcess": "प्रोसेस करने के लिए अधिकतम पेज",
+                "relevanceThreshold": "प्रासंगिकता सीमा",
+                "aiFirstGeneration": "AI-फ़र्स्ट जनरेशन",
+                "aiFirstGenerationDescription": "वेब खोज से पहले प्रारंभिक आइटमों के AI-जनरेशन को सक्षम करें।",
+                "contentFiltering": "सामग्री फ़िल्टरिंग",
+                "contentFilteringDescription": "सामग्री गुणवत्ता फ़िल्टरिंग सक्षम करें",
+                "recreateConfirmTitle": "निर्देशिका डेटा पुनः बनाएं?",
+                "recreateConfirmDescription": "पुनः बनाएं मौजूदा आइटम हटा देगा और उन्हें खरोंच से पुनः जनरेट करेगा। इस क्रिया को पूर्ववत नहीं किया जा सकता।",
+                "confirmRecreate": "हाँ, पुनः बनाएं",
+                "recreateInlineTitle": "पुनः बनाएं मौजूदा आइटम हटा देगा",
+                "recreateInlineDescription": "यह मोड वर्तमान आइटमों को हटाता है और उन्हें खरोंच से पुनर्निर्मित करता है। केवल तभी आगे बढ़ें जब आप सब कुछ प्रतिस्थापित करना चाहते हैं।"
+            },
+            "progress": {
+                "title": "जनरेशन प्रगति पर है",
+                "processingRequest": "आपका अनुरोध प्रोसेस किया जा रहा है...",
+                "steps": {
+                    "promptComparison": "प्रॉम्प्ट तुलना",
+                    "promptProcessing": "आपका प्रॉम्प्ट प्रोसेस किया जा रहा है",
+                    "domainDetection": "डोमेन प्रकार पता लगाना",
+                    "aiFirstItemsGeneration": "प्रारंभिक AI आइटम जनरेट करना",
+                    "searchQueriesGeneration": "खोज क्वेरी बनाना",
+                    "webSearch": "वेब खोज",
+                    "contentRetrieval": "सामग्री प्राप्त करना",
+                    "contentFiltering": "प्रासंगिक सामग्री फ़िल्टर करना",
+                    "itemsExtraction": "सामग्री से आइटम निकालना",
+                    "deduplicationDataAggregation": "डुप्लिकेट हटाना और डेटा एकत्रित करना",
+                    "categoriesTagsProcessing": "श्रेणियाँ और टैग प्रोसेस करना",
+                    "sourcesValidation": "स्रोत सत्यापन",
+                    "badgesProcessing": "गुणवत्ता बैज प्रोसेसिंग",
+                    "markdownGeneration": "मार्कडाउन सामग्री जनरेट करना",
+                    "processing": "प्रोसेस हो रहा है..."
+                },
+                "progress": "प्रगति",
+                "closeNote": "इसमें कुछ मिनट लग सकते हैं। आप इस पेज को बंद कर सकते हैं और बाद में वापस आ सकते हैं।"
+            },
+            "settings": {
+                "sourceSettings": "स्रोत रिपॉजिटरी",
+                "originalSource": "मूल स्रोत",
+                "syncEnabled": "सिंक सक्षम",
+                "syncDescription": "स्रोत रिपॉजिटरी से अपडेट स्वचालित रूप से खींचें।",
+                "syncUpdateFailed": "सिंक सेटिंग्स अपडेट करने में विफल",
+                "syncDisabled": "सिंक अक्षम",
+                "generalSettings": "सामान्य सेटिंग्स",
+                "generalTitle": "सामान्य सेटिंग्स",
+                "directoryName": "निर्देशिका नाम",
+                "description": "विवरण",
+                "organizationRepository": "संगठन रिपॉजिटरी",
+                "organizationHelp": "आपके व्यक्तिगत खाते के बजाय किसी संगठन के तहत रिपॉजिटरी बनाएं",
+                "organizationName": "संगठन का नाम",
+                "organizationNamePlaceholder": "संगठन का नाम दर्ज करें",
+                "readmeConfiguration": "README कॉन्फ़िगरेशन",
+                "readmeTitle": "README कॉन्फ़िगरेशन",
+                "customHeader": "कस्टम हेडर",
+                "customHeaderPlaceholder": "README हेडर में कस्टम सामग्री जोड़ें",
+                "overwriteDefaultHeader": "डिफ़ॉल्ट हेडर ओवरराइट करें",
+                "customFooter": "कस्टम फ़ुटर",
+                "cantDeleteWhileGenerating": "आइटम जनरेट होते समय निर्देशिका नहीं हटाई जा सकती।",
+                "customFooterPlaceholder": "README फ़ुटर में कस्टम सामग्री जोड़ें",
+                "overwriteDefaultFooter": "डिफ़ॉल्ट फ़ुटर ओवरराइट करें",
+                "dangerZone": "खतरा क्षेत्र",
+                "dangerTitle": "खतरा क्षेत्र",
+                "deleteWarning": "एक बार जब आप एक निर्देशिका हटाते हैं, तो वापसी का कोई रास्ता नहीं है। कृपया निश्चित रहें।",
+                "dangerDescription": "एक बार जब आप एक निर्देशिका हटाते हैं, तो वापसी का कोई रास्ता नहीं है। कृपया निश्चित रहें।",
+                "deleteOptions": "चुनें कि क्या हटाना है:",
+                "deleteDataRepository": "डेटा रिपॉजिटरी हटाएं",
+                "deleteDataRepositoryDescription": "GitHub से JSON डेटा रिपॉजिटरी हटाएं",
+                "deleteMarkdownRepository": "मार्कडाउन रिपॉजिटरी हटाएं",
+                "deleteMarkdownRepositoryDescription": "README वाली मार्कडाउन रिपॉजिटरी हटाएं",
+                "deleteWebsiteRepository": "वेबसाइट रिपॉजिटरी हटाएं",
+                "deleteWebsiteRepositoryDescription": "डिप्लॉय की गई वेबसाइट रिपॉजिटरी हटाएं",
+                "deleteConfirm": "क्या आप बिल्कुल सुनिश्चित हैं?",
+                "deleteConfirmDetail": "इस क्रिया को पूर्ववत नहीं किया जा सकता। निर्देशिका और चयनित रिपॉजिटरी स्थायी रूप से हटा दी जाएंगी।",
+                "confirmDirectoryName": "पुष्टि करने के लिए निर्देशिका नाम लिखें",
+                "confirmDirectoryNameDescription": "हटाने की पुष्टि करने के लिए \"{name}\" लिखें",
+                "deleteNameMismatch": "निर्देशिका नाम मेल नहीं खाता",
+                "deleteButton": "निर्देशिका हटाएं",
+                "deleteConfirmButton": "हाँ, हटाएं",
+                "deleteSuccess": "निर्देशिका सफलतापूर्वक हटाई गई",
+                "deleteFailed": "निर्देशिका हटाने में विफल",
+                "yesDelete": "हाँ, हटाएं",
+                "cancel": "रद्द करें",
+                "saveChanges": "परिवर्तन सहेजें",
+                "updateReadme": "README अपडेट करें",
+                "updateSuccess": "सेटिंग्स सफलतापूर्वक अपडेट की गईं",
+                "updateFailed": "सेटिंग्स अपडेट करने में विफल"
+            },
+            "deploy": {
+                "noTokenAlert": {
+                    "title": "Vercel टोकन आवश्यक",
+                    "description": "अपनी निर्देशिका को Vercel पर डिप्लॉय करने के लिए, आपको अपने खाता सेटिंग्स में अपना Vercel API टोकन कॉन्फ़िगर करने की आवश्यकता है।",
+                    "configureButton": "API टोकन सेटिंग्स पर जाएं",
+                    "getTokenButton": "Vercel टोकन प्राप्त करें",
+                    "howTo": {
+                        "title": "अपना Vercel टोकन कैसे कॉन्फ़िगर करें:",
+                        "step1": "Vercel डैशबोर्ड खोलने के लिए 'Vercel टोकन प्राप्त करें' पर क्लिक करें",
+                        "step2": "डिप्लॉयमेंट अनुमतियों के साथ एक नया टोकन बनाएं",
+                        "step3": "जनरेट किया गया टोकन कॉपी करें",
+                        "step4": "API टोकन सेटिंग्स पर जाएं और Vercel सेक्शन में अपना टोकन पेस्ट करें"
+                    }
+                },
+                "sharedNoTokenAlert": {
+                    "title": "डिप्लॉयमेंट उपलब्ध नहीं",
+                    "description": "निर्देशिका मालिक ने डिप्लॉयमेंट के लिए Vercel टोकन कॉन्फ़िगर नहीं किया है। कृपया डिप्लॉयमेंट सेट अप करने के लिए निर्देशिका मालिक से संपर्क करें।",
+                    "hint": "एक सहयोगी के रूप में, एक बार मालिक अपना Vercel इंटीग्रेशन कॉन्फ़िगर कर लेता है, तो आप डिप्लॉयमेंट ट्रिगर कर सकते हैं।"
+                },
+                "form": {
+                    "deployToVercel": {
+                        "title": "Vercel पर डिप्लॉय करें",
+                        "description": "अपनी निर्देशिका वेबसाइट रिपॉजिटरी को Vercel पर डिप्लॉय करें।",
+                        "deployButton": "अभी डिप्लॉय करें",
+                        "deployingButton": "डिप्लॉय हो रहा है...",
+                        "deployingStateButton": "डिप्लॉय हो रहा है ({state})...",
+                        "successMessage": "आपकी वेबसाइट सफलतापूर्वक डिप्लॉय हो गई है!",
+                        "teamSelection": {
+                            "title": "Vercel टीम चुनें",
+                            "description": "इस निर्देशिका को डिप्लॉय करने के लिए Vercel टीम चुनें।",
+                            "label": "टीम",
+                            "placeholder": "एक टीम चुनें",
+                            "confirmButton": "टीम पर डिप्लॉय करें",
+                            "cancelButton": "रद्द करें"
+                        }
+                    },
+                    "updateRepository": {
+                        "title": "वेबसाइट रिपॉजिटरी अपडेट करें",
+                        "description": "टेम्प्लेट से नवीनतम परिवर्तनों को सिंक करें",
+                        "websiteRepository": "वेबसाइट रिपॉजिटरी",
+                        "updateButton": "रिपॉजिटरी अपडेट करें",
+                        "updatingButton": "अपडेट हो रहा है..."
+                    },
+                    "messages": {
+                        "deploySuccess": "डिप्लॉयमेंट सफलतापूर्वक शुरू हुआ",
+                        "deployPending": "डिप्लॉयमेंट कतार में है और जल्द ही शुरू होगा",
+                        "deployFailed": "Vercel पर डिप्लॉय करने में विफल",
+                        "deployError": "डिप्लॉयमेंट के दौरान एक त्रुटि हुई",
+                        "updateSuccess": "रिपॉजिटरी सफलतापूर्वक अपडेट की गई",
+                        "updateFailed": "रिपॉजिटरी अपडेट करने में विफल",
+                        "updateError": "रिपॉजिटरी अपडेट करते समय एक त्रुटि हुई"
+                    },
+                    "info": {
+                        "deployInfo": "डिप्लॉयमेंट में आमतौर पर 1-3 मिनट लगते हैं। पूरा होने पर आपको एक URL प्राप्त होगा।",
+                        "updateInfo": "अपडेट आपकी निर्देशिका सामग्री को अगले डिप्लॉयमेंट के लिए वेबसाइट रिपॉजिटरी में सिंक करते हैं।"
+                    },
+                    "websiteTemplate": {
+                        "title": "स्वचालित टेम्प्लेट अपडेट",
+                        "description": "अपनी वेबसाइट को नवीनतम टेम्प्लेट परिवर्तनों के साथ स्वचालित रूप से सिंक रखें।",
+                        "autoUpdate": "स्वचालित रूप से अपडेट करें",
+                        "autoUpdateDescription": "हर घंटे टेम्प्लेट अपडेट के लिए जांचें और स्वचालित रूप से लागू करें।",
+                        "useBeta": "टेम्प्लेट का बीटा संस्करण उपयोग करें",
+                        "useBetaDescription": "स्थिर मुख्य ब्रांच के बजाय स्टेज ब्रांच का उपयोग करें।",
+                        "lastUpdated": "अंतिम अपडेट",
+                        "lastChecked": "अंतिम जाँच",
+                        "lastError": "अंतिम त्रुटि",
+                        "updateSuccess": "सेटिंग्स सफलतापूर्वक अपडेट की गईं",
+                        "updateFailed": "सेटिंग्स अपडेट करने में विफल"
+                    }
+                }
+            }
+        },
+        "directoryCreation": {
+            "title": "नई निर्देशिका बनाएं",
+            "subtitle": "चुनें कि आप अपनी निर्देशिका कैसे बनाना चाहते हैं",
+            "backToOptions": "विकल्पों पर वापस जाएं",
+            "organizationSelector": {
+                "label": "रिपॉजिटरी मालिक",
+                "loading": "संगठन लोड हो रहे हैं...",
+                "personal": "व्यक्तिगत खाता",
+                "personalAccount": "रिपॉजिटरी आपके व्यक्तिगत खाते के तहत बनाई जाएगी",
+                "organizations": "संगठन",
+                "personalHelp": "रिपॉजिटरी आपके व्यक्तिगत GitHub खाते के तहत बनाई जाएगी",
+                "organizationHelp": "रिपॉजिटरी {org} संगठन के तहत बनाई जाएगी"
+            },
+            "ai": {
+                "title": "AI के साथ बनाएं",
+                "subtitle": "प्राकृतिक भाषा में अपने निर्देशिका विचार का वर्णन करें और AI को सेटअप संभालने दें",
+                "getStarted": "शुरू करें",
+                "formTitle": "AI के साथ निर्देशिका बनाएं",
+                "formSubtitle": "अपने निर्देशिका विचार का वर्णन करें और AI को सेटअप और प्रारंभिक सामग्री जनरेशन संभालने दें",
+                "directoryNameLabel": "निर्देशिका नाम",
+                "directoryNamePlaceholder": "उदा., अद्भुत AI टूल्स",
+                "directoryNameHelp": "यदि आप इसे खाली छोड़ते हैं तो AI एक नाम सुझाएगा",
+                "promptLabel": "अपनी निर्देशिका का वर्णन करें",
+                "githubRequired": "कृपया पहले अपना GitHub खाता कनेक्ट करें।",
+                "promptPlaceholder": "बताएं कि आप किस प्रकार की निर्देशिका बनाना चाहते हैं, इसमें कौन से आइटम होने चाहिए, और कोई विशिष्ट आवश्यकताएं...",
+                "inspirationText": "प्रेरणा की आवश्यकता है? इनमें से एक आज़माएं:",
+                "examplePrompts": {
+                    "0": {
+                        "name": "AI डेवलपर टूल्स",
+                        "prompt": "डेवलपर्स के लिए सर्वश्रेष्ठ AI टूल्स की एक निर्देशिका बनाएं"
+                    },
+                    "1": {
+                        "name": "React कंपोनेंट्स हब",
+                        "prompt": "ओपन-सोर्स React कंपोनेंट्स की एक क्यूरेटेड सूची बनाएं"
+                    },
+                    "2": {
+                        "name": "रिमोट टीम टूल्स",
+                        "prompt": "रिमोट टीमों के लिए उत्पादकता ऐप्स की एक निर्देशिका जनरेट करें"
+                    },
+                    "3": {
+                        "name": "सस्टेनेबल फैशन",
+                        "prompt": "सस्टेनेबल फैशन ब्रांड्स का एक संग्रह बनाएं"
+                    }
+                },
+                "featuresTitle": "AI आपके लिए क्या करेगा:",
+                "features": {
+                    "0": "उपयुक्त नाम और विवरण जनरेट करेगा",
+                    "1": "प्रारंभिक श्रेणियाँ और संरचना बनाएगा",
+                    "2": "प्रासंगिक आइटम स्वतः ढूंढेगा और जोड़ेगा",
+                    "3": "उचित दस्तावेज़ीकरण के साथ GitHub रिपॉजिटरी सेट अप करेगा"
+                },
+                "generateButton": "AI के साथ जनरेट करें",
+                "generatingButton": "निर्देशिका जनरेट हो रही है...",
+                "cancelButton": "रद्द करें",
+                "noteTitle": "नोट:",
+                "noteText": "AI जनरेशन में आमतौर पर आपके अनुरोध की जटिलता के आधार पर 2-5 मिनट लगते हैं। आपकी निर्देशिका तैयार होने पर आपको सूचित किया जाएगा।",
+                "errors": {
+                    "promptRequired": "कृपया बताएं कि आप किस प्रकार की निर्देशिका बनाना चाहते हैं",
+                    "nameRequired": "निर्देशिका नाम आवश्यक है",
+                    "slugRequired": "निर्देशिका स्लग आवश्यक है",
+                    "descriptionRequired": "निर्देशिका विवरण आवश्यक है"
+                },
+                "success": {
+                    "started": "निर्देशिका निर्माण शुरू हुआ!",
+                    "generating": "AI सामग्री जनरेट कर रहा है। इसमें कुछ मिनट लग सकते हैं...",
+                    "created": "निर्देशिका सफलतापूर्वक बनाई गई!"
+                },
+                "advancedSettings": "उन्नत सेटिंग्स",
+                "advancedSubtitle": "संगठन और रिपॉजिटरी सेटिंग्स कॉन्फ़िगर करें",
+                "organizationLabel": "संगठन रिपॉजिटरी",
+                "organizationHelp": "आपके व्यक्तिगत खाते के बजाय किसी संगठन के तहत रिपॉजिटरी बनाएं",
+                "organizationNameLabel": "संगठन का नाम",
+                "organizationNamePlaceholder": "संगठन का नाम दर्ज करें"
+            },
+            "manual": {
+                "title": "मैन्युअल रूप से बनाएं",
+                "subtitle": "हर सेटिंग और विकल्प पर पूर्ण नियंत्रण के साथ अपनी निर्देशिका कॉन्फ़िगर करें",
+                "configureNow": "अभी कॉन्फ़िगर करें",
+                "formTitle": "मैन्युअल रूप से निर्देशिका बनाएं",
+                "formSubtitle": "हर सेटिंग पर पूर्ण नियंत्रण के साथ अपनी निर्देशिका कॉन्फ़िगर करें",
+                "basicInfo": "मूल जानकारी",
+                "nameLabel": "निर्देशिका नाम *",
+                "namePlaceholder": "उदा., अद्भुत AI टूल्स",
+                "slugLabel": "निर्देशिका स्लग *",
+                "slugPlaceholder": "awesome-ai-tools",
+                "githubRequired": "कृपया पहले अपना GitHub खाता कनेक्ट करें।",
+                "slugHelp": "URL-अनुकूल पहचानकर्ता (केवल लोअरकेस अक्षर, संख्याएँ और हाइफ़न)",
+                "descriptionLabel": "विवरण *",
+                "descriptionPlaceholder": "डेवलपर्स के लिए सर्वश्रेष्ठ AI टूल्स और संसाधनों की एक क्यूरेटेड सूची",
+                "advancedSettings": "उन्नत सेटिंग्स",
+                "advancedSubtitle": "संगठन, कस्टम हेडर, और अधिक",
+                "organizationLabel": "संगठन के तहत बनाएं",
+                "organizationHelp": "इस निर्देशिका को आपके व्यक्तिगत खाते के बजाय GitHub संगठन के तहत बनाएं",
+                "organizationNameLabel": "संगठन का नाम",
+                "organizationNamePlaceholder": "my-organization",
+                "headerLabel": "कस्टम README हेडर",
+                "headerPlaceholder": "अपनी README फ़ाइल के शीर्ष पर कस्टम सामग्री जोड़ें",
+                "headerOverwrite": "डिफ़ॉल्ट हेडर पूरी तरह से बदलें",
+                "footerLabel": "कस्टम README फ़ुटर",
+                "footerPlaceholder": "अपनी README फ़ाइल के निचले भाग में कस्टम सामग्री जोड़ें",
+                "footerOverwrite": "डिफ़ॉल्ट फ़ुटर पूरी तरह से बदलें",
+                "createButton": "निर्देशिका बनाएं",
+                "creatingButton": "निर्देशिका बन रही है...",
+                "cancelButton": "रद्द करें",
+                "nameRequired": "निर्देशिका नाम आवश्यक है",
+                "slugRequired": "निर्देशिका स्लग आवश्यक है",
+                "descriptionRequired": "निर्देशिका विवरण आवश्यक है",
+                "success": {
+                    "created": "निर्देशिका सफलतापूर्वक बनाई गई!"
+                }
+            },
+            "import": {
+                "title": "मौजूदा आयात करें",
+                "subtitle": "मौजूदा GitHub रिपॉजिटरी से निर्देशिका आयात करें",
+                "importNow": "अभी आयात करें",
+                "formTitle": "GitHub से निर्देशिका आयात करें",
+                "formSubtitle": "अपनी निर्देशिका बनाने के लिए मौजूदा GitHub रिपॉजिटरी से आइटम आयात करें",
+                "sync": {
+                    "title": "सिंक रखें",
+                    "description": "स्रोत रिपॉजिटरी से अपडेट स्वचालित रूप से खींचें।"
+                },
+                "sourceMethod": {
+                    "url": {
+                        "title": "URL पेस्ट करें",
+                        "description": "सीधे एक GitHub रिपॉजिटरी URL दर्ज करें"
+                    },
+                    "repository": {
+                        "title": "मेरी रिपॉजिटरी",
+                        "description": "अपनी GitHub रिपॉजिटरी में से चुनें"
+                    }
+                },
+                "urlLabel": "GitHub रिपॉजिटरी URL",
+                "urlPlaceholder": "https://github.com/owner/repository",
+                "urlHelp": "GitHub रिपॉजिटरी का पूरा URL दर्ज करें",
+                "supportedFormats": {
+                    "title": "समर्थित रिपॉजिटरी प्रारूप",
+                    "dataRepo": {
+                        "title": "डेटा रिपॉजिटरी",
+                        "description": "config.yml और data/ फ़ोल्डर संरचना वाली रिपॉजिटरी"
+                    },
+                    "awesomeReadme": {
+                        "title": "Awesome सूची",
+                        "description": "मार्कडाउन README वाली क्यूरेटेड सूची रिपॉजिटरी"
+                    }
+                },
+                "analyzing": {
+                    "title": "रिपॉजिटरी विश्लेषण",
+                    "subtitle": "रिपॉजिटरी प्रकार और संरचना का पता लगाया जा रहा है..."
+                },
+                "detectedType": {
+                    "dataRepo": "डेटा रिपॉजिटरी का पता चला",
+                    "awesomeReadme": "Awesome सूची का पता चला"
+                },
+                "badges": {
+                    "dataRepo": "डेटा रिपॉजिटरी",
+                    "awesomeReadme": "Awesome सूची"
+                },
+                "preview": {
+                    "items": "आइटम",
+                    "categories": "श्रेणियाँ"
+                },
+                "nameLabel": "निर्देशिका नाम",
+                "namePlaceholder": "उदा., मेरी अद्भुत निर्देशिका",
+                "advancedSettings": "उन्नत सेटिंग्स",
+                "advancedSubtitle": "संगठन और रिपॉजिटरी सेटिंग्स कॉन्फ़िगर करें",
+                "attribution": {
+                    "title": "स्रोत श्रेय:",
+                    "text": "यह निर्देशिका अपने स्रोत के रूप में {url} को संदर्भित करेगी"
+                },
+                "analyzeButton": "रिपॉजिटरी विश्लेषण करें",
+                "importButton": "निर्देशिका आयात करें",
+                "importingButton": "आयात हो रहा है...",
+                "backButton": "वापस",
+                "cancelButton": "रद्द करें",
+                "importing": {
+                    "title": "निर्देशिका आयात हो रही है",
+                    "subtitle": "स्रोत रिपॉजिटरी से आपकी निर्देशिका सेट अप की जा रही है..."
+                },
+                "repositorySelector": {
+                    "title": "रिपॉजिटरी चुनें",
+                    "searchPlaceholder": "रिपॉजिटरी खोजें...",
+                    "loading": "रिपॉजिटरी लोड हो रही हैं...",
+                    "noRepositories": "कोई रिपॉजिटरी नहीं मिली",
+                    "noResults": "आपकी खोज से कोई रिपॉजिटरी मेल नहीं खाती",
+                    "tryAgain": "पुनः प्रयास करें",
+                    "loadMore": "अधिक लोड करें",
+                    "showing": "{total} में से {shown} रिपॉजिटरी दिखाई जा रही हैं",
+                    "today": "आज",
+                    "yesterday": "कल",
+                    "daysAgo": "{days} दिन पहले",
+                    "weeksAgo": "{weeks} सप्ताह पहले",
+                    "repositoriesLoaded": "रिपॉजिटरी लोड हुईं",
+                    "moreAvailable": "और उपलब्ध",
+                    "errors": {
+                        "fetchFailed": "रिपॉजिटरी लोड करने में विफल"
+                    }
+                },
+                "chooseMode": {
+                    "title": "आयात विधि चुनें",
+                    "repository": "रिपॉजिटरी: {owner}/{repo}",
+                    "repositoryWithItems": "रिपॉजिटरी: {owner}/{repo} ({itemCount} आइटम)",
+                    "importCopy": {
+                        "title": "आयात और कॉपी",
+                        "description": "डेटा की एक कॉपी के साथ नई रिपॉजिटरी बनाएं। फ़ोर्क करने या नए सिरे से शुरू करने के लिए सबसे अच्छा।"
+                    },
+                    "linkExisting": {
+                        "title": "मौजूदा लिंक करें",
+                        "description": "सीधे अपनी मौजूदा रिपॉजिटरी का उपयोग करें। कोई कॉपी नहीं, परिवर्तन स्वचालित रूप से सिंक होते हैं।"
+                    },
+                    "back": "वापस"
+                },
+                "linkConfirm": {
+                    "title": "रिपॉजिटरी लिंक करें",
+                    "descriptionMissing": "कुछ रिपॉजिटरी नहीं मिलीं। आप उनके बिना जारी रख सकते हैं या अभी बना सकते हैं।",
+                    "descriptionReady": "सभी रिपॉजिटरी मिल गईं। लिंक करने के लिए तैयार।",
+                    "dataRepo": "डेटा रिपॉजिटरी",
+                    "markdownRepo": "मार्कडाउन रिपॉजिटरी",
+                    "websiteRepo": "वेबसाइट रिपॉजिटरी",
+                    "found": "मिली",
+                    "notFound": "नहीं मिली",
+                    "cancel": "रद्द करें",
+                    "continueWithout": "बिना जारी रखें",
+                    "createMissing": "लापता बनाएं",
+                    "creating": "बनाई जा रही है...",
+                    "linking": "लिंक हो रही है...",
+                    "linkRepos": "रिपॉजिटरी लिंक करें"
+                },
+                "errors": {
+                    "urlRequired": "कृपया एक GitHub रिपॉजिटरी URL दर्ज करें",
+                    "unsupportedFormat": "यह रिपॉजिटरी प्रारूप समर्थित नहीं है। कृपया डेटा रिपॉजिटरी या Awesome सूची प्रारूप का उपयोग करें।",
+                    "analyzeFailed": "रिपॉजिटरी विश्लेषण करने में विफल",
+                    "analyzeForLinkingFailed": "लिंकिंग के लिए विश्लेषण करने में विफल",
+                    "nameRequired": "निर्देशिका नाम आवश्यक है",
+                    "noAnalysis": "कृपया पहले एक रिपॉजिटरी विश्लेषण करें",
+                    "githubRequired": "कृपया पहले अपना GitHub खाता कनेक्ट करें",
+                    "importFailed": "निर्देशिका आयात करने में विफल",
+                    "linkFailed": "निर्देशिका लिंक करने में विफल"
+                },
+                "success": {
+                    "started": "आयात शुरू हुआ! आपकी निर्देशिका पर रीडायरेक्ट किया जा रहा है...",
+                    "linked": "निर्देशिका सफलतापूर्वक लिंक की गई"
+                }
+            }
+        },
+        "github": {
+            "connection": {
+                "alert": {
+                    "title": "GitHub कनेक्ट नहीं है",
+                    "subtitle": "निर्देशिकाएँ बनाने और प्रबंधित करने के लिए अपना GitHub खाता कनेक्ट करें",
+                    "connectButton": "GitHub कनेक्ट करें",
+                    "connectingButton": "कनेक्ट हो रहा है..."
+                },
+                "status": {
+                    "title": "GitHub स्थिति",
+                    "connected": "कनेक्टेड",
+                    "notConnected": "कनेक्ट नहीं",
+                    "connectedDescription": "आपकी निर्देशिकाएँ आपके खाते में GitHub रिपॉजिटरी के रूप में संग्रहीत की जाएंगी।",
+                    "notConnectedDescription": "निर्देशिकाएँ बनाने और प्रबंधित करने के लिए अपना GitHub खाता कनेक्ट करें।",
+                    "connectedAccount": "कनेक्टेड खाता:",
+                    "requiredNote": "निर्देशिकाएँ बनाने के लिए आवश्यक",
+                    "connectButton": "GitHub कनेक्ट करें",
+                    "connectingButton": "कनेक्ट हो रहा है...",
+                    "failedToConnect": "GitHub कनेक्ट करने में विफल"
+                }
+            }
+        },
+        "apiTokens": {
+            "title": "API और टोकन",
+            "subtitle": "अपनी API कुंजियाँ और तृतीय-पक्ष एकीकरण प्रबंधित करें",
+            "vercel": {
+                "title": "Vercel एकीकरण",
+                "subtitle": "वेबसाइटों के रूप में निर्देशिकाएँ डिप्लॉय करने के लिए अपना Vercel खाता कनेक्ट करें",
+                "connected": "कनेक्टेड",
+                "notConnected": "कनेक्ट नहीं",
+                "connectedMessage": "आपका Vercel खाता कनेक्टेड है। अब आप Vercel पर निर्देशिकाएँ डिप्लॉय कर सकते हैं।",
+                "disconnect": "Vercel डिस्कनेक्ट करें",
+                "disconnecting": "हटाया जा रहा है...",
+                "apiTokenLabel": "Vercel API टोकन",
+                "placeholder": "vc_...",
+                "showToken": "दिखाएं",
+                "hideToken": "छिपाएं",
+                "getTokenHelp": "आप अपना API टोकन प्राप्त कर सकते हैं",
+                "vercelDashboard": "Vercel डैशबोर्ड",
+                "save": "टोकन सहेजें",
+                "saving": "सहेजा जा रहा है...",
+                "messages": {
+                    "tokenRequired": "कृपया एक मान्य Vercel टोकन दर्ज करें",
+                    "saveSuccess": "Vercel टोकन सफलतापूर्वक सहेजा गया",
+                    "saveFailed": "Vercel टोकन सहेजने में विफल",
+                    "removeSuccess": "Vercel टोकन सफलतापूर्वक हटाया गया",
+                    "removeFailed": "Vercel टोकन हटाने में विफल",
+                    "unexpectedError": "एक अनपेक्षित त्रुटि हुई"
+                }
+            },
+            "apiKeys": {
+                "title": "API कुंजियाँ",
+                "subtitle": "प्रोग्रामेटिक पहुंच के लिए API कुंजियाँ जनरेट और प्रबंधित करें",
+                "generate": "API कुंजी जनरेट करें (जल्द आ रहा है)"
+            },
+            "webhooks": {
+                "title": "वेबहुक्स",
+                "subtitle": "रीयल-टाइम अपडेट प्राप्त करने के लिए वेबहुक्स कॉन्फ़िगर करें",
+                "configure": "वेबहुक्स कॉन्फ़िगर करें (जल्द आ रहा है)"
+            }
+        },
+        "notifications": {
+            "title": "सूचना प्राथमिकताएँ",
+            "subtitle": "चुनें कि आप महत्वपूर्ण अपडेट के बारे में कैसे सूचित होना चाहते हैं",
+            "email": {
+                "title": "ईमेल सूचनाएँ",
+                "directoryUpdates": {
+                    "label": "निर्देशिका अपडेट",
+                    "description": "अपनी निर्देशिकाओं में महत्वपूर्ण अपडेट के बारे में सूचित रहें"
+                },
+                "newItems": {
+                    "label": "नए आइटम",
+                    "description": "अपनी निर्देशिकाओं में नए आइटम जोड़े जाने पर सूचित रहें"
+                },
+                "weeklyDigest": {
+                    "label": "साप्ताहिक डाइजेस्ट",
+                    "description": "अपनी निर्देशिका गतिविधि का साप्ताहिक सारांश प्राप्त करें"
+                },
+                "marketing": {
+                    "label": "मार्केटिंग और प्रचार",
+                    "description": "नई सुविधाओं और ऑफ़र्स के बारे में अपडेट प्राप्त करें"
+                }
+            },
+            "app": {
+                "title": "इन-ऐप सूचनाएँ",
+                "newItems": {
+                    "label": "नए आइटम",
+                    "description": "नए निर्देशिका आइटम के लिए सूचनाएँ दिखाएं"
+                },
+                "comments": {
+                    "label": "टिप्पणियाँ",
+                    "description": "अपनी निर्देशिकाओं पर टिप्पणियों के बारे में सूचित रहें"
+                },
+                "mentions": {
+                    "label": "उल्लेख",
+                    "description": "जब कोई आपका उल्लेख करे तो सूचित रहें"
+                },
+                "systemUpdates": {
+                    "label": "सिस्टम अपडेट",
+                    "description": "महत्वपूर्ण सिस्टम सूचनाएँ और रखरखाव अलर्ट"
+                }
+            },
+            "actions": {
+                "save": "प्राथमिकताएँ सहेजें",
+                "saving": "सहेजा जा रहा है..."
+            },
+            "messages": {
+                "success": "सूचना प्राथमिकताएँ अपडेट की गईं",
+                "error": "प्राथमिकताएँ अपडेट करने में विफल",
+                "unexpectedError": "एक अनपेक्षित त्रुटि हुई"
+            }
+        },
+        "sidebar": {
+            "menu": "मेनू",
+            "aiChat": "AI चैट",
+            "newDirectory": "नई निर्देशिका",
+            "navigation": {
+                "dashboard": "डैशबोर्ड",
+                "directories": "निर्देशिकाएँ",
+                "settings": "सेटिंग्स"
+            },
+            "signOut": "साइन आउट",
+            "signingOut": "साइन आउट हो रहा है..."
+        },
+        "dangerZone": {
+            "title": "खतरा क्षेत्र",
+            "subtitle": "अपरिवर्तनीय और विनाशकारी कार्य",
+            "export": {
+                "title": "अपना डेटा निर्यात करें",
+                "subtitle": "अपनी सभी निर्देशिकाएँ, आइटम और सेटिंग्स डाउनलोड करें",
+                "action": "डेटा निर्यात करें (जल्द आ रहा है)"
+            },
+            "delete": {
+                "title": "खाता हटाएं",
+                "subtitle": "अपना खाता और सभी संबंधित डेटा स्थायी रूप से हटाएं। इस क्रिया को पूर्ववत नहीं किया जा सकता।",
+                "button": "मेरा खाता हटाएं",
+                "confirmTitle": "⚠️ यह स्थायी रूप से हटाएगा:",
+                "confirmItems": [
+                    "आपका खाता और प्रोफ़ाइल",
+                    "आपकी सभी निर्देशिकाएँ",
+                    "सभी निर्देशिका आइटम और डेटा",
+                    "API कुंजियाँ और एकीकरण",
+                    "सभी संबद्ध वेबसाइटें"
+                ],
+                "confirmLabel": "पुष्टि करने के लिए अपना ईमेल {email} लिखें",
+                "confirmPlaceholder": "अपना ईमेल दर्ज करें",
+                "confirmButton": "हाँ, मेरा खाता हटाएं",
+                "deleting": "हटाया जा रहा है...",
+                "cancel": "रद्द करें"
+            },
+            "messages": {
+                "confirmEmail": "पुष्टि करने के लिए कृपया अपना ईमेल सही दर्ज करें",
+                "deleteSuccess": "खाता सफलतापूर्वक हटा दिया गया",
+                "deleteFailed": "खाता हटाने में विफल",
+                "unexpectedError": "एक अनपेक्षित त्रुटि हुई"
+            }
+        },
+        "aiChat": {
+            "title": "AI सहायक",
+            "subtitle": "प्राकृतिक भाषा के साथ निर्देशिकाएँ बनाएं",
+            "newChat": "नई चैट",
+            "loadingConversation": "वार्तालाप लोड हो रहा है…",
+            "inputPlaceholder": "वह निर्देशिका वर्णित करें जिसे आप बनाना चाहते हैं...",
+            "sendButton": "भेजें"
+        }
+    },
+    "layout": {
+        "auth": {
+            "backToHome": "होम पर वापस जाएं",
+            "feature": {
+                "title": "AI के साथ निर्देशिकाएँ बनाएं",
+                "subtitle": "प्राकृतिक भाषा का उपयोग करके मिनटों में सुंदर, खोज योग्य निर्देशिकाएँ बनाएं। कोई कोडिंग आवश्यक नहीं।",
+                "benefits": {
+                    "ai": {
+                        "title": "AI-संचालित निर्माण",
+                        "description": "बताएं कि आप क्या चाहते हैं और AI काम करेगा"
+                    },
+                    "templates": {
+                        "title": "पेशेवर टेम्प्लेट",
+                        "description": "सुंदर, अनुकूलन योग्य डिज़ाइनों से शुरुआत करें"
+                    },
+                    "management": {
+                        "title": "आसान प्रबंधन",
+                        "description": "अपनी सामग्री को आसानी से अपडेट और व्यवस्थित करें"
+                    }
+                }
+            },
+            "footer": {
+                "copyright": "© {year} {companyName}। सर्वाधिकार सुरक्षित।",
+                "terms": "सेवा की शर्तें",
+                "privacy": "गोपनीयता नीति",
+                "help": "सहायता"
+            }
+        }
+    },
+    "errors": {
+        "global": {
+            "title": "कुछ गलत हो गया!",
+            "tryAgain": "पुनः प्रयास करें"
+        }
+    },
+    "metadata": {
+        "title": "{companyName} - निर्देशिका बिल्डर",
+        "description": "निर्देशिकाएँ बनाने और प्रबंधित करने के लिए एक SaaS प्लेटफ़ॉर्म"
+    },
+    "api": {
+        "errors": {
+            "unauthorized": "आप इस क्रिया को करने के लिए अधिकृत नहीं हैं",
+            "unauthorizedLogin": "अनधिकृत: कृपया पुनः लॉग इन करें।",
+            "forbidden": "निषिद्ध: आपके पास इस क्रिया को करने की अनुमति नहीं है।",
+            "serverError": "सर्वर त्रुटि: {message}",
+            "unexpected": "अनपेक्षित सर्वर त्रुटि हुई।",
+            "apiError": "API त्रुटि: {status} {statusText}",
+            "loginFailed": "लॉगिन विफल",
+            "registerFailed": "पंजीकरण करने में विफल",
+            "unsupportedProvider": "असमर्थित प्रदाता",
+            "providerConnectFailed": "प्रदाता कनेक्ट करने में विफल",
+            "forgotPasswordFailed": "पासवर्ड रीसेट ईमेल भेजने में विफल",
+            "resetPasswordFailed": "पासवर्ड रीसेट करने में विफल"
+        }
+    },
+    "actions": {
+        "directories": {
+            "slug": {
+                "required": "स्लग आवश्यक है",
+                "format": "स्लग में केवल लोअरकेस अक्षर, संख्याएँ और हाइफ़न होने चाहिए"
+            },
+            "name": {
+                "required": "नाम आवश्यक है",
+                "maxLength": "नाम 100 अक्षरों से कम होना चाहिए"
+            },
+            "description": {
+                "required": "विवरण आवश्यक है",
+                "maxLength": "विवरण 500 अक्षरों से कम होना चाहिए"
+            },
+            "prompt": {
+                "minLength": "प्रॉम्प्ट कम से कम 10 अक्षरों का होना चाहिए",
+                "maxLength": "प्रॉम्प्ट 1000 अक्षरों से कम होना चाहिए"
+            },
+            "oauthRequired": "OAuth कनेक्शन आवश्यक। कृपया पहले अपना {provider} खाता कनेक्ट करें।",
+            "githubRequired": "GitHub कनेक्शन आवश्यक। कृपया पहले अपना GitHub खाता कनेक्ट करें।",
+            "createSuccess": "निर्देशिका सफलतापूर्वक बनाई गई!",
+            "createFailed": "निर्देशिका बनाने में विफल",
+            "updateSuccess": "निर्देशिका सफलतापूर्वक अपडेट की गई!",
+            "updateFailed": "निर्देशिका अपडेट करने में विफल",
+            "invalidGeneratedData": "मान्य निर्देशिका डेटा जनरेट करने में विफल",
+            "aiGenerationStarted": "निर्देशिका निर्माण शुरू हुआ! AI सामग्री जनरेट कर रहा है...",
+            "invalidId": "अमान्य निर्देशिका ID",
+            "deleteSuccess": "निर्देशिका सफलतापूर्वक हटाई गई",
+            "deleteFailed": "निर्देशिका हटाने में विफल",
+            "fetchFailed": "निर्देशिकाएँ प्राप्त करने में विफल",
+            "organization": {
+                "requiredWhenOwnerProvided": "मालिक प्रदान किए जाने पर संगठन सक्षम होना चाहिए"
+            },
+            "import": {
+                "invalidUrl": "कृपया एक मान्य URL दर्ज करें",
+                "analyzeFailed": "रिपॉजिटरी विश्लेषण करने में विफल",
+                "started": "आयात सफलतापूर्वक शुरू हुआ",
+                "failed": "निर्देशिका आयात करने में विफल",
+                "fetchReposFailed": "रिपॉजिटरी प्राप्त करने में विफल"
+            }
+        },
+        "generator": {
+            "promptRequired": "प्रॉम्प्ट आवश्यक है",
+            "nameRequired": "नाम आवश्यक है",
+            "generationStartedSuccessfully": "जनरेशन सफलतापूर्वक शुरू हुआ",
+            "updateStartedSuccessfully": "अपडेट सफलतापूर्वक शुरू हुआ",
+            "failedToGenerateItems": "आइटम जनरेट करने में विफल",
+            "failedToUpdateItems": "आइटम अपडेट करने में विफल",
+            "markdownRegeneratedSuccessfully": "मार्कडाउन सफलतापूर्वक पुनः जनरेट किया गया",
+            "failedToRegenerateMarkdown": "मार्कडाउन पुनः जनरेट करने में विफल",
+            "notAuthorizedToAccessOrganization": "आप इस संगठन तक पहुंचने के लिए अधिकृत नहीं हैं। कृपया सहायता के लिए मालिक ({owner}) से संपर्क करें।"
+        },
+        "settings": {
+            "profile": {
+                "usernameRequired": "उपयोगकर्ता नाम आवश्यक है",
+                "usernameMaxLength": "उपयोगकर्ता नाम 50 अक्षरों से कम होना चाहिए",
+                "usernameFormat": "उपयोगकर्ता नाम में केवल अक्षर, संख्याएँ, डैश और अंडरस्कोर हो सकते हैं",
+                "updateFailed": "प्रोफ़ाइल अपडेट करने में विफल",
+                "notAuthenticated": "प्रमाणित नहीं"
+            },
+            "password": {
+                "currentRequired": "वर्तमान पासवर्ड आवश्यक है",
+                "newMinLength": "पासवर्ड कम से कम 8 अक्षरों का होना चाहिए",
+                "newMaxLength": "पासवर्ड 100 अक्षरों से कम होना चाहिए",
+                "updateFailed": "पासवर्ड अपडेट करने में विफल",
+                "updateSuccess": "पासवर्ड सफलतापूर्वक अपडेट किया गया",
+                "notAuthenticated": "प्रमाणित नहीं"
+            },
+            "vercel": {
+                "notAuthenticated": "प्रमाणित नहीं",
+                "tokenRequired": "टोकन आवश्यक है",
+                "invalidFormat": "अमान्य Vercel टोकन प्रारूप",
+                "saveFailed": "Vercel टोकन सहेजने में विफल",
+                "saveSuccess": "Vercel टोकन सफलतापूर्वक सहेजा गया",
+                "validationFailed": "प्रदान किया गया Vercel टोकन अमान्य है। कृपया दोबारा जांचें और पुनः प्रयास करें।",
+                "removeFailed": "Vercel टोकन हटाने में विफल",
+                "removeSuccess": "Vercel टोकन सफलतापूर्वक हटाया गया"
+            },
+            "github": {
+                "notAuthenticated": "प्रमाणित नहीं",
+                "disconnectFailed": "GitHub डिस्कनेक्ट करने में विफल",
+                "disconnectSuccess": "GitHub खाता सफलतापूर्वक डिस्कनेक्ट कर दिया गया"
+            },
+            "notifications": {
+                "notAuthenticated": "प्रमाणित नहीं",
+                "updateFailed": "प्राथमिकताएँ अपडेट करने में विफल",
+                "updateSuccess": "सूचना प्राथमिकताएँ सफलतापूर्वक अपडेट की गईं"
+            },
+            "danger": {
+                "notAuthenticated": "प्रमाणित नहीं",
+                "deleteFailed": "खाता हटाने में विफल",
+                "deleteDisabled": "डेमो में खाता हटाना अक्षम है"
+            }
+        },
+        "deploy": {
+            "deployVercelFailed": "Vercel पर डिप्लॉय करने में विफल",
+            "updateRepositoryFailed": "रिपॉजिटरी अपडेट करने में विफल",
+            "updateSettingsFailed": "वेबसाइट टेम्प्लेट सेटिंग्स अपडेट करने में विफल"
+        }
+    },
+    "validation": {
+        "auth": {
+            "invalidCredentials": "अमान्य ईमेल या पासवर्ड",
+            "account": {
+                "suspended": "खाता निलंबित है"
+            },
+            "email": {
+                "required": "ईमेल खाली नहीं हो सकता",
+                "invalid": "अमान्य ईमेल",
+                "emailAlreadyRegistered": "ईमेल पहले से पंजीकृत है"
+            },
+            "password": {
+                "required": "पासवर्ड खाली नहीं हो सकता",
+                "minLength": "पासवर्ड कम से कम {length} अक्षरों का होना चाहिए",
+                "lowercase": "पासवर्ड में कम से कम एक लोअरकेस अक्षर होना चाहिए",
+                "numberOrSpecial": "पासवर्ड में कम से कम एक नंबर या विशेष वर्ण होना चाहिए",
+                "cannotStartWith": "पासवर्ड डॉट या न्यूलाइन से शुरू नहीं हो सकता",
+                "digit": "पासवर्ड में कम से कम एक अंक होना चाहिए"
+            },
+            "username": {
+                "minLength": "उपयोगकर्ता नाम में कम से कम {length} अक्षर होने चाहिए"
+            }
+        }
+    }
+}

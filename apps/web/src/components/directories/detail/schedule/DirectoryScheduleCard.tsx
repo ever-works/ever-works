@@ -365,10 +365,7 @@ function ScheduleForm({
                     <PlayCircle className="h-4 w-4" aria-hidden />
                 </Button>
 
-                <Button
-                    onClick={saveSchedule}
-                    disabled={isSaving || isRunning || isCancelling}
-                >
+                <Button onClick={saveSchedule} disabled={isSaving || isRunning || isCancelling}>
                     {isSaving ? t('actions.saving') : t('actions.save')}
                 </Button>
 

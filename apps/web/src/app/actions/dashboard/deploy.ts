@@ -148,8 +148,25 @@ export async function updateWebsiteTemplateSettings(
     }
 
     const t = await getTranslations('actions.deploy');
+    const tDirectories = await getTranslations('actions.directories');
 
     try {
+        const { directory } = await directoryAPI.get(directoryId);
+
+        // When enabling auto-update, verify GitHub connection exists
+        if (settings.websiteTemplateAutoUpdate === true) {
+            await authAPI.oauth_connections.ensureConnection(directory.repoProvider);
+
+            const oauthCheck = await checkOAuthConnection(directory.repoProvider);
+            if (!oauthCheck.connected) {
+                return {
+                    success: false,
+                    error: tDirectories('oauthRequired', { provider: directory.repoProvider }),
+                    requiresGitHub: true,
+                };
+            }
+        }
+
         const response = await directoryAPI.update(directoryId, settings);
 
         revalidatePath(ROUTES.DASHBOARD_DIRECTORY_DEPLOY(directoryId));

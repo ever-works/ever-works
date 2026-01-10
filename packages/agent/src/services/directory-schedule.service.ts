@@ -1,4 +1,11 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+    BadRequestException,
+    Inject,
+    Injectable,
+    Logger,
+    NotFoundException,
+    Optional,
+} from '@nestjs/common';
 import { DirectorySchedule } from '@src/entities/directory-schedule.entity';
 import { DirectoryScheduleRepository } from '@src/database/repositories/directory-schedule.repository';
 import { DirectoryRepository } from '@src/database/repositories/directory.repository';
@@ -21,6 +28,10 @@ import { UsageLedgerService } from '@src/subscriptions/usage-ledger.service';
 import { UsageLedgerTriggerType } from '@src/entities/usage-ledger-entry.entity';
 import { DataGeneratorService } from '@src/data-generator/data-generator.service';
 import { Directory } from '@src/entities/directory.entity';
+import {
+    NOTIFICATION_OPERATIONS,
+    NotificationOperations,
+} from '@src/notification-operations/notification-operations.interface';
 
 @Injectable()
 export class DirectoryScheduleService {
@@ -34,6 +45,9 @@ export class DirectoryScheduleService {
         private readonly subscriptionService: SubscriptionService,
         private readonly usageLedgerService: UsageLedgerService,
         private readonly dataGeneratorService: DataGeneratorService,
+        @Optional()
+        @Inject(NOTIFICATION_OPERATIONS)
+        private readonly notificationOperations?: NotificationOperations,
     ) {}
 
     async getSchedule(
@@ -319,6 +333,17 @@ export class DirectoryScheduleService {
             this.logger.warn(
                 `Schedule ${schedule.id} paused after ${failureCount} failures${reason ? `: ${reason}` : ''}`,
             );
+
+            // Publish notification for schedule paused due to failures
+            const directory = await this.directoryRepository.findById(schedule.directoryId);
+            if (directory && this.notificationOperations) {
+                await this.notificationOperations.notifySchedulePaused(
+                    schedule.userId,
+                    schedule.directoryId,
+                    directory.name,
+                    reason || `Paused after ${failureCount} consecutive failures`,
+                );
+            }
         }
     }
 
@@ -372,6 +397,17 @@ export class DirectoryScheduleService {
                 status: DirectoryScheduleStatus.PAUSED,
                 nextRunAt: null,
             });
+
+            // Publish notification for schedule paused due to plan limit
+            const directory = await this.directoryRepository.findById(schedule.directoryId);
+            if (directory && this.notificationOperations) {
+                await this.notificationOperations.notifySchedulePaused(
+                    schedule.userId,
+                    schedule.directoryId,
+                    directory.name,
+                    `Plan limit exceeded. Your ${plan.displayName} plan allows ${plan.maxDirectories} active schedules.`,
+                );
+            }
 
             return false;
         }

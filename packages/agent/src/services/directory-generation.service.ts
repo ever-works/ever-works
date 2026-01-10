@@ -49,6 +49,10 @@ import { DirectorySchedule } from '@src/entities/directory-schedule.entity';
 import { DirectoryScheduleService } from './directory-schedule.service';
 import { UserRepository } from '@src/database/repositories/user.repository';
 import { DirectoryImportService } from './directory-import.service';
+import {
+    NOTIFICATION_OPERATIONS,
+    NotificationOperations,
+} from '@src/notification-operations/notification-operations.interface';
 
 type GenerationTriggerContext = {
     triggeredBy: 'user' | 'schedule' | 'api';
@@ -89,6 +93,9 @@ export class DirectoryGenerationService {
         @Optional()
         @Inject(DIRECTORY_GENERATION_DISPATCHER)
         private readonly generationDispatcher?: DirectoryGenerationDispatcher,
+        @Optional()
+        @Inject(NOTIFICATION_OPERATIONS)
+        private readonly notificationOperations?: NotificationOperations,
     ) {}
 
     async generateItems(
@@ -813,6 +820,9 @@ export class DirectoryGenerationService {
             hasError = true;
 
             this.logger.error('Error during generation:', error);
+
+            // Notify user of account-level errors
+            await this.handleErrorNotification(error, user, directory);
         }
 
         if (!hasError) {
@@ -867,5 +877,116 @@ export class DirectoryGenerationService {
             scheduleId: context.scheduleId,
             billingMode: context.billingMode,
         };
+    }
+
+    /**
+     * Detect account-level errors and notify the user
+     */
+    private async handleErrorNotification(
+        error: unknown,
+        user: User,
+        directory: Directory,
+    ): Promise<void> {
+        if (!this.notificationOperations) {
+            return;
+        }
+
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorLower = errorMessage.toLowerCase();
+
+        // Detect AI credits/quota errors
+        if (this.isAiCreditsError(errorLower)) {
+            const provider = this.detectProvider(errorLower);
+            await this.notificationOperations.notifyAiCreditsDepleted(
+                user.id,
+                provider,
+                errorMessage,
+            );
+            return;
+        }
+
+        // Detect AI provider authentication/configuration errors
+        if (this.isAiProviderError(errorLower)) {
+            const provider = this.detectProvider(errorLower);
+            await this.notificationOperations.notifyAiProviderError(
+                user.id,
+                provider,
+                errorMessage,
+            );
+            return;
+        }
+
+        // Detect Git authentication errors
+        if (this.isGitAuthError(errorLower)) {
+            const provider = this.detectGitProvider(errorLower);
+            await this.notificationOperations.notifyGitAuthExpired(user.id, provider);
+            return;
+        }
+
+        // For other account-level errors (rate limits, configuration issues)
+        if (this.isAccountLevelError(errorLower)) {
+            await this.notificationOperations.notifyGenerationAccountError(
+                user.id,
+                directory.id,
+                directory.name,
+                errorMessage,
+            );
+        }
+    }
+
+    private isAiCreditsError(error: string): boolean {
+        return (
+            error.includes('insufficient_quota') ||
+            error.includes('rate_limit') ||
+            error.includes('quota exceeded') ||
+            error.includes('credits') ||
+            error.includes('billing') ||
+            error.includes('exceeded your current quota')
+        );
+    }
+
+    private isAiProviderError(error: string): boolean {
+        return (
+            error.includes('invalid_api_key') ||
+            error.includes('authentication') ||
+            error.includes('unauthorized') ||
+            error.includes('api key')
+        );
+    }
+
+    private isGitAuthError(error: string): boolean {
+        return (
+            (error.includes('git') || error.includes('github') || error.includes('gitlab')) &&
+            (error.includes('authentication') ||
+                error.includes('unauthorized') ||
+                error.includes('token') ||
+                error.includes('expired') ||
+                error.includes('permission denied'))
+        );
+    }
+
+    private isAccountLevelError(error: string): boolean {
+        return (
+            error.includes('account') ||
+            error.includes('subscription') ||
+            error.includes('plan limit') ||
+            error.includes('not configured')
+        );
+    }
+
+    private detectProvider(error: string): string {
+        if (error.includes('openai')) return 'OpenAI';
+        if (error.includes('anthropic') || error.includes('claude')) return 'Anthropic';
+        if (error.includes('google') || error.includes('gemini')) return 'Google';
+        if (error.includes('groq')) return 'Groq';
+        if (error.includes('ollama')) return 'Ollama';
+        if (error.includes('openrouter')) return 'OpenRouter';
+        return 'AI Provider';
+    }
+
+    private detectGitProvider(error: string): string {
+        if (error.includes('gitlab')) return 'GitLab';
+        if (error.includes('bitbucket')) return 'Bitbucket';
+        return 'GitHub';
     }
 }
