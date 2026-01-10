@@ -1,0 +1,1543 @@
+{
+    "auth": {
+        "error": {
+            "title": "Lỗi Xác Thực",
+            "subtitle": "Chúng tôi gặp sự cố với quá trình xác thực của bạn",
+            "errorOccurred": "Đã xảy ra lỗi",
+            "somethingWentWrong": "Đã xảy ra sự cố",
+            "generic": "Đã xảy ra lỗi không mong muốn. Vui lòng thử lại sau.",
+            "invalidCredentials": "Email hoặc mật khẩu bạn nhập không chính xác.",
+            "emailNotVerified": "Vui lòng xác minh địa chỉ email của bạn trước khi đăng nhập.",
+            "accountLocked": "Tài khoản của bạn đã bị khóa vì lý do bảo mật.",
+            "sessionExpired": "Phiên làm việc của bạn đã hết hạn. Vui lòng đăng nhập lại.",
+            "networkError": "Không thể kết nối. Vui lòng kiểm tra kết nối internet của bạn.",
+            "oauth": {
+                "missingCode": "Thiếu mã ủy quyền. Vui lòng thử đăng nhập lại.",
+                "invalidState": "Trạng thái ủy quyền không hợp lệ. Vui lòng thử đăng nhập lại.",
+                "unsupportedProvider": "Nhà cung cấp xác thực này không được hỗ trợ.",
+                "callbackFailed": "Không thể hoàn tất xác thực. Vui lòng thử lại."
+            },
+            "resetPassword": {
+                "missingToken": "Liên kết đặt lại mật khẩu không hợp lệ. Thiếu mã xác minh.",
+                "invalidToken": "Liên kết đặt lại mật khẩu không hợp lệ hoặc đã bị can thiệp.",
+                "expiredToken": "Liên kết đặt lại mật khẩu đã hết hạn. Vui lòng yêu cầu liên kết mới.",
+                "failed": "Không thể đặt lại mật khẩu. Vui lòng thử lại hoặc yêu cầu liên kết đặt lại mới."
+            },
+            "verifyEmail": {
+                "missingToken": "Liên kết xác minh email không hợp lệ. Thiếu mã xác minh.",
+                "invalidToken": "Liên kết xác minh email không hợp lệ hoặc đã được sử dụng.",
+                "expiredToken": "Liên kết xác minh email đã hết hạn. Vui lòng yêu cầu liên kết mới.",
+                "failed": "Không thể xác minh email. Vui lòng thử lại hoặc yêu cầu liên kết xác minh mới."
+            },
+            "authorize": {
+                "invalidRedirectUrl": "URL chuyển hướng không hợp lệ hoặc không được phép. Vui lòng liên hệ hỗ trợ nếu bạn tin đây là lỗi."
+            },
+            "actions": {
+                "backToLogin": "Quay lại Đăng nhập",
+                "tryRegister": "Thử Đăng ký",
+                "resendVerification": "Gửi lại Email Xác minh",
+                "contactSupport": "Liên hệ Hỗ trợ",
+                "requestNewReset": "Yêu cầu Liên kết Đặt lại Mới"
+            },
+            "helpText": "Nếu bạn vẫn tiếp tục gặp sự cố, vui lòng kiểm tra tài nguyên trợ giúp bên dưới.",
+            "links": {
+                "help": "Trung tâm Trợ giúp",
+                "systemStatus": "Tình trạng Hệ thống"
+            }
+        },
+        "login": {
+            "title": "Chào mừng trở lại",
+            "subtitle": "Đăng nhập vào tài khoản của bạn để tiếp tục",
+            "form": {
+                "email": {
+                    "label": "Địa chỉ email",
+                    "placeholder": "you@example.com"
+                },
+                "password": {
+                    "label": "Mật khẩu",
+                    "placeholder": "Nhập mật khẩu của bạn"
+                },
+                "forgotPassword": "Quên mật khẩu?",
+                "rememberMe": "Ghi nhớ đăng nhập trong 30 ngày",
+                "submit": "Đăng nhập",
+                "submitting": "Đang đăng nhập..."
+            },
+            "socialLogin": {
+                "divider": "Hoặc tiếp tục với",
+                "google": "Google",
+                "github": "GitHub"
+            },
+            "signUp": {
+                "text": "Chưa có tài khoản?",
+                "link": "Đăng ký"
+            },
+            "errors": {
+                "invalidCredentials": "Email hoặc mật khẩu không hợp lệ"
+            },
+            "passwordReset": {
+                "success": "Đặt lại mật khẩu thành công!",
+                "canLogin": "Bây giờ bạn có thể đăng nhập bằng mật khẩu mới."
+            }
+        },
+        "forgotPassword": {
+            "title": "Quên mật khẩu?",
+            "subtitle": "Đừng lo, chúng tôi sẽ gửi hướng dẫn đặt lại cho bạn",
+            "successTitle": "Kiểm tra email của bạn",
+            "successSubtitle": "Chúng tôi đã gửi cho bạn hướng dẫn đặt lại mật khẩu",
+            "form": {
+                "email": {
+                    "label": "Địa chỉ email",
+                    "placeholder": "Nhập email của bạn"
+                },
+                "submit": "Gửi Liên kết Đặt lại",
+                "submitting": "Đang gửi..."
+            },
+            "success": {
+                "title": "Đã gửi email thành công",
+                "message": "Chúng tôi đã gửi hướng dẫn đặt lại mật khẩu đến {email}",
+                "checkSpam": "Nếu bạn không thấy email, hãy kiểm tra thư mục spam."
+            },
+            "errors": {
+                "failed": "Không thể gửi email đặt lại. Vui lòng thử lại."
+            },
+            "backToLogin": "Quay lại đăng nhập",
+            "noAccount": {
+                "text": "Chưa có tài khoản?",
+                "link": "Đăng ký"
+            }
+        },
+        "resetPassword": {
+            "title": "Đặt lại mật khẩu của bạn",
+            "subtitle": "Nhập mật khẩu mới của bạn bên dưới",
+            "successTitle": "Đặt lại mật khẩu thành công",
+            "successSubtitle": "Mật khẩu của bạn đã được cập nhật",
+            "form": {
+                "password": {
+                    "label": "Mật khẩu mới",
+                    "placeholder": "Nhập mật khẩu mới của bạn",
+                    "helperText": "Phải có ít nhất 6 ký tự với chữ thường và số/ký tự đặc biệt",
+                    "errors": {
+                        "minLength": "Mật khẩu phải có ít nhất 6 ký tự",
+                        "lowercase": "Mật khẩu phải chứa ít nhất một chữ cái viết thường",
+                        "numberOrSpecial": "Mật khẩu phải chứa ít nhất một số hoặc ký tự đặc biệt",
+                        "cannotStartWith": "Mật khẩu không được bắt đầu bằng dấu chấm hoặc xuống dòng"
+                    }
+                },
+                "confirmPassword": {
+                    "label": "Xác nhận mật khẩu mới",
+                    "placeholder": "Xác nhận mật khẩu mới của bạn",
+                    "errors": {
+                        "noMatch": "Mật khẩu không khớp"
+                    }
+                },
+                "submit": "Đặt lại Mật khẩu",
+                "submitting": "Đang đặt lại..."
+            },
+            "success": {
+                "title": "Đặt lại mật khẩu thành công",
+                "message": "Mật khẩu của bạn đã được cập nhật thành công. Bây giờ bạn có thể đăng nhập bằng mật khẩu mới.",
+                "loginButton": "Đi đến Đăng nhập"
+            },
+            "errors": {
+                "failed": "Không thể đặt lại mật khẩu. Vui lòng thử lại hoặc yêu cầu liên kết đặt lại mới.",
+                "noToken": "Liên kết đặt lại không hợp lệ",
+                "invalidLink": "Liên kết Đặt lại Không hợp lệ",
+                "missingTokenMessage": "Liên kết đặt lại mật khẩu không hợp lệ hoặc không đầy đủ. Vui lòng yêu cầu đặt lại mật khẩu mới.",
+                "requestNewLink": "Yêu cầu Liên kết Đặt lại Mới"
+            },
+            "backToLogin": "Quay lại đăng nhập"
+        },
+        "register": {
+            "title": "Tạo tài khoản của bạn",
+            "subtitle": "Bắt đầu xây dựng những thư mục tuyệt vời ngay hôm nay",
+            "form": {
+                "name": {
+                    "label": "Họ và tên",
+                    "placeholder": "John Doe"
+                },
+                "email": {
+                    "label": "Địa chỉ email",
+                    "placeholder": "you@example.com"
+                },
+                "password": {
+                    "label": "Mật khẩu",
+                    "placeholder": "Tạo mật khẩu mạnh",
+                    "hint": "Phải có ít nhất 8 ký tự"
+                },
+                "confirmPassword": {
+                    "label": "Xác nhận mật khẩu",
+                    "placeholder": "Xác nhận mật khẩu của bạn"
+                },
+                "terms": {
+                    "text": "Tôi đồng ý với",
+                    "termsLink": "Điều khoản Dịch vụ",
+                    "and": "và",
+                    "privacyLink": "Chính sách Bảo mật"
+                },
+                "submit": "Tạo tài khoản",
+                "submitting": "Đang tạo tài khoản..."
+            },
+            "socialSignUp": {
+                "divider": "Hoặc đăng ký với",
+                "google": "Google",
+                "github": "GitHub"
+            },
+            "signIn": {
+                "text": "Đã có tài khoản?",
+                "link": "Đăng nhập"
+            },
+            "errors": {
+                "passwordsDoNotMatch": "Mật khẩu không khớp",
+                "passwordTooShort": "Mật khẩu phải có ít nhất 8 ký tự",
+                "generic": "Đã xảy ra lỗi. Vui lòng thử lại."
+            }
+        }
+    },
+    "dashboard": {
+        "title": "Bảng điều khiển",
+        "toasts": {
+            "newUser": {
+                "title": "Chào mừng đến với {companyName}! 🎉",
+                "description": "Tài khoản của bạn đã được tạo thành công. Vui lòng kiểm tra email để xác minh tài khoản."
+            },
+            "emailVerification": {
+                "title": "Xác minh email của bạn",
+                "description": "Chúng tôi đã gửi liên kết xác minh đến địa chỉ email của bạn. Vui lòng kiểm tra hộp thư đến và thư mục spam.",
+                "action": "Gửi lại email"
+            },
+            "verified": {
+                "title": "Đã xác minh email thành công! ✅",
+                "description": "Địa chỉ email của bạn đã được xác minh. Bây giờ bạn có toàn quyền truy cập vào tất cả tính năng."
+            },
+            "oauthConnected": {
+                "title": "Đã kết nối tài khoản với GitHub",
+                "description": "Tài khoản của bạn đã được kết nối thành công với GitHub."
+            }
+        },
+        "header": {
+            "welcome": "Chào mừng trở lại, {username}!",
+            "subtitle": "Quản lý các thư mục được hỗ trợ AI của bạn và theo dõi hiệu suất của chúng",
+            "notifications": {
+                "title": "Thông báo",
+                "empty": "Không có thông báo mới"
+            }
+        },
+        "directories": {
+            "title": "Thư mục",
+            "subtitle": "Quản lý và tổ chức các thư mục được hỗ trợ AI của bạn",
+            "recent": "Thư mục Gần đây",
+            "viewAll": "Xem tất cả ({count})",
+            "search": "Tìm kiếm thư mục...",
+            "create": "Tạo Thư mục",
+            "showing": "Đang hiển thị {current} trong tổng số {total} thư mục",
+            "pagination": {
+                "previous": "Trước",
+                "next": "Tiếp"
+            },
+            "empty": {
+                "title": "Chưa có thư mục nào",
+                "description": "Tạo thư mục được hỗ trợ AI đầu tiên của bạn để bắt đầu tổ chức và giới thiệu nội dung.",
+                "action": "Tạo Thư mục Đầu tiên của Bạn",
+                "notFound": {
+                    "title": "Không tìm thấy thư mục",
+                    "withSearch": "Thử điều chỉnh từ khóa tìm kiếm của bạn",
+                    "withoutSearch": "Tạo thư mục được hỗ trợ AI đầu tiên của bạn để bắt đầu"
+                }
+            }
+        },
+        "settings": {
+            "title": "Cài đặt",
+            "subtitle": "Quản lý cài đặt tài khoản và tùy chọn của bạn",
+            "tabs": {
+                "profile": "Hồ sơ",
+                "security": "Bảo mật",
+                "apiTokens": "API & Mã thông báo",
+                "oauth": "Tài khoản Đã Kết nối",
+                "notifications": "Thông báo",
+                "dangerZone": "Khu vực Nguy hiểm"
+            },
+            "profile": {
+                "title": "Cài đặt Hồ sơ",
+                "subtitle": "Cập nhật thông tin hồ sơ và ảnh đại diện của bạn",
+                "fields": {
+                    "name": "Tên",
+                    "username": "Tên người dùng",
+                    "email": "Email",
+                    "emailHelperText": "Không thể thay đổi email"
+                },
+                "placeholders": {
+                    "name": "Nhập tên của bạn",
+                    "username": "Nhập tên người dùng của bạn"
+                },
+                "actions": {
+                    "save": "Lưu Thay đổi"
+                },
+                "messages": {
+                    "success": "Đã cập nhật hồ sơ thành công",
+                    "usernameRequired": "Tên người dùng là bắt buộc",
+                    "error": "Không thể cập nhật hồ sơ",
+                    "unexpectedError": "Đã xảy ra lỗi không mong muốn"
+                }
+            },
+            "security": {
+                "title": "Cài đặt Bảo mật",
+                "subtitle": "Quản lý bảo mật tài khoản và xác thực của bạn",
+                "changePassword": {
+                    "title": "Đổi Mật khẩu",
+                    "currentPassword": "Mật khẩu Hiện tại",
+                    "newPassword": "Mật khẩu Mới",
+                    "confirmPassword": "Xác nhận Mật khẩu Mới",
+                    "showPasswords": "Hiển thị mật khẩu",
+                    "placeholders": {
+                        "current": "Nhập mật khẩu hiện tại",
+                        "new": "Nhập mật khẩu mới (ít nhất 8 ký tự)",
+                        "confirm": "Xác nhận mật khẩu mới"
+                    },
+                    "actions": {
+                        "update": "Cập nhật Mật khẩu"
+                    },
+                    "messages": {
+                        "success": "Đã cập nhật mật khẩu thành công",
+                        "fillAllFields": "Vui lòng điền đầy đủ tất cả các trường mật khẩu",
+                        "minLength": "Mật khẩu mới phải có ít nhất 8 ký tự",
+                        "mismatch": "Mật khẩu mới không khớp",
+                        "sameAsCurrent": "Mật khẩu mới phải khác với mật khẩu hiện tại",
+                        "error": "Không thể cập nhật mật khẩu",
+                        "unexpectedError": "Đã xảy ra lỗi không mong muốn"
+                    }
+                },
+                "twoFactor": {
+                    "title": "Xác thực Hai Yếu tố",
+                    "subtitle": "Thêm một lớp bảo mật bổ sung cho tài khoản của bạn",
+                    "action": "Sắp ra mắt"
+                },
+                "sessions": {
+                    "title": "Phiên Hoạt động",
+                    "subtitle": "Quản lý các phiên hoạt động của bạn trên các thiết bị",
+                    "action": "Xem Phiên (Sắp ra mắt)"
+                }
+            },
+            "oauth": {
+                "title": "Tài khoản Đã Kết nối",
+                "subtitle": "Kết nối tài khoản bên ngoài của bạn để có chức năng nâng cao",
+                "github": {
+                    "name": "GitHub",
+                    "connected": "Tạo và quản lý thư mục với kho lưu trữ GitHub",
+                    "disconnected": "Kết nối để tạo thư mục từ kho lưu trữ",
+                    "scopes": "Phạm vi",
+                    "actions": {
+                        "connect": "Kết nối",
+                        "disconnect": "Ngắt kết nối",
+                        "confirmDisconnect": "Bạn có chắc chắn muốn ngắt kết nối tài khoản GitHub của mình?"
+                    },
+                    "messages": {
+                        "disconnected": "Đã ngắt kết nối tài khoản GitHub",
+                        "connectError": "Không thể kết nối GitHub",
+                        "disconnectError": "Không thể ngắt kết nối GitHub"
+                    }
+                }
+            }
+        },
+        "stats": {
+            "totalDirectories": "Tổng số Thư mục",
+            "totalItems": "Tổng số Mục",
+            "activeWebsites": "Website Hoạt động",
+            "fromLastMonth": "so với tháng trước"
+        },
+        "directoryCard": {
+            "status": {
+                "active": "Hoạt động",
+                "notStarted": "Chưa Bắt đầu",
+                "generating": "Đang Tạo",
+                "generated": "Đã Tạo",
+                "error": "Lỗi",
+                "cancelled": "Đã Hủy",
+                "idle": "Không hoạt động"
+            },
+            "role": {
+                "owner": "Chủ sở hữu",
+                "manager": "Quản lý",
+                "editor": "Biên tập viên",
+                "viewer": "Người xem"
+            },
+            "shared": {
+                "tooltip": "Được chia sẻ với bạn với vai trò {role}"
+            },
+            "noDescription": "Không có mô tả",
+            "items": "{count} mục",
+            "views": "{count} lượt xem",
+            "updated": "Đã cập nhật {date}",
+            "viewAction": "Xem →"
+        },
+        "directoryList": {
+            "title": "Thư mục của Bạn",
+            "createButton": "Tạo Thư mục"
+        },
+        "directoryDetail": {
+            "failedToGenerateItems": "Không thể tạo các mục. Vui lòng thử lại.",
+            "generationCompleted": "Đã hoàn tất tạo thành công",
+            "generationCancelled": "Đã hủy tạo",
+            "role": {
+                "owner": "Chủ sở hữu",
+                "manager": "Quản lý",
+                "editor": "Biên tập viên",
+                "viewer": "Người xem"
+            },
+            "shared": {
+                "tooltip": "Được chia sẻ với bạn với vai trò {role}"
+            },
+            "status": {
+                "notStarted": "Chưa Bắt đầu",
+                "generating": "Đang Tạo",
+                "generated": "Đã Tạo",
+                "error": "Lỗi",
+                "cancelled": "Đã Hủy"
+            },
+            "tabs": {
+                "overview": "Tổng quan",
+                "items": "Mục",
+                "generator": "Trình tạo",
+                "schedule": "Lịch trình",
+                "history": "Lịch sử",
+                "deploy": "Triển khai",
+                "members": "Thành viên",
+                "settings": "Cài đặt"
+            },
+            "members": {
+                "title": "Thành viên Nhóm",
+                "subtitle": "Quản lý ai có quyền truy cập vào thư mục này và quyền hạn của họ.",
+                "inviteMember": "Mời Thành viên",
+                "noMembers": "Chưa có thành viên nhóm. Mời ai đó để hợp tác.",
+                "roles": {
+                    "creator": "Người tạo",
+                    "owner": "Chủ sở hữu",
+                    "manager": "Quản lý",
+                    "editor": "Biên tập viên",
+                    "viewer": "Người xem"
+                },
+                "roleDescriptions": {
+                    "owner": "Toàn quyền kiểm soát bao gồm xóa và quản lý thành viên.",
+                    "manager": "Có thể chỉnh sửa thư mục và quản lý thành viên, nhưng không thể xóa.",
+                    "editor": "Có thể chỉnh sửa nội dung thư mục và chạy các lần tạo.",
+                    "viewer": "Quyền truy cập chỉ đọc để xem thư mục."
+                },
+                "invite": {
+                    "title": "Mời Thành viên Nhóm",
+                    "description": "Thêm thành viên mới để hợp tác trên thư mục này.",
+                    "emailLabel": "Địa chỉ email",
+                    "emailPlaceholder": "colleague@example.com",
+                    "roleLabel": "Vai trò",
+                    "submit": "Gửi Lời mời",
+                    "cancel": "Hủy",
+                    "success": "Đã mời thành viên thành công.",
+                    "errors": {
+                        "emailRequired": "Địa chỉ email là bắt buộc.",
+                        "failed": "Không thể mời thành viên. Vui lòng thử lại."
+                    }
+                },
+                "confirmRemove": {
+                    "title": "Xóa Thành viên",
+                    "description": "Bạn có chắc chắn muốn xóa {username} khỏi thư mục này không? Họ sẽ mất tất cả quyền truy cập.",
+                    "confirm": "Xóa",
+                    "cancel": "Hủy"
+                },
+                "roleUpdated": "Đã cập nhật vai trò thành viên.",
+                "memberRemoved": "Đã xóa thành viên thành công.",
+                "errors": {
+                    "updateFailed": "Không thể cập nhật vai trò thành viên.",
+                    "removeFailed": "Không thể xóa thành viên."
+                }
+            },
+            "schedule": {
+                "page": {
+                    "title": "Cập nhật theo lịch trình",
+                    "subtitle": "Tự động hóa việc làm mới cho {name} với nhịp độ chuyên dụng và xử lý lỗi.",
+                    "fallbackName": "thư mục này"
+                },
+                "card": {
+                    "title": "Tự động hóa",
+                    "subtitle": {
+                        "enabled": "Điều chỉnh nhịp độ, thanh toán và biện pháp bảo vệ để các lần làm mới theo lịch trình luôn đáng tin cậy.",
+                        "disabled": "Tự động hóa việc làm mới mà không giới hạn đăng ký—thiết lập nhịp độ và biện pháp bảo vệ lỗi tự do."
+                    },
+                    "summary": {
+                        "status": "Trạng thái",
+                        "nextRun": "Lần chạy tiếp theo",
+                        "lastRun": "Lần chạy cuối",
+                        "failures": "Lỗi",
+                        "notScheduled": "Không được lên lịch",
+                        "never": "Không bao giờ",
+                        "statusMap": {
+                            "active": "Tự động hóa đang hoạt động",
+                            "paused": "Tạm dừng",
+                            "canceled": "Đã hủy",
+                            "disabled": "Đã tắt"
+                        }
+                    },
+                    "fields": {
+                        "automation": "Tự động hóa",
+                        "automationHelp": "Tạm dừng để ngừng tạm thời các lần chạy trong tương lai.",
+                        "billing": "Chế độ thanh toán",
+                        "billingHelp": "Đăng ký mở khóa các lần chạy không giới hạn. Thanh toán theo lần sử dụng tính phí cho mỗi lần thực thi.",
+                        "cadence": "Nhịp độ",
+                        "cadenceHelp": "Gói hiện tại: {plan}",
+                        "cadenceOpen": "Tất cả các nhịp độ đều có sẵn trong khi đăng ký bị tắt.",
+                        "maxFailures": "Giới hạn lỗi",
+                        "maxFailuresHelp": "Tự động tạm dừng khi đạt đến số lượng lỗi này.",
+                        "createPullRequest": "Tạo Pull Request",
+                        "createPullRequestHelp": "Khi được bật, các bản cập nhật theo lịch trình sẽ tạo một pull request thay vì commit trực tiếp."
+                    },
+                    "billing": {
+                        "subscription": "Đăng ký",
+                        "usage": "Thanh toán theo lần sử dụng"
+                    },
+                    "cadence": {
+                        "hourly": "Mỗi giờ",
+                        "daily": "Mỗi ngày",
+                        "weekly": "Mỗi tuần",
+                        "monthly": "Mỗi tháng"
+                    },
+                    "plans": {
+                        "free": "Miễn phí",
+                        "standard": "Tiêu chuẩn",
+                        "premium": "Cao cấp",
+                        "unmetered": "Không giới hạn"
+                    },
+                    "usageRequired": "Chuyển sang thanh toán theo lần sử dụng để sử dụng nhịp độ này.",
+                    "cadenceAllowed": "Nhịp độ được phép trên gói của bạn.",
+                    "actions": {
+                        "save": "Lưu thay đổi",
+                        "saving": "Đang lưu...",
+                        "runNow": "Chạy ngay",
+                        "starting": "Đang bắt đầu...",
+                        "cancel": "Hủy lịch trình",
+                        "cancelling": "Đang hủy..."
+                    },
+                    "success": {
+                        "saved": "Đã lưu lịch trình.",
+                        "runStarted": "Đã bắt đầu lần chạy theo lịch trình.",
+                        "cancelled": "Đã hủy lịch trình."
+                    },
+                    "errors": {
+                        "requireUsage": "Bật thanh toán theo lần sử dụng để sử dụng nhịp độ này.",
+                        "updateFailed": "Không thể cập nhật lịch trình.",
+                        "runFailed": "Không thể bắt đầu chạy.",
+                        "cancelFailed": "Không thể hủy lịch trình."
+                    },
+                    "empty": {
+                        "title": "Chạy lần tạo thủ công trước",
+                        "description": "Hoàn thành một lần chạy thủ công thành công để mở khóa lập lịch trình tự động. Khi thư mục của bạn có dữ liệu, chúng tôi có thể giữ cho nó luôn mới mẻ cho bạn.",
+                        "refresh": "Làm mới trạng thái"
+                    },
+                    "requiresGeneration": "Chạy ít nhất một lần tạo mục trước khi bật lịch trình."
+                },
+                "actions": {
+                    "invalid": "Dữ liệu không hợp lệ",
+                    "updated": "Đã cập nhật lịch trình.",
+                    "updateFailed": "Không thể cập nhật lịch trình.",
+                    "runStarted": "Đã bắt đầu lần chạy theo lịch trình.",
+                    "runFailed": "Không thể kích hoạt chạy.",
+                    "cancelled": "Đã hủy lịch trình.",
+                    "cancelFailed": "Không thể hủy lịch trình."
+                }
+            },
+            "statusCard": {
+                "notStarted": {
+                    "title": "Chưa Bắt đầu Tạo",
+                    "description": "Bắt đầu tạo các mục cho thư mục của bạn để điền nó bằng nội dung.",
+                    "action": "Bắt đầu Tạo"
+                },
+                "generating": {
+                    "title": "Đang Tiến hành Tạo",
+                    "description": "Đang xử lý yêu cầu của bạn...",
+                    "processing": "Đang xử lý..."
+                },
+                "generated": {
+                    "title": "Đã Hoàn tất Tạo",
+                    "description": "Thư mục của bạn đã được điền thành công bằng các mục.",
+                    "viewItems": "Xem Các Mục",
+                    "regenerate": "Tạo lại"
+                },
+                "error": {
+                    "title": "Tạo Thất bại",
+                    "description": "Đã xảy ra lỗi trong quá trình tạo.",
+                    "retry": "Thử Tạo lại"
+                },
+                "cancelled": {
+                    "title": "Đã Hủy Tạo",
+                    "description": "Lần tạo trước đã bị dừng trước khi hoàn tất.",
+                    "restart": "Khởi động lại Tạo"
+                }
+            },
+            "stats": {
+                "totalItems": "Tổng số Mục",
+                "categories": "Danh mục",
+                "generationStatus": "Trạng thái Tạo",
+                "daysActive": "Ngày Hoạt động"
+            },
+            "history": {
+                "title": "Lịch sử Tạo",
+                "subtitle": "Theo dõi các lần chạy tạo trước đây, các mục đã tạo và chi tiết thực thi.",
+                "error": "Không thể tải thêm mục nhập",
+                "empty": {
+                    "title": "Chưa có lịch sử",
+                    "description": "Yêu cầu một lần tạo để xem tiến trình và kết quả ở đây."
+                },
+                "status": {
+                    "generating": "Đang tiến hành",
+                    "generated": "Đã hoàn thành",
+                    "error": "Thất bại",
+                    "cancelled": "Đã hủy"
+                },
+                "table": {
+                    "run": "Lần chạy",
+                    "status": "Trạng thái",
+                    "newItems": "Mục Mới",
+                    "updatedItems": "Đã cập nhật",
+                    "totalItems": "Tổng số",
+                    "duration": "Thời lượng",
+                    "startedAt": "Đã bắt đầu",
+                    "tokens": "Tokens",
+                    "cost": "Chi phí"
+                },
+                "loadMore": "Tải thêm",
+                "noMore": "Không còn bản ghi nào",
+                "unknown": "Không xác định"
+            },
+            "info": {
+                "title": "Thông tin Thư mục",
+                "yourRole": "Vai trò của Bạn",
+                "role": {
+                    "owner": "Chủ sở hữu",
+                    "manager": "Quản lý",
+                    "editor": "Biên tập viên",
+                    "viewer": "Người xem"
+                },
+                "slug": "Slug",
+                "repositories": "Kho lưu trữ",
+                "dataRepo": "Kho lưu trữ Dữ liệu",
+                "websiteRepo": "Kho lưu trữ Website",
+                "mainRepo": "Kho lưu trữ Chính",
+                "repoProvider": "Nhà cung cấp Kho lưu trữ",
+                "organization": "Tổ chức",
+                "created": "Đã tạo",
+                "lastUpdated": "Lần cập nhật cuối",
+                "readmeHeader": "Đầu trang README",
+                "readmeFooter": "Chân trang README",
+                "custom": "Tùy chỉnh",
+                "customOverwrite": "Tùy chỉnh (Ghi đè)",
+                "yes": "Có",
+                "no": "Không"
+            },
+            "config": {
+                "title": "Chi tiết Cấu hình",
+                "initialPrompt": "Lời nhắc Tạo Ban đầu",
+                "companyDetails": "Thông tin Công ty",
+                "companyName": "Tên Công ty",
+                "companyWebsite": "Website",
+                "generationSettings": "Cài đặt Tạo",
+                "generationMethod": "Phương pháp Tạo",
+                "autoApproval": "Phê duyệt Tự động",
+                "pagingMode": "Chế độ Phân trang",
+                "contentTable": "Bảng Nội dung",
+                "enabled": "Đã bật",
+                "disabled": "Đã tắt",
+                "pullRequestUpdate": "Chi tiết Pull Request",
+                "branch": "Nhánh",
+                "prTitle": "Tiêu đề PR",
+                "mainRepository": "Kho lưu trữ Chính",
+                "dataRepository": "Kho lưu trữ Dữ liệu"
+            },
+            "activity": {
+                "title": "Hoạt động Gần đây",
+                "noActivity": "Chưa có hoạt động nào",
+                "created": "Đã Tạo Thư mục",
+                "directoryCreated": "Thư mục đã được tạo thành công",
+                "justNow": "Vừa xong"
+            },
+            "items": {
+                "title": "Các Mục trong Thư mục",
+                "subtitle": "Quản lý và tổ chức các mục trong thư mục của bạn",
+                "noItemsTitle": "Chưa có Mục nào",
+                "noItemsDescription": "Thư mục của bạn chưa có mục nào. Tạo các mục để điền thư mục của bạn bằng nội dung.",
+                "generateItems": "Tạo Các Mục",
+                "searchPlaceholder": "Tìm kiếm mục...",
+                "allCategories": "Tất cả Danh mục",
+                "showing": "Đang hiển thị {current} trong tổng số {total} mục",
+                "noMatch": "Không có mục nào phù hợp với tiêu chí tìm kiếm của bạn",
+                "source": "Nguồn",
+                "addItem": "Thêm Mục",
+                "delete": "Xóa",
+                "deleteWithPR": "Xóa với Pull Request",
+                "deleteConfirm": "Bạn có chắc chắn muốn xóa \"{name}\" không?",
+                "deleteSuccess": "Đã xóa mục thành công",
+                "deleteFailed": "Không thể xóa mục",
+                "deleteError": "Đã xảy ra lỗi khi xóa mục",
+                "updateSuccess": "Đã cập nhật mục thành công",
+                "updateFailed": "Không thể cập nhật mục",
+                "updateError": "Đã xảy ra lỗi khi cập nhật mục",
+                "updateItem": "Cập nhật mục",
+                "loadingMore": "Đang tải thêm... ({current} trên {total})",
+                "addModal": {
+                    "title": "Thêm Mục Mới",
+                    "sourceUrl": "URL Nguồn",
+                    "sourceUrlPlaceholder": "https://example.com/product",
+                    "sourceUrlHelp": "Nhấp 'Trích xuất' để tự động lấy thông tin chi tiết về mục từ URL",
+                    "extract": "Trích xuất",
+                    "extractSuccess": "Đã trích xuất thông tin chi tiết về mục thành công",
+                    "extractFailed": "Không thể trích xuất thông tin chi tiết về mục",
+                    "extractError": "Đã xảy ra lỗi khi trích xuất thông tin chi tiết",
+                    "name": "Tên",
+                    "namePlaceholder": "Nhập tên mục",
+                    "description": "Mô tả",
+                    "descriptionPlaceholder": "Nhập mô tả ngắn gọn về mục",
+                    "category": "Danh mục",
+                    "tags": "Thẻ",
+                    "tagPlaceholder": "Thêm thẻ và nhấn Enter",
+                    "slug": "Slug (Tùy chọn)",
+                    "slugPlaceholder": "custom-item-slug",
+                    "slugHelp": "Định danh thân thiện với URL. Sẽ được tự động tạo nếu để trống",
+                    "brand": "Thương hiệu (Tùy chọn)",
+                    "brandPlaceholder": "Nhập tên thương hiệu",
+                    "brandLogoUrl": "URL Logo Thương hiệu (Tùy chọn)",
+                    "brandLogoUrlPlaceholder": "https://example.com/logo.png",
+                    "images": "Hình ảnh (Tùy chọn)",
+                    "imagePlaceholder": "https://example.com/screenshot.png",
+                    "imagesHelp": "Thêm URL hình ảnh (ảnh chụp màn hình, hình ảnh sản phẩm)",
+                    "featured": "Mục Nổi bật",
+                    "featuredHelp": "Đánh dấu mục này là nổi bật trong thư mục",
+                    "updateWithPR": "Tạo Pull Request",
+                    "updateWithPRHelp": "Gửi thay đổi dưới dạng pull request thay vì commit trực tiếp",
+                    "cancel": "Hủy",
+                    "adding": "Đang thêm...",
+                    "addItem": "Thêm Mục",
+                    "success": "Đã thêm mục thành công",
+                    "successDescription": "Mục đã được thêm vào thư mục của bạn",
+                    "failed": "Không thể thêm mục",
+                    "error": "Đã xảy ra lỗi khi thêm mục",
+                    "errors": {
+                        "urlRequired": "URL nguồn là bắt buộc để trích xuất",
+                        "invalidUrl": "Vui lòng nhập URL hợp lệ bao gồm http:// hoặc https://",
+                        "invalidImageUrl": "Vui lòng nhập URL hình ảnh hợp lệ",
+                        "requiredFields": "Vui lòng điền đầy đủ tất cả các trường bắt buộc"
+                    }
+                },
+                "editDisplay": "Chỉnh sửa hiển thị",
+                "editDisplayDescription": "Bật/tắt trạng thái nổi bật và đặt thứ tự hiển thị.",
+                "orderLabel": "Thứ tự hiển thị (tùy chọn)",
+                "orderHelp": "Số thấp hơn hiển thị sớm hơn trong nhóm nổi bật/không nổi bật.",
+                "deleteDialogTitle": "Xóa mục",
+                "deleteDialogDescription": "Thao tác này sẽ xóa {name} khỏi kho lưu trữ.",
+                "createPRLabel": "Tạo Pull Request",
+                "createPRHelp": "Nếu được bật, các thay đổi được đề xuất qua PR thay vì commit trực tiếp.",
+                "reasonLabel": "Lý do (tùy chọn)",
+                "reasonPlaceholder": "Tại sao bạn xóa mục này?",
+                "confirmDelete": "Xóa mục"
+            },
+            "generator": {
+                "regenerationWarning": "Cảnh báo Tạo lại",
+                "regenerationWarningDescription": "Thư mục này đã được tạo. Bắt đầu một lần tạo mới sẽ thay thế các mục hiện có.",
+                "requiredInfo": "Thông tin Bắt buộc",
+                "updateConfiguration": "Cập nhật Cấu hình",
+                "promptRequired": "Lời nhắc là bắt buộc",
+                "operationStartedSuccessfully": "Đã bắt đầu thao tác thành công",
+                "failedToStartOperation": "Không thể bắt đầu thao tác",
+                "directoryName": "Tên Thư mục",
+                "generationPrompt": "Lời nhắc Tạo",
+                "recommended": "Đề xuất",
+                "promptPlaceholder": "Mô tả những mục nào nên được tạo cho thư mục này...",
+                "promptHelperText": "Hãy cụ thể về loại nội dung bạn muốn tạo",
+                "repositoryDescription": "Mô tả Kho lưu trữ",
+                "repositoryPlaceholder": "Mô tả ngắn gọn về kho lưu trữ (tùy chọn)",
+                "startGeneration": "Bắt đầu Tạo",
+                "regenerateItems": "Tạo lại Các Mục",
+                "updateItems": "Cập nhật Các Mục",
+                "recreateDirectory": "Tạo lại Thư mục",
+                "showAdvancedOptions": "Hiển thị Tùy chọn Nâng cao",
+                "hideAdvancedOptions": "Ẩn Tùy chọn Nâng cao",
+                "cancel": "Hủy",
+                "companyInformation": "Thông tin Công ty",
+                "companyInfoDescription": "Thông tin công ty tùy chọn cho nội dung có thương hiệu",
+                "companyName": "Tên Công ty",
+                "companyNamePlaceholder": "Nhập tên công ty",
+                "companyWebsite": "Website Công ty",
+                "companyWebsitePlaceholder": "https://example.com",
+                "categoriesKeywords": "Danh mục & Từ khóa",
+                "categoriesDescription": "Xác định danh mục và từ khóa để tổ chức nội dung",
+                "initialCategories": "Danh mục Ban đầu",
+                "priorityCategories": "Danh mục Ưu tiên",
+                "targetKeywords": "Từ khóa Mục tiêu",
+                "addCategoryPlaceholder": "Thêm danh mục",
+                "addPriorityCategoryPlaceholder": "Thêm danh mục ưu tiên",
+                "addKeywordPlaceholder": "Thêm từ khóa",
+                "add": "Thêm",
+                "sourceUrls": "URL Nguồn",
+                "sourceUrlsDescription": "Thêm các URL cụ thể để trích xuất nội dung",
+                "sourceUrlPlaceholder": "https://example.com/page",
+                "addUrl": "Thêm URL",
+                "noSourceUrlsMessage": "Chưa thêm URL nguồn nào. Trình tạo sẽ sử dụng tìm kiếm để tìm nội dung.",
+                "advancedConfig": "Cấu hình Nâng cao",
+                "advancedConfigDescription": "Tinh chỉnh các tham số và hành vi tạo",
+                "generationMethod": "Phương pháp Tạo",
+                "methodCreateUpdate": "Tạo hoặc Cập nhật",
+                "methodRecreate": "Tạo lại (Thay thế Tất cả)",
+                "updateWithPullRequest": "Cập nhật với Pull Request",
+                "updateWithPullRequestDescription": "Tạo một pull request thay vì commit trực tiếp",
+                "enableBadgeEvaluation": "Bật Đánh giá Huy hiệu",
+                "enableBadgeEvaluationDescription": "Đánh giá và thêm huy hiệu chất lượng vào các mục",
+                "websiteRepositoryCreationMethod": "Phương pháp Tạo Kho lưu trữ Website",
+                "methodDuplicate": "Sao chép",
+                "methodFork": "Fork",
+                "directoryNamePlaceholder": "Nhập tên thư mục",
+                "methodCreateFromTemplate": "Tạo từ Mẫu",
+                "aiProcessingConfiguration": "Cấu hình Xử lý AI",
+                "maxSearchQueries": "Số lượng Truy vấn Tìm kiếm Tối đa",
+                "resultsPerQuery": "Kết quả mỗi Truy vấn",
+                "maxPagesToProcess": "Số lượng Trang Xử lý Tối đa",
+                "relevanceThreshold": "Ngưỡng Liên quan",
+                "aiFirstGeneration": "Tạo AI-Đầu tiên",
+                "aiFirstGenerationDescription": "Bật tạo các mục ban đầu bằng AI trước khi tìm kiếm web.",
+                "contentFiltering": "Lọc Nội dung",
+                "contentFilteringDescription": "Bật lọc chất lượng nội dung",
+                "recreateConfirmTitle": "Tạo lại dữ liệu thư mục?",
+                "recreateConfirmDescription": "Tạo lại sẽ xóa các mục hiện có và tạo lại chúng từ đầu. Hành động này không thể hoàn tác.",
+                "confirmRecreate": "Có, tạo lại",
+                "recreateInlineTitle": "Tạo lại sẽ xóa các mục hiện có",
+                "recreateInlineDescription": "Chế độ này xóa các mục hiện tại và xây dựng lại chúng từ đầu. Chỉ tiến hành nếu bạn muốn thay thế mọi thứ."
+            },
+            "progress": {
+                "title": "Đang Tiến hành Tạo",
+                "processingRequest": "Đang xử lý yêu cầu của bạn...",
+                "steps": {
+                    "promptComparison": "So sánh các lời nhắc",
+                    "promptProcessing": "Đang xử lý lời nhắc của bạn",
+                    "domainDetection": "Đang phát hiện loại miền",
+                    "aiFirstItemsGeneration": "Đang tạo các mục AI ban đầu",
+                    "searchQueriesGeneration": "Đang tạo các truy vấn tìm kiếm",
+                    "webSearch": "Đang tìm kiếm web",
+                    "contentRetrieval": "Đang truy xuất nội dung",
+                    "contentFiltering": "Đang lọc nội dung liên quan",
+                    "itemsExtraction": "Đang trích xuất các mục từ nội dung",
+                    "deduplicationDataAggregation": "Đang loại bỏ trùng lặp và tổng hợp dữ liệu",
+                    "categoriesTagsProcessing": "Đang xử lý danh mục và thẻ",
+                    "sourcesValidation": "Đang xác thực nguồn",
+                    "badgesProcessing": "Đang xử lý huy hiệu chất lượng",
+                    "markdownGeneration": "Đang tạo nội dung markdown",
+                    "processing": "Đang xử lý..."
+                },
+                "progress": "Tiến trình",
+                "closeNote": "Việc này có thể mất vài phút. Bạn có thể đóng trang này và quay lại sau."
+            },
+            "settings": {
+                "sourceSettings": "Kho lưu trữ Nguồn",
+                "originalSource": "Nguồn Gốc",
+                "syncEnabled": "Đã bật Đồng bộ",
+                "syncDescription": "Tự động kéo các bản cập nhật từ kho lưu trữ nguồn.",
+                "syncUpdateFailed": "Không thể cập nhật cài đặt đồng bộ",
+                "syncDisabled": "Đã tắt Đồng bộ",
+                "generalSettings": "Cài đặt Chung",
+                "generalTitle": "Cài đặt Chung",
+                "directoryName": "Tên Thư mục",
+                "description": "Mô tả",
+                "organizationRepository": "Kho lưu trữ Tổ chức",
+                "organizationHelp": "Tạo kho lưu trữ dưới một tổ chức thay vì tài khoản cá nhân của bạn",
+                "organizationName": "Tên Tổ chức",
+                "organizationNamePlaceholder": "Nhập tên tổ chức",
+                "readmeConfiguration": "Cấu hình README",
+                "readmeTitle": "Cấu hình README",
+                "customHeader": "Đầu trang Tùy chỉnh",
+                "customHeaderPlaceholder": "Thêm nội dung tùy chỉnh vào đầu trang README",
+                "overwriteDefaultHeader": "Ghi đè đầu trang mặc định",
+                "customFooter": "Chân trang Tùy chỉnh",
+                "cantDeleteWhileGenerating": "Không thể xóa thư mục trong khi đang tạo các mục.",
+                "customFooterPlaceholder": "Thêm nội dung tùy chỉnh vào chân trang README",
+                "overwriteDefaultFooter": "Ghi đè chân trang mặc định",
+                "dangerZone": "Khu vực Nguy hiểm",
+                "dangerTitle": "Khu vực Nguy hiểm",
+                "deleteWarning": "Một khi bạn xóa một thư mục, sẽ không thể khôi phục. Vui lòng chắc chắn.",
+                "dangerDescription": "Một khi bạn xóa một thư mục, sẽ không thể khôi phục. Vui lòng chắc chắn.",
+                "deleteOptions": "Chọn những gì cần xóa:",
+                "deleteDataRepository": "Xóa kho lưu trữ dữ liệu",
+                "deleteDataRepositoryDescription": "Xóa kho lưu trữ dữ liệu JSON khỏi GitHub",
+                "deleteMarkdownRepository": "Xóa kho lưu trữ markdown",
+                "deleteMarkdownRepositoryDescription": "Xóa kho lưu trữ markdown chứa README",
+                "deleteWebsiteRepository": "Xóa kho lưu trữ website",
+                "deleteWebsiteRepositoryDescription": "Xóa kho lưu trữ website đã triển khai",
+                "deleteConfirm": "Bạn có thực sự chắc chắn không?",
+                "deleteConfirmDetail": "Hành động này không thể hoàn tác. Thư mục và các kho lưu trữ được chọn sẽ bị xóa vĩnh viễn.",
+                "confirmDirectoryName": "Nhập tên thư mục để xác nhận",
+                "confirmDirectoryNameDescription": "Nhập \"{name}\" để xác nhận xóa",
+                "deleteNameMismatch": "Tên thư mục không khớp",
+                "deleteButton": "Xóa Thư mục",
+                "deleteConfirmButton": "Có, Xóa",
+                "deleteSuccess": "Đã xóa thư mục thành công",
+                "deleteFailed": "Không thể xóa thư mục",
+                "yesDelete": "Có, Xóa",
+                "cancel": "Hủy",
+                "saveChanges": "Lưu Thay đổi",
+                "updateReadme": "Cập nhật README",
+                "updateSuccess": "Đã cập nhật cài đặt thành công",
+                "updateFailed": "Không thể cập nhật cài đặt"
+            },
+            "deploy": {
+                "noTokenAlert": {
+                    "title": "Cần Mã thông báo Vercel",
+                    "description": "Để triển khai thư mục của bạn lên Vercel, bạn cần cấu hình mã thông báo API Vercel của mình trong cài đặt tài khoản.",
+                    "configureButton": "Đi đến Cài đặt Mã thông báo API",
+                    "getTokenButton": "Lấy Mã thông báo Vercel",
+                    "howTo": {
+                        "title": "Cách cấu hình mã thông báo Vercel của bạn:",
+                        "step1": "Nhấp 'Lấy Mã thông báo Vercel' để mở bảng điều khiển Vercel",
+                        "step2": "Tạo mã thông báo mới với quyền triển khai",
+                        "step3": "Sao chép mã thông báo đã tạo",
+                        "step4": "Đi đến Cài đặt Mã thông báo API và dán mã thông báo của bạn vào phần Vercel"
+                    }
+                },
+                "sharedNoTokenAlert": {
+                    "title": "Triển khai Không Khả dụng",
+                    "description": "Chủ sở hữu thư mục chưa cấu hình mã thông báo Vercel để triển khai. Vui lòng liên hệ chủ sở hữu thư mục để thiết lập triển khai.",
+                    "hint": "Là một cộng tác viên, bạn có thể kích hoạt triển khai một khi chủ sở hữu cấu hình tích hợp Vercel của họ."
+                },
+                "form": {
+                    "deployToVercel": {
+                        "title": "Triển khai lên Vercel",
+                        "description": "Triển khai kho lưu trữ website thư mục của bạn trên Vercel.",
+                        "deployButton": "Triển khai Ngay",
+                        "deployingButton": "Đang triển khai...",
+                        "deployingStateButton": "Đang triển khai ({state})...",
+                        "successMessage": "Website của bạn đã được triển khai thành công!",
+                        "teamSelection": {
+                            "title": "Chọn Nhóm Vercel",
+                            "description": "Chọn nhóm Vercel để triển khai thư mục này.",
+                            "label": "Nhóm",
+                            "placeholder": "Chọn một nhóm",
+                            "confirmButton": "Triển khai đến nhóm",
+                            "cancelButton": "Hủy"
+                        }
+                    },
+                    "updateRepository": {
+                        "title": "Cập nhật Kho lưu trữ Website",
+                        "description": "Đồng bộ các thay đổi mới nhất từ mẫu đến",
+                        "websiteRepository": "kho lưu trữ website",
+                        "updateButton": "Cập nhật Kho lưu trữ",
+                        "updatingButton": "Đang cập nhật..."
+                    },
+                    "messages": {
+                        "deploySuccess": "Đã bắt đầu triển khai thành công",
+                        "deployPending": "Triển khai đang được xếp hàng đợi và sẽ bắt đầu sớm",
+                        "deployFailed": "Không thể triển khai lên Vercel",
+                        "deployError": "Đã xảy ra lỗi trong quá trình triển khai",
+                        "updateSuccess": "Đã cập nhật kho lưu trữ thành công",
+                        "updateFailed": "Không thể cập nhật kho lưu trữ",
+                        "updateError": "Đã xảy ra lỗi khi cập nhật kho lưu trữ"
+                    },
+                    "info": {
+                        "deployInfo": "Triển khai thường mất 1-3 phút. Bạn sẽ nhận được URL khi hoàn tất.",
+                        "updateInfo": "Cập nhật đồng bộ nội dung thư mục của bạn với kho lưu trữ website cho lần triển khai tiếp theo."
+                    },
+                    "websiteTemplate": {
+                        "title": "Cập nhật Mẫu Tự động",
+                        "description": "Giữ cho website của bạn tự động đồng bộ với các thay đổi mẫu mới nhất.",
+                        "autoUpdate": "Cập nhật tự động",
+                        "autoUpdateDescription": "Kiểm tra cập nhật mẫu mỗi giờ và áp dụng tự động.",
+                        "useBeta": "Sử dụng phiên bản beta của mẫu",
+                        "useBetaDescription": "Sử dụng nhánh stage thay vì nhánh main ổn định.",
+                        "lastUpdated": "Lần cập nhật cuối",
+                        "lastChecked": "Lần kiểm tra cuối",
+                        "lastError": "Lỗi cuối",
+                        "updateSuccess": "Đã cập nhật cài đặt thành công",
+                        "updateFailed": "Không thể cập nhật cài đặt"
+                    }
+                }
+            }
+        },
+        "directoryCreation": {
+            "title": "Tạo Thư mục Mới",
+            "subtitle": "Chọn cách bạn muốn tạo thư mục của mình",
+            "backToOptions": "Quay lại tùy chọn",
+            "organizationSelector": {
+                "label": "Chủ sở hữu Kho lưu trữ",
+                "loading": "Đang tải tổ chức...",
+                "personal": "Tài khoản Cá nhân",
+                "personalAccount": "Kho lưu trữ sẽ được tạo dưới tài khoản cá nhân của bạn",
+                "organizations": "Tổ chức",
+                "personalHelp": "Kho lưu trữ sẽ được tạo dưới tài khoản GitHub cá nhân của bạn",
+                "organizationHelp": "Kho lưu trữ sẽ được tạo dưới tổ chức {org}"
+            },
+            "ai": {
+                "title": "Tạo với AI",
+                "subtitle": "Mô tả ý tưởng thư mục của bạn bằng ngôn ngữ tự nhiên và để AI xử lý việc thiết lập",
+                "getStarted": "Bắt đầu",
+                "formTitle": "Tạo Thư mục với AI",
+                "formSubtitle": "Mô tả ý tưởng thư mục của bạn và để AI xử lý việc thiết lập và tạo nội dung ban đầu",
+                "directoryNameLabel": "Tên Thư mục",
+                "directoryNamePlaceholder": "ví dụ: Công cụ AI Tuyệt vời",
+                "directoryNameHelp": "AI sẽ đề xuất tên nếu bạn để trống ô này",
+                "promptLabel": "Mô tả Thư mục của Bạn",
+                "githubRequired": "Vui lòng kết nối tài khoản GitHub của bạn trước.",
+                "promptPlaceholder": "Mô tả loại thư mục bạn muốn tạo, những mục nào nó nên chứa và bất kỳ yêu cầu cụ thể nào...",
+                "inspirationText": "Cần cảm hứng? Hãy thử một trong những cái này:",
+                "examplePrompts": {
+                    "0": {
+                        "name": "Công cụ Dành cho Nhà phát triển AI",
+                        "prompt": "Tạo một thư mục về các công cụ AI tốt nhất dành cho nhà phát triển"
+                    },
+                    "1": {
+                        "name": "Trung tâm Thành phần React",
+                        "prompt": "Xây dựng danh sách được tuyển chọn các thành phần React mã nguồn mở"
+                    },
+                    "2": {
+                        "name": "Công cụ cho Nhóm Từ xa",
+                        "prompt": "Tạo một thư mục về ứng dụng năng suất cho nhóm làm việc từ xa"
+                    },
+                    "3": {
+                        "name": "Thời trang Bền vững",
+                        "prompt": "Tạo một bộ sưu tập các thương hiệu thời trang bền vững"
+                    }
+                },
+                "featuresTitle": "AI sẽ làm gì cho bạn:",
+                "features": {
+                    "0": "Tạo tên và mô tả phù hợp",
+                    "1": "Tạo danh mục và cấu trúc ban đầu",
+                    "2": "Tìm và tự động thêm các mục liên quan",
+                    "3": "Thiết lập kho lưu trữ GitHub với tài liệu phù hợp"
+                },
+                "generateButton": "Tạo với AI",
+                "generatingButton": "Đang tạo Thư mục...",
+                "cancelButton": "Hủy",
+                "noteTitle": "Lưu ý:",
+                "noteText": "Việc tạo AI thường mất 2-5 phút tùy thuộc vào độ phức tạp của yêu cầu của bạn. Bạn sẽ được thông báo khi thư mục của bạn sẵn sàng.",
+                "errors": {
+                    "promptRequired": "Vui lòng mô tả loại thư mục bạn muốn tạo",
+                    "nameRequired": "Tên thư mục là bắt buộc",
+                    "slugRequired": "Slug thư mục là bắt buộc",
+                    "descriptionRequired": "Mô tả thư mục là bắt buộc"
+                },
+                "success": {
+                    "started": "Đã bắt đầu tạo thư mục!",
+                    "generating": "AI đang tạo nội dung. Việc này có thể mất vài phút...",
+                    "created": "Đã tạo thư mục thành công!"
+                },
+                "advancedSettings": "Cài đặt Nâng cao",
+                "advancedSubtitle": "Cấu hình tổ chức và cài đặt kho lưu trữ",
+                "organizationLabel": "Kho lưu trữ Tổ chức",
+                "organizationHelp": "Tạo kho lưu trữ dưới một tổ chức thay vì tài khoản cá nhân của bạn",
+                "organizationNameLabel": "Tên Tổ chức",
+                "organizationNamePlaceholder": "Nhập tên tổ chức"
+            },
+            "manual": {
+                "title": "Tạo Thủ công",
+                "subtitle": "Cấu hình thư mục của bạn với toàn quyền kiểm soát mọi cài đặt và tùy chọn",
+                "configureNow": "Cấu hình ngay",
+                "formTitle": "Tạo Thư mục Thủ công",
+                "formSubtitle": "Cấu hình thư mục của bạn với toàn quyền kiểm soát mọi cài đặt",
+                "basicInfo": "Thông tin Cơ bản",
+                "nameLabel": "Tên Thư mục *",
+                "namePlaceholder": "ví dụ: Công cụ AI Tuyệt vời",
+                "slugLabel": "Slug Thư mục *",
+                "slugPlaceholder": "awesome-ai-tools",
+                "githubRequired": "Vui lòng kết nối tài khoản GitHub của bạn trước.",
+                "slugHelp": "Định danh thân thiện với URL (chỉ chữ thường, số và dấu gạch ngang)",
+                "descriptionLabel": "Mô tả *",
+                "descriptionPlaceholder": "Danh sách được tuyển chọn về các công cụ và tài nguyên AI tốt nhất dành cho nhà phát triển",
+                "advancedSettings": "Cài đặt Nâng cao",
+                "advancedSubtitle": "Tổ chức, đầu trang tùy chỉnh và hơn thế nữa",
+                "organizationLabel": "Tạo dưới tổ chức",
+                "organizationHelp": "Tạo thư mục này dưới một tổ chức GitHub thay vì tài khoản cá nhân của bạn",
+                "organizationNameLabel": "Tên Tổ chức",
+                "organizationNamePlaceholder": "my-organization",
+                "headerLabel": "Đầu trang README Tùy chỉnh",
+                "headerPlaceholder": "Thêm nội dung tùy chỉnh vào đầu tệp README của bạn",
+                "headerOverwrite": "Thay thế toàn bộ đầu trang mặc định",
+                "footerLabel": "Chân trang README Tùy chỉnh",
+                "footerPlaceholder": "Thêm nội dung tùy chỉnh vào cuối tệp README của bạn",
+                "footerOverwrite": "Thay thế toàn bộ chân trang mặc định",
+                "createButton": "Tạo Thư mục",
+                "creatingButton": "Đang tạo Thư mục...",
+                "cancelButton": "Hủy",
+                "nameRequired": "Tên thư mục là bắt buộc",
+                "slugRequired": "Slug thư mục là bắt buộc",
+                "descriptionRequired": "Mô tả thư mục là bắt buộc",
+                "success": {
+                    "created": "Đã tạo thư mục thành công!"
+                }
+            },
+            "import": {
+                "title": "Nhập Hiện có",
+                "subtitle": "Nhập một thư mục từ kho lưu trữ GitHub hiện có",
+                "importNow": "Nhập ngay",
+                "formTitle": "Nhập Thư mục từ GitHub",
+                "formSubtitle": "Nhập các mục từ kho lưu trữ GitHub hiện có để tạo thư mục của bạn",
+                "sync": {
+                    "title": "Giữ đồng bộ",
+                    "description": "Tự động kéo các bản cập nhật từ kho lưu trữ nguồn."
+                },
+                "sourceMethod": {
+                    "url": {
+                        "title": "Dán URL",
+                        "description": "Nhập trực tiếp URL kho lưu trữ GitHub"
+                    },
+                    "repository": {
+                        "title": "Kho lưu trữ của Tôi",
+                        "description": "Chọn từ các kho lưu trữ GitHub của bạn"
+                    }
+                },
+                "urlLabel": "URL Kho lưu trữ GitHub",
+                "urlPlaceholder": "https://github.com/owner/repository",
+                "urlHelp": "Nhập URL đầy đủ của kho lưu trữ GitHub",
+                "supportedFormats": {
+                    "title": "Định dạng Kho lưu trữ Được Hỗ trợ",
+                    "dataRepo": {
+                        "title": "Kho lưu trữ Dữ liệu",
+                        "description": "Kho lưu trữ có cấu trúc config.yml và thư mục data/"
+                    },
+                    "awesomeReadme": {
+                        "title": "Danh sách Awesome",
+                        "description": "Kho lưu trữ danh sách được tuyển chọn với README markdown"
+                    }
+                },
+                "analyzing": {
+                    "title": "Đang Phân tích Kho lưu trữ",
+                    "subtitle": "Đang phát hiện loại và cấu trúc kho lưu trữ..."
+                },
+                "detectedType": {
+                    "dataRepo": "Đã Phát hiện Kho lưu trữ Dữ liệu",
+                    "awesomeReadme": "Đã Phát hiện Danh sách Awesome"
+                },
+                "badges": {
+                    "dataRepo": "Kho lưu trữ Dữ liệu",
+                    "awesomeReadme": "Danh sách Awesome"
+                },
+                "preview": {
+                    "items": "mục",
+                    "categories": "danh mục"
+                },
+                "nameLabel": "Tên Thư mục",
+                "namePlaceholder": "ví dụ: Thư mục Tuyệt vời của Tôi",
+                "advancedSettings": "Cài đặt Nâng cao",
+                "advancedSubtitle": "Cấu hình tổ chức và cài đặt kho lưu trữ",
+                "attribution": {
+                    "title": "Ghi công Nguồn:",
+                    "text": "Thư mục này sẽ tham chiếu {url} làm nguồn của nó"
+                },
+                "analyzeButton": "Phân tích Kho lưu trữ",
+                "importButton": "Nhập Thư mục",
+                "importingButton": "Đang nhập...",
+                "backButton": "Quay lại",
+                "cancelButton": "Hủy",
+                "importing": {
+                    "title": "Đang Nhập Thư mục",
+                    "subtitle": "Đang thiết lập thư mục của bạn từ kho lưu trữ nguồn..."
+                },
+                "repositorySelector": {
+                    "title": "Chọn Kho lưu trữ",
+                    "searchPlaceholder": "Tìm kiếm kho lưu trữ...",
+                    "loading": "Đang tải kho lưu trữ...",
+                    "noRepositories": "Không tìm thấy kho lưu trữ nào",
+                    "noResults": "Không có kho lưu trữ nào phù hợp với tìm kiếm của bạn",
+                    "tryAgain": "Thử lại",
+                    "loadMore": "Tải thêm",
+                    "showing": "Đang hiển thị {shown} trong tổng số {total} kho lưu trữ",
+                    "today": "Hôm nay",
+                    "yesterday": "Hôm qua",
+                    "daysAgo": "{days} ngày trước",
+                    "weeksAgo": "{weeks} tuần trước",
+                    "repositoriesLoaded": "kho lưu trữ đã tải",
+                    "moreAvailable": "khả dụng thêm",
+                    "errors": {
+                        "fetchFailed": "Không thể tải kho lưu trữ"
+                    }
+                },
+                "chooseMode": {
+                    "title": "Chọn Phương pháp Nhập",
+                    "repository": "Kho lưu trữ: {owner}/{repo}",
+                    "repositoryWithItems": "Kho lưu trữ: {owner}/{repo} ({itemCount} mục)",
+                    "importCopy": {
+                        "title": "Nhập & Sao chép",
+                        "description": "Tạo kho lưu trữ mới với bản sao của dữ liệu. Tốt nhất cho việc fork hoặc bắt đầu mới."
+                    },
+                    "linkExisting": {
+                        "title": "Liên kết Hiện có",
+                        "description": "Sử dụng kho lưu trữ hiện có của bạn trực tiếp. Không sao chép, thay đổi tự động đồng bộ."
+                    },
+                    "back": "Quay lại"
+                },
+                "linkConfirm": {
+                    "title": "Liên kết Kho lưu trữ",
+                    "descriptionMissing": "Một số kho lưu trữ không được tìm thấy. Bạn có thể tiếp tục mà không có chúng hoặc tạo chúng ngay bây giờ.",
+                    "descriptionReady": "Đã tìm thấy tất cả kho lưu trữ. Sẵn sàng liên kết.",
+                    "dataRepo": "Kho lưu trữ Dữ liệu",
+                    "markdownRepo": "Kho lưu trữ Markdown",
+                    "websiteRepo": "Kho lưu trữ Website",
+                    "found": "Đã tìm thấy",
+                    "notFound": "Không tìm thấy",
+                    "cancel": "Hủy",
+                    "continueWithout": "Tiếp tục mà không có",
+                    "createMissing": "Tạo kho lưu trữ còn thiếu",
+                    "creating": "Đang tạo...",
+                    "linking": "Đang liên kết...",
+                    "linkRepos": "Liên kết kho lưu trữ"
+                },
+                "errors": {
+                    "urlRequired": "Vui lòng nhập URL kho lưu trữ GitHub",
+                    "unsupportedFormat": "Định dạng kho lưu trữ này không được hỗ trợ. Vui lòng sử dụng định dạng Kho lưu trữ Dữ liệu hoặc Danh sách Awesome.",
+                    "analyzeFailed": "Không thể phân tích kho lưu trữ",
+                    "analyzeForLinkingFailed": "Không thể phân tích để liên kết",
+                    "nameRequired": "Tên thư mục là bắt buộc",
+                    "noAnalysis": "Vui lòng phân tích một kho lưu trữ trước",
+                    "githubRequired": "Vui lòng kết nối tài khoản GitHub của bạn trước",
+                    "importFailed": "Không thể nhập thư mục",
+                    "linkFailed": "Không thể liên kết thư mục"
+                },
+                "success": {
+                    "started": "Đã bắt đầu nhập! Đang chuyển hướng đến thư mục của bạn...",
+                    "linked": "Đã liên kết thư mục thành công"
+                }
+            }
+        },
+        "github": {
+            "connection": {
+                "alert": {
+                    "title": "GitHub chưa được kết nối",
+                    "subtitle": "Kết nối tài khoản GitHub của bạn để tạo và quản lý thư mục",
+                    "connectButton": "Kết nối GitHub",
+                    "connectingButton": "Đang kết nối..."
+                },
+                "status": {
+                    "title": "Trạng thái GitHub",
+                    "connected": "Đã kết nối",
+                    "notConnected": "Chưa kết nối",
+                    "connectedDescription": "Thư mục của bạn sẽ được lưu trữ dưới dạng kho lưu trữ GitHub trong tài khoản của bạn.",
+                    "notConnectedDescription": "Kết nối tài khoản GitHub của bạn để tạo và quản lý thư mục.",
+                    "connectedAccount": "Tài khoản đã kết nối:",
+                    "requiredNote": "Bắt buộc để tạo thư mục",
+                    "connectButton": "Kết nối GitHub",
+                    "connectingButton": "Đang kết nối...",
+                    "failedToConnect": "Không thể kết nối GitHub"
+                }
+            }
+        },
+        "apiTokens": {
+            "title": "API & Mã thông báo",
+            "subtitle": "Quản lý khóa API và tích hợp bên thứ ba của bạn",
+            "vercel": {
+                "title": "Tích hợp Vercel",
+                "subtitle": "Kết nối tài khoản Vercel của bạn để triển khai thư mục dưới dạng website",
+                "connected": "Đã kết nối",
+                "notConnected": "Chưa kết nối",
+                "connectedMessage": "Tài khoản Vercel của bạn đã được kết nối. Bây giờ bạn có thể triển khai thư mục lên Vercel.",
+                "disconnect": "Ngắt kết nối Vercel",
+                "disconnecting": "Đang xóa...",
+                "apiTokenLabel": "Mã thông báo API Vercel",
+                "placeholder": "vc_...",
+                "showToken": "Hiển thị",
+                "hideToken": "Ẩn",
+                "getTokenHelp": "Bạn có thể lấy mã thông báo API từ",
+                "vercelDashboard": "Bảng điều khiển Vercel",
+                "save": "Lưu Mã thông báo",
+                "saving": "Đang lưu...",
+                "messages": {
+                    "tokenRequired": "Vui lòng nhập mã thông báo Vercel hợp lệ",
+                    "saveSuccess": "Đã lưu mã thông báo Vercel thành công",
+                    "saveFailed": "Không thể lưu mã thông báo Vercel",
+                    "removeSuccess": "Đã xóa mã thông báo Vercel thành công",
+                    "removeFailed": "Không thể xóa mã thông báo Vercel",
+                    "unexpectedError": "Đã xảy ra lỗi không mong muốn"
+                }
+            },
+            "apiKeys": {
+                "title": "Khóa API",
+                "subtitle": "Tạo và quản lý khóa API để truy cập theo chương trình",
+                "generate": "Tạo Khóa API (Sắp ra mắt)"
+            },
+            "webhooks": {
+                "title": "Webhooks",
+                "subtitle": "Cấu hình webhooks để nhận cập nhật thời gian thực",
+                "configure": "Cấu hình Webhooks (Sắp ra mắt)"
+            }
+        },
+        "notifications": {
+            "title": "Tùy chọn Thông báo",
+            "subtitle": "Chọn cách bạn muốn được thông báo về các bản cập nhật quan trọng",
+            "email": {
+                "title": "Thông báo qua Email",
+                "directoryUpdates": {
+                    "label": "Cập nhật Thư mục",
+                    "description": "Nhận thông báo về các bản cập nhật quan trọng đối với thư mục của bạn"
+                },
+                "newItems": {
+                    "label": "Mục Mới",
+                    "description": "Nhận thông báo khi có mục mới được thêm vào thư mục của bạn"
+                },
+                "weeklyDigest": {
+                    "label": "Bản tóm tắt Hàng tuần",
+                    "description": "Nhận bản tóm tắt hàng tuần về hoạt động thư mục của bạn"
+                },
+                "marketing": {
+                    "label": "Tiếp thị & Khuyến mãi",
+                    "description": "Nhận cập nhật về các tính năng mới và ưu đãi"
+                }
+            },
+            "app": {
+                "title": "Thông báo Trong Ứng dụng",
+                "newItems": {
+                    "label": "Mục Mới",
+                    "description": "Hiển thị thông báo cho các mục thư mục mới"
+                },
+                "comments": {
+                    "label": "Bình luận",
+                    "description": "Nhận thông báo về bình luận trên thư mục của bạn"
+                },
+                "mentions": {
+                    "label": "Đề cập",
+                    "description": "Nhận thông báo khi ai đó đề cập đến bạn"
+                },
+                "systemUpdates": {
+                    "label": "Cập nhật Hệ thống",
+                    "description": "Thông báo hệ thống quan trọng và cảnh báo bảo trì"
+                }
+            },
+            "actions": {
+                "save": "Lưu Tùy chọn",
+                "saving": "Đang lưu..."
+            },
+            "messages": {
+                "success": "Đã cập nhật tùy chọn thông báo",
+                "error": "Không thể cập nhật tùy chọn",
+                "unexpectedError": "Đã xảy ra lỗi không mong muốn"
+            }
+        },
+        "sidebar": {
+            "menu": "Menu",
+            "aiChat": "Trò chuyện AI",
+            "newDirectory": "Thư mục Mới",
+            "navigation": {
+                "dashboard": "Bảng điều khiển",
+                "directories": "Thư mục",
+                "settings": "Cài đặt"
+            },
+            "signOut": "Đăng xuất",
+            "signingOut": "Đang đăng xuất..."
+        },
+        "dangerZone": {
+            "title": "Khu vực Nguy hiểm",
+            "subtitle": "Các hành động không thể hoàn tác và phá hủy",
+            "export": {
+                "title": "Xuất Dữ liệu của Bạn",
+                "subtitle": "Tải xuống tất cả thư mục, mục và cài đặt của bạn",
+                "action": "Xuất Dữ liệu (Sắp ra mắt)"
+            },
+            "delete": {
+                "title": "Xóa Tài khoản",
+                "subtitle": "Xóa vĩnh viễn tài khoản của bạn và tất cả dữ liệu liên quan. Hành động này không thể hoàn tác.",
+                "button": "Xóa Tài khoản của Tôi",
+                "confirmTitle": "⚠️ Điều này sẽ xóa vĩnh viễn:",
+                "confirmItems": [
+                    "Tài khoản và hồ sơ của bạn",
+                    "Tất cả thư mục của bạn",
+                    "Tất cả mục và dữ liệu thư mục",
+                    "Khóa API và tích hợp",
+                    "Tất cả website liên quan"
+                ],
+                "confirmLabel": "Nhập email của bạn {email} để xác nhận",
+                "confirmPlaceholder": "Nhập email của bạn",
+                "confirmButton": "Có, Xóa Tài khoản của Tôi",
+                "deleting": "Đang xóa...",
+                "cancel": "Hủy"
+            },
+            "messages": {
+                "confirmEmail": "Vui lòng nhập chính xác email của bạn để xác nhận",
+                "deleteSuccess": "Đã xóa tài khoản thành công",
+                "deleteFailed": "Không thể xóa tài khoản",
+                "unexpectedError": "Đã xảy ra lỗi không mong muốn"
+            }
+        },
+        "aiChat": {
+            "title": "Trợ lý AI",
+            "subtitle": "Tạo thư mục bằng ngôn ngữ tự nhiên",
+            "newChat": "Cuộc trò chuyện mới",
+            "loadingConversation": "Đang tải cuộc trò chuyện…",
+            "inputPlaceholder": "Mô tả thư mục bạn muốn tạo...",
+            "sendButton": "Gửi"
+        }
+    },
+    "layout": {
+        "auth": {
+            "backToHome": "Quay lại trang chủ",
+            "feature": {
+                "title": "Xây dựng Thư mục với AI",
+                "subtitle": "Tạo các thư mục đẹp, có thể tìm kiếm trong vài phút bằng ngôn ngữ tự nhiên. Không cần viết mã.",
+                "benefits": {
+                    "ai": {
+                        "title": "Tạo bằng AI",
+                        "description": "Mô tả những gì bạn muốn và để AI làm công việc"
+                    },
+                    "templates": {
+                        "title": "Mẫu Chuyên nghiệp",
+                        "description": "Bắt đầu với các thiết kế đẹp, có thể tùy chỉnh"
+                    },
+                    "management": {
+                        "title": "Quản lý Dễ dàng",
+                        "description": "Cập nhật và tổ chức nội dung của bạn một cách dễ dàng"
+                    }
+                }
+            },
+            "footer": {
+                "copyright": "© {year} {companyName}. Mọi quyền được bảo lưu.",
+                "terms": "Điều khoản Dịch vụ",
+                "privacy": "Chính sách Bảo mật",
+                "help": "Trợ giúp"
+            }
+        }
+    },
+    "errors": {
+        "global": {
+            "title": "Đã xảy ra sự cố!",
+            "tryAgain": "Thử lại"
+        }
+    },
+    "metadata": {
+        "title": "{companyName} - Trình Xây dựng Thư mục",
+        "description": "Nền tảng SaaS để xây dựng và quản lý thư mục"
+    },
+    "api": {
+        "errors": {
+            "unauthorized": "Bạn không được phép thực hiện hành động này",
+            "unauthorizedLogin": "Không được phép: Vui lòng đăng nhập lại.",
+            "forbidden": "Bị cấm: Bạn không có quyền thực hiện hành động này.",
+            "serverError": "Lỗi máy chủ: {message}",
+            "unexpected": "Đã xảy ra lỗi máy chủ không mong muốn.",
+            "apiError": "Lỗi API: {status} {statusText}",
+            "loginFailed": "Đăng nhập thất bại",
+            "registerFailed": "Không thể đăng ký",
+            "unsupportedProvider": "Nhà cung cấp không được hỗ trợ",
+            "providerConnectFailed": "Không thể kết nối nhà cung cấp",
+            "forgotPasswordFailed": "Không thể gửi email đặt lại mật khẩu",
+            "resetPasswordFailed": "Không thể đặt lại mật khẩu"
+        }
+    },
+    "actions": {
+        "directories": {
+            "slug": {
+                "required": "Slug là bắt buộc",
+                "format": "Slug chỉ được chứa chữ thường, số và dấu gạch ngang"
+            },
+            "name": {
+                "required": "Tên là bắt buộc",
+                "maxLength": "Tên phải ít hơn 100 ký tự"
+            },
+            "description": {
+                "required": "Mô tả là bắt buộc",
+                "maxLength": "Mô tả phải ít hơn 500 ký tự"
+            },
+            "prompt": {
+                "minLength": "Lời nhắc phải có ít nhất 10 ký tự",
+                "maxLength": "Lời nhắc phải ít hơn 1000 ký tự"
+            },
+            "oauthRequired": "Yêu cầu kết nối OAuth. Vui lòng kết nối tài khoản {provider} của bạn trước.",
+            "githubRequired": "Yêu cầu kết nối GitHub. Vui lòng kết nối tài khoản GitHub của bạn trước.",
+            "createSuccess": "Đã tạo thư mục thành công!",
+            "createFailed": "Không thể tạo thư mục",
+            "updateSuccess": "Đã cập nhật thư mục thành công!",
+            "updateFailed": "Không thể cập nhật thư mục",
+            "invalidGeneratedData": "Không thể tạo dữ liệu thư mục hợp lệ",
+            "aiGenerationStarted": "Đã bắt đầu tạo thư mục! AI đang tạo nội dung...",
+            "invalidId": "ID thư mục không hợp lệ",
+            "deleteSuccess": "Đã xóa thư mục thành công",
+            "deleteFailed": "Không thể xóa thư mục",
+            "fetchFailed": "Không thể tải thư mục",
+            "organization": {
+                "requiredWhenOwnerProvided": "Tổ chức phải được bật khi có chủ sở hữu được cung cấp"
+            },
+            "import": {
+                "invalidUrl": "Vui lòng nhập URL hợp lệ",
+                "analyzeFailed": "Không thể phân tích kho lưu trữ",
+                "started": "Đã bắt đầu nhập thành công",
+                "failed": "Không thể nhập thư mục",
+                "fetchReposFailed": "Không thể tải kho lưu trữ"
+            }
+        },
+        "generator": {
+            "promptRequired": "Lời nhắc là bắt buộc",
+            "nameRequired": "Tên là bắt buộc",
+            "generationStartedSuccessfully": "Đã bắt đầu tạo thành công",
+            "updateStartedSuccessfully": "Đã bắt đầu cập nhật thành công",
+            "failedToGenerateItems": "Không thể tạo các mục",
+            "failedToUpdateItems": "Không thể cập nhật các mục",
+            "markdownRegeneratedSuccessfully": "Đã tạo lại markdown thành công",
+            "failedToRegenerateMarkdown": "Không thể tạo lại markdown",
+            "notAuthorizedToAccessOrganization": "Bạn không được phép truy cập tổ chức này. Vui lòng liên hệ chủ sở hữu ({owner}) để được hỗ trợ."
+        },
+        "settings": {
+            "profile": {
+                "usernameRequired": "Tên người dùng là bắt buộc",
+                "usernameMaxLength": "Tên người dùng phải ít hơn 50 ký tự",
+                "usernameFormat": "Tên người dùng chỉ được chứa chữ cái, số, dấu gạch ngang và dấu gạch dưới",
+                "updateFailed": "Không thể cập nhật hồ sơ",
+                "notAuthenticated": "Chưa xác thực"
+            },
+            "password": {
+                "currentRequired": "Mật khẩu hiện tại là bắt buộc",
+                "newMinLength": "Mật khẩu phải có ít nhất 8 ký tự",
+                "newMaxLength": "Mật khẩu phải ít hơn 100 ký tự",
+                "updateFailed": "Không thể cập nhật mật khẩu",
+                "updateSuccess": "Đã cập nhật mật khẩu thành công",
+                "notAuthenticated": "Chưa xác thực"
+            },
+            "vercel": {
+                "notAuthenticated": "Chưa xác thực",
+                "tokenRequired": "Mã thông báo là bắt buộc",
+                "invalidFormat": "Định dạng mã thông báo Vercel không hợp lệ",
+                "saveFailed": "Không thể lưu mã thông báo Vercel",
+                "saveSuccess": "Đã lưu mã thông báo Vercel thành công",
+                "validationFailed": "Mã thông báo Vercel được cung cấp không hợp lệ. Vui lòng kiểm tra kỹ và thử lại.",
+                "removeFailed": "Không thể xóa mã thông báo Vercel",
+                "removeSuccess": "Đã xóa mã thông báo Vercel thành công"
+            },
+            "github": {
+                "notAuthenticated": "Chưa xác thực",
+                "disconnectFailed": "Không thể ngắt kết nối GitHub",
+                "disconnectSuccess": "Đã ngắt kết nối tài khoản GitHub thành công"
+            },
+            "notifications": {
+                "notAuthenticated": "Chưa xác thực",
+                "updateFailed": "Không thể cập nhật tùy chọn",
+                "updateSuccess": "Đã cập nhật tùy chọn thông báo thành công"
+            },
+            "danger": {
+                "notAuthenticated": "Chưa xác thực",
+                "deleteFailed": "Không thể xóa tài khoản",
+                "deleteDisabled": "Đã tắt tính năng xóa tài khoản trong bản demo"
+            }
+        },
+        "deploy": {
+            "deployVercelFailed": "Không thể triển khai lên Vercel",
+            "updateRepositoryFailed": "Không thể cập nhật kho lưu trữ",
+            "updateSettingsFailed": "Không thể cập nhật cài đặt mẫu website"
+        }
+    },
+    "validation": {
+        "auth": {
+            "invalidCredentials": "Email hoặc mật khẩu không hợp lệ",
+            "account": {
+                "suspended": "Tài khoản bị tạm ngưng"
+            },
+            "email": {
+                "required": "Email không được để trống",
+                "invalid": "Email không hợp lệ",
+                "emailAlreadyRegistered": "Email đã được đăng ký"
+            },
+            "password": {
+                "required": "Mật khẩu không được để trống",
+                "minLength": "Mật khẩu phải có ít nhất {length} ký tự",
+                "lowercase": "Mật khẩu phải chứa ít nhất một chữ cái viết thường",
+                "numberOrSpecial": "Mật khẩu phải chứa ít nhất một số hoặc ký tự đặc biệt",
+                "cannotStartWith": "Mật khẩu không được bắt đầu bằng dấu chấm hoặc xuống dòng",
+                "digit": "Mật khẩu phải chứa ít nhất một chữ số"
+            },
+            "username": {
+                "minLength": "Tên người dùng phải chứa ít nhất {length} ký tự"
+            }
+        }
+    }
+}
