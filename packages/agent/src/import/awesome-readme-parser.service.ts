@@ -145,9 +145,12 @@ export class AwesomeReadmeParserService {
             total_cost: 0,
         };
 
+        this.logger.log(`[Import] Parsing README (${content.length} chars)`);
+
         let categories: Category[];
         try {
             categories = await this.extractCategories(content, metrics);
+            this.logger.log(`[Import] Found ${categories.length} categories`);
         } catch (error) {
             this.logger.error('Failed to extract categories', error);
             parseErrors.push(`Category extraction failed: ${error.message}`);
@@ -167,6 +170,9 @@ export class AwesomeReadmeParserService {
                     metrics,
                 );
                 allItems.push(...items);
+                this.logger.log(
+                    `[Import] Section ${i + 1}/${sections.length}: ${items.length} items`,
+                );
             } catch (error) {
                 this.logger.error(`Failed to extract items from ${section.categoryName}`, error);
                 parseErrors.push(
@@ -181,6 +187,8 @@ export class AwesomeReadmeParserService {
 
         const tags = this.extractUniqueTags(allItems);
         const uniqueItems = this.deduplicateItems(allItems);
+
+        this.logger.log(`[Import] Complete: ${uniqueItems.length} items, ${tags.length} tags`);
 
         return {
             items: uniqueItems,

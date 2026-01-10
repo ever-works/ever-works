@@ -9,6 +9,11 @@ export type DirectoryImportPayload = {
     sourceType: ImportSourceType;
     historyId: string;
     historyStartedAt?: string;
+    triggerSource?: 'user' | 'schedule' | 'api';
+    options?: {
+        createMissingRepos?: boolean;
+        enableSync?: boolean;
+    };
 };
 
 export type DirectoryImportMetrics = {

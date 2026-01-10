@@ -1,11 +1,17 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { configure } from '@trigger.dev/sdk';
 import { config } from '@packages/agent/config';
-import { DirectoryGenerationPayload, DirectoryGenerationDispatcher } from '@packages/agent/tasks';
+import {
+    DirectoryGenerationPayload,
+    DirectoryGenerationDispatcher,
+    DirectoryImportPayload,
+    DirectoryImportDispatcher,
+} from '@packages/agent/tasks';
 import { directoryGenerationTask } from '../tasks/trigger/directory-generation.task';
+import { directoryImportTask } from '../tasks/trigger/directory-import.task';
 
 @Injectable()
-export class TriggerService implements DirectoryGenerationDispatcher {
+export class TriggerService implements DirectoryGenerationDispatcher, DirectoryImportDispatcher {
     private readonly logger = new Logger(TriggerService.name);
     private configured = false;
 
@@ -63,6 +69,24 @@ export class TriggerService implements DirectoryGenerationDispatcher {
             return handle.id;
         } catch (error) {
             this.logger.error('Failed to dispatch directory-generation task', error as Error);
+            return null;
+        }
+    }
+
+    async dispatchDirectoryImport(payload: DirectoryImportPayload): Promise<string | null> {
+        if (!this.ensureConfigured()) {
+            return null;
+        }
+
+        try {
+            const handle = await directoryImportTask.trigger(payload, {
+                tags: ['directory-import', payload.sourceType, payload.directoryId],
+                machine: this.machine() as any,
+            });
+
+            return handle.id;
+        } catch (error) {
+            this.logger.error('Failed to dispatch directory-import task', error as Error);
             return null;
         }
     }

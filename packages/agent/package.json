@@ -80,6 +80,10 @@
         "./notification-operations": {
             "types": "./dist/notification-operations/index.d.ts",
             "default": "./dist/notification-operations/index.js"
+        },
+        "./import": {
+            "types": "./dist/import/index.d.ts",
+            "default": "./dist/import/index.js"
         }
     },
     "scripts": {

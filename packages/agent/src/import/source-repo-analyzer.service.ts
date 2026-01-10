@@ -406,12 +406,47 @@ export class SourceRepoAnalyzerService {
 
         const octokit = new Octokit({ auth: token });
 
-        const readmeFiles = ['README.md', 'readme.md', 'Readme.md'];
+        // Try GitHub's dedicated readme API first (more reliable)
+        try {
+            const response = await octokit.rest.repos.getReadme({
+                owner: parsed.owner,
+                repo: parsed.repo,
+            });
+
+            if (response.data.content && response.data.encoding === 'base64') {
+                const content = Buffer.from(response.data.content, 'base64').toString('utf-8');
+                return { content, path: response.data.name };
+            }
+        } catch (err) {
+            this.logger.warn(
+                `Failed to get README via API for ${parsed.owner}/${parsed.repo}: ${err.message}`,
+            );
+        }
+
+        // Fallback: try common README filenames via API
+        const readmeFiles = ['README.md', 'readme.md', 'Readme.md', 'README.MD'];
 
         for (const filename of readmeFiles) {
             const content = await this.getFileContent(octokit, parsed.owner, parsed.repo, filename);
             if (content) {
                 return { content, path: filename };
+            }
+        }
+
+        // Final fallback: fetch from raw.githubusercontent.com directly
+        const branches = ['main', 'master'];
+        for (const branch of branches) {
+            for (const filename of readmeFiles) {
+                try {
+                    const rawUrl = `https://raw.githubusercontent.com/${parsed.owner}/${parsed.repo}/${branch}/${filename}`;
+                    const response = await fetch(rawUrl);
+                    if (response.ok) {
+                        const content = await response.text();
+                        return { content, path: filename };
+                    }
+                } catch {
+                    // Continue to next attempt
+                }
             }
         }
 
