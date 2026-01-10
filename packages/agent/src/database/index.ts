@@ -11,4 +11,5 @@ export * from './repositories/subscription-plan.repository';
 export * from './repositories/user-subscription.repository';
 export * from './repositories/directory-schedule.repository';
 export * from './repositories/usage-ledger.repository';
+export * from './repositories/notification.repository';
 export * from './database-init.service';

@@ -3,10 +3,10 @@
 import { cn } from '@/lib/utils/cn';
 import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
-import { useTranslations, useLocale } from 'next-intl';
+import { useTranslations } from 'next-intl';
 import type { Directory } from '@/lib/api/directory';
 import { DirectoryMemberRole, GenerateStatusType } from '@/lib/api/enums';
-import { Users, Lock, Unlock, Database, Layout, FolderGit2 } from 'lucide-react';
+import { Users } from 'lucide-react';
 import { ShowDateTime } from '../ui/show-datetime';
 
 interface DirectoryCardProps {
@@ -23,31 +23,10 @@ const formatDate = (date: string, locale: string) => {
 
 export function DirectoryCard({ directory }: DirectoryCardProps) {
     const t = useTranslations('dashboard.directoryCard');
-    const locale = useLocale();
 
     const status = directory.generateStatus?.status;
     const userRole = directory.userRole;
     const isShared = userRole && userRole !== DirectoryMemberRole.OWNER;
-
-    // Helper to render visibility icon
-    const renderRepoIcon = (
-        type: 'data' | 'website' | 'directory',
-        isPrivate: boolean | undefined,
-        Icon: typeof Database,
-        label: string,
-    ) => {
-        if (isPrivate === undefined) return null;
-
-        return (
-            <div
-                className="flex items-center gap-1 text-xs text-muted-foreground"
-                title={`${label}: ${isPrivate ? 'Private' : 'Public'}`}
-            >
-                <Icon className="w-3 h-3" />
-                {isPrivate ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
-            </div>
-        );
-    };
 
     return (
         <Link
@@ -105,25 +84,6 @@ export function DirectoryCard({ directory }: DirectoryCardProps) {
                     </span>
                 )}
             </p>
-
-            {/* Repository Visibility Icons */}
-            {directory.repoVisibility && (
-                <div className="flex gap-3 mb-2">
-                    {renderRepoIcon(
-                        'directory',
-                        directory.repoVisibility.directory,
-                        FolderGit2,
-                        'Main Repo',
-                    )}
-                    {renderRepoIcon('data', directory.repoVisibility.data, Database, 'Data Repo')}
-                    {renderRepoIcon(
-                        'website',
-                        directory.repoVisibility.website,
-                        Layout,
-                        'Website Repo',
-                    )}
-                </div>
-            )}
 
             <div className="flex-1 mb-4">
                 {directory.description && (

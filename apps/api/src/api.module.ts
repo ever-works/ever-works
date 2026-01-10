@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { ScheduleModule } from '@nestjs/schedule';
 import { AuthModule } from './auth/auth.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { throttlerConfig } from './config/throttler.config';
@@ -14,6 +15,7 @@ import { AiConversationModule } from './ai-conversation/ai-conversation.module';
 import { TriggerInternalModule } from './trigger/trigger-internal.module';
 import { TwentyCrmModule } from './integrations';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { CacheFactory } from '@packages/agent/cache';
 
 @Module({
@@ -21,6 +23,7 @@ import { CacheFactory } from '@packages/agent/cache';
         CacheFactory.TypeORM({
             isGlobal: true,
         }),
+        ScheduleModule.forRoot(),
         TwentyCrmModule.forRoot(),
         ThrottlerModule.forRoot(throttlerConfig),
         EventEmitterModule.forRoot(),
@@ -40,6 +43,7 @@ import { CacheFactory } from '@packages/agent/cache';
         MailModule,
         TriggerInternalModule,
         SubscriptionsModule,
+        NotificationsModule,
     ],
     providers: [
         {

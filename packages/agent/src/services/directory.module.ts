@@ -19,6 +19,8 @@ import { DirectoryMemberService } from './directory-member.service';
 import { DirectoryImportService } from './directory-import.service';
 import { SubscriptionsModule } from '@src/subscriptions';
 import { RepositoryManagementService } from './repository-management.service';
+import { NotificationsModule } from '@src/notifications';
+import { NotificationOperationsModule } from '@src/notification-operations';
 
 @Module({
     imports: [
@@ -32,6 +34,8 @@ import { RepositoryManagementService } from './repository-management.service';
         AiModule,
         ImportModule,
         SubscriptionsModule,
+        NotificationsModule,
+        NotificationOperationsModule,
     ],
     providers: [
         DirectoryOwnershipService,

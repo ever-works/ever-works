@@ -5,6 +5,7 @@ import { Suspense, useState } from 'react';
 import DashboardToasts from './toasts';
 import { DashboardSidebar } from '@/components/dashboard/DashboardSidebar';
 import { DashboardHeader } from '@/components/dashboard/DashboardHeader';
+import { GlobalNotificationBanner } from '@/components/dashboard/GlobalNotificationBanner';
 import { Footer } from '@/components/footer';
 
 interface DashboardLayoutClientProps {
@@ -41,6 +42,8 @@ export function DashboardLayoutClient({ user, children }: DashboardLayoutClientP
                         onMenuClick={() => setSidebarOpen(!sidebarOpen)}
                         isSidebarOpen={sidebarOpen}
                     />
+
+                    <GlobalNotificationBanner />
 
                     <main
                         className="flex-1 flex flex-col overflow-y-auto bg-surface dark:bg-surface-dark min-h-0"

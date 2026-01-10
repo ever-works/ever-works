@@ -946,7 +946,8 @@
                         "lastChecked": "Last checked",
                         "lastError": "Last error",
                         "updateSuccess": "Settings updated successfully",
-                        "updateFailed": "Failed to update settings"
+                        "updateFailed": "Failed to update settings",
+                        "githubRequired": "GitHub connection required. Please connect your GitHub account in Settings to enable automatic updates."
                     }
                 }
             }

@@ -58,6 +58,17 @@ export class WebsiteTemplateSchedulerService {
             // Check if update is available
             const updateCheck = await this.websiteUpdateService.checkForUpdate(directory);
 
+            // Handle token/connection errors
+            if (updateCheck.error) {
+                await this.directoryRepository.update(directory.id, {
+                    websiteTemplateLastError: updateCheck.error,
+                });
+                this.logger.warn(
+                    `Cannot check updates for ${directory.slug}: ${updateCheck.error}`,
+                );
+                return;
+            }
+
             if (!updateCheck.updateAvailable) {
                 this.logger.debug(
                     `No update available for directory ${directory.slug} (branch: ${updateCheck.branch})`,
