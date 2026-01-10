@@ -35,9 +35,16 @@ export class WebsiteUpdateService {
     }> {
         // Use directory owner's Git token (they set up the repos)
         const directoryOwner = directory.user as User;
-        const token = directoryOwner.getGitToken();
+        const token = directoryOwner?.getGitToken?.();
         const websiteRepo = directory.getWebsiteRepo();
         const branch = options?.branch || WEBSITE_TEMPLATE_CONFIG.branch;
+
+        // Validate token before proceeding
+        if (!token) {
+            throw new Error(
+                `GitHub token not available for directory owner. Please ensure the owner has a valid GitHub connection.`,
+            );
+        }
 
         // Check if the target repository exists
         const repositoryExists = await this.githubService.repositoryExists(
@@ -101,7 +108,12 @@ export class WebsiteUpdateService {
         user: User,
     ): Promise<BranchSyncSummary | null> {
         const directoryOwner = directory.user as User;
-        const token = directoryOwner.getGitToken();
+        const token = directoryOwner?.getGitToken?.();
+
+        if (!token) {
+            this.logger.error('GitHub token not available for branch sync');
+            return null;
+        }
 
         const branchMapping = directory.websiteTemplateUseBeta
             ? { [config.websiteTemplate.getBetaBranch()]: 'main' }
@@ -144,12 +156,21 @@ export class WebsiteUpdateService {
         latestCommit?: string;
         currentCommit?: string;
         branch: string;
+        error?: string;
     }> {
         const directoryOwner = directory.user as User;
-        const token = directoryOwner.getGitToken();
+        const token = directoryOwner?.getGitToken?.();
         const branch = directory.websiteTemplateUseBeta
             ? config.websiteTemplate.getBetaBranch()
             : WEBSITE_TEMPLATE_CONFIG.branch;
+
+        if (!token) {
+            return {
+                updateAvailable: false,
+                branch,
+                error: 'GitHub token not available',
+            };
+        }
 
         const latestCommit = await this.githubService.getLatestCommit(
             WEBSITE_TEMPLATE_CONFIG.owner,

@@ -32,6 +32,8 @@ import {
 } from '@packages/agent/services';
 import { ScheduleRunCompleteDto, ScheduleRunFailureDto } from './dto/schedule-run.dto';
 import { GenerateStatusType } from '@packages/agent/entities';
+import { NotificationService } from '@packages/agent/notifications';
+import { CreateNotificationDto } from './dto/create-notification.dto';
 
 type DirectoryContextResponse = {
     directory: Directory;
@@ -64,6 +66,7 @@ export class TriggerInternalController {
         @Inject(CACHE_MANAGER) private cacheManager: Cache,
         private readonly scheduleDispatcher: DirectoryScheduleDispatcherService,
         private readonly directoryScheduleService: DirectoryScheduleService,
+        private readonly notificationService: NotificationService,
     ) {}
 
     @Get('directories/:id/context')
@@ -209,6 +212,25 @@ export class TriggerInternalController {
         const value = await this.cacheManager.del(key);
 
         return { deleted: value };
+    }
+
+    @Post('notifications')
+    @Public()
+    async createNotification(
+        @Headers('x-trigger-secret') secret: string,
+        @Body() dto: CreateNotificationDto,
+    ) {
+        this.ensureSecret(secret);
+
+        const notification = await this.notificationService.create({
+            ...dto,
+            expiresAt: dto.expiresAt ? new Date(dto.expiresAt) : undefined,
+        });
+
+        return {
+            success: true,
+            notificationId: notification.id,
+        };
     }
 
     private ensureSecret(secret?: string) {

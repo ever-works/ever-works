@@ -281,6 +281,9 @@ function WebsiteTemplateSettings({ directory }: DeployFormProps) {
                 if (result.success) {
                     toast.success(t('form.websiteTemplate.updateSuccess'));
                     router.refresh();
+                } else if ('requiresGitHub' in result && result.requiresGitHub) {
+                    setAutoUpdate(!checked); // Revert on failure
+                    toast.error(t('form.websiteTemplate.githubRequired'));
                 } else {
                     setAutoUpdate(!checked); // Revert on failure
                     toast.error(result.error || t('form.websiteTemplate.updateFailed'));

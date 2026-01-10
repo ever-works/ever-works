@@ -1,19 +1,29 @@
 import { Module } from '@nestjs/common';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { DIRECTORY_OPERATIONS } from '@packages/agent/directory-operations';
+import { NOTIFICATION_OPERATIONS } from '@packages/agent/notification-operations';
 import { DataGeneratorService } from '@packages/agent/data-generator';
 import { MarkdownGeneratorService } from '@packages/agent/markdown-generator';
 import { WebsiteGeneratorService } from '@packages/agent/website-generator';
+import {
+    SourceRepoAnalyzerService,
+    AwesomeReadmeParserService,
+    ImportExecutorService,
+} from '@packages/agent/import';
 import { GitModule } from '@packages/agent/git';
 import { TriggerItemsGeneratorModule } from './trigger-items-generator.module';
 import { TriggerInternalModule } from './trigger-internal.module';
+import { TriggerAiModule } from './trigger-ai.module';
 import { RemoteDirectoryOperationsService } from './remote-directory-operations.service';
+import { RemoteNotificationOperationsService } from './remote-notification-operations.service';
 import { TriggerGenerationOrchestrator } from './trigger-generation.orchestrator';
+import { TriggerImportOrchestrator } from './trigger-import.orchestrator';
 import { TriggerCacheFactory } from './cache/cache.factory';
 
 @Module({
     imports: [
         TriggerItemsGeneratorModule,
+        TriggerAiModule,
         GitModule,
         EventEmitterModule.forRoot(),
         TriggerInternalModule,
@@ -25,11 +35,20 @@ import { TriggerCacheFactory } from './cache/cache.factory';
             provide: DIRECTORY_OPERATIONS,
             useExisting: RemoteDirectoryOperationsService,
         },
+        RemoteNotificationOperationsService,
+        {
+            provide: NOTIFICATION_OPERATIONS,
+            useExisting: RemoteNotificationOperationsService,
+        },
         DataGeneratorService,
         MarkdownGeneratorService,
         WebsiteGeneratorService,
+        SourceRepoAnalyzerService,
+        AwesomeReadmeParserService,
+        ImportExecutorService,
         TriggerGenerationOrchestrator,
+        TriggerImportOrchestrator,
     ],
-    exports: [TriggerGenerationOrchestrator, TriggerInternalModule],
+    exports: [TriggerGenerationOrchestrator, TriggerImportOrchestrator, TriggerInternalModule],
 })
 export class TriggerWorkerModule {}

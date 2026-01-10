@@ -14,6 +14,7 @@ import {
     UserSubscription,
     DirectorySchedule,
     UsageLedgerEntry,
+    Notification,
 } from '../entities';
 import * as path from 'path';
 import * as os from 'os';
@@ -59,6 +60,7 @@ export const ENTITIES = [
     UserSubscription,
     DirectorySchedule,
     UsageLedgerEntry,
+    Notification,
 ];
 
 export const databaseConfig = registerAs('database', (): DatabaseConfig => {

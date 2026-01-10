@@ -144,21 +144,32 @@ export class AwesomeReadmeParserService {
             total_tokens_used: 0,
             total_cost: 0,
         };
+        const overallStartTime = Date.now();
+
+        this.logger.log(`[Import] Parsing README (${content.length} chars)`);
+        this.logger.log(`[Import] Step 1/3: Extracting categories...`);
 
         let categories: Category[];
         try {
             categories = await this.extractCategories(content, metrics);
+            this.logger.log(`[Import] Step 1/3 complete: Found ${categories.length} categories`);
         } catch (error) {
-            this.logger.error('Failed to extract categories', error);
+            this.logger.error('[Import] Category extraction failed, using fallback', error);
             parseErrors.push(`Category extraction failed: ${error.message}`);
             categories = this.fallbackCategoryExtraction(content);
+            this.logger.log(`[Import] Fallback found ${categories.length} categories`);
         }
 
         const allItems: ItemData[] = [];
         const sections = this.splitIntoSections(content, categories);
 
+        this.logger.log(`[Import] Step 2/3: Extracting items from ${sections.length} sections...`);
+
         for (let i = 0; i < sections.length; i++) {
             const section = sections[i];
+            this.logger.log(
+                `[Import] Processing section ${i + 1}/${sections.length}: "${section.categoryName}" (${section.content.length} chars)`,
+            );
             try {
                 const items = await this.extractItemsFromSection(
                     section.content,
@@ -167,8 +178,14 @@ export class AwesomeReadmeParserService {
                     metrics,
                 );
                 allItems.push(...items);
+                this.logger.log(
+                    `[Import] Section ${i + 1}/${sections.length} complete: ${items.length} items (total: ${allItems.length})`,
+                );
             } catch (error) {
-                this.logger.error(`Failed to extract items from ${section.categoryName}`, error);
+                this.logger.error(
+                    `[Import] Failed to extract items from section "${section.categoryName}"`,
+                    error,
+                );
                 parseErrors.push(
                     `Item extraction failed for ${section.categoryName}: ${error.message}`,
                 );
@@ -179,8 +196,18 @@ export class AwesomeReadmeParserService {
             }
         }
 
+        this.logger.log(`[Import] Step 3/3: Finalizing - extracting tags and deduplicating...`);
         const tags = this.extractUniqueTags(allItems);
         const uniqueItems = this.deduplicateItems(allItems);
+
+        const overallDuration = Date.now() - overallStartTime;
+        const durationMinutes = (overallDuration / 1000 / 60).toFixed(1);
+        this.logger.log(
+            `[Import] Complete in ${durationMinutes}min: ${uniqueItems.length} items, ${tags.length} tags, ${categories.length} categories`,
+        );
+        this.logger.log(
+            `[Import] Metrics: ${metrics.total_tokens_used} tokens, $${metrics.total_cost.toFixed(4)} cost`,
+        );
 
         return {
             items: uniqueItems,
@@ -203,23 +230,41 @@ export class AwesomeReadmeParserService {
         metrics: MetricsAccumulator,
     ): Promise<Category[]> {
         if (content.length <= this.CATEGORY_CHUNK_SIZE) {
-            return this.extractCategoriesFromChunk(content, metrics);
+            this.logger.log(`[Import] Content fits in single chunk, extracting categories...`);
+            const categories = await this.extractCategoriesFromChunk(content, metrics);
+            this.logger.log(`[Import] Extracted ${categories.length} categories from single chunk`);
+            return categories;
         }
 
         const chunks = await this.categoryTextSplitter.splitText(content);
+        this.logger.log(
+            `[Import] Content split into ${chunks.length} chunks for category extraction`,
+        );
+
         const allCategories: Category[] = [];
         const seenIds = new Set<string>();
 
         for (let i = 0; i < chunks.length; i++) {
+            this.logger.log(
+                `[Import] Processing category chunk ${i + 1}/${chunks.length} (${chunks[i].length} chars)...`,
+            );
             try {
                 const chunkCategories = await this.extractCategoriesFromChunk(chunks[i], metrics);
+                let newCount = 0;
                 for (const cat of chunkCategories) {
                     if (!seenIds.has(cat.id)) {
                         seenIds.add(cat.id);
                         allCategories.push(cat);
+                        newCount++;
                     }
                 }
-            } catch {
+                this.logger.log(
+                    `[Import] Category chunk ${i + 1}/${chunks.length}: found ${chunkCategories.length} categories (${newCount} new, ${allCategories.length} total)`,
+                );
+            } catch (error) {
+                this.logger.warn(
+                    `[Import] Category chunk ${i + 1}/${chunks.length} failed: ${error.message}`,
+                );
                 continue;
             }
 
@@ -235,6 +280,9 @@ export class AwesomeReadmeParserService {
         content: string,
         metrics: MetricsAccumulator,
     ): Promise<Category[]> {
+        this.logger.log(`[Import] AI call: extracting categories from chunk...`);
+        const startTime = Date.now();
+
         const { result, usage, cost } = await this.aiService.askJson(
             CATEGORY_EXTRACTION_PROMPT,
             extractedCategoriesSchema,
@@ -246,6 +294,11 @@ export class AwesomeReadmeParserService {
                     taskId: 'awesome-category-extraction',
                 },
             },
+        );
+
+        const duration = Date.now() - startTime;
+        this.logger.log(
+            `[Import] AI call complete: ${result.categories.length} categories in ${duration}ms (tokens: ${usage?.totalTokens || 'N/A'})`,
         );
 
         accumulateMetrics(metrics, usage, cost);
@@ -350,8 +403,15 @@ export class AwesomeReadmeParserService {
 
         if (sectionContent.length > this.MAX_CHUNK_SIZE) {
             const chunks = await this.textSplitter.splitText(sectionContent);
+            this.logger.log(
+                `[Import] Section "${categoryName}" split into ${chunks.length} chunks`,
+            );
 
             for (let i = 0; i < chunks.length; i++) {
+                this.logger.log(
+                    `[Import] AI call: extracting items from "${categoryName}" chunk ${i + 1}/${chunks.length}...`,
+                );
+                const startTime = Date.now();
                 try {
                     const { result, usage, cost } = await this.aiService.askJson(
                         ITEM_EXTRACTION_PROMPT,
@@ -366,12 +426,21 @@ export class AwesomeReadmeParserService {
                         },
                     );
 
+                    const duration = Date.now() - startTime;
+                    const itemCount = result.items?.length || 0;
+                    this.logger.log(
+                        `[Import] Chunk ${i + 1}/${chunks.length}: ${itemCount} items in ${duration}ms`,
+                    );
+
                     accumulateMetrics(metrics, usage, cost);
 
                     for (const item of result.items || []) {
                         extractedItems.push(this.mapToItemData(item, categoryId));
                     }
-                } catch {
+                } catch (error) {
+                    this.logger.warn(
+                        `[Import] Chunk ${i + 1}/${chunks.length} failed: ${error.message}`,
+                    );
                     continue;
                 }
 
@@ -380,6 +449,9 @@ export class AwesomeReadmeParserService {
                 }
             }
         } else {
+            this.logger.log(`[Import] AI call: extracting items from "${categoryName}"...`);
+            const startTime = Date.now();
+
             const { result, usage, cost } = await this.aiService.askJson(
                 ITEM_EXTRACTION_PROMPT,
                 extractedItemsSchema,
@@ -391,6 +463,11 @@ export class AwesomeReadmeParserService {
                         taskId: 'awesome-item-extraction',
                     },
                 },
+            );
+
+            const duration = Date.now() - startTime;
+            this.logger.log(
+                `[Import] AI call complete: ${result.items.length} items in ${duration}ms`,
             );
 
             accumulateMetrics(metrics, usage, cost);

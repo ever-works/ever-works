@@ -213,16 +213,50 @@ export abstract class GitProvider {
         return git.statusMatrix({ fs, dir });
     }
 
-    push(dir: string, token: string, force: boolean = false) {
-        const auth = this.getAuth(token);
+    async push(dir: string, token: string, force: boolean = false, maxRetries: number = 3) {
+        if (!token) {
+            throw new Error('Git token is required for push operation');
+        }
 
-        return git.push({
-            onAuth: () => auth,
-            fs,
-            http,
-            dir,
-            force,
-        });
+        const auth = this.getAuth(token);
+        let lastError: Error | null = null;
+
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                return await git.push({
+                    onAuth: () => auth,
+                    fs,
+                    http,
+                    dir,
+                    force,
+                });
+            } catch (error: any) {
+                lastError = error;
+                const errorMessage = error?.message || '';
+
+                // Check if this is a retryable error (ref lock, network issues)
+                const isRetryable =
+                    errorMessage.includes('cannot lock ref') ||
+                    errorMessage.includes('failed to lock') ||
+                    errorMessage.includes('ETIMEDOUT') ||
+                    errorMessage.includes('ECONNRESET');
+
+                if (!isRetryable || attempt === maxRetries) {
+                    throw error;
+                }
+
+                this.logger?.warn(
+                    `Push attempt ${attempt}/${maxRetries} failed: ${errorMessage}. Retrying...`,
+                );
+
+                // Exponential backoff: 1s, 2s, 4s
+                await new Promise((resolve) =>
+                    setTimeout(resolve, 1000 * Math.pow(2, attempt - 1)),
+                );
+            }
+        }
+
+        throw lastError;
     }
 
     /**

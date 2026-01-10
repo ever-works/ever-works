@@ -1,6 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { config } from '@packages/agent/config';
-import { Directory, GenerateStatusType } from '@packages/agent/entities';
+import {
+    Directory,
+    GenerateStatusType,
+    NotificationType,
+    NotificationCategory,
+} from '@packages/agent/entities';
 import { DirectoryCommand, DirectoryCommandAction } from '@packages/agent/tasks';
 
 type DirectoryContextResponse = {
@@ -11,6 +16,19 @@ type DirectoryContextResponse = {
 type DispatchSchedulesResponse = {
     dispatched: number;
 };
+
+export interface CreateNotificationPayload {
+    userId: string;
+    type: NotificationType;
+    category: NotificationCategory;
+    title: string;
+    message: string;
+    actionUrl?: string;
+    actionLabel?: string;
+    metadata?: Record<string, any>;
+    isPersistent?: boolean;
+    deduplicationKey?: string;
+}
 
 @Injectable()
 export class TriggerInternalApiClient {
@@ -103,6 +121,20 @@ export class TriggerInternalApiClient {
         });
 
         return response.deleted;
+    }
+
+    /**
+     * Create a notification via the internal API
+     * Use this to notify users of account-level issues from tasks
+     */
+    async createNotification(
+        payload: CreateNotificationPayload,
+    ): Promise<{ notificationId: string }> {
+        return this.request<{ notificationId: string }>({
+            method: 'POST',
+            path: `/notifications`,
+            body: payload,
+        });
     }
 
     private async request<T>({
