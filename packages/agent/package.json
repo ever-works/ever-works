@@ -72,6 +72,14 @@
         "./cache": {
             "types": "./dist/cache/index.d.ts",
             "default": "./dist/cache/index.js"
+        },
+        "./notifications": {
+            "types": "./dist/notifications/index.d.ts",
+            "default": "./dist/notifications/index.js"
+        },
+        "./notification-operations": {
+            "types": "./dist/notification-operations/index.d.ts",
+            "default": "./dist/notification-operations/index.js"
         }
     },
     "scripts": {

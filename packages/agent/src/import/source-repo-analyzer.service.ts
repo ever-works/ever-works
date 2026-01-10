@@ -205,6 +205,7 @@ export class SourceRepoAnalyzerService {
             hasConfig,
             hasDataFolder,
             hasReadme,
+            isMultiFile: false,
             itemCount: undefined as number | undefined,
             categoryCount: undefined as number | undefined,
         };
@@ -272,26 +273,53 @@ export class SourceRepoAnalyzerService {
                 const readmeContent = await this.getFileContent(octokit, owner, repo, 'README.md');
 
                 if (readmeContent && this.isAwesomeListReadme(readmeContent)) {
-                    const listItems = readmeContent.match(/^[-*]\s+\[.+?\]\(.+?\)/gm);
-                    structure.itemCount = listItems ? listItems.length : undefined;
+                    // Check if this is a multi-file structure (links to subdirectories)
+                    const directoryLinks = (
+                        readmeContent.match(/\[.+?\]\(\.\/[a-zA-Z0-9-_]+\/?/gm) || []
+                    ).length;
+                    const isMultiFile = directoryLinks >= 3;
+                    structure.isMultiFile = isMultiFile;
 
-                    const headers = readmeContent.match(/^#{2,3}\s+.+$/gm);
-                    const nonCategoryHeaders = [
-                        'contents',
-                        'table of contents',
-                        'contributing',
-                        'license',
-                        'authors',
-                        'acknowledgments',
-                        'resources',
-                        'related',
-                        'see also',
-                    ];
-                    const categoryHeaders = headers?.filter((h) => {
-                        const headerText = h.replace(/^#+\s+/, '').toLowerCase();
-                        return !nonCategoryHeaders.some((nc) => headerText.includes(nc));
-                    });
-                    structure.categoryCount = categoryHeaders ? categoryHeaders.length : undefined;
+                    if (isMultiFile) {
+                        // For multi-file structures, count subdirectories with README as potential item sources
+                        const subDirs = contents.filter((c) => c.type === 'dir');
+                        structure.categoryCount = subDirs.length;
+
+                        // Try to estimate item count from table of contents or subdirectory names
+                        // e.g., "ai-apis-1208" -> extract 1208
+                        let estimatedItems = 0;
+                        for (const dir of subDirs) {
+                            const countMatch = dir.name.match(/-(\d+)$/);
+                            if (countMatch) {
+                                estimatedItems += parseInt(countMatch[1], 10);
+                            }
+                        }
+                        structure.itemCount =
+                            estimatedItems > 0 ? estimatedItems : subDirs.length * 50; // Estimate ~50 items per category
+                    } else {
+                        const listItems = this.countListItems(readmeContent);
+                        structure.itemCount = listItems > 0 ? listItems : undefined;
+
+                        const headers = readmeContent.match(/^#{2,3}\s+.+$/gm);
+                        const nonCategoryHeaders = [
+                            'contents',
+                            'table of contents',
+                            'contributing',
+                            'license',
+                            'authors',
+                            'acknowledgments',
+                            'resources',
+                            'related',
+                            'see also',
+                        ];
+                        const categoryHeaders = headers?.filter((h) => {
+                            const headerText = h.replace(/^#+\s+/, '').toLowerCase();
+                            return !nonCategoryHeaders.some((nc) => headerText.includes(nc));
+                        });
+                        structure.categoryCount = categoryHeaders
+                            ? categoryHeaders.length
+                            : undefined;
+                    }
 
                     return { type: 'awesome_readme', structure };
                 }
@@ -303,12 +331,45 @@ export class SourceRepoAnalyzerService {
         return { type: null, structure };
     }
 
-    private isAwesomeListReadme(content: string): boolean {
-        const hasListLinks = /^[-*]\s+\[.+?\]\(.+?\)/m.test(content);
-        const hasSectionHeaders = /^#{2,3}\s+.+$/m.test(content);
-        const listItemCount = (content.match(/^[-*]\s+\[.+?\]\(.+?\)/gm) || []).length;
+    private countListItems(content: string): number {
+        // Count bullet list links (- [Name](url) or * [Name](url), with optional bold)
+        const bulletListLinks = (content.match(/^[-*]\s+\*{0,2}\[.+?\]\(.+?\)/gm) || []).length;
 
-        return hasListLinks && hasSectionHeaders && listItemCount >= 5;
+        // Count numbered list links (1. [Name](url))
+        const numberedListLinks = (content.match(/^\d+\.\s+\*{0,2}\[.+?\]\(.+?\)/gm) || []).length;
+
+        // Count table format links (| [Name](url) |)
+        const tableLinks = (content.match(/\|\s*\[.+?\]\(https?:\/\/.+?\)/gm) || []).length;
+
+        return bulletListLinks + numberedListLinks + tableLinks;
+    }
+
+    private isAwesomeListReadme(content: string): boolean {
+        // Check for any markdown headers (H1, H2, or H3)
+        const hasSectionHeaders = /^#{1,3}\s+.+$/m.test(content);
+
+        // Pattern 1: Standard bullet list links (- [Name](url) or * [Name](url))
+        const bulletListLinks = (content.match(/^[-*]\s+\*{0,2}\[.+?\]\(.+?\)/gm) || []).length;
+
+        // Pattern 2: Numbered list links (1. [Name](url))
+        const numberedListLinks = (content.match(/^\d+\.\s+\*{0,2}\[.+?\]\(.+?\)/gm) || []).length;
+
+        // Pattern 3: Table format links (| [Name](url) |) with http/https URLs
+        const tableLinks = (content.match(/\|\s*\[.+?\]\(https?:\/\/.+?\)/gm) || []).length;
+
+        // Pattern 4: Links to internal directories (./folder/ or ./folder-name/)
+        const directoryLinks = (content.match(/\[.+?\]\(\.\/[a-zA-Z0-9-_]+\/?/gm) || []).length;
+
+        const totalLinkCount = bulletListLinks + numberedListLinks + tableLinks;
+        const hasListLinks = totalLinkCount > 0;
+
+        // Multi-file structure: has directory links AND section headers
+        const isMultiFileStructure = directoryLinks >= 3 && hasSectionHeaders;
+
+        // Standard awesome list: has list links AND section headers AND enough items
+        const isStandardAwesomeList = hasListLinks && hasSectionHeaders && totalLinkCount >= 5;
+
+        return isStandardAwesomeList || isMultiFileStructure;
     }
 
     async getFileContent(

@@ -250,7 +250,9 @@ export abstract class GitProvider {
                 );
 
                 // Exponential backoff: 1s, 2s, 4s
-                await new Promise((resolve) => setTimeout(resolve, 1000 * Math.pow(2, attempt - 1)));
+                await new Promise((resolve) =>
+                    setTimeout(resolve, 1000 * Math.pow(2, attempt - 1)),
+                );
             }
         }
 

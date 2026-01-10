@@ -224,10 +224,7 @@ export class DirectoryImportService {
             if (result.success) {
                 // Enable sync schedule only for awesome_readme imports
                 // Data repos and link_existing run AI generation, not sync
-                if (
-                    dto.sync !== false &&
-                    dto.sourceType === ImportSourceTypeEnum.AWESOME_README
-                ) {
+                if (dto.sync !== false && dto.sourceType === ImportSourceTypeEnum.AWESOME_README) {
                     try {
                         await this.directoryScheduleService.updateSchedule(
                             directory.id,
