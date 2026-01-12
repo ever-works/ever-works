@@ -45,7 +45,6 @@ export const AddItemForm = memo(function AddItemForm({
 }: AddItemFormProps) {
     const t = useTranslations('dashboard.directoryDetail.items.addModal');
     const [isExtracting, setIsExtracting] = useState(false);
-    const [categoryInput, setCategoryInput] = useState('');
     const [tagInput, setTagInput] = useState('');
     const [imageInput, setImageInput] = useState('');
 
@@ -230,8 +229,6 @@ export const AddItemForm = memo(function AddItemForm({
             <CategoriesField
                 existingCategories={categories}
                 selectedCategories={formData.categories}
-                categoryInput={categoryInput}
-                setCategoryInput={setCategoryInput}
                 onAddCategory={handleAddCategory}
                 onRemoveCategory={handleRemoveCategory}
                 isPending={isPending}
