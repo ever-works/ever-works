@@ -32,7 +32,7 @@ export const AddItemModal = memo(function AddItemModal({
         name: '',
         description: '',
         source_url: '',
-        category: categories[0] || '',
+        categories: [],
         tags: [],
         featured: false,
         pay_and_publish_now: true,
@@ -50,7 +50,7 @@ export const AddItemModal = memo(function AddItemModal({
                 !formData.name ||
                 !formData.description ||
                 !formData.source_url ||
-                !formData.category
+                formData.categories.length === 0
             ) {
                 toast.error(t('errors.requiredFields'));
                 return;
@@ -59,7 +59,16 @@ export const AddItemModal = memo(function AddItemModal({
             startTransition(async () => {
                 try {
                     const submitData = {
-                        ...formData,
+                        name: formData.name,
+                        description: formData.description,
+                        source_url: formData.source_url,
+                        // Backward compatibility: send first category as 'category'
+                        category: formData.categories[0],
+                        // New field: send all categories as array
+                        categories: formData.categories,
+                        tags: formData.tags,
+                        featured: formData.featured,
+                        pay_and_publish_now: formData.pay_and_publish_now,
                         slug:
                             formData.slug ||
                             formData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
@@ -80,7 +89,7 @@ export const AddItemModal = memo(function AddItemModal({
                             name: '',
                             description: '',
                             source_url: '',
-                            category: categories[0] || '',
+                            categories: [],
                             tags: [],
                             featured: false,
                             pay_and_publish_now: true,

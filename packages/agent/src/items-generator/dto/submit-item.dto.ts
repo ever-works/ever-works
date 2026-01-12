@@ -7,6 +7,7 @@ import {
     IsArray,
     IsInt,
     Min,
+    ValidateIf,
 } from 'class-validator';
 
 export class SubmitItemDto {
@@ -22,9 +23,18 @@ export class SubmitItemDto {
     @IsUrl({ protocols: ['http', 'https'], require_tld: true })
     source_url: string;
 
+    // Backward compatibility: accept single category string
+    // Required if categories array is not provided or empty
+    @ValidateIf((o) => !o.categories || o.categories.length === 0)
     @IsString()
     @IsNotEmpty()
-    category: string;
+    category?: string;
+
+    // New: accept array of categories
+    @IsOptional()
+    @IsArray()
+    @IsString({ each: true })
+    categories?: string[];
 
     @IsOptional()
     @IsArray()

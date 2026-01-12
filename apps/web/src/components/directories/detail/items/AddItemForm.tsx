@@ -10,12 +10,13 @@ import { useTranslations } from 'next-intl';
 import { Loader2, Link2, Plus, X } from 'lucide-react';
 import { extractItemDetails } from '@/app/actions/dashboard/items';
 import { toast } from 'sonner';
+import { CategoriesField } from './CategoriesField';
 
 export interface ItemFormData {
     name: string;
     description: string;
     source_url: string;
-    category: string;
+    categories: string[];
     tags: string[];
     featured: boolean;
     pay_and_publish_now: boolean;
@@ -44,6 +45,7 @@ export const AddItemForm = memo(function AddItemForm({
 }: AddItemFormProps) {
     const t = useTranslations('dashboard.directoryDetail.items.addModal');
     const [isExtracting, setIsExtracting] = useState(false);
+    const [categoryInput, setCategoryInput] = useState('');
     const [tagInput, setTagInput] = useState('');
     const [imageInput, setImageInput] = useState('');
 
@@ -73,9 +75,14 @@ export const AddItemForm = memo(function AddItemForm({
 
             if (result.success && result.data) {
                 setFormData((prev) => {
-                    const shouldUpdateCategory =
-                        result.data?.category &&
-                        (categories.length === 0 || categories.includes(result.data.category));
+                    // Handle extracted category - add to categories if valid and not already present
+                    let newCategories = [...prev.categories];
+                    if (result.data?.category) {
+                        const extractedCategory = result.data.category;
+                        if (!newCategories.includes(extractedCategory)) {
+                            newCategories = [...newCategories, extractedCategory];
+                        }
+                    }
 
                     return {
                         ...prev,
@@ -85,7 +92,7 @@ export const AddItemForm = memo(function AddItemForm({
                             result.data.tags && result.data.tags.length > 0
                                 ? result.data.tags
                                 : prev.tags,
-                        category: shouldUpdateCategory ? result.data.category! : prev.category,
+                        categories: newCategories.length > 0 ? newCategories : prev.categories,
                         brand: result.data.brand || prev.brand,
                         brand_logo_url: result.data.brand_logo_url || prev.brand_logo_url,
                         images:
@@ -104,6 +111,22 @@ export const AddItemForm = memo(function AddItemForm({
         } finally {
             setIsExtracting(false);
         }
+    };
+
+    const handleAddCategory = (category: string) => {
+        if (category.trim() && !formData.categories.includes(category.trim())) {
+            setFormData({
+                ...formData,
+                categories: [...formData.categories, category.trim()],
+            });
+        }
+    };
+
+    const handleRemoveCategory = (category: string) => {
+        setFormData({
+            ...formData,
+            categories: formData.categories.filter((c) => c !== category),
+        });
     };
 
     const handleAddTag = () => {
@@ -203,31 +226,16 @@ export const AddItemForm = memo(function AddItemForm({
                 disabled={isPending}
             />
 
-            {/* Category */}
-            <div className="space-y-2">
-                <label className="text-sm font-medium text-text dark:text-text-dark">
-                    {t('category')} *
-                </label>
-                <select
-                    value={formData.category}
-                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                    className={cn(
-                        'w-full px-4 py-2 rounded-lg',
-                        'bg-surface dark:bg-surface-dark',
-                        'border border-border dark:border-border-dark',
-                        'text-text dark:text-text-dark',
-                        'focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-primary-dark',
-                        'disabled:opacity-50 disabled:cursor-not-allowed',
-                    )}
-                    disabled={isPending}
-                >
-                    {categories.map((cat) => (
-                        <option key={cat} value={cat}>
-                            {cat}
-                        </option>
-                    ))}
-                </select>
-            </div>
+            {/* Categories */}
+            <CategoriesField
+                existingCategories={categories}
+                selectedCategories={formData.categories}
+                categoryInput={categoryInput}
+                setCategoryInput={setCategoryInput}
+                onAddCategory={handleAddCategory}
+                onRemoveCategory={handleRemoveCategory}
+                isPending={isPending}
+            />
 
             {/* Tags */}
             <TagsField

@@ -549,14 +549,9 @@ export class CategoryProcessingService implements IPipelineStep {
     ): Category[] {
         const categoryNames = items.reduce((acc, item) => {
             if (Array.isArray(item.category)) {
-                acc.push(
-                    ...(item.category.map((cat) => (typeof cat === 'string' ? cat : cat.name)) ||
-                        []),
-                );
+                acc.push(...item.category);
             } else if (typeof item.category === 'string') {
                 acc.push(item.category);
-            } else if (item.category?.name) {
-                acc.push(item.category.name);
             }
 
             return acc;
