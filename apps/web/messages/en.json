@@ -692,6 +692,15 @@
                     "description": "Description",
                     "descriptionPlaceholder": "Enter a brief description of the item",
                     "category": "Category",
+                    "categories": "Categories",
+                    "existingCategories": "Select from existing",
+                    "addNewCategory": "Or add new category",
+                    "categoryPlaceholder": "Search or create category...",
+                    "addMoreCategories": "Add more...",
+                    "createCategory": "Create",
+                    "noMatchingCategories": "No matching categories",
+                    "noCategories": "No categories yet. Type to create one.",
+                    "categoriesRequired": "Select at least one category",
                     "tags": "Tags",
                     "tagPlaceholder": "Add a tag and press Enter",
                     "slug": "Slug (Optional)",
@@ -877,7 +886,15 @@
                 "saveChanges": "Save Changes",
                 "updateReadme": "Update README",
                 "updateSuccess": "Settings updated successfully",
-                "updateFailed": "Failed to update settings"
+                "updateFailed": "Failed to update settings",
+                "visibilityUpdateFailed": "Failed to update repository visibility",
+                "visibilityWarningTitle": "Make Repository Private?",
+                "visibilityWarningDescription": "You are about to make {name} private.",
+                "visibilityWarningPermanent": "This action has permanent consequences:",
+                "visibilityWarningStars": "All stars will be permanently lost",
+                "visibilityWarningWatchers": "All watchers will be removed",
+                "visibilityWarningNotRestored": "Stars and watchers will NOT be restored if you make the repository public again",
+                "visibilityConfirmPrivate": "Yes, Make Private"
             },
             "deploy": {
                 "noTokenAlert": {

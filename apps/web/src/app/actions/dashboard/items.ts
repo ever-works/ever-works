@@ -103,10 +103,10 @@ export async function extractItemDetails(sourceUrl: string, existingCategories?:
             };
         }
 
-        const normalizedCategory =
-            typeof response.item.category === 'string'
-                ? response.item.category
-                : response.item.category?.name;
+        // Normalize category to string (take first if array)
+        const normalizedCategory = Array.isArray(response.item.category)
+            ? response.item.category[0]
+            : response.item.category;
 
         const normalizedTags = (response.item.tags || []).map((tag) =>
             typeof tag === 'string' ? tag : tag.name,

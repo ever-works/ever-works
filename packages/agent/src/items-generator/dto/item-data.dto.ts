@@ -1,4 +1,3 @@
-import { Category } from './category.dto';
 import { Tag } from './tag.dto';
 import { ItemBadges } from './badge.dto';
 import { Brand } from './brand.dto';
@@ -14,7 +13,7 @@ export interface ItemData {
     featured?: boolean;
     order?: number;
     source_url: string;
-    category: string | Category | Category[];
+    category: string | string[];
     slug?: string;
     tags: string[] | Tag[];
     markdown?: string;
