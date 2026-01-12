@@ -8,6 +8,7 @@ import {
     IsInt,
     Min,
     ValidateIf,
+    ArrayMinSize,
 } from 'class-validator';
 
 export class SubmitItemDto {
@@ -30,9 +31,9 @@ export class SubmitItemDto {
     @IsNotEmpty()
     category?: string;
 
-    // New: accept array of categories
-    @IsOptional()
+    @ValidateIf((o) => !o.category)
     @IsArray()
+    @ArrayMinSize(1)
     @IsString({ each: true })
     categories?: string[];
 

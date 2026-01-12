@@ -62,9 +62,7 @@ export const AddItemModal = memo(function AddItemModal({
                         name: formData.name,
                         description: formData.description,
                         source_url: formData.source_url,
-                        // Backward compatibility: send first category as 'category'
-                        category: formData.categories[0],
-                        // New field: send all categories as array
+                        category: formData.categories[0] ?? '',
                         categories: formData.categories,
                         tags: formData.tags,
                         featured: formData.featured,

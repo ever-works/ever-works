@@ -221,11 +221,6 @@ export const CategoriesField = memo(function CategoriesField({
                     </ComboboxOptions>
                 </div>
             </Combobox>
-
-            {/* Validation message */}
-            {selectedCategories.length === 0 && (
-                <p className="text-xs text-danger">{t('categoriesRequired')}</p>
-            )}
         </div>
     );
 });
