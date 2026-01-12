@@ -877,7 +877,15 @@
                 "saveChanges": "Save Changes",
                 "updateReadme": "Update README",
                 "updateSuccess": "Settings updated successfully",
-                "updateFailed": "Failed to update settings"
+                "updateFailed": "Failed to update settings",
+                "visibilityUpdateFailed": "Failed to update repository visibility",
+                "visibilityWarningTitle": "Make Repository Private?",
+                "visibilityWarningDescription": "You are about to make {name} private.",
+                "visibilityWarningPermanent": "This action has permanent consequences:",
+                "visibilityWarningStars": "All stars will be permanently lost",
+                "visibilityWarningWatchers": "All watchers will be removed",
+                "visibilityWarningNotRestored": "Stars and watchers will NOT be restored if you make the repository public again",
+                "visibilityConfirmPrivate": "Yes, Make Private"
             },
             "deploy": {
                 "noTokenAlert": {
