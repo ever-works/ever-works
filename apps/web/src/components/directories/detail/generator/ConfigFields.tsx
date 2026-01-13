@@ -55,9 +55,12 @@ export function ConfigFields({
         <div className="space-y-6">
             {/* Generation Method */}
             <div>
-                <label className="block text-sm font-medium text-text dark:text-text-dark mb-2">
+                <label className="block text-sm font-medium text-text dark:text-text-dark mb-1">
                     {t('generationMethod')}
                 </label>
+                <p className="text-xs text-text-muted dark:text-text-muted-dark mb-2">
+                    {t('generationMethodDescription')}
+                </p>
                 <select
                     value={generationMethod}
                     onChange={(e) =>
@@ -104,9 +107,12 @@ export function ConfigFields({
 
             {/* Website Repository Method */}
             <div>
-                <label className="block text-sm font-medium text-text dark:text-text-dark mb-2">
+                <label className="block text-sm font-medium text-text dark:text-text-dark mb-1">
                     {t('websiteRepositoryCreationMethod')}
                 </label>
+                <p className="text-xs text-text-muted dark:text-text-muted-dark mb-2">
+                    {t('websiteRepositoryCreationMethodDescription')}
+                </p>
                 <select
                     value={websiteRepositoryCreationMethod}
                     onChange={(e) =>
@@ -152,6 +158,7 @@ export function ConfigFields({
                                 },
                             })
                         }
+                        helperText={t('maxSearchQueriesDescription')}
                         variant="form"
                         min="1"
                         max="50"
@@ -173,6 +180,7 @@ export function ConfigFields({
                                 },
                             })
                         }
+                        helperText={t('resultsPerQueryDescription')}
                         variant="form"
                         min="1"
                         max="20"
@@ -192,6 +200,7 @@ export function ConfigFields({
                                 },
                             })
                         }
+                        helperText={t('maxPagesToProcessDescription')}
                         variant="form"
                         min="1"
                         max="100"
@@ -216,6 +225,7 @@ export function ConfigFields({
                                 },
                             })
                         }
+                        helperText={t('relevanceThresholdDescription')}
                         variant="form"
                         min="0"
                         max="1"

@@ -26,6 +26,7 @@ export function CompanyFields({ company, onChange }: CompanyFieldsProps) {
                     )
                 }
                 placeholder={t('companyNamePlaceholder')}
+                helperText={t('companyNameDescription')}
                 variant="form"
             />
 
@@ -43,6 +44,7 @@ export function CompanyFields({ company, onChange }: CompanyFieldsProps) {
                     )
                 }
                 placeholder={t('companyWebsitePlaceholder')}
+                helperText={t('companyWebsiteDescription')}
                 variant="form"
             />
         </div>
