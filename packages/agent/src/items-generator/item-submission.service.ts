@@ -70,11 +70,17 @@ export class ItemSubmissionService {
             this.logger.log(`Created and switched to new branch: ${branchName}`);
 
             // Prepare item data
+            // Handle both category (string) and categories (array) for backward compatibility
+            const category =
+                submitItemDto.categories && submitItemDto.categories.length > 0
+                    ? submitItemDto.categories
+                    : submitItemDto.category;
+
             const itemData: ItemData = {
                 name: submitItemDto.name,
                 description: submitItemDto.description,
                 source_url: submitItemDto.source_url,
-                category: submitItemDto.category,
+                category,
                 tags: submitItemDto.tags || [],
                 featured: submitItemDto.featured || false,
                 order: submitItemDto.order,

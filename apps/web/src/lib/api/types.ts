@@ -52,7 +52,7 @@ export interface ItemData {
     featured?: boolean;
     order?: number;
     source_url: string;
-    category: string | Category;
+    category: string | string[];
     slug?: string;
     tags: string[] | Tag[];
     markdown?: string;

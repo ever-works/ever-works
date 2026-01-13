@@ -30,7 +30,7 @@ export interface ItemData {
     featured?: boolean;
     order?: number;
     source_url: string;
-    category: string | string[] | Category | Category[];
+    category: string | string[];
     slug?: string;
     tags: string[] | Tag[];
     badges?: ItemBadges;
