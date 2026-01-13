@@ -180,7 +180,7 @@ const ItemCardGrid = memo(function ItemCardGrid({
                 'bg-card dark:bg-card-dark',
                 'transition-colors',
                 isFeatured
-                    ? 'border-amber-400 dark:border-amber-500 bg-amber-50/50 dark:bg-amber-900/10'
+                    ? 'border-amber-400/30 dark:border-amber-500/30'
                     : 'border-card-border dark:border-card-border-dark hover:border-primary/50',
             )}
         >
