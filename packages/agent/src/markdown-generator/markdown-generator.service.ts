@@ -302,9 +302,9 @@ export class MarkdownGeneratorService {
 
         for (const categoryId of sortedCategoryIds) {
             const categoryDetails = categories.get(categoryId);
-            builder.addSubHeader(categoryDetails.name);
-
             const items = groups[categoryId];
+            builder.addSubHeader(categoryDetails.name, items.length);
+
             items.sort((a, b) => {
                 const aFeatured = !!a.featured;
                 const bFeatured = !!b.featured;

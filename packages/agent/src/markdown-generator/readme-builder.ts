@@ -4,7 +4,7 @@ import { ItemData } from '../agent/types';
 export class ReadmeBuilder {
     private content: string = '';
     private isTocEnabled: boolean = false;
-    private readonly toc: string[] = []; // Table of Contents
+    private readonly toc: { header: string; count?: number }[] = []; // Table of Contents
 
     constructor(
         private readonly header: string,
@@ -16,9 +16,9 @@ export class ReadmeBuilder {
         return this;
     }
 
-    addSubHeader(header: string) {
+    addSubHeader(header: string, count?: number) {
         this.content += `## ${header}\n\n`;
-        this.toc.push(header);
+        this.toc.push({ header, count });
         return this;
     }
 
@@ -42,9 +42,13 @@ export class ReadmeBuilder {
 
         if (this.isTocEnabled) {
             toc += '## 📑 Table of Contents\n\n';
-            this.toc.forEach((header) => {
+            this.toc.forEach(({ header, count }) => {
                 const slug = slugifyText(header);
-                toc += `- [${header}](#${slug})\n`;
+                let label = header;
+                if (count !== undefined) {
+                    label += ` (${count.toLocaleString('en-US')})`;
+                }
+                toc += `- [${label}](#${slug})\n`;
             });
             toc += '\n';
         }
