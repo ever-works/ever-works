@@ -5,7 +5,7 @@ import { ItemData, ItemBadges } from '@/lib/api/types-only';
 import { cn } from '@/lib/utils/cn';
 import { Link } from '@/i18n/navigation';
 import { useTranslations } from 'next-intl';
-import { ExternalLink } from 'lucide-react';
+import { ExternalLink, Star, Eye } from 'lucide-react';
 import { removeItem } from '@/app/actions/dashboard/items';
 import { toast } from 'sonner';
 import { getCategoryName } from '@/lib/utils/items';
@@ -18,6 +18,7 @@ interface ItemCardProps {
     canEdit?: boolean;
     onDelete?: () => void;
     onUpdate?: (item: Partial<ItemData>) => void;
+    directoryWebsite?: string;
 }
 
 export const ItemCard = memo(function ItemCard({
@@ -27,6 +28,7 @@ export const ItemCard = memo(function ItemCard({
     canEdit = false,
     onDelete,
     onUpdate,
+    directoryWebsite,
 }: ItemCardProps) {
     const t = useTranslations('dashboard.directoryDetail.items');
     const [isPending, startTransition] = useTransition();
@@ -60,6 +62,7 @@ export const ItemCard = memo(function ItemCard({
                 canEdit={canEdit}
                 onUpdate={onUpdate}
                 isPending={isPending}
+                directoryWebsite={directoryWebsite}
             />
         );
     }
@@ -72,6 +75,7 @@ export const ItemCard = memo(function ItemCard({
             canEdit={canEdit}
             onUpdate={onUpdate}
             isPending={isPending}
+            directoryWebsite={directoryWebsite}
         />
     );
 });
@@ -83,6 +87,7 @@ interface ItemCardViewProps {
     canEdit?: boolean;
     onUpdate?: (item: Partial<ItemData>) => void;
     directoryId: string;
+    directoryWebsite?: string;
 }
 
 const ItemCardList = memo(function ItemCardList({
@@ -92,18 +97,26 @@ const ItemCardList = memo(function ItemCardList({
     canEdit = false,
     onUpdate,
     directoryId,
+    directoryWebsite,
 }: ItemCardViewProps) {
+    const isFeatured = item.featured === true;
+
     return (
         <div
             className={cn(
-                'flex items-center gap-4 p-4 rounded-lg border',
+                'flex items-center gap-4 p-4 rounded-lg border-2',
                 'bg-card dark:bg-card-dark',
-                'border-card-border dark:border-card-border-dark',
-                'hover:border-primary/50 transition-colors',
+                'transition-colors',
+                isFeatured
+                    ? 'border-amber-400 dark:border-amber-500 bg-amber-50/50 dark:bg-amber-900/10'
+                    : 'border-card-border dark:border-card-border-dark hover:border-primary/50',
             )}
         >
             <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
+                    {isFeatured && (
+                        <Star className="w-4 h-4 text-amber-500 fill-amber-500 shrink-0" />
+                    )}
                     <h4 className="font-medium text-text dark:text-text-dark truncate">
                         {item.name}
                     </h4>
@@ -115,13 +128,33 @@ const ItemCardList = memo(function ItemCardList({
                     </p>
                 )}
             </div>
-            {getCategoryName(item.category) && (
-                <span className="px-2 py-1 text-xs rounded-full bg-primary/10 text-primary shrink-0">
-                    {getCategoryName(item.category)}
-                </span>
-            )}
+
+            {/* Order badge and Category */}
+            <div className="flex items-center gap-2 shrink-0">
+                {item.order !== undefined && item.order !== null && (
+                    <span className="px-2 py-1 text-xs font-medium rounded-full bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300">
+                        #{item.order}
+                    </span>
+                )}
+                {getCategoryName(item.category) && (
+                    <span className="px-2 py-1 text-xs rounded-full bg-primary/10 text-primary">
+                        {getCategoryName(item.category)}
+                    </span>
+                )}
+            </div>
 
             <div className="flex items-center gap-2 shrink-0">
+                {directoryWebsite && item.slug && (
+                    <Link
+                        href={`${directoryWebsite}/details/${item.slug}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs hover:underline flex items-center gap-1 text-text-secondary dark:text-text-secondary-dark hover:text-primary"
+                        aria-label="View on directory website"
+                    >
+                        <Eye className="w-4 h-4" />
+                    </Link>
+                )}
                 {item.source_url && (
                     <Link
                         href={item.source_url}
@@ -153,22 +186,31 @@ const ItemCardGrid = memo(function ItemCardGrid({
     canEdit = false,
     onUpdate,
     directoryId,
+    directoryWebsite,
 }: ItemCardViewProps) {
     const t = useTranslations('dashboard.directoryDetail.items');
+    const isFeatured = item.featured === true;
 
     return (
         <div
             className={cn(
-                'p-4 rounded-lg border',
+                'p-4 rounded-lg border-2',
                 'bg-card dark:bg-card-dark',
-                'border-card-border dark:border-card-border-dark',
-                'hover:border-primary/50 transition-colors',
+                'transition-colors',
+                isFeatured
+                    ? 'border-amber-400/30 dark:border-amber-500/30'
+                    : 'border-card-border dark:border-card-border-dark hover:border-primary/50',
             )}
         >
             <div className="flex items-start justify-between mb-2">
-                <h4 className="font-medium text-text dark:text-text-dark line-clamp-1">
-                    {item.name}
-                </h4>
+                <div className="flex items-center gap-2 min-w-0">
+                    {isFeatured && (
+                        <Star className="w-4 h-4 text-amber-500 fill-amber-500 shrink-0" />
+                    )}
+                    <h4 className="font-medium text-text dark:text-text-dark line-clamp-1">
+                        {item.name}
+                    </h4>
+                </div>
                 {canEdit && (
                     <ItemActions
                         item={item}
@@ -189,22 +231,42 @@ const ItemCardGrid = memo(function ItemCardGrid({
             )}
 
             <div className="flex items-center justify-between">
-                {getCategoryName(item.category) && (
-                    <span className="px-2 py-1 text-xs rounded-full bg-primary/10 text-primary">
-                        {getCategoryName(item.category)}
-                    </span>
-                )}
-                {item.source_url && (
-                    <Link
-                        href={item.source_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-primary hover:underline flex items-center gap-1"
-                    >
-                        <ExternalLink className="w-3 h-3" />
-                        {t('source')}
-                    </Link>
-                )}
+                <div className="flex items-center gap-2">
+                    {item.order !== undefined && item.order !== null && (
+                        <span className="px-2 py-1 text-xs font-medium rounded-full bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300">
+                            #{item.order}
+                        </span>
+                    )}
+                    {getCategoryName(item.category) && (
+                        <span className="px-2 py-1 text-xs rounded-full bg-primary/10 text-primary">
+                            {getCategoryName(item.category)}
+                        </span>
+                    )}
+                </div>
+                <div className="flex items-center gap-3">
+                    {directoryWebsite && item.slug && (
+                        <Link
+                            href={`${directoryWebsite}/details/${item.slug}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-text-secondary dark:text-text-secondary-dark hover:text-primary hover:underline flex items-center gap-1"
+                            aria-label="View on directory website"
+                        >
+                            <Eye className="w-4 h-4" />
+                        </Link>
+                    )}
+                    {item.source_url && (
+                        <Link
+                            href={item.source_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-primary hover:underline flex items-center gap-1"
+                        >
+                            <ExternalLink className="w-3 h-3" />
+                            {t('source')}
+                        </Link>
+                    )}
+                </div>
             </div>
         </div>
     );

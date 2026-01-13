@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Menu, MenuButton, MenuItems, MenuItem, Transition } from '@headlessui/react';
+import { Menu, MenuButton, MenuItems, MenuItem } from '@headlessui/react';
 import { cn } from '@/lib/utils/cn';
 
 interface DropdownMenuProps {
@@ -47,41 +47,30 @@ export function DropdownMenuContent({
     side = 'bottom',
     className,
 }: DropdownMenuContentProps) {
-    const alignmentClasses = {
-        start: side === 'bottom' ? 'origin-top-left left-0' : 'origin-bottom-left left-0',
-        center:
-            side === 'bottom'
-                ? 'origin-top left-1/2 -translate-x-1/2'
-                : 'origin-bottom left-1/2 -translate-x-1/2',
-        end: side === 'bottom' ? 'origin-top-right right-0' : 'origin-bottom-right right-0',
-    };
-
-    const spacingClasses = side === 'bottom' ? 'mt-2' : 'mb-2 bottom-full';
+    const anchorSide = side === 'bottom' ? 'bottom' : 'top';
+    const anchorAlign = align === 'center' ? '' : align === 'start' ? ' start' : ' end';
+    const anchorTo = `${anchorSide}${anchorAlign}` as const;
 
     return (
-        <Transition
-            enter="transition ease-out duration-100"
-            enterFrom="transform opacity-0 scale-95"
-            enterTo="transform opacity-100 scale-100"
-            leave="transition ease-in duration-75"
-            leaveFrom="transform opacity-100 scale-100"
-            leaveTo="transform opacity-0 scale-95"
+        <MenuItems
+            transition
+            portal
+            anchor={{ to: anchorTo, gap: 8 }}
+            className={cn(
+                'z-50 min-w-[8rem] overflow-hidden rounded-lg',
+                'bg-surface dark:bg-surface-dark',
+                'border border-border dark:border-border-dark',
+                'shadow-lg',
+                'focus:outline-none',
+                // Transition styles
+                'transition duration-100 ease-out',
+                'data-[closed]:scale-95 data-[closed]:opacity-0',
+                'data-[leave]:duration-75 data-[leave]:ease-in',
+                className,
+            )}
         >
-            <MenuItems
-                className={cn(
-                    'absolute z-50 min-w-[8rem] overflow-hidden rounded-lg',
-                    'bg-surface dark:bg-surface-dark',
-                    'border border-border dark:border-border-dark',
-                    'shadow-lg',
-                    'focus:outline-none',
-                    spacingClasses,
-                    alignmentClasses[align],
-                    className,
-                )}
-            >
-                <div className="p-1">{children}</div>
-            </MenuItems>
-        </Transition>
+            <div className="p-1">{children}</div>
+        </MenuItems>
     );
 }
 
