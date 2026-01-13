@@ -5,7 +5,7 @@ import { ItemData, ItemBadges } from '@/lib/api/types-only';
 import { cn } from '@/lib/utils/cn';
 import { Link } from '@/i18n/navigation';
 import { useTranslations } from 'next-intl';
-import { ExternalLink, Star } from 'lucide-react';
+import { ExternalLink, Star, Eye } from 'lucide-react';
 import { removeItem } from '@/app/actions/dashboard/items';
 import { toast } from 'sonner';
 import { getCategoryName } from '@/lib/utils/items';
@@ -18,6 +18,7 @@ interface ItemCardProps {
     canEdit?: boolean;
     onDelete?: () => void;
     onUpdate?: (item: Partial<ItemData>) => void;
+    directoryWebsite?: string;
 }
 
 export const ItemCard = memo(function ItemCard({
@@ -27,6 +28,7 @@ export const ItemCard = memo(function ItemCard({
     canEdit = false,
     onDelete,
     onUpdate,
+    directoryWebsite,
 }: ItemCardProps) {
     const t = useTranslations('dashboard.directoryDetail.items');
     const [isPending, startTransition] = useTransition();
@@ -60,6 +62,7 @@ export const ItemCard = memo(function ItemCard({
                 canEdit={canEdit}
                 onUpdate={onUpdate}
                 isPending={isPending}
+                directoryWebsite={directoryWebsite}
             />
         );
     }
@@ -72,6 +75,7 @@ export const ItemCard = memo(function ItemCard({
             canEdit={canEdit}
             onUpdate={onUpdate}
             isPending={isPending}
+            directoryWebsite={directoryWebsite}
         />
     );
 });
@@ -83,6 +87,7 @@ interface ItemCardViewProps {
     canEdit?: boolean;
     onUpdate?: (item: Partial<ItemData>) => void;
     directoryId: string;
+    directoryWebsite?: string;
 }
 
 const ItemCardList = memo(function ItemCardList({
@@ -92,6 +97,7 @@ const ItemCardList = memo(function ItemCardList({
     canEdit = false,
     onUpdate,
     directoryId,
+    directoryWebsite,
 }: ItemCardViewProps) {
     const isFeatured = item.featured === true;
 
@@ -138,6 +144,17 @@ const ItemCardList = memo(function ItemCardList({
             </div>
 
             <div className="flex items-center gap-2 shrink-0">
+                {directoryWebsite && item.slug && (
+                    <Link
+                        href={`${directoryWebsite}/details/${item.slug}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs hover:underline flex items-center gap-1 text-text-secondary dark:text-text-secondary-dark hover:text-primary"
+                        aria-label="View on directory website"
+                    >
+                        <Eye className="w-4 h-4" />
+                    </Link>
+                )}
                 {item.source_url && (
                     <Link
                         href={item.source_url}
@@ -169,6 +186,7 @@ const ItemCardGrid = memo(function ItemCardGrid({
     canEdit = false,
     onUpdate,
     directoryId,
+    directoryWebsite,
 }: ItemCardViewProps) {
     const t = useTranslations('dashboard.directoryDetail.items');
     const isFeatured = item.featured === true;
@@ -225,17 +243,30 @@ const ItemCardGrid = memo(function ItemCardGrid({
                         </span>
                     )}
                 </div>
-                {item.source_url && (
-                    <Link
-                        href={item.source_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-primary hover:underline flex items-center gap-1"
-                    >
-                        <ExternalLink className="w-3 h-3" />
-                        {t('source')}
-                    </Link>
-                )}
+                <div className="flex items-center gap-3">
+                    {directoryWebsite && item.slug && (
+                        <Link
+                            href={`${directoryWebsite}/details/${item.slug}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-text-secondary dark:text-text-secondary-dark hover:text-primary hover:underline flex items-center gap-1"
+                            aria-label="View on directory website"
+                        >
+                            <Eye className="w-4 h-4" />
+                        </Link>
+                    )}
+                    {item.source_url && (
+                        <Link
+                            href={item.source_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-primary hover:underline flex items-center gap-1"
+                        >
+                            <ExternalLink className="w-3 h-3" />
+                            {t('source')}
+                        </Link>
+                    )}
+                </div>
             </div>
         </div>
     );
