@@ -46,6 +46,7 @@ export interface SubmitItemDto {
     description: string;
     source_url: string;
     category: string;
+    categories?: string[];
     tags?: string[];
     featured?: boolean;
     order?: number;

@@ -57,9 +57,12 @@ export function CategoriesFields({
         <div className="space-y-6">
             {/* Initial Categories */}
             <div>
-                <label className="block text-sm font-medium text-text dark:text-text-dark mb-2">
+                <label className="block text-sm font-medium text-text dark:text-text-dark mb-1">
                     {t('initialCategories')}
                 </label>
+                <p className="text-xs text-text-muted dark:text-text-muted-dark mb-2">
+                    {t('initialCategoriesDescription')}
+                </p>
                 <div className="flex gap-2 mb-2">
                     <Input
                         type="text"
@@ -105,9 +108,12 @@ export function CategoriesFields({
 
             {/* Priority Categories */}
             <div>
-                <label className="block text-sm font-medium text-text dark:text-text-dark mb-2">
+                <label className="block text-sm font-medium text-text dark:text-text-dark mb-1">
                     {t('priorityCategories')}
                 </label>
+                <p className="text-xs text-text-muted dark:text-text-muted-dark mb-2">
+                    {t('priorityCategoriesDescription')}
+                </p>
                 <div className="flex gap-2 mb-2">
                     <Input
                         type="text"
@@ -153,9 +159,12 @@ export function CategoriesFields({
 
             {/* Target Keywords */}
             <div>
-                <label className="block text-sm font-medium text-text dark:text-text-dark mb-2">
+                <label className="block text-sm font-medium text-text dark:text-text-dark mb-1">
                     {t('targetKeywords')}
                 </label>
+                <p className="text-xs text-text-muted dark:text-text-muted-dark mb-2">
+                    {t('targetKeywordsDescription')}
+                </p>
                 <div className="flex gap-2 mb-2">
                     <Input
                         type="text"

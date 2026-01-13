@@ -33,9 +33,12 @@ export function SourceFields({ sourceUrls, onChange }: SourceFieldsProps) {
 
     return (
         <div>
-            <label className="block text-sm font-medium text-text dark:text-text-dark mb-2">
+            <label className="block text-sm font-medium text-text dark:text-text-dark mb-1">
                 {t('sourceUrls')}
             </label>
+            <p className="text-xs text-text-muted dark:text-text-muted-dark mb-2">
+                {t('sourceUrlsFieldDescription')}
+            </p>
             <div className="flex gap-2 mb-3">
                 <Input
                     type="url"

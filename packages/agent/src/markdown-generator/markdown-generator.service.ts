@@ -125,20 +125,25 @@ export class MarkdownGeneratorService {
                     item.tags = item.tags.map((tag) => this.populate<Tag>(tag, tags));
                 }
 
-                if (Array.isArray(item.category)) {
-                    item.category = item.category.map((category) =>
-                        this.populate<Category>(category, categories),
-                    );
-                } else {
-                    item.category = [this.populate(item.category, categories)];
+                // Normalize category to array of strings
+                const itemCategories: string[] = Array.isArray(item.category)
+                    ? item.category
+                    : [item.category];
+
+                // Ensure each category is in the categories map
+                for (const cat of itemCategories) {
+                    if (!categories.has(cat)) {
+                        categories.set(cat, { id: cat, name: cat });
+                    }
                 }
 
-                for (const category of item.category) {
-                    const group = groups[category.id];
+                // Group item by each of its categories
+                for (const cat of itemCategories) {
+                    const group = groups[cat];
                     if (group) {
                         group.push(item);
                     } else {
-                        groups[category.id] = [item];
+                        groups[cat] = [item];
                     }
                 }
             }
@@ -297,9 +302,9 @@ export class MarkdownGeneratorService {
 
         for (const categoryId of sortedCategoryIds) {
             const categoryDetails = categories.get(categoryId);
-            builder.addSubHeader(categoryDetails.name);
-
             const items = groups[categoryId];
+            builder.addSubHeader(categoryDetails.name, items.length);
+
             items.sort((a, b) => {
                 const aFeatured = !!a.featured;
                 const bFeatured = !!b.featured;

@@ -15,6 +15,7 @@ interface ItemsListProps {
     items: ItemData[];
     directoryId: string;
     canEdit?: boolean;
+    directoryWebsite?: string;
 }
 
 // Estimated heights for virtualization
@@ -51,7 +52,12 @@ function useColumnCount(viewMode: 'grid' | 'list') {
     return columns;
 }
 
-export function ItemsList({ items: initialItems, directoryId, canEdit = false }: ItemsListProps) {
+export function ItemsList({
+    items: initialItems,
+    directoryId,
+    canEdit = false,
+    directoryWebsite,
+}: ItemsListProps) {
     const t = useTranslations('dashboard.directoryDetail.items');
     const [items, setItems] = useState(() => sortItems(initialItems));
     const [searchQuery, setSearchQuery] = useState('');
@@ -182,6 +188,7 @@ export function ItemsList({ items: initialItems, directoryId, canEdit = false }:
                     onItemDelete={handleItemDelete}
                     onItemUpdate={handleItemUpdate}
                     scrollContainerRef={scrollContainerRef}
+                    directoryWebsite={directoryWebsite}
                 />
             )}
         </div>
@@ -200,6 +207,7 @@ interface VirtualizedItemsListProps {
     onItemDelete: (itemSlug: string) => void;
     onItemUpdate: (item: Partial<ItemData> & { slug?: string }) => void;
     scrollContainerRef: React.RefObject<HTMLElement | null>;
+    directoryWebsite?: string;
 }
 
 function VirtualizedItemsList({
@@ -211,6 +219,7 @@ function VirtualizedItemsList({
     onItemDelete,
     onItemUpdate,
     scrollContainerRef,
+    directoryWebsite,
 }: VirtualizedItemsListProps) {
     const listRef = useRef<HTMLDivElement>(null);
     const [scrollMargin, setScrollMargin] = useState(0);
@@ -284,6 +293,7 @@ function VirtualizedItemsList({
                                 onUpdate={(updated) =>
                                     onItemUpdate({ ...updated, slug: item.slug })
                                 }
+                                directoryWebsite={directoryWebsite}
                             />
                         ))}
                     </div>

@@ -692,6 +692,15 @@
                     "description": "Description",
                     "descriptionPlaceholder": "Enter a brief description of the item",
                     "category": "Category",
+                    "categories": "Categories",
+                    "existingCategories": "Select from existing",
+                    "addNewCategory": "Or add new category",
+                    "categoryPlaceholder": "Search or create category...",
+                    "addMoreCategories": "Add more...",
+                    "createCategory": "Create",
+                    "noMatchingCategories": "No matching categories",
+                    "noCategories": "No categories yet. Type to create one.",
+                    "categoriesRequired": "Select at least one category",
                     "tags": "Tags",
                     "tagPlaceholder": "Add a tag and press Enter",
                     "slug": "Slug (Optional)",
@@ -803,7 +812,19 @@
                 "recreateConfirmDescription": "Recreate will delete existing items and regenerate them from scratch. This action cannot be undone.",
                 "confirmRecreate": "Yes, recreate",
                 "recreateInlineTitle": "Recreate will remove existing items",
-                "recreateInlineDescription": "This mode deletes current items and rebuilds them from scratch. Proceed only if you want to replace everything."
+                "recreateInlineDescription": "This mode deletes current items and rebuilds them from scratch. Proceed only if you want to replace everything.",
+                "companyNameDescription": "Used to personalize generated content with your brand identity.",
+                "companyWebsiteDescription": "AI will analyze your website to better understand your brand context.",
+                "initialCategoriesDescription": "Seed categories to organize items. The AI will use these as a starting point.",
+                "priorityCategoriesDescription": "Categories that will appear first in the generated output. Useful for highlighting important sections.",
+                "targetKeywordsDescription": "Keywords to guide the AI search and content generation. More specific keywords yield better results.",
+                "sourceUrlsFieldDescription": "Specific URLs to extract content from. If empty, the generator will search the web automatically.",
+                "generationMethodDescription": "Choose whether to update existing items or recreate everything from scratch.",
+                "websiteRepositoryCreationMethodDescription": "How the website repository is created. Template is recommended for most cases.",
+                "maxSearchQueriesDescription": "Number of search queries the AI will generate to find relevant content (1-50).",
+                "resultsPerQueryDescription": "Maximum results to retrieve per search query (1-20).",
+                "maxPagesToProcessDescription": "Maximum web pages to process for content extraction (1-100).",
+                "relevanceThresholdDescription": "Minimum relevance score (0-1) for content to be included. Higher values mean stricter filtering."
             },
             "progress": {
                 "title": "Generation in Progress",
@@ -877,7 +898,15 @@
                 "saveChanges": "Save Changes",
                 "updateReadme": "Update README",
                 "updateSuccess": "Settings updated successfully",
-                "updateFailed": "Failed to update settings"
+                "updateFailed": "Failed to update settings",
+                "visibilityUpdateFailed": "Failed to update repository visibility",
+                "visibilityWarningTitle": "Make Repository Private?",
+                "visibilityWarningDescription": "You are about to make {name} private.",
+                "visibilityWarningPermanent": "This action has permanent consequences:",
+                "visibilityWarningStars": "All stars will be permanently lost",
+                "visibilityWarningWatchers": "All watchers will be removed",
+                "visibilityWarningNotRestored": "Stars and watchers will NOT be restored if you make the repository public again",
+                "visibilityConfirmPrivate": "Yes, Make Private"
             },
             "deploy": {
                 "noTokenAlert": {
