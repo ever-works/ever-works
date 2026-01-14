@@ -88,6 +88,7 @@ export interface ItemResponse {
     status: 'success' | 'error' | 'pending';
     slug: string;
     item_name: string;
+    item_slug?: string;
     message: string;
     pr_number?: number;
     pr_url?: string;
@@ -95,6 +96,8 @@ export interface ItemResponse {
     pr_body?: string;
     pr_branch_name?: string;
     auto_merged?: boolean;
+    /** The created/updated item data (available on success) */
+    item?: ItemData;
 }
 
 export interface ExtractItemDetailsResponse {

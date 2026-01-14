@@ -153,8 +153,10 @@ export class ItemSubmissionService {
                     status: 'success',
                     slug: directory.slug,
                     item_name: itemWithMarkdown.name,
+                    item_slug: itemWithMarkdown.slug,
                     message: `Item "${itemWithMarkdown.name}" has been successfully added and published (committed directly to ${defaultBranch}).`,
                     auto_merged: true, // Indicates direct commit (no PR created)
+                    item: itemWithMarkdown, // Return the created item for client-side list update
                 };
             }
 
@@ -206,6 +208,7 @@ export class ItemSubmissionService {
                 status: 'success',
                 slug: directory.slug,
                 item_name: itemWithMarkdown.name,
+                item_slug: itemWithMarkdown.slug,
                 message: `Item "${itemWithMarkdown.name}" has been submitted for review. PR #${pr.number} created.`,
                 pr_number: pr.number,
                 pr_url: pr.html_url,
@@ -213,6 +216,7 @@ export class ItemSubmissionService {
                 pr_body: prBody,
                 pr_branch_name: branchName!,
                 auto_merged: false,
+                item: itemWithMarkdown, // Return the created item for client-side list update
             };
         } catch (error) {
             this.logger.error('Failed to submit item', error);

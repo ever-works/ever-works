@@ -8,13 +8,17 @@ import { toast } from 'sonner';
 import { addItem } from '@/app/actions/dashboard/items';
 import { Loader2, Plus } from 'lucide-react';
 import { AddItemForm, ItemFormData } from './AddItemForm';
+import { ItemData } from '@/lib/api/types-only';
 
 interface AddItemModalProps {
     directoryId: string;
     categories: string[];
     isOpen: boolean;
     onClose: () => void;
+    /** @deprecated Use onItemAdded instead for immediate list updates */
     onSuccess?: () => void;
+    /** Callback when an item is successfully added, with the item data for immediate list update */
+    onItemAdded?: (item: ItemData) => void;
 }
 
 export const AddItemModal = memo(function AddItemModal({
@@ -23,6 +27,7 @@ export const AddItemModal = memo(function AddItemModal({
     isOpen,
     onClose,
     onSuccess,
+    onItemAdded,
 }: AddItemModalProps) {
     const t = useTranslations('dashboard.directoryDetail.items.addModal');
     const [isPending, startTransition] = useTransition();
@@ -82,6 +87,13 @@ export const AddItemModal = memo(function AddItemModal({
 
                     if (result.status === 'success') {
                         toast.success(result.message || t('success'));
+
+                        // If we have the item data, add it to the list immediately
+                        if (result.item && onItemAdded) {
+                            onItemAdded(result.item);
+                        }
+
+                        // Call legacy onSuccess for backward compatibility
                         onSuccess?.();
                         onClose();
 
@@ -107,7 +119,7 @@ export const AddItemModal = memo(function AddItemModal({
                 }
             });
         },
-        [formData, directoryId, categories, onSuccess, onClose, t, updateWithPR],
+        [formData, directoryId, categories, onSuccess, onClose, onItemAdded, t, updateWithPR],
     );
 
     return (

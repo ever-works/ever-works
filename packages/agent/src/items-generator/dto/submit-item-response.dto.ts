@@ -1,3 +1,5 @@
+import { ItemData } from './item-data.dto';
+
 export interface SubmitItemResponseDto {
     status: 'success' | 'error' | 'pending';
     slug: string;
@@ -10,4 +12,7 @@ export interface SubmitItemResponseDto {
     pr_body?: string;
     pr_branch_name?: string;
     auto_merged?: boolean;
+    /** The created item data (available on success) for immediate client-side list update */
+    item?: ItemData;
+    error_details?: string;
 }

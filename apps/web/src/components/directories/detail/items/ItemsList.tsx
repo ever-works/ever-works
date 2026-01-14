@@ -16,6 +16,8 @@ interface ItemsListProps {
     directoryId: string;
     canEdit?: boolean;
     directoryWebsite?: string;
+    /** Ref to imperatively add a new item to the list */
+    addItemRef?: React.RefObject<((item: ItemData) => void) | null>;
 }
 
 // Estimated heights for virtualization
@@ -57,6 +59,7 @@ export function ItemsList({
     directoryId,
     canEdit = false,
     directoryWebsite,
+    addItemRef,
 }: ItemsListProps) {
     const t = useTranslations('dashboard.directoryDetail.items');
     const [items, setItems] = useState(() => sortItems(initialItems));
@@ -70,6 +73,25 @@ export function ItemsList({
     useEffect(() => {
         scrollContainerRef.current = document.getElementById('main-content');
     }, []);
+
+    // Expose addItem function via ref for parent components
+    const handleAddItem = useCallback((newItem: ItemData) => {
+        setItems((prev) => {
+            // Check for duplicates by slug
+            if (newItem.slug && prev.some((item) => item.slug === newItem.slug)) {
+                return prev;
+            }
+            return sortItems([newItem, ...prev]);
+        });
+    }, []);
+
+    // Assign the addItem handler to the ref
+    useEffect(() => {
+        if (addItemRef && 'current' in addItemRef) {
+            (addItemRef as React.RefObject<((item: ItemData) => void) | null>).current =
+                handleAddItem;
+        }
+    }, [addItemRef, handleAddItem]);
 
     // Memoize categories to prevent recalculation
     const categories = useMemo(() => {
