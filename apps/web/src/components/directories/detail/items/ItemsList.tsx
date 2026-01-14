@@ -87,9 +87,8 @@ export function ItemsList({
 
     // Assign the addItem handler to the ref
     useEffect(() => {
-        if (addItemRef && 'current' in addItemRef) {
-            (addItemRef as React.RefObject<((item: ItemData) => void) | null>).current =
-                handleAddItem;
+        if (addItemRef?.current) {
+            addItemRef.current = handleAddItem;
         }
     }, [addItemRef, handleAddItem]);
 

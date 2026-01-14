@@ -155,8 +155,8 @@ export class ItemSubmissionService {
                     item_name: itemWithMarkdown.name,
                     item_slug: itemWithMarkdown.slug,
                     message: `Item "${itemWithMarkdown.name}" has been successfully added and published (committed directly to ${defaultBranch}).`,
-                    auto_merged: true, // Indicates direct commit (no PR created)
-                    item: itemWithMarkdown, // Return the created item for client-side list update
+                    direct_commit: true,
+                    item: itemWithMarkdown,
                 };
             }
 
