@@ -71,4 +71,8 @@ export class SubmitItemDto {
     @IsArray()
     @IsUrl({ protocols: ['http', 'https'], require_tld: true }, { each: true })
     images?: string[];
+
+    @IsOptional()
+    @IsBoolean()
+    create_pull_request?: boolean;
 }

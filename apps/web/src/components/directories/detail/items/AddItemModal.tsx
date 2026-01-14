@@ -66,13 +66,16 @@ export const AddItemModal = memo(function AddItemModal({
                         categories: formData.categories,
                         tags: formData.tags,
                         featured: formData.featured,
-                        pay_and_publish_now: formData.pay_and_publish_now,
+                        // If user wants to create PR, disable pay_and_publish_now to avoid auto-merge
+                        pay_and_publish_now: updateWithPR ? false : formData.pay_and_publish_now,
                         slug:
                             formData.slug ||
                             formData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
                         brand: formData.brand || undefined,
                         brand_logo_url: formData.brand_logo_url || undefined,
                         images: formData.images.length > 0 ? formData.images : undefined,
+                        // Pass the create_pull_request flag to the backend
+                        create_pull_request: updateWithPR,
                     };
 
                     const result = await addItem(directoryId, submitData);
@@ -104,7 +107,7 @@ export const AddItemModal = memo(function AddItemModal({
                 }
             });
         },
-        [formData, directoryId, categories, onSuccess, onClose, t],
+        [formData, directoryId, categories, onSuccess, onClose, t, updateWithPR],
     );
 
     return (

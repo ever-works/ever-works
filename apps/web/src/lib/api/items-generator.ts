@@ -55,6 +55,7 @@ export interface SubmitItemDto {
     brand?: string;
     brand_logo_url?: string;
     images?: string[];
+    create_pull_request?: boolean;
 }
 
 export interface RemoveItemDto {

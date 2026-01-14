@@ -59,15 +59,35 @@ export class ItemSubmissionService {
                 return null;
             });
 
-            const shouldAutoMerge =
-                submitItemDto.pay_and_publish_now || (config && config.autoapproval === true);
+            // Determine if we should create a PR or commit directly to main
+            // If create_pull_request is explicitly true, always create PR (no auto-merge)
+            // If create_pull_request is false/undefined and (pay_and_publish_now OR autoapproval), commit directly
+            const forceCreatePR = submitItemDto.create_pull_request === true;
+            const shouldDirectCommit =
+                !forceCreatePR &&
+                (submitItemDto.pay_and_publish_now || (config && config.autoapproval === true));
+            const shouldCreatePR = forceCreatePR || !shouldDirectCommit;
+
+            this.logger.log(
+                `Item submission mode: ${shouldDirectCommit ? 'direct commit to main' : 'create PR'}${forceCreatePR ? ' (forced by user)' : ''}`,
+            );
 
             // Get main branch
             const defaultBranch = await this.githubService.getMainBranch(dest);
 
-            // Create new branch for the item submission
-            const branchName = await this.githubService.createAndSwitchToRandomBranch(dest);
-            this.logger.log(`Created and switched to new branch: ${branchName}`);
+            let branchName: string | null = null;
+            if (shouldCreatePR) {
+                // Create new branch for the item submission
+                branchName = await this.githubService.createAndSwitchToRandomBranch(dest);
+                this.logger.log(`Created and switched to new branch: ${branchName}`);
+            } else {
+                // Switch to main branch for direct commit
+                await this.githubService.switchToMainBranch(dest).catch((err) => {
+                    this.logger.error('Failed to switch to main branch', err);
+                    throw new Error('Failed to switch to main branch for direct commit');
+                });
+                this.logger.log(`Switched to main branch: ${defaultBranch}`);
+            }
 
             // Prepare item data
             // Handle both category (string) and categories (array) for backward compatibility
@@ -124,6 +144,20 @@ export class ItemSubmissionService {
             // Push changes
             await this.githubService.push(dest, token);
 
+            // If direct commit, return success without PR
+            if (!shouldCreatePR) {
+                this.logger.log(
+                    `Item "${itemWithMarkdown.name}" committed directly to main branch`,
+                );
+                return {
+                    status: 'success',
+                    slug: directory.slug,
+                    item_name: itemWithMarkdown.name,
+                    message: `Item "${itemWithMarkdown.name}" has been successfully added and published (committed directly to ${defaultBranch}).`,
+                    auto_merged: true, // Indicates direct commit (no PR created)
+                };
+            }
+
             // Create PR
             const prTitle = `Add ${itemWithMarkdown.name} - ${format(new Date(), 'MM/dd/yyyy HH:mm')}`;
 
@@ -158,7 +192,7 @@ export class ItemSubmissionService {
                 {
                     owner: directory.getRepoOwner(),
                     repo: repo,
-                    head: branchName,
+                    head: branchName!,
                     base: defaultBranch,
                     title: prTitle,
                     body: prBody,
@@ -166,46 +200,19 @@ export class ItemSubmissionService {
                 token,
             );
 
-            let autoMerged = false;
-
-            // Auto-merge if conditions are met
-            if (shouldAutoMerge && pr.number) {
-                try {
-                    await this.githubService.mergePR(
-                        {
-                            owner: directory.getRepoOwner(),
-                            repo: repo,
-                            pull_number: pr.number,
-                            commit_title: `Merge: ${prTitle}`,
-                            merge_method: 'squash',
-                        },
-                        token,
-                    );
-                    autoMerged = true;
-                    this.logger.log(
-                        `Auto-merged PR #${pr.number} for item ${itemWithMarkdown.name}`,
-                    );
-                } catch (mergeError) {
-                    this.logger.warn(
-                        `Failed to auto-merge PR #${pr.number}: ${mergeError.message}`,
-                    );
-                    // Continue without auto-merge - PR is still created
-                }
-            }
+            this.logger.log(`PR #${pr.number} created for item "${itemWithMarkdown.name}"`);
 
             return {
                 status: 'success',
                 slug: directory.slug,
                 item_name: itemWithMarkdown.name,
-                message: autoMerged
-                    ? `Item "${itemWithMarkdown.name}" has been successfully added and published.`
-                    : `Item "${itemWithMarkdown.name}" has been submitted for review. PR #${pr.number} created.`,
+                message: `Item "${itemWithMarkdown.name}" has been submitted for review. PR #${pr.number} created.`,
                 pr_number: pr.number,
                 pr_url: pr.html_url,
                 pr_title: prTitle,
                 pr_body: prBody,
-                pr_branch_name: branchName,
-                auto_merged: autoMerged,
+                pr_branch_name: branchName!,
+                auto_merged: false,
             };
         } catch (error) {
             this.logger.error('Failed to submit item', error);
