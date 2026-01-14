@@ -246,7 +246,7 @@ const ItemCardGrid = memo(function ItemCardGrid({
                 <div className="flex items-center gap-3">
                     {directoryWebsite && item.slug && (
                         <Link
-                            href={`${directoryWebsite}/details/${item.slug}`}
+                            href={`${directoryWebsite}/items/${item.slug}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-xs text-text-secondary dark:text-text-secondary-dark hover:text-primary hover:underline flex items-center gap-1"

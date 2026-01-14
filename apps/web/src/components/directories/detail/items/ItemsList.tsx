@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { useTranslations } from 'next-intl';
 import { Grid as GridIcon, List as ListIcon } from 'lucide-react';
 import { ItemCard } from './ItemCard';
-import { getCategoryName } from '@/lib/utils/items';
+import { getCategoryName, getCategoryNames } from '@/lib/utils/items';
 
 interface ItemsListProps {
     items: ItemData[];
@@ -89,7 +89,7 @@ export function ItemsList({
                 item.description?.toLowerCase().includes(query);
 
             const matchesCategory =
-                !selectedCategory || getCategoryName(item.category) === selectedCategory;
+                !selectedCategory || getCategoryNames(item.category).includes(selectedCategory);
 
             return matchesSearch && matchesCategory;
         });
