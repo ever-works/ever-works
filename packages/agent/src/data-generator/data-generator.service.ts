@@ -328,6 +328,7 @@ export class DataGeneratorService {
             promises.push(
                 data.mergeConfig({
                     ...this.withCompanyConfig(createItemsGeneratorDto.company),
+                    version: await data.getVersion(),
                     metadata,
                 }),
             );
@@ -849,6 +850,7 @@ export class DataGeneratorService {
 
             const configData = {
                 ...importedData.config,
+                version: await data.getVersion(),
                 metadata: {
                     ...existingMetadata,
                     initial_prompt: initialPrompt,

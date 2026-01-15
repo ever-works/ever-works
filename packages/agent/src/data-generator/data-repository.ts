@@ -3,13 +3,8 @@ import * as fs from 'node:fs/promises';
 import * as yaml from 'yaml';
 import deepmerge from 'deepmerge';
 import { format } from 'date-fns';
-import {
-    Category,
-    CreateItemsGeneratorDto,
-    GenerationMethod,
-    ItemData,
-    Tag,
-} from '../items-generator/dto';
+import semver from 'semver';
+import { Category, CreateItemsGeneratorDto, ItemData, Tag } from '../items-generator/dto';
 
 export type PRUpdate = {
     branch: string;
@@ -62,6 +57,7 @@ export interface IDataConfig {
     company_name?: string;
     company_website?: string;
     content_table?: boolean;
+    version?: string;
     item_name?: string;
     items_name?: string;
     copyright_year?: number;
@@ -355,7 +351,27 @@ export class DataRepository {
         const str = yaml.stringify(config);
         await fs.writeFile(this.configPath, str, 'utf-8');
     }
+    async getVersion(config?: IDataConfig) {
+        const theConfig = config ?? (await this.getConfig());
+        const versionStr = theConfig.version || '0.1.0';
 
+        const version = semver.parse(versionStr);
+        if (!version || !theConfig.version) {
+            return versionStr;
+        }
+
+        version.inc('patch');
+
+        if (version.patch >= 100) {
+            version.inc('minor');
+        }
+
+        if (version.minor >= 10) {
+            version.inc('major');
+        }
+
+        return version.format();
+    }
     /**
      * Ensure a config.yml exists; if missing, create it with defaults merged with optional overrides.
      */
