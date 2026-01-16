@@ -10,7 +10,9 @@ export interface BatchDeployItem {
 
 export interface BatchDeployOptions {
     directories: BatchDeployItem[];
-    vercelToken: string;
+    /** Fallback Vercel token if directory owner's token is not available */
+    vercelToken?: string;
+    /** Fallback GitHub token if directory owner's token is not available */
     ghToken?: string;
     defaultTeamScope?: string;
 }
@@ -22,6 +24,10 @@ export interface BatchDeployItemResult {
     message: string;
     owner?: string;
     repository?: string;
+    /** Resolved Vercel token used for this deployment (for verification) */
+    resolvedVercelToken?: string;
+    /** Team scope used for this deployment (for verification) */
+    resolvedTeamScope?: string;
 }
 
 export interface BatchDeployResult {
@@ -111,11 +117,13 @@ export class BatchDeployService {
 
     /**
      * Deploy a single directory (includes branch sync via VercelService)
+     * Resolves tokens based on directory ownership - for shared directories,
+     * uses the owner's tokens since they set up the infrastructure.
      */
     private async deploySingleDirectory(
         directoryId: string,
         tokens: {
-            vercelToken: string;
+            vercelToken?: string;
             ghToken?: string;
             vercelTeamScope?: string;
         },
@@ -135,6 +143,31 @@ export class BatchDeployService {
 
             this.logger.log(`Deploying directory: ${directory.slug}`);
 
+            // Determine if user is the directory creator
+            const directoryOwner = directory.user;
+            const isCreator = directoryOwner?.id === user.id;
+
+            // For shared directories, use the directory owner's tokens
+            // The owner set up the infrastructure, collaborators just trigger deployments
+            const resolvedGhToken =
+                tokens.ghToken || (isCreator ? user.getGitToken() : directoryOwner?.getGitToken());
+
+            const resolvedVercelToken =
+                tokens.vercelToken ||
+                (isCreator ? user.vercelToken : directoryOwner?.vercelToken) ||
+                user.vercelToken;
+
+            if (!resolvedVercelToken) {
+                return {
+                    directoryId,
+                    slug: directory.slug,
+                    status: 'error',
+                    message: isCreator
+                        ? 'Vercel token is required. Please configure it in your settings.'
+                        : 'The directory owner has not configured a Vercel token for deployment.',
+                };
+            }
+
             // VercelService.deploy already handles branch sync
             const deploymentInitiated = await this.vercelService.deploy(
                 {
@@ -143,8 +176,8 @@ export class BatchDeployService {
                     provider: 'vercel',
                     data: {
                         vercelTeamScope: tokens.vercelTeamScope,
-                        vercelToken: tokens.vercelToken,
-                        ghToken: tokens.ghToken || user.getGitToken(),
+                        vercelToken: resolvedVercelToken,
+                        ghToken: resolvedGhToken,
                     },
                 },
                 directory,
@@ -160,6 +193,9 @@ export class BatchDeployService {
                     : 'Failed to initiate deployment',
                 owner: directory.getRepoOwner(),
                 repository: `${directory.getRepoOwner()}/${directory.getWebsiteRepo()}`,
+                // Include resolved tokens for verification (only on success)
+                resolvedVercelToken: deploymentInitiated ? resolvedVercelToken : undefined,
+                resolvedTeamScope: deploymentInitiated ? tokens.vercelTeamScope : undefined,
             };
         } catch (error) {
             this.logger.error(`Failed to deploy directory ${directoryId}:`, error.message);

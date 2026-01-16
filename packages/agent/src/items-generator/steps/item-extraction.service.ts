@@ -61,7 +61,7 @@ export class ItemExtractionService implements IPipelineStep {
     private textSplitter: RecursiveCharacterTextSplitter;
 
     // Constants for content chunking
-    private readonly MAX_CHUNK_SIZE = 3000; // Characters per chunk
+    private readonly MAX_CHUNK_SIZE = 6000; // Characters per chunk
     private readonly CHUNK_OVERLAP = 200; // Overlap between chunks
 
     public readonly name = ItemsGeneratorStep.ITEMS_EXTRACTION;

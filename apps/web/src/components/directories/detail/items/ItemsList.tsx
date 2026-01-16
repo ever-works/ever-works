@@ -9,13 +9,15 @@ import { Button } from '@/components/ui/button';
 import { useTranslations } from 'next-intl';
 import { Grid as GridIcon, List as ListIcon } from 'lucide-react';
 import { ItemCard } from './ItemCard';
-import { getCategoryName } from '@/lib/utils/items';
+import { getCategoryName, getCategoryNames } from '@/lib/utils/items';
 
 interface ItemsListProps {
     items: ItemData[];
     directoryId: string;
     canEdit?: boolean;
     directoryWebsite?: string;
+    /** Ref to imperatively add a new item to the list */
+    addItemRef?: React.RefObject<((item: ItemData) => void) | null>;
 }
 
 // Estimated heights for virtualization
@@ -57,6 +59,7 @@ export function ItemsList({
     directoryId,
     canEdit = false,
     directoryWebsite,
+    addItemRef,
 }: ItemsListProps) {
     const t = useTranslations('dashboard.directoryDetail.items');
     const [items, setItems] = useState(() => sortItems(initialItems));
@@ -70,6 +73,24 @@ export function ItemsList({
     useEffect(() => {
         scrollContainerRef.current = document.getElementById('main-content');
     }, []);
+
+    // Expose addItem function via ref for parent components
+    const handleAddItem = useCallback((newItem: ItemData) => {
+        setItems((prev) => {
+            // Check for duplicates by slug
+            if (newItem.slug && prev.some((item) => item.slug === newItem.slug)) {
+                return prev;
+            }
+            return sortItems([newItem, ...prev]);
+        });
+    }, []);
+
+    // Assign the addItem handler to the ref
+    useEffect(() => {
+        if (addItemRef?.current) {
+            addItemRef.current = handleAddItem;
+        }
+    }, [addItemRef, handleAddItem]);
 
     // Memoize categories to prevent recalculation
     const categories = useMemo(() => {
@@ -89,7 +110,7 @@ export function ItemsList({
                 item.description?.toLowerCase().includes(query);
 
             const matchesCategory =
-                !selectedCategory || getCategoryName(item.category) === selectedCategory;
+                !selectedCategory || getCategoryNames(item.category).includes(selectedCategory);
 
             return matchesSearch && matchesCategory;
         });

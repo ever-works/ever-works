@@ -71,15 +71,30 @@ export abstract class GitProvider {
 
         await fs.promises.mkdir(dir, { recursive: true });
 
-        await git.clone({
-            onAuth: () => auth,
-            fs,
-            http,
-            dir,
-            url,
-            ref: branch,
-            singleBranch: true,
-        });
+        try {
+            await git.clone({
+                onAuth: () => auth,
+                fs,
+                http,
+                dir,
+                url,
+                ref: branch,
+                singleBranch: true,
+            });
+        } catch (error: any) {
+            // Handle empty repository (no commits yet) - initialize locally instead
+            if (
+                error?.code === 'NotFoundError' ||
+                error?.message?.includes('Could not find') ||
+                error?.message?.includes('empty')
+            ) {
+                this.logger?.log(`Remote repository is empty, initializing local repo at ${dir}`);
+                await git.init({ fs, dir, defaultBranch: branch || 'main' });
+                await git.addRemote({ fs, dir, remote: 'origin', url });
+            } else {
+                throw error;
+            }
+        }
 
         return dir;
     }

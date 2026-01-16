@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { ItemData, Category, Tag } from '@/lib/api/types-only';
 import { ItemsList } from './ItemsList';
 import { AddItemModal } from './AddItemModal';
@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
 import { Plus, Package, FolderTree, Tags as TagsIcon } from 'lucide-react';
-import { useRouter } from '@/i18n/navigation';
 import { getCategoryName } from '@/lib/utils/items';
 import { useDirectoryDetail, useDirectoryPermissions } from '../DirectoryDetailContext';
 import { CategoriesTab } from './CategoriesTab';
@@ -30,11 +29,13 @@ export function ItemsPageClient({
     tags: initialTags = [],
 }: ItemsPageClientProps) {
     const t = useTranslations('dashboard.directoryDetail.items');
-    const router = useRouter();
     const permissions = useDirectoryPermissions();
     const { directory } = useDirectoryDetail();
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [activeTab, setActiveTab] = useState<TabType>('items');
+
+    // Ref to imperatively add items to the list
+    const addItemRef = useRef<((item: ItemData) => void) | null>(null);
 
     // Get unique categories from existing items for the Add Item modal
     const categoryNames = Array.from(
@@ -48,10 +49,12 @@ export function ItemsPageClient({
     // If no categories exist, provide some defaults
     const finalCategories = categoryNames.length > 0 ? categoryNames : [];
 
-    const handleAddSuccess = () => {
-        // Refresh the page to show new item
-        router.refresh();
-    };
+    // Callback to add item to the list immediately
+    const handleItemAdded = useCallback((newItem: ItemData) => {
+        if (addItemRef.current) {
+            addItemRef.current(newItem);
+        }
+    }, []);
 
     const tabs = [
         { id: 'items' as const, label: t('tabs.browseItems'), icon: Package },
@@ -115,6 +118,7 @@ export function ItemsPageClient({
                     directoryId={directoryId}
                     canEdit={permissions.canEdit}
                     directoryWebsite={directory.website}
+                    addItemRef={addItemRef}
                 />
             )}
 
@@ -142,7 +146,7 @@ export function ItemsPageClient({
                     categories={finalCategories}
                     isOpen={isAddModalOpen}
                     onClose={() => setIsAddModalOpen(false)}
-                    onSuccess={handleAddSuccess}
+                    onItemAdded={handleItemAdded}
                 />
             )}
         </>
