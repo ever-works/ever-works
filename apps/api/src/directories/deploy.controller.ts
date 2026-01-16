@@ -201,24 +201,20 @@ export class DeployController {
     ): Promise<BatchDeployResponseDto> {
         const user = await this.authService.getUser(auth.userId);
 
-        // Use user's tokens if not provided
+        // Tokens from request are optional fallbacks - per-directory token resolution
+        // will use directory owner's tokens for shared directories
         const vercelToken = batchDeployDto.VERCEL_TOKEN || user.vercelToken;
         const ghToken = batchDeployDto.GITHUB_TOKEN || user.getGitToken();
 
-        if (!vercelToken) {
-            throw new BadRequestException({
-                status: 'error',
-                message: 'Vercel token is required. Please configure it in your settings.',
-            });
-        }
-
-        // Validate Vercel token
-        const valid = await this.vercelService.validateToken(vercelToken);
-        if (!valid) {
-            throw new BadRequestException({
-                status: 'error',
-                message: 'Invalid Vercel token',
-            });
+        // Validate the fallback Vercel token if provided
+        if (vercelToken) {
+            const valid = await this.vercelService.validateToken(vercelToken);
+            if (!valid) {
+                throw new BadRequestException({
+                    status: 'error',
+                    message: 'Invalid Vercel token',
+                });
+            }
         }
 
         // Validate ownership for all directories before starting
@@ -226,7 +222,8 @@ export class DeployController {
             await this.ownershipService.ensureCanEdit(item.directoryId, user.id);
         }
 
-        // Execute batch deployment
+        // Execute batch deployment - token resolution happens per-directory
+        // For shared directories, the owner's tokens will be used
         const result = await this.batchDeployService.deployBatch(
             {
                 directories: batchDeployDto.directories,
@@ -236,6 +233,26 @@ export class DeployController {
             },
             user,
         );
+
+        // Start verification for successful deployments
+        for (const deployResult of result.results) {
+            if (
+                deployResult.status === 'pending' &&
+                deployResult.resolvedVercelToken &&
+                deployResult.directoryId
+            ) {
+                // Get the directory entity for verification
+                const { directory } = await this.ownershipService.ensureCanEdit(
+                    deployResult.directoryId,
+                    user.id,
+                );
+                this.vercelDeploymentVerifierService.startVerification(
+                    directory,
+                    deployResult.resolvedVercelToken,
+                    deployResult.resolvedTeamScope,
+                );
+            }
+        }
 
         // Determine overall status
         let status: 'success' | 'partial' | 'error';
@@ -247,13 +264,18 @@ export class DeployController {
             status = 'error';
         }
 
+        // Strip sensitive token info from results before returning
+        const sanitizedResults = result.results.map(
+            ({ resolvedVercelToken, resolvedTeamScope, ...rest }) => rest,
+        );
+
         return {
             status,
             message: `Batch deployment: ${result.successfullyStarted} started, ${result.failed} failed`,
             totalRequested: result.totalRequested,
             successfullyStarted: result.successfullyStarted,
             failed: result.failed,
-            results: result.results,
+            results: sanitizedResults,
         };
     }
 }

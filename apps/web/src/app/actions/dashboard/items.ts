@@ -28,12 +28,17 @@ export async function addItem(directoryId: string, data: SubmitItemDto) {
             status: response.status,
             message:
                 response.message || (response.status === 'success' ? t('success') : t('failed')),
-            item: response,
+            // Return the full item data for immediate list update
+            item: response.item,
+            item_slug: response.item_slug,
+            auto_merged: response.auto_merged,
+            pr_url: response.pr_url,
+            pr_number: response.pr_number,
         };
     } catch (error) {
         console.error('Add item error:', error);
         return {
-            status: 'error',
+            status: 'error' as const,
             message: error instanceof Error ? error.message : t('error'),
         };
     }
