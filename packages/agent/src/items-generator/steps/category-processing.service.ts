@@ -8,6 +8,7 @@ import { itemDataWithCategoriesAndTagsSchema } from '../schemas/item-extraction.
 import { IPipelineStep, GenerationContext } from '../interfaces/pipeline.interface';
 import { ItemsGeneratorStep } from '../constants/steps';
 import { accumulateMetrics, MetricsAccumulator } from '../utils/metrics.util';
+import { appendCustomPrompt } from '../utils/prompt.util';
 
 // Base prompt for categorization
 const CATEGORY_PROMPT =
@@ -111,6 +112,7 @@ type CategoryProcessingParams = {
     existingItems: ItemData[];
     existingBrands?: Brand[];
     metrics?: MetricsAccumulator;
+    customPrompt?: string | null;
 };
 
 @Injectable()
@@ -131,6 +133,7 @@ export class CategoryProcessingService implements IPipelineStep {
             allInitialCategories,
             allPriorityCategories,
             metrics,
+            advancedPrompts,
         } = context;
 
         this.logger.log(`[${directory.slug}] Category and Tag Generation - Starting`);
@@ -151,6 +154,7 @@ export class CategoryProcessingService implements IPipelineStep {
             existingItems: existing.existingItems,
             existingBrands: existing.existingBrands,
             metrics,
+            customPrompt: advancedPrompts?.categorization,
         });
 
         this.logger.log(
@@ -183,6 +187,7 @@ export class CategoryProcessingService implements IPipelineStep {
         existingItems,
         existingBrands = [],
         metrics,
+        customPrompt,
     }: CategoryProcessingParams) {
         const { prompt, priority_categories = [] } = createItemsGeneratorDto;
 
@@ -232,6 +237,7 @@ export class CategoryProcessingService implements IPipelineStep {
                 existingTags: existingTagsSet,
                 initialCategoryMetrics,
                 metrics,
+                customPrompt,
             });
 
             this.logger.log(
@@ -290,6 +296,7 @@ export class CategoryProcessingService implements IPipelineStep {
         existingTags,
         initialCategoryMetrics,
         metrics,
+        customPrompt,
     }: {
         prompt: string;
         items: Partial<ItemData>[];
@@ -297,6 +304,7 @@ export class CategoryProcessingService implements IPipelineStep {
         existingTags: Set<string>;
         initialCategoryMetrics: Record<string, number>;
         metrics?: MetricsAccumulator;
+        customPrompt?: string | null;
     }): Promise<ItemData[]> {
         if (!items || items.length === 0) return [];
 
@@ -310,6 +318,7 @@ export class CategoryProcessingService implements IPipelineStep {
                     existingTags,
                     initialCategoryMetrics,
                     metrics,
+                    customPrompt,
                 });
             }
 
@@ -320,8 +329,12 @@ export class CategoryProcessingService implements IPipelineStep {
             // Use enhanced prompt if we have existing categories/tags
             const hasContext = existingCategories.size > 0 || existingTags.size > 0;
 
+            // Apply custom prompt to whichever base prompt we use
+            const finalEnhancedPrompt = appendCustomPrompt(ENHANCED_CATEGORY_PROMPT, customPrompt);
+            const finalBasePrompt = appendCustomPrompt(CATEGORY_PROMPT, customPrompt);
+
             const { result, usage, cost } = hasContext
-                ? await this.aiService.askJson(ENHANCED_CATEGORY_PROMPT, categorizeOutputSchema, {
+                ? await this.aiService.askJson(finalEnhancedPrompt, categorizeOutputSchema, {
                       temperature: 0.3,
                       variables: {
                           task: prompt,
@@ -335,7 +348,7 @@ export class CategoryProcessingService implements IPipelineStep {
                           taskId: 'category-processing',
                       },
                   })
-                : await this.aiService.askJson(CATEGORY_PROMPT, categorizeOutputSchema, {
+                : await this.aiService.askJson(finalBasePrompt, categorizeOutputSchema, {
                       temperature: 0.3,
                       variables: {
                           task: prompt,
@@ -378,6 +391,7 @@ export class CategoryProcessingService implements IPipelineStep {
         existingTags,
         initialCategoryMetrics,
         metrics,
+        customPrompt,
     }: {
         prompt: string;
         items: Partial<ItemData>[];
@@ -385,6 +399,7 @@ export class CategoryProcessingService implements IPipelineStep {
         existingTags: Set<string>;
         initialCategoryMetrics: Record<string, number>;
         metrics?: MetricsAccumulator;
+        customPrompt?: string | null;
     }): Promise<ItemData[]> {
         const allCategorizedItems: ItemData[] = [];
 
@@ -417,8 +432,9 @@ export class CategoryProcessingService implements IPipelineStep {
                 });
 
                 // Always use enhanced prompt for batch processing (we always have context)
+                const finalPrompt = appendCustomPrompt(ENHANCED_CATEGORY_PROMPT, customPrompt);
                 const { result, usage, cost } = await this.aiService.askJson(
-                    ENHANCED_CATEGORY_PROMPT,
+                    finalPrompt,
                     categorizeOutputSchema,
                     {
                         temperature: 0.3,

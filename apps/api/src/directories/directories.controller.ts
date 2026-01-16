@@ -13,7 +13,11 @@ import {
     Query,
     UseGuards,
 } from '@nestjs/common';
-import { CreateDirectoryDto, UpdateDirectoryDto } from '@packages/agent/dto';
+import {
+    CreateDirectoryDto,
+    UpdateDirectoryDto,
+    UpdateDirectoryAdvancedPromptsDto,
+} from '@packages/agent/dto';
 import {
     CreateItemsGeneratorDto,
     DeleteDirectoryDto,
@@ -39,6 +43,7 @@ import {
     RepositoryStatus,
     RepositoryType,
     DirectoryOwnershipService,
+    DirectoryAdvancedPromptsService,
 } from '@packages/agent/services';
 import {
     AnalyzeRepositoryDto,
@@ -73,6 +78,7 @@ export class DirectoriesController {
         private readonly directoryImportService: DirectoryImportService,
         private readonly repositoryManagementService: RepositoryManagementService,
         private readonly directoryOwnershipService: DirectoryOwnershipService,
+        private readonly directoryAdvancedPromptsService: DirectoryAdvancedPromptsService,
     ) {}
 
     @Get('directories')
@@ -445,6 +451,26 @@ export class DirectoriesController {
             body.repoType,
             body.isPrivate,
         );
+    }
+
+    // ============================================
+    // Advanced Prompts Endpoints
+    // ============================================
+
+    @Get('directories/:id/advanced-prompts')
+    @HttpCode(HttpStatus.OK)
+    async getAdvancedPrompts(@CurrentUser() auth: AuthenticatedUser, @Param('id') id: string) {
+        return this.directoryAdvancedPromptsService.getAdvancedPrompts(id, auth.userId);
+    }
+
+    @Put('directories/:id/advanced-prompts')
+    @HttpCode(HttpStatus.OK)
+    async updateAdvancedPrompts(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') id: string,
+        @Body() dto: UpdateDirectoryAdvancedPromptsDto,
+    ) {
+        return this.directoryAdvancedPromptsService.updateAdvancedPrompts(id, dto, auth.userId);
     }
 
     // ============================================

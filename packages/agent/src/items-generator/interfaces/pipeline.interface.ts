@@ -10,6 +10,19 @@ import {
 import { ExistingItems } from '../items-generator.service';
 import { WebPageData, DomainAnalysis } from './items-generator.interfaces';
 
+/**
+ * Per-directory custom prompts that are appended to standard prompts.
+ */
+export interface AdvancedPromptsContext {
+    relevanceAssessment?: string | null;
+    itemGeneration?: string | null;
+    itemExtraction?: string | null;
+    searchQuery?: string | null;
+    categorization?: string | null;
+    deduplication?: string | null;
+    sourceValidation?: string | null;
+}
+
 export interface GenerationContext {
     directory: Directory;
     dto: CreateItemsGeneratorDto;
@@ -44,6 +57,9 @@ export interface GenerationContext {
     allPriorityCategories: string[];
     featuredItemHints: string[];
     subject?: string;
+
+    // Per-directory advanced prompts (custom prompts appended to standard prompts)
+    advancedPrompts?: AdvancedPromptsContext | null;
 
     // Control
     shouldStop?: boolean;

@@ -906,7 +906,51 @@
                 "visibilityWarningStars": "All stars will be permanently lost",
                 "visibilityWarningWatchers": "All watchers will be removed",
                 "visibilityWarningNotRestored": "Stars and watchers will NOT be restored if you make the repository public again",
-                "visibilityConfirmPrivate": "Yes, Make Private"
+                "visibilityConfirmPrivate": "Yes, Make Private",
+                "advancedPrompts": {
+                    "title": "Advanced Prompts",
+                    "subtitle": "Customize AI prompts for directory generation. Leave empty to use defaults.",
+                    "save": "Save Prompts",
+                    "saveSuccess": "Advanced prompts saved successfully",
+                    "saveFailed": "Failed to save advanced prompts",
+                    "prompts": {
+                        "relevanceAssessment": {
+                            "title": "Relevance Assessment",
+                            "description": "Additional instructions for filtering web pages by relevance to your directory topic.",
+                            "placeholder": "e.g., Only include pages that focus on open-source projects..."
+                        },
+                        "itemGeneration": {
+                            "title": "Item Generation",
+                            "description": "Additional instructions for AI-generated initial items before web search.",
+                            "placeholder": "e.g., Focus on enterprise-grade solutions with active maintenance..."
+                        },
+                        "itemExtraction": {
+                            "title": "Item Extraction",
+                            "description": "Additional instructions for extracting items from web page content.",
+                            "placeholder": "e.g., Prioritize tools with official documentation links..."
+                        },
+                        "searchQuery": {
+                            "title": "Search Query Generation",
+                            "description": "Additional instructions for generating search queries to find content.",
+                            "placeholder": "e.g., Include queries targeting GitHub repositories and official docs..."
+                        },
+                        "categorization": {
+                            "title": "Categorization",
+                            "description": "Additional instructions for categorizing and tagging extracted items.",
+                            "placeholder": "e.g., Use technical categories like 'CLI Tools', 'Libraries', 'Frameworks'..."
+                        },
+                        "deduplication": {
+                            "title": "Deduplication",
+                            "description": "Additional instructions for identifying and removing duplicate items.",
+                            "placeholder": "e.g., Consider items with similar GitHub repos as duplicates..."
+                        },
+                        "sourceValidation": {
+                            "title": "Source Validation",
+                            "description": "Additional instructions for validating item source URLs.",
+                            "placeholder": "e.g., Prefer official project websites over third-party reviews..."
+                        }
+                    }
+                }
             },
             "deploy": {
                 "noTokenAlert": {

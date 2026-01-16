@@ -7,6 +7,7 @@ import { SearchService } from '../shared';
 import { IPipelineStep, GenerationContext } from '../interfaces/pipeline.interface';
 import { ItemsGeneratorStep } from '../constants/steps';
 import { accumulateMetrics } from '../utils/metrics.util';
+import { appendCustomPrompt } from '../utils/prompt.util';
 
 const urlValidationSchema = z.object({
     is_official: z.boolean(),
@@ -59,7 +60,7 @@ export class SourceValidationService implements IPipelineStep {
     ) {}
 
     async run(context: GenerationContext): Promise<GenerationContext> {
-        const { directory, finalItems, metrics, subject } = context;
+        const { directory, finalItems, metrics, subject, advancedPrompts } = context;
 
         this.logger.log(
             `[${directory.slug}] Validating source URLs for ${finalItems.length} items`,
@@ -69,6 +70,7 @@ export class SourceValidationService implements IPipelineStep {
             finalItems,
             metrics,
             subject,
+            advancedPrompts?.sourceValidation,
         );
 
         context.finalItems = validatedItems;
@@ -80,6 +82,7 @@ export class SourceValidationService implements IPipelineStep {
         items: ItemData[],
         metrics?: GenerationContext['metrics'],
         subject?: string,
+        customPrompt?: string | null,
     ): Promise<ItemData[]> {
         if (!items || items.length === 0) {
             return [];
@@ -94,7 +97,7 @@ export class SourceValidationService implements IPipelineStep {
                 const batch = items.slice(i, i + BATCH_SIZE);
 
                 const validationPromises = batch.map((item) => {
-                    return this.validateAndFetchSourceUrl(item, metrics, subject)
+                    return this.validateAndFetchSourceUrl(item, metrics, subject, customPrompt)
                         .then((validatedSourceUrl) => {
                             if (validatedSourceUrl) {
                                 return { ...item, source_url: validatedSourceUrl, valid: true };
@@ -130,6 +133,7 @@ export class SourceValidationService implements IPipelineStep {
         currentItem: ItemData,
         metrics?: GenerationContext['metrics'],
         subject?: string,
+        customPrompt?: string | null,
     ): Promise<string | undefined> {
         const sourceUrl = currentItem.source_url;
         const itemName = currentItem.name;
@@ -241,6 +245,7 @@ export class SourceValidationService implements IPipelineStep {
                     safeItemDescription,
                     url,
                     metrics,
+                    customPrompt,
                 );
                 return { url, aiValidation };
             });
@@ -291,6 +296,7 @@ export class SourceValidationService implements IPipelineStep {
         itemDescription: string,
         candidateUrl: string,
         metrics?: GenerationContext['metrics'],
+        customPrompt?: string | null,
     ): Promise<{ isOfficial: boolean; confidence: number; reasoning: string } | null> {
         if (!this.aiService.isAiConfigured()) {
             return null;
@@ -310,8 +316,9 @@ export class SourceValidationService implements IPipelineStep {
                 pageContent.slice(midContent - 1000, midContent + 1000) ||
                 pageContent.slice(0, 2000);
 
+            const finalPrompt = appendCustomPrompt(URL_VALIDATION_PROMPT, customPrompt);
             const { result, usage, cost } = await this.aiService.askJson(
-                URL_VALIDATION_PROMPT,
+                finalPrompt,
                 urlValidationSchema,
                 {
                     temperature: 0.1,

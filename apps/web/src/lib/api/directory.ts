@@ -366,6 +366,31 @@ export interface RepositoryStatus {
     exists: boolean;
 }
 
+// Advanced Prompts Types
+export interface DirectoryAdvancedPrompts {
+    id: string;
+    directoryId: string;
+    relevanceAssessment?: string | null;
+    itemGeneration?: string | null;
+    itemExtraction?: string | null;
+    searchQuery?: string | null;
+    categorization?: string | null;
+    deduplication?: string | null;
+    sourceValidation?: string | null;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface UpdateDirectoryAdvancedPromptsDto {
+    relevanceAssessment?: string | null;
+    itemGeneration?: string | null;
+    itemExtraction?: string | null;
+    searchQuery?: string | null;
+    categorization?: string | null;
+    deduplication?: string | null;
+    sourceValidation?: string | null;
+}
+
 export const directoryAPI = {
     // Get all directories with pagination and search
     getAll: async (options?: { limit?: number; offset?: number; search?: string }) => {
@@ -559,6 +584,22 @@ export const directoryAPI = {
     ) => {
         return serverMutation<RepositoryStatus>({
             endpoint: `/directories/${id}/repositories/visibility`,
+            data,
+            method: 'PUT',
+            wrapInData: false,
+        });
+    },
+
+    // Advanced Prompts
+    getAdvancedPrompts: async (id: string) => {
+        return serverFetch<APIResponse<{ advancedPrompts: DirectoryAdvancedPrompts | null }>>(
+            `/directories/${id}/advanced-prompts`,
+        );
+    },
+
+    updateAdvancedPrompts: async (id: string, data: UpdateDirectoryAdvancedPromptsDto) => {
+        return serverMutation<APIResponse<{ advancedPrompts: DirectoryAdvancedPrompts }>>({
+            endpoint: `/directories/${id}/advanced-prompts`,
             data,
             method: 'PUT',
             wrapInData: false,

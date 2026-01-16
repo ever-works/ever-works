@@ -2,6 +2,7 @@ import { Logger, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { DirectoryRepository } from './repositories/directory.repository';
+import { DirectoryAdvancedPromptsRepository } from './repositories/directory-advanced-prompts.repository';
 import { DirectoryMemberRepository } from './repositories/directory-member.repository';
 import { RefreshTokenRepository } from './repositories/refresh-token.repository';
 import { OAuthTokenRepository } from './repositories/oauth-token.repository';
@@ -33,6 +34,7 @@ import { NotificationRepository } from './repositories/notification.repository';
     ],
     providers: [
         DirectoryRepository,
+        DirectoryAdvancedPromptsRepository,
         DirectoryMemberRepository,
         UserGitHubService,
         RefreshTokenRepository,
@@ -50,6 +52,7 @@ import { NotificationRepository } from './repositories/notification.repository';
         TypeOrmModule,
         UserGitHubService,
         DirectoryRepository,
+        DirectoryAdvancedPromptsRepository,
         DirectoryMemberRepository,
         UserRepository,
         RefreshTokenRepository,

@@ -1,4 +1,5 @@
 export * from './directory.entity';
+export * from './directory-advanced-prompts.entity';
 export * from './directory-member.entity';
 export * from './user.entity';
 export * from './refresh-token.entity';

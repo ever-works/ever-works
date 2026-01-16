@@ -8,4 +8,5 @@ export * from './directory-schedule.service';
 export * from './directory-schedule-dispatcher.service';
 export * from './directory-member.service';
 export * from './directory-import.service';
+export * from './directory-advanced-prompts.service';
 export * from './repository-management.service';

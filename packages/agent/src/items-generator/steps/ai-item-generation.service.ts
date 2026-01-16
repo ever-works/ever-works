@@ -11,6 +11,7 @@ import {
 import { IPipelineStep, GenerationContext } from '../interfaces/pipeline.interface';
 import { ItemsGeneratorStep } from '../constants/steps';
 import { accumulateMetrics, MetricsAccumulator } from '../utils/metrics.util';
+import { appendCustomPrompt } from '../utils/prompt.util';
 
 const UNDERSTANDING_PROMPT = `You are an AI assistant helping to curate a "Directory website".
 Topic: "{topicName}"
@@ -67,7 +68,7 @@ export class AiItemGenerationService implements IPipelineStep {
     constructor(private readonly aiService: AiService) {}
 
     async run(context: GenerationContext): Promise<GenerationContext> {
-        const { dto, directory, featuredItemHints, metrics } = context;
+        const { dto, directory, featuredItemHints, metrics, advancedPrompts } = context;
 
         if (dto.config.ai_first_generation_enabled) {
             this.logger.log(`[${directory.slug}] AI-First Item Generation - Invoking`);
@@ -77,6 +78,7 @@ export class AiItemGenerationService implements IPipelineStep {
                 dto,
                 featuredItemHints,
                 metrics,
+                advancedPrompts?.itemGeneration,
             );
             this.logger.log(
                 `[${directory.slug}] AI generated ${initialAiItems.length} initial items.`,
@@ -96,6 +98,7 @@ export class AiItemGenerationService implements IPipelineStep {
         createItemsGeneratorDto: CreateItemsGeneratorDto,
         featuredItemHints: string[] = [],
         metrics?: MetricsAccumulator,
+        customPrompt?: string | null,
     ): Promise<ItemData[]> {
         const {
             name: topicName,
@@ -172,8 +175,10 @@ export class AiItemGenerationService implements IPipelineStep {
         const featuredHintsSection = this.generateFeaturedHintsSection(featuredItemHints);
 
         try {
+            const finalPrompt = appendCustomPrompt(GENERATION_PROMPT, customPrompt);
+
             const { result, usage, cost } = await this.aiService.askJson(
-                GENERATION_PROMPT,
+                finalPrompt,
                 extractedItemsSchema,
                 {
                     temperature: 0,
