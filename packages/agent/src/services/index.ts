@@ -10,3 +10,4 @@ export * from './directory-member.service';
 export * from './directory-import.service';
 export * from './directory-advanced-prompts.service';
 export * from './repository-management.service';
+export * from './directory-taxonomy.service';

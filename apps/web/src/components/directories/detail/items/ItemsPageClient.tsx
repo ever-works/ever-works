@@ -1,31 +1,43 @@
 'use client';
 
 import { useState } from 'react';
-import { ItemData } from '@/lib/api/types-only';
+import { ItemData, Category, Tag } from '@/lib/api/types-only';
 import { ItemsList } from './ItemsList';
 import { AddItemModal } from './AddItemModal';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
-import { Plus } from 'lucide-react';
+import { Plus, Package, FolderTree, Tags as TagsIcon } from 'lucide-react';
 import { useRouter } from '@/i18n/navigation';
 import { getCategoryName } from '@/lib/utils/items';
 import { useDirectoryDetail, useDirectoryPermissions } from '../DirectoryDetailContext';
+import { CategoriesTab } from './CategoriesTab';
+import { TagsTab } from './TagsTab';
+
+type TabType = 'items' | 'categories' | 'tags';
 
 interface ItemsPageClientProps {
     items: ItemData[];
     directoryId: string;
+    categories?: Category[];
+    tags?: Tag[];
 }
 
-export function ItemsPageClient({ items, directoryId }: ItemsPageClientProps) {
+export function ItemsPageClient({
+    items,
+    directoryId,
+    categories: initialCategories = [],
+    tags: initialTags = [],
+}: ItemsPageClientProps) {
     const t = useTranslations('dashboard.directoryDetail.items');
     const router = useRouter();
     const permissions = useDirectoryPermissions();
     const { directory } = useDirectoryDetail();
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+    const [activeTab, setActiveTab] = useState<TabType>('items');
 
-    // Get unique categories from existing items
-    const categories = Array.from(
+    // Get unique categories from existing items for the Add Item modal
+    const categoryNames = Array.from(
         new Set(
             items
                 .map((item) => getCategoryName(item.category))
@@ -34,12 +46,18 @@ export function ItemsPageClient({ items, directoryId }: ItemsPageClientProps) {
     );
 
     // If no categories exist, provide some defaults
-    const finalCategories = categories.length > 0 ? categories : [];
+    const finalCategories = categoryNames.length > 0 ? categoryNames : [];
 
     const handleAddSuccess = () => {
         // Refresh the page to show new item
         router.refresh();
     };
+
+    const tabs = [
+        { id: 'items' as const, label: t('tabs.browseItems'), icon: Package },
+        { id: 'categories' as const, label: t('tabs.categories'), icon: FolderTree },
+        { id: 'tags' as const, label: t('tabs.tags'), icon: TagsIcon },
+    ];
 
     return (
         <>
@@ -53,7 +71,7 @@ export function ItemsPageClient({ items, directoryId }: ItemsPageClientProps) {
                             {t('subtitle')}
                         </p>
                     </div>
-                    {permissions.canEdit && (
+                    {permissions.canEdit && activeTab === 'items' && (
                         <Button
                             variant="primary"
                             onClick={() => setIsAddModalOpen(true)}
@@ -66,12 +84,57 @@ export function ItemsPageClient({ items, directoryId }: ItemsPageClientProps) {
                 </div>
             </div>
 
-            <ItemsList
-                items={items}
-                directoryId={directoryId}
-                canEdit={permissions.canEdit}
-                directoryWebsite={directory.website}
-            />
+            {/* Tabs Navigation */}
+            <div className="mb-6 border-b border-border dark:border-border-dark">
+                <nav className="-mb-px flex space-x-8" aria-label="Tabs">
+                    {tabs.map((tab) => {
+                        const Icon = tab.icon;
+                        return (
+                            <button
+                                key={tab.id}
+                                onClick={() => setActiveTab(tab.id)}
+                                className={cn(
+                                    'flex items-center gap-2 whitespace-nowrap border-b-2 py-3 px-1 text-sm font-medium transition-colors',
+                                    activeTab === tab.id
+                                        ? 'border-primary text-primary dark:border-primary-dark dark:text-primary-dark'
+                                        : 'border-transparent text-text-secondary dark:text-text-secondary-dark hover:border-border dark:hover:border-border-dark hover:text-text dark:hover:text-text-dark',
+                                )}
+                            >
+                                <Icon className="w-4 h-4" />
+                                {tab.label}
+                            </button>
+                        );
+                    })}
+                </nav>
+            </div>
+
+            {/* Tab Content */}
+            {activeTab === 'items' && (
+                <ItemsList
+                    items={items}
+                    directoryId={directoryId}
+                    canEdit={permissions.canEdit}
+                    directoryWebsite={directory.website}
+                />
+            )}
+
+            {activeTab === 'categories' && (
+                <CategoriesTab
+                    directoryId={directoryId}
+                    initialCategories={initialCategories}
+                    items={items}
+                    canEdit={permissions.canEdit}
+                />
+            )}
+
+            {activeTab === 'tags' && (
+                <TagsTab
+                    directoryId={directoryId}
+                    initialTags={initialTags}
+                    items={items}
+                    canEdit={permissions.canEdit}
+                />
+            )}
 
             {permissions.canEdit && (
                 <AddItemModal
