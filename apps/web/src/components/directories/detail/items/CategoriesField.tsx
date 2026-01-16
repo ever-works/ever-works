@@ -91,7 +91,7 @@ export const CategoriesField = memo(function CategoriesField({
                     {/* Trigger container with selected chips */}
                     <div
                         className={cn(
-                            'flex flex-wrap items-center gap-1.5 min-h-[42px] px-3 py-2',
+                            'flex flex-wrap items-center gap-1.5 min-h-10.5 px-3 py-2',
                             'rounded-lg border border-border dark:border-border-dark',
                             'bg-surface dark:bg-surface-dark',
                             'focus-within:border-primary dark:focus-within:border-primary-dark',
@@ -127,7 +127,7 @@ export const CategoriesField = memo(function CategoriesField({
                         {/* Search input */}
                         <ComboboxInput
                             className={cn(
-                                'flex-1 min-w-[120px] bg-transparent border-none outline-none',
+                                'flex-1 min-w-30 bg-transparent border-none outline-none',
                                 'text-sm text-text dark:text-text-dark',
                                 'placeholder:text-text-muted dark:placeholder:text-text-muted-dark',
                             )}
@@ -143,7 +143,14 @@ export const CategoriesField = memo(function CategoriesField({
 
                         {/* Dropdown trigger button */}
                         <ComboboxButton className="absolute inset-y-0 right-0 flex items-center pr-3">
-                            <ChevronDown className="h-4 w-4 text-text-muted" />
+                            {({ open }) => (
+                                <ChevronDown
+                                    className={cn(
+                                        'h-4 w-4 text-text-muted transition-transform duration-200',
+                                        open && 'rotate-180',
+                                    )}
+                                />
+                            )}
                         </ComboboxButton>
                     </div>
 

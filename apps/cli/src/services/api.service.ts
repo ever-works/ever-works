@@ -78,6 +78,7 @@ export interface SubmitItemDto {
     featured?: boolean;
     pay_and_publish_now?: boolean;
     slug?: string;
+    create_pull_request?: boolean;
 }
 
 export interface UpdateWebsiteRepositoryResponse {
@@ -92,6 +93,7 @@ export interface UpdateWebsiteRepositoryResponse {
 export interface RemoveItemDto {
     item_slug: string;
     reason?: string;
+    create_pull_request?: boolean;
 }
 
 export interface DeployDto {

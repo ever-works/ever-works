@@ -116,7 +116,7 @@ Extract all items from this section.` as const;
 export class AwesomeReadmeParserService {
     private readonly logger = new Logger(AwesomeReadmeParserService.name);
 
-    private readonly MAX_CHUNK_SIZE = 3000;
+    private readonly MAX_CHUNK_SIZE = 6000;
     private readonly CHUNK_OVERLAP = 200;
     private readonly CATEGORY_CHUNK_SIZE = 8000;
     private readonly BATCH_DELAY_MS = 500;

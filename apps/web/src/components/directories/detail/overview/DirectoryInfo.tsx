@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
 import { useDirectoryDetail } from '../DirectoryDetailContext';
 import { Link } from '@/i18n/navigation';
-import { Users, UserCircle, Lock, Unlock, Database, Layout, FolderGit2 } from 'lucide-react';
+import { Users, UserCircle, Lock, Unlock } from 'lucide-react';
 
 interface DirectoryInfoProps {
     directory: Directory;
@@ -27,16 +27,6 @@ const renderRepoIcon = (isPrivate: boolean | undefined, label: string) => {
         </div>
     );
 };
-
-// {
-//     directory.repoVisibility && (
-//         <div className="flex gap-3 mb-2">
-
-//             {renderRepoIcon('data', directory.repoVisibility.data, Database, 'Data Repo')}
-//             {renderRepoIcon('website', directory.repoVisibility.website, Layout, 'Website Repo')}
-//         </div>
-//     );
-// }
 
 export function DirectoryInfo({ directory, config }: DirectoryInfoProps) {
     const t = useTranslations('dashboard.directoryDetail.info');
