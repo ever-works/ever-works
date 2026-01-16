@@ -26,12 +26,12 @@ export class SubmitItemDto {
 
     // Backward compatibility: accept single category string
     // Required if categories array is not provided or empty
-    @ValidateIf((o) => !o.categories || o.categories.length === 0)
+    @ValidateIf((o) => !Array.isArray(o.categories) || o.categories.length === 0)
     @IsString()
     @IsNotEmpty()
     category?: string;
 
-    @ValidateIf((o) => !o.category)
+    @ValidateIf((o) => typeof o.category !== 'string' || o.category.length === 0)
     @IsArray()
     @ArrayMinSize(1)
     @IsString({ each: true })
@@ -71,4 +71,8 @@ export class SubmitItemDto {
     @IsArray()
     @IsUrl({ protocols: ['http', 'https'], require_tld: true }, { each: true })
     images?: string[];
+
+    @IsOptional()
+    @IsBoolean()
+    create_pull_request?: boolean;
 }
