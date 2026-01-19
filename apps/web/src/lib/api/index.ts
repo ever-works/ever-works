@@ -8,3 +8,4 @@ export * from './settings';
 export * from './health';
 export * from './deploy';
 export * from './members';
+export * from './types';

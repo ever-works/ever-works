@@ -8,6 +8,7 @@ import {
     ChatMessage,
     User,
     Directory,
+    DirectoryAdvancedPrompts,
     DirectoryMember,
     DirectoryGenerationHistory,
     SubscriptionPlan,
@@ -48,6 +49,7 @@ export interface DatabaseConfig extends Omit<TypeOrmModuleOptions, 'type'> {
 
 export const ENTITIES = [
     Directory,
+    DirectoryAdvancedPrompts,
     DirectoryMember,
     User,
     RefreshToken,

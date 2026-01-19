@@ -20,8 +20,9 @@ import { IDataConfig } from '../data-generator/data-repository';
 import { Directory } from '../entities';
 import { AiService } from '../ai';
 import { PipelineExecutor } from './pipeline/pipeline-executor';
-import { GenerationContext } from './interfaces/pipeline.interface';
+import { GenerationContext, AdvancedPromptsContext } from './interfaces/pipeline.interface';
 import { ParallelStep } from './pipeline/steps/parallel.step';
+import { DirectoryAdvancedPromptsRepository } from '../database/repositories/directory-advanced-prompts.repository';
 
 export type ExistingItems = {
     existingItems?: ItemData[];
@@ -51,6 +52,7 @@ export class ItemsGeneratorService {
         private readonly categoryProcessingService: CategoryProcessingService,
         private readonly markdownGenerationService: MarkdownGenerationService,
         private readonly badgeProcessingService: BadgeProcessingService,
+        private readonly advancedPromptsRepository: DirectoryAdvancedPromptsRepository,
     ) {
         // Configure the pipeline once at startup
         this.pipelineExecutor
@@ -110,6 +112,23 @@ export class ItemsGeneratorService {
             let context: GenerationContext;
             let resumeFromStepName: string | undefined;
 
+            // Load advanced prompts for this directory (custom prompts appended to standard prompts)
+            const advancedPromptsEntity = await this.advancedPromptsRepository.findByDirectoryId(
+                directory.id,
+            );
+
+            const advancedPrompts: AdvancedPromptsContext | null = advancedPromptsEntity
+                ? {
+                      relevanceAssessment: advancedPromptsEntity.relevanceAssessment,
+                      itemGeneration: advancedPromptsEntity.itemGeneration,
+                      itemExtraction: advancedPromptsEntity.itemExtraction,
+                      searchQuery: advancedPromptsEntity.searchQuery,
+                      categorization: advancedPromptsEntity.categorization,
+                      deduplication: advancedPromptsEntity.deduplication,
+                      sourceValidation: advancedPromptsEntity.sourceValidation,
+                  }
+                : null;
+
             // Attempt to load checkpoint
             const checkpoint = await this.pipelineExecutor.loadCheckpoint(directory);
             const lastStep = this.pipelineExecutor.getStepNames().length - 1;
@@ -139,6 +158,7 @@ export class ItemsGeneratorService {
                             wp.raw_content,
                         ]),
                     ),
+                    advancedPrompts, // Always use fresh advanced prompts (not from checkpoint)
                 };
                 context.finalBrands = checkpoint.context.finalBrands || [];
             } else {
@@ -174,6 +194,7 @@ export class ItemsGeneratorService {
                     allInitialCategories: [],
                     allPriorityCategories: [],
                     featuredItemHints: [],
+                    advancedPrompts,
                 };
             }
 

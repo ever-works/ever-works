@@ -14,6 +14,7 @@ import {
     ImportSourceType,
     GetUserRepositoriesResponseDto,
     UpdateDirectorySchedulePayload,
+    UpdateDirectoryAdvancedPromptsDto,
 } from '@/lib/api';
 import { getAuthFromCookie } from '@/lib/auth';
 import { checkOAuthConnection } from './oauth';
@@ -703,6 +704,74 @@ export async function toggleRepositoryVisibility(
             success: false,
             error:
                 error instanceof Error ? error.message : 'Failed to update repository visibility',
+        };
+    }
+}
+
+// Advanced Prompts Actions
+
+export async function getAdvancedPrompts(directoryId: string) {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    try {
+        const response = await directoryAPI.getAdvancedPrompts(directoryId);
+        return {
+            success: true,
+            data: response.advancedPrompts,
+        };
+    } catch (error) {
+        console.error('Failed to fetch advanced prompts:', error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to fetch advanced prompts',
+        };
+    }
+}
+
+export async function updateAdvancedPrompts(
+    directoryId: string,
+    data: UpdateDirectoryAdvancedPromptsDto,
+) {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    // Validation schema for advanced prompts (max 2000 chars per prompt)
+    const advancedPromptsSchema = z.object({
+        relevanceAssessment: z.string().max(2000).nullable().optional(),
+        itemGeneration: z.string().max(2000).nullable().optional(),
+        itemExtraction: z.string().max(2000).nullable().optional(),
+        searchQuery: z.string().max(2000).nullable().optional(),
+        categorization: z.string().max(2000).nullable().optional(),
+        deduplication: z.string().max(2000).nullable().optional(),
+        sourceValidation: z.string().max(2000).nullable().optional(),
+    });
+
+    try {
+        const validation = advancedPromptsSchema.safeParse(data);
+        if (!validation.success) {
+            return {
+                success: false,
+                error: validation.error.errors[0].message,
+            };
+        }
+
+        const response = await directoryAPI.updateAdvancedPrompts(directoryId, validation.data);
+        revalidatePath(`/directories/${directoryId}/settings`);
+
+        return {
+            success: true,
+            data: response.advancedPrompts,
+        };
+    } catch (error) {
+        console.error('Failed to update advanced prompts:', error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to update advanced prompts',
         };
     }
 }

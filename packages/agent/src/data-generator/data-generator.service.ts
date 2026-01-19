@@ -12,6 +12,8 @@ import {
     GenerationMethod,
     CompanyDto,
     ItemsGeneratorMetrics,
+    Category,
+    Tag,
 } from '../items-generator/dto';
 import { format } from 'date-fns';
 import { GenerateStatusType } from '../entities/types';
@@ -328,6 +330,7 @@ export class DataGeneratorService {
             promises.push(
                 data.mergeConfig({
                     ...this.withCompanyConfig(createItemsGeneratorDto.company),
+                    version: await data.getNextVersion(),
                     metadata,
                 }),
             );
@@ -600,6 +603,56 @@ export class DataGeneratorService {
         };
     }
 
+    /**
+     * Save categories to the data repository and push changes
+     */
+    async saveCategories(directory: Directory, user: User, categories: Category[]) {
+        const directoryOwner = this.getDirectoryOwner(directory);
+        const token = directoryOwner.getGitToken();
+        const committer = user.asCommitter();
+        const repo = directory.getDataRepo();
+
+        const dest = await this.githubService.cloneOrPull({
+            owner: directory.getRepoOwner(),
+            repo,
+            token,
+            committer,
+        });
+
+        const data = await DataRepository.create(dest);
+
+        await data.writeCategories(categories);
+
+        await this.githubService.addAll(data.dir);
+        await this.githubService.commit(data.dir, 'update categories', committer);
+        await this.githubService.push(dest, token);
+    }
+
+    /**
+     * Save tags to the data repository and push changes
+     */
+    async saveTags(directory: Directory, user: User, tags: Tag[]) {
+        const directoryOwner = this.getDirectoryOwner(directory);
+        const token = directoryOwner.getGitToken();
+        const committer = user.asCommitter();
+        const repo = directory.getDataRepo();
+
+        const dest = await this.githubService.cloneOrPull({
+            owner: directory.getRepoOwner(),
+            repo,
+            token,
+            committer,
+        });
+
+        const data = await DataRepository.create(dest);
+
+        await data.writeTags(tags);
+
+        await this.githubService.addAll(data.dir);
+        await this.githubService.commit(data.dir, 'update tags', committer);
+        await this.githubService.push(dest, token);
+    }
+
     async count(directory: Directory, user: User) {
         const data = await this.repositoryData(directory, user);
 
@@ -849,6 +902,7 @@ export class DataGeneratorService {
 
             const configData = {
                 ...importedData.config,
+                version: await data.getNextVersion(),
                 metadata: {
                     ...existingMetadata,
                     initial_prompt: initialPrompt,

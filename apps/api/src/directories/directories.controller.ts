@@ -13,7 +13,15 @@ import {
     Query,
     UseGuards,
 } from '@nestjs/common';
-import { CreateDirectoryDto, UpdateDirectoryDto } from '@packages/agent/dto';
+import {
+    CreateDirectoryDto,
+    UpdateDirectoryDto,
+    UpdateDirectoryAdvancedPromptsDto,
+    CreateCategoryDto,
+    UpdateCategoryDto,
+    CreateTagDto,
+    UpdateTagDto,
+} from '@packages/agent/dto';
 import {
     CreateItemsGeneratorDto,
     DeleteDirectoryDto,
@@ -39,6 +47,8 @@ import {
     RepositoryStatus,
     RepositoryType,
     DirectoryOwnershipService,
+    DirectoryAdvancedPromptsService,
+    DirectoryTaxonomyService,
 } from '@packages/agent/services';
 import {
     AnalyzeRepositoryDto,
@@ -73,6 +83,8 @@ export class DirectoriesController {
         private readonly directoryImportService: DirectoryImportService,
         private readonly repositoryManagementService: RepositoryManagementService,
         private readonly directoryOwnershipService: DirectoryOwnershipService,
+        private readonly directoryAdvancedPromptsService: DirectoryAdvancedPromptsService,
+        private readonly directoryTaxonomyService: DirectoryTaxonomyService,
     ) {}
 
     @Get('directories')
@@ -448,6 +460,26 @@ export class DirectoriesController {
     }
 
     // ============================================
+    // Advanced Prompts Endpoints
+    // ============================================
+
+    @Get('directories/:id/advanced-prompts')
+    @HttpCode(HttpStatus.OK)
+    async getAdvancedPrompts(@CurrentUser() auth: AuthenticatedUser, @Param('id') id: string) {
+        return this.directoryAdvancedPromptsService.getAdvancedPrompts(id, auth.userId);
+    }
+
+    @Put('directories/:id/advanced-prompts')
+    @HttpCode(HttpStatus.OK)
+    async updateAdvancedPrompts(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') id: string,
+        @Body() dto: UpdateDirectoryAdvancedPromptsDto,
+    ) {
+        return this.directoryAdvancedPromptsService.updateAdvancedPrompts(id, dto, auth.userId);
+    }
+
+    // ============================================
     // Import endpoints
     // ============================================
 
@@ -498,5 +530,73 @@ export class DirectoriesController {
         };
 
         return this.directoryImportService.getUserRepositories(dto, user);
+    }
+
+    // ============================================
+    // Taxonomy CRUD Endpoints (Categories & Tags)
+    // ============================================
+
+    // Categories
+    @Post('directories/:id/categories')
+    @HttpCode(HttpStatus.OK)
+    async createCategory(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') id: string,
+        @Body() dto: CreateCategoryDto,
+    ) {
+        return this.directoryTaxonomyService.createCategory(id, dto, auth.userId);
+    }
+
+    @Put('directories/:id/categories/:categoryId')
+    @HttpCode(HttpStatus.OK)
+    async updateCategory(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') id: string,
+        @Param('categoryId') categoryId: string,
+        @Body() dto: UpdateCategoryDto,
+    ) {
+        return this.directoryTaxonomyService.updateCategory(id, categoryId, dto, auth.userId);
+    }
+
+    @Delete('directories/:id/categories/:categoryId')
+    @HttpCode(HttpStatus.OK)
+    async deleteCategory(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') id: string,
+        @Param('categoryId') categoryId: string,
+    ) {
+        return this.directoryTaxonomyService.deleteCategory(id, categoryId, auth.userId);
+    }
+
+    // Tags
+    @Post('directories/:id/tags')
+    @HttpCode(HttpStatus.OK)
+    async createTag(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') id: string,
+        @Body() dto: CreateTagDto,
+    ) {
+        return this.directoryTaxonomyService.createTag(id, dto, auth.userId);
+    }
+
+    @Put('directories/:id/tags/:tagId')
+    @HttpCode(HttpStatus.OK)
+    async updateTag(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') id: string,
+        @Param('tagId') tagId: string,
+        @Body() dto: UpdateTagDto,
+    ) {
+        return this.directoryTaxonomyService.updateTag(id, tagId, dto, auth.userId);
+    }
+
+    @Delete('directories/:id/tags/:tagId')
+    @HttpCode(HttpStatus.OK)
+    async deleteTag(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') id: string,
+        @Param('tagId') tagId: string,
+    ) {
+        return this.directoryTaxonomyService.deleteTag(id, tagId, auth.userId);
     }
 }
