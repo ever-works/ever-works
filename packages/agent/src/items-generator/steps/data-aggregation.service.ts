@@ -19,6 +19,7 @@ type DataAggregationParams = {
     urlsScannedThisRun: number;
     pagesProcessedThisRun: number;
     metrics?: MetricsAccumulator;
+    customPrompt?: string | null;
 };
 
 @Injectable()
@@ -34,7 +35,15 @@ export class DataAggregationService implements IPipelineStep {
     ) {}
 
     async run(context: GenerationContext): Promise<GenerationContext> {
-        const { dto, directory, existing, initialAiItems, extractedWebItems, webPages } = context;
+        const {
+            dto,
+            directory,
+            existing,
+            initialAiItems,
+            extractedWebItems,
+            webPages,
+            advancedPrompts,
+        } = context;
 
         // Combine AI-generated items and web-extracted items
         const allDiscoveredItems = [...initialAiItems, ...extractedWebItems];
@@ -52,6 +61,7 @@ export class DataAggregationService implements IPipelineStep {
             newlyExtractedItemsThisRun: allDiscoveredItems,
             pagesProcessedThisRun: webPages.length,
             metrics: context.metrics,
+            customPrompt: advancedPrompts?.deduplication,
         });
 
         context.aggregatedItems = aggregatedItems;
@@ -71,6 +81,7 @@ export class DataAggregationService implements IPipelineStep {
         urlsScannedThisRun,
         pagesProcessedThisRun,
         metrics: inputMetrics,
+        customPrompt,
     }: DataAggregationParams) {
         const { prompt } = createItemsGeneratorDto;
         // Use provided metrics or create a new accumulator
@@ -116,6 +127,7 @@ export class DataAggregationService implements IPipelineStep {
                 prompt,
                 deduplicated,
                 metrics,
+                customPrompt,
             );
             this.logger.log(
                 `[${directorySlug}] AI-based deduplication: ${deduplicated.length} items remaining`,
