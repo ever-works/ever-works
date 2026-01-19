@@ -351,7 +351,7 @@ export class DataRepository {
         const str = yaml.stringify(config);
         await fs.writeFile(this.configPath, str, 'utf-8');
     }
-    async getVersion(config?: IDataConfig) {
+    async getNextVersion(config?: IDataConfig) {
         const theConfig = config ?? (await this.getConfig());
         const versionStr = theConfig.version || '0.1.0';
 

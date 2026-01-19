@@ -32,7 +32,6 @@ export function TagsTab({ directoryId, initialTags, items, canEdit }: TagsTabPro
     const [editingTag, setEditingTag] = useState<Tag | null>(null);
     const [isDeleting, setIsDeleting] = useState<string | null>(null);
 
-    // Count items per tag (items store slugified tags, match against tag.id)
     const itemCounts = useMemo(() => {
         const counts: Record<string, number> = {};
         items.forEach((item) => {
@@ -213,7 +212,7 @@ export function TagsTab({ directoryId, initialTags, items, canEdit }: TagsTabPro
                                         <td className="px-4 py-3 text-center">
                                             <span
                                                 className={cn(
-                                                    'inline-flex items-center justify-center min-w-[2rem] px-2 py-0.5 rounded-full text-xs font-medium',
+                                                    'inline-flex items-center justify-center min-w-8 px-2 py-0.5 rounded-full text-xs font-medium',
                                                     count > 0
                                                         ? 'bg-primary/10 text-primary dark:bg-primary-dark/10 dark:text-primary-dark'
                                                         : 'bg-gray-100 dark:bg-gray-800 text-text-secondary dark:text-text-secondary-dark',

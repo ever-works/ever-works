@@ -1,5 +1,5 @@
 import { Transform } from 'class-transformer';
-import { IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsOptional, MaxLength } from 'class-validator';
 import { sanitizePrompt } from '../utils/sanitize.util';
 
 const MAX_PROMPT_LENGTH = 2000;
@@ -20,43 +20,36 @@ function sanitizeAndNormalize(value: unknown): string | null {
  */
 export class UpdateDirectoryAdvancedPromptsDto {
     @IsOptional()
-    @IsString()
     @MaxLength(MAX_PROMPT_LENGTH)
     @Transform(({ value }) => sanitizeAndNormalize(value))
     relevanceAssessment?: string | null;
 
     @IsOptional()
-    @IsString()
     @MaxLength(MAX_PROMPT_LENGTH)
     @Transform(({ value }) => sanitizeAndNormalize(value))
     itemGeneration?: string | null;
 
     @IsOptional()
-    @IsString()
     @MaxLength(MAX_PROMPT_LENGTH)
     @Transform(({ value }) => sanitizeAndNormalize(value))
     itemExtraction?: string | null;
 
     @IsOptional()
-    @IsString()
     @MaxLength(MAX_PROMPT_LENGTH)
     @Transform(({ value }) => sanitizeAndNormalize(value))
     searchQuery?: string | null;
 
     @IsOptional()
-    @IsString()
     @MaxLength(MAX_PROMPT_LENGTH)
     @Transform(({ value }) => sanitizeAndNormalize(value))
     categorization?: string | null;
 
     @IsOptional()
-    @IsString()
     @MaxLength(MAX_PROMPT_LENGTH)
     @Transform(({ value }) => sanitizeAndNormalize(value))
     deduplication?: string | null;
 
     @IsOptional()
-    @IsString()
     @MaxLength(MAX_PROMPT_LENGTH)
     @Transform(({ value }) => sanitizeAndNormalize(value))
     sourceValidation?: string | null;

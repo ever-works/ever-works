@@ -4,7 +4,7 @@ import { DirectoryOwnershipService } from './directory-ownership.service';
 import { CreateCategoryDto, UpdateCategoryDto, CreateTagDto, UpdateTagDto } from '@src/dto';
 import { Category, Tag } from '@src/items-generator/dto';
 import { UserRepository } from '@src/database/repositories/user.repository';
-import { randomUUID } from 'crypto';
+import { slugifyText } from '@src/items-generator/utils/text.utils';
 
 /**
  * Service for managing directory taxonomy (categories and tags).
@@ -53,9 +53,9 @@ export class DirectoryTaxonomyService {
             throw new BadRequestException('A category with this name already exists');
         }
 
-        // Create new category
+        // Create new category with slugified ID to match item category references
         const newCategory: Category = {
-            id: randomUUID(),
+            id: slugifyText(dto.name.trim()),
             name: dto.name.trim(),
             description: dto.description?.trim(),
             icon_url: dto.icon_url?.trim(),
@@ -191,9 +191,9 @@ export class DirectoryTaxonomyService {
             throw new BadRequestException('A tag with this name already exists');
         }
 
-        // Create new tag
+        // Create new tag with slugified ID to match item tag references
         const newTag: Tag = {
-            id: randomUUID(),
+            id: slugifyText(dto.name.trim()),
             name: dto.name.trim(),
         };
 
