@@ -7,6 +7,7 @@ import { ItemsGeneratorStep } from '../constants/steps';
 import z from 'zod';
 import { accumulateMetrics } from '../utils/metrics.util';
 import { getErrorMessage, getErrorStack } from '../utils/error.util';
+import { appendCustomPrompt } from '../utils/prompt.util';
 
 const SEARCH_QUERY_PROMPT =
     `You are a directory builder generating search queries to find the most relevant, official sources.
@@ -30,11 +31,15 @@ export class SearchQueryGenerationService implements IPipelineStep {
     constructor(private readonly aiService: AiService) {}
 
     async run(context: GenerationContext): Promise<GenerationContext> {
-        const { dto, directory, metrics } = context;
+        const { dto, directory, metrics, advancedPrompts } = context;
 
         this.logger.log(`[${directory.slug}] AI-Powered Search Query Generation - Starting`);
 
-        const searchQueries = await this.generateSearchQueries(dto, metrics);
+        const searchQueries = await this.generateSearchQueries(
+            dto,
+            metrics,
+            advancedPrompts?.searchQuery,
+        );
         this.logger.log(`[${directory.slug}] Generated ${searchQueries.length} search queries.`);
 
         context.searchQueries = searchQueries;
@@ -45,6 +50,7 @@ export class SearchQueryGenerationService implements IPipelineStep {
     async generateSearchQueries(
         createItemsGeneratorDto: CreateItemsGeneratorDto,
         metrics?: GenerationContext['metrics'],
+        customPrompt?: string | null,
     ): Promise<string[]> {
         const {
             name,
@@ -88,25 +94,23 @@ export class SearchQueryGenerationService implements IPipelineStep {
             })
             .strict() as z.ZodType<{ queries: string[] }>;
 
+        const finalPrompt = appendCustomPrompt(SEARCH_QUERY_PROMPT, customPrompt);
+
         try {
-            const { result, usage, cost } = await this.aiService.askJson(
-                SEARCH_QUERY_PROMPT,
-                schema,
-                {
-                    temperature: 0.2,
-                    variables: {
-                        name,
-                        description,
-                        keywords: keywords.length ? keywords.join(', ') : 'N/A',
-                        date: `${formatDate(now, 'cccc')} ${formatDate(now, 'yyyy-MM-dd HH:mm')}`,
-                        query_count: String(config.max_search_queries * 2),
-                    },
-                    routing: {
-                        complexity: TaskComplexity.SIMPLE,
-                        taskId: 'search-query-generation',
-                    },
+            const { result, usage, cost } = await this.aiService.askJson(finalPrompt, schema, {
+                temperature: 0.2,
+                variables: {
+                    name,
+                    description,
+                    keywords: keywords.length ? keywords.join(', ') : 'N/A',
+                    date: `${formatDate(now, 'cccc')} ${formatDate(now, 'yyyy-MM-dd HH:mm')}`,
+                    query_count: String(config.max_search_queries * 2),
                 },
-            );
+                routing: {
+                    complexity: TaskComplexity.SIMPLE,
+                    taskId: 'search-query-generation',
+                },
+            });
 
             accumulateMetrics(metrics, usage, cost);
 

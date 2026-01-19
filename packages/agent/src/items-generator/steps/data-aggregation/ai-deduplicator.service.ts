@@ -7,6 +7,7 @@ import { SharedUtilsService } from './shared-utils.service';
 import { DEDUPLICATOR_PROMPT } from './prompts.constants';
 import { getErrorMessage, getErrorStack } from '../../utils/error.util';
 import { accumulateMetrics, MetricsAccumulator } from '../../utils/metrics.util';
+import { appendCustomPrompt } from '../../utils/prompt.util';
 
 @Injectable()
 export class AiDeduplicatorService {
@@ -25,11 +26,13 @@ export class AiDeduplicatorService {
      * @param description Description of the directory
      * @param items Items to deduplicate
      * @param metrics Optional metrics accumulator for tracking token usage
+     * @param customPrompt Optional custom prompt to append
      */
     async deduplicateWithAI(
         description: string,
         items: ItemData[],
         metrics?: MetricsAccumulator,
+        customPrompt?: string | null,
     ): Promise<ItemData[]> {
         if (!items || items.length === 0) return [];
 
@@ -38,11 +41,17 @@ export class AiDeduplicatorService {
 
         // For small arrays, process directly
         if (items.length <= this.sharedUtils.MAX_CLUSTER_SIZE) {
-            return this.processSingleDeduplicationBatch(description, items, metrics);
+            return this.processSingleDeduplicationBatch(description, items, metrics, customPrompt);
         }
 
         // For large arrays, use a chunking strategy
-        return this.processLargeDeduplicationArray(description, items, startTime, metrics);
+        return this.processLargeDeduplicationArray(
+            description,
+            items,
+            startTime,
+            metrics,
+            customPrompt,
+        );
     }
 
     /**
@@ -50,15 +59,18 @@ export class AiDeduplicatorService {
      * @param description Description of the directory
      * @param items Items to deduplicate
      * @param metrics Optional metrics accumulator
+     * @param customPrompt Optional custom prompt to append
      */
     private async processSingleDeduplicationBatch(
         description: string,
         items: ItemData[],
         metrics?: MetricsAccumulator,
+        customPrompt?: string | null,
     ): Promise<ItemData[]> {
         try {
+            const finalPrompt = appendCustomPrompt(DEDUPLICATOR_PROMPT, customPrompt);
             const { result, usage, cost } = await this.aiService.askJson(
-                DEDUPLICATOR_PROMPT,
+                finalPrompt,
                 extractedItemsSchema,
                 {
                     temperature: 0,
@@ -99,12 +111,14 @@ export class AiDeduplicatorService {
      * @param items Items to deduplicate
      * @param startTime Start time for logging
      * @param metrics Optional metrics accumulator
+     * @param customPrompt Optional custom prompt to append
      */
     private async processLargeDeduplicationArray(
         description: string,
         items: ItemData[],
         startTime: number,
         metrics?: MetricsAccumulator,
+        customPrompt?: string | null,
     ): Promise<ItemData[]> {
         // Group similar items by name similarity to create more efficient chunks
         const groupedItems = this.sharedUtils.groupSimilarItems(items);
@@ -140,6 +154,7 @@ export class AiDeduplicatorService {
                         description,
                         chunk,
                         metrics,
+                        customPrompt,
                     );
                     deduplicatedChunks = deduplicatedChunks.concat(deduplicatedChunk);
 
@@ -163,6 +178,7 @@ export class AiDeduplicatorService {
                     description,
                     group,
                     metrics,
+                    customPrompt,
                 );
                 processedItems = processedItems.concat(deduplicatedGroup);
 

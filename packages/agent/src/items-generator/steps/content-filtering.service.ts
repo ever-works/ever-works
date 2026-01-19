@@ -7,6 +7,7 @@ import { IPipelineStep, GenerationContext } from '../interfaces/pipeline.interfa
 import { ItemsGeneratorStep } from '../constants/steps';
 import { accumulateMetrics } from '../utils/metrics.util';
 import { getErrorMessage, getErrorStack } from '../utils/error.util';
+import { appendCustomPrompt } from '../utils/prompt.util';
 
 const RELEVANCE_ASSESSMENT_PROMPT =
     `You are an expert content analyst. Assess the relevance of the following web page content to the main topic.
@@ -45,7 +46,7 @@ export class ContentFilteringService implements IPipelineStep {
     constructor(private readonly aiService: AiService) {}
 
     async run(context: GenerationContext): Promise<GenerationContext> {
-        const { dto, directory, webPages, metrics } = context;
+        const { dto, directory, webPages, metrics, advancedPrompts } = context;
         const { config } = dto;
 
         if (config.content_filtering_enabled) {
@@ -58,6 +59,7 @@ export class ContentFilteringService implements IPipelineStep {
                 dto.prompt,
                 config,
                 metrics,
+                advancedPrompts?.relevanceAssessment,
             );
 
             this.logger.log(
@@ -79,6 +81,7 @@ export class ContentFilteringService implements IPipelineStep {
         topicDescription: string,
         config: Required<ConfigDto>,
         metrics?: GenerationContext['metrics'],
+        customPrompt?: string | null,
     ): Promise<WebPageData[]> {
         this.logger.log(
             `[${directorySlug}] Starting content filtering for ${webPages.length} pages`,
@@ -120,11 +123,13 @@ export class ContentFilteringService implements IPipelineStep {
             try {
                 const snippet = this.buildSnippet(page.raw_content);
 
+                const finalPrompt = appendCustomPrompt(RELEVANCE_ASSESSMENT_PROMPT, customPrompt);
+
                 const {
                     result: assessmentResult,
                     usage,
                     cost,
-                } = await this.aiService.askJson(RELEVANCE_ASSESSMENT_PROMPT, relevanceSchema, {
+                } = await this.aiService.askJson(finalPrompt, relevanceSchema, {
                     temperature: 0,
                     variables: {
                         topic_name: topicName,

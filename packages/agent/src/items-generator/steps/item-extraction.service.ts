@@ -15,6 +15,7 @@ import { IPipelineStep, GenerationContext } from '../interfaces/pipeline.interfa
 import { ItemsGeneratorStep } from '../constants/steps';
 import { accumulateMetrics, MetricsAccumulator } from '../utils/metrics.util';
 import { getErrorMessage, getErrorStack } from '../utils/error.util';
+import { appendCustomPrompt } from '../utils/prompt.util';
 
 const ITEMS_EXTRACTION_PROMPT =
     `You are an expert data extractor and technical writer for directory websites.
@@ -74,7 +75,7 @@ export class ItemExtractionService implements IPipelineStep {
     }
 
     async run(context: GenerationContext): Promise<GenerationContext> {
-        const { dto, directory, webPages, featuredItemHints, metrics } = context;
+        const { dto, directory, webPages, featuredItemHints, metrics, advancedPrompts } = context;
 
         this.logger.log(
             `[${directory.slug}] AI-Driven Structured Data Extraction for Items from Web - Starting`,
@@ -87,6 +88,7 @@ export class ItemExtractionService implements IPipelineStep {
             featuredItemHints,
             false,
             metrics,
+            advancedPrompts?.itemExtraction,
         );
 
         this.logger.log(
@@ -136,6 +138,7 @@ export class ItemExtractionService implements IPipelineStep {
         featuredItemHints: string[] = [],
         withTags = false,
         metrics?: MetricsAccumulator,
+        customPrompt?: string | null,
     ): Promise<ItemData[]> {
         const { name: topicName, prompt: topicDescription, config } = createItemsGeneratorDto;
 
@@ -169,6 +172,7 @@ export class ItemExtractionService implements IPipelineStep {
         const featuredHintsSection = this.generateFeaturedHintsSection(featuredItemHints);
         const schema = withTags ? extractedItemsSchemaWithTags : extractedItemsSchema;
         const validationSchema = withTags ? itemDataWithCategoriesAndTagsSchema : itemDataSchema;
+        const finalPrompt = appendCustomPrompt(ITEMS_EXTRACTION_PROMPT, customPrompt);
 
         // Define the item extraction function
         const extractItemsFromPage = async (page: WebPageData): Promise<ItemData[]> => {
@@ -185,7 +189,7 @@ export class ItemExtractionService implements IPipelineStep {
                         chunks.map(async (chunk: string, index: number) => {
                             try {
                                 const { result, usage, cost } = await this.aiService.askJson(
-                                    ITEMS_EXTRACTION_PROMPT,
+                                    finalPrompt,
                                     schema,
                                     {
                                         temperature: 0.1,
@@ -250,7 +254,7 @@ export class ItemExtractionService implements IPipelineStep {
                         result: extractionResult,
                         usage,
                         cost,
-                    } = await this.aiService.askJson(ITEMS_EXTRACTION_PROMPT, schema, {
+                    } = await this.aiService.askJson(finalPrompt, schema, {
                         temperature: 0.1,
                         variables: {
                             topicName,

@@ -10,7 +10,7 @@ import {
     DirectoryScheduleBillingMode,
     DirectoryMemberRole,
 } from './enums';
-import { APIResponse, ItemData } from './types';
+import { APIResponse, ItemData, Category, Tag } from './types';
 import { CreateItemsGeneratorDto, ItemsGeneratorResponse } from './items-generator';
 
 export interface MarkdownReadmeConfig {
@@ -366,6 +366,31 @@ export interface RepositoryStatus {
     exists: boolean;
 }
 
+// Advanced Prompts Types
+export interface DirectoryAdvancedPrompts {
+    id: string;
+    directoryId: string;
+    relevanceAssessment?: string | null;
+    itemGeneration?: string | null;
+    itemExtraction?: string | null;
+    searchQuery?: string | null;
+    categorization?: string | null;
+    deduplication?: string | null;
+    sourceValidation?: string | null;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface UpdateDirectoryAdvancedPromptsDto {
+    relevanceAssessment?: string | null;
+    itemGeneration?: string | null;
+    itemExtraction?: string | null;
+    searchQuery?: string | null;
+    categorization?: string | null;
+    deduplication?: string | null;
+    sourceValidation?: string | null;
+}
+
 export const directoryAPI = {
     // Get all directories with pagination and search
     getAll: async (options?: { limit?: number; offset?: number; search?: string }) => {
@@ -561,6 +586,82 @@ export const directoryAPI = {
             endpoint: `/directories/${id}/repositories/visibility`,
             data,
             method: 'PUT',
+            wrapInData: false,
+        });
+    },
+
+    // Advanced Prompts
+    getAdvancedPrompts: async (id: string) => {
+        return serverFetch<APIResponse<{ advancedPrompts: DirectoryAdvancedPrompts | null }>>(
+            `/directories/${id}/advanced-prompts`,
+        );
+    },
+
+    updateAdvancedPrompts: async (id: string, data: UpdateDirectoryAdvancedPromptsDto) => {
+        return serverMutation<APIResponse<{ advancedPrompts: DirectoryAdvancedPrompts }>>({
+            endpoint: `/directories/${id}/advanced-prompts`,
+            data,
+            method: 'PUT',
+            wrapInData: false,
+        });
+    },
+
+    // ============================================
+    // Taxonomy CRUD Operations
+    // ============================================
+
+    // Categories
+    createCategory: async (id: string, data: Partial<Category>) => {
+        return serverMutation<APIResponse<{ category: Category }>>({
+            endpoint: `/directories/${id}/categories`,
+            data,
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    updateCategory: async (id: string, categoryId: string, data: Partial<Category>) => {
+        return serverMutation<APIResponse<{ category: Category }>>({
+            endpoint: `/directories/${id}/categories/${categoryId}`,
+            data,
+            method: 'PUT',
+            wrapInData: false,
+        });
+    },
+
+    deleteCategory: async (id: string, categoryId: string) => {
+        return serverMutation<APIResponse<{ message: string }>>({
+            endpoint: `/directories/${id}/categories/${categoryId}`,
+            data: {},
+            method: 'DELETE',
+            wrapInData: false,
+        });
+    },
+
+    // Tags
+    createTag: async (id: string, data: Partial<Tag>) => {
+        return serverMutation<APIResponse<{ tag: Tag }>>({
+            endpoint: `/directories/${id}/tags`,
+            data,
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    updateTag: async (id: string, tagId: string, data: Partial<Tag>) => {
+        return serverMutation<APIResponse<{ tag: Tag }>>({
+            endpoint: `/directories/${id}/tags/${tagId}`,
+            data,
+            method: 'PUT',
+            wrapInData: false,
+        });
+    },
+
+    deleteTag: async (id: string, tagId: string) => {
+        return serverMutation<APIResponse<{ message: string }>>({
+            endpoint: `/directories/${id}/tags/${tagId}`,
+            data: {},
+            method: 'DELETE',
             wrapInData: false,
         });
     },
