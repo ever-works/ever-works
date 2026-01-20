@@ -912,7 +912,21 @@
                 "maxSearchQueriesDescription": "Number of search queries the AI will generate to find relevant content (1-50).",
                 "resultsPerQueryDescription": "Maximum results to retrieve per search query (1-20).",
                 "maxPagesToProcessDescription": "Maximum web pages to process for content extraction (1-100).",
-                "relevanceThresholdDescription": "Minimum relevance score (0-1) for content to be included. Higher values mean stricter filtering."
+                "relevanceThresholdDescription": "Minimum relevance score (0-1) for content to be included. Higher values mean stricter filtering.",
+                "dataGeneration": "Data Generation Options",
+                "dataGenerationDescription": "Configure data volume and entity generation",
+                "dataVolumeMode": "Data Volume Mode",
+                "dataVolumeModeReal": "Real",
+                "dataVolumeModeRealDescription": "Generate full production-ready data",
+                "dataVolumeModeSample": "Sample",
+                "dataVolumeModeSampleDescription": "Generate minimal sample data (~10 items)",
+                "entityGeneration": "Entity Generation",
+                "generateCategories": "Generate Categories",
+                "generateCategoriesDescription": "Create category structure for organizing items",
+                "generateTags": "Generate Tags",
+                "generateTagsDescription": "Create tags for flexible item labeling",
+                "generateBrands": "Generate Brands",
+                "generateBrandsDescription": "Extract and create brand entities from items"
             },
             "progress": {
                 "title": "Generation in Progress",

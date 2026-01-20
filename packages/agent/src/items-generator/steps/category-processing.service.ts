@@ -113,6 +113,9 @@ type CategoryProcessingParams = {
     existingBrands?: Brand[];
     metrics?: MetricsAccumulator;
     customPrompt?: string | null;
+    generateCategories?: boolean;
+    generateTags?: boolean;
+    generateBrands?: boolean;
 };
 
 @Injectable()
@@ -138,6 +141,33 @@ export class CategoryProcessingService implements IPipelineStep {
 
         this.logger.log(`[${directory.slug}] Category and Tag Generation - Starting`);
 
+        // Check entity generation toggles from config
+        const generateCategories = dto.config?.generate_categories ?? true;
+        const generateTags = dto.config?.generate_tags ?? true;
+        const generateBrands = dto.config?.generate_brands ?? true;
+
+        // If all entity generation is disabled, skip AI processing entirely
+        if (!generateCategories && !generateTags && !generateBrands) {
+            this.logger.log(
+                `[${directory.slug}] All entity generation disabled, assigning default category`,
+            );
+
+            const defaultCategory = { id: 'uncategorized', name: 'Uncategorized' };
+            const finalItems = aggregatedItems.map((item) => ({
+                ...item,
+                category: 'uncategorized',
+                tags: [],
+                slug: item.slug || slugifyText(item.name),
+            })) as ItemData[];
+
+            context.finalItems = finalItems;
+            context.finalCategories = [defaultCategory];
+            context.finalTags = [];
+            context.finalBrands = [];
+
+            return context;
+        }
+
         // Create a modified DTO with merged priority categories
         const dtoWithMergedPriorities = {
             ...dto,
@@ -155,6 +185,9 @@ export class CategoryProcessingService implements IPipelineStep {
             existingBrands: existing.existingBrands,
             metrics,
             customPrompt: advancedPrompts?.categorization,
+            generateCategories,
+            generateTags,
+            generateBrands,
         });
 
         this.logger.log(
@@ -188,6 +221,9 @@ export class CategoryProcessingService implements IPipelineStep {
         existingBrands = [],
         metrics,
         customPrompt,
+        generateCategories = true,
+        generateTags = true,
+        generateBrands = true,
     }: CategoryProcessingParams) {
         const { prompt, priority_categories = [] } = createItemsGeneratorDto;
 
@@ -230,7 +266,7 @@ export class CategoryProcessingService implements IPipelineStep {
 
         try {
             // Categorize items using AI
-            const categorized = await this.categorizeItems({
+            let categorized = await this.categorizeItems({
                 prompt,
                 items: extractedItems,
                 existingCategories: existingCategoriesSet,
@@ -244,10 +280,42 @@ export class CategoryProcessingService implements IPipelineStep {
                 `[${directorySlug}] Successfully categorized ${categorized.length} items`,
             );
 
-            // Extract unique categories and tags
-            const categories = this.extractUniqueCategories(categorized, priority_categories);
-            const tags = this.extractUniqueTags(categorized);
-            const brands = this.extractUniqueBrands(categorized, existingBrands);
+            // Extract unique categories and tags based on toggle settings
+            let categories: Category[];
+            let tags: Tag[];
+            let brands: Brand[];
+
+            if (generateCategories) {
+                categories = this.extractUniqueCategories(categorized, priority_categories);
+            } else {
+                // Assign default "Uncategorized" category when categories are disabled
+                categories = [{ id: 'uncategorized', name: 'Uncategorized' }];
+                categorized = categorized.map((item) => ({
+                    ...item,
+                    category: 'uncategorized',
+                })) as ItemData[];
+            }
+
+            if (generateTags) {
+                tags = this.extractUniqueTags(categorized);
+            } else {
+                tags = [];
+                categorized = categorized.map((item) => ({
+                    ...item,
+                    tags: [],
+                })) as ItemData[];
+            }
+
+            if (generateBrands) {
+                brands = this.extractUniqueBrands(categorized, existingBrands);
+            } else {
+                brands = [];
+                categorized = categorized.map((item) => ({
+                    ...item,
+                    brand: undefined,
+                    brand_logo_url: undefined,
+                })) as ItemData[];
+            }
 
             // Convert to final format
             const finalItems = categorized.map((item) => this.toItemData(item));

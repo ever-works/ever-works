@@ -12,6 +12,7 @@ import { UpdateItemsFields } from './UpdateItemsFields';
 import { CompanyFields } from './CompanyFields';
 import { CategoriesFields } from './CategoriesFields';
 import { SourceFields } from './SourceFields';
+import { DataGenerationFields } from './DataGenerationFields';
 import { ConfigFields, DEFAULT_CONFIG } from './ConfigFields';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils/cn';
@@ -26,7 +27,7 @@ import {
 } from '@/components/ui/dialog';
 import { generateItems, updateItems } from '@/app/actions/dashboard/generator';
 import { useTranslations } from 'next-intl';
-import { GenerationMethod, WebsiteRepositoryCreationMethod } from '@/lib/api/enums';
+import { GenerationMethod, WebsiteRepositoryCreationMethod, DataVolumeMode } from '@/lib/api/enums';
 
 interface GeneratorFormProps {
     directoryId: string;
@@ -62,7 +63,7 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
         website_repository_creation_method:
             lastRequestData?.website_repository_creation_method ||
             WebsiteRepositoryCreationMethod.CREATE_USING_TEMPLATE,
-        config: lastRequestData?.config || DEFAULT_CONFIG,
+        config: { ...DEFAULT_CONFIG, ...lastRequestData?.config },
     });
 
     const toggleSection = (section: string) => {
@@ -200,6 +201,19 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
                         <SourceFields
                             sourceUrls={formData.source_urls || []}
                             onChange={(source_urls) => setFormData({ ...formData, source_urls })}
+                        />
+                    </CollapsibleSection>
+
+                    {/* Data Generation Options */}
+                    <CollapsibleSection
+                        title={t('dataGeneration')}
+                        description={t('dataGenerationDescription')}
+                        isExpanded={expandedSections.includes('dataGeneration')}
+                        onToggle={() => toggleSection('dataGeneration')}
+                    >
+                        <DataGenerationFields
+                            config={formData.config}
+                            onChange={(updates) => setFormData({ ...formData, ...updates })}
                         />
                     </CollapsibleSection>
 

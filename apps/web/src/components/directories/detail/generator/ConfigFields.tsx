@@ -2,7 +2,7 @@
 
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
-import { GenerationMethod, WebsiteRepositoryCreationMethod } from '@/lib/api/enums';
+import { GenerationMethod, WebsiteRepositoryCreationMethod, DataVolumeMode } from '@/lib/api/enums';
 import { ConfigDto } from '@/lib/api/types-only';
 import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
@@ -34,6 +34,10 @@ export const DEFAULT_CONFIG: ConfigDto = {
     ai_first_generation_enabled: false,
     content_filtering_enabled: true,
     prompt_comparison_confidence_threshold: 0.5,
+    data_volume_mode: DataVolumeMode.REAL,
+    generate_categories: true,
+    generate_tags: true,
+    generate_brands: true,
 };
 
 export function ConfigFields({

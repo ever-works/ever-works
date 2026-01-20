@@ -353,10 +353,12 @@ export class DataRepository {
     }
     async getNextVersion(config?: IDataConfig) {
         const theConfig = config ?? (await this.getConfig());
-        const versionStr = theConfig.version || '0.1.0';
+        // Normalize version to string (YAML may parse "1.0" as number 1)
+        const rawVersion = theConfig.version;
+        const versionStr = rawVersion != null ? String(rawVersion) : '0.1.0';
 
         const version = semver.parse(versionStr);
-        if (!version || !theConfig.version) {
+        if (!version || rawVersion == null) {
             return versionStr;
         }
 

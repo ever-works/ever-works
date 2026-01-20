@@ -1,5 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { CreateItemsGeneratorDto, GenerationMethod } from './dto/create-items-generator.dto';
+import {
+    CreateItemsGeneratorDto,
+    GenerationMethod,
+    getEffectiveConfig,
+    ConfigDto,
+    DataVolumeMode,
+} from './dto/create-items-generator.dto';
 import {
     AiItemGenerationService,
     SearchQueryGenerationService,
@@ -88,6 +94,13 @@ export class ItemsGeneratorService {
     ) {
         // Make a copy of the DTO to avoid mutating the original
         createItemsGeneratorDto = { ...createItemsGeneratorDto };
+
+        // Apply effective config (handles sample mode overrides)
+        if (createItemsGeneratorDto.config) {
+            createItemsGeneratorDto.config = getEffectiveConfig(
+                createItemsGeneratorDto.config,
+            ) as ConfigDto;
+        }
 
         const directorySlug = directory.slug;
         const { name } = createItemsGeneratorDto;
@@ -352,6 +365,10 @@ export class ItemsGeneratorService {
                         ai_first_generation_enabled: false,
                         content_filtering_enabled: true,
                         prompt_comparison_confidence_threshold: 0.5,
+                        data_volume_mode: DataVolumeMode.REAL,
+                        generate_categories: true,
+                        generate_tags: true,
+                        generate_brands: true,
                     },
                 },
                 [webPage],

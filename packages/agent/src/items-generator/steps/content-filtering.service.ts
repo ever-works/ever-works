@@ -79,7 +79,7 @@ export class ContentFilteringService implements IPipelineStep {
         webPages: WebPageData[],
         topicName: string,
         topicDescription: string,
-        config: Required<ConfigDto>,
+        config: ConfigDto,
         metrics?: GenerationContext['metrics'],
         customPrompt?: string | null,
     ): Promise<WebPageData[]> {

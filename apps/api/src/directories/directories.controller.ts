@@ -544,7 +544,9 @@ export class DirectoriesController {
         @Param('id') id: string,
         @Body() dto: CreateCategoryDto,
     ) {
-        return this.directoryTaxonomyService.createCategory(id, dto, auth.userId);
+        const result = await this.directoryTaxonomyService.createCategory(id, dto, auth.userId);
+        await this.cacheManager.del(`directory-categories-tags-${id}-${auth.userId}`);
+        return result;
     }
 
     @Put('directories/:id/categories/:categoryId')
@@ -555,7 +557,9 @@ export class DirectoriesController {
         @Param('categoryId') categoryId: string,
         @Body() dto: UpdateCategoryDto,
     ) {
-        return this.directoryTaxonomyService.updateCategory(id, categoryId, dto, auth.userId);
+        const result = await this.directoryTaxonomyService.updateCategory(id, categoryId, dto, auth.userId);
+        await this.cacheManager.del(`directory-categories-tags-${id}-${auth.userId}`);
+        return result;
     }
 
     @Delete('directories/:id/categories/:categoryId')
@@ -565,7 +569,9 @@ export class DirectoriesController {
         @Param('id') id: string,
         @Param('categoryId') categoryId: string,
     ) {
-        return this.directoryTaxonomyService.deleteCategory(id, categoryId, auth.userId);
+        const result = await this.directoryTaxonomyService.deleteCategory(id, categoryId, auth.userId);
+        await this.cacheManager.del(`directory-categories-tags-${id}-${auth.userId}`);
+        return result;
     }
 
     // Tags
@@ -576,7 +582,9 @@ export class DirectoriesController {
         @Param('id') id: string,
         @Body() dto: CreateTagDto,
     ) {
-        return this.directoryTaxonomyService.createTag(id, dto, auth.userId);
+        const result = await this.directoryTaxonomyService.createTag(id, dto, auth.userId);
+        await this.cacheManager.del(`directory-categories-tags-${id}-${auth.userId}`);
+        return result;
     }
 
     @Put('directories/:id/tags/:tagId')
@@ -587,7 +595,9 @@ export class DirectoriesController {
         @Param('tagId') tagId: string,
         @Body() dto: UpdateTagDto,
     ) {
-        return this.directoryTaxonomyService.updateTag(id, tagId, dto, auth.userId);
+        const result = await this.directoryTaxonomyService.updateTag(id, tagId, dto, auth.userId);
+        await this.cacheManager.del(`directory-categories-tags-${id}-${auth.userId}`);
+        return result;
     }
 
     @Delete('directories/:id/tags/:tagId')
@@ -597,6 +607,8 @@ export class DirectoriesController {
         @Param('id') id: string,
         @Param('tagId') tagId: string,
     ) {
-        return this.directoryTaxonomyService.deleteTag(id, tagId, auth.userId);
+        const result = await this.directoryTaxonomyService.deleteTag(id, tagId, auth.userId);
+        await this.cacheManager.del(`directory-categories-tags-${id}-${auth.userId}`);
+        return result;
     }
 }

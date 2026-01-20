@@ -134,6 +134,15 @@ export class DataAggregationService implements IPipelineStep {
             );
         }
 
+        // Apply max_items limit if specified (for sample mode or explicit limit)
+        const maxItems = createItemsGeneratorDto.config?.max_items;
+        if (maxItems && deduplicated.length > maxItems) {
+            this.logger.log(
+                `[${directorySlug}] Applying max_items limit: ${deduplicated.length} → ${maxItems} items`,
+            );
+            deduplicated = deduplicated.slice(0, maxItems);
+        }
+
         // Calculate final output metrics (merging accumulated token/cost metrics)
         const outputMetrics: ItemsGeneratorMetrics = {
             urls_scanned: urlsScannedThisRun,

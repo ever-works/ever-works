@@ -35,6 +35,12 @@ const STORED_CONFIG_DEFAULTS = {
     max_results_per_query: 5,
     max_pages_to_process: 10,
     ai_first_generation_enabled: false,
+    // Data generation defaults - ensure all entities are generated
+    generate_categories: true,
+    generate_tags: true,
+    generate_brands: true,
+    // Default to real mode for stored configs (sample mode is for quick tests)
+    data_volume_mode: 'real',
 };
 
 const DEFAULT_ITEM_MARKDOWN = (item: ItemData) =>
