@@ -5,6 +5,7 @@ import { User } from '../entities/user.entity';
 import { DataRepository, IDataConfig } from '../data-generator/data-repository';
 import { slugifyText } from './utils/text.utils';
 import { ItemsGeneratorService } from './items-generator.service';
+import { ScreenshotOneService } from '../screenshot/screenshot-one.service';
 import {
     SubmitItemDto,
     SubmitItemResponseDto,
@@ -23,6 +24,7 @@ export class ItemSubmissionService {
     constructor(
         private readonly githubService: GithubService,
         private readonly itemsGeneratorService: ItemsGeneratorService,
+        private readonly screenshotOneService: ScreenshotOneService,
     ) {}
 
     async submitItem(
@@ -109,6 +111,19 @@ export class ItemSubmissionService {
                 brand_logo_url: submitItemDto.brand_logo_url || null,
                 images: submitItemDto.images || [],
             };
+
+            // Capture screenshot if service is available and source_url is provided
+            if (submitItemDto.source_url && this.screenshotOneService.isAvailable(directoryOwner)) {
+                const screenshotUrl = await this.captureItemScreenshot(
+                    submitItemDto.source_url,
+                    directoryOwner,
+                );
+                if (screenshotUrl && !itemData.images.includes(screenshotUrl)) {
+                    // Add screenshot as the first image if not already present
+                    itemData.images = [screenshotUrl, ...itemData.images];
+                    this.logger.debug(`Added screenshot for item: ${submitItemDto.name}`);
+                }
+            }
 
             // Process badges for the item if it's a repository
             const itemWithBadges =
@@ -499,6 +514,38 @@ export class ItemSubmissionService {
                 item_slug: updateItemDto.item_slug,
                 message: error.message,
             };
+        }
+    }
+
+    /**
+     * Capture a screenshot of an item's source URL.
+     * Returns the screenshot URL if successful, null otherwise.
+     */
+    private async captureItemScreenshot(sourceUrl: string, user: User): Promise<string | null> {
+        try {
+            // Get the direct URL for the screenshot (not fetching the image)
+            const screenshotUrl = this.screenshotOneService.getScreenshotUrl(
+                {
+                    url: sourceUrl,
+                    blockAds: true,
+                    blockTrackers: true,
+                    blockCookieBanners: true,
+                },
+                user,
+            );
+
+            if (!screenshotUrl) {
+                this.logger.warn(`Failed to generate screenshot URL for: ${sourceUrl}`);
+                return null;
+            }
+
+            this.logger.debug(`Generated screenshot URL for: ${sourceUrl}`);
+            return screenshotUrl;
+        } catch (error) {
+            this.logger.warn(
+                `Failed to capture screenshot for ${sourceUrl}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            );
+            return null;
         }
     }
 }

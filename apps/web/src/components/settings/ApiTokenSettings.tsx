@@ -2,7 +2,12 @@
 
 import { useState, useTransition } from 'react';
 import { cn } from '@/lib/utils/cn';
-import { updateVercelToken, removeVercelToken } from '@/app/actions/settings';
+import {
+    updateVercelToken,
+    removeVercelToken,
+    updateScreenshotOneAccessKey,
+    removeScreenshotOneAccessKey,
+} from '@/app/actions/settings';
 import { toast } from 'sonner';
 import { useTranslations } from 'next-intl';
 import { UserProfile } from '@/lib/api';
@@ -16,6 +21,14 @@ export function ApiTokenSettings({ user }: ApiTokenSettingsProps) {
     const [vercelToken, setVercelToken] = useState(user.vercelToken || '');
     const [hasVercelToken, setHasVercelToken] = useState(!!user.vercelToken);
     const [showToken, setShowToken] = useState(false);
+
+    // ScreenshotOne state
+    const [screenshotoneAccessKey, setScreenshotoneAccessKey] = useState(
+        user.screenshotoneAccessKey || '',
+    );
+    const [hasScreenshotoneKey, setHasScreenshotoneKey] = useState(!!user.screenshotoneAccessKey);
+    const [showScreenshotoneKey, setShowScreenshotoneKey] = useState(false);
+
     const t = useTranslations('dashboard.apiTokens');
 
     const handleSaveVercelToken = () => {
@@ -56,6 +69,49 @@ export function ApiTokenSettings({ user }: ApiTokenSettingsProps) {
                 }
             } catch (error) {
                 toast.error(t('vercel.messages.unexpectedError'));
+            }
+        });
+    };
+
+    // ScreenshotOne handlers
+    const handleSaveScreenshotoneKey = () => {
+        if (!screenshotoneAccessKey.trim()) {
+            toast.error(t('screenshotone.messages.accessKeyRequired'));
+            return;
+        }
+
+        startTransition(async () => {
+            try {
+                const result = await updateScreenshotOneAccessKey(screenshotoneAccessKey.trim());
+
+                if (result.success) {
+                    toast.success(t('screenshotone.messages.saveSuccess'));
+                    setHasScreenshotoneKey(true);
+                    setScreenshotoneAccessKey('');
+                    setShowScreenshotoneKey(false);
+                } else {
+                    toast.error(result.error || t('screenshotone.messages.saveFailed'));
+                }
+            } catch (error) {
+                toast.error(t('screenshotone.messages.unexpectedError'));
+            }
+        });
+    };
+
+    const handleRemoveScreenshotoneKey = () => {
+        startTransition(async () => {
+            try {
+                const result = await removeScreenshotOneAccessKey();
+
+                if (result.success) {
+                    toast.success(t('screenshotone.messages.removeSuccess'));
+                    setScreenshotoneAccessKey('');
+                    setHasScreenshotoneKey(false);
+                } else {
+                    toast.error(result.error || t('screenshotone.messages.removeFailed'));
+                }
+            } catch (error) {
+                toast.error(t('screenshotone.messages.unexpectedError'));
             }
         });
     };
@@ -166,6 +222,115 @@ export function ApiTokenSettings({ user }: ApiTokenSettingsProps) {
                                 )}
                             >
                                 {isPending ? t('vercel.saving') : t('vercel.save')}
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* ScreenshotOne Integration */}
+            <div className="pt-6 border-t border-border dark:border-border-dark space-y-4">
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h3 className="text-lg font-medium text-text dark:text-text-dark">
+                            {t('screenshotone.title')}
+                        </h3>
+                        <p className="text-sm text-text-muted dark:text-text-muted-dark mt-1">
+                            {t('screenshotone.subtitle')}
+                        </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <span
+                            className={cn(
+                                'px-2 py-1 rounded text-xs font-medium',
+                                hasScreenshotoneKey
+                                    ? 'bg-success/10 text-success'
+                                    : 'bg-surface-secondary dark:bg-surface-secondary-dark text-text-muted dark:text-text-muted-dark',
+                            )}
+                        >
+                            {hasScreenshotoneKey
+                                ? t('screenshotone.connected')
+                                : t('screenshotone.notConnected')}
+                        </span>
+                    </div>
+                </div>
+
+                {hasScreenshotoneKey ? (
+                    <div className="p-4 rounded-lg bg-surface-secondary dark:bg-surface-secondary-dark">
+                        <p className="text-sm text-text dark:text-text-dark mb-3">
+                            {t('screenshotone.connectedMessage')}
+                        </p>
+                        <button
+                            onClick={handleRemoveScreenshotoneKey}
+                            disabled={isPending}
+                            className={cn(
+                                'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
+                                'bg-danger/10 text-danger hover:bg-danger/20',
+                                'disabled:opacity-50 disabled:cursor-not-allowed',
+                            )}
+                        >
+                            {isPending
+                                ? t('screenshotone.disconnecting')
+                                : t('screenshotone.disconnect')}
+                        </button>
+                    </div>
+                ) : (
+                    <div className="space-y-4">
+                        <div>
+                            <label className="block text-sm font-medium text-text dark:text-text-dark mb-2">
+                                {t('screenshotone.accessKeyLabel')}
+                            </label>
+                            <div className="relative">
+                                <input
+                                    type={showScreenshotoneKey ? 'text' : 'password'}
+                                    value={screenshotoneAccessKey}
+                                    onChange={(e) => setScreenshotoneAccessKey(e.target.value)}
+                                    className={cn(
+                                        'w-full px-4 py-2 pr-24 rounded-lg',
+                                        'bg-surface dark:bg-surface-dark',
+                                        'border border-border dark:border-border-dark',
+                                        'text-text dark:text-text-dark',
+                                        'focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-primary-dark',
+                                        'placeholder:text-text-muted dark:placeholder:text-text-muted-dark',
+                                        'font-mono',
+                                    )}
+                                    placeholder={t('screenshotone.placeholder')}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowScreenshotoneKey(!showScreenshotoneKey)}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 px-2 py-1 text-xs text-text-muted dark:text-text-muted-dark hover:text-text dark:hover:text-text-dark"
+                                >
+                                    {showScreenshotoneKey
+                                        ? t('screenshotone.hideKey')
+                                        : t('screenshotone.showKey')}
+                                </button>
+                            </div>
+                            <p className="text-xs text-text-muted dark:text-text-muted-dark mt-2">
+                                {t('screenshotone.getKeyHelp')}{' '}
+                                <a
+                                    href="https://screenshotone.com/dashboard"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-primary dark:text-primary-dark hover:underline"
+                                >
+                                    {t('screenshotone.dashboard')}
+                                </a>
+                            </p>
+                        </div>
+
+                        <div className="flex justify-end">
+                            <button
+                                onClick={handleSaveScreenshotoneKey}
+                                disabled={isPending || !screenshotoneAccessKey}
+                                className={cn(
+                                    'px-6 py-2 rounded-lg font-medium transition-colors',
+                                    'bg-primary dark:bg-primary-dark text-white',
+                                    'hover:bg-primary/90 dark:hover:bg-primary-dark/90',
+                                    'disabled:opacity-50 disabled:cursor-not-allowed',
+                                )}
+                            >
+                                {isPending ? t('screenshotone.saving') : t('screenshotone.save')}
                             </button>
                         </div>
                     </div>

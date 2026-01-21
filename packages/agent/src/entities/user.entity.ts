@@ -53,6 +53,9 @@ export class User {
     @Column({ nullable: true })
     vercelToken: string;
 
+    @Column({ nullable: true })
+    screenshotoneAccessKey: string;
+
     // User status
     @Column({ default: true })
     isActive: boolean;

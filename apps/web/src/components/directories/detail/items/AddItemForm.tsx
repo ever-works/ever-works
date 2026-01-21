@@ -7,8 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
-import { Loader2, Link2, Plus, X } from 'lucide-react';
-import { extractItemDetails } from '@/app/actions/dashboard/items';
+import { Loader2, Link2, Plus, X, Camera } from 'lucide-react';
+import { extractItemDetails, captureScreenshot } from '@/app/actions/dashboard/items';
 import { toast } from 'sonner';
 import { CategoriesField } from './CategoriesField';
 
@@ -45,6 +45,7 @@ export const AddItemForm = memo(function AddItemForm({
 }: AddItemFormProps) {
     const t = useTranslations('dashboard.directoryDetail.items.addModal');
     const [isExtracting, setIsExtracting] = useState(false);
+    const [isCapturingScreenshot, setIsCapturingScreenshot] = useState(false);
     const [tagInput, setTagInput] = useState('');
     const [imageInput, setImageInput] = useState('');
 
@@ -164,6 +165,40 @@ export const AddItemForm = memo(function AddItemForm({
             ...formData,
             images: formData.images.filter((img) => img !== url),
         });
+    };
+
+    const handleCaptureScreenshot = async () => {
+        if (!formData.source_url) {
+            toast.error(t('errors.urlRequired'));
+            return;
+        }
+
+        if (!isValidHttpUrl(formData.source_url)) {
+            toast.error(t('errors.invalidUrl'));
+            return;
+        }
+
+        setIsCapturingScreenshot(true);
+        try {
+            const result = await captureScreenshot(formData.source_url);
+
+            if (result.success && result.imageUrl) {
+                if (!formData.images.includes(result.imageUrl)) {
+                    setFormData({
+                        ...formData,
+                        images: [result.imageUrl, ...formData.images],
+                    });
+                }
+                toast.success(result.message || t('screenshotSuccess'));
+            } else {
+                toast.error(result.error || t('screenshotFailed'));
+            }
+        } catch (error) {
+            console.error(error);
+            toast.error(t('screenshotError'));
+        } finally {
+            setIsCapturingScreenshot(false);
+        }
     };
 
     return (
@@ -287,6 +322,9 @@ export const AddItemForm = memo(function AddItemForm({
                 setImageInput={setImageInput}
                 onAddImage={handleAddImage}
                 onRemoveImage={handleRemoveImage}
+                onCaptureScreenshot={handleCaptureScreenshot}
+                isCapturingScreenshot={isCapturingScreenshot}
+                sourceUrl={formData.source_url}
                 isPending={isPending}
             />
 
@@ -394,6 +432,9 @@ interface ImagesFieldProps {
     setImageInput: (value: string) => void;
     onAddImage: () => void;
     onRemoveImage: (url: string) => void;
+    onCaptureScreenshot: () => void;
+    isCapturingScreenshot: boolean;
+    sourceUrl: string;
     isPending: boolean;
 }
 
@@ -403,9 +444,21 @@ const ImagesField = memo(function ImagesField({
     setImageInput,
     onAddImage,
     onRemoveImage,
+    onCaptureScreenshot,
+    isCapturingScreenshot,
+    sourceUrl,
     isPending,
 }: ImagesFieldProps) {
     const t = useTranslations('dashboard.directoryDetail.items.addModal');
+
+    const isValidHttpUrl = (value: string) => {
+        try {
+            const url = new URL(value);
+            return url.protocol === 'http:' || url.protocol === 'https:';
+        } catch {
+            return false;
+        }
+    };
 
     return (
         <div className="space-y-2">
@@ -437,7 +490,31 @@ const ImagesField = memo(function ImagesField({
                     <Plus className="w-4 h-4" />
                 </Button>
             </div>
-            <p className="text-xs text-text-muted dark:text-text-muted-dark">{t('imagesHelp')}</p>
+            <div className="flex items-center gap-2">
+                <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={onCaptureScreenshot}
+                    disabled={
+                        isPending ||
+                        isCapturingScreenshot ||
+                        !sourceUrl ||
+                        !isValidHttpUrl(sourceUrl)
+                    }
+                    className="shrink-0"
+                >
+                    {isCapturingScreenshot ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                        <Camera className="w-4 h-4" />
+                    )}
+                    <span className="ml-2">{t('captureScreenshot')}</span>
+                </Button>
+                <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                    {t('captureScreenshotHelp')}
+                </p>
+            </div>
             {images.length > 0 && (
                 <div className="flex flex-wrap gap-2 mt-2">
                     {images.map((url) => (

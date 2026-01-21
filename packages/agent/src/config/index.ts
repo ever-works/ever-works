@@ -310,6 +310,25 @@ export const config = {
         },
     },
 
+    // ScreenshotOne configuration
+    screenshotone: {
+        getAccessKey() {
+            return process.env.SCREENSHOTONE_ACCESS_KEY;
+        },
+        getDefaultViewportWidth() {
+            return parseInt(process.env.SCREENSHOTONE_VIEWPORT_WIDTH || '1280');
+        },
+        getDefaultViewportHeight() {
+            return parseInt(process.env.SCREENSHOTONE_VIEWPORT_HEIGHT || '800');
+        },
+        getDefaultFormat() {
+            return (process.env.SCREENSHOTONE_FORMAT as 'png' | 'jpg' | 'webp') || 'png';
+        },
+        isEnabled() {
+            return Boolean(process.env.SCREENSHOTONE_ACCESS_KEY);
+        },
+    },
+
     // Tavily configuration
     tavily: {
         getApiKey() {

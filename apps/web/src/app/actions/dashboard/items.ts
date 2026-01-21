@@ -1,6 +1,7 @@
 'use server';
 
 import { itemsGeneratorAPI, SubmitItemDto, RemoveItemDto, UpdateItemDto } from '@/lib/api';
+import { screenshotAPI } from '@/lib/api/screenshot';
 import { getAuthFromCookie } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { ROUTES } from '@/lib/constants';
@@ -173,5 +174,71 @@ export async function updateItem(directoryId: string, data: UpdateItemDto) {
             status: 'error',
             message: error instanceof Error ? error.message : t('updateError'),
         };
+    }
+}
+
+export async function captureScreenshot(sourceUrl: string) {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    const t = await getTranslations('dashboard.directoryDetail.items.screenshot');
+
+    try {
+        // First check if the service is available
+        const availability = await screenshotAPI.checkAvailability();
+
+        if (!availability.available) {
+            return {
+                success: false,
+                error: t('notConfigured'),
+            };
+        }
+
+        // Get the screenshot URL
+        const response = await screenshotAPI.getScreenshotUrl({
+            url: sourceUrl,
+            blockAds: true,
+            blockTrackers: true,
+            blockCookieBanners: true,
+        });
+
+        if (response.status !== 'success' || !response.imageUrl) {
+            return {
+                success: false,
+                error: response.message || t('captureFailed'),
+            };
+        }
+
+        return {
+            success: true,
+            imageUrl: response.imageUrl,
+            message: t('captureSuccess'),
+        };
+    } catch (error) {
+        console.error('Capture screenshot error:', error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : t('captureError'),
+        };
+    }
+}
+
+export async function checkScreenshotAvailability() {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        return { available: false };
+    }
+
+    try {
+        const availability = await screenshotAPI.checkAvailability();
+        return {
+            available: availability.available,
+            hasGlobalKey: availability.hasGlobalKey,
+            hasUserKey: availability.hasUserKey,
+        };
+    } catch {
+        return { available: false };
     }
 }

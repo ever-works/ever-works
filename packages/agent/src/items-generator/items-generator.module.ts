@@ -23,6 +23,7 @@ import {
 import { AiModule } from '../ai';
 import { GitModule } from '../git';
 import { DatabaseModule } from '../database/database.module';
+import { ScreenshotModule } from '../screenshot/screenshot.module';
 import { PipelineExecutor } from './pipeline/pipeline-executor';
 
 export const STEP_SERVICES = [
@@ -61,7 +62,7 @@ export const STEP_SERVICES = [
 export const STEP_SERVICES_EXPORTS = [ItemsGeneratorService, ItemSubmissionService];
 
 @Module({
-    imports: [AiModule, GitModule, DatabaseModule],
+    imports: [AiModule, GitModule, DatabaseModule, ScreenshotModule],
     providers: STEP_SERVICES,
     exports: STEP_SERVICES_EXPORTS,
 })

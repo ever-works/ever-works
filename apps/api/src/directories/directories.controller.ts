@@ -557,7 +557,12 @@ export class DirectoriesController {
         @Param('categoryId') categoryId: string,
         @Body() dto: UpdateCategoryDto,
     ) {
-        const result = await this.directoryTaxonomyService.updateCategory(id, categoryId, dto, auth.userId);
+        const result = await this.directoryTaxonomyService.updateCategory(
+            id,
+            categoryId,
+            dto,
+            auth.userId,
+        );
         await this.cacheManager.del(`directory-categories-tags-${id}-${auth.userId}`);
         return result;
     }
@@ -569,7 +574,11 @@ export class DirectoriesController {
         @Param('id') id: string,
         @Param('categoryId') categoryId: string,
     ) {
-        const result = await this.directoryTaxonomyService.deleteCategory(id, categoryId, auth.userId);
+        const result = await this.directoryTaxonomyService.deleteCategory(
+            id,
+            categoryId,
+            auth.userId,
+        );
         await this.cacheManager.del(`directory-categories-tags-${id}-${auth.userId}`);
         return result;
     }
