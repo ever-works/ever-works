@@ -315,6 +315,9 @@ export const config = {
         getAccessKey() {
             return process.env.SCREENSHOTONE_ACCESS_KEY;
         },
+        getSecretKey() {
+            return process.env.SCREENSHOTONE_SECRET_KEY;
+        },
         getDefaultViewportWidth() {
             return parseInt(process.env.SCREENSHOTONE_VIEWPORT_WIDTH || '1280');
         },

@@ -30,6 +30,7 @@ export interface UpdateProfileDto {
     avatar?: string;
     vercelToken?: string;
     screenshotoneAccessKey?: string;
+    screenshotoneSecretKey?: string;
 }
 
 // DTOs - Email Verification
@@ -62,6 +63,7 @@ export interface UserProfile {
     emailVerified?: boolean;
     vercelToken?: string;
     screenshotoneAccessKey?: string;
+    screenshotoneSecretKey?: string;
 }
 
 export interface OAuthUrlResponse {

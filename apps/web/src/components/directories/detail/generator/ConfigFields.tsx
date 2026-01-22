@@ -13,6 +13,7 @@ interface ConfigFieldsProps {
     generationMethod?: GenerationMethod;
     updateWithPullRequest?: boolean;
     badgeEvaluationEnabled?: boolean;
+    captureScreenshots?: boolean;
     websiteRepositoryCreationMethod?: WebsiteRepositoryCreationMethod;
     onChange: (
         updates: Partial<{
@@ -20,6 +21,7 @@ interface ConfigFieldsProps {
             generation_method?: GenerationMethod;
             update_with_pull_request?: boolean;
             badge_evaluation_enabled?: boolean;
+            capture_screenshots?: boolean;
             website_repository_creation_method?: WebsiteRepositoryCreationMethod;
         }>,
     ) => void;
@@ -45,6 +47,7 @@ export function ConfigFields({
     generationMethod,
     updateWithPullRequest,
     badgeEvaluationEnabled,
+    captureScreenshots,
     websiteRepositoryCreationMethod,
     onChange,
 }: ConfigFieldsProps) {
@@ -105,6 +108,14 @@ export function ConfigFields({
                     onChange={(e) => onChange({ badge_evaluation_enabled: e.target.checked })}
                     label={t('enableBadgeEvaluation')}
                     description={t('enableBadgeEvaluationDescription')}
+                    variant="form"
+                />
+
+                <Checkbox
+                    checked={captureScreenshots}
+                    onChange={(e) => onChange({ capture_screenshots: e.target.checked })}
+                    label={t('captureScreenshots')}
+                    description={t('captureScreenshotsDescription')}
                     variant="form"
                 />
             </div>

@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import * as screenshotone from 'screenshotone-api-sdk';
 import axios from 'axios';
 import { config } from '../config';
 import { User } from '../entities/user.entity';
@@ -27,35 +28,68 @@ export interface ScreenshotValidationResult {
     message?: string;
 }
 
+export interface ScreenshotKeys {
+    accessKey: string;
+    secretKey?: string;
+}
+
 @Injectable()
 export class ScreenshotOneService {
     private readonly logger = new Logger(ScreenshotOneService.name);
-    private readonly baseUrl = 'https://api.screenshotone.com/take';
 
-    /**
-     * Resolves the access key to use. User key takes precedence over global.
-     */
-    resolveAccessKey(user?: User): string | null {
-        if (user?.screenshotoneAccessKey) {
-            return user.screenshotoneAccessKey;
-        }
-        return config.screenshotone.getAccessKey() || null;
-    }
-
-    /**
-     * Checks if the service is available (has a valid access key configured).
-     */
-    isAvailable(user?: User): boolean {
-        return this.resolveAccessKey(user) !== null;
-    }
-
-    /**
-     * Captures a screenshot of the given URL.
-     */
-    async capture(options: ScreenshotOptions, user?: User): Promise<ScreenshotResult> {
-        const accessKey = this.resolveAccessKey(user);
-
+    resolveKeys(user?: User): ScreenshotKeys | null {
+        const accessKey = user?.screenshotoneAccessKey || config.screenshotone.getAccessKey();
         if (!accessKey) {
+            return null;
+        }
+
+        const secretKey = user?.screenshotoneSecretKey || config.screenshotone.getSecretKey();
+        return { accessKey, secretKey: secretKey || undefined };
+    }
+
+    isAvailable(user?: User): boolean {
+        return this.resolveKeys(user) !== null;
+    }
+
+    private createClient(keys: ScreenshotKeys): screenshotone.Client {
+        return new screenshotone.Client(keys.accessKey, keys.secretKey || '');
+    }
+
+    private buildTakeOptions(options: ScreenshotOptions): screenshotone.TakeOptions {
+        const takeOptions = screenshotone.TakeOptions.url(options.url)
+            .viewportWidth(options.viewportWidth || config.screenshotone.getDefaultViewportWidth())
+            .viewportHeight(
+                options.viewportHeight || config.screenshotone.getDefaultViewportHeight(),
+            )
+            .format(options.format || config.screenshotone.getDefaultFormat());
+
+        if (options.fullPage) {
+            takeOptions.fullPage(true);
+        }
+
+        if (options.delay !== undefined && options.delay > 0) {
+            takeOptions.delay(options.delay);
+        }
+
+        if (options.blockAds) {
+            takeOptions.blockAds(true);
+        }
+
+        if (options.blockTrackers) {
+            takeOptions.blockTrackers(true);
+        }
+
+        if (options.blockCookieBanners) {
+            takeOptions.blockCookieBanners(true);
+        }
+
+        return takeOptions;
+    }
+
+    async capture(options: ScreenshotOptions, user?: User): Promise<ScreenshotResult> {
+        const keys = this.resolveKeys(user);
+
+        if (!keys) {
             this.logger.warn('ScreenshotOne capture attempted without API key');
             return {
                 success: false,
@@ -64,33 +98,38 @@ export class ScreenshotOneService {
         }
 
         try {
-            const params = this.buildParams(options, accessKey);
-            const queryString = new URLSearchParams(params).toString();
-            const screenshotUrl = `${this.baseUrl}?${queryString}`;
+            const client = this.createClient(keys);
+            const takeOptions = this.buildTakeOptions(options);
 
-            this.logger.debug(`Capturing screenshot for URL: ${options.url}`);
+            this.logger.debug(
+                `Capturing screenshot for URL: ${options.url} (signed: ${!!keys.secretKey})`,
+            );
 
-            // Fetch the screenshot as a buffer
-            const response = await axios.get(screenshotUrl, {
-                responseType: 'arraybuffer',
-                timeout: 60000, // 60 second timeout
-                validateStatus: (status) => status >= 200 && status < 400,
-            });
+            // Use SDK's take() method to fetch the screenshot
+            const imageBlob = await client.take(takeOptions);
+            const imageBuffer = Buffer.from(await imageBlob.arrayBuffer());
 
-            if (response.status !== 200) {
-                return {
-                    success: false,
-                    error: `Screenshot API returned status ${response.status}`,
-                };
-            }
+            // Generate signed URL for reference (if secret key is available)
+            const screenshotUrl = keys.secretKey
+                ? await client.generateSignedTakeURL(takeOptions)
+                : await client.generateTakeURL(takeOptions);
 
-            // Return the image URL (for direct use) and buffer (for storage)
             return {
                 success: true,
                 imageUrl: screenshotUrl,
-                imageBuffer: Buffer.from(response.data),
+                imageBuffer,
             };
         } catch (error) {
+            if (error instanceof screenshotone.APIError) {
+                this.logger.error(
+                    `ScreenshotOne API error for ${options.url}: ${error.errorMessage} (${error.errorCode})`,
+                );
+                return {
+                    success: false,
+                    error: error.errorMessage || `API error: ${error.errorCode}`,
+                };
+            }
+
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
             this.logger.error(`Failed to capture screenshot for ${options.url}: ${errorMessage}`);
 
@@ -101,26 +140,25 @@ export class ScreenshotOneService {
         }
     }
 
-    /**
-     * Gets the direct URL for a screenshot (without fetching it).
-     * Useful for displaying screenshots directly in img tags.
-     */
-    getScreenshotUrl(options: ScreenshotOptions, user?: User): string | null {
-        const accessKey = this.resolveAccessKey(user);
+    async getScreenshotUrl(options: ScreenshotOptions, user?: User): Promise<string | null> {
+        const keys = this.resolveKeys(user);
 
-        if (!accessKey) {
+        if (!keys) {
             return null;
         }
 
-        const params = this.buildParams(options, accessKey);
-        const queryString = new URLSearchParams(params).toString();
-        return `${this.baseUrl}?${queryString}`;
+        const client = this.createClient(keys);
+        const takeOptions = this.buildTakeOptions(options);
+
+        return keys.secretKey
+            ? await client.generateSignedTakeURL(takeOptions)
+            : await client.generateTakeURL(takeOptions);
     }
 
-    /**
-     * Validates an access key by making a test request to the API.
-     */
-    async validateAccessKey(accessKey: string): Promise<ScreenshotValidationResult> {
+    async validateKeys(
+        accessKey: string,
+        secretKey?: string,
+    ): Promise<ScreenshotValidationResult> {
         if (!accessKey || typeof accessKey !== 'string') {
             return {
                 valid: false,
@@ -129,20 +167,15 @@ export class ScreenshotOneService {
         }
 
         try {
-            // Test the key by trying to capture a screenshot of a simple page
-            const testUrl = 'https://httpbin.org/html';
-            const params = this.buildParams(
-                {
-                    url: testUrl,
-                    viewportWidth: 320,
-                    viewportHeight: 240,
-                    format: 'png',
-                },
-                accessKey,
-            );
+            const client = new screenshotone.Client(accessKey, secretKey || '');
+            const testOptions = screenshotone.TakeOptions.url('https://httpbin.org/html')
+                .viewportWidth(320)
+                .viewportHeight(240)
+                .format('png');
 
-            const queryString = new URLSearchParams(params).toString();
-            const screenshotUrl = `${this.baseUrl}?${queryString}`;
+            const screenshotUrl = secretKey
+                ? await client.generateSignedTakeURL(testOptions)
+                : await client.generateTakeURL(testOptions);
 
             const response = await axios.head(screenshotUrl, {
                 timeout: 30000,
@@ -152,12 +185,14 @@ export class ScreenshotOneService {
             if (response.status === 200) {
                 return {
                     valid: true,
-                    message: 'Access key is valid',
+                    message: secretKey
+                        ? 'Access key and secret key are valid'
+                        : 'Access key is valid',
                 };
             } else if (response.status === 401 || response.status === 403) {
                 return {
                     valid: false,
-                    message: 'Invalid or unauthorized access key',
+                    message: 'Invalid or unauthorized keys',
                 };
             } else {
                 return {
@@ -166,53 +201,27 @@ export class ScreenshotOneService {
                 };
             }
         } catch (error) {
+            if (error instanceof screenshotone.APIError) {
+                return {
+                    valid: false,
+                    message: error.errorMessage || 'Invalid keys',
+                };
+            }
+
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-            this.logger.error(`Failed to validate access key: ${errorMessage}`);
+            this.logger.error(`Failed to validate keys: ${errorMessage}`);
 
             return {
                 valid: false,
-                message: 'Failed to validate access key',
+                message: 'Failed to validate keys',
             };
         }
     }
 
     /**
-     * Builds the query parameters for the ScreenshotOne API.
+     * @deprecated Use validateKeys instead
      */
-    private buildParams(options: ScreenshotOptions, accessKey: string): Record<string, string> {
-        const params: Record<string, string> = {
-            access_key: accessKey,
-            url: options.url,
-            viewport_width: String(
-                options.viewportWidth || config.screenshotone.getDefaultViewportWidth(),
-            ),
-            viewport_height: String(
-                options.viewportHeight || config.screenshotone.getDefaultViewportHeight(),
-            ),
-            format: options.format || config.screenshotone.getDefaultFormat(),
-        };
-
-        // Optional parameters
-        if (options.fullPage) {
-            params.full_page = 'true';
-        }
-
-        if (options.delay !== undefined && options.delay > 0) {
-            params.delay = String(options.delay);
-        }
-
-        if (options.blockAds) {
-            params.block_ads = 'true';
-        }
-
-        if (options.blockTrackers) {
-            params.block_trackers = 'true';
-        }
-
-        if (options.blockCookieBanners) {
-            params.block_cookie_banners = 'true';
-        }
-
-        return params;
+    async validateAccessKey(accessKey: string): Promise<ScreenshotValidationResult> {
+        return this.validateKeys(accessKey);
     }
 }

@@ -1,5 +1,6 @@
 import { BadRequestException, Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
-import { ScreenshotOneService } from '@packages/agent/screenshot';
+import { ScreenshotOneService, SmartImageRouterService } from '@packages/agent/screenshot';
+import { DomainType } from '@packages/agent/items-generator';
 import { CurrentUser, JwtAuthGuard } from '../auth';
 import { AuthenticatedUser } from '../auth/types/jwt.types';
 import { AuthService } from '../auth/services/auth.service';
@@ -7,6 +8,8 @@ import {
     ValidateCredentialsDto,
     CaptureScreenshotDto,
     GetScreenshotUrlDto,
+    SmartImagePreviewDto,
+    SmartImagePreviewResponseDto,
 } from './dto/screenshot.dto';
 
 @Controller('api/screenshot')
@@ -14,15 +17,16 @@ import {
 export class ScreenshotController {
     constructor(
         private readonly screenshotOneService: ScreenshotOneService,
+        private readonly smartImageRouterService: SmartImageRouterService,
         private readonly authService: AuthService,
     ) {}
 
     /**
-     * Validate a ScreenshotOne access key.
+     * Validate ScreenshotOne access key and optional secret key.
      */
     @Post('/validate-credentials')
     async validateCredentials(@Body() dto: ValidateCredentialsDto) {
-        const result = await this.screenshotOneService.validateAccessKey(dto.accessKey);
+        const result = await this.screenshotOneService.validateKeys(dto.accessKey, dto.secretKey);
 
         return {
             status: result.valid ? 'success' : 'error',
@@ -114,7 +118,7 @@ export class ScreenshotController {
             });
         }
 
-        const imageUrl = this.screenshotOneService.getScreenshotUrl(
+        const imageUrl = await this.screenshotOneService.getScreenshotUrl(
             {
                 url: dto.url,
                 viewportWidth: dto.viewportWidth,
@@ -139,6 +143,35 @@ export class ScreenshotController {
         return {
             status: 'success',
             imageUrl,
+        };
+    }
+
+    /**
+     * Get a smart image for a URL based on domain type.
+     * Routes to product image extraction for ecommerce, screenshots for software.
+     */
+    @Post('/smart-preview')
+    async getSmartImagePreview(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Body() dto: SmartImagePreviewDto,
+    ): Promise<SmartImagePreviewResponseDto> {
+        const user = await this.authService.getUser(auth.userId);
+
+        const domainType = (dto.domainType as DomainType) || DomainType.GENERAL;
+
+        const result = await this.smartImageRouterService.getSmartImage({
+            url: dto.url,
+            domainType,
+            itemName: dto.itemName,
+            user,
+        });
+
+        return {
+            status: result.primaryImage ? 'success' : 'error',
+            primaryImage: result.primaryImage,
+            source: result.source,
+            confidence: result.confidence,
+            error: result.error,
         };
     }
 }

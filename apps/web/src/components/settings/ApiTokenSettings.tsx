@@ -5,8 +5,8 @@ import { cn } from '@/lib/utils/cn';
 import {
     updateVercelToken,
     removeVercelToken,
-    updateScreenshotOneAccessKey,
-    removeScreenshotOneAccessKey,
+    updateScreenshotOneKeys,
+    removeScreenshotOneKeys,
 } from '@/app/actions/settings';
 import { toast } from 'sonner';
 import { useTranslations } from 'next-intl';
@@ -26,8 +26,12 @@ export function ApiTokenSettings({ user }: ApiTokenSettingsProps) {
     const [screenshotoneAccessKey, setScreenshotoneAccessKey] = useState(
         user.screenshotoneAccessKey || '',
     );
+    const [screenshotoneSecretKey, setScreenshotoneSecretKey] = useState(
+        user.screenshotoneSecretKey || '',
+    );
     const [hasScreenshotoneKey, setHasScreenshotoneKey] = useState(!!user.screenshotoneAccessKey);
     const [showScreenshotoneKey, setShowScreenshotoneKey] = useState(false);
+    const [showScreenshotoneSecretKey, setShowScreenshotoneSecretKey] = useState(false);
 
     const t = useTranslations('dashboard.apiTokens');
 
@@ -74,7 +78,7 @@ export function ApiTokenSettings({ user }: ApiTokenSettingsProps) {
     };
 
     // ScreenshotOne handlers
-    const handleSaveScreenshotoneKey = () => {
+    const handleSaveScreenshotoneKeys = () => {
         if (!screenshotoneAccessKey.trim()) {
             toast.error(t('screenshotone.messages.accessKeyRequired'));
             return;
@@ -82,13 +86,18 @@ export function ApiTokenSettings({ user }: ApiTokenSettingsProps) {
 
         startTransition(async () => {
             try {
-                const result = await updateScreenshotOneAccessKey(screenshotoneAccessKey.trim());
+                const result = await updateScreenshotOneKeys(
+                    screenshotoneAccessKey.trim(),
+                    screenshotoneSecretKey.trim() || undefined,
+                );
 
                 if (result.success) {
                     toast.success(t('screenshotone.messages.saveSuccess'));
                     setHasScreenshotoneKey(true);
                     setScreenshotoneAccessKey('');
+                    setScreenshotoneSecretKey('');
                     setShowScreenshotoneKey(false);
+                    setShowScreenshotoneSecretKey(false);
                 } else {
                     toast.error(result.error || t('screenshotone.messages.saveFailed'));
                 }
@@ -98,14 +107,15 @@ export function ApiTokenSettings({ user }: ApiTokenSettingsProps) {
         });
     };
 
-    const handleRemoveScreenshotoneKey = () => {
+    const handleRemoveScreenshotoneKeys = () => {
         startTransition(async () => {
             try {
-                const result = await removeScreenshotOneAccessKey();
+                const result = await removeScreenshotOneKeys();
 
                 if (result.success) {
                     toast.success(t('screenshotone.messages.removeSuccess'));
                     setScreenshotoneAccessKey('');
+                    setScreenshotoneSecretKey('');
                     setHasScreenshotoneKey(false);
                 } else {
                     toast.error(result.error || t('screenshotone.messages.removeFailed'));
@@ -261,7 +271,7 @@ export function ApiTokenSettings({ user }: ApiTokenSettingsProps) {
                             {t('screenshotone.connectedMessage')}
                         </p>
                         <button
-                            onClick={handleRemoveScreenshotoneKey}
+                            onClick={handleRemoveScreenshotoneKeys}
                             disabled={isPending}
                             className={cn(
                                 'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
@@ -307,7 +317,44 @@ export function ApiTokenSettings({ user }: ApiTokenSettingsProps) {
                                 </button>
                             </div>
                             <p className="text-xs text-text-muted dark:text-text-muted-dark mt-2">
-                                {t('screenshotone.getKeyHelp')}{' '}
+                                {t('screenshotone.accessKeyHelp')}
+                            </p>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-text dark:text-text-dark mb-2">
+                                {t('screenshotone.secretKeyLabel')}
+                            </label>
+                            <div className="relative">
+                                <input
+                                    type={showScreenshotoneSecretKey ? 'text' : 'password'}
+                                    value={screenshotoneSecretKey}
+                                    onChange={(e) => setScreenshotoneSecretKey(e.target.value)}
+                                    className={cn(
+                                        'w-full px-4 py-2 pr-24 rounded-lg',
+                                        'bg-surface dark:bg-surface-dark',
+                                        'border border-border dark:border-border-dark',
+                                        'text-text dark:text-text-dark',
+                                        'focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-primary-dark',
+                                        'placeholder:text-text-muted dark:placeholder:text-text-muted-dark',
+                                        'font-mono',
+                                    )}
+                                    placeholder={t('screenshotone.secretKeyPlaceholder')}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        setShowScreenshotoneSecretKey(!showScreenshotoneSecretKey)
+                                    }
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 px-2 py-1 text-xs text-text-muted dark:text-text-muted-dark hover:text-text dark:hover:text-text-dark"
+                                >
+                                    {showScreenshotoneSecretKey
+                                        ? t('screenshotone.hideKey')
+                                        : t('screenshotone.showKey')}
+                                </button>
+                            </div>
+                            <p className="text-xs text-text-muted dark:text-text-muted-dark mt-2">
+                                {t('screenshotone.secretKeyHelp')}{' '}
                                 <a
                                     href="https://screenshotone.com/dashboard"
                                     target="_blank"
@@ -321,7 +368,7 @@ export function ApiTokenSettings({ user }: ApiTokenSettingsProps) {
 
                         <div className="flex justify-end">
                             <button
-                                onClick={handleSaveScreenshotoneKey}
+                                onClick={handleSaveScreenshotoneKeys}
                                 disabled={isPending || !screenshotoneAccessKey}
                                 className={cn(
                                     'px-6 py-2 rounded-lg font-medium transition-colors',

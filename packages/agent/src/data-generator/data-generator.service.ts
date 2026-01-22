@@ -408,6 +408,14 @@ export class DataGeneratorService {
                 itemsCount: generatedItems.items.length + existingData.existingItems.length,
             });
 
+            // Persist domain type if detected and not manually set
+            if (generatedItems.domainAnalysis && !directory.domainTypeManuallySet) {
+                await this.directoryOperations.updateDirectory(directory.id, {
+                    domainType: generatedItems.domainAnalysis.domain_type,
+                    domainTypeConfidence: generatedItems.domainAnalysis.confidence,
+                });
+            }
+
             const stats: GenerationStats = {
                 newItemsCount,
                 updatedItemsCount,

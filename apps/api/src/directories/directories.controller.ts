@@ -36,6 +36,7 @@ import {
     UpdateItemsGeneratorDto,
     UpdateItemDto,
 } from '@packages/agent/items-generator';
+import { BulkCaptureImagesDto, BulkCaptureImagesResponseDto } from '@packages/agent/services';
 import {
     DirectoryDetailService,
     DirectoryGenerationService,
@@ -376,6 +377,39 @@ export class DirectoriesController {
         @Body() extractItemDetailsDto: ExtractItemDetailsDto,
     ): Promise<ExtractItemDetailsResponseDto> {
         return this.directoryGenerationService.extractItemDetails(extractItemDetailsDto);
+    }
+
+    // ============================================
+    // Bulk Image Capture Endpoints
+    // ============================================
+
+    @Post('directories/:id/bulk-capture-images')
+    @HttpCode(HttpStatus.OK)
+    async bulkCaptureImages(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') id: string,
+        @Body() dto: BulkCaptureImagesDto,
+    ): Promise<BulkCaptureImagesResponseDto> {
+        const user = await this.authService.getUser(auth.userId);
+
+        return this.directoryGenerationService.bulkCaptureImages(id, dto, user);
+    }
+
+    @Put('directories/:id/domain-type')
+    @HttpCode(HttpStatus.OK)
+    async updateDomainType(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') id: string,
+        @Body() dto: { domainType: string; manuallySet?: boolean },
+    ) {
+        const user = await this.authService.getUser(auth.userId);
+
+        return this.directoryGenerationService.updateDomainType(
+            id,
+            dto.domainType,
+            user,
+            dto.manuallySet ?? true,
+        );
     }
 
     @Post('directories/:id/regenerate-markdown')

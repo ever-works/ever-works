@@ -167,12 +167,13 @@ export async function removeVercelToken() {
 }
 
 // ScreenshotOne Token Actions
-export async function updateScreenshotOneAccessKey(accessKey: string) {
+export async function updateScreenshotOneKeys(accessKey: string, secretKey?: string) {
     const t = await getTranslations('actions.settings.screenshotone');
 
     // Validation schema with translations
-    const screenshotoneAccessKeySchema = z.object({
+    const screenshotoneKeysSchema = z.object({
         accessKey: z.string().min(1, t('accessKeyRequired')),
+        secretKey: z.string().optional(),
     });
 
     try {
@@ -182,7 +183,7 @@ export async function updateScreenshotOneAccessKey(accessKey: string) {
         }
 
         // Validate input
-        const validation = screenshotoneAccessKeySchema.safeParse({ accessKey });
+        const validation = screenshotoneKeysSchema.safeParse({ accessKey, secretKey });
         if (!validation.success) {
             return {
                 success: false,
@@ -192,6 +193,7 @@ export async function updateScreenshotOneAccessKey(accessKey: string) {
 
         const validationResponse = await screenshotAPI.validateCredentials(
             validation.data.accessKey,
+            validation.data.secretKey,
         );
 
         if (validationResponse.status !== 'success' || !validationResponse.valid) {
@@ -201,7 +203,10 @@ export async function updateScreenshotOneAccessKey(accessKey: string) {
             };
         }
 
-        await authAPI.updateProfile({ screenshotoneAccessKey: validation.data.accessKey });
+        await authAPI.updateProfile({
+            screenshotoneAccessKey: validation.data.accessKey,
+            screenshotoneSecretKey: validation.data.secretKey || '',
+        });
         revalidatePath(ROUTES.DASHBOARD_SETTINGS_API_TOKENS);
 
         return { success: true, message: t('saveSuccess') };
@@ -213,7 +218,7 @@ export async function updateScreenshotOneAccessKey(accessKey: string) {
     }
 }
 
-export async function removeScreenshotOneAccessKey() {
+export async function removeScreenshotOneKeys() {
     const t = await getTranslations('actions.settings.screenshotone');
 
     try {
@@ -222,7 +227,10 @@ export async function removeScreenshotOneAccessKey() {
             return { success: false, error: t('notAuthenticated') };
         }
 
-        await authAPI.updateProfile({ screenshotoneAccessKey: '' });
+        await authAPI.updateProfile({
+            screenshotoneAccessKey: '',
+            screenshotoneSecretKey: '',
+        });
         revalidatePath(ROUTES.DASHBOARD_SETTINGS_API_TOKENS);
 
         return { success: true, message: t('removeSuccess') };

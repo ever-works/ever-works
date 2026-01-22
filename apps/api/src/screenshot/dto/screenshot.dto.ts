@@ -1,8 +1,14 @@
 import { IsString, IsOptional, IsNumber, IsBoolean, IsUrl, Min, Max, IsIn } from 'class-validator';
 
+export * from './smart-image.dto';
+
 export class ValidateCredentialsDto {
     @IsString()
     accessKey: string;
+
+    @IsOptional()
+    @IsString()
+    secretKey?: string;
 }
 
 export class CaptureScreenshotDto {

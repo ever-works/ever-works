@@ -38,6 +38,7 @@ export interface CreateItemsGeneratorDto {
     generation_method?: GenerationMethod;
     update_with_pull_request?: boolean;
     badge_evaluation_enabled?: boolean;
+    capture_screenshots?: boolean;
     website_repository_creation_method?: WebsiteRepositoryCreationMethod;
 }
 

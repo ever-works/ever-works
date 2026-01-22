@@ -226,6 +226,17 @@ export class CreateItemsGeneratorDto {
     @IsEnum(WebsiteRepositoryCreationMethod)
     website_repository_creation_method?: WebsiteRepositoryCreationMethod =
         WebsiteRepositoryCreationMethod.CREATE_USING_TEMPLATE;
+
+    /**
+     * When enabled, captures images for each generated item using smart routing:
+     * - SOFTWARE/SERVICES: Takes screenshots of the source URLs
+     * - ECOMMERCE/GENERAL: Extracts product images (og:image, JSON-LD), falls back to screenshots
+     *
+     * Default: false (lazy mode - images are not captured during generation)
+     */
+    @IsOptional()
+    @IsBoolean()
+    capture_screenshots?: boolean = false;
 }
 
 export class UpdateItemsGeneratorDto {

@@ -20,6 +20,7 @@ import {
     PromptComparisonService,
     BadgeProcessingService,
     DomainDetectionService,
+    ImageCaptureService,
 } from './steps';
 import { Category, ItemData, Tag, Brand } from './dto';
 import { IDataConfig } from '../data-generator/data-repository';
@@ -58,14 +59,13 @@ export class ItemsGeneratorService {
         private readonly categoryProcessingService: CategoryProcessingService,
         private readonly markdownGenerationService: MarkdownGenerationService,
         private readonly badgeProcessingService: BadgeProcessingService,
+        private readonly imageCaptureService: ImageCaptureService,
         private readonly advancedPromptsRepository: DirectoryAdvancedPromptsRepository,
     ) {
-        // Configure the pipeline once at startup
         this.pipelineExecutor
             .addStep(this.promptComparisonService)
             .addStep(this.promptProcessingService)
             .addStep(this.domainDetectionService)
-            // Run AI Item Generation and Search Query Generation in parallel
             .addStep(
                 new ParallelStep([this.aiItemGenerationService, this.searchQueryGenerationService]),
             )
@@ -76,6 +76,7 @@ export class ItemsGeneratorService {
             .addStep(this.categoryProcessingService)
             .addStep(this.sourceValidationService)
             .addStep(this.badgeProcessingService)
+            .addStep(this.imageCaptureService)
             .addStep(this.markdownGenerationService);
     }
 
@@ -225,6 +226,7 @@ export class ItemsGeneratorService {
                 brands: finalContext.finalBrands,
                 metrics: finalContext.metrics,
                 contentCache: finalContext.contentCache,
+                domainAnalysis: finalContext.domainAnalysis,
             };
         } catch (error: any) {
             this.logger.error(

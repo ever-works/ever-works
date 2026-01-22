@@ -242,3 +242,89 @@ export async function checkScreenshotAvailability() {
         return { available: false };
     }
 }
+
+export async function captureSmartImage(
+    sourceUrl: string,
+    domainType?: 'software' | 'ecommerce' | 'services' | 'general',
+    itemName?: string,
+) {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    const t = await getTranslations('dashboard.directoryDetail.items.screenshot');
+
+    try {
+        const response = await screenshotAPI.getSmartImage({
+            url: sourceUrl,
+            domainType,
+            itemName,
+        });
+
+        if (response.status !== 'success' || !response.primaryImage) {
+            return {
+                success: false,
+                error: response.error || t('captureFailed'),
+            };
+        }
+
+        return {
+            success: true,
+            imageUrl: response.primaryImage,
+            source: response.source,
+            confidence: response.confidence,
+            message: t('captureSuccess'),
+        };
+    } catch (error) {
+        console.error('Smart image capture error:', error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : t('captureError'),
+        };
+    }
+}
+
+export async function bulkCaptureImages(
+    directoryId: string,
+    options: { itemSlugs?: string[]; mode: 'missing' | 'all' },
+) {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    const t = await getTranslations('dashboard.directoryDetail.items.screenshot');
+
+    try {
+        const response = await screenshotAPI.bulkCaptureImages(directoryId, {
+            itemSlugs: options.itemSlugs,
+            mode: options.mode,
+        });
+
+        // Revalidate the directory items page
+        revalidatePath(`/directories/${directoryId}/items`);
+        revalidatePath(`/directories/${directoryId}`);
+
+        return {
+            success: response.status !== 'error',
+            status: response.status,
+            results: response.results,
+            totalProcessed: response.totalProcessed,
+            successCount: response.successCount,
+            errorCount: response.errorCount,
+            message: response.message || t('bulkCaptureComplete'),
+        };
+    } catch (error) {
+        console.error('Bulk capture images error:', error);
+        return {
+            success: false,
+            status: 'error' as const,
+            results: [],
+            totalProcessed: 0,
+            successCount: 0,
+            errorCount: 0,
+            message: error instanceof Error ? error.message : t('bulkCaptureError'),
+        };
+    }
+}

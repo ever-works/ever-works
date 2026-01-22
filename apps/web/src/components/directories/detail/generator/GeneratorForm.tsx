@@ -60,6 +60,7 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
         generation_method: GenerationMethod.CREATE_UPDATE,
         update_with_pull_request: false,
         badge_evaluation_enabled: lastRequestData?.badge_evaluation_enabled || false,
+        capture_screenshots: lastRequestData?.capture_screenshots || false,
         website_repository_creation_method:
             lastRequestData?.website_repository_creation_method ||
             WebsiteRepositoryCreationMethod.CREATE_USING_TEMPLATE,
@@ -229,6 +230,7 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
                             generationMethod={formData.generation_method}
                             updateWithPullRequest={formData.update_with_pull_request || false}
                             badgeEvaluationEnabled={formData.badge_evaluation_enabled || false}
+                            captureScreenshots={formData.capture_screenshots || false}
                             websiteRepositoryCreationMethod={
                                 formData.website_repository_creation_method
                             }
