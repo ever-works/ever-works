@@ -27,17 +27,18 @@ export default async function DirectoryItemsPage({ params }: Params) {
         const rawTags = taxonomyRes.tags || [];
 
         // Ensure categories have proper structure
-        categories = rawCategories.map((cat: string | Category, index: number) => {
+        categories = rawCategories.map((cat: string | Category) => {
             if (typeof cat === 'string') {
-                return { id: `cat-${index}`, name: cat };
+                return { id: cat, name: cat };
             }
             return cat;
         });
 
         // Ensure tags have proper structure
-        tags = rawTags.map((tag: string | Tag, index: number) => {
+        // Use the string itself as ID (it's likely already a slug that matches item references)
+        tags = rawTags.map((tag: string | Tag) => {
             if (typeof tag === 'string') {
-                return { id: `tag-${index}`, name: tag };
+                return { id: tag, name: tag };
             }
             return tag;
         });

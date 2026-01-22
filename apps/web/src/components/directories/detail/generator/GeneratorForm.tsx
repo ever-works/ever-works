@@ -12,6 +12,7 @@ import { UpdateItemsFields } from './UpdateItemsFields';
 import { CompanyFields } from './CompanyFields';
 import { CategoriesFields } from './CategoriesFields';
 import { SourceFields } from './SourceFields';
+import { DataGenerationFields } from './DataGenerationFields';
 import { ConfigFields, DEFAULT_CONFIG } from './ConfigFields';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils/cn';
@@ -26,7 +27,7 @@ import {
 } from '@/components/ui/dialog';
 import { generateItems, updateItems } from '@/app/actions/dashboard/generator';
 import { useTranslations } from 'next-intl';
-import { GenerationMethod, WebsiteRepositoryCreationMethod } from '@/lib/api/enums';
+import { GenerationMethod, WebsiteRepositoryCreationMethod, DataVolumeMode } from '@/lib/api/enums';
 
 interface GeneratorFormProps {
     directoryId: string;
@@ -59,10 +60,11 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
         generation_method: GenerationMethod.CREATE_UPDATE,
         update_with_pull_request: false,
         badge_evaluation_enabled: lastRequestData?.badge_evaluation_enabled || false,
+        capture_screenshots: lastRequestData?.capture_screenshots || false,
         website_repository_creation_method:
             lastRequestData?.website_repository_creation_method ||
             WebsiteRepositoryCreationMethod.CREATE_USING_TEMPLATE,
-        config: lastRequestData?.config || DEFAULT_CONFIG,
+        config: { ...DEFAULT_CONFIG, ...lastRequestData?.config },
     });
 
     const toggleSection = (section: string) => {
@@ -203,6 +205,19 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
                         />
                     </CollapsibleSection>
 
+                    {/* Data Generation Options */}
+                    <CollapsibleSection
+                        title={t('dataGeneration')}
+                        description={t('dataGenerationDescription')}
+                        isExpanded={expandedSections.includes('dataGeneration')}
+                        onToggle={() => toggleSection('dataGeneration')}
+                    >
+                        <DataGenerationFields
+                            config={formData.config}
+                            onChange={(updates) => setFormData({ ...formData, ...updates })}
+                        />
+                    </CollapsibleSection>
+
                     {/* Advanced Configuration */}
                     <CollapsibleSection
                         title={t('advancedConfig')}
@@ -215,6 +230,7 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
                             generationMethod={formData.generation_method}
                             updateWithPullRequest={formData.update_with_pull_request || false}
                             badgeEvaluationEnabled={formData.badge_evaluation_enabled || false}
+                            captureScreenshots={formData.capture_screenshots || false}
                             websiteRepositoryCreationMethod={
                                 formData.website_repository_creation_method
                             }

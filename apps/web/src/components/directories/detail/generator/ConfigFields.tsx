@@ -2,7 +2,7 @@
 
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
-import { GenerationMethod, WebsiteRepositoryCreationMethod } from '@/lib/api/enums';
+import { GenerationMethod, WebsiteRepositoryCreationMethod, DataVolumeMode } from '@/lib/api/enums';
 import { ConfigDto } from '@/lib/api/types-only';
 import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
@@ -13,6 +13,7 @@ interface ConfigFieldsProps {
     generationMethod?: GenerationMethod;
     updateWithPullRequest?: boolean;
     badgeEvaluationEnabled?: boolean;
+    captureScreenshots?: boolean;
     websiteRepositoryCreationMethod?: WebsiteRepositoryCreationMethod;
     onChange: (
         updates: Partial<{
@@ -20,6 +21,7 @@ interface ConfigFieldsProps {
             generation_method?: GenerationMethod;
             update_with_pull_request?: boolean;
             badge_evaluation_enabled?: boolean;
+            capture_screenshots?: boolean;
             website_repository_creation_method?: WebsiteRepositoryCreationMethod;
         }>,
     ) => void;
@@ -34,6 +36,10 @@ export const DEFAULT_CONFIG: ConfigDto = {
     ai_first_generation_enabled: false,
     content_filtering_enabled: true,
     prompt_comparison_confidence_threshold: 0.5,
+    data_volume_mode: DataVolumeMode.REAL,
+    generate_categories: true,
+    generate_tags: true,
+    generate_brands: true,
 };
 
 export function ConfigFields({
@@ -41,6 +47,7 @@ export function ConfigFields({
     generationMethod,
     updateWithPullRequest,
     badgeEvaluationEnabled,
+    captureScreenshots,
     websiteRepositoryCreationMethod,
     onChange,
 }: ConfigFieldsProps) {
@@ -101,6 +108,14 @@ export function ConfigFields({
                     onChange={(e) => onChange({ badge_evaluation_enabled: e.target.checked })}
                     label={t('enableBadgeEvaluation')}
                     description={t('enableBadgeEvaluationDescription')}
+                    variant="form"
+                />
+
+                <Checkbox
+                    checked={captureScreenshots}
+                    onChange={(e) => onChange({ capture_screenshots: e.target.checked })}
+                    label={t('captureScreenshots')}
+                    description={t('captureScreenshotsDescription')}
                     variant="form"
                 />
             </div>

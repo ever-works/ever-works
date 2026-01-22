@@ -4,7 +4,7 @@ import React, { useState, useTransition, memo, useEffect } from 'react';
 import { ItemData } from '@/lib/api/types-only';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
-import { removeItem, updateItem } from '@/app/actions/dashboard/items';
+import { removeItem, updateItem, captureScreenshot } from '@/app/actions/dashboard/items';
 import { Button } from '@/components/ui/button';
 import {
     DropdownMenu,
@@ -22,7 +22,7 @@ import {
 } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
-import { Loader2, MoreVertical, Trash2, SlidersHorizontal } from 'lucide-react';
+import { Loader2, MoreVertical, Trash2, SlidersHorizontal, Camera } from 'lucide-react';
 
 type ItemActionsProps = {
     item: ItemData;
@@ -42,13 +42,49 @@ export const ItemActions = memo(function ItemActions({
     const t = useTranslations('dashboard.directoryDetail.items');
     const [isDisplayDialogOpen, setIsDisplayDialogOpen] = useState(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+    const [isCapturingScreenshot, setIsCapturingScreenshot] = useState(false);
+
+    const handleCaptureScreenshot = async () => {
+        if (!item.source_url) {
+            toast.error(t('screenshot.noSourceUrl', { defaultValue: 'No source URL available' }));
+            return;
+        }
+
+        setIsCapturingScreenshot(true);
+        try {
+            const result = await captureScreenshot(item.source_url);
+
+            if (result.success && result.imageUrl) {
+                // Update the item's images with the new screenshot
+                const currentImages = item.images || [];
+                if (!currentImages.includes(result.imageUrl)) {
+                    onUpdate?.({
+                        images: [result.imageUrl, ...currentImages],
+                    });
+                }
+                toast.success(
+                    result.message ||
+                        t('screenshot.success', { defaultValue: 'Screenshot captured' }),
+                );
+            } else {
+                toast.error(
+                    result.error ||
+                        t('screenshot.failed', { defaultValue: 'Failed to capture screenshot' }),
+                );
+            }
+        } catch (error) {
+            toast.error(t('screenshot.error', { defaultValue: 'Screenshot capture error' }));
+        } finally {
+            setIsCapturingScreenshot(false);
+        }
+    };
 
     return (
         <>
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm" disabled={isPending}>
-                        {isPending ? (
+                    <Button variant="ghost" size="sm" disabled={isPending || isCapturingScreenshot}>
+                        {isPending || isCapturingScreenshot ? (
                             <Loader2 className="w-4 h-4 animate-spin" />
                         ) : (
                             <MoreVertical className="w-4 h-4" />
@@ -58,7 +94,7 @@ export const ItemActions = memo(function ItemActions({
 
                 <DropdownMenuContent
                     align="end"
-                    className="w-44 bg-card dark:bg-card-dark border border-border dark:border-border-dark shadow-lg rounded-lg p-1"
+                    className="w-48 bg-card dark:bg-card-dark border border-border dark:border-border-dark shadow-lg rounded-lg p-1"
                 >
                     <DropdownMenuItem
                         onClick={() => setIsDisplayDialogOpen(true)}
@@ -67,6 +103,20 @@ export const ItemActions = memo(function ItemActions({
                         <SlidersHorizontal className="w-4 h-4" />
                         {t('editDisplay', { defaultValue: 'Edit display' })}
                     </DropdownMenuItem>
+                    {item.source_url && (
+                        <DropdownMenuItem
+                            onClick={handleCaptureScreenshot}
+                            disabled={isCapturingScreenshot}
+                            className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-text dark:text-text-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark hover:text-primary dark:hover:text-primary focus:bg-surface-secondary dark:focus:bg-surface-secondary-dark transition-colors"
+                        >
+                            {isCapturingScreenshot ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                                <Camera className="w-4 h-4" />
+                            )}
+                            {t('captureScreenshot', { defaultValue: 'Capture screenshot' })}
+                        </DropdownMenuItem>
+                    )}
                     <DropdownMenuItem
                         onClick={() => setIsDeleteDialogOpen(true)}
                         className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-danger dark:text-danger-dark hover:bg-danger/10 focus:bg-danger/10 transition-colors"

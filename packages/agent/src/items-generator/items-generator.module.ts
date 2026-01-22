@@ -14,6 +14,7 @@ import { PromptProcessingService } from './steps/prompt-processing.service';
 import { PromptComparisonService } from './steps/prompt-comparison.service';
 import { BadgeProcessingService } from './steps/badge-processing.service';
 import { DomainDetectionService } from './steps/domain-detection.service';
+import { ImageCaptureService } from './steps/image-capture.service';
 import { SearchService, NotionService, BadgeEvaluationService } from './shared';
 import {
     SharedUtilsService,
@@ -23,6 +24,7 @@ import {
 import { AiModule } from '../ai';
 import { GitModule } from '../git';
 import { DatabaseModule } from '../database/database.module';
+import { ScreenshotModule } from '../screenshot/screenshot.module';
 import { PipelineExecutor } from './pipeline/pipeline-executor';
 
 export const STEP_SERVICES = [
@@ -56,12 +58,13 @@ export const STEP_SERVICES = [
     CategoryProcessingService,
     MarkdownGenerationService,
     BadgeProcessingService,
+    ImageCaptureService,
 ];
 
 export const STEP_SERVICES_EXPORTS = [ItemsGeneratorService, ItemSubmissionService];
 
 @Module({
-    imports: [AiModule, GitModule, DatabaseModule],
+    imports: [AiModule, GitModule, DatabaseModule, ScreenshotModule],
     providers: STEP_SERVICES,
     exports: STEP_SERVICES_EXPORTS,
 })

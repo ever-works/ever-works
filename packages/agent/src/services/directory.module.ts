@@ -8,6 +8,7 @@ import { DeployModule } from '../deploy/deploy.module';
 import { DatabaseModule } from '../database/database.module';
 import { AiModule } from '../ai/ai.module';
 import { ImportModule } from '../import/import.module';
+import { ScreenshotModule } from '../screenshot/screenshot.module';
 import { DirectoryDetailService } from './directory-detail.service';
 import { DirectoryOwnershipService } from './directory-ownership.service';
 import { DirectoryQueryService } from './directory-query.service';
@@ -35,6 +36,7 @@ import { NotificationOperationsModule } from '@src/notification-operations';
         DeployModule,
         AiModule,
         ImportModule,
+        ScreenshotModule,
         SubscriptionsModule,
         NotificationsModule,
         NotificationOperationsModule,

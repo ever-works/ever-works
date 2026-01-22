@@ -78,6 +78,16 @@ export class Directory {
     @TimestampColumn({ nullable: true })
     generationFinishedAt?: Date;
 
+    // Domain Type FIELDS (for smart image routing)
+    @Column({ type: 'varchar', length: 20, nullable: true })
+    domainType?: string; // 'software' | 'ecommerce' | 'services' | 'general'
+
+    @Column({ type: 'float', nullable: true })
+    domainTypeConfidence?: number;
+
+    @Column({ type: 'boolean', default: false })
+    domainTypeManuallySet: boolean;
+
     @OneToOne(() => DirectorySchedule, (schedule) => schedule.directory)
     schedule?: ClassToObject<DirectorySchedule>;
 
