@@ -16,6 +16,7 @@ import { TriggerInternalModule } from './trigger/trigger-internal.module';
 import { TwentyCrmModule } from './integrations';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { ScreenshotModule } from './screenshot/screenshot.module';
 import { CacheFactory } from '@packages/agent/cache';
 
 @Module({
@@ -44,6 +45,7 @@ import { CacheFactory } from '@packages/agent/cache';
         TriggerInternalModule,
         SubscriptionsModule,
         NotificationsModule,
+        ScreenshotModule,
     ],
     providers: [
         {

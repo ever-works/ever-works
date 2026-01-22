@@ -5,6 +5,8 @@ import { User } from '../entities/user.entity';
 import { DataRepository, IDataConfig } from '../data-generator/data-repository';
 import { slugifyText } from './utils/text.utils';
 import { ItemsGeneratorService } from './items-generator.service';
+import { SmartImageRouterService } from '../screenshot/smart-image-router.service';
+import { DomainType } from './interfaces/items-generator.interfaces';
 import {
     SubmitItemDto,
     SubmitItemResponseDto,
@@ -23,6 +25,7 @@ export class ItemSubmissionService {
     constructor(
         private readonly githubService: GithubService,
         private readonly itemsGeneratorService: ItemsGeneratorService,
+        private readonly smartImageRouterService: SmartImageRouterService,
     ) {}
 
     async submitItem(
@@ -109,6 +112,24 @@ export class ItemSubmissionService {
                 brand_logo_url: submitItemDto.brand_logo_url || null,
                 images: submitItemDto.images || [],
             };
+
+            // Smart image capture based on directory domain type
+            if (submitItemDto.source_url) {
+                const smartImage = await this.smartImageRouterService.getSmartImage({
+                    url: submitItemDto.source_url,
+                    domainType: (directory.domainType as DomainType) || DomainType.GENERAL,
+                    itemName: submitItemDto.name,
+                    user: directoryOwner,
+                });
+
+                if (smartImage.primaryImage && !itemData.images.includes(smartImage.primaryImage)) {
+                    // Add smart image as the first image if not already present
+                    itemData.images = [smartImage.primaryImage, ...itemData.images];
+                    this.logger.debug(
+                        `Added ${smartImage.source} image for item: ${submitItemDto.name} (confidence: ${smartImage.confidence})`,
+                    );
+                }
+            }
 
             // Process badges for the item if it's a repository
             const itemWithBadges =

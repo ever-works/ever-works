@@ -462,6 +462,9 @@ export class AuthService {
             ...(isNotNull(updateData.username) && { username: updateData.username }),
             ...(isNotNull(updateData.avatar) && { avatar: updateData.avatar }),
             ...(isNotNull(updateData.vercelToken) && { vercelToken: updateData.vercelToken }),
+            ...(isNotNull(updateData.screenshotoneAccessKey) && {
+                screenshotoneAccessKey: updateData.screenshotoneAccessKey,
+            }),
         });
 
         // Return updated profile

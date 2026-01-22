@@ -30,6 +30,18 @@ export enum WebsiteRepositoryCreationMethod {
     CREATE_USING_TEMPLATE = 'create-using-template',
 }
 
+export enum DataVolumeMode {
+    REAL = 'real',
+    SAMPLE = 'sample',
+}
+
+export const SAMPLE_MODE_CONFIG = {
+    max_search_queries: 2,
+    max_results_per_query: 3,
+    max_pages_to_process: 5,
+    max_items: 10,
+} as const;
+
 export class CompanyDto {
     @IsString()
     @IsNotEmpty()
@@ -84,6 +96,50 @@ export class ConfigDto {
     @Min(0.01)
     @Max(1.0)
     prompt_comparison_confidence_threshold: number = 0.5;
+
+    @IsOptional()
+    @IsEnum(DataVolumeMode)
+    data_volume_mode: DataVolumeMode = DataVolumeMode.REAL;
+
+    @IsOptional()
+    @IsBoolean()
+    generate_categories: boolean = true;
+
+    @IsOptional()
+    @IsBoolean()
+    generate_tags: boolean = true;
+
+    @IsOptional()
+    @IsBoolean()
+    generate_brands: boolean = true;
+
+    @IsOptional()
+    @IsInt()
+    @Min(1)
+    @Max(1000)
+    max_items?: number;
+}
+
+/**
+ * Returns an effective configuration by applying sample mode overrides when applicable.
+ * This function merges the user-provided config with SAMPLE_MODE_CONFIG values when
+ * data_volume_mode is set to SAMPLE.
+ *
+ * @param config The original ConfigDto
+ * @returns A new ConfigDto with sample mode overrides applied if applicable
+ */
+export function getEffectiveConfig(config: ConfigDto): ConfigDto {
+    if (config.data_volume_mode !== DataVolumeMode.SAMPLE) {
+        return config;
+    }
+
+    return {
+        ...config,
+        max_search_queries: SAMPLE_MODE_CONFIG.max_search_queries,
+        max_results_per_query: SAMPLE_MODE_CONFIG.max_results_per_query,
+        max_pages_to_process: SAMPLE_MODE_CONFIG.max_pages_to_process,
+        max_items: config.max_items ?? SAMPLE_MODE_CONFIG.max_items,
+    };
 }
 
 /**
@@ -170,6 +226,17 @@ export class CreateItemsGeneratorDto {
     @IsEnum(WebsiteRepositoryCreationMethod)
     website_repository_creation_method?: WebsiteRepositoryCreationMethod =
         WebsiteRepositoryCreationMethod.CREATE_USING_TEMPLATE;
+
+    /**
+     * When enabled, captures images for each generated item using smart routing:
+     * - SOFTWARE/SERVICES: Takes screenshots of the source URLs
+     * - ECOMMERCE/GENERAL: Extracts product images (og:image, JSON-LD), falls back to screenshots
+     *
+     * Default: false (lazy mode - images are not captured during generation)
+     */
+    @IsOptional()
+    @IsBoolean()
+    capture_screenshots?: boolean = false;
 }
 
 export class UpdateItemsGeneratorDto {

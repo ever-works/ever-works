@@ -11,3 +11,4 @@ export * from './markdown-generation.service';
 export * from './prompt-processing.service';
 export * from './badge-processing.service';
 export * from './domain-detection.service';
+export * from './image-capture.service';

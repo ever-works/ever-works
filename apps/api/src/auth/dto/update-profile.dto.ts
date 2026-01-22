@@ -13,4 +13,8 @@ export class UpdateProfileDto {
     @IsString()
     @IsOptional()
     vercelToken?: string;
+
+    @IsString()
+    @IsOptional()
+    screenshotoneAccessKey?: string;
 }
