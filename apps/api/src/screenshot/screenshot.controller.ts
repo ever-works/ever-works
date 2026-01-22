@@ -94,7 +94,8 @@ export class ScreenshotController {
 
         return {
             status: 'success',
-            imageUrl: result.imageUrl,
+            imageUrl: result.cacheUrl || result.imageUrl,
+            cacheUrl: result.cacheUrl,
             // Convert buffer to base64 for JSON response
             imageBase64: result.imageBuffer ? result.imageBuffer.toString('base64') : null,
         };

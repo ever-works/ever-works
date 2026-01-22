@@ -242,10 +242,11 @@ export class SmartImageRouterService {
             };
         }
 
-        // Return the ScreenshotOne URL (the image was captured successfully)
-        // In the future, we could store the imageBuffer and return a storage URL
+        // Prefer cache URL (clean CDN URL without access key) over API URL
+        const imageUrl = result.cacheUrl || result.imageUrl || null;
+
         return {
-            primaryImage: result.imageUrl || null,
+            primaryImage: imageUrl,
             source: 'screenshot',
             confidence: 1.0, // Screenshot is always reliable once captured
         };

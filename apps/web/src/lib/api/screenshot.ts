@@ -29,6 +29,7 @@ export interface CaptureScreenshotDto {
 export interface CaptureScreenshotResponse {
     status: 'success' | 'error';
     imageUrl?: string;
+    cacheUrl?: string;
     imageBase64?: string;
     message?: string;
 }

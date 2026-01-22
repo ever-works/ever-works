@@ -14,11 +14,14 @@ export interface ScreenshotOptions {
     blockAds?: boolean;
     blockTrackers?: boolean;
     blockCookieBanners?: boolean;
+    cache?: boolean;
+    cacheTtl?: number;
 }
 
 export interface ScreenshotResult {
     success: boolean;
     imageUrl?: string;
+    cacheUrl?: string;
     imageBuffer?: Buffer;
     error?: string;
 }
@@ -55,7 +58,10 @@ export class ScreenshotOneService {
         return new screenshotone.Client(keys.accessKey, keys.secretKey || '');
     }
 
-    private buildTakeOptions(options: ScreenshotOptions): screenshotone.TakeOptions {
+    private buildTakeOptions(
+        options: ScreenshotOptions,
+        enableCache = true,
+    ): screenshotone.TakeOptions {
         const takeOptions = screenshotone.TakeOptions.url(options.url)
             .viewportWidth(options.viewportWidth || config.screenshotone.getDefaultViewportWidth())
             .viewportHeight(
@@ -83,6 +89,12 @@ export class ScreenshotOneService {
             takeOptions.blockCookieBanners(true);
         }
 
+        // Enable caching by default (7 days = 604800 seconds)
+        if (enableCache && options.cache !== false) {
+            takeOptions.cache(true);
+            takeOptions.cacheTtl(options.cacheTtl || 604800);
+        }
+
         return takeOptions;
     }
 
@@ -102,21 +114,34 @@ export class ScreenshotOneService {
             const takeOptions = this.buildTakeOptions(options);
 
             this.logger.debug(
-                `Capturing screenshot for URL: ${options.url} (signed: ${!!keys.secretKey})`,
+                `Capturing screenshot for URL: ${options.url} (signed: ${!!keys.secretKey}, cache: true)`,
             );
 
-            // Use SDK's take() method to fetch the screenshot
-            const imageBlob = await client.take(takeOptions);
-            const imageBuffer = Buffer.from(await imageBlob.arrayBuffer());
-
-            // Generate signed URL for reference (if secret key is available)
+            // Generate the API URL (signed if secret key available)
             const screenshotUrl = keys.secretKey
                 ? await client.generateSignedTakeURL(takeOptions)
                 : await client.generateTakeURL(takeOptions);
 
+            // Make HTTP request to capture screenshot and get cache URL from headers
+            const response = await axios.get(screenshotUrl, {
+                responseType: 'arraybuffer',
+                timeout: 60000,
+                validateStatus: (status) => status >= 200 && status < 400,
+            });
+
+            const imageBuffer = Buffer.from(response.data);
+
+            // Extract cache URL from response headers (clean URL without access key)
+            const cacheUrl = response.headers['x-screenshotone-cache-url'] as string | undefined;
+
+            this.logger.debug(
+                `Screenshot captured for ${options.url}, cache URL: ${cacheUrl ? 'obtained' : 'not available'}`,
+            );
+
             return {
                 success: true,
                 imageUrl: screenshotUrl,
+                cacheUrl: cacheUrl || undefined,
                 imageBuffer,
             };
         } catch (error) {
@@ -127,6 +152,20 @@ export class ScreenshotOneService {
                 return {
                     success: false,
                     error: error.errorMessage || `API error: ${error.errorCode}`,
+                };
+            }
+
+            if (axios.isAxiosError(error)) {
+                const status = error.response?.status;
+                const message = error.response?.data
+                    ? Buffer.from(error.response.data).toString('utf-8')
+                    : error.message;
+                this.logger.error(
+                    `ScreenshotOne HTTP error for ${options.url}: ${status} - ${message}`,
+                );
+                return {
+                    success: false,
+                    error: `HTTP ${status}: ${message}`,
                 };
             }
 
@@ -155,10 +194,7 @@ export class ScreenshotOneService {
             : await client.generateTakeURL(takeOptions);
     }
 
-    async validateKeys(
-        accessKey: string,
-        secretKey?: string,
-    ): Promise<ScreenshotValidationResult> {
+    async validateKeys(accessKey: string, secretKey?: string): Promise<ScreenshotValidationResult> {
         if (!accessKey || typeof accessKey !== 'string') {
             return {
                 valid: false,

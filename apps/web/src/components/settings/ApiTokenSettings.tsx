@@ -356,7 +356,7 @@ export function ApiTokenSettings({ user }: ApiTokenSettingsProps) {
                             <p className="text-xs text-text-muted dark:text-text-muted-dark mt-2">
                                 {t('screenshotone.secretKeyHelp')}{' '}
                                 <a
-                                    href="https://screenshotone.com/dashboard"
+                                    href="https://dash.screenshotone.com/dashboard"
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="text-primary dark:text-primary-dark hover:underline"
