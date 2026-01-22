@@ -38,7 +38,7 @@
 		"prettier": "^3.7.4",
 		"prettier-eslint-cli": "^8.0.1",
 		"prettier-plugin-tailwindcss": "^0.5.14",
-		"turbo": "^2.7.4"
+		"turbo": "^2.7.5"
 	},
 	"engines": {
 		"node": ">=20",

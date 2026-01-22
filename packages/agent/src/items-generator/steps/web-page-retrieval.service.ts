@@ -66,7 +66,7 @@ export class WebPageRetrievalService implements IPipelineStep {
         slug: string,
         searchQueries: string[],
         processedSourceUrls: Set<string>,
-        config: Required<ConfigDto>,
+        config: ConfigDto,
     ): Promise<WebPageData[]> {
         const allFetchedPages: WebPageData[] = [];
         const currentRunProcessedUrls = new Set<string>();

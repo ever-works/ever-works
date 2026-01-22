@@ -1,5 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { CreateItemsGeneratorDto, GenerationMethod } from './dto/create-items-generator.dto';
+import {
+    CreateItemsGeneratorDto,
+    GenerationMethod,
+    getEffectiveConfig,
+    ConfigDto,
+    DataVolumeMode,
+} from './dto/create-items-generator.dto';
 import {
     AiItemGenerationService,
     SearchQueryGenerationService,
@@ -14,6 +20,7 @@ import {
     PromptComparisonService,
     BadgeProcessingService,
     DomainDetectionService,
+    ImageCaptureService,
 } from './steps';
 import { Category, ItemData, Tag, Brand } from './dto';
 import { IDataConfig } from '../data-generator/data-repository';
@@ -52,14 +59,13 @@ export class ItemsGeneratorService {
         private readonly categoryProcessingService: CategoryProcessingService,
         private readonly markdownGenerationService: MarkdownGenerationService,
         private readonly badgeProcessingService: BadgeProcessingService,
+        private readonly imageCaptureService: ImageCaptureService,
         private readonly advancedPromptsRepository: DirectoryAdvancedPromptsRepository,
     ) {
-        // Configure the pipeline once at startup
         this.pipelineExecutor
             .addStep(this.promptComparisonService)
             .addStep(this.promptProcessingService)
             .addStep(this.domainDetectionService)
-            // Run AI Item Generation and Search Query Generation in parallel
             .addStep(
                 new ParallelStep([this.aiItemGenerationService, this.searchQueryGenerationService]),
             )
@@ -70,6 +76,7 @@ export class ItemsGeneratorService {
             .addStep(this.categoryProcessingService)
             .addStep(this.sourceValidationService)
             .addStep(this.badgeProcessingService)
+            .addStep(this.imageCaptureService)
             .addStep(this.markdownGenerationService);
     }
 
@@ -88,6 +95,13 @@ export class ItemsGeneratorService {
     ) {
         // Make a copy of the DTO to avoid mutating the original
         createItemsGeneratorDto = { ...createItemsGeneratorDto };
+
+        // Apply effective config (handles sample mode overrides)
+        if (createItemsGeneratorDto.config) {
+            createItemsGeneratorDto.config = getEffectiveConfig(
+                createItemsGeneratorDto.config,
+            ) as ConfigDto;
+        }
 
         const directorySlug = directory.slug;
         const { name } = createItemsGeneratorDto;
@@ -212,6 +226,7 @@ export class ItemsGeneratorService {
                 brands: finalContext.finalBrands,
                 metrics: finalContext.metrics,
                 contentCache: finalContext.contentCache,
+                domainAnalysis: finalContext.domainAnalysis,
             };
         } catch (error: any) {
             this.logger.error(
@@ -352,6 +367,10 @@ export class ItemsGeneratorService {
                         ai_first_generation_enabled: false,
                         content_filtering_enabled: true,
                         prompt_comparison_confidence_threshold: 0.5,
+                        data_volume_mode: DataVolumeMode.REAL,
+                        generate_categories: true,
+                        generate_tags: true,
+                        generate_brands: true,
                     },
                 },
                 [webPage],

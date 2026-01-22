@@ -12,5 +12,6 @@ export enum ItemsGeneratorStep {
     CATEGORIES_TAGS_PROCESSING = 'categories-tags-processing',
     SOURCES_VALIDATION = 'sources-validation',
     BADGES_PROCESSING = 'badges-processing',
+    IMAGE_CAPTURE = 'image-capture',
     MARKDOWN_GENERATION = 'markdown-generation',
 }

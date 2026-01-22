@@ -53,6 +53,34 @@ import {
     NOTIFICATION_OPERATIONS,
     NotificationOperations,
 } from '@src/notification-operations/notification-operations.interface';
+import {
+    SmartImageRouterService,
+    BulkImageRequest,
+} from '@src/screenshot/smart-image-router.service';
+import { DomainType } from '@src/items-generator/interfaces/items-generator.interfaces';
+
+export interface BulkCaptureImagesDto {
+    itemSlugs?: string[];
+    mode: 'missing' | 'all';
+}
+
+export interface BulkCaptureResultDto {
+    itemSlug?: string;
+    itemName?: string;
+    primaryImage: string | null;
+    source: 'screenshot' | 'scraped' | 'vision_selected';
+    confidence?: number;
+    error?: string;
+}
+
+export interface BulkCaptureImagesResponseDto {
+    status: 'success' | 'partial' | 'error';
+    results: BulkCaptureResultDto[];
+    totalProcessed: number;
+    successCount: number;
+    errorCount: number;
+    message?: string;
+}
 
 type GenerationTriggerContext = {
     triggeredBy: 'user' | 'schedule' | 'api';
@@ -90,6 +118,7 @@ export class DirectoryGenerationService {
         private readonly directoryScheduleService: DirectoryScheduleService,
         private readonly directoryImportService: DirectoryImportService,
         private readonly userRepository: UserRepository,
+        private readonly smartImageRouterService: SmartImageRouterService,
         @Optional()
         @Inject(DIRECTORY_GENERATION_DISPATCHER)
         private readonly generationDispatcher?: DirectoryGenerationDispatcher,
@@ -391,6 +420,138 @@ export class DirectoryGenerationService {
             throw new BadRequestException({
                 status: 'error',
                 source_url: dto.source_url,
+                message: normalizeGeneratorError(error),
+            });
+        }
+    }
+
+    async bulkCaptureImages(
+        directoryId: string,
+        dto: BulkCaptureImagesDto,
+        user: User,
+    ): Promise<BulkCaptureImagesResponseDto> {
+        try {
+            // Require editor role to capture images
+            const { directory } = await this.ownershipService.ensureCanEdit(directoryId, user.id);
+
+            // Get all items from the directory
+            const items = await this.dataGenerator.getItems(directory, user);
+
+            if (!items || items.length === 0) {
+                return {
+                    status: 'success',
+                    results: [],
+                    totalProcessed: 0,
+                    successCount: 0,
+                    errorCount: 0,
+                    message: 'No items found in directory',
+                };
+            }
+
+            // Filter items based on mode and itemSlugs
+            let itemsToProcess = items;
+
+            if (dto.itemSlugs && dto.itemSlugs.length > 0) {
+                itemsToProcess = items.filter((item) => dto.itemSlugs!.includes(item.slug));
+            }
+
+            if (dto.mode === 'missing') {
+                // Only process items without images
+                itemsToProcess = itemsToProcess.filter(
+                    (item) => !item.images || item.images.length === 0,
+                );
+            }
+
+            // Filter items that have source_url
+            itemsToProcess = itemsToProcess.filter((item) => item.source_url);
+
+            if (itemsToProcess.length === 0) {
+                return {
+                    status: 'success',
+                    results: [],
+                    totalProcessed: 0,
+                    successCount: 0,
+                    errorCount: 0,
+                    message:
+                        dto.mode === 'missing'
+                            ? 'No items without images found'
+                            : 'No items with source URLs found',
+                };
+            }
+
+            // Get domain type for routing
+            const domainType = (directory.domainType as DomainType) || DomainType.GENERAL;
+
+            // Build bulk request
+            const bulkRequests: BulkImageRequest[] = itemsToProcess.map((item) => ({
+                url: item.source_url,
+                itemName: item.name,
+                itemSlug: item.slug,
+            }));
+
+            // Process bulk capture
+            const bulkResults = await this.smartImageRouterService.bulkGetSmartImages(
+                bulkRequests,
+                domainType,
+                user,
+            );
+
+            // Calculate stats
+            const successCount = bulkResults.filter((r) => r.primaryImage !== null).length;
+            const errorCount = bulkResults.filter((r) => r.error).length;
+
+            return {
+                status: errorCount === 0 ? 'success' : successCount > 0 ? 'partial' : 'error',
+                results: bulkResults,
+                totalProcessed: bulkResults.length,
+                successCount,
+                errorCount,
+                message: `Processed ${bulkResults.length} items: ${successCount} successful, ${errorCount} failed`,
+            };
+        } catch (error) {
+            if (error instanceof HttpException) {
+                throw error;
+            }
+
+            this.logger.error('Error in bulk capture images:', error);
+
+            throw new BadRequestException({
+                status: 'error',
+                message: normalizeGeneratorError(error),
+            });
+        }
+    }
+
+    async updateDomainType(
+        directoryId: string,
+        domainType: string,
+        user: User,
+        manuallySet = true,
+    ): Promise<{ status: string; domainType: string; domainTypeManuallySet: boolean }> {
+        try {
+            // Require editor role to update domain type
+            await this.ownershipService.ensureCanEdit(directoryId, user.id);
+
+            // Update the directory
+            await this.directoryRepository.update(directoryId, {
+                domainType,
+                domainTypeManuallySet: manuallySet,
+            });
+
+            return {
+                status: 'success',
+                domainType,
+                domainTypeManuallySet: manuallySet,
+            };
+        } catch (error) {
+            if (error instanceof HttpException) {
+                throw error;
+            }
+
+            this.logger.error('Error updating domain type:', error);
+
+            throw new BadRequestException({
+                status: 'error',
                 message: normalizeGeneratorError(error),
             });
         }

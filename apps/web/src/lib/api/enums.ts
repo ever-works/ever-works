@@ -24,6 +24,11 @@ export enum WebsiteRepositoryCreationMethod {
     CREATE_USING_TEMPLATE = 'create-using-template',
 }
 
+export enum DataVolumeMode {
+    REAL = 'real',
+    SAMPLE = 'sample',
+}
+
 export enum ItemsGeneratorStep {
     PROMPT_COMPARISON = 'prompt-comparison',
     PROMPT_PROCESSING = 'prompt-processing',

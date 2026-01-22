@@ -1,6 +1,6 @@
 import 'server-only';
 import { serverMutation } from './server-api';
-import { GenerationMethod, WebsiteRepositoryCreationMethod } from './enums';
+import { GenerationMethod, WebsiteRepositoryCreationMethod, DataVolumeMode } from './enums';
 import { APIResponse, ItemData } from './types';
 
 // DTOs
@@ -18,6 +18,11 @@ export interface ConfigDto {
     ai_first_generation_enabled?: boolean;
     content_filtering_enabled?: boolean;
     prompt_comparison_confidence_threshold?: number;
+    data_volume_mode?: DataVolumeMode;
+    generate_categories?: boolean;
+    generate_tags?: boolean;
+    generate_brands?: boolean;
+    max_items?: number;
 }
 
 export interface CreateItemsGeneratorDto {
@@ -33,6 +38,7 @@ export interface CreateItemsGeneratorDto {
     generation_method?: GenerationMethod;
     update_with_pull_request?: boolean;
     badge_evaluation_enabled?: boolean;
+    capture_screenshots?: boolean;
     website_repository_creation_method?: WebsiteRepositoryCreationMethod;
 }
 

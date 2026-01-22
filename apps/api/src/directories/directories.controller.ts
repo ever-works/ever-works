@@ -36,6 +36,7 @@ import {
     UpdateItemsGeneratorDto,
     UpdateItemDto,
 } from '@packages/agent/items-generator';
+import { BulkCaptureImagesDto, BulkCaptureImagesResponseDto } from '@packages/agent/services';
 import {
     DirectoryDetailService,
     DirectoryGenerationService,
@@ -378,6 +379,39 @@ export class DirectoriesController {
         return this.directoryGenerationService.extractItemDetails(extractItemDetailsDto);
     }
 
+    // ============================================
+    // Bulk Image Capture Endpoints
+    // ============================================
+
+    @Post('directories/:id/bulk-capture-images')
+    @HttpCode(HttpStatus.OK)
+    async bulkCaptureImages(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') id: string,
+        @Body() dto: BulkCaptureImagesDto,
+    ): Promise<BulkCaptureImagesResponseDto> {
+        const user = await this.authService.getUser(auth.userId);
+
+        return this.directoryGenerationService.bulkCaptureImages(id, dto, user);
+    }
+
+    @Put('directories/:id/domain-type')
+    @HttpCode(HttpStatus.OK)
+    async updateDomainType(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') id: string,
+        @Body() dto: { domainType: string; manuallySet?: boolean },
+    ) {
+        const user = await this.authService.getUser(auth.userId);
+
+        return this.directoryGenerationService.updateDomainType(
+            id,
+            dto.domainType,
+            user,
+            dto.manuallySet ?? true,
+        );
+    }
+
     @Post('directories/:id/regenerate-markdown')
     @HttpCode(HttpStatus.OK)
     async regenerateMarkdown(@CurrentUser() auth: AuthenticatedUser, @Param('id') id: string) {
@@ -544,7 +578,9 @@ export class DirectoriesController {
         @Param('id') id: string,
         @Body() dto: CreateCategoryDto,
     ) {
-        return this.directoryTaxonomyService.createCategory(id, dto, auth.userId);
+        const result = await this.directoryTaxonomyService.createCategory(id, dto, auth.userId);
+        await this.cacheManager.del(`directory-categories-tags-${id}-${auth.userId}`);
+        return result;
     }
 
     @Put('directories/:id/categories/:categoryId')
@@ -555,7 +591,14 @@ export class DirectoriesController {
         @Param('categoryId') categoryId: string,
         @Body() dto: UpdateCategoryDto,
     ) {
-        return this.directoryTaxonomyService.updateCategory(id, categoryId, dto, auth.userId);
+        const result = await this.directoryTaxonomyService.updateCategory(
+            id,
+            categoryId,
+            dto,
+            auth.userId,
+        );
+        await this.cacheManager.del(`directory-categories-tags-${id}-${auth.userId}`);
+        return result;
     }
 
     @Delete('directories/:id/categories/:categoryId')
@@ -565,7 +608,13 @@ export class DirectoriesController {
         @Param('id') id: string,
         @Param('categoryId') categoryId: string,
     ) {
-        return this.directoryTaxonomyService.deleteCategory(id, categoryId, auth.userId);
+        const result = await this.directoryTaxonomyService.deleteCategory(
+            id,
+            categoryId,
+            auth.userId,
+        );
+        await this.cacheManager.del(`directory-categories-tags-${id}-${auth.userId}`);
+        return result;
     }
 
     // Tags
@@ -576,7 +625,9 @@ export class DirectoriesController {
         @Param('id') id: string,
         @Body() dto: CreateTagDto,
     ) {
-        return this.directoryTaxonomyService.createTag(id, dto, auth.userId);
+        const result = await this.directoryTaxonomyService.createTag(id, dto, auth.userId);
+        await this.cacheManager.del(`directory-categories-tags-${id}-${auth.userId}`);
+        return result;
     }
 
     @Put('directories/:id/tags/:tagId')
@@ -587,7 +638,9 @@ export class DirectoriesController {
         @Param('tagId') tagId: string,
         @Body() dto: UpdateTagDto,
     ) {
-        return this.directoryTaxonomyService.updateTag(id, tagId, dto, auth.userId);
+        const result = await this.directoryTaxonomyService.updateTag(id, tagId, dto, auth.userId);
+        await this.cacheManager.del(`directory-categories-tags-${id}-${auth.userId}`);
+        return result;
     }
 
     @Delete('directories/:id/tags/:tagId')
@@ -597,6 +650,8 @@ export class DirectoriesController {
         @Param('id') id: string,
         @Param('tagId') tagId: string,
     ) {
-        return this.directoryTaxonomyService.deleteTag(id, tagId, auth.userId);
+        const result = await this.directoryTaxonomyService.deleteTag(id, tagId, auth.userId);
+        await this.cacheManager.del(`directory-categories-tags-${id}-${auth.userId}`);
+        return result;
     }
 }
