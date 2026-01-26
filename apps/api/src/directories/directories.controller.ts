@@ -21,6 +21,7 @@ import {
     UpdateCategoryDto,
     CreateTagDto,
     UpdateTagDto,
+    UpdateWebsiteSettingsDto,
 } from '@packages/agent/dto';
 import {
     CreateItemsGeneratorDto,
@@ -167,6 +168,24 @@ export class DirectoriesController {
             },
             CACHE_TTL,
         );
+    }
+
+    @Get('directories/:id/website-settings')
+    @HttpCode(HttpStatus.OK)
+    async getWebsiteSettings(@CurrentUser() auth: AuthenticatedUser, @Param('id') id: string) {
+        const user = await this.authService.getUser(auth.userId);
+        return this.directoryQueryService.getWebsiteSettings(id, user);
+    }
+
+    @Put('directories/:id/website-settings')
+    @HttpCode(HttpStatus.OK)
+    async updateWebsiteSettings(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') id: string,
+        @Body() dto: UpdateWebsiteSettingsDto,
+    ) {
+        const user = await this.authService.getUser(auth.userId);
+        return this.directoryQueryService.updateWebsiteSettings(id, user, dto);
     }
 
     @Get('directories/:id/count')
