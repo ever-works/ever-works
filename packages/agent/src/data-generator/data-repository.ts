@@ -48,6 +48,18 @@ export interface SettingsConfig {
     footer?: SettingsFooterConfig;
 }
 
+export interface CustomMenuItem {
+    label: string;
+    path: string;
+    target?: '_self' | '_blank';
+    icon?: string;
+}
+
+export interface CustomMenuConfig {
+    header?: CustomMenuItem[];
+    footer?: CustomMenuItem[];
+}
+
 export interface PaginationConfig {
     type?: string;
     itemsPerPage?: number;
@@ -65,6 +77,7 @@ export interface IDataConfig {
     autoapproval?: boolean;
     settings?: SettingsConfig;
     pagination?: PaginationConfig;
+    custom_menu?: CustomMenuConfig;
     metadata?: {
         initial_prompt?: string;
         pr_update?: PRUpdate | null;
@@ -105,6 +118,11 @@ const DEFAULT_PAGINATION: PaginationConfig = {
     itemsPerPage: 12,
 };
 
+const DEFAULT_CUSTOM_MENU: CustomMenuConfig = {
+    header: [],
+    footer: [],
+};
+
 const DEFAULT_DATA_CONFIG: IDataConfig = {
     company_name: 'Acme',
     content_table: true, // Previous value was false
@@ -114,6 +132,7 @@ const DEFAULT_DATA_CONFIG: IDataConfig = {
     copyright_year: new Date().getFullYear(),
     settings: DEFAULT_SETTINGS,
     pagination: DEFAULT_PAGINATION,
+    custom_menu: DEFAULT_CUSTOM_MENU,
 };
 
 const createDefaultConfig = (overrides: Partial<IDataConfig> = {}): IDataConfig =>
