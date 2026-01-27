@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { randomBytes } from 'crypto';
 import { DeployProvider, VercelInput } from './deploy.types';
 import { GithubService } from '../git/github.service';
@@ -18,6 +18,7 @@ export type { Vercel } from '@vercel/sdk';
 
 @Injectable()
 export class VercelService {
+    private readonly logger = new Logger(VercelService.name);
     private readonly PROVIDER_ID: DeployProvider = 'vercel';
     private readonly CRON_SECRET_LENGTH = 32;
 
@@ -93,8 +94,18 @@ export class VercelService {
         vercelInput: VercelInput,
         directory: Directory,
     ) {
+        try {
+            await this.setVariable(ctx, 'DEPLOY_PROVIDER', this.PROVIDER_ID);
+            this.logger.log(
+                `Set DEPLOY_PROVIDER variable to "${this.PROVIDER_ID}" for ${ctx.owner}/${ctx.repo}`,
+            );
+        } catch (error) {
+            this.logger.error(
+                `Failed to set DEPLOY_PROVIDER variable for ${ctx.owner}/${ctx.repo}: ${error.message}`,
+            );
+        }
+
         await Promise.all([
-            this.setVariable(ctx, 'DEPLOY_PROVIDER', this.PROVIDER_ID),
             this.setSecret(ctx, 'DATA_REPOSITORY', `${directory.slug}-data`),
             this.setSecret(ctx, 'VERCEL_TOKEN', vercelInput.data.vercelToken),
         ]);
@@ -142,34 +153,130 @@ export class VercelService {
         user: User,
         token: string,
     ): Promise<boolean> {
-        const dispatchAction = () =>
-            this.githubService.dispatchAction(
-                {
-                    workflow: 'deploy_vercel.yaml',
-                    inputs: { environment: 'production' },
-                    branch: WEBSITE_TEMPLATE_CONFIG.branch,
-                    owner: vercelInput.owner,
-                    repo: vercelInput.repo,
-                },
-                token,
-            );
+        // Workflow files to try, in order of preference:
+        // 1. deploy_vercel.yaml - Has workflow_dispatch trigger (preferred)
+        // 2. deploy_prod.yaml - May or may not have workflow_dispatch depending on template version
+        const workflowFilesToTry = ['deploy_vercel.yaml', 'deploy_prod.yaml'];
 
-        try {
-            await dispatchAction();
-            return true;
-        } catch {
-            try {
-                await this.websiteUpdateService.updateRepository(directory, user);
-                await this.delay(5000);
-                await dispatchAction();
-                return true;
-            } catch {
-                return false;
+        const tryDispatch = async (): Promise<boolean> => {
+            // Try dispatching each workflow file by filename
+            for (const workflowFile of workflowFilesToTry) {
+                try {
+                    this.logger.log(
+                        `Attempting to dispatch workflow "${workflowFile}" for ${vercelInput.owner}/${vercelInput.repo}`,
+                    );
+
+                    await this.githubService.dispatchAction(
+                        {
+                            workflow: workflowFile,
+                            inputs: { environment: 'production' },
+                            branch: WEBSITE_TEMPLATE_CONFIG.branch,
+                            owner: vercelInput.owner,
+                            repo: vercelInput.repo,
+                        },
+                        token,
+                    );
+
+                    this.logger.log(
+                        `Successfully dispatched workflow "${workflowFile}" for ${vercelInput.owner}/${vercelInput.repo}`,
+                    );
+                    return true;
+                } catch (error) {
+                    this.logger.warn(
+                        `Failed to dispatch workflow "${workflowFile}" for ${vercelInput.owner}/${vercelInput.repo}: ${error.message}`,
+                    );
+                    // Continue to try the next workflow file
+                }
             }
+            return false;
+        };
+
+        // First attempt
+        const firstAttemptSuccess = await tryDispatch();
+        if (firstAttemptSuccess) {
+            return true;
+        }
+
+        // If dispatch fails, update the repository (push to main).
+        // The workflow has a 'push' trigger on main, so pushing will trigger deployment automatically.
+        try {
+            this.logger.log(
+                `Workflow dispatch failed. Updating repository for ${vercelInput.owner}/${vercelInput.repo} (push to main will trigger deployment via push trigger)`,
+            );
+            await this.websiteUpdateService.updateRepository(directory, user);
+
+            // Create a trigger commit to ensure a new workflow run is triggered
+            // (force pushing the same commits won't trigger a new workflow run)
+            await this.createTriggerCommit(vercelInput, directory, user, token);
+
+            // Give GitHub a moment to register the push
+            await this.delay(3000);
+
+            // Try dispatch one more time in case the workflow was just indexed
+            const retrySuccess = await tryDispatch();
+            if (retrySuccess) {
+                return true;
+            }
+
+            // Even if dispatch failed, the push to main should have triggered the workflow
+            // via its 'push' trigger (on: push: branches: [main])
+            this.logger.log(
+                `Manual dispatch failed, but push to main completed. ` +
+                    `Deployment should start via workflow push trigger for ${vercelInput.owner}/${vercelInput.repo}`,
+            );
+            return true; // Return true because push trigger should handle deployment
+        } catch (error) {
+            this.logger.error(
+                `Failed to update repository for ${vercelInput.owner}/${vercelInput.repo}: ${error.message}`,
+            );
+            return false;
         }
     }
 
     private delay(ms: number): Promise<void> {
         return new Promise((resolve) => setTimeout(resolve, ms));
+    }
+
+    /**
+     * Creates a small trigger commit to ensure GitHub triggers a new workflow run.
+     * This is needed because force-pushing the same commits won't trigger workflows.
+     */
+    private async createTriggerCommit(
+        vercelInput: VercelInput,
+        directory: Directory,
+        user: User,
+        token: string,
+    ): Promise<void> {
+        try {
+            const repoDir = await this.githubService.cloneOrPull({
+                owner: vercelInput.owner,
+                repo: vercelInput.repo,
+                branch: WEBSITE_TEMPLATE_CONFIG.branch,
+                token,
+                committer: user.asCommitter(),
+            });
+
+            // Create/update a deployment trigger file
+            const triggerFile = `${repoDir}/.deployment-trigger`;
+            const fs = await import('node:fs/promises');
+            await fs.writeFile(triggerFile, `Deployment triggered at ${new Date().toISOString()}\n`);
+
+            await this.githubService.add(repoDir, '.deployment-trigger');
+            await this.githubService.commit(
+                repoDir,
+                `chore: trigger deployment\n\nTriggered by Ever Works platform`,
+                user.asCommitter(),
+            );
+            await this.githubService.push(repoDir, token);
+
+            this.logger.log(
+                `Created trigger commit for ${vercelInput.owner}/${vercelInput.repo} to initiate workflow`,
+            );
+        } catch (error) {
+            this.logger.warn(
+                `Failed to create trigger commit for ${vercelInput.owner}/${vercelInput.repo}: ${error.message}`,
+            );
+            // Don't throw - the main push might have triggered the workflow already
+        }
     }
 }
