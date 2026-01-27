@@ -278,6 +278,7 @@ export interface WebsiteSettings {
 }
 
 export interface WebsiteSettingsResponse {
+    company_name: string;
     settings: WebsiteSettings;
     custom_menu: {
         header: CustomMenuItem[];
@@ -286,6 +287,7 @@ export interface WebsiteSettingsResponse {
 }
 
 export interface UpdateWebsiteSettingsDto {
+    company_name?: string;
     categories_enabled?: boolean;
     companies_enabled?: boolean;
     tags_enabled?: boolean;

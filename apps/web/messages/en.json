@@ -1081,6 +1081,12 @@
                     "saveFailed": "Failed to save website settings",
                     "save": "Save Settings",
                     "sections": {
+                        "siteName": {
+                            "title": "Site Identity",
+                            "label": "Site Name",
+                            "placeholder": "My Directory",
+                            "helper": "The name displayed on your website header and browser tab"
+                        },
                         "global": {
                             "title": "Global Features",
                             "categories": "Categories",
@@ -1222,6 +1228,19 @@
                         "updateSuccess": "Settings updated successfully",
                         "updateFailed": "Failed to update settings",
                         "githubRequired": "GitHub connection required. Please connect your GitHub account in Settings to enable automatic updates."
+                    },
+                    "configDialog": {
+                        "title": "Configure Before Deploy",
+                        "description": "Review and customize your website settings before deployment",
+                        "siteName": "Site Name",
+                        "siteNamePlaceholder": "My Directory",
+                        "siteNameHelper": "The name displayed on your website (default: Acme)",
+                        "advancedSettings": "Advanced Settings",
+                        "advancedSettingsDescription": "Configure additional website options",
+                        "loadFailed": "Failed to load current settings",
+                        "saveAndDeploy": "Save & Deploy",
+                        "skipAndDeploy": "Skip & Deploy",
+                        "cancel": "Cancel"
                     }
                 }
             }

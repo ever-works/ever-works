@@ -756,6 +756,7 @@ export class DataGeneratorService {
                 icon?: string;
             }>;
         },
+        companyName?: string,
     ): Promise<void> {
         const directoryOwner = this.getDirectoryOwner(directory);
         const token = directoryOwner.getGitToken();
@@ -782,6 +783,7 @@ export class DataGeneratorService {
         // Build new config
         const newConfig = {
             ...currentConfig,
+            company_name: companyName !== undefined ? companyName : currentConfig.company_name,
             settings: newSettings,
             custom_menu: customMenu !== undefined ? customMenu : currentConfig.custom_menu,
         };

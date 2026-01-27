@@ -54,6 +54,7 @@ interface WebsiteSettings {
 }
 
 interface FormData {
+    company_name: string;
     settings: WebsiteSettings;
     custom_menu: {
         header: CustomMenuItem[];
@@ -62,6 +63,7 @@ interface FormData {
 }
 
 const DEFAULT_FORM_DATA: FormData = {
+    company_name: 'Acme',
     settings: {
         categories_enabled: true,
         companies_enabled: true,
@@ -117,8 +119,9 @@ export function WebsiteConfigSettings({ directoryId }: WebsiteConfigSettingsProp
         try {
             const result = await getWebsiteSettings(directoryId);
             if (result.success && result.data) {
-                const { settings, custom_menu } = result.data;
+                const { company_name, settings, custom_menu } = result.data;
                 setFormData({
+                    company_name: company_name || 'Acme',
                     settings: {
                         ...DEFAULT_FORM_DATA.settings,
                         ...settings,
@@ -145,6 +148,7 @@ export function WebsiteConfigSettings({ directoryId }: WebsiteConfigSettingsProp
         setIsSaving(true);
         try {
             const result = await updateWebsiteSettings(directoryId, {
+                company_name: formData.company_name,
                 ...formData.settings,
                 custom_menu: formData.custom_menu,
             });
@@ -292,6 +296,28 @@ export function WebsiteConfigSettings({ directoryId }: WebsiteConfigSettingsProp
                         </div>
                     ) : (
                         <>
+                            {/* Site Name Section */}
+                            <section>
+                                <h4 className="text-md font-medium text-text dark:text-text-dark mb-4">
+                                    {t('sections.siteName.title')}
+                                </h4>
+                                <div className="max-w-md">
+                                    <Input
+                                        label={t('sections.siteName.label')}
+                                        value={formData.company_name}
+                                        onChange={(e) =>
+                                            setFormData((prev) => ({
+                                                ...prev,
+                                                company_name: e.target.value,
+                                            }))
+                                        }
+                                        placeholder={t('sections.siteName.placeholder')}
+                                        helperText={t('sections.siteName.helper')}
+                                        variant="form"
+                                    />
+                                </div>
+                            </section>
+
                             {/* Global Toggles Section */}
                             <section>
                                 <h4 className="text-md font-medium text-text dark:text-text-dark mb-4">

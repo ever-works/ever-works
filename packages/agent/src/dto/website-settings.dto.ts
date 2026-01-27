@@ -136,6 +136,11 @@ export class SettingsFooterDto {
  */
 export class UpdateWebsiteSettingsDto {
     @IsOptional()
+    @IsString()
+    @MaxLength(100)
+    company_name?: string;
+
+    @IsOptional()
     @IsBoolean()
     categories_enabled?: boolean;
 
@@ -177,6 +182,7 @@ export class UpdateWebsiteSettingsDto {
  */
 export interface WebsiteSettingsResponseDto {
     status: 'success' | 'error';
+    company_name: string;
     settings: {
         categories_enabled?: boolean;
         companies_enabled?: boolean;

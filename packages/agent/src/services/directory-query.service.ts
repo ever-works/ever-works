@@ -227,6 +227,7 @@ export class DirectoryQueryService {
             const config = await this.dataGenerator.config(directory, user);
             return {
                 status: 'success',
+                company_name: config?.company_name || 'Acme',
                 settings: config?.settings || {},
                 custom_menu: config?.custom_menu || { header: [], footer: [] },
             };
@@ -239,6 +240,7 @@ export class DirectoryQueryService {
             if (errMessage.includes('Repository not found')) {
                 return {
                     status: 'success',
+                    company_name: 'Acme',
                     settings: {},
                     custom_menu: { header: [], footer: [] },
                 };
@@ -257,6 +259,7 @@ export class DirectoryQueryService {
         directoryId: string,
         user: User,
         dto: {
+            company_name?: string;
             categories_enabled?: boolean;
             companies_enabled?: boolean;
             tags_enabled?: boolean;
@@ -302,8 +305,14 @@ export class DirectoryQueryService {
         const { directory } = await this.ownershipService.ensureCanEdit(directoryId, user.id);
 
         try {
-            const { custom_menu, ...settings } = dto;
-            await this.dataGenerator.updateWebsiteSettings(directory, user, settings, custom_menu);
+            const { custom_menu, company_name, ...settings } = dto;
+            await this.dataGenerator.updateWebsiteSettings(
+                directory,
+                user,
+                settings,
+                custom_menu,
+                company_name,
+            );
             return {
                 status: 'success',
                 message: 'Website settings updated successfully',
