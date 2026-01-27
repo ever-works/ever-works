@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Select } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { ChevronDownIcon, ChevronUpIcon, PlusIcon, TrashIcon } from 'lucide-react';
+import { ChevronDownIcon, ChevronUpIcon, PlusIcon, TrashIcon, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
     getWebsiteSettings,
@@ -97,6 +97,28 @@ const DEFAULT_FORM_DATA: FormData = {
     },
 };
 
+function SettingsCard({
+    title,
+    children,
+    className,
+}: {
+    title: string;
+    children: React.ReactNode;
+    className?: string;
+}) {
+    return (
+        <div
+            className={cn(
+                'rounded-lg border bg-card dark:bg-card-dark border-card-border dark:border-card-border-dark p-5',
+                className,
+            )}
+        >
+            <h4 className="text-sm font-semibold text-text dark:text-text-dark mb-4">{title}</h4>
+            {children}
+        </div>
+    );
+}
+
 export function WebsiteConfigSettings({ directoryId }: WebsiteConfigSettingsProps) {
     const t = useTranslations('dashboard.directoryDetail.settings.websiteConfig');
 
@@ -106,13 +128,11 @@ export function WebsiteConfigSettings({ directoryId }: WebsiteConfigSettingsProp
     const [hasLoaded, setHasLoaded] = useState(false);
     const [formData, setFormData] = useState<FormData>(DEFAULT_FORM_DATA);
 
-    // Load settings when expanded for the first time
     useEffect(() => {
         if (isExpanded && !hasLoaded) {
             loadSettings();
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isExpanded]);
+    }, [isExpanded, hasLoaded]);
 
     const loadSettings = async () => {
         setIsLoading(true);
@@ -172,10 +192,7 @@ export function WebsiteConfigSettings({ directoryId }: WebsiteConfigSettingsProp
     ) => {
         setFormData((prev) => ({
             ...prev,
-            settings: {
-                ...prev.settings,
-                [key]: value,
-            },
+            settings: { ...prev.settings, [key]: value },
         }));
     };
 
@@ -184,10 +201,7 @@ export function WebsiteConfigSettings({ directoryId }: WebsiteConfigSettingsProp
             ...prev,
             settings: {
                 ...prev.settings,
-                header: {
-                    ...prev.settings.header,
-                    [key]: value,
-                },
+                header: { ...prev.settings.header, [key]: value },
             },
         }));
     };
@@ -197,10 +211,7 @@ export function WebsiteConfigSettings({ directoryId }: WebsiteConfigSettingsProp
             ...prev,
             settings: {
                 ...prev.settings,
-                homepage: {
-                    ...prev.settings.homepage,
-                    [key]: value,
-                },
+                homepage: { ...prev.settings.homepage, [key]: value },
             },
         }));
     };
@@ -210,10 +221,7 @@ export function WebsiteConfigSettings({ directoryId }: WebsiteConfigSettingsProp
             ...prev,
             settings: {
                 ...prev.settings,
-                footer: {
-                    ...prev.settings.footer,
-                    [key]: value,
-                },
+                footer: { ...prev.settings.footer, [key]: value },
             },
         }));
     };
@@ -289,109 +297,109 @@ export function WebsiteConfigSettings({ directoryId }: WebsiteConfigSettingsProp
 
             {/* Expandable Content */}
             {isExpanded && (
-                <div className="px-6 pb-6 space-y-8">
+                <div className="px-6 pb-6">
                     {isLoading ? (
-                        <div className="flex justify-center py-8">
-                            <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" />
+                        <div className="flex justify-center py-12">
+                            <Loader2 className="animate-spin h-8 w-8 text-primary" />
                         </div>
                     ) : (
-                        <>
-                            {/* Site Name Section */}
-                            <section>
-                                <h4 className="text-md font-medium text-text dark:text-text-dark mb-4">
-                                    {t('sections.siteName.title')}
-                                </h4>
-                                <div className="max-w-md">
-                                    <Input
-                                        label={t('sections.siteName.label')}
-                                        value={formData.company_name}
-                                        onChange={(e) =>
-                                            setFormData((prev) => ({
-                                                ...prev,
-                                                company_name: e.target.value,
-                                            }))
-                                        }
-                                        placeholder={t('sections.siteName.placeholder')}
-                                        helperText={t('sections.siteName.helper')}
-                                        variant="form"
-                                    />
-                                </div>
-                            </section>
+                        <div className="space-y-4">
+                            {/* Site Identity Card */}
+                            <SettingsCard title={t('sections.siteName.title')}>
+                                <Input
+                                    label={t('sections.siteName.label')}
+                                    value={formData.company_name}
+                                    onChange={(e) =>
+                                        setFormData((prev) => ({
+                                            ...prev,
+                                            company_name: e.target.value,
+                                        }))
+                                    }
+                                    placeholder={t('sections.siteName.placeholder')}
+                                    helperText={t('sections.siteName.helper')}
+                                    variant="form"
+                                />
+                            </SettingsCard>
 
-                            {/* Global Toggles Section */}
-                            <section>
-                                <h4 className="text-md font-medium text-text dark:text-text-dark mb-4">
-                                    {t('sections.global.title')}
-                                </h4>
-                                <div className="space-y-3">
+                            {/* Global Features Card */}
+                            <SettingsCard title={t('sections.global.title')}>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                     <Switch
                                         checked={formData.settings.categories_enabled ?? true}
-                                        onChange={(checked) => updateSettings('categories_enabled', checked)}
+                                        onChange={(checked) =>
+                                            updateSettings('categories_enabled', checked)
+                                        }
                                         label={t('sections.global.categories')}
-                                        helperText={t('sections.global.categoriesHelper')}
                                     />
                                     <Switch
                                         checked={formData.settings.tags_enabled ?? true}
                                         onChange={(checked) => updateSettings('tags_enabled', checked)}
                                         label={t('sections.global.tags')}
-                                        helperText={t('sections.global.tagsHelper')}
                                     />
                                     <Switch
                                         checked={formData.settings.companies_enabled ?? true}
-                                        onChange={(checked) => updateSettings('companies_enabled', checked)}
+                                        onChange={(checked) =>
+                                            updateSettings('companies_enabled', checked)
+                                        }
                                         label={t('sections.global.companies')}
-                                        helperText={t('sections.global.companiesHelper')}
                                     />
                                     <Switch
                                         checked={formData.settings.surveys_enabled ?? true}
-                                        onChange={(checked) => updateSettings('surveys_enabled', checked)}
+                                        onChange={(checked) =>
+                                            updateSettings('surveys_enabled', checked)
+                                        }
                                         label={t('sections.global.surveys')}
-                                        helperText={t('sections.global.surveysHelper')}
                                     />
                                 </div>
-                            </section>
+                            </SettingsCard>
 
-                            {/* Header Settings Section */}
-                            <section>
-                                <h4 className="text-md font-medium text-text dark:text-text-dark mb-4">
-                                    {t('sections.header.title')}
-                                </h4>
-                                <div className="space-y-3">
-                                    <Switch
-                                        checked={formData.settings.header?.submit_enabled ?? true}
-                                        onChange={(checked) => updateHeaderSettings('submit_enabled', checked)}
-                                        label={t('sections.header.submit')}
-                                        helperText={t('sections.header.submitHelper')}
-                                    />
-                                    <Switch
-                                        checked={formData.settings.header?.pricing_enabled ?? true}
-                                        onChange={(checked) => updateHeaderSettings('pricing_enabled', checked)}
-                                        label={t('sections.header.pricing')}
-                                        helperText={t('sections.header.pricingHelper')}
-                                    />
-                                    <Switch
-                                        checked={formData.settings.header?.layout_enabled ?? true}
-                                        onChange={(checked) => updateHeaderSettings('layout_enabled', checked)}
-                                        label={t('sections.header.layoutSelector')}
-                                        helperText={t('sections.header.layoutSelectorHelper')}
-                                    />
-                                    <Switch
-                                        checked={formData.settings.header?.language_enabled ?? true}
-                                        onChange={(checked) => updateHeaderSettings('language_enabled', checked)}
-                                        label={t('sections.header.languageSelector')}
-                                        helperText={t('sections.header.languageSelectorHelper')}
-                                    />
-                                    <Switch
-                                        checked={formData.settings.header?.theme_enabled ?? true}
-                                        onChange={(checked) => updateHeaderSettings('theme_enabled', checked)}
-                                        label={t('sections.header.themeSelector')}
-                                        helperText={t('sections.header.themeSelectorHelper')}
-                                    />
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+                            {/* Header Settings Card */}
+                            <SettingsCard title={t('sections.header.title')}>
+                                <div className="space-y-4">
+                                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                                        <Switch
+                                            checked={formData.settings.header?.submit_enabled ?? true}
+                                            onChange={(checked) =>
+                                                updateHeaderSettings('submit_enabled', checked)
+                                            }
+                                            label={t('sections.header.submit')}
+                                        />
+                                        <Switch
+                                            checked={formData.settings.header?.pricing_enabled ?? true}
+                                            onChange={(checked) =>
+                                                updateHeaderSettings('pricing_enabled', checked)
+                                            }
+                                            label={t('sections.header.pricing')}
+                                        />
+                                        <Switch
+                                            checked={formData.settings.header?.layout_enabled ?? true}
+                                            onChange={(checked) =>
+                                                updateHeaderSettings('layout_enabled', checked)
+                                            }
+                                            label={t('sections.header.layoutSelector')}
+                                        />
+                                        <Switch
+                                            checked={formData.settings.header?.language_enabled ?? true}
+                                            onChange={(checked) =>
+                                                updateHeaderSettings('language_enabled', checked)
+                                            }
+                                            label={t('sections.header.languageSelector')}
+                                        />
+                                        <Switch
+                                            checked={formData.settings.header?.theme_enabled ?? true}
+                                            onChange={(checked) =>
+                                                updateHeaderSettings('theme_enabled', checked)
+                                            }
+                                            label={t('sections.header.themeSelector')}
+                                        />
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 border-t border-border dark:border-border-dark">
                                         <Select
                                             label={t('sections.header.defaultLayout')}
                                             value={formData.settings.header?.layout_default || 'home1'}
-                                            onChange={(e) => updateHeaderSettings('layout_default', e.target.value)}
+                                            onChange={(e) =>
+                                                updateHeaderSettings('layout_default', e.target.value)
+                                            }
                                             variant="form"
                                         >
                                             <option value="home1">Home 1</option>
@@ -401,242 +409,358 @@ export function WebsiteConfigSettings({ directoryId }: WebsiteConfigSettingsProp
                                         <Select
                                             label={t('sections.header.defaultTheme')}
                                             value={formData.settings.header?.theme_default || 'light'}
-                                            onChange={(e) => updateHeaderSettings('theme_default', e.target.value)}
+                                            onChange={(e) =>
+                                                updateHeaderSettings('theme_default', e.target.value)
+                                            }
                                             variant="form"
                                         >
-                                            <option value="light">{t('sections.header.themeLight')}</option>
-                                            <option value="dark">{t('sections.header.themeDark')}</option>
-                                            <option value="system">{t('sections.header.themeSystem')}</option>
+                                            <option value="light">
+                                                {t('sections.header.themeLight')}
+                                            </option>
+                                            <option value="dark">
+                                                {t('sections.header.themeDark')}
+                                            </option>
+                                            <option value="system">
+                                                {t('sections.header.themeSystem')}
+                                            </option>
                                         </Select>
                                         <Select
                                             label={t('sections.header.defaultPagination')}
-                                            value={formData.settings.header?.pagination_default || 'standard'}
-                                            onChange={(e) => updateHeaderSettings('pagination_default', e.target.value)}
+                                            value={
+                                                formData.settings.header?.pagination_default ||
+                                                'standard'
+                                            }
+                                            onChange={(e) =>
+                                                updateHeaderSettings(
+                                                    'pagination_default',
+                                                    e.target.value,
+                                                )
+                                            }
                                             variant="form"
                                         >
-                                            <option value="standard">{t('sections.header.paginationStandard')}</option>
-                                            <option value="infinite">{t('sections.header.paginationInfinite')}</option>
-                                            <option value="loadmore">{t('sections.header.paginationLoadMore')}</option>
+                                            <option value="standard">
+                                                {t('sections.header.paginationStandard')}
+                                            </option>
+                                            <option value="infinite">
+                                                {t('sections.header.paginationInfinite')}
+                                            </option>
+                                            <option value="loadmore">
+                                                {t('sections.header.paginationLoadMore')}
+                                            </option>
                                         </Select>
                                     </div>
                                 </div>
-                            </section>
+                            </SettingsCard>
 
-                            {/* Homepage Settings Section */}
-                            <section>
-                                <h4 className="text-md font-medium text-text dark:text-text-dark mb-4">
-                                    {t('sections.homepage.title')}
-                                </h4>
-                                <div className="space-y-3">
-                                    <Switch
-                                        checked={formData.settings.homepage?.hero_enabled ?? true}
-                                        onChange={(checked) => updateHomepageSettings('hero_enabled', checked)}
-                                        label={t('sections.homepage.hero')}
-                                        helperText={t('sections.homepage.heroHelper')}
-                                    />
-                                    <Switch
-                                        checked={formData.settings.homepage?.search_enabled ?? true}
-                                        onChange={(checked) => updateHomepageSettings('search_enabled', checked)}
-                                        label={t('sections.homepage.search')}
-                                        helperText={t('sections.homepage.searchHelper')}
-                                    />
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                            {/* Homepage Settings Card */}
+                            <SettingsCard title={t('sections.homepage.title')}>
+                                <div className="space-y-4">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <Switch
+                                            checked={formData.settings.homepage?.hero_enabled ?? true}
+                                            onChange={(checked) =>
+                                                updateHomepageSettings('hero_enabled', checked)
+                                            }
+                                            label={t('sections.homepage.hero')}
+                                        />
+                                        <Switch
+                                            checked={
+                                                formData.settings.homepage?.search_enabled ?? true
+                                            }
+                                            onChange={(checked) =>
+                                                updateHomepageSettings('search_enabled', checked)
+                                            }
+                                            label={t('sections.homepage.search')}
+                                        />
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-border dark:border-border-dark">
                                         <Select
                                             label={t('sections.homepage.defaultView')}
-                                            value={formData.settings.homepage?.default_view || 'classic'}
-                                            onChange={(e) => updateHomepageSettings('default_view', e.target.value)}
+                                            value={
+                                                formData.settings.homepage?.default_view || 'classic'
+                                            }
+                                            onChange={(e) =>
+                                                updateHomepageSettings('default_view', e.target.value)
+                                            }
                                             variant="form"
                                         >
-                                            <option value="classic">{t('sections.homepage.viewClassic')}</option>
-                                            <option value="grid">{t('sections.homepage.viewGrid')}</option>
-                                            <option value="list">{t('sections.homepage.viewList')}</option>
+                                            <option value="classic">
+                                                {t('sections.homepage.viewClassic')}
+                                            </option>
+                                            <option value="grid">
+                                                {t('sections.homepage.viewGrid')}
+                                            </option>
+                                            <option value="list">
+                                                {t('sections.homepage.viewList')}
+                                            </option>
                                         </Select>
                                         <Select
                                             label={t('sections.homepage.defaultSort')}
-                                            value={formData.settings.homepage?.default_sort || 'popularity'}
-                                            onChange={(e) => updateHomepageSettings('default_sort', e.target.value)}
+                                            value={
+                                                formData.settings.homepage?.default_sort ||
+                                                'popularity'
+                                            }
+                                            onChange={(e) =>
+                                                updateHomepageSettings('default_sort', e.target.value)
+                                            }
                                             variant="form"
                                         >
-                                            <option value="popularity">{t('sections.homepage.sortPopularity')}</option>
-                                            <option value="newest">{t('sections.homepage.sortNewest')}</option>
-                                            <option value="alphabetical">{t('sections.homepage.sortAlphabetical')}</option>
+                                            <option value="popularity">
+                                                {t('sections.homepage.sortPopularity')}
+                                            </option>
+                                            <option value="newest">
+                                                {t('sections.homepage.sortNewest')}
+                                            </option>
+                                            <option value="alphabetical">
+                                                {t('sections.homepage.sortAlphabetical')}
+                                            </option>
                                         </Select>
                                     </div>
                                 </div>
-                            </section>
+                            </SettingsCard>
 
-                            {/* Footer Settings Section */}
-                            <section>
-                                <h4 className="text-md font-medium text-text dark:text-text-dark mb-4">
-                                    {t('sections.footer.title')}
-                                </h4>
-                                <div className="space-y-3">
+                            {/* Footer Settings Card */}
+                            <SettingsCard title={t('sections.footer.title')}>
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                                     <Switch
                                         checked={formData.settings.footer?.subscribe_enabled ?? true}
-                                        onChange={(checked) => updateFooterSettings('subscribe_enabled', checked)}
+                                        onChange={(checked) =>
+                                            updateFooterSettings('subscribe_enabled', checked)
+                                        }
                                         label={t('sections.footer.subscribe')}
-                                        helperText={t('sections.footer.subscribeHelper')}
                                     />
                                     <Switch
                                         checked={formData.settings.footer?.version_enabled ?? true}
-                                        onChange={(checked) => updateFooterSettings('version_enabled', checked)}
+                                        onChange={(checked) =>
+                                            updateFooterSettings('version_enabled', checked)
+                                        }
                                         label={t('sections.footer.version')}
-                                        helperText={t('sections.footer.versionHelper')}
                                     />
                                     <Switch
-                                        checked={formData.settings.footer?.theme_selector_enabled ?? true}
-                                        onChange={(checked) => updateFooterSettings('theme_selector_enabled', checked)}
+                                        checked={
+                                            formData.settings.footer?.theme_selector_enabled ?? true
+                                        }
+                                        onChange={(checked) =>
+                                            updateFooterSettings('theme_selector_enabled', checked)
+                                        }
                                         label={t('sections.footer.themeSelector')}
-                                        helperText={t('sections.footer.themeSelectorHelper')}
                                     />
                                 </div>
-                            </section>
+                            </SettingsCard>
 
-                            {/* Custom Menu Items Section */}
-                            <section>
-                                <h4 className="text-md font-medium text-text dark:text-text-dark mb-4">
-                                    {t('sections.customMenu.title')}
-                                </h4>
+                            {/* Custom Menu Links Card */}
+                            <SettingsCard title={t('sections.customMenu.title')}>
                                 <p className="text-sm text-text-muted dark:text-text-muted-dark mb-4">
                                     {t('sections.customMenu.description')}
                                 </p>
 
-                                {/* Header Menu Items */}
-                                <div className="mb-6">
-                                    <div className="flex items-center justify-between mb-3">
-                                        <h5 className="text-sm font-medium text-text dark:text-text-dark">
-                                            {t('sections.customMenu.headerLinks')}
-                                        </h5>
-                                        <Button
-                                            type="button"
-                                            variant="secondary"
-                                            size="sm"
-                                            onClick={() => addMenuItem('header')}
-                                            disabled={formData.custom_menu.header.length >= 10}
-                                        >
-                                            <PlusIcon className="h-4 w-4 mr-1" />
-                                            {t('sections.customMenu.addLink')}
-                                        </Button>
-                                    </div>
-                                    {formData.custom_menu.header.length === 0 ? (
-                                        <p className="text-sm text-text-muted dark:text-text-muted-dark italic">
-                                            {t('sections.customMenu.noLinks')}
-                                        </p>
-                                    ) : (
-                                        <div className="space-y-3">
-                                            {formData.custom_menu.header.map((item, index) => (
-                                                <div key={index} className="flex items-start gap-3 p-3 bg-surface-secondary dark:bg-surface-secondary-dark rounded-lg">
-                                                    <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-3">
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                    {/* Header Links */}
+                                    <div className="space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <h5 className="text-sm font-medium text-text dark:text-text-dark">
+                                                {t('sections.customMenu.headerLinks')}
+                                            </h5>
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => addMenuItem('header')}
+                                                disabled={formData.custom_menu.header.length >= 10}
+                                            >
+                                                <PlusIcon className="h-4 w-4" />
+                                            </Button>
+                                        </div>
+                                        {formData.custom_menu.header.length === 0 ? (
+                                            <p className="text-sm text-text-muted dark:text-text-muted-dark italic py-2">
+                                                {t('sections.customMenu.noLinks')}
+                                            </p>
+                                        ) : (
+                                            <div className="space-y-2">
+                                                {formData.custom_menu.header.map((item, index) => (
+                                                    <div
+                                                        key={index}
+                                                        className="flex items-center gap-2 p-2 bg-surface-secondary dark:bg-surface-secondary-dark rounded"
+                                                    >
                                                         <Input
-                                                            placeholder={t('sections.customMenu.labelPlaceholder')}
+                                                            placeholder={t(
+                                                                'sections.customMenu.labelPlaceholder',
+                                                            )}
                                                             value={item.label}
-                                                            onChange={(e) => updateMenuItem('header', index, 'label', e.target.value)}
+                                                            onChange={(e) =>
+                                                                updateMenuItem(
+                                                                    'header',
+                                                                    index,
+                                                                    'label',
+                                                                    e.target.value,
+                                                                )
+                                                            }
                                                             variant="form"
+                                                            className="flex-1"
                                                         />
                                                         <Input
-                                                            placeholder={t('sections.customMenu.pathPlaceholder')}
+                                                            placeholder={t(
+                                                                'sections.customMenu.pathPlaceholder',
+                                                            )}
                                                             value={item.path}
-                                                            onChange={(e) => updateMenuItem('header', index, 'path', e.target.value)}
+                                                            onChange={(e) =>
+                                                                updateMenuItem(
+                                                                    'header',
+                                                                    index,
+                                                                    'path',
+                                                                    e.target.value,
+                                                                )
+                                                            }
                                                             variant="form"
+                                                            className="flex-1"
                                                         />
                                                         <Select
                                                             value={item.target || '_self'}
-                                                            onChange={(e) => updateMenuItem('header', index, 'target', e.target.value)}
+                                                            onChange={(e) =>
+                                                                updateMenuItem(
+                                                                    'header',
+                                                                    index,
+                                                                    'target',
+                                                                    e.target.value,
+                                                                )
+                                                            }
                                                             variant="form"
+                                                            className="w-24"
                                                         >
-                                                            <option value="_self">{t('sections.customMenu.targetSelf')}</option>
-                                                            <option value="_blank">{t('sections.customMenu.targetBlank')}</option>
+                                                            <option value="_self">
+                                                                {t('sections.customMenu.targetSelf')}
+                                                            </option>
+                                                            <option value="_blank">
+                                                                {t('sections.customMenu.targetBlank')}
+                                                            </option>
                                                         </Select>
+                                                        <Button
+                                                            type="button"
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            onClick={() =>
+                                                                removeMenuItem('header', index)
+                                                            }
+                                                            className="text-danger hover:text-danger shrink-0"
+                                                        >
+                                                            <TrashIcon className="h-4 w-4" />
+                                                        </Button>
                                                     </div>
-                                                    <Button
-                                                        type="button"
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() => removeMenuItem('header', index)}
-                                                        className="text-danger hover:text-danger"
-                                                    >
-                                                        <TrashIcon className="h-4 w-4" />
-                                                    </Button>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
 
-                                {/* Footer Menu Items */}
-                                <div>
-                                    <div className="flex items-center justify-between mb-3">
-                                        <h5 className="text-sm font-medium text-text dark:text-text-dark">
-                                            {t('sections.customMenu.footerLinks')}
-                                        </h5>
-                                        <Button
-                                            type="button"
-                                            variant="secondary"
-                                            size="sm"
-                                            onClick={() => addMenuItem('footer')}
-                                            disabled={formData.custom_menu.footer.length >= 10}
-                                        >
-                                            <PlusIcon className="h-4 w-4 mr-1" />
-                                            {t('sections.customMenu.addLink')}
-                                        </Button>
-                                    </div>
-                                    {formData.custom_menu.footer.length === 0 ? (
-                                        <p className="text-sm text-text-muted dark:text-text-muted-dark italic">
-                                            {t('sections.customMenu.noLinks')}
-                                        </p>
-                                    ) : (
-                                        <div className="space-y-3">
-                                            {formData.custom_menu.footer.map((item, index) => (
-                                                <div key={index} className="flex items-start gap-3 p-3 bg-surface-secondary dark:bg-surface-secondary-dark rounded-lg">
-                                                    <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-3">
+                                    {/* Footer Links */}
+                                    <div className="space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <h5 className="text-sm font-medium text-text dark:text-text-dark">
+                                                {t('sections.customMenu.footerLinks')}
+                                            </h5>
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => addMenuItem('footer')}
+                                                disabled={formData.custom_menu.footer.length >= 10}
+                                            >
+                                                <PlusIcon className="h-4 w-4" />
+                                            </Button>
+                                        </div>
+                                        {formData.custom_menu.footer.length === 0 ? (
+                                            <p className="text-sm text-text-muted dark:text-text-muted-dark italic py-2">
+                                                {t('sections.customMenu.noLinks')}
+                                            </p>
+                                        ) : (
+                                            <div className="space-y-2">
+                                                {formData.custom_menu.footer.map((item, index) => (
+                                                    <div
+                                                        key={index}
+                                                        className="flex items-center gap-2 p-2 bg-surface-secondary dark:bg-surface-secondary-dark rounded"
+                                                    >
                                                         <Input
-                                                            placeholder={t('sections.customMenu.labelPlaceholder')}
+                                                            placeholder={t(
+                                                                'sections.customMenu.labelPlaceholder',
+                                                            )}
                                                             value={item.label}
-                                                            onChange={(e) => updateMenuItem('footer', index, 'label', e.target.value)}
+                                                            onChange={(e) =>
+                                                                updateMenuItem(
+                                                                    'footer',
+                                                                    index,
+                                                                    'label',
+                                                                    e.target.value,
+                                                                )
+                                                            }
                                                             variant="form"
+                                                            className="flex-1"
                                                         />
                                                         <Input
-                                                            placeholder={t('sections.customMenu.pathPlaceholder')}
+                                                            placeholder={t(
+                                                                'sections.customMenu.pathPlaceholder',
+                                                            )}
                                                             value={item.path}
-                                                            onChange={(e) => updateMenuItem('footer', index, 'path', e.target.value)}
+                                                            onChange={(e) =>
+                                                                updateMenuItem(
+                                                                    'footer',
+                                                                    index,
+                                                                    'path',
+                                                                    e.target.value,
+                                                                )
+                                                            }
                                                             variant="form"
+                                                            className="flex-1"
                                                         />
                                                         <Select
                                                             value={item.target || '_self'}
-                                                            onChange={(e) => updateMenuItem('footer', index, 'target', e.target.value)}
+                                                            onChange={(e) =>
+                                                                updateMenuItem(
+                                                                    'footer',
+                                                                    index,
+                                                                    'target',
+                                                                    e.target.value,
+                                                                )
+                                                            }
                                                             variant="form"
+                                                            className="w-24"
                                                         >
-                                                            <option value="_self">{t('sections.customMenu.targetSelf')}</option>
-                                                            <option value="_blank">{t('sections.customMenu.targetBlank')}</option>
+                                                            <option value="_self">
+                                                                {t('sections.customMenu.targetSelf')}
+                                                            </option>
+                                                            <option value="_blank">
+                                                                {t('sections.customMenu.targetBlank')}
+                                                            </option>
                                                         </Select>
+                                                        <Button
+                                                            type="button"
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            onClick={() =>
+                                                                removeMenuItem('footer', index)
+                                                            }
+                                                            className="text-danger hover:text-danger shrink-0"
+                                                        >
+                                                            <TrashIcon className="h-4 w-4" />
+                                                        </Button>
                                                     </div>
-                                                    <Button
-                                                        type="button"
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() => removeMenuItem('footer', index)}
-                                                        className="text-danger hover:text-danger"
-                                                    >
-                                                        <TrashIcon className="h-4 w-4" />
-                                                    </Button>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
-                            </section>
+                            </SettingsCard>
 
                             {/* Save Button */}
-                            <Button
-                                type="button"
-                                onClick={handleSave}
-                                disabled={isSaving}
-                                loading={isSaving}
-                                variant="secondary"
-                            >
-                                {t('save')}
-                            </Button>
-                        </>
+                            <div className="flex justify-end pt-2">
+                                <Button
+                                    type="button"
+                                    onClick={handleSave}
+                                    disabled={isSaving}
+                                    loading={isSaving}
+                                >
+                                    {t('save')}
+                                </Button>
+                            </div>
+                        </div>
                     )}
                 </div>
             )}
