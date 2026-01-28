@@ -21,7 +21,7 @@ import {
 } from '@nestjs/swagger';
 import { AuthService } from '../services/auth.service';
 import { OAuthUrlService } from '../services/oauth-url.service';
-import { RegisterDto, RefreshTokenDto, UpdatePasswordDto } from '../dto/auth.dto';
+import { RegisterDto, LoginDto, RefreshTokenDto, UpdatePasswordDto } from '../dto/auth.dto';
 import { VerifyEmailDto, ForgotPasswordDto, ResetPasswordDto } from '../dto/email-verification.dto';
 import { UpdateProfileDto } from '../dto/update-profile.dto';
 import { LocalAuthGuard } from '../guards/local-auth.guard';
@@ -51,7 +51,7 @@ export class AuthController {
     @Post('login')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({ summary: 'User login', description: 'Authenticate with email and password' })
-    @ApiBody({ schema: { properties: { email: { type: 'string' }, password: { type: 'string' } } } })
+    @ApiBody({ type: LoginDto })
     @ApiResponse({ status: 200, description: 'Successfully authenticated, returns access and refresh tokens' })
     @ApiResponse({ status: 401, description: 'Invalid credentials' })
     async login(@Request() req) {
