@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
@@ -128,13 +128,7 @@ export function WebsiteConfigSettings({ directoryId }: WebsiteConfigSettingsProp
     const [hasLoaded, setHasLoaded] = useState(false);
     const [formData, setFormData] = useState<FormData>(DEFAULT_FORM_DATA);
 
-    useEffect(() => {
-        if (isExpanded && !hasLoaded) {
-            loadSettings();
-        }
-    }, [isExpanded, hasLoaded]);
-
-    const loadSettings = async () => {
+    const loadSettings = useCallback(async () => {
         setIsLoading(true);
         try {
             const result = await getWebsiteSettings(directoryId);
@@ -162,7 +156,13 @@ export function WebsiteConfigSettings({ directoryId }: WebsiteConfigSettingsProp
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [directoryId, t]);
+
+    useEffect(() => {
+        if (isExpanded && !hasLoaded) {
+            loadSettings();
+        }
+    }, [isExpanded, hasLoaded, loadSettings]);
 
     const handleSave = async () => {
         setIsSaving(true);
