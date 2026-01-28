@@ -709,6 +709,94 @@ export class DataGeneratorService {
         };
     }
 
+    /**
+     * Update website settings in config.yml and push to GitHub
+     */
+    async updateWebsiteSettings(
+        directory: Directory,
+        user: User,
+        settings: {
+            categories_enabled?: boolean;
+            companies_enabled?: boolean;
+            tags_enabled?: boolean;
+            surveys_enabled?: boolean;
+            header?: {
+                submit_enabled?: boolean;
+                pricing_enabled?: boolean;
+                layout_enabled?: boolean;
+                language_enabled?: boolean;
+                theme_enabled?: boolean;
+                layout_default?: string;
+                pagination_default?: string;
+                theme_default?: string;
+            };
+            homepage?: {
+                hero_enabled?: boolean;
+                search_enabled?: boolean;
+                default_view?: string;
+                default_sort?: string;
+            };
+            footer?: {
+                subscribe_enabled?: boolean;
+                version_enabled?: boolean;
+                theme_selector_enabled?: boolean;
+            };
+        },
+        customMenu?: {
+            header?: Array<{
+                label: string;
+                path: string;
+                target?: '_self' | '_blank';
+                icon?: string;
+            }>;
+            footer?: Array<{
+                label: string;
+                path: string;
+                target?: '_self' | '_blank';
+                icon?: string;
+            }>;
+        },
+        companyName?: string,
+    ): Promise<void> {
+        const directoryOwner = this.getDirectoryOwner(directory);
+        const token = directoryOwner.getGitToken();
+        const committer = user.asCommitter();
+
+        const data = await this.repositoryData(directory, user);
+        const currentConfig = await data.getConfig();
+
+        // Deep merge settings
+        const newSettings = {
+            ...currentConfig.settings,
+            ...settings,
+            header: settings.header
+                ? { ...currentConfig.settings?.header, ...settings.header }
+                : currentConfig.settings?.header,
+            homepage: settings.homepage
+                ? { ...currentConfig.settings?.homepage, ...settings.homepage }
+                : currentConfig.settings?.homepage,
+            footer: settings.footer
+                ? { ...currentConfig.settings?.footer, ...settings.footer }
+                : currentConfig.settings?.footer,
+        };
+
+        // Build new config
+        const newConfig = {
+            ...currentConfig,
+            company_name: companyName !== undefined ? companyName : currentConfig.company_name,
+            settings: newSettings,
+            custom_menu: customMenu !== undefined ? customMenu : currentConfig.custom_menu,
+        };
+
+        await data.writeConfig(newConfig);
+
+        await this.githubService.addAll(data.dir);
+        await this.githubService.commit(data.dir, 'update website settings', committer);
+        await this.githubService.push(data.dir, token);
+
+        this.logger.log(`Successfully updated website settings for directory ${directory.slug}`);
+    }
+
     private async repositoryData(directory: Directory, user: User) {
         // Use directory owner's Git token (they set up the repos)
         const directoryOwner = this.getDirectoryOwner(directory);

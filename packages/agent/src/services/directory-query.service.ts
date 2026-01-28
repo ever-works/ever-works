@@ -219,6 +219,119 @@ export class DirectoryQueryService {
         }
     }
 
+    async getWebsiteSettings(directoryId: string, user: User) {
+        // Any access level can view settings
+        const { directory } = await this.ownershipService.ensureCanView(directoryId, user.id);
+
+        try {
+            const config = await this.dataGenerator.config(directory, user);
+            return {
+                status: 'success',
+                company_name: config?.company_name || 'Acme',
+                settings: config?.settings || {},
+                custom_menu: config?.custom_menu || { header: [], footer: [] },
+            };
+        } catch (error) {
+            if (error instanceof HttpException) {
+                throw error;
+            }
+
+            const errMessage = normalizeGeneratorError(error);
+            if (errMessage.includes('Repository not found')) {
+                return {
+                    status: 'success',
+                    company_name: 'Acme',
+                    settings: {},
+                    custom_menu: { header: [], footer: [] },
+                };
+            }
+
+            this.logger.error('Failed to get website settings:', error);
+
+            throw new BadRequestException({
+                status: 'error',
+                message: errMessage,
+            });
+        }
+    }
+
+    async updateWebsiteSettings(
+        directoryId: string,
+        user: User,
+        dto: {
+            company_name?: string;
+            categories_enabled?: boolean;
+            companies_enabled?: boolean;
+            tags_enabled?: boolean;
+            surveys_enabled?: boolean;
+            header?: {
+                submit_enabled?: boolean;
+                pricing_enabled?: boolean;
+                layout_enabled?: boolean;
+                language_enabled?: boolean;
+                theme_enabled?: boolean;
+                layout_default?: string;
+                pagination_default?: string;
+                theme_default?: string;
+            };
+            homepage?: {
+                hero_enabled?: boolean;
+                search_enabled?: boolean;
+                default_view?: string;
+                default_sort?: string;
+            };
+            footer?: {
+                subscribe_enabled?: boolean;
+                version_enabled?: boolean;
+                theme_selector_enabled?: boolean;
+            };
+            custom_menu?: {
+                header?: Array<{
+                    label: string;
+                    path: string;
+                    target?: '_self' | '_blank';
+                    icon?: string;
+                }>;
+                footer?: Array<{
+                    label: string;
+                    path: string;
+                    target?: '_self' | '_blank';
+                    icon?: string;
+                }>;
+            };
+        },
+    ) {
+        // Require edit access to update settings
+        const { directory } = await this.ownershipService.ensureCanEdit(directoryId, user.id);
+
+        try {
+            const { custom_menu, company_name, ...settings } = dto;
+            await this.dataGenerator.updateWebsiteSettings(
+                directory,
+                user,
+                settings,
+                custom_menu,
+                company_name,
+            );
+            return {
+                status: 'success',
+                message: 'Website settings updated successfully',
+            };
+        } catch (error) {
+            if (error instanceof HttpException) {
+                throw error;
+            }
+
+            const errMessage = normalizeGeneratorError(error);
+            this.logger.error('Failed to update website settings:', error);
+
+            throw new BadRequestException({
+                status: 'error',
+                message: errMessage,
+            });
+        }
+    }
+
     async directoryCount(directoryId: string, user: User) {
         // Any access level can view count
         const { directory } = await this.ownershipService.ensureCanView(directoryId, user.id);

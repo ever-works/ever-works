@@ -235,6 +235,72 @@ export interface DirectoryCategoriesTags {
     tags: string[];
 }
 
+// Website Settings Types
+export interface CustomMenuItem {
+    label: string;
+    path: string;
+    target?: '_self' | '_blank';
+    icon?: string;
+}
+
+export interface WebsiteSettingsHeader {
+    submit_enabled?: boolean;
+    pricing_enabled?: boolean;
+    layout_enabled?: boolean;
+    language_enabled?: boolean;
+    theme_enabled?: boolean;
+    layout_default?: string;
+    pagination_default?: string;
+    theme_default?: string;
+}
+
+export interface WebsiteSettingsHomepage {
+    hero_enabled?: boolean;
+    search_enabled?: boolean;
+    default_view?: string;
+    default_sort?: string;
+}
+
+export interface WebsiteSettingsFooter {
+    subscribe_enabled?: boolean;
+    version_enabled?: boolean;
+    theme_selector_enabled?: boolean;
+}
+
+export interface WebsiteSettings {
+    categories_enabled?: boolean;
+    companies_enabled?: boolean;
+    tags_enabled?: boolean;
+    surveys_enabled?: boolean;
+    header?: WebsiteSettingsHeader;
+    homepage?: WebsiteSettingsHomepage;
+    footer?: WebsiteSettingsFooter;
+}
+
+export interface WebsiteSettingsResponse {
+    company_name: string;
+    settings: WebsiteSettings;
+    custom_menu: {
+        header: CustomMenuItem[];
+        footer: CustomMenuItem[];
+    };
+}
+
+export interface UpdateWebsiteSettingsDto {
+    company_name?: string;
+    categories_enabled?: boolean;
+    companies_enabled?: boolean;
+    tags_enabled?: boolean;
+    surveys_enabled?: boolean;
+    header?: WebsiteSettingsHeader;
+    homepage?: WebsiteSettingsHomepage;
+    footer?: WebsiteSettingsFooter;
+    custom_menu?: {
+        header?: CustomMenuItem[];
+        footer?: CustomMenuItem[];
+    };
+}
+
 export interface GenerationMetrics {
     urls_scanned?: number;
     pages_processed?: number;
@@ -600,6 +666,20 @@ export const directoryAPI = {
     updateAdvancedPrompts: async (id: string, data: UpdateDirectoryAdvancedPromptsDto) => {
         return serverMutation<APIResponse<{ advancedPrompts: DirectoryAdvancedPrompts }>>({
             endpoint: `/directories/${id}/advanced-prompts`,
+            data,
+            method: 'PUT',
+            wrapInData: false,
+        });
+    },
+
+    // Website Settings
+    getWebsiteSettings: async (id: string) => {
+        return serverFetch<APIResponse<WebsiteSettingsResponse>>(`/directories/${id}/website-settings`);
+    },
+
+    updateWebsiteSettings: async (id: string, data: UpdateWebsiteSettingsDto) => {
+        return serverMutation<APIResponse<{ message: string }>>({
+            endpoint: `/directories/${id}/website-settings`,
             data,
             method: 'PUT',
             wrapInData: false,
