@@ -24,10 +24,19 @@ async function bootstrap() {
     app.use(urlencoded({ limit: '10mb', extended: true }));
 
     // Security configurations
-    // Skip helmet for API docs to allow Scalar's inline scripts
+    // Use relaxed CSP for API docs to allow Scalar's inline scripts
     app.use((req, res, next) => {
         if (req.path.startsWith('/api/docs')) {
-            return next();
+            return helmet({
+                contentSecurityPolicy: {
+                    directives: {
+                        defaultSrc: ["'self'"],
+                        scriptSrc: ["'self'", "'unsafe-inline'"],
+                        styleSrc: ["'self'", "'unsafe-inline'"],
+                        imgSrc: ["'self'", "data:", "https:"],
+                    },
+                },
+            })(req, res, next);
         }
         return helmet()(req, res, next);
     });
