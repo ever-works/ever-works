@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
     Dialog,
     DialogClose,
@@ -128,19 +128,7 @@ export function DeployConfigDialog({
         custom_menu: { header: [], footer: [] },
     });
 
-    useEffect(() => {
-        if (open && !hasLoaded) {
-            loadSettings();
-        }
-    }, [open, hasLoaded]);
-
-    useEffect(() => {
-        if (!open) {
-            setActiveTab('general');
-        }
-    }, [open]);
-
-    const loadSettings = async () => {
+    const loadSettings = useCallback(async () => {
         setIsLoading(true);
         try {
             const result = await getWebsiteSettings(directoryId);
@@ -168,7 +156,19 @@ export function DeployConfigDialog({
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [directoryId, t]);
+
+    useEffect(() => {
+        if (open && !hasLoaded) {
+            loadSettings();
+        }
+    }, [open, hasLoaded, loadSettings]);
+
+    useEffect(() => {
+        if (!open) {
+            setActiveTab('general');
+        }
+    }, [open]);
 
     const handleSaveAndDeploy = () => onConfirm(formData);
     const handleSkipAndDeploy = () => onConfirm(null);
