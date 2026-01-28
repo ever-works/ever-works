@@ -1,0 +1,65 @@
+{
+	"name": "@ever-works/plugin",
+	"version": "1.0.0",
+	"description": "Plugin system contracts, helpers, and utilities for Ever Works platform",
+	"private": false,
+	"license": "MIT",
+	"type": "module",
+	"main": "./dist/index.js",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		},
+		"./contracts": {
+			"types": "./dist/contracts/index.d.ts",
+			"import": "./dist/contracts/index.js"
+		},
+		"./pipeline": {
+			"types": "./dist/pipeline/index.d.ts",
+			"import": "./dist/pipeline/index.js"
+		},
+		"./events": {
+			"types": "./dist/events/index.d.ts",
+			"import": "./dist/events/index.js"
+		},
+		"./settings": {
+			"types": "./dist/settings/index.d.ts",
+			"import": "./dist/settings/index.js"
+		},
+		"./common": {
+			"types": "./dist/common/index.d.ts",
+			"import": "./dist/common/index.js"
+		},
+		"./helpers": {
+			"types": "./dist/helpers/index.d.ts",
+			"import": "./dist/helpers/index.js"
+		},
+		"./abstract": {
+			"types": "./dist/abstract/index.d.ts",
+			"import": "./dist/abstract/index.js"
+		},
+		"./testing": {
+			"types": "./dist/testing/index.d.ts",
+			"import": "./dist/testing/index.js"
+		}
+	},
+	"files": [
+		"dist"
+	],
+	"scripts": {
+		"build": "tsup",
+		"dev": "tsup --watch",
+		"clean": "rm -rf dist",
+		"type-check": "tsc --noEmit"
+	},
+	"devDependencies": {
+		"@types/node": "^22.19.3",
+		"tsup": "^8.0.0",
+		"typescript": "^5.9.3"
+	},
+	"peerDependencies": {},
+	"dependencies": {}
+}

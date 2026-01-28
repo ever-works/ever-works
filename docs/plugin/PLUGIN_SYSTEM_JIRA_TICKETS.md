@@ -13,11 +13,11 @@ Transform Ever Works from a tightly-coupled, hardcoded system into a fully modul
 **Story Title:** Create Plugin Contracts Package
 
 **Story Description:**
-Create a new `packages/plugin-contracts` package containing all TypeScript interfaces and types that define the plugin system contracts. This package will be lightweight (no runtime dependencies) and used by both the core agent and all plugins.
+Create a new `packages/plugin` package containing all TypeScript interfaces and types that define the plugin system contracts. This package will be lightweight (no runtime dependencies) and used by both the core agent and all plugins.
 
 **Acceptance Criteria:**
 
-- Package is created at `packages/plugin-contracts`
+- Package is created at `packages/plugin`
 - All capability interfaces are defined
 - Package builds successfully
 - Package can be imported by other packages
@@ -26,16 +26,16 @@ Create a new `packages/plugin-contracts` package containing all TypeScript inter
 
 ## Task 1.1: Package Setup
 
-**Title:** Set up plugin-contracts package structure
+**Title:** Set up plugin package structure
 
 **Description:**
-Create the initial package structure for `packages/plugin-contracts` including package.json, tsconfig.json, and folder structure.
+Create the initial package structure for `packages/plugin` including package.json, tsconfig.json, and folder structure.
 
 **Implementation Details:**
 
-1. Create directory `packages/plugin-contracts`
+1. Create directory `packages/plugin`
 2. Create `package.json` with:
-    - Name: `@ever-works/plugin-contracts`
+    - Name: `@ever-works/plugin`
     - Version: `1.0.0`
     - Main: `dist/index.js`
     - Types: `dist/index.d.ts`
@@ -53,9 +53,9 @@ Create the initial package structure for `packages/plugin-contracts` including p
 
 **Files to Create:**
 
-- `packages/plugin-contracts/package.json`
-- `packages/plugin-contracts/tsconfig.json`
-- `packages/plugin-contracts/src/index.ts`
+- `packages/plugin/package.json`
+- `packages/plugin/tsconfig.json`
+- `packages/plugin/src/index.ts`
 
 ---
 
@@ -119,7 +119,7 @@ export type PluginState = 'discovered' | 'loaded' | 'enabled' | 'disabled' | 'un
 
 **Files to Create:**
 
-- `packages/plugin-contracts/src/plugin.interface.ts`
+- `packages/plugin/src/plugin.interface.ts`
 
 ---
 
@@ -249,7 +249,7 @@ export interface PluginEnvVarConfig {
 
 **Files to Create:**
 
-- `packages/plugin-contracts/src/plugin-context.interface.ts`
+- `packages/plugin/src/plugin-context.interface.ts`
 
 ---
 
@@ -311,7 +311,7 @@ export interface Repository {
 
 **Files to Create:**
 
-- `packages/plugin-contracts/src/capabilities/git-provider.interface.ts`
+- `packages/plugin/src/capabilities/git-provider.interface.ts`
 
 ---
 
@@ -366,7 +366,7 @@ export type DeploymentStatus = 'queued' | 'building' | 'ready' | 'error' | 'canc
 
 **Files to Create:**
 
-- `packages/plugin-contracts/src/capabilities/deployment.interface.ts`
+- `packages/plugin/src/capabilities/deployment.interface.ts`
 
 ---
 
@@ -422,7 +422,7 @@ export interface BulkScreenshotRequest {
 
 **Files to Create:**
 
-- `packages/plugin-contracts/src/capabilities/screenshot.interface.ts`
+- `packages/plugin/src/capabilities/screenshot.interface.ts`
 
 ---
 
@@ -465,7 +465,7 @@ export interface SearchResult {
 
 **Files to Create:**
 
-- `packages/plugin-contracts/src/capabilities/search.interface.ts`
+- `packages/plugin/src/capabilities/search.interface.ts`
 
 ---
 
@@ -512,7 +512,7 @@ export interface ExtractedContent {
 
 **Files to Create:**
 
-- `packages/plugin-contracts/src/capabilities/content-extractor.interface.ts`
+- `packages/plugin/src/capabilities/content-extractor.interface.ts`
 
 ---
 
@@ -557,7 +557,7 @@ export interface RawItem {
 
 **Files to Create:**
 
-- `packages/plugin-contracts/src/capabilities/data-source.interface.ts`
+- `packages/plugin/src/capabilities/data-source.interface.ts`
 
 ---
 
@@ -758,7 +758,7 @@ export interface TokenUsage {
 
 **Files to Create:**
 
-- `packages/plugin-contracts/src/capabilities/ai-provider.interface.ts`
+- `packages/plugin/src/capabilities/ai-provider.interface.ts`
 
 ---
 
@@ -1029,8 +1029,8 @@ class ContentEnrichmentPlugin implements IPlugin, IPipelineStepPlugin {
 
 **Files to Create:**
 
-- `packages/plugin-contracts/src/types/step-types.ts`
-- `packages/plugin-contracts/src/capabilities/pipeline-step.interface.ts`
+- `packages/plugin/src/types/step-types.ts`
+- `packages/plugin/src/capabilities/pipeline-step.interface.ts`
 
 ---
 
@@ -1135,7 +1135,7 @@ class ExaWebsetsPlugin implements IFullPipelinePlugin {
 
 **Files to Create:**
 
-- `packages/plugin-contracts/src/capabilities/full-pipeline.interface.ts`
+- `packages/plugin/src/capabilities/full-pipeline.interface.ts`
 
 ---
 
@@ -1190,7 +1190,7 @@ export interface FormFieldOption {
 
 **Files to Create:**
 
-- `packages/plugin-contracts/src/capabilities/form-field.interface.ts`
+- `packages/plugin/src/capabilities/form-field.interface.ts`
 
 ---
 
@@ -1248,7 +1248,7 @@ export interface GitUserInfo {
 
 **Files to Create:**
 
-- `packages/plugin-contracts/src/capabilities/git-oauth.interface.ts`
+- `packages/plugin/src/capabilities/git-oauth.interface.ts`
 
 ---
 
@@ -1290,7 +1290,7 @@ export interface CapabilityInfo {
 
 **Files to Create:**
 
-- `packages/plugin-contracts/src/capabilities/custom-capability.interface.ts`
+- `packages/plugin/src/capabilities/custom-capability.interface.ts`
 
 ---
 
@@ -1330,7 +1330,7 @@ export interface CapabilityRegistration<T = unknown> {
 
 **Files to Create:**
 
-- `packages/plugin-contracts/src/types/capability.types.ts`
+- `packages/plugin/src/types/capability.types.ts`
 
 ---
 
@@ -1552,10 +1552,10 @@ export class PluginSettingsService {
 
 **Files to Create:**
 
-- `packages/plugin-contracts/src/types/settings.types.ts`
-- `packages/plugin-contracts/src/types/pipeline.types.ts`
-- `packages/plugin-contracts/src/types/common.types.ts`
-- `packages/plugin-contracts/src/types/step-types.ts` - **TYPE-SAFE step IDs, data keys, and result types**
+- `packages/plugin/src/types/settings.types.ts`
+- `packages/plugin/src/types/pipeline.types.ts`
+- `packages/plugin/src/types/common.types.ts`
+- `packages/plugin/src/types/step-types.ts` - **TYPE-SAFE step IDs, data keys, and result types**
 
 **⚠️ TYPE SAFETY:** The `step-types.ts` file is critical for compile-time validation of pipeline steps. See [Task 1.11](#task-111-ipipelinestepplugin-interface) for details on `BuiltInStepId`, `StepDataKey`, and `StepDataTypes`.
 
@@ -1605,9 +1605,9 @@ export * from './deployment.interface';
 
 **Files to Create/Update:**
 
-- `packages/plugin-contracts/src/index.ts`
-- `packages/plugin-contracts/src/capabilities/index.ts`
-- `packages/plugin-contracts/src/types/index.ts`
+- `packages/plugin/src/index.ts`
+- `packages/plugin/src/capabilities/index.ts`
+- `packages/plugin/src/types/index.ts`
 
 ---
 
@@ -1667,7 +1667,7 @@ export interface ISubProviderPlugin extends IPlugin {
 
 **Files to Create:**
 
-- `packages/plugin-contracts/src/capabilities/sub-provider.interface.ts`
+- `packages/plugin/src/capabilities/sub-provider.interface.ts`
 
 ---
 
@@ -1719,7 +1719,7 @@ export function isConfigAwarePlugin(plugin: IPlugin): plugin is IConfigAwarePlug
 
 **Files to Create:**
 
-- `packages/plugin-contracts/src/capabilities/config-aware.interface.ts`
+- `packages/plugin/src/capabilities/config-aware.interface.ts`
 
 ---
 
@@ -1783,7 +1783,7 @@ export interface SubProviderSelection {
 
 **Files to Create:**
 
-- `packages/plugin-contracts/src/types/sub-provider.types.ts`
+- `packages/plugin/src/types/sub-provider.types.ts`
 
 ---
 
@@ -1853,7 +1853,7 @@ export function base64Icon(data: string): PluginIcon {
 
 **Files to Create:**
 
-- `packages/plugin-contracts/src/types/icon.types.ts`
+- `packages/plugin/src/types/icon.types.ts`
 
 ---
 
@@ -1911,7 +1911,7 @@ export interface PipelineStepDefinition {
 
 **Files to Create:**
 
-- `packages/plugin-contracts/src/types/pipeline-step.types.ts`
+- `packages/plugin/src/types/pipeline-step.types.ts`
 
 ---
 
@@ -1960,7 +1960,7 @@ export function isDisablePosition(pos: StepPosition): pos is { type: 'disable'; 
 
 **Files to Update:**
 
-- `packages/plugin-contracts/src/types/pipeline-step.types.ts`
+- `packages/plugin/src/types/pipeline-step.types.ts`
 
 ---
 
@@ -2002,7 +2002,7 @@ export interface ParallelGroupResult {
 
 **Files to Update:**
 
-- `packages/plugin-contracts/src/types/pipeline-step.types.ts`
+- `packages/plugin/src/types/pipeline-step.types.ts`
 
 ---
 
@@ -2052,7 +2052,7 @@ export type StepExecutor =
 
 **Files to Update:**
 
-- `packages/plugin-contracts/src/types/pipeline-step.types.ts`
+- `packages/plugin/src/types/pipeline-step.types.ts`
 
 ---
 
@@ -2215,7 +2215,7 @@ export class PluginManifestValidator {
 **Title:** Create PluginVersionChecker service
 
 **Description:**
-Create a service that checks plugin compatibility with the current plugin-contracts version using minContractsVersion and maxContractsVersion.
+Create a service that checks plugin compatibility with the current plugin version using minContractsVersion and maxContractsVersion.
 
 **Implementation Details:**
 
@@ -2226,7 +2226,7 @@ export class PluginVersionChecker {
 	private contractsVersion: string;
 
 	constructor() {
-		// Read from @ever-works/plugin-contracts package.json
+		// Read from @ever-works/plugin package.json
 		this.contractsVersion = this.getContractsVersion();
 	}
 
@@ -2236,14 +2236,14 @@ export class PluginVersionChecker {
 		if (minContractsVersion && semver.lt(this.contractsVersion, minContractsVersion)) {
 			return {
 				compatible: false,
-				reason: `Requires plugin-contracts >= ${minContractsVersion}, current: ${this.contractsVersion}`
+				reason: `Requires plugin >= ${minContractsVersion}, current: ${this.contractsVersion}`
 			};
 		}
 
 		if (maxContractsVersion && semver.gt(this.contractsVersion, maxContractsVersion)) {
 			return {
 				compatible: false,
-				reason: `Requires plugin-contracts <= ${maxContractsVersion}, current: ${this.contractsVersion}`
+				reason: `Requires plugin <= ${maxContractsVersion}, current: ${this.contractsVersion}`
 			};
 		}
 
@@ -3004,12 +3004,12 @@ export const PLUGINS_OPTIONS = 'PLUGINS_OPTIONS';
 
 ---
 
-## Task 2.12: Add plugin-contracts dependency
+## Task 2.12: Add plugin dependency
 
-**Title:** Add @ever-works/plugin-contracts as dependency
+**Title:** Add @ever-works/plugin as dependency
 
 **Description:**
-Update packages/agent/package.json to depend on @ever-works/plugin-contracts.
+Update packages/agent/package.json to depend on @ever-works/plugin.
 
 **Implementation Details:**
 
@@ -3017,7 +3017,7 @@ Update packages/agent/package.json to depend on @ever-works/plugin-contracts.
 // packages/agent/package.json
 {
 	"dependencies": {
-		"@ever-works/plugin-contracts": "workspace:*"
+		"@ever-works/plugin": "workspace:*"
 	}
 }
 ```
@@ -5204,7 +5204,7 @@ Create a service that resolves sub-provider IDs (e.g., "exa:websets", "exa:searc
 // packages/agent/src/plugins/sub-provider-resolver.service.ts
 import { Injectable } from '@nestjs/common';
 import { PluginRegistryService } from './plugin-registry.service';
-import { ISubProviderPlugin, IPlugin, PluginSubProvider } from '@ever-works/plugin-contracts';
+import { ISubProviderPlugin, IPlugin, PluginSubProvider } from '@ever-works/plugin';
 
 export interface ResolvedSubProvider {
 	pluginId: string;
@@ -5356,7 +5356,7 @@ Create a factory function that creates a fully mocked PluginContext for unit tes
 
 ```typescript
 // packages/plugin-test-utils/src/mock-context.ts
-import { PluginContext, PluginEnvironment } from '@ever-works/plugin-contracts';
+import { PluginContext, PluginEnvironment } from '@ever-works/plugin';
 import { createMockPluginEnvironment } from './mock-environment';
 
 export interface MockPluginContextOptions {
@@ -5411,7 +5411,7 @@ Create a mock implementation of PluginEnvironment for testing env var handling.
 
 ```typescript
 // packages/plugin-test-utils/src/mock-environment.ts
-import { PluginEnvironment } from '@ever-works/plugin-contracts';
+import { PluginEnvironment } from '@ever-works/plugin';
 
 export function createMockPluginEnvironment(envVars: Record<string, string> = {}): PluginEnvironment {
 	return {
@@ -5445,7 +5445,7 @@ Create a reusable test suite that validates any plugin implements IPlugin correc
 
 ```typescript
 // packages/plugin-test-utils/src/contract-tests.ts
-import { IPlugin, PluginContext } from '@ever-works/plugin-contracts';
+import { IPlugin, PluginContext } from '@ever-works/plugin';
 import { createMockPluginContext } from './mock-context';
 import { createMockPluginEnvironment } from './mock-environment';
 
@@ -5660,8 +5660,8 @@ jobs:
 
             - run: pnpm install
 
-            # Run plugin-contracts tests
-            - run: pnpm --filter "@ever-works/plugin-contracts" test:cov
+            # Run plugin tests
+            - run: pnpm --filter "@ever-works/plugin" test:cov
 
             # Run plugin-test-utils tests
             - run: pnpm --filter "@ever-works/plugin-test-utils" test
@@ -5676,7 +5676,7 @@ jobs:
             - name: Check coverage
               run: |
                   COVERAGE_THRESHOLD=80
-                  for pkg in packages/plugin-contracts packages/plugin-test-utils packages/plugins/*; do
+                  for pkg in packages/plugin packages/plugin-test-utils packages/plugins/*; do
                     if [ -f "$pkg/coverage/coverage-summary.json" ]; then
                       COVERAGE=$(cat "$pkg/coverage/coverage-summary.json" | jq '.total.lines.pct')
                       if (( $(echo "$COVERAGE < $COVERAGE_THRESHOLD" | bc -l) )); then

@@ -101,7 +101,7 @@ Everything is plugin-based:
 ```json
 {
 	"peerDependencies": {
-		"@ever-works/plugin-contracts": "^1.0.0"
+		"@ever-works/plugin": "^1.0.0"
 	},
 	"dependencies": {
 		// Only plugin-specific deps (e.g., "screenshotone-api-sdk")
@@ -231,7 +231,7 @@ const bad = context.getStepResult('extrcted-items'); // ❌ Compile error!
 │                                  │                                      │
 │                                  ▼                                      │
 │  ┌───────────────────────────────────────────────────────────────────┐ │
-│  │                   packages/plugin-contracts/                       │ │
+│  │                   packages/plugin/                       │ │
 │  │  IPlugin, IGitProviderPlugin, IDeploymentPlugin, IScreenshotPlugin │ │
 │  │  IAiProviderPlugin, IPipelineStepPlugin, ICustomCapabilityRegistry │ │
 │  └───────────────────────────────────────────────────────────────────┘ │
@@ -254,7 +254,7 @@ const bad = context.getStepResult('extrcted-items'); // ❌ Compile error!
 
 ```
 packages/
-├── plugin-contracts/            # Plugin interfaces & types (light package)
+├── plugin/            # Plugin interfaces & types (light package)
 │   ├── package.json
 │   ├── tsconfig.json
 │   └── src/
@@ -277,7 +277,7 @@ packages/
 │           ├── pipeline.types.ts
 │           └── common.types.ts
 │
-├── agent/                       # Core runtime (uses plugin-contracts)
+├── agent/                       # Core runtime (uses plugin)
 │   ├── package.json
 │   └── src/
 │       ├── plugins/
@@ -427,7 +427,7 @@ interface PluginManifest {
 	description?: string; // Short description for UI
 	author?: string; // Plugin author
 	homepage?: string; // Documentation URL
-	minContractsVersion?: string; // Minimum @ever-works/plugin-contracts version
+	minContractsVersion?: string; // Minimum @ever-works/plugin version
 	maxContractsVersion?: string; // Maximum compatible version
 	dependencies?: string[]; // Other plugin IDs this depends on
 
@@ -505,7 +505,7 @@ type PluginCategory =
 	"version": "1.0.0",
 	"main": "dist/index.js",
 	"peerDependencies": {
-		"@ever-works/plugin-contracts": "^1.0.0"
+		"@ever-works/plugin": "^1.0.0"
 	},
 	"dependencies": {
 		"screenshotone-api-sdk": "^1.0.0"
@@ -775,7 +775,7 @@ await plugin.connect(mockContext);  // ✅ Works in tests!
 
 ## Core Capabilities
 
-Core capabilities are **fixed interfaces** called by the core system. They are defined in `plugin-contracts` and provide full TypeScript type safety.
+Core capabilities are **fixed interfaces** called by the core system. They are defined in `plugin` and provide full TypeScript type safety.
 
 **⚠️ TYPE SAFETY:** All capability interfaces use strict typing. No `any` types - use `unknown` for truly dynamic data.
 
@@ -2914,7 +2914,7 @@ cd packages/plugins/my-plugin
 		"dev": "tsc --watch"
 	},
 	"peerDependencies": {
-		"@ever-works/plugin-contracts": "^1.0.0"
+		"@ever-works/plugin": "^1.0.0"
 	},
 	"everworks": {
 		"plugin": {
@@ -2940,7 +2940,7 @@ import {
 	ScreenshotOptions,
 	Screenshot,
 	ValidationResult
-} from '@ever-works/plugin-contracts';
+} from '@ever-works/plugin';
 
 export class MyPlugin implements IPlugin, IScreenshotPlugin {
 	readonly id = 'my-plugin';
@@ -3024,7 +3024,7 @@ Since plugins are standalone packages (not NestJS modules), they can be tested w
 ```typescript
 // packages/plugins/screenshotone/src/__tests__/screenshotone.plugin.test.ts
 import { ScreenshotOnePlugin } from '../screenshotone.plugin';
-import { createMockPluginContext } from '@ever-works/plugin-contracts/testing';
+import { createMockPluginContext } from '@ever-works/plugin/testing';
 
 describe('ScreenshotOnePlugin', () => {
 	let plugin: ScreenshotOnePlugin;
@@ -3079,7 +3079,7 @@ describe('ScreenshotOnePlugin', () => {
 ### Mock Plugin Context
 
 ```typescript
-// packages/plugin-contracts/src/testing/mock-context.ts
+// packages/plugin/src/testing/mock-context.ts
 export function createMockPluginContext(options?: {
 	settings?: Record<string, unknown>;
 	userSettings?: Record<string, unknown>;
@@ -3135,7 +3135,7 @@ export function createMockPluginContext(options?: {
 
 ```typescript
 // packages/plugins/screenshotone/src/__tests__/screenshotone.integration.test.ts
-import { PluginTestHarness } from '@ever-works/plugin-contracts/testing';
+import { PluginTestHarness } from '@ever-works/plugin/testing';
 
 describe('ScreenshotOnePlugin Integration', () => {
 	let harness: PluginTestHarness;
@@ -3355,7 +3355,7 @@ interface PluginAuditLog {
 
 ### Phase 1: Foundation
 
-- Create `plugin-contracts` package
+- Create `plugin` package
 - Create plugin runtime in `agent`
 - Create plugin entities
 
@@ -3573,7 +3573,7 @@ describe('GitHubPlugin', () => {
 
 | Component               | Coverage Target | Test Type                             |
 | ----------------------- | --------------- | ------------------------------------- |
-| `plugin-contracts`      | 80%             | Unit tests for type guards, utilities |
+| `plugin`                | 80%             | Unit tests for type guards, utilities |
 | Plugin runtime services | 80%             | Unit tests with mocks                 |
 | Built-in plugins        | 80%             | Unit tests, integration tests         |
 | Pipeline builder        | 90%             | Unit tests for step ordering          |
@@ -3656,7 +3656,7 @@ jobs:
 22. **Contract tests for plugins** - Base test suite validates IPlugin compliance
 23. **Unit tests for all services** - Every service has corresponding `.spec.ts` file
 24. **Integration tests for flows** - E2E tests for plugin loading → usage → results
-25. **Test coverage requirements** - Minimum 80% coverage for plugin-contracts, plugin-runtime, built-in plugins
+25. **Test coverage requirements** - Minimum 80% coverage for plugin, plugin-runtime, built-in plugins
 
 ---
 
@@ -3664,7 +3664,7 @@ jobs:
 
 | Component                 | Location                                                               |
 | ------------------------- | ---------------------------------------------------------------------- |
-| Plugin Contracts          | `packages/plugin-contracts/src/`                                       |
+| Plugin Contracts          | `packages/plugin/src/`                                                 |
 | Plugin Runtime            | `packages/agent/src/plugins/`                                          |
 | Service Facades           | `packages/agent/src/facades/`                                          |
 | Pipeline Factory          | `packages/agent/src/pipeline/`                                         |

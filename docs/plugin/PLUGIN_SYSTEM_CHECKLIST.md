@@ -4,13 +4,15 @@ This checklist tracks the implementation progress of the Plugin System as define
 
 **Total Tasks:** 164 across 18 Stories
 
+**Note:** The package is named `@ever-works/plugin` (not `plugin-contracts` as originally planned) to reflect its expanded scope including base classes, helpers, and testing utilities.
+
 ---
 
 ## Progress Summary
 
 | Phase                      | Stories | Tasks   | Completed |
 | -------------------------- | ------- | ------- | --------- |
-| Phase 1: Foundation        | 1-2     | 40      | 0         |
+| Phase 1: Foundation        | 1-2     | 40      | 28        |
 | Phase 2: Pipeline          | 3       | 23      | 0         |
 | Phase 3: Module Decoupling | 5-8     | 16      | 0         |
 | Phase 4: Built-in Plugins  | 4       | 12      | 0         |
@@ -19,46 +21,53 @@ This checklist tracks the implementation progress of the Plugin System as define
 | Phase 7: API Refactoring   | 11      | 12      | 0         |
 | Phase 8: Frontend          | 12-17   | 36      | 0         |
 | Phase 9: Testing & CI      | 18      | 15      | 0         |
-| **Total**                  | **18**  | **164** | **0**     |
+| **Total**                  | **18**  | **164** | **28**    |
 
 ---
 
 ## Phase 1: Foundation
 
-### Story 1: Plugin Contracts Package (28 tasks)
+### Story 1: Plugin Package (28 tasks) ✅ COMPLETE
 
-Create `packages/plugin-contracts` containing all TypeScript interfaces and types.
+Create `packages/plugin` containing all TypeScript interfaces, types, base classes, and testing utilities.
 
 **⚠️ TYPE SAFETY IS CRITICAL:** All interfaces must be strongly typed. Step IDs, data keys, and step results use union types and mapped interfaces for compile-time validation.
 
-- [ ] **1.1** Set up plugin-contracts package structure
-- [ ] **1.2** Define base IPlugin interface (includes `configurationMode` for admin/user/hybrid settings)
-- [ ] **1.3** Define PluginContext interface (**TYPE-SAFE:** typed events with `PluginEventName` and `PluginEventPayloads`)
-- [ ] **1.4** Define IGitProviderPlugin capability interface
-- [ ] **1.5** Define IDeploymentPlugin capability interface
-- [ ] **1.6** Define IScreenshotPlugin capability interface
-- [ ] **1.7** Define ISearchPlugin capability interface
-- [ ] **1.8** Define IContentExtractorPlugin capability interface
-- [ ] **1.9** Define IDataSourcePlugin capability interface
-- [ ] **1.10** Define IAiProviderPlugin interface (includes `askJson`, `getCapabilities`, `healthCheck`)
-- [ ] **1.11** Define IPipelineStepPlugin capability interface (**TYPE-SAFE:** uses `BuiltInStepId`, `StepDataKey`, `StepDataTypes`)
-- [ ] **1.12** Define IFullPipelinePlugin capability interface
-- [ ] **1.13** Define IFormFieldPlugin capability interface
-- [ ] **1.14** Define IGitOAuthPlugin capability interface for git provider OAuth
-- [ ] **1.15** Define ICustomCapabilityRegistry interface for plugin-to-plugin communication
-- [ ] **1.16** Define CapabilityMetadata and related types
-- [ ] **1.17** Define common types for settings, validation, and pipeline (includes `step-types.ts`)
-- [ ] **1.18** Create clean export index for all interfaces (exports `step-types.ts`)
-- [ ] **1.19** Define ISubProviderPlugin interface for multi-capability plugins
-- [ ] **1.20** Define IConfigAwarePlugin interface for ConfigDto field handling
-- [ ] **1.21** Define PluginSubProvider and SubProviderOption types
-- [ ] **1.22** Define PluginIcon type with multiple format support
-- [ ] **1.23** Define PipelineStepDefinition interface (**TYPE-SAFE:** typed `id`, `dependencies`, `provides`)
-- [ ] **1.24** Define StepPosition union type (**TYPE-SAFE:** `stepId` must be `BuiltInStepId`)
-- [ ] **1.25** Define ParallelGroup interface for concurrent step execution
-- [ ] **1.26** Define ExecutablePipeline interface for compiled pipelines
-- [ ] **1.27** Define step-types.ts with `BuiltInStepId`, `StepDataKey`, `StepDataTypes` types
-- [ ] **1.28** Define event-types.ts with `PluginEventName` and `PluginEventPayloads` types
+- [x] **1.1** Set up plugin package structure
+- [x] **1.2** Define base IPlugin interface (includes `configurationMode` for admin/user/hybrid settings)
+- [x] **1.3** Define PluginContext interface (**TYPE-SAFE:** typed events with `PluginEventName` and `PluginEventPayloads`)
+- [x] **1.4** Define IGitProviderPlugin capability interface (includes API operations: createRepository, createPullRequest, etc.)
+- [x] **1.5** Define IDeploymentPlugin capability interface
+- [x] **1.6** Define IScreenshotPlugin capability interface
+- [x] **1.7** Define ISearchPlugin capability interface
+- [x] **1.8** Define IContentExtractorPlugin capability interface
+- [x] **1.9** Define IDataSourcePlugin capability interface
+- [x] **1.10** Define IAiProviderPlugin interface (includes `askJson`, `getCapabilities`, `healthCheck`)
+- [x] **1.11** Define IPipelineStepPlugin capability interface (**TYPE-SAFE:** uses `BuiltInStepId`, `StepDataKey`, `StepDataTypes`)
+- [x] **1.12** Define IFullPipelinePlugin capability interface
+- [x] **1.13** Define IFormFieldPlugin capability interface
+- [x] **1.14** Define IGitOAuthPlugin capability interface for git provider OAuth (separate from git-provider)
+- [x] **1.15** Define ICustomCapabilityRegistry interface for plugin-to-plugin communication
+- [x] **1.16** Define CapabilityMetadata and related types
+- [x] **1.17** Define common types for settings, validation, and pipeline (includes `step-types.ts`)
+- [x] **1.18** Create clean export index for all interfaces (exports `step-types.ts`)
+- [x] **1.19** Define ISubProviderPlugin interface for multi-capability plugins
+- [x] **1.20** Define IConfigAwarePlugin interface for ConfigDto field handling
+- [x] **1.21** Define PluginSubProvider and SubProviderOption types
+- [x] **1.22** Define PluginIcon type with multiple format support
+- [x] **1.23** Define PipelineStepDefinition interface (**TYPE-SAFE:** typed `id`, `dependencies`, `provides`)
+- [x] **1.24** Define StepPosition union type (**TYPE-SAFE:** `stepId` must be `BuiltInStepId`)
+- [x] **1.25** Define ParallelGroup interface for concurrent step execution
+- [x] **1.26** Define ExecutablePipeline interface for compiled pipelines
+- [x] **1.27** Define step-types.ts with `BuiltInStepId`, `StepDataKey`, `StepDataTypes` types
+- [x] **1.28** Define event-types.ts with `PluginEventName` and `PluginEventPayloads` types
+
+**Additional Deliverables (beyond original scope):**
+
+- [x] Abstract base classes: `BasePlugin`, `BaseGitProvider`, `BaseAiProvider`, `BasePipelineStep`
+- [x] Helper utilities: settings resolver, validation helpers, context helpers
+- [x] Testing utilities: mock context, mock environment, test harness, contract tests
+- [x] `IGitOperations` interface for local git operations (clone, push, commit - shared by all providers)
 
 ### Story 2: Plugin System Runtime (12 tasks)
 
@@ -75,7 +84,7 @@ Create the plugin runtime system in `packages/agent` for discovery, loading, and
 - [ ] **2.9** Create CustomCapabilityRegistryService
 - [ ] **2.10** Create TypeORM entities (Plugin, AdminPlugin, UserPlugin, DirectoryPlugin)
 - [ ] **2.11** Create PluginsModule with forRoot configuration
-- [ ] **2.12** Add @ever-works/plugin-contracts as dependency
+- [ ] **2.12** Add @ever-works/plugin as dependency
 
 ---
 
@@ -299,10 +308,10 @@ Add sub-provider selection to generator form with dynamic fields.
 
 Create comprehensive testing infrastructure for the plugin system.
 
-- [ ] **18.1** Create `@ever-works/plugin-test-utils` package
-- [ ] **18.2** Create MockPluginContext factory
-- [ ] **18.3** Create MockPluginEnvironment factory
-- [ ] **18.4** Create Plugin Contract Tests base suite
+- [x] **18.1** Create testing utilities in `@ever-works/plugin/testing` (moved from separate package)
+- [x] **18.2** Create MockPluginContext factory
+- [x] **18.3** Create MockPluginEnvironment factory
+- [x] **18.4** Create Plugin Contract Tests base suite
 - [ ] **18.5** Create unit tests for plugin discovery and loading (PluginLoaderService)
 - [ ] **18.6** Create unit tests for plugin registry (PluginRegistryService)
 - [ ] **18.7** Create tests for plugin lifecycle management
@@ -339,3 +348,4 @@ Create comprehensive testing infrastructure for the plugin system.
 - See [PLUGIN_ARCHITECTURE_GUIDE.md](./PLUGIN_ARCHITECTURE_GUIDE.md) for architecture overview and design patterns
 - Each task checkbox can be marked with `[x]` when completed
 - Update the Progress Summary table as tasks are completed
+- **Package naming**: `@ever-works/plugin` includes contracts, base classes, helpers, and testing utilities
