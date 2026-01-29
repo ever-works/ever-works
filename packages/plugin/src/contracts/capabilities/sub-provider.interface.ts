@@ -1,4 +1,5 @@
 import type { IPlugin } from '../plugin.interface.js';
+import type { PluginIcon } from '../plugin-manifest.types.js';
 
 /**
  * Sub-provider registration information
@@ -10,8 +11,8 @@ export interface SubProviderRegistration {
 	readonly name: string;
 	/** Description */
 	readonly description?: string;
-	/** Icon */
-	readonly icon?: string;
+	/** Icon (supports multiple formats: SVG, URL, base64, Lucide) */
+	readonly icon?: PluginIcon;
 	/** Parent capability type */
 	readonly parentCapability: string;
 	/** Whether this is the default sub-provider */

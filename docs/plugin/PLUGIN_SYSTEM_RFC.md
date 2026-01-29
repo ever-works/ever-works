@@ -409,6 +409,41 @@ PluginsModule.forRoot({ paths: ['packages/plugins/*'] })
 └─────────────────────────────────────────┘
 ```
 
+### Environment-Specific Plugin Paths
+
+Plugin paths must be configured differently for development and production (Docker) environments:
+
+```typescript
+// apps/api/src/app.module.ts
+import { PluginsModule } from '@packages/agent/plugins';
+import * as path from 'path';
+
+@Module({
+	imports: [
+		PluginsModule.forRoot({
+			pluginPaths: [
+				// In dev: resolve to monorepo packages/plugins
+				path.resolve(__dirname, '../../../packages/plugins'),
+				// In prod (Docker): ./plugins relative to /app
+				'./plugins'
+			]
+		})
+	]
+})
+export class AppModule {}
+```
+
+| Environment                               | `process.cwd()` | Plugin Location                          |
+| ----------------------------------------- | --------------- | ---------------------------------------- |
+| Development (`pnpm dev` from `apps/api/`) | `apps/api/`     | `packages/plugins/` (via `path.resolve`) |
+| Production (Docker)                       | `/app/`         | `/app/plugins/` (copied during build)    |
+
+**Notes:**
+
+- The loader resolves relative paths from `process.cwd()`
+- Non-existent paths are silently skipped (no error)
+- Both paths can be specified; the loader checks each one
+
 ---
 
 ## Plugin Manifest Schema

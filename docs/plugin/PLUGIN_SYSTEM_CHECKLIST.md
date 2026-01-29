@@ -2,7 +2,7 @@
 
 This checklist tracks the implementation progress of the Plugin System as defined in [PLUGIN_SYSTEM_JIRA_TICKETS.md](./PLUGIN_SYSTEM_JIRA_TICKETS.md).
 
-**Total Tasks:** 177 across 19 Stories
+**Total Tasks:** 178 across 19 Stories
 
 **Note:** The package is named `@ever-works/plugin` (not `plugin-contracts` as originally planned) to reflect its expanded scope including base classes, helpers, and testing utilities.
 
@@ -231,10 +231,11 @@ Migrate hardcoded entity fields to the plugin system. See [PLUGIN_SYSTEM_RFC.md 
 
 ## Phase 7: API Refactoring
 
-### Story 11: API App Refactoring (12 tasks)
+### Story 11: API App Refactoring (13 tasks)
 
 Refactor apps/api to use the plugin system instead of hardcoded providers.
 
+- [ ] **11.0** Import and configure PluginsModule in AppModule (with dev/prod plugin paths)
 - [ ] **11.1** Replace /vercel/_ with generic /deploy/:provider/_ controller
 - [ ] **11.2** Remove VercelDeploymentVerifier (use IDeploymentPlugin.getStatus())
 - [ ] **11.3** Replace GitHub strategy with plugin-based Git OAuth

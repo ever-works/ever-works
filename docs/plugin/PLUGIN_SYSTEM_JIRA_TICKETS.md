@@ -4600,6 +4600,49 @@ Refactor apps/api to use the plugin system instead of hardcoded providers.
 
 ---
 
+## Task 11.0: Integrate PluginsModule into API
+
+**Title:** Import and configure PluginsModule in AppModule
+
+**Description:**
+Add PluginsModule to the API's AppModule with environment-aware plugin paths for both development and production (Docker) environments.
+
+**Implementation Details:**
+
+```typescript
+// apps/api/src/app.module.ts
+import { PluginsModule } from '@packages/agent/plugins';
+import * as path from 'path';
+
+@Module({
+	imports: [
+		PluginsModule.forRoot({
+			pluginPaths: [
+				// In dev: resolve to monorepo packages/plugins
+				path.resolve(__dirname, '../../../packages/plugins'),
+				// In prod (Docker): ./plugins relative to /app
+				'./plugins'
+			]
+			// Or use environment-based config
+		})
+		// ... other imports
+	]
+})
+export class AppModule {}
+```
+
+**Notes:**
+
+- In development (`pnpm dev` from `apps/api/`), `process.cwd()` is `apps/api/`, so we use `path.resolve(__dirname, ...)` to reach `packages/plugins/`
+- In production (Docker), `process.cwd()` is `/app/`, and built-in plugins are copied to `/app/plugins/`
+- Both paths are checked; non-existent paths are silently skipped
+
+**Files to Modify:**
+
+- `apps/api/src/app.module.ts`
+
+---
+
 ## Task 11.1: Generic Deploy Controller
 
 **Title:** Replace /vercel/_ with /deploy/:provider/_

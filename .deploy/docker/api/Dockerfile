@@ -20,38 +20,39 @@ RUN turbo prune --scope=ever-works-api --docker
 # Add lockfile and package.json's of isolated subworkspace
 FROM base AS installer
 
-USER root
-
 WORKDIR /app
 
 # First install the dependencies (as they change less often)
 COPY --from=builder /app/out/json/ .
-COPY --from=builder /app/.gitignore .gitignore
+COPY --from=builder /app/out/pnpm-lock.yaml ./pnpm-lock.yaml
 
 # Install deps
-RUN cd apps/api && pnpm install --frozen-lockfile
+RUN pnpm install --frozen-lockfile
 
 # Build the project
 COPY --from=builder /app/out/full/ .
 
-# Build the apps
+# Build the API and its dependencies
 RUN pnpm build --filter=ever-works-api...
 
-# Prune dev deps and husky
-RUN sed -i '/"prepare.*husky/d' package.json
-RUN rm -rf ./**/node_modules
-RUN rm -rf /app/packages/agent/src /app/packages/monitoring/src /app/packages/tasks/src
+# Build built-in plugins (if any exist)
+RUN pnpm build --filter="./packages/plugins/*" || true
+
+# Deploy creates standalone copy with all npm dependencies (no pnpm needed at runtime)
+RUN pnpm deploy --filter=ever-works-api --prod --legacy /app/deploy
+
+# Copy built-in plugins to deploy directory
+RUN mkdir -p /app/deploy/plugins && \
+    for dir in packages/plugins/*/; do \
+        if [ -d "$dir/dist" ]; then \
+            plugin_name=$(basename "$dir"); \
+            cp -r "$dir" /app/deploy/plugins/"$plugin_name"; \
+        fi \
+    done
 
 #--
-# Build
+# Production image - NO PNPM required
 FROM node:22-alpine
-
-# Install PNPM
-RUN npm install -g pnpm@10
-RUN npm install -g npm@latest
-
-# Create app directory with proper ownership
-RUN mkdir -p /app && chown node:node /app
 
 USER node
 
@@ -59,24 +60,20 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 ENV APP_TYPE=api
-
-COPY --from=installer --chown=node:node /app/package.json ./
-COPY --from=installer --chown=node:node /app/pnpm-lock.yaml ./
-COPY --from=installer --chown=node:node /app/pnpm-workspace.yaml ./
-COPY --from=installer --chown=node:node /app/apps /app/apps
-COPY --from=installer --chown=node:node /app/packages /app/packages
-
-# Copy entrypoint script
-COPY --chown=node:node .deploy/docker/api/entrypoint.sh /app/entrypoint.sh
-RUN chmod +x /app/entrypoint.sh
-
-RUN pnpm install --prod
-RUN pnpm store prune
-
-WORKDIR /app/apps/api
-
 ENV PORT=3100
 ENV RUN_MIGRATIONS=false
+
+# Copy production files from pnpm deploy output
+COPY --from=installer --chown=node:node /app/deploy/dist ./dist
+COPY --from=installer --chown=node:node /app/deploy/node_modules ./node_modules
+COPY --from=installer --chown=node:node /app/deploy/package.json ./
+
+# Copy built-in plugins
+COPY --from=installer --chown=node:node /app/deploy/plugins ./plugins
+
+# Copy entrypoint script
+COPY --chown=node:node .deploy/docker/api/entrypoint.sh ./entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
 
 VOLUME [ "/tmp/ever-works-repos" ]
 
