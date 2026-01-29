@@ -171,29 +171,44 @@ export function OAuthConnections({
                                     onClick={handleGitHubReconnect}
                                     disabled={isPending}
                                     className={cn(
-                                        'px-4 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer',
+                                        'px-4 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer',
                                         'bg-surface dark:bg-surface-dark',
                                         'text-text dark:text-text-dark',
                                         'border border-card-border dark:border-card-border-dark',
                                         'hover:bg-surface-hover dark:hover:bg-surface-hover-dark',
+                                        'hover:border-primary/50 hover:shadow-sm',
                                         'disabled:opacity-50 disabled:cursor-not-allowed',
+                                        'flex items-center gap-2',
                                     )}
                                 >
-                                    {isPending ? 'Reconnecting...' : t('github.actions.reconnect')}
+                                    {isPending ? (
+                                        <>
+                                            <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                                            Reconnecting...
+                                        </>
+                                    ) : (
+                                        t('github.actions.reconnect')
+                                    )}
                                 </button>
                                 <button
                                     onClick={handleGitHubDisconnect}
                                     disabled={isPending}
                                     className={cn(
-                                        'px-4 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer',
+                                        'px-4 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer',
                                         'bg-red-500/10 text-red-600 dark:text-red-400',
-                                        'hover:bg-red-500/20',
+                                        'hover:bg-red-500/20 hover:shadow-sm',
                                         'disabled:opacity-50 disabled:cursor-not-allowed',
+                                        'flex items-center gap-2',
                                     )}
                                 >
-                                    {isPending
-                                        ? 'Disconnecting...'
-                                        : t('github.actions.disconnect')}
+                                    {isPending ? (
+                                        <>
+                                            <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                                            Disconnecting...
+                                        </>
+                                    ) : (
+                                        t('github.actions.disconnect')
+                                    )}
                                 </button>
                             </>
                         ) : (
