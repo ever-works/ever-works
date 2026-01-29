@@ -70,6 +70,9 @@ async function buildCLI() {
             '@nestjs/microservices',
             '@nestjs/websockets/socket-module',
 
+            // class-transformer optional storage (used by @nestjs/mapped-types)
+            'class-transformer/storage',
+
             // Build Dependencies
             'fs-extra',
 

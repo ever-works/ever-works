@@ -156,6 +156,7 @@
         "@mozilla/readability": "^0.6.0",
         "@nestjs/cache-manager": "^3.1.0",
         "@nestjs/config": "^4.0.2",
+        "@nestjs/swagger": "^11.2.5",
         "@nestjs/typeorm": "^11.0.0",
         "@supabase/supabase-js": "^2.89.0",
         "@tavily/core": "^0.3.7",
