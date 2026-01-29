@@ -1,0 +1,861 @@
+import { Test, TestingModule } from '@nestjs/testing';
+import { Logger } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { PluginSettingsService } from '../services/plugin-settings.service';
+import { PluginRegistryService, RegisteredPlugin } from '../services/plugin-registry.service';
+import { PluginRepository } from '../repositories/plugin.repository';
+import { UserPluginRepository } from '../repositories/user-plugin.repository';
+import { DirectoryPluginRepository } from '../repositories/directory-plugin.repository';
+import { PluginEvents } from '../plugins.constants';
+import type { IPlugin, PluginManifest, JsonSchema } from '@ever-works/plugin';
+
+// Silence Logger output during tests
+jest.spyOn(Logger.prototype, 'error').mockImplementation(() => {});
+jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => {});
+jest.spyOn(Logger.prototype, 'log').mockImplementation(() => {});
+jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => {});
+
+describe('PluginSettingsService', () => {
+    let service: PluginSettingsService;
+    let registry: PluginRegistryService;
+    let pluginRepository: PluginRepository;
+    let userPluginRepository: UserPluginRepository;
+    let directoryPluginRepository: DirectoryPluginRepository;
+    let eventEmitter: EventEmitter2;
+
+    const createSettingsSchema = (): JsonSchema =>
+        ({
+            type: 'object',
+            properties: {
+                apiKey: {
+                    type: 'string',
+                    'x-secret': true,
+                    'x-envVar': 'PLUGIN_API_KEY',
+                },
+                enabled: {
+                    type: 'boolean',
+                    default: true,
+                },
+                maxItems: {
+                    type: 'number',
+                    default: 10,
+                    'x-scope': 'directory',
+                },
+                theme: {
+                    type: 'string',
+                    default: 'light',
+                    'x-scope': 'user',
+                },
+            },
+        }) as unknown as JsonSchema;
+
+    const createMockPlugin = (settingsSchema?: JsonSchema): IPlugin =>
+        ({
+            id: 'test-plugin',
+            name: 'Test Plugin',
+            version: '1.0.0',
+            category: 'utility',
+            capabilities: ['test'],
+            settingsSchema: settingsSchema || createSettingsSchema(),
+            configurationMode: 'hybrid',
+            onLoad: jest.fn().mockResolvedValue(undefined),
+            onEnable: jest.fn().mockResolvedValue(undefined),
+            onDisable: jest.fn().mockResolvedValue(undefined),
+            onUnload: jest.fn().mockResolvedValue(undefined),
+            validateSettings: jest.fn().mockResolvedValue({ valid: true }),
+        }) as unknown as IPlugin;
+
+    const createRegisteredPlugin = (plugin?: IPlugin): RegisteredPlugin => ({
+        plugin: plugin || createMockPlugin(),
+        manifest: {
+            id: 'test-plugin',
+            name: 'Test Plugin',
+            version: '1.0.0',
+            description: 'Test',
+            category: 'utility',
+            capabilities: ['test'],
+        } as PluginManifest,
+        state: 'loaded',
+        builtIn: false,
+        registeredAt: Date.now(),
+        stateHistory: [],
+    });
+
+    beforeEach(async () => {
+        const module: TestingModule = await Test.createTestingModule({
+            providers: [
+                PluginSettingsService,
+                {
+                    provide: PluginRegistryService,
+                    useValue: {
+                        get: jest.fn().mockReturnValue(createRegisteredPlugin()),
+                    },
+                },
+                {
+                    provide: PluginRepository,
+                    useValue: {
+                        findByPluginId: jest.fn().mockResolvedValue(null),
+                        updateSettings: jest.fn().mockResolvedValue({}),
+                    },
+                },
+                {
+                    provide: UserPluginRepository,
+                    useValue: {
+                        findByUserAndPlugin: jest.fn().mockResolvedValue(null),
+                        updateSettings: jest.fn().mockResolvedValue({}),
+                        create: jest.fn().mockResolvedValue({}),
+                        deleteByUserAndPlugin: jest.fn().mockResolvedValue(true),
+                    },
+                },
+                {
+                    provide: DirectoryPluginRepository,
+                    useValue: {
+                        findByDirectoryAndPlugin: jest.fn().mockResolvedValue(null),
+                        updateSettings: jest.fn().mockResolvedValue({}),
+                        create: jest.fn().mockResolvedValue({}),
+                        deleteByDirectoryAndPlugin: jest.fn().mockResolvedValue(true),
+                    },
+                },
+                {
+                    provide: EventEmitter2,
+                    useValue: {
+                        emit: jest.fn(),
+                    },
+                },
+            ],
+        }).compile();
+
+        service = module.get<PluginSettingsService>(PluginSettingsService);
+        registry = module.get<PluginRegistryService>(PluginRegistryService);
+        pluginRepository = module.get<PluginRepository>(PluginRepository);
+        userPluginRepository = module.get<UserPluginRepository>(UserPluginRepository);
+        directoryPluginRepository =
+            module.get<DirectoryPluginRepository>(DirectoryPluginRepository);
+        eventEmitter = module.get<EventEmitter2>(EventEmitter2);
+    });
+
+    describe('getResolvedSettings', () => {
+        it('should throw error for non-existent plugin', async () => {
+            jest.spyOn(registry, 'get').mockReturnValue(undefined);
+
+            await expect(service.getResolvedSettings('non-existent')).rejects.toThrow(
+                'Plugin "non-existent" not found',
+            );
+        });
+
+        it('should return default values when no settings are stored', async () => {
+            const result = await service.getResolvedSettings('test-plugin');
+
+            expect(result.enabled).toEqual({
+                key: 'enabled',
+                value: true,
+                source: 'default',
+                isFallback: true,
+            });
+            expect(result.maxItems).toEqual({
+                key: 'maxItems',
+                value: 10,
+                source: 'default',
+                isFallback: true,
+            });
+        });
+
+        it('should resolve admin settings over defaults', async () => {
+            jest.spyOn(pluginRepository, 'findByPluginId').mockResolvedValue({
+                id: '1',
+                pluginId: 'test-plugin',
+                settings: { enabled: false },
+                secretSettings: {},
+            } as any);
+
+            const result = await service.getResolvedSettings('test-plugin');
+
+            expect(result.enabled).toEqual({
+                key: 'enabled',
+                value: false,
+                source: 'admin',
+                isFallback: false,
+            });
+        });
+
+        it('should resolve user settings over admin settings', async () => {
+            jest.spyOn(pluginRepository, 'findByPluginId').mockResolvedValue({
+                id: '1',
+                pluginId: 'test-plugin',
+                settings: { theme: 'dark' },
+                secretSettings: {},
+            } as any);
+
+            jest.spyOn(userPluginRepository, 'findByUserAndPlugin').mockResolvedValue({
+                id: '1',
+                userId: 'user-1',
+                pluginId: 'test-plugin',
+                settings: { theme: 'blue' },
+                secretSettings: {},
+            } as any);
+
+            const result = await service.getResolvedSettings('test-plugin', { userId: 'user-1' });
+
+            expect(result.theme).toEqual({
+                key: 'theme',
+                value: 'blue',
+                source: 'user',
+                isFallback: false,
+            });
+        });
+
+        it('should resolve directory settings over user settings', async () => {
+            jest.spyOn(pluginRepository, 'findByPluginId').mockResolvedValue({
+                id: '1',
+                pluginId: 'test-plugin',
+                settings: { maxItems: 20 },
+                secretSettings: {},
+            } as any);
+
+            jest.spyOn(userPluginRepository, 'findByUserAndPlugin').mockResolvedValue({
+                id: '1',
+                userId: 'user-1',
+                pluginId: 'test-plugin',
+                settings: { maxItems: 30 },
+                secretSettings: {},
+            } as any);
+
+            jest.spyOn(directoryPluginRepository, 'findByDirectoryAndPlugin').mockResolvedValue({
+                id: '1',
+                directoryId: 'dir-1',
+                pluginId: 'test-plugin',
+                settings: { maxItems: 50 },
+                secretSettings: {},
+            } as any);
+
+            const result = await service.getResolvedSettings('test-plugin', {
+                userId: 'user-1',
+                directoryId: 'dir-1',
+            });
+
+            expect(result.maxItems).toEqual({
+                key: 'maxItems',
+                value: 50,
+                source: 'directory',
+                isFallback: false,
+            });
+        });
+
+        it('should resolve from environment variable', async () => {
+            const originalEnv = process.env.PLUGIN_API_KEY;
+            process.env.PLUGIN_API_KEY = 'env-api-key';
+
+            const result = await service.getResolvedSettings('test-plugin');
+
+            expect(result.apiKey).toEqual({
+                key: 'apiKey',
+                value: 'env-api-key',
+                source: 'env',
+                isFallback: true,
+            });
+
+            // Restore
+            if (originalEnv !== undefined) {
+                process.env.PLUGIN_API_KEY = originalEnv;
+            } else {
+                delete process.env.PLUGIN_API_KEY;
+            }
+        });
+
+        it('should include secrets when requested', async () => {
+            jest.spyOn(pluginRepository, 'findByPluginId').mockResolvedValue({
+                id: '1',
+                pluginId: 'test-plugin',
+                settings: {},
+                secretSettings: { apiKey: 'secret-key' },
+            } as any);
+
+            const result = await service.getResolvedSettings('test-plugin', {
+                includeSecrets: true,
+            });
+
+            expect(result.apiKey.value).toBe('secret-key');
+        });
+
+        it('should exclude secrets when not requested', async () => {
+            jest.spyOn(pluginRepository, 'findByPluginId').mockResolvedValue({
+                id: '1',
+                pluginId: 'test-plugin',
+                settings: {},
+                secretSettings: { apiKey: 'secret-key' },
+            } as any);
+
+            const result = await service.getResolvedSettings('test-plugin', {
+                includeSecrets: false,
+            });
+
+            expect(result.apiKey.source).toBe('default');
+        });
+    });
+
+    describe('getSettings', () => {
+        it('should return plain settings values', async () => {
+            jest.spyOn(pluginRepository, 'findByPluginId').mockResolvedValue({
+                id: '1',
+                pluginId: 'test-plugin',
+                settings: { enabled: false, maxItems: 25 },
+                secretSettings: {},
+            } as any);
+
+            const result = await service.getSettings('test-plugin');
+
+            expect(result).toEqual({
+                apiKey: undefined,
+                enabled: false,
+                maxItems: 25,
+                theme: 'light',
+            });
+        });
+    });
+
+    describe('updateAdminSettings', () => {
+        it('should throw error for non-existent plugin', async () => {
+            jest.spyOn(registry, 'get').mockReturnValue(undefined);
+
+            await expect(service.updateAdminSettings('non-existent', {})).rejects.toThrow(
+                'Plugin "non-existent" not found',
+            );
+        });
+
+        it('should throw error for invalid settings', async () => {
+            const plugin = createMockPlugin();
+            (plugin.validateSettings as jest.Mock).mockResolvedValue({
+                valid: false,
+                errors: [{ path: 'enabled', message: 'Must be boolean' }],
+            });
+            jest.spyOn(registry, 'get').mockReturnValue(createRegisteredPlugin(plugin));
+
+            await expect(
+                service.updateAdminSettings('test-plugin', { enabled: 'not-boolean' }),
+            ).rejects.toThrow('Invalid settings');
+        });
+
+        it('should update admin settings', async () => {
+            jest.spyOn(pluginRepository, 'findByPluginId').mockResolvedValue({
+                id: '1',
+                pluginId: 'test-plugin',
+                settings: { enabled: true },
+                secretSettings: {},
+            } as any);
+
+            await service.updateAdminSettings('test-plugin', { enabled: false });
+
+            expect(pluginRepository.updateSettings).toHaveBeenCalledWith(
+                'test-plugin',
+                { enabled: false },
+                {},
+            );
+        });
+
+        it('should separate secret settings', async () => {
+            jest.spyOn(pluginRepository, 'findByPluginId').mockResolvedValue({
+                id: '1',
+                pluginId: 'test-plugin',
+                settings: {},
+                secretSettings: {},
+            } as any);
+
+            await service.updateAdminSettings('test-plugin', {
+                enabled: true,
+                apiKey: 'new-key',
+            });
+
+            expect(pluginRepository.updateSettings).toHaveBeenCalledWith(
+                'test-plugin',
+                { enabled: true },
+                { apiKey: 'new-key' },
+            );
+        });
+
+        it('should emit settings changed event', async () => {
+            jest.spyOn(pluginRepository, 'findByPluginId').mockResolvedValue({
+                id: '1',
+                pluginId: 'test-plugin',
+                settings: {},
+                secretSettings: {},
+            } as any);
+
+            await service.updateAdminSettings('test-plugin', { enabled: false });
+
+            expect(eventEmitter.emit).toHaveBeenCalledWith(
+                PluginEvents.SETTINGS_CHANGED,
+                expect.objectContaining({
+                    pluginId: 'test-plugin',
+                    changedKeys: ['enabled'],
+                    scope: 'global',
+                }),
+            );
+        });
+
+        it('should use explicit secretKeys option', async () => {
+            jest.spyOn(pluginRepository, 'findByPluginId').mockResolvedValue({
+                id: '1',
+                pluginId: 'test-plugin',
+                settings: {},
+                secretSettings: {},
+            } as any);
+
+            await service.updateAdminSettings(
+                'test-plugin',
+                { customSecret: 'value', enabled: true },
+                { secretKeys: ['customSecret'] },
+            );
+
+            expect(pluginRepository.updateSettings).toHaveBeenCalledWith(
+                'test-plugin',
+                { enabled: true },
+                { customSecret: 'value' },
+            );
+        });
+    });
+
+    describe('updateUserSettings', () => {
+        it('should throw error for non-existent plugin', async () => {
+            jest.spyOn(registry, 'get').mockReturnValue(undefined);
+
+            await expect(service.updateUserSettings('non-existent', 'user-1', {})).rejects.toThrow(
+                'Plugin "non-existent" not found',
+            );
+        });
+
+        it('should create user settings if not exists', async () => {
+            jest.spyOn(pluginRepository, 'findByPluginId').mockResolvedValue({
+                id: '1',
+                pluginId: 'test-plugin',
+                settings: {},
+                secretSettings: {},
+            } as any);
+            jest.spyOn(userPluginRepository, 'findByUserAndPlugin').mockResolvedValue(null);
+
+            await service.updateUserSettings('test-plugin', 'user-1', { theme: 'dark' });
+
+            expect(userPluginRepository.create).toHaveBeenCalledWith({
+                userId: 'user-1',
+                pluginId: 'test-plugin',
+                pluginEntityId: '1',
+                settings: { theme: 'dark' },
+                secretSettings: {},
+            });
+        });
+
+        it('should update existing user settings', async () => {
+            jest.spyOn(pluginRepository, 'findByPluginId').mockResolvedValue({
+                id: '1',
+                pluginId: 'test-plugin',
+                settings: {},
+                secretSettings: {},
+            } as any);
+            jest.spyOn(userPluginRepository, 'findByUserAndPlugin').mockResolvedValue({
+                id: '1',
+                userId: 'user-1',
+                pluginId: 'test-plugin',
+                settings: { theme: 'light' },
+                secretSettings: {},
+            } as any);
+
+            await service.updateUserSettings('test-plugin', 'user-1', { theme: 'dark' });
+
+            expect(userPluginRepository.updateSettings).toHaveBeenCalledWith(
+                'user-1',
+                'test-plugin',
+                { theme: 'dark' },
+                {},
+            );
+        });
+
+        it('should emit settings changed event', async () => {
+            jest.spyOn(pluginRepository, 'findByPluginId').mockResolvedValue({
+                id: '1',
+                pluginId: 'test-plugin',
+                settings: {},
+                secretSettings: {},
+            } as any);
+            jest.spyOn(userPluginRepository, 'findByUserAndPlugin').mockResolvedValue(null);
+
+            await service.updateUserSettings('test-plugin', 'user-1', { theme: 'dark' });
+
+            expect(eventEmitter.emit).toHaveBeenCalledWith(
+                PluginEvents.SETTINGS_CHANGED,
+                expect.objectContaining({
+                    pluginId: 'test-plugin',
+                    scope: 'user',
+                    userId: 'user-1',
+                }),
+            );
+        });
+
+        it('should throw if plugin entity not found', async () => {
+            jest.spyOn(pluginRepository, 'findByPluginId').mockResolvedValue(null);
+
+            await expect(
+                service.updateUserSettings('test-plugin', 'user-1', { theme: 'dark' }),
+            ).rejects.toThrow('Plugin entity not found');
+        });
+    });
+
+    describe('updateDirectorySettings', () => {
+        it('should throw error for non-existent plugin', async () => {
+            jest.spyOn(registry, 'get').mockReturnValue(undefined);
+
+            await expect(
+                service.updateDirectorySettings('non-existent', 'dir-1', {}),
+            ).rejects.toThrow('Plugin "non-existent" not found');
+        });
+
+        it('should create directory settings if not exists', async () => {
+            jest.spyOn(pluginRepository, 'findByPluginId').mockResolvedValue({
+                id: '1',
+                pluginId: 'test-plugin',
+                settings: {},
+                secretSettings: {},
+            } as any);
+            jest.spyOn(directoryPluginRepository, 'findByDirectoryAndPlugin').mockResolvedValue(
+                null,
+            );
+
+            await service.updateDirectorySettings('test-plugin', 'dir-1', { maxItems: 25 });
+
+            expect(directoryPluginRepository.create).toHaveBeenCalledWith({
+                directoryId: 'dir-1',
+                pluginId: 'test-plugin',
+                pluginEntityId: '1',
+                settings: { maxItems: 25 },
+                secretSettings: {},
+            });
+        });
+
+        it('should update existing directory settings', async () => {
+            jest.spyOn(pluginRepository, 'findByPluginId').mockResolvedValue({
+                id: '1',
+                pluginId: 'test-plugin',
+                settings: {},
+                secretSettings: {},
+            } as any);
+            jest.spyOn(directoryPluginRepository, 'findByDirectoryAndPlugin').mockResolvedValue({
+                id: '1',
+                directoryId: 'dir-1',
+                pluginId: 'test-plugin',
+                settings: { maxItems: 10 },
+                secretSettings: {},
+            } as any);
+
+            await service.updateDirectorySettings('test-plugin', 'dir-1', { maxItems: 25 });
+
+            expect(directoryPluginRepository.updateSettings).toHaveBeenCalledWith(
+                'dir-1',
+                'test-plugin',
+                { maxItems: 25 },
+                {},
+            );
+        });
+
+        it('should emit settings changed event', async () => {
+            jest.spyOn(pluginRepository, 'findByPluginId').mockResolvedValue({
+                id: '1',
+                pluginId: 'test-plugin',
+                settings: {},
+                secretSettings: {},
+            } as any);
+            jest.spyOn(directoryPluginRepository, 'findByDirectoryAndPlugin').mockResolvedValue(
+                null,
+            );
+
+            await service.updateDirectorySettings('test-plugin', 'dir-1', { maxItems: 25 });
+
+            expect(eventEmitter.emit).toHaveBeenCalledWith(
+                PluginEvents.SETTINGS_CHANGED,
+                expect.objectContaining({
+                    pluginId: 'test-plugin',
+                    scope: 'directory',
+                    directoryId: 'dir-1',
+                }),
+            );
+        });
+    });
+
+    describe('deleteUserSettings', () => {
+        it('should delete user settings', async () => {
+            const result = await service.deleteUserSettings('test-plugin', 'user-1');
+
+            expect(result).toBe(true);
+            expect(userPluginRepository.deleteByUserAndPlugin).toHaveBeenCalledWith(
+                'user-1',
+                'test-plugin',
+            );
+        });
+    });
+
+    describe('deleteDirectorySettings', () => {
+        it('should delete directory settings', async () => {
+            const result = await service.deleteDirectorySettings('test-plugin', 'dir-1');
+
+            expect(result).toBe(true);
+            expect(directoryPluginRepository.deleteByDirectoryAndPlugin).toHaveBeenCalledWith(
+                'dir-1',
+                'test-plugin',
+            );
+        });
+    });
+
+    describe('getSettingsSchema', () => {
+        it('should return settings schema', () => {
+            const result = service.getSettingsSchema('test-plugin');
+
+            expect(result).toBeDefined();
+            expect(result?.type).toBe('object');
+            expect(result?.properties).toBeDefined();
+        });
+
+        it('should return undefined for non-existent plugin', () => {
+            jest.spyOn(registry, 'get').mockReturnValue(undefined);
+
+            const result = service.getSettingsSchema('non-existent');
+
+            expect(result).toBeUndefined();
+        });
+    });
+
+    describe('validateSettings', () => {
+        it('should return valid for valid settings', async () => {
+            const result = await service.validateSettings('test-plugin', { enabled: true });
+
+            expect(result.valid).toBe(true);
+            expect(result.errors).toBeUndefined();
+        });
+
+        it('should return invalid for invalid settings', async () => {
+            const plugin = createMockPlugin();
+            (plugin.validateSettings as jest.Mock).mockResolvedValue({
+                valid: false,
+                errors: [{ path: 'enabled', message: 'Must be boolean' }],
+            });
+            jest.spyOn(registry, 'get').mockReturnValue(createRegisteredPlugin(plugin));
+
+            const result = await service.validateSettings('test-plugin', {
+                enabled: 'not-boolean',
+            });
+
+            expect(result.valid).toBe(false);
+            expect(result.errors).toContain('Must be boolean');
+        });
+
+        it('should return invalid for non-existent plugin', async () => {
+            jest.spyOn(registry, 'get').mockReturnValue(undefined);
+
+            const result = await service.validateSettings('non-existent', {});
+
+            expect(result.valid).toBe(false);
+            expect(result.errors).toContain('Plugin "non-existent" not found');
+        });
+    });
+
+    describe('environment variable parsing', () => {
+        it('should parse boolean true from env', async () => {
+            const originalEnv = process.env.TEST_BOOL;
+            process.env.TEST_BOOL = 'true';
+
+            const schema: JsonSchema = {
+                type: 'object',
+                properties: {
+                    testBool: {
+                        type: 'boolean',
+                        'x-envVar': 'TEST_BOOL',
+                    },
+                },
+            } as unknown as JsonSchema;
+
+            const plugin = createMockPlugin(schema);
+            jest.spyOn(registry, 'get').mockReturnValue(createRegisteredPlugin(plugin));
+
+            const result = await service.getResolvedSettings('test-plugin');
+
+            expect(result.testBool.value).toBe(true);
+
+            // Cleanup
+            if (originalEnv !== undefined) {
+                process.env.TEST_BOOL = originalEnv;
+            } else {
+                delete process.env.TEST_BOOL;
+            }
+        });
+
+        it('should parse boolean from "1"', async () => {
+            const originalEnv = process.env.TEST_BOOL;
+            process.env.TEST_BOOL = '1';
+
+            const schema: JsonSchema = {
+                type: 'object',
+                properties: {
+                    testBool: {
+                        type: 'boolean',
+                        'x-envVar': 'TEST_BOOL',
+                    },
+                },
+            } as unknown as JsonSchema;
+
+            const plugin = createMockPlugin(schema);
+            jest.spyOn(registry, 'get').mockReturnValue(createRegisteredPlugin(plugin));
+
+            const result = await service.getResolvedSettings('test-plugin');
+
+            expect(result.testBool.value).toBe(true);
+
+            // Cleanup
+            if (originalEnv !== undefined) {
+                process.env.TEST_BOOL = originalEnv;
+            } else {
+                delete process.env.TEST_BOOL;
+            }
+        });
+
+        it('should parse number from env', async () => {
+            const originalEnv = process.env.TEST_NUM;
+            process.env.TEST_NUM = '42';
+
+            const schema: JsonSchema = {
+                type: 'object',
+                properties: {
+                    testNum: {
+                        type: 'number',
+                        'x-envVar': 'TEST_NUM',
+                    },
+                },
+            } as unknown as JsonSchema;
+
+            const plugin = createMockPlugin(schema);
+            jest.spyOn(registry, 'get').mockReturnValue(createRegisteredPlugin(plugin));
+
+            const result = await service.getResolvedSettings('test-plugin');
+
+            expect(result.testNum.value).toBe(42);
+
+            // Cleanup
+            if (originalEnv !== undefined) {
+                process.env.TEST_NUM = originalEnv;
+            } else {
+                delete process.env.TEST_NUM;
+            }
+        });
+
+        it('should parse array from JSON string', async () => {
+            const originalEnv = process.env.TEST_ARR;
+            process.env.TEST_ARR = '["a","b","c"]';
+
+            const schema: JsonSchema = {
+                type: 'object',
+                properties: {
+                    testArr: {
+                        type: 'array',
+                        'x-envVar': 'TEST_ARR',
+                    },
+                },
+            } as unknown as JsonSchema;
+
+            const plugin = createMockPlugin(schema);
+            jest.spyOn(registry, 'get').mockReturnValue(createRegisteredPlugin(plugin));
+
+            const result = await service.getResolvedSettings('test-plugin');
+
+            expect(result.testArr.value).toEqual(['a', 'b', 'c']);
+
+            // Cleanup
+            if (originalEnv !== undefined) {
+                process.env.TEST_ARR = originalEnv;
+            } else {
+                delete process.env.TEST_ARR;
+            }
+        });
+
+        it('should parse array from comma-separated string', async () => {
+            const originalEnv = process.env.TEST_ARR;
+            process.env.TEST_ARR = 'a, b, c';
+
+            const schema: JsonSchema = {
+                type: 'object',
+                properties: {
+                    testArr: {
+                        type: 'array',
+                        'x-envVar': 'TEST_ARR',
+                    },
+                },
+            } as unknown as JsonSchema;
+
+            const plugin = createMockPlugin(schema);
+            jest.spyOn(registry, 'get').mockReturnValue(createRegisteredPlugin(plugin));
+
+            const result = await service.getResolvedSettings('test-plugin');
+
+            expect(result.testArr.value).toEqual(['a', 'b', 'c']);
+
+            // Cleanup
+            if (originalEnv !== undefined) {
+                process.env.TEST_ARR = originalEnv;
+            } else {
+                delete process.env.TEST_ARR;
+            }
+        });
+
+        it('should parse object from JSON string', async () => {
+            const originalEnv = process.env.TEST_OBJ;
+            process.env.TEST_OBJ = '{"key":"value"}';
+
+            const schema: JsonSchema = {
+                type: 'object',
+                properties: {
+                    testObj: {
+                        type: 'object',
+                        'x-envVar': 'TEST_OBJ',
+                    },
+                },
+            } as unknown as JsonSchema;
+
+            const plugin = createMockPlugin(schema);
+            jest.spyOn(registry, 'get').mockReturnValue(createRegisteredPlugin(plugin));
+
+            const result = await service.getResolvedSettings('test-plugin');
+
+            expect(result.testObj.value).toEqual({ key: 'value' });
+
+            // Cleanup
+            if (originalEnv !== undefined) {
+                process.env.TEST_OBJ = originalEnv;
+            } else {
+                delete process.env.TEST_OBJ;
+            }
+        });
+
+        it('should return empty object for invalid JSON object', async () => {
+            const originalEnv = process.env.TEST_OBJ;
+            process.env.TEST_OBJ = 'not-json';
+
+            const schema: JsonSchema = {
+                type: 'object',
+                properties: {
+                    testObj: {
+                        type: 'object',
+                        'x-envVar': 'TEST_OBJ',
+                    },
+                },
+            } as unknown as JsonSchema;
+
+            const plugin = createMockPlugin(schema);
+            jest.spyOn(registry, 'get').mockReturnValue(createRegisteredPlugin(plugin));
+
+            const result = await service.getResolvedSettings('test-plugin');
+
+            expect(result.testObj.value).toEqual({});
+
+            // Cleanup
+            if (originalEnv !== undefined) {
+                process.env.TEST_OBJ = originalEnv;
+            } else {
+                delete process.env.TEST_OBJ;
+            }
+        });
+    });
+});
