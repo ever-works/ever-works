@@ -122,6 +122,10 @@ export class DirectoryImportService {
         const page = dto.page || 1;
         const perPage = dto.perPage || 30;
 
+        this.logger.log(
+            `getUserRepositories called with: owner=${dto.owner}, type=${dto.type}, page=${page}`,
+        );
+
         try {
             // Define a common repo type that works with both listForAuthenticatedUser and listForOrg
             type RepoItem = {
@@ -138,6 +142,7 @@ export class DirectoryImportService {
             let repos: RepoItem[];
 
             if (dto.owner && dto.type === 'org') {
+                this.logger.log(`Fetching repos for organization: ${dto.owner}`);
                 // Fetch repos for a specific organization
                 const { data } = await octokit.rest.repos.listForOrg({
                     org: dto.owner,
@@ -148,6 +153,7 @@ export class DirectoryImportService {
                 });
                 repos = data as RepoItem[];
             } else if (dto.owner && dto.type === 'user') {
+                this.logger.log(`Fetching repos for personal account (owner filter)`);
                 // Fetch repos for a specific user (personal account)
                 const { data } = await octokit.rest.repos.listForAuthenticatedUser({
                     sort: 'updated',
@@ -158,6 +164,7 @@ export class DirectoryImportService {
                 });
                 repos = data as RepoItem[];
             } else {
+                this.logger.log(`Fetching all accessible repos (no owner filter)`);
                 // Fetch all accessible repos (current behavior)
                 const { data } = await octokit.rest.repos.listForAuthenticatedUser({
                     sort: 'updated',

@@ -642,6 +642,8 @@ export const directoryAPI = {
         if (options?.type) params.append('type', options.type);
         const query = params.toString() ? `?${params.toString()}` : '';
 
+        console.log('[directoryAPI.getUserRepositories] Request URL:', `/directories/import/repositories${query}`);
+
         return serverFetch<GetUserRepositoriesResponseDto>(
             `/directories/import/repositories${query}`,
         );

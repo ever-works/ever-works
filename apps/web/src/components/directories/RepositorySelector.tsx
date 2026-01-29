@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
@@ -54,6 +54,9 @@ export function RepositorySelector({ onSelect, selectedUrl }: RepositorySelector
 
     const perPage = 30;
 
+    // Use ref to track the current owner for request cancellation
+    const currentRequestRef = useRef<number>(0);
+
     // Fetch organizations on mount
     useEffect(() => {
         const loadOrganizations = async () => {
@@ -72,19 +75,37 @@ export function RepositorySelector({ onSelect, selectedUrl }: RepositorySelector
         loadOrganizations();
     }, []);
 
+    // Fetch repositories with explicit owner/type parameters
     const fetchRepositories = useCallback(
-        async (pageNum: number, searchQuery: string, append = false) => {
+        async (
+            pageNum: number,
+            searchQuery: string,
+            owner: string,
+            type: 'user' | 'org',
+            append = false,
+        ) => {
+            const requestId = ++currentRequestRef.current;
+
             setLoading(true);
             setError(null);
 
+            const params = {
+                page: pageNum,
+                perPage,
+                search: searchQuery || undefined,
+                owner: owner || undefined,
+                type: owner ? type : undefined,
+            };
+            console.log('[RepositorySelector] Fetching repos with params:', params);
+
             try {
-                const result = await getUserRepositories({
-                    page: pageNum,
-                    perPage,
-                    search: searchQuery || undefined,
-                    owner: selectedOwner || undefined,
-                    type: selectedOwner ? ownerType : undefined,
-                });
+                const result = await getUserRepositories(params);
+
+                // Check if this request is still the current one
+                if (requestId !== currentRequestRef.current) {
+                    console.log('[RepositorySelector] Stale request, ignoring result');
+                    return;
+                }
 
                 if (result.success && result.data) {
                     if (append) {
@@ -97,46 +118,59 @@ export function RepositorySelector({ onSelect, selectedUrl }: RepositorySelector
                     setError(result.error || t('errors.fetchFailed'));
                 }
             } catch (err) {
-                setError(t('errors.fetchFailed'));
+                if (requestId === currentRequestRef.current) {
+                    setError(t('errors.fetchFailed'));
+                }
             } finally {
-                setLoading(false);
+                if (requestId === currentRequestRef.current) {
+                    setLoading(false);
+                }
             }
         },
-        [t, selectedOwner, ownerType],
+        [t],
     );
 
     // Fetch repositories on mount and when owner changes
     useEffect(() => {
+        console.log(
+            '[RepositorySelector] useEffect triggered - selectedOwner:',
+            selectedOwner,
+            'ownerType:',
+            ownerType,
+        );
         setPage(1);
         setSearch('');
-        fetchRepositories(1, '');
+        fetchRepositories(1, '', selectedOwner, ownerType);
     }, [selectedOwner, ownerType, fetchRepositories]);
 
     const handleSearch = (value: string) => {
         setSearch(value);
         setPage(1);
-        fetchRepositories(1, value);
+        fetchRepositories(1, value, selectedOwner, ownerType);
     };
 
     const handleLoadMore = () => {
         const nextPage = page + 1;
         setPage(nextPage);
-        fetchRepositories(nextPage, search, true);
+        fetchRepositories(nextPage, search, selectedOwner, ownerType, true);
     };
 
     const handleRefresh = () => {
         setPage(1);
-        fetchRepositories(1, search);
+        fetchRepositories(1, search, selectedOwner, ownerType);
     };
 
     const handleOwnerChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         const value = e.target.value;
+        console.log('[RepositorySelector] Owner changed to:', value);
         if (value === '') {
             // Personal account selected
+            console.log('[RepositorySelector] Setting owner to personal account');
             setSelectedOwner('');
             setOwnerType('user');
         } else {
             // Organization selected
+            console.log('[RepositorySelector] Setting owner to organization:', value);
             setSelectedOwner(value);
             setOwnerType('org');
         }
