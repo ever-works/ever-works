@@ -25,21 +25,11 @@ export interface SearchFacadeOptions {
 }
 
 /**
- * Content extraction result
- */
-export interface ExtractedContent {
-	/** Source URL */
-	readonly url: string;
-	/** Extracted raw text/markdown content */
-	readonly rawContent: string;
-	/** Extracted images */
-	readonly images?: readonly string[];
-}
-
-/**
  * Search Facade interface for pipeline steps.
  *
- * Provides web search and content extraction capabilities.
+ * Provides web search capabilities ONLY.
+ * Content extraction is handled by ContentExtractorFacade.
+ *
  * The actual implementation handles provider resolution and settings.
  */
 export interface ISearchFacade {
@@ -60,29 +50,7 @@ export interface ISearchFacade {
 	search(query: string, options?: SearchFacadeOptions): Promise<SearchFacadeResult[]>;
 
 	/**
-	 * Extract content from a URL.
-	 *
-	 * Fetches the page and extracts the main content as markdown/text.
-	 *
-	 * @param url - URL to extract content from
-	 * @returns Extracted content with raw text and images
-	 *
-	 * @example
-	 * ```typescript
-	 * const content = await searchFacade.extractContent('https://example.com');
-	 * console.log(content.rawContent);
-	 * ```
-	 */
-	extractContent(url: string): Promise<ExtractedContent>;
-
-	/**
 	 * Check if search service is configured and available.
 	 */
 	isConfigured(): boolean;
-
-	/**
-	 * Check if local content extraction is configured.
-	 * When true, content is extracted locally instead of via API.
-	 */
-	isLocalExtractionConfigured(): boolean;
 }

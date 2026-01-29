@@ -1,54 +1,73 @@
 /**
- * Extracted content from a data source
+ * Extracted content from any URL (facade result type)
  */
-export interface DataSourceContent {
+export interface FacadeExtractedContent {
+	/** Source URL */
+	readonly url: string;
 	/** Extracted raw text/markdown content */
 	readonly rawContent: string;
+	/** Extracted images */
+	readonly images?: readonly string[];
 	/** Optional metadata about the content */
 	readonly metadata?: Record<string, unknown>;
 }
 
 /**
+ * Content extraction options for the facade.
+ *
+ * Note: This is separate from ContentExtractionOptions in the plugin interface,
+ * which is used when calling plugin.extract() directly.
+ */
+export interface FacadeExtractionOptions {
+	/** Override the default content extractor plugin */
+	readonly providerOverride?: string;
+	/** Include images in extraction */
+	readonly includeImages?: boolean;
+	/** Include links in extraction */
+	readonly includeLinks?: boolean;
+}
+
+/**
  * Content Extractor Facade interface for pipeline steps.
  *
- * Provides specialized content extraction from various data sources.
- * Data source plugins (Notion, Google Docs, etc.) are resolved through
- * the plugin system.
+ * Provides unified content extraction from any URL.
+ * Routes to appropriate plugin based on URL pattern or user selection.
+ *
+ * Resolution order:
+ * 1. Explicit provider override
+ * 2. Non-system extractors (Tavily Extract, Firecrawl)
+ * 3. System/default extractor (local-content-extractor)
  */
 export interface IContentExtractorFacade {
 	/**
-	 * Extract content from a URL using the appropriate data source plugin.
+	 * Extract content from a URL.
 	 *
-	 * The facade will determine which data source plugin handles the URL
-	 * based on the URL pattern (e.g., notion.so → Notion plugin).
+	 * Resolution order:
+	 * 1. Explicit provider override (if specified in options)
+	 * 2. Non-system extractors (Tavily, Firecrawl)
+	 * 3. System/default extractor (local-content-extractor)
 	 *
 	 * @param url - URL to extract content from
-	 * @returns Extracted content or null if no plugin can handle the URL
+	 * @param options - Optional extraction configuration
+	 * @returns Extracted content or null if extraction fails
 	 *
 	 * @example
 	 * ```typescript
-	 * // Notion URL → handled by Notion data source plugin
-	 * const content = await extractor.extractContent('https://notion.so/page-id');
+	 * // Uses default resolution (prefers non-system extractors)
+	 * const content = await extractor.extractContent('https://example.com');
 	 *
-	 * // Google Docs URL → handled by Google Docs data source plugin
-	 * const content = await extractor.extractContent('https://docs.google.com/...');
+	 * // Force specific extractor
+	 * const content = await extractor.extractContent('https://example.com', {
+	 *     providerOverride: 'local-content-extractor'
+	 * });
 	 * ```
 	 */
-	extractContent(url: string): Promise<DataSourceContent | null>;
+	extractContent(url: string, options?: FacadeExtractionOptions): Promise<FacadeExtractedContent | null>;
 
 	/**
-	 * Check if any data source plugin can handle the given URL.
+	 * Check if content extraction is configured and available.
 	 *
-	 * @param url - URL to check
-	 * @returns true if a data source plugin is available for this URL
+	 * @returns true if any content extractor plugin is enabled
 	 */
-	canHandle(url: string): boolean;
-
-	/**
-	 * Check if content extraction is configured for the given URL type.
-	 *
-	 * @param url - URL to check
-	 * @returns true if the data source plugin is properly configured
-	 */
-	isConfigured(url: string): boolean;
+	isConfigured(): boolean;
 }

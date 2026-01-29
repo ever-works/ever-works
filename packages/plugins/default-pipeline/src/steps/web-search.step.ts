@@ -9,8 +9,8 @@ import type {
  * Web Search Step
  *
  * Executes search queries and retrieves web page content.
- * Uses the SearchFacade for web search and content extraction,
- * and ContentExtractorFacade for specialized extraction (Notion, etc.).
+ * Uses the SearchFacade for web search and ContentExtractorFacade
+ * for all content extraction (unified facade).
  */
 export class WebSearchStep implements IBuiltInStepExecutor {
 	readonly name = 'Web Search';
@@ -30,7 +30,6 @@ export class WebSearchStep implements IBuiltInStepExecutor {
 				directory.slug,
 				extractedUrls,
 				processedSourceUrls,
-				searchFacade,
 				contentExtractorFacade,
 				logger
 			);
@@ -44,6 +43,7 @@ export class WebSearchStep implements IBuiltInStepExecutor {
 			processedSourceUrls,
 			config,
 			searchFacade,
+			contentExtractorFacade,
 			logger
 		);
 
@@ -73,6 +73,7 @@ export class WebSearchStep implements IBuiltInStepExecutor {
 		processedSourceUrls: Set<string>,
 		config: Record<string, unknown>,
 		searchFacade: StepExecutionContext['searchFacade'],
+		contentExtractorFacade: StepExecutionContext['contentExtractorFacade'],
 		logger: StepExecutionContext['logger']
 	): Promise<WebPageData[]> {
 		const allFetchedPages: WebPageData[] = [];
@@ -146,14 +147,18 @@ export class WebSearchStep implements IBuiltInStepExecutor {
 
 			const extractionPromises = batch.map(async ({ url, query }) => {
 				try {
-					const response = await searchFacade.extractContent(url);
+					// Use ContentExtractorFacade for all content extraction
+					const response = await contentExtractorFacade.extractContent(url);
 
-					if (!response.rawContent) {
+					if (!response?.rawContent) {
 						logger.warn(
 							`[${slug}] Skipping document with missing extraction results for query "${query}". URL: ${url}`
 						);
 						return null;
 					}
+
+					// Mark URL as processed
+					processedSourceUrls.add(url);
 
 					return {
 						source_url: url,
@@ -186,137 +191,71 @@ export class WebSearchStep implements IBuiltInStepExecutor {
 	}
 
 	/**
-	 * Retrieve web pages from specific URLs
+	 * Retrieve web pages from specific URLs.
+	 *
+	 * Uses ContentExtractorFacade for all content extraction (unified facade).
+	 * The facade internally handles routing to the appropriate plugin.
 	 */
 	private async retrieveSpecificUrls(
 		slug: string,
 		urls: string[],
 		processedSourceUrls: Set<string>,
-		searchFacade: StepExecutionContext['searchFacade'],
 		contentExtractorFacade: StepExecutionContext['contentExtractorFacade'],
 		logger: StepExecutionContext['logger']
 	): Promise<WebPageData[]> {
 		const dedupedUrls = [...new Set(urls)];
 		const allFetchedPages: WebPageData[] = [];
 
-		if (dedupedUrls.length === 0) {
+		// Filter out already processed URLs
+		const urlsToProcess = dedupedUrls.filter((url) => !processedSourceUrls.has(url));
+
+		if (urlsToProcess.length === 0) {
 			logger.debug(`[${slug}] All URLs have already been processed. Skipping.`);
 			return [];
 		}
 
-		// Separate URLs that can be handled by data source plugins from regular URLs
-		const dataSourceUrls: string[] = [];
-		const regularUrls: string[] = [];
+		logger.log(`[${slug}] Processing ${urlsToProcess.length} URLs`);
 
-		for (const url of dedupedUrls) {
-			if (contentExtractorFacade.canHandle(url)) {
-				dataSourceUrls.push(url);
-			} else {
-				regularUrls.push(url);
-			}
-		}
+		// Process all URLs using ContentExtractorFacade (unified content extraction)
+		for (let i = 0; i < urlsToProcess.length; i += this.BATCH_SIZE) {
+			const batch = urlsToProcess.slice(i, i + this.BATCH_SIZE);
 
-		logger.log(
-			`[${slug}] Processing ${dedupedUrls.length} URLs: ${dataSourceUrls.length} data source URLs, ${regularUrls.length} regular URLs`
-		);
-
-		// Process data source URLs (Notion, Google Docs, etc.)
-		if (dataSourceUrls.length > 0) {
-			logger.debug(`[${slug}] Processing ${dataSourceUrls.length} data source URLs`);
-
-			for (const url of dataSourceUrls) {
-				if (!contentExtractorFacade.isConfigured(url)) {
-					logger.warn(`[${slug}] Data source plugin not configured for URL: ${url}`);
-					// Fall back to regular URL processing
-					regularUrls.push(url);
-					continue;
-				}
-
+			const extractionPromises = batch.map(async (url) => {
 				try {
 					const content = await contentExtractorFacade.extractContent(url);
 
-					if (content) {
-						// Add to processed URLs set
-						processedSourceUrls.add(url);
-
-						allFetchedPages.push({
-							source_url: url,
-							raw_content: content.rawContent,
-							retrieved_at: new Date().toISOString()
-						});
-					}
-				} catch (error) {
-					logger.error(
-						`[${slug}] Error extracting content from data source URL ${url}: ${error instanceof Error ? error.message : String(error)}`
-					);
-				}
-			}
-		}
-
-		// Process regular URLs
-		if (regularUrls.length > 0) {
-			logger.debug(`[${slug}] Processing ${regularUrls.length} regular URLs`);
-			const results = await this.processUrls(slug, regularUrls, processedSourceUrls, searchFacade, logger);
-			allFetchedPages.push(...results);
-		}
-
-		logger.log(`[${slug}] Specific URL retrieval complete. Retrieved ${allFetchedPages.length} pages.`);
-
-		return allFetchedPages;
-	}
-
-	/**
-	 * Process URLs using the search facade
-	 */
-	private async processUrls(
-		slug: string,
-		urls: string[],
-		processedSourceUrls: Set<string>,
-		searchFacade: StepExecutionContext['searchFacade'],
-		logger: StepExecutionContext['logger']
-	): Promise<WebPageData[]> {
-		const allFetchedPages: WebPageData[] = [];
-
-		logger.debug(`[${slug}] Processing ${urls.length} URLs`);
-
-		for (let i = 0; i < urls.length; i += this.BATCH_SIZE) {
-			const batch = urls.slice(i, i + this.BATCH_SIZE);
-
-			const extractionPromises = batch.map(async (url: string) => {
-				try {
-					const response = await searchFacade.extractContent(url);
-
-					if (!response.rawContent) {
+					if (!content?.rawContent) {
 						logger.warn(`[${slug}] Skipping URL with missing extraction results: ${url}`);
 						return null;
 					}
 
-					// Add to processed URLs set
+					// Mark URL as processed
 					processedSourceUrls.add(url);
 
 					return {
 						source_url: url,
-						raw_content: response.rawContent,
+						raw_content: content.rawContent,
 						retrieved_at: new Date().toISOString()
-					};
+					} as WebPageData;
 				} catch (error) {
 					logger.error(
-						`[${slug}] Error fetching content from ${url}: ${error instanceof Error ? error.message : String(error)}`
+						`[${slug}] Error extracting content from ${url}: ${error instanceof Error ? error.message : String(error)}`
 					);
 					return null;
 				}
 			});
 
 			const batchResults = await Promise.all(extractionPromises);
-			const validResults: WebPageData[] = batchResults.filter((result): result is WebPageData => result !== null);
-
+			const validResults = batchResults.filter((result): result is WebPageData => result !== null);
 			allFetchedPages.push(...validResults);
 
-			// Add a small delay between batches to be polite to the API
-			if (i + this.BATCH_SIZE < urls.length) {
+			// Add a small delay between batches to be polite to APIs
+			if (i + this.BATCH_SIZE < urlsToProcess.length) {
 				await this.delay(500);
 			}
 		}
+
+		logger.log(`[${slug}] Specific URL retrieval complete. Retrieved ${allFetchedPages.length} pages.`);
 
 		return allFetchedPages;
 	}

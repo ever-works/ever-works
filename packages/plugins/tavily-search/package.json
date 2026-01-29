@@ -1,0 +1,64 @@
+{
+	"name": "@ever-works/tavily-search-plugin",
+	"version": "1.0.0",
+	"description": "Tavily Search Plugin - Web search and content extraction using Tavily API",
+	"private": true,
+	"main": "./dist/index.js",
+	"module": "./dist/index.mjs",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"import": "./dist/index.mjs",
+			"require": "./dist/index.js",
+			"types": "./dist/index.d.ts"
+		}
+	},
+	"scripts": {
+		"build": "tsup",
+		"dev": "tsup --watch",
+		"type-check": "tsc --noEmit",
+		"clean": "rm -rf dist",
+		"test": "vitest run",
+		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage"
+	},
+	"peerDependencies": {
+		"@ever-works/plugin": "workspace:*"
+	},
+	"dependencies": {
+		"@tavily/core": "^0.5.0"
+	},
+	"devDependencies": {
+		"@ever-works/plugin": "workspace:*",
+		"tsup": "^8.4.0",
+		"typescript": "^5.7.3",
+		"vitest": "^3.0.0"
+	},
+	"everworks": {
+		"plugin": {
+			"id": "tavily-search",
+			"name": "Tavily Search",
+			"version": "1.0.0",
+			"category": "search",
+			"capabilities": [
+				"search",
+				"content-extractor"
+			],
+			"description": "Web search and content extraction using Tavily API. Supports both search queries and direct URL content extraction.",
+			"autoInstall": false,
+			"systemPlugin": false,
+			"builtIn": true,
+			"envVars": [
+				{
+					"name": "TAVILY_API_KEY",
+					"required": false,
+					"secret": true,
+					"description": "Tavily API key (optional - can be set via admin/user settings)"
+				}
+			],
+			"icon": {
+				"svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"11\" cy=\"11\" r=\"8\"/><line x1=\"21\" y1=\"21\" x2=\"16.65\" y2=\"16.65\"/></svg>"
+			}
+		}
+	}
+}

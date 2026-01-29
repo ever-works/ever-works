@@ -139,6 +139,20 @@ export interface JsonSchema {
 	readonly 'x-secret'?: boolean;
 	/** Placeholder text */
 	readonly 'x-placeholder'?: string;
+
+	// Plugin settings extensions
+	/** Environment variable fallback (checked when no other setting is found) */
+	readonly 'x-envVar'?: string;
+	/** Setting scope: global, user, or directory */
+	readonly 'x-scope'?: 'global' | 'user' | 'directory';
+	/** Category for grouping settings in UI */
+	readonly 'x-category'?: string;
+	/** Whether changes require plugin restart */
+	readonly 'x-requiresRestart'?: boolean;
+	/** Whether field should be masked in UI (for secrets) */
+	readonly 'x-masked'?: boolean;
+	/** Whether field should be write-only (not readable after set) */
+	readonly 'x-writeOnly'?: boolean;
 }
 
 /**

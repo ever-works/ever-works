@@ -1,0 +1,60 @@
+{
+	"name": "@ever-works/local-content-extractor-plugin",
+	"version": "1.0.0",
+	"description": "Local Content Extractor - System plugin for extracting web page content using axios + Readability",
+	"private": true,
+	"main": "./dist/index.js",
+	"module": "./dist/index.mjs",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"import": "./dist/index.mjs",
+			"require": "./dist/index.js",
+			"types": "./dist/index.d.ts"
+		}
+	},
+	"scripts": {
+		"build": "tsup",
+		"dev": "tsup --watch",
+		"type-check": "tsc --noEmit",
+		"clean": "rm -rf dist",
+		"test": "vitest run",
+		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage"
+	},
+	"peerDependencies": {
+		"@ever-works/plugin": "workspace:*"
+	},
+	"dependencies": {
+		"@mozilla/readability": "^0.6.0",
+		"axios": "^1.13.4",
+		"linkedom": "^0.18.0",
+		"turndown": "^7.2.2"
+	},
+	"devDependencies": {
+		"@ever-works/plugin": "workspace:*",
+		"@types/turndown": "^5.0.5",
+		"tsup": "^8.4.0",
+		"typescript": "^5.7.3",
+		"vitest": "^3.0.0"
+	},
+	"everworks": {
+		"plugin": {
+			"id": "local-content-extractor",
+			"name": "Local Content Extractor",
+			"version": "1.0.0",
+			"category": "content-extractor",
+			"capabilities": [
+				"content-extractor"
+			],
+			"description": "System plugin for extracting web page content using axios + Readability. Provides fallback content extraction without requiring external API keys.",
+			"autoInstall": true,
+			"systemPlugin": true,
+			"builtIn": true,
+			"isDefault": true,
+			"icon": {
+				"svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z\"/><polyline points=\"14 2 14 8 20 8\"/><line x1=\"16\" y1=\"13\" x2=\"8\" y2=\"13\"/><line x1=\"16\" y1=\"17\" x2=\"8\" y2=\"17\"/><polyline points=\"10 9 9 9 8 9\"/></svg>"
+			}
+		}
+	}
+}

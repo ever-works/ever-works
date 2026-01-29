@@ -45,7 +45,7 @@ export class MarkdownGenerationStep implements IBuiltInStepExecutor {
 
 	async run(context: MutableGenerationContext, execContext: StepExecutionContext): Promise<MutableGenerationContext> {
 		const { directory, finalItems, contentCache, metrics } = context;
-		const { logger, aiFacade, searchFacade } = execContext;
+		const { logger, aiFacade, contentExtractorFacade } = execContext;
 
 		if (!finalItems || finalItems.length === 0) {
 			return context;
@@ -59,7 +59,7 @@ export class MarkdownGenerationStep implements IBuiltInStepExecutor {
 			metrics,
 			logger,
 			aiFacade,
-			searchFacade
+			contentExtractorFacade
 		);
 
 		context.finalItems = itemsWithMarkdown;
@@ -75,7 +75,7 @@ export class MarkdownGenerationStep implements IBuiltInStepExecutor {
 		metrics: PipelineMetrics,
 		logger: StepExecutionContext['logger'],
 		aiFacade: StepExecutionContext['aiFacade'],
-		searchFacade: StepExecutionContext['searchFacade']
+		contentExtractorFacade: StepExecutionContext['contentExtractorFacade']
 	): Promise<MutableItemData[]> {
 		if (!items || items.length === 0) {
 			return [];
@@ -94,7 +94,7 @@ export class MarkdownGenerationStep implements IBuiltInStepExecutor {
 					metrics,
 					logger,
 					aiFacade,
-					searchFacade
+					contentExtractorFacade
 				);
 				return {
 					...item,
@@ -122,7 +122,7 @@ export class MarkdownGenerationStep implements IBuiltInStepExecutor {
 		metrics: PipelineMetrics,
 		logger: StepExecutionContext['logger'],
 		aiFacade: StepExecutionContext['aiFacade'],
-		searchFacade: StepExecutionContext['searchFacade']
+		contentExtractorFacade: StepExecutionContext['contentExtractorFacade']
 	): Promise<string> {
 		if (!item || !item.source_url) {
 			logger.warn(`Cannot generate markdown: Missing item or source URL`);
@@ -135,7 +135,7 @@ export class MarkdownGenerationStep implements IBuiltInStepExecutor {
 
 			if (!rawContent) {
 				// Fall back to fetching if not in cache
-				const content = await this.extractContentFrom(item.source_url, logger, searchFacade);
+				const content = await this.extractContentFrom(item.source_url, logger, contentExtractorFacade);
 				rawContent = content?.rawContent;
 			}
 
@@ -176,16 +176,16 @@ export class MarkdownGenerationStep implements IBuiltInStepExecutor {
 	}
 
 	/**
-	 * Extracts content from a URL using the search facade
+	 * Extracts content from a URL using the content extractor facade
 	 */
 	private async extractContentFrom(
 		url: string,
 		logger: StepExecutionContext['logger'],
-		searchFacade: StepExecutionContext['searchFacade']
+		contentExtractorFacade: StepExecutionContext['contentExtractorFacade']
 	): Promise<{ rawContent: string } | null> {
 		try {
-			const content = await searchFacade.extractContent(url);
-			return { rawContent: content.rawContent };
+			const content = await contentExtractorFacade.extractContent(url);
+			return content ? { rawContent: content.rawContent } : null;
 		} catch (error) {
 			logger.error(`Error extracting content from ${url}: ${getErrorMessage(error)}`);
 			return null;

@@ -43,5 +43,10 @@ export {
 export {
     ContentExtractorFacadeService,
     ContentExtractorFacadeError,
-    type ContentExtractorFacadeOptions,
+    NoContentExtractorProviderError,
+    ContentExtractorProviderNotFoundError,
+    type ExtendedFacadeExtractionOptions,
 } from './content-extractor.facade';
+
+// Re-export facade types from plugin for convenience
+export type { FacadeExtractionOptions, FacadeExtractedContent } from '@ever-works/plugin';

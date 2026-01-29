@@ -773,6 +773,56 @@ importers:
         specifier: ^3.0.0
         version: 3.2.4(@types/node@25.0.3)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.44.1)(yaml@2.8.2)
 
+  packages/plugins/local-content-extractor:
+    dependencies:
+      '@mozilla/readability':
+        specifier: ^0.6.0
+        version: 0.6.0
+      axios:
+        specifier: ^1.13.4
+        version: 1.13.4
+      linkedom:
+        specifier: ^0.18.0
+        version: 0.18.12
+      turndown:
+        specifier: ^7.2.2
+        version: 7.2.2
+    devDependencies:
+      '@ever-works/plugin':
+        specifier: workspace:*
+        version: link:../../plugin
+      '@types/turndown':
+        specifier: ^5.0.5
+        version: 5.0.6
+      tsup:
+        specifier: ^8.4.0
+        version: 8.5.1(@swc/core@1.15.8(@swc/helpers@0.5.18))(jiti@2.6.1)(postcss@8.5.6)(typescript@5.9.3)(yaml@2.8.2)
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.4(@types/node@25.0.3)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.44.1)(yaml@2.8.2)
+
+  packages/plugins/tavily-search:
+    dependencies:
+      '@tavily/core':
+        specifier: ^0.5.0
+        version: 0.5.14
+    devDependencies:
+      '@ever-works/plugin':
+        specifier: workspace:*
+        version: link:../../plugin
+      tsup:
+        specifier: ^8.4.0
+        version: 8.5.1(@swc/core@1.15.8(@swc/helpers@0.5.18))(jiti@2.6.1)(postcss@8.5.6)(typescript@5.9.3)(yaml@2.8.2)
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.4(@types/node@25.0.3)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.44.1)(yaml@2.8.2)
+
   packages/tasks:
     dependencies:
       '@nestjs/cache-manager':
@@ -3623,6 +3673,9 @@ packages:
   '@tavily/core@0.3.7':
     resolution: {integrity: sha512-WnEeWfXGajam+uyWMf7qtEAKnitYWy9Bb6OFPtCEeT1GyXMqvpUd+4itssGnDt6RLFHv23erlt6MyPXKMD8CPA==}
 
+  '@tavily/core@0.5.14':
+    resolution: {integrity: sha512-4TO9J8Yyn/908aeVI0IdGP2VTg1XPXylVp2kVpAJbtr0P6Ftou1qChHLSK1oG/splhw+boQ0c8LpUoynVMRXpA==}
+
   '@tokenizer/inflate@0.2.7':
     resolution: {integrity: sha512-MADQgmZT1eKjp06jpI2yozxaU9uVs4GzzgSL+uEq7bVcJ9V1ZXQkeGNql1fsSI0gMy1vhvNTNbUqrx+pZfJVmg==}
     engines: {node: '>=18'}
@@ -3854,6 +3907,9 @@ packages:
 
   '@types/through@0.0.33':
     resolution: {integrity: sha512-HsJ+z3QuETzP3cswwtzt2vEIiHBk/dCcHGhbmG5X3ecnwFD/lPrMpliGXxSCg03L9AhrdwA4Oz/qfspkDW+xGQ==}
+
+  '@types/turndown@5.0.6':
+    resolution: {integrity: sha512-ru00MoyeeouE5BX4gRL+6m/BsDfbRayOskWqUvh7CLGW+UXxHQItqALa38kKnOiZPqJrtzJUgAC2+F0rL1S4Pg==}
 
   '@types/unist@3.0.3':
     resolution: {integrity: sha512-ko/gIFJRv177XgZsZcBwnqJN5x/Gien8qNOn0D5bQU/zAzVf9Zt3BlcUiLqhV9y4ARk0GbT3tnUiPNgnTXzc/Q==}
@@ -4296,6 +4352,9 @@ packages:
 
   axios@1.13.2:
     resolution: {integrity: sha512-VPk9ebNqPcy5lRGuSlKx752IlDatOjT9paPlm8A7yOuW2Fbvp4X3JznJtT4f0GzGLLiWE9W8onz51SqLYwzGaA==}
+
+  axios@1.13.4:
+    resolution: {integrity: sha512-1wVkUaAO6WyaYtCkcYCOx12ZgpGf9Zif+qXa4n+oYzK558YryKqiL6UWwd5DqiH3VRW0GYhTZQ/vlgJrCoNQlg==}
 
   b4a@1.7.3:
     resolution: {integrity: sha512-5Q2mfq2WfGuFp3uS//0s6baOJLMoVduPYVeNmDYxu5OUA1/cBfvr2RIS7vi62LdNj/urk1hfmj867I3qt6uZ7Q==}
@@ -11875,6 +11934,15 @@ snapshots:
       - debug
       - supports-color
 
+  '@tavily/core@0.5.14':
+    dependencies:
+      axios: 1.13.4
+      https-proxy-agent: 7.0.6
+      js-tiktoken: 1.0.21
+    transitivePeerDependencies:
+      - debug
+      - supports-color
+
   '@tokenizer/inflate@0.2.7':
     dependencies:
       debug: 4.4.3
@@ -12220,6 +12288,8 @@ snapshots:
   '@types/through@0.0.33':
     dependencies:
       '@types/node': 22.19.3
+
+  '@types/turndown@5.0.6': {}
 
   '@types/unist@3.0.3': {}
 
@@ -12765,6 +12835,14 @@ snapshots:
   aws-ssl-profiles@1.1.2: {}
 
   axios@1.13.2:
+    dependencies:
+      follow-redirects: 1.15.11
+      form-data: 4.0.5
+      proxy-from-env: 1.1.0
+    transitivePeerDependencies:
+      - debug
+
+  axios@1.13.4:
     dependencies:
       follow-redirects: 1.15.11
       form-data: 4.0.5

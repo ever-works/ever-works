@@ -61,7 +61,7 @@ export class SourceValidationStep implements IBuiltInStepExecutor {
 
 	async run(context: MutableGenerationContext, execContext: StepExecutionContext): Promise<MutableGenerationContext> {
 		const { directory, finalItems, metrics, subject, advancedPrompts } = context;
-		const { logger, aiFacade, searchFacade } = execContext;
+		const { logger, aiFacade, searchFacade, contentExtractorFacade } = execContext;
 
 		logger.log(`[${directory.slug}] Validating source URLs for ${finalItems.length} items`);
 
@@ -72,7 +72,8 @@ export class SourceValidationStep implements IBuiltInStepExecutor {
 			advancedPrompts?.sourceValidation,
 			logger,
 			aiFacade,
-			searchFacade
+			searchFacade,
+			contentExtractorFacade
 		);
 
 		context.finalItems = validatedItems;
@@ -87,7 +88,8 @@ export class SourceValidationStep implements IBuiltInStepExecutor {
 		customPrompt: string | null | undefined,
 		logger: StepExecutionContext['logger'],
 		aiFacade: StepExecutionContext['aiFacade'],
-		searchFacade: StepExecutionContext['searchFacade']
+		searchFacade: StepExecutionContext['searchFacade'],
+		contentExtractorFacade: StepExecutionContext['contentExtractorFacade']
 	): Promise<MutableItemData[]> {
 		if (!items || items.length === 0) {
 			return [];
@@ -108,7 +110,8 @@ export class SourceValidationStep implements IBuiltInStepExecutor {
 						customPrompt,
 						logger,
 						aiFacade,
-						searchFacade
+						searchFacade,
+						contentExtractorFacade
 					)
 						.then((validatedSourceUrl) => {
 							if (validatedSourceUrl) {
@@ -148,7 +151,8 @@ export class SourceValidationStep implements IBuiltInStepExecutor {
 		customPrompt: string | null | undefined,
 		logger: StepExecutionContext['logger'],
 		aiFacade: StepExecutionContext['aiFacade'],
-		searchFacade: StepExecutionContext['searchFacade']
+		searchFacade: StepExecutionContext['searchFacade'],
+		contentExtractorFacade: StepExecutionContext['contentExtractorFacade']
 	): Promise<string | undefined> {
 		const sourceUrl = currentItem.source_url;
 		const itemName = currentItem.name;
@@ -253,7 +257,7 @@ export class SourceValidationStep implements IBuiltInStepExecutor {
 					metrics,
 					customPrompt,
 					aiFacade,
-					searchFacade
+					contentExtractorFacade
 				);
 				return { url, aiValidation };
 			});
@@ -302,7 +306,7 @@ export class SourceValidationStep implements IBuiltInStepExecutor {
 		metrics: PipelineMetrics,
 		customPrompt: string | null | undefined,
 		aiFacade: StepExecutionContext['aiFacade'],
-		searchFacade: StepExecutionContext['searchFacade']
+		contentExtractorFacade: StepExecutionContext['contentExtractorFacade']
 	): Promise<{ isOfficial: boolean; confidence: number; reasoning: string } | null> {
 		if (!aiFacade.isConfigured()) {
 			return null;
@@ -311,8 +315,8 @@ export class SourceValidationStep implements IBuiltInStepExecutor {
 		try {
 			let pageContent = '';
 			try {
-				const extractedContent = await searchFacade.extractContent(candidateUrl);
-				pageContent = extractedContent.rawContent || '';
+				const extractedContent = await contentExtractorFacade.extractContent(candidateUrl);
+				pageContent = extractedContent?.rawContent || '';
 			} catch {
 				// Continue with empty content - AI can still analyze the URL structure
 			}
