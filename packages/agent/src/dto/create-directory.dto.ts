@@ -9,6 +9,7 @@ import {
     Matches,
     MaxLength,
 } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { MarkdownReadmeConfig } from '../entities/directory.entity';
 import { sanitizeName, sanitizeDescription, sanitizeText } from '../utils/sanitize.util';
 
@@ -17,6 +18,7 @@ export enum RepoProvider {
 }
 
 export class MarkdownReadmeConfigDto implements MarkdownReadmeConfig {
+    @ApiPropertyOptional({ description: 'Custom header content for the README' })
     @IsOptional()
     @IsString()
     @Transform(({ value }) =>
@@ -26,10 +28,12 @@ export class MarkdownReadmeConfigDto implements MarkdownReadmeConfig {
     )
     header?: string;
 
+    @ApiPropertyOptional({ description: 'Whether to replace the default header entirely', default: false })
     @IsOptional()
     @IsBoolean()
     overwriteDefaultHeader?: boolean;
 
+    @ApiPropertyOptional({ description: 'Custom footer content for the README' })
     @IsOptional()
     @IsString()
     @Transform(({ value }) =>
@@ -39,12 +43,17 @@ export class MarkdownReadmeConfigDto implements MarkdownReadmeConfig {
     )
     footer?: string;
 
+    @ApiPropertyOptional({ description: 'Whether to replace the default footer entirely', default: false })
     @IsOptional()
     @IsBoolean()
     overwriteDefaultFooter?: boolean;
 }
 
 export class CreateDirectoryDto {
+    @ApiProperty({
+        description: 'URL-friendly identifier (lowercase letters, numbers, hyphens only)',
+        example: 'my-awesome-directory',
+    })
     @IsString()
     @IsNotEmpty()
     @Matches(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, {
@@ -53,30 +62,40 @@ export class CreateDirectoryDto {
     @Transform(({ value }) => (typeof value === 'string' ? value.trim().toLowerCase() : value))
     slug: string;
 
+    @ApiProperty({ description: 'Display name for the directory', example: 'My Awesome Directory', maxLength: 100 })
     @IsString()
     @IsNotEmpty()
     @MaxLength(100)
     @Transform(({ value }) => (typeof value === 'string' ? sanitizeName(value, 100) : value))
     name: string;
 
+    @ApiProperty({
+        description: 'Brief description of the directory',
+        example: 'A curated list of awesome tools and resources',
+        maxLength: 500,
+    })
     @IsString()
     @IsNotEmpty()
     @MaxLength(500)
     @Transform(({ value }) => (typeof value === 'string' ? sanitizeDescription(value, 500) : value))
     description: string;
 
+    @ApiPropertyOptional({ description: 'GitHub username or organization for repository ownership' })
     @IsOptional()
     @IsString()
     @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
     owner?: string;
 
+    @ApiProperty({ description: 'Whether the owner is a GitHub organization', example: false })
     @IsBoolean()
     organization: boolean;
 
+    @ApiPropertyOptional({ description: 'Repository provider', enum: RepoProvider, default: RepoProvider.GITHUB })
     @IsEnum(RepoProvider)
     @IsOptional()
     repoProvider: RepoProvider = RepoProvider.GITHUB;
 
+    @ApiPropertyOptional({ description: 'Custom README configuration', type: MarkdownReadmeConfigDto })
     @IsOptional()
     @ValidateNested()
     @Type(() => MarkdownReadmeConfigDto)

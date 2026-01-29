@@ -19,6 +19,8 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { pageIntervalRefresh } from '@/lib/utils';
 import { VercelTeamSelectionDialog } from './VercelTeamSelectionDialog';
+import { DeployConfigDialog, type DeployConfigData } from './DeployConfigDialog';
+import { updateWebsiteSettings } from '@/app/actions/dashboard/directories';
 import { formatDistanceToNow } from 'date-fns';
 
 interface DeployFormProps {
@@ -30,8 +32,10 @@ export function DeployForm({ directory, isDeploying }: DeployFormProps) {
     const t = useTranslations('dashboard.directoryDetail.deploy');
     const [isPending, startTransition] = useTransition();
     const router = useRouter();
+    const [isConfigDialogOpen, setIsConfigDialogOpen] = useState(false);
     const [isTeamDialogOpen, setIsTeamDialogOpen] = useState(false);
     const [vercelTeams, setVercelTeams] = useState<VercelTeam[]>([]);
+    const [pendingTeamScope, setPendingTeamScope] = useState<string | undefined>();
 
     const hasVercelTeams = vercelTeams.length > 0;
     const setHasCheckedExisting = useRef(false);
@@ -90,12 +94,48 @@ export function DeployForm({ directory, isDeploying }: DeployFormProps) {
             return;
         }
 
-        if (!hasVercelTeams) {
-            runDeploy();
-            return;
-        }
+        // Show config dialog first
+        setIsConfigDialogOpen(true);
+    };
 
-        setIsTeamDialogOpen(true);
+    const handleConfigConfirm = async (settings: DeployConfigData | null) => {
+        setIsConfigDialogOpen(false);
+
+        // Save settings if provided (user clicked "Save & Deploy")
+        if (settings) {
+            startTransition(async () => {
+                try {
+                    const result = await updateWebsiteSettings(directory.id, {
+                        company_name: settings.company_name,
+                        ...settings.settings,
+                        custom_menu: settings.custom_menu,
+                    });
+
+                    if (!result.success) {
+                        toast.error(result.error || 'Failed to save settings');
+                        return;
+                    }
+                } catch (error) {
+                    console.error('Failed to save settings:', error);
+                    toast.error('Failed to save settings before deployment');
+                    return;
+                }
+
+                // Proceed to team selection or direct deploy
+                proceedToDeploy();
+            });
+        } else {
+            // User clicked "Skip & Deploy" - proceed without saving
+            proceedToDeploy();
+        }
+    };
+
+    const proceedToDeploy = () => {
+        if (hasVercelTeams) {
+            setIsTeamDialogOpen(true);
+        } else {
+            runDeploy();
+        }
     };
 
     const handleConfirmDeploy = (teamScope: string) => {
@@ -105,6 +145,14 @@ export function DeployForm({ directory, isDeploying }: DeployFormProps) {
 
     return (
         <div className="space-y-6">
+            <DeployConfigDialog
+                open={isConfigDialogOpen}
+                directoryId={directory.id}
+                isSubmitting={isPending || isDeploying}
+                onConfirm={handleConfigConfirm}
+                onCancel={() => setIsConfigDialogOpen(false)}
+            />
+
             <VercelTeamSelectionDialog
                 open={isTeamDialogOpen}
                 teams={vercelTeams}

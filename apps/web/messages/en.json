@@ -1072,6 +1072,91 @@
                             "placeholder": "e.g., Prefer official project websites over third-party reviews..."
                         }
                     }
+                },
+                "websiteConfig": {
+                    "title": "Website Configuration",
+                    "subtitle": "Customize how your directory website looks and behaves",
+                    "loadFailed": "Failed to load website settings",
+                    "saveSuccess": "Website settings saved successfully",
+                    "saveFailed": "Failed to save website settings",
+                    "save": "Save Settings",
+                    "sections": {
+                        "siteName": {
+                            "title": "Site Identity",
+                            "label": "Site Name",
+                            "placeholder": "My Directory",
+                            "helper": "The name displayed on your website header and browser tab"
+                        },
+                        "global": {
+                            "title": "Global Features",
+                            "categories": "Categories",
+                            "categoriesHelper": "Show category filtering and navigation",
+                            "tags": "Tags",
+                            "tagsHelper": "Show tag filtering and navigation",
+                            "companies": "Companies",
+                            "companiesHelper": "Show company information for items",
+                            "surveys": "Surveys",
+                            "surveysHelper": "Enable survey functionality"
+                        },
+                        "header": {
+                            "title": "Header Settings",
+                            "submit": "Submit Button",
+                            "submitHelper": "Show the submit item button in header",
+                            "pricing": "Pricing Link",
+                            "pricingHelper": "Show pricing link in header navigation",
+                            "layoutSelector": "Layout Selector",
+                            "layoutSelectorHelper": "Allow users to switch between layouts",
+                            "languageSelector": "Language Selector",
+                            "languageSelectorHelper": "Allow users to change language",
+                            "themeSelector": "Theme Selector",
+                            "themeSelectorHelper": "Allow users to switch between themes",
+                            "defaultLayout": "Default Layout",
+                            "defaultTheme": "Default Theme",
+                            "themeLight": "Light",
+                            "themeDark": "Dark",
+                            "themeSystem": "System",
+                            "defaultPagination": "Default Pagination",
+                            "paginationStandard": "Standard",
+                            "paginationInfinite": "Infinite Scroll",
+                            "paginationLoadMore": "Load More"
+                        },
+                        "homepage": {
+                            "title": "Homepage Settings",
+                            "hero": "Hero Section",
+                            "heroHelper": "Show the hero section with title and description",
+                            "search": "Search Bar",
+                            "searchHelper": "Show the search bar on homepage",
+                            "defaultView": "Default View",
+                            "viewClassic": "Classic",
+                            "viewGrid": "Grid",
+                            "viewList": "List",
+                            "defaultSort": "Default Sort",
+                            "sortPopularity": "Popularity",
+                            "sortNewest": "Newest",
+                            "sortAlphabetical": "Alphabetical"
+                        },
+                        "footer": {
+                            "title": "Footer Settings",
+                            "subscribe": "Newsletter Subscribe",
+                            "subscribeHelper": "Show newsletter subscription form",
+                            "version": "Version Display",
+                            "versionHelper": "Show version information in footer",
+                            "themeSelector": "Footer Theme Selector",
+                            "themeSelectorHelper": "Show theme toggle in footer"
+                        },
+                        "customMenu": {
+                            "title": "Custom Menu Links",
+                            "description": "Add custom links to your website header and footer navigation",
+                            "headerLinks": "Header Links",
+                            "footerLinks": "Footer Links",
+                            "addLink": "Add Link",
+                            "noLinks": "No custom links added",
+                            "labelPlaceholder": "Link label",
+                            "pathPlaceholder": "/about or https://...",
+                            "targetSelf": "Same tab",
+                            "targetBlank": "New tab"
+                        }
+                    }
                 }
             },
             "deploy": {
@@ -1143,6 +1228,19 @@
                         "updateSuccess": "Settings updated successfully",
                         "updateFailed": "Failed to update settings",
                         "githubRequired": "GitHub connection required. Please connect your GitHub account in Settings to enable automatic updates."
+                    },
+                    "configDialog": {
+                        "title": "Configure Before Deploy",
+                        "description": "Review and customize your website settings before deployment",
+                        "siteName": "Site Name",
+                        "siteNamePlaceholder": "My Directory",
+                        "siteNameHelper": "The name displayed on your website (default: Acme)",
+                        "advancedSettings": "Advanced Settings",
+                        "advancedSettingsDescription": "Configure additional website options",
+                        "loadFailed": "Failed to load current settings",
+                        "saveAndDeploy": "Save & Deploy",
+                        "skipAndDeploy": "Skip & Deploy",
+                        "cancel": "Cancel"
                     }
                 }
             }

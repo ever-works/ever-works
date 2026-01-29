@@ -1,4 +1,5 @@
 import { BadRequestException, Body, Controller, Param, Post, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { BatchDeployService, DeployVercelDto, VercelService } from '@packages/agent/deploy';
 import { DirectoryOwnershipService } from '@packages/agent/services';
 import { AuthService, CurrentUser, JwtAuthGuard } from '../auth';
@@ -7,6 +8,8 @@ import { VercelDeploymentVerifierService } from './tasks/vercel-deployment-verif
 import { VercelTokenDto } from './dto/deploy.dto';
 import { BatchDeployResponseDto, BatchDeployVercelDto } from './dto/batch-deploy.dto';
 
+@ApiTags('Deploy')
+@ApiBearerAuth('JWT-auth')
 @Controller('api/deploy')
 @UseGuards(JwtAuthGuard)
 export class DeployController {
@@ -19,6 +22,10 @@ export class DeployController {
     ) {}
 
     @Post('/directories/:id/vercel')
+    @ApiOperation({ summary: 'Deploy to Vercel', description: 'Deploy a directory website to Vercel' })
+    @ApiParam({ name: 'id', description: 'Directory ID' })
+    @ApiResponse({ status: 200, description: 'Deployment started' })
+    @ApiResponse({ status: 400, description: 'Invalid Vercel token or missing configuration' })
     async toVercel(
         @CurrentUser() auth: AuthenticatedUser,
         @Body() deployVercel: DeployVercelDto,
@@ -91,6 +98,8 @@ export class DeployController {
     }
 
     @Post('/vercel/validate-token')
+    @ApiOperation({ summary: 'Validate Vercel token', description: 'Check if a Vercel API token is valid' })
+    @ApiResponse({ status: 200, description: 'Token validation result' })
     async validateToken(@Body() deployToken: VercelTokenDto) {
         const userInfo = await this.vercelService.validateToken(deployToken.token);
 

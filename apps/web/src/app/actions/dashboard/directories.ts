@@ -775,3 +775,90 @@ export async function updateAdvancedPrompts(
         };
     }
 }
+
+export async function getWebsiteSettings(directoryId: string) {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    try {
+        const response = await directoryAPI.getWebsiteSettings(directoryId);
+        return {
+            success: true,
+            data: response,
+        };
+    } catch (error) {
+        console.error('Failed to fetch website settings:', error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to fetch website settings',
+        };
+    }
+}
+
+export async function updateWebsiteSettings(
+    directoryId: string,
+    data: {
+        company_name?: string;
+        categories_enabled?: boolean;
+        companies_enabled?: boolean;
+        tags_enabled?: boolean;
+        surveys_enabled?: boolean;
+        header?: {
+            submit_enabled?: boolean;
+            pricing_enabled?: boolean;
+            layout_enabled?: boolean;
+            language_enabled?: boolean;
+            theme_enabled?: boolean;
+            layout_default?: string;
+            pagination_default?: string;
+            theme_default?: string;
+        };
+        homepage?: {
+            hero_enabled?: boolean;
+            search_enabled?: boolean;
+            default_view?: string;
+            default_sort?: string;
+        };
+        footer?: {
+            subscribe_enabled?: boolean;
+            version_enabled?: boolean;
+            theme_selector_enabled?: boolean;
+        };
+        custom_menu?: {
+            header?: Array<{
+                label: string;
+                path: string;
+                target?: '_self' | '_blank';
+                icon?: string;
+            }>;
+            footer?: Array<{
+                label: string;
+                path: string;
+                target?: '_self' | '_blank';
+                icon?: string;
+            }>;
+        };
+    },
+) {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    try {
+        await directoryAPI.updateWebsiteSettings(directoryId, data);
+        revalidatePath(`/directories/${directoryId}/settings`);
+
+        return {
+            success: true,
+        };
+    } catch (error) {
+        console.error('Failed to update website settings:', error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to update website settings',
+        };
+    }
+}

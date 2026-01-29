@@ -10,6 +10,7 @@ import {
     Put,
     UseGuards,
 } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DirectoryMemberService } from '@packages/agent/services';
 import { AuthService, CurrentUser, JwtAuthGuard } from '../auth';
@@ -19,6 +20,8 @@ import { UpdateMemberRoleDto } from './dto/update-member-role.dto';
 import { MemberInvitedEvent } from '../events';
 import { config } from '../config/constants';
 
+@ApiTags('Members')
+@ApiBearerAuth('JWT-auth')
 @Controller('api/directories/:directoryId/members')
 @UseGuards(JwtAuthGuard)
 export class MembersController {
@@ -30,6 +33,8 @@ export class MembersController {
 
     @Get()
     @HttpCode(HttpStatus.OK)
+    @ApiOperation({ summary: 'List members', description: 'Get all members of a directory' })
+    @ApiResponse({ status: 200, description: 'List of directory members' })
     async listMembers(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('directoryId') directoryId: string,
@@ -47,6 +52,8 @@ export class MembersController {
 
     @Post()
     @HttpCode(HttpStatus.CREATED)
+    @ApiOperation({ summary: 'Invite member', description: 'Invite a user to join the directory' })
+    @ApiResponse({ status: 201, description: 'Member invited successfully' })
     async inviteMember(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('directoryId') directoryId: string,
@@ -91,6 +98,8 @@ export class MembersController {
 
     @Put(':memberId')
     @HttpCode(HttpStatus.OK)
+    @ApiOperation({ summary: 'Update member role', description: 'Update the role of a directory member' })
+    @ApiResponse({ status: 200, description: 'Member role updated' })
     async updateMemberRole(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('directoryId') directoryId: string,
@@ -113,6 +122,8 @@ export class MembersController {
 
     @Delete(':memberId')
     @HttpCode(HttpStatus.OK)
+    @ApiOperation({ summary: 'Remove member', description: 'Remove a member from the directory' })
+    @ApiResponse({ status: 200, description: 'Member removed successfully' })
     async removeMember(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('directoryId') directoryId: string,
@@ -129,6 +140,8 @@ export class MembersController {
 
     @Post('leave')
     @HttpCode(HttpStatus.OK)
+    @ApiOperation({ summary: 'Leave directory', description: 'Leave a directory you are a member of' })
+    @ApiResponse({ status: 200, description: 'Successfully left the directory' })
     async leaveDirectory(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('directoryId') directoryId: string,

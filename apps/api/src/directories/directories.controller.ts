@@ -13,6 +13,7 @@ import {
     Query,
     UseGuards,
 } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger';
 import {
     CreateDirectoryDto,
     UpdateDirectoryDto,
@@ -21,6 +22,7 @@ import {
     UpdateCategoryDto,
     CreateTagDto,
     UpdateTagDto,
+    UpdateWebsiteSettingsDto,
 } from '@packages/agent/dto';
 import {
     CreateItemsGeneratorDto,
@@ -70,6 +72,8 @@ import { DirectoryScheduleStatus } from '@packages/agent/entities';
 
 let CACHE_TTL = 1000 * 60 * 10; // 10 minutes
 
+@ApiTags('Directories')
+@ApiBearerAuth('JWT-auth')
 @Controller('api')
 @UseGuards(JwtAuthGuard)
 export class DirectoriesController {
@@ -90,6 +94,11 @@ export class DirectoriesController {
 
     @Get('directories')
     @HttpCode(HttpStatus.OK)
+    @ApiOperation({ summary: 'List directories', description: 'Get all directories accessible to the authenticated user' })
+    @ApiQuery({ name: 'limit', required: false, description: 'Maximum number of results' })
+    @ApiQuery({ name: 'offset', required: false, description: 'Number of results to skip' })
+    @ApiQuery({ name: 'search', required: false, description: 'Search term to filter directories' })
+    @ApiResponse({ status: 200, description: 'List of directories' })
     async getDirectories(
         @CurrentUser() auth: AuthenticatedUser,
         @Query('limit') limit?: string,
@@ -113,6 +122,9 @@ export class DirectoriesController {
 
     @Post('directories')
     @HttpCode(HttpStatus.OK)
+    @ApiOperation({ summary: 'Create directory', description: 'Create a new directory' })
+    @ApiResponse({ status: 200, description: 'Directory created successfully' })
+    @ApiResponse({ status: 400, description: 'Invalid input data' })
     async createDirectory(
         @CurrentUser() auth: AuthenticatedUser,
         @Body() createDirectoryDto: CreateDirectoryDto,
@@ -123,6 +135,10 @@ export class DirectoriesController {
 
     @Get('directories/:id')
     @HttpCode(HttpStatus.OK)
+    @ApiOperation({ summary: 'Get directory', description: 'Get a specific directory by ID' })
+    @ApiParam({ name: 'id', description: 'Directory ID' })
+    @ApiResponse({ status: 200, description: 'Directory details' })
+    @ApiResponse({ status: 404, description: 'Directory not found' })
     async getDirectory(@CurrentUser() auth: AuthenticatedUser, @Param('id') id: string) {
         const user = await this.authService.getUser(auth.userId);
         return this.directoryQueryService.getDirectory(id, user);
@@ -167,6 +183,24 @@ export class DirectoriesController {
             },
             CACHE_TTL,
         );
+    }
+
+    @Get('directories/:id/website-settings')
+    @HttpCode(HttpStatus.OK)
+    async getWebsiteSettings(@CurrentUser() auth: AuthenticatedUser, @Param('id') id: string) {
+        const user = await this.authService.getUser(auth.userId);
+        return this.directoryQueryService.getWebsiteSettings(id, user);
+    }
+
+    @Put('directories/:id/website-settings')
+    @HttpCode(HttpStatus.OK)
+    async updateWebsiteSettings(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') id: string,
+        @Body() dto: UpdateWebsiteSettingsDto,
+    ) {
+        const user = await this.authService.getUser(auth.userId);
+        return this.directoryQueryService.updateWebsiteSettings(id, user, dto);
     }
 
     @Get('directories/:id/count')
@@ -242,6 +276,9 @@ export class DirectoriesController {
 
     @Post('directories/:id/generate')
     @HttpCode(HttpStatus.ACCEPTED)
+    @ApiOperation({ summary: 'Generate items', description: 'Start AI-powered item generation for a directory' })
+    @ApiParam({ name: 'id', description: 'Directory ID' })
+    @ApiResponse({ status: 202, description: 'Generation started' })
     async generateItems(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id') id: string,
