@@ -267,7 +267,14 @@ export class PluginsModule implements OnModuleInit, OnModuleDestroy {
             }
         }
 
-        // Auto-enable if configured
+        // Always enable system plugins (they cannot be disabled)
+        const systemResults = await this.lifecycleManager.enableSystemPlugins();
+        const systemEnabled = systemResults.filter((r) => r.success).length;
+        if (systemEnabled > 0) {
+            this.logger.log(`Auto-enabled ${systemEnabled} system plugins`);
+        }
+
+        // Auto-enable all other plugins if configured
         if (this.options.autoEnableOnLoad) {
             const enableResults = await this.lifecycleManager.enableAll();
             const enabled = enableResults.filter((r) => r.success).length;

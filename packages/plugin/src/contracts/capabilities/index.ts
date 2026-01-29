@@ -9,6 +9,7 @@ export * from './ai-provider.interface.js';
 export * from './pipeline-step.interface.js';
 export * from './full-pipeline.interface.js';
 export * from './form-field.interface.js';
+export * from './form-schema-provider.interface.js';
 export * from './sub-provider.interface.js';
 export * from './config-aware.interface.js';
 export * from './custom-capability.interface.js';

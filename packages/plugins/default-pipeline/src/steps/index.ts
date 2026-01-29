@@ -17,6 +17,7 @@ export { SearchQueryGenerationStep } from './search-query-generation.step.js';
 
 // Web Retrieval Steps (Transformed)
 export { WebSearchStep } from './web-search.step.js';
+export { ContentRetrievalStep } from './content-retrieval.step.js';
 export { ContentFilteringStep } from './content-filtering.step.js';
 export { ItemExtractionStep } from './item-extraction.step.js';
 export { DataAggregationStep } from './data-aggregation.step.js';

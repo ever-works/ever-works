@@ -293,9 +293,12 @@ export async function testPipelineStepContract(plugin: IPipelineStepPlugin): Pro
 	results.push(
 		await harness.test('getStepDefinition returns valid definition', async () => {
 			const definition = plugin.getStepDefinition();
-			harness.assert(typeof definition.id === 'string', 'definition.id must be a string');
-			harness.assert(typeof definition.name === 'string', 'definition.name must be a string');
-			harness.assert(typeof definition.position === 'object', 'definition.position must be an object');
+			harness.assert(definition !== undefined, 'definition must not be undefined');
+			if (definition) {
+				harness.assert(typeof definition.id === 'string', 'definition.id must be a string');
+				harness.assert(typeof definition.name === 'string', 'definition.name must be a string');
+				harness.assert(typeof definition.position === 'object', 'definition.position must be an object');
+			}
 		})
 	);
 

@@ -37,10 +37,7 @@ function isPipelineStepPlugin(plugin: IPlugin): plugin is IPipelineStepPlugin {
 }
 import { PipelineBuilderService } from './pipeline-builder.service';
 import { DefaultPipelinePlugin } from './default-pipeline.plugin';
-import {
-    PluginRegistryService,
-    RegisteredPlugin,
-} from '../plugins/services/plugin-registry.service';
+import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
 import { TypedGenerationContext, createGenerationContext } from './generation-context';
 import { ExecutablePipelineRunner } from './executable-pipeline.class';
 
@@ -106,6 +103,29 @@ export class StepPipelineExecutorService {
         private readonly contentExtractorFacade: ContentExtractorFacadeService,
         @Optional() @Inject(CACHE_MANAGER) private readonly cacheManager?: Cache,
     ) {}
+
+    /**
+     * Get the default pipeline plugin.
+     * Prefers the NestJS-injected plugin, falls back to registry lookup.
+     */
+    private getDefaultPipelinePlugin(): DefaultPipelinePlugin {
+        // Primary: use the NestJS-injected plugin
+        if (this.defaultPlugin) {
+            return this.defaultPlugin;
+        }
+
+        // Fallback: get from plugin registry
+        const registered = this.registry.get('default-pipeline');
+        if (registered && registered.state === 'enabled') {
+            // The registered plugin should be compatible with DefaultPipelinePlugin interface
+            return registered.plugin as unknown as DefaultPipelinePlugin;
+        }
+
+        throw new Error(
+            'Default pipeline plugin not available. ' +
+                'Ensure DefaultPipelinePlugin is provided in the module or loaded via plugin system.',
+        );
+    }
 
     /**
      * Create a StepExecutionContext for step executors.
@@ -457,7 +477,8 @@ export class StepPipelineExecutorService {
 
         if (executor.type === 'builtin') {
             // Execute via DefaultPipelinePlugin
-            await this.defaultPlugin.executeStep(step.id, context, execContext, {
+            const defaultPipeline = this.getDefaultPipelinePlugin();
+            await defaultPipeline.executeStep(step.id, context, execContext, {
                 timeout: options?.timeout,
                 signal: options?.signal,
                 settings: options?.stepSettings?.[step.id] ?? {},

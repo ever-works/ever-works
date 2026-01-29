@@ -386,6 +386,40 @@ export class PluginLifecycleManagerService {
     }
 
     /**
+     * Enable all system plugins.
+     * System plugins are plugins marked with systemPlugin: true in their manifest
+     * that should always be enabled and cannot be disabled by users.
+     */
+    async enableSystemPlugins(): Promise<LifecycleResult[]> {
+        const results: LifecycleResult[] = [];
+
+        // Get all loaded plugins
+        const loaded = this.registry.getByState('loaded');
+
+        for (const registered of loaded) {
+            // Check if it's a system plugin
+            const isSystemPlugin =
+                registered.manifest.systemPlugin ||
+                (registered.plugin as { systemPlugin?: boolean }).systemPlugin;
+
+            if (isSystemPlugin) {
+                const result = await this.enable(registered.plugin.id);
+                results.push(result);
+
+                if (result.success) {
+                    this.logger.log(`Auto-enabled system plugin: ${registered.plugin.id}`);
+                } else {
+                    this.logger.error(
+                        `Failed to auto-enable system plugin ${registered.plugin.id}: ${result.error}`,
+                    );
+                }
+            }
+        }
+
+        return results;
+    }
+
+    /**
      * Disable all enabled plugins
      */
     async disableAll(): Promise<LifecycleResult[]> {

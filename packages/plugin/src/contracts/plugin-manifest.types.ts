@@ -132,6 +132,10 @@ export interface PluginManifest {
 	readonly dependencies?: Record<string, string>;
 	/** Whether plugin is built-in */
 	readonly builtIn?: boolean;
+	/** Whether this is a system plugin that cannot be disabled by users */
+	readonly systemPlugin?: boolean;
+	/** Whether plugin should be auto-installed on first load */
+	readonly autoInstall?: boolean;
 	/** Whether plugin is deprecated */
 	readonly deprecated?: boolean;
 	/** Deprecation message */

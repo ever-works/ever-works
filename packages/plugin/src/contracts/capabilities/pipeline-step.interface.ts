@@ -41,9 +41,22 @@ export interface StepProgress {
  */
 export interface IPipelineStepPlugin extends IPlugin {
 	/**
-	 * Get the step definition
+	 * Get step definition(s).
+	 *
+	 * For single-step plugins: Call with no arguments to get the step definition.
+	 * For multi-step plugins: Call with stepId to get a specific step, or no arguments
+	 * to get the first/primary step definition.
+	 *
+	 * @param stepId - Optional step ID for multi-step plugins
+	 * @returns The step definition, or undefined if stepId not found
 	 */
-	getStepDefinition(): PipelineStepDefinition;
+	getStepDefinition(stepId?: string): PipelineStepDefinition | undefined;
+
+	/**
+	 * Get all step definitions (for multi-step plugins).
+	 * Single-step plugins should return an array with one element.
+	 */
+	getStepDefinitions?(): PipelineStepDefinition[];
 
 	/**
 	 * Execute the pipeline step

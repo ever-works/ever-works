@@ -14,7 +14,10 @@ import type {
 	IPipelineStepPlugin,
 	BuiltInStepId,
 	IBuiltInStepExecutor,
-	StepExecutionContext
+	StepExecutionContext,
+	FormFieldDefinition,
+	FormFieldGroup,
+	IFormSchemaProvider
 } from '@ever-works/plugin';
 
 // Import all step implementations
@@ -24,6 +27,7 @@ import { DomainDetectionStep } from './steps/domain-detection.step.js';
 import { AiItemGenerationStep } from './steps/ai-item-generation.step.js';
 import { SearchQueryGenerationStep } from './steps/search-query-generation.step.js';
 import { WebSearchStep } from './steps/web-search.step.js';
+import { ContentRetrievalStep } from './steps/content-retrieval.step.js';
 import { ContentFilteringStep } from './steps/content-filtering.step.js';
 import { ItemExtractionStep } from './steps/item-extraction.step.js';
 import { DataAggregationStep } from './steps/data-aggregation.step.js';
@@ -44,11 +48,9 @@ import { MarkdownGenerationStep } from './steps/markdown-generation.step.js';
  * - System plugin (cannot be disabled by users)
  * - Lowest priority (other plugins can replace or modify its steps)
  * - Owns all 15 built-in step definitions and service mappings
- *
- * NOTE: This is a standalone package, NOT a NestJS module.
- * It uses PluginContext for dependencies, not NestJS DI.
+
  */
-export class DefaultPipelinePlugin implements IPlugin, IPipelineStepPlugin {
+export class DefaultPipelinePlugin implements IPlugin, IPipelineStepPlugin, IFormSchemaProvider {
 	// ============================================================================
 	// Built-in Step Definitions (Single Source of Truth)
 	// ============================================================================
@@ -396,11 +398,16 @@ export class DefaultPipelinePlugin implements IPlugin, IPipelineStepPlugin {
 	readonly name = 'Default Pipeline';
 	readonly version = '1.0.0';
 	readonly category: PluginCategory = 'pipeline';
-	readonly capabilities: readonly string[] = ['pipeline-step'];
+	readonly capabilities: readonly string[] = ['pipeline-step', 'form-schema-provider'];
 	readonly settingsSchema: JsonSchema = {
 		type: 'object',
 		properties: {}
 	};
+
+	/**
+	 * This plugin handles ALL config fields (it's the standard pipeline)
+	 */
+	readonly handledConfigFields = ['*'] as const;
 
 	/**
 	 * Marks this as a system plugin that cannot be disabled
@@ -450,10 +457,17 @@ export class DefaultPipelinePlugin implements IPlugin, IPipelineStepPlugin {
 	// ============================================================================
 
 	/**
-	 * Get step definitions for all built-in steps
+	 * Get a specific step definition by ID.
+	 *
+	 * @param stepId - Optional step ID. If not provided, returns the first step (for backward compatibility).
+	 * @returns The step definition or undefined if not found.
+	 * @deprecated Use getStepDefinitions() to get all steps or static getBuiltInStep() for a specific step.
 	 */
-	getStepDefinition(): PipelineStepDefinition {
-		// This returns the first step - in practice, getStepDefinitions is used
+	getStepDefinition(stepId?: string): PipelineStepDefinition | undefined {
+		if (stepId) {
+			return DefaultPipelinePlugin.STEPS_MAP.get(stepId as BuiltInStepId);
+		}
+		// Backward compatibility: return first step if no ID provided
 		return DefaultPipelinePlugin.STEPS[0];
 	}
 
@@ -559,6 +573,348 @@ export class DefaultPipelinePlugin implements IPlugin, IPipelineStepPlugin {
 	}
 
 	// ============================================================================
+	// IFormSchemaProvider interface
+	// ============================================================================
+
+	/**
+	 * Get form fields for the generator form.
+	 * These fields replace the hardcoded ConfigDto fields in the frontend.
+	 */
+	getFormFields(): FormFieldDefinition[] {
+		return [
+			// === DATA SOURCES ===
+			{
+				name: 'source_urls',
+				type: 'tags',
+				label: 'Source URLs',
+				description: 'URLs to extract items from directly (bypasses search)',
+				placeholder: 'https://example.com/products',
+				group: 'sources'
+			},
+
+			// === CATEGORY HINTS ===
+			{
+				name: 'initial_categories',
+				type: 'tags',
+				label: 'Initial Categories',
+				description: 'Suggested categories for the directory',
+				group: 'categories'
+			},
+			{
+				name: 'priority_categories',
+				type: 'tags',
+				label: 'Priority Categories',
+				description: 'Categories to prioritize and show first in results',
+				group: 'categories'
+			},
+			{
+				name: 'target_keywords',
+				type: 'tags',
+				label: 'Target Keywords',
+				description: 'Keywords to guide search and extraction',
+				group: 'categories'
+			},
+
+			// === FEATURE TOGGLES ===
+			{
+				name: 'ai_first_generation_enabled',
+				type: 'boolean',
+				label: 'AI First Generation',
+				description: 'Generate initial items using AI before web search',
+				defaultValue: false,
+				group: 'features'
+			},
+			{
+				name: 'generate_categories',
+				type: 'boolean',
+				label: 'Generate Categories',
+				description: 'Automatically generate categories from content',
+				defaultValue: true,
+				group: 'features'
+			},
+			{
+				name: 'generate_tags',
+				type: 'boolean',
+				label: 'Generate Tags',
+				description: 'Automatically generate tags for items',
+				defaultValue: true,
+				group: 'features'
+			},
+			{
+				name: 'generate_brands',
+				type: 'boolean',
+				label: 'Extract Brands',
+				description: 'Extract and categorize brands from content',
+				defaultValue: true,
+				group: 'features'
+			},
+			{
+				name: 'capture_screenshots',
+				type: 'boolean',
+				label: 'Capture Screenshots',
+				description: 'Take screenshots or extract images for items',
+				defaultValue: false,
+				group: 'features'
+			},
+			{
+				name: 'badge_evaluation_enabled',
+				type: 'boolean',
+				label: 'Enable Badge Evaluation',
+				description: 'Evaluate and assign badges to items',
+				defaultValue: false,
+				group: 'features'
+			},
+
+			// === SEARCH CONFIGURATION ===
+			{
+				name: 'max_search_queries',
+				type: 'number',
+				label: 'Max Search Queries',
+				description: 'Number of search queries to generate and execute',
+				defaultValue: 10,
+				validation: { min: 1, max: 100 },
+				group: 'search'
+			},
+			{
+				name: 'max_results_per_query',
+				type: 'number',
+				label: 'Results per Query',
+				description: 'Maximum results to retrieve per search query',
+				defaultValue: 5,
+				validation: { min: 1, max: 100 },
+				group: 'search'
+			},
+			{
+				name: 'max_pages_to_process',
+				type: 'number',
+				label: 'Max Pages to Process',
+				description: 'Maximum web pages to process for content extraction',
+				defaultValue: 10,
+				validation: { min: 1, max: 1000 },
+				group: 'search'
+			},
+
+			// === VOLUME CONTROL ===
+			{
+				name: 'data_volume_mode',
+				type: 'select',
+				label: 'Data Volume',
+				description: 'Controls the amount of data processed',
+				options: [
+					{ value: 'real', label: 'Full (production)' },
+					{ value: 'sample', label: 'Sample (testing)' }
+				],
+				defaultValue: 'real',
+				group: 'volume'
+			},
+			{
+				name: 'max_items',
+				type: 'number',
+				label: 'Max Items',
+				description: 'Maximum items to generate (optional limit)',
+				validation: { min: 1, max: 1000 },
+				group: 'volume'
+			},
+
+			// === ADVANCED SETTINGS ===
+			{
+				name: 'content_filtering_enabled',
+				type: 'boolean',
+				label: 'Content Filtering',
+				description: 'Filter irrelevant content before extraction',
+				defaultValue: true,
+				group: 'advanced'
+			},
+			{
+				name: 'relevance_threshold_content',
+				type: 'number',
+				label: 'Relevance Threshold',
+				description: 'Minimum relevance score for content (0-1)',
+				defaultValue: 0.6,
+				validation: { min: 0, max: 1 },
+				showIf: { field: 'content_filtering_enabled', operator: 'eq', value: true },
+				group: 'advanced'
+			},
+			{
+				name: 'min_content_length_for_extraction',
+				type: 'number',
+				label: 'Min Content Length',
+				description: 'Minimum character length for content extraction',
+				defaultValue: 100,
+				validation: { min: 0, max: 10000 },
+				group: 'advanced'
+			},
+			{
+				name: 'prompt_comparison_confidence_threshold',
+				type: 'number',
+				label: 'Prompt Comparison Threshold',
+				description: 'Confidence threshold for prompt similarity (0-1)',
+				defaultValue: 0.5,
+				validation: { min: 0, max: 1 },
+				group: 'advanced'
+			}
+		];
+	}
+
+	/**
+	 * Get form field groups for UI organization
+	 */
+	getFormGroups(): FormFieldGroup[] {
+		return [
+			{
+				name: 'sources',
+				title: 'Data Sources',
+				description: 'Configure where to find items',
+				order: 1
+			},
+			{
+				name: 'categories',
+				title: 'Categories & Keywords',
+				description: 'Guide the categorization and search',
+				order: 2,
+				collapsible: true
+			},
+			{
+				name: 'features',
+				title: 'Generation Features',
+				description: 'Enable or disable generation features',
+				order: 3,
+				collapsible: true
+			},
+			{
+				name: 'search',
+				title: 'Search Configuration',
+				description: 'Configure web search behavior',
+				order: 4,
+				collapsible: true,
+				collapsed: true
+			},
+			{
+				name: 'volume',
+				title: 'Volume Control',
+				description: 'Control the amount of data processed',
+				order: 5,
+				collapsible: true,
+				collapsed: true
+			},
+			{
+				name: 'advanced',
+				title: 'Advanced Settings',
+				description: 'Fine-tune extraction and filtering',
+				order: 6,
+				collapsible: true,
+				collapsed: true
+			}
+		];
+	}
+
+	/**
+	 * Validate form input values for the generator form
+	 */
+	validateFormInput(values: Record<string, unknown>): ValidationResult {
+		const errors: Array<{ path: string; message: string }> = [];
+
+		// Validate numeric ranges
+		const numericFields = [
+			{ name: 'max_search_queries', min: 1, max: 100 },
+			{ name: 'max_results_per_query', min: 1, max: 100 },
+			{ name: 'max_pages_to_process', min: 1, max: 1000 },
+			{ name: 'max_items', min: 1, max: 1000 },
+			{ name: 'relevance_threshold_content', min: 0, max: 1 },
+			{ name: 'min_content_length_for_extraction', min: 0, max: 10000 },
+			{ name: 'prompt_comparison_confidence_threshold', min: 0, max: 1 }
+		];
+
+		for (const field of numericFields) {
+			const value = values[field.name];
+			if (value !== undefined && value !== null) {
+				const num = Number(value);
+				if (isNaN(num)) {
+					errors.push({
+						path: field.name,
+						message: `${field.name} must be a number`
+					});
+				} else if (num < field.min || num > field.max) {
+					errors.push({
+						path: field.name,
+						message: `${field.name} must be between ${field.min} and ${field.max}`
+					});
+				}
+			}
+		}
+
+		// Validate URL arrays
+		const urlArrayFields = ['source_urls'];
+		for (const fieldName of urlArrayFields) {
+			const value = values[fieldName];
+			if (Array.isArray(value)) {
+				for (let i = 0; i < value.length; i++) {
+					const url = value[i];
+					if (typeof url === 'string' && url.trim()) {
+						try {
+							new URL(url);
+						} catch {
+							errors.push({
+								path: `${fieldName}[${i}]`,
+								message: `Invalid URL: ${url}`
+							});
+						}
+					}
+				}
+			}
+		}
+
+		// Validate data_volume_mode
+		const volumeMode = values.data_volume_mode;
+		if (volumeMode !== undefined && !['real', 'sample'].includes(volumeMode as string)) {
+			errors.push({
+				path: 'data_volume_mode',
+				message: 'data_volume_mode must be "real" or "sample"'
+			});
+		}
+
+		return {
+			valid: errors.length === 0,
+			errors: errors.length > 0 ? errors : undefined
+		};
+	}
+
+	/**
+	 * Get default values for all form fields
+	 */
+	getDefaultValues(): Record<string, unknown> {
+		const defaults: Record<string, unknown> = {};
+		for (const field of this.getFormFields()) {
+			if (field.defaultValue !== undefined) {
+				defaults[field.name] = field.defaultValue;
+			}
+		}
+		return defaults;
+	}
+
+	/**
+	 * Transform form values before sending to the backend.
+	 * Handles case normalization and type conversion.
+	 */
+	transformFormValues(values: Record<string, unknown>): Record<string, unknown> {
+		const transformed = { ...values };
+
+		// Normalize data_volume_mode to uppercase for backend compatibility
+		if (transformed.data_volume_mode) {
+			transformed.data_volume_mode = (transformed.data_volume_mode as string).toUpperCase();
+		}
+
+		// Filter out empty arrays
+		for (const key of Object.keys(transformed)) {
+			if (Array.isArray(transformed[key]) && (transformed[key] as unknown[]).length === 0) {
+				delete transformed[key];
+			}
+		}
+
+		return transformed;
+	}
+
+	// ============================================================================
 	// IPlugin lifecycle interface
 	// ============================================================================
 
@@ -585,6 +941,7 @@ export class DefaultPipelinePlugin implements IPlugin, IPipelineStepPlugin {
 			'ai-first-items-generation': new AiItemGenerationStep(),
 			'search-queries-generation': new SearchQueryGenerationStep(),
 			'web-search': new WebSearchStep(),
+			'content-retrieval': new ContentRetrievalStep(),
 			'content-filtering': new ContentFilteringStep(),
 			'items-extraction': new ItemExtractionStep(),
 			'deduplication-and-data-aggregation': new DataAggregationStep(),
@@ -646,12 +1003,14 @@ export class DefaultPipelinePlugin implements IPlugin, IPipelineStepPlugin {
 			id: this.id,
 			name: this.name,
 			version: this.version,
-			description: 'System plugin providing the default generation pipeline',
+			description: 'System plugin providing the default generation pipeline with 15 built-in steps',
 			category: this.category,
 			capabilities: [...this.capabilities],
 			author: { name: 'Ever Works Team' },
 			license: 'MIT',
-			builtIn: true
+			builtIn: true,
+			systemPlugin: true,
+			autoInstall: true
 		};
 	}
 }
