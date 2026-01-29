@@ -122,10 +122,6 @@ export class DirectoryImportService {
         const page = dto.page || 1;
         const perPage = dto.perPage || 30;
 
-        this.logger.log(
-            `getUserRepositories called with: owner=${dto.owner}, type=${dto.type}, page=${page}`,
-        );
-
         try {
             // Define a common repo type that works with both listForAuthenticatedUser and listForOrg
             type RepoItem = {
@@ -142,7 +138,6 @@ export class DirectoryImportService {
             let repos: RepoItem[];
 
             if (dto.owner && dto.type === 'org') {
-                this.logger.log(`Fetching repos for organization: ${dto.owner}`);
                 // Fetch repos for a specific organization
                 const { data } = await octokit.rest.repos.listForOrg({
                     org: dto.owner,
@@ -153,7 +148,6 @@ export class DirectoryImportService {
                 });
                 repos = data as RepoItem[];
             } else if (dto.type === 'user') {
-                this.logger.log(`Fetching repos for personal account only (affiliation: owner)`);
                 // Fetch only repos owned by the authenticated user (personal repos)
                 const { data } = await octokit.rest.repos.listForAuthenticatedUser({
                     sort: 'updated',
@@ -164,8 +158,7 @@ export class DirectoryImportService {
                 });
                 repos = data as RepoItem[];
             } else {
-                this.logger.log(`Fetching all accessible repos (no owner filter)`);
-                // Fetch all accessible repos (current behavior)
+                // Fetch all accessible repos
                 const { data } = await octokit.rest.repos.listForAuthenticatedUser({
                     sort: 'updated',
                     direction: 'desc',
@@ -196,10 +189,6 @@ export class DirectoryImportService {
                 updated_at: repo.updated_at || new Date().toISOString(),
                 default_branch: repo.default_branch,
             }));
-
-            this.logger.log(
-                `Returning ${repositories.length} repos. Owners: ${[...new Set(repositories.map((r) => r.owner))].join(', ')}`,
-            );
 
             return {
                 repositories,

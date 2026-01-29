@@ -602,8 +602,6 @@ export async function analyzeForLinking(sourceUrl: string) {
 export async function getUserRepositories(params: GetUserRepositoriesParams = {}) {
     const t = await getTranslations('actions.directories');
 
-    console.log('[getUserRepositories] Server action called with params:', params);
-
     try {
         // We need to ensure that oauth connection is valid or revoke it if not
         await authAPI.oauth_connections.ensureConnection(RepoProvider.GITHUB);
@@ -617,14 +615,6 @@ export async function getUserRepositories(params: GetUserRepositoriesParams = {}
                 requiresGitHub: true,
             };
         }
-
-        console.log('[getUserRepositories] Calling API with:', {
-            page: params.page,
-            perPage: params.perPage,
-            search: params.search,
-            owner: params.owner,
-            type: params.type,
-        });
 
         const result = await directoryAPI.getUserRepositories({
             page: params.page,
