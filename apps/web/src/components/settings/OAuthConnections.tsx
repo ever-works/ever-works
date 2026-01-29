@@ -1,12 +1,12 @@
 'use client';
 
 import { useTransition } from 'react';
-import { connectGitHub } from '@/app/actions/dashboard/oauth';
+import { connectGitHub, reconnectGitHub } from '@/app/actions/dashboard/oauth';
 import { disconnectGitHub } from '@/app/actions/settings';
 import { toast } from 'sonner';
 import { ROUTES } from '@/lib/constants';
 import { useTranslations } from 'next-intl';
-import { ConnectionInfo } from '@/lib/api';
+import { ConnectionInfo, GitHubOrganization } from '@/lib/api';
 import Link from 'next/link';
 import Image from 'next/image';
 import { cn } from '@/lib/utils/cn';
@@ -20,9 +20,14 @@ interface OAuthConnectionsProps {
     };
     githubConnection: ConnectionInfo | null;
     googleConnection: ConnectionInfo | null;
+    organizations?: GitHubOrganization[];
 }
 
-export function OAuthConnections({ user, githubConnection }: OAuthConnectionsProps) {
+export function OAuthConnections({
+    user,
+    githubConnection,
+    organizations = [],
+}: OAuthConnectionsProps) {
     const [isPending, startTransition] = useTransition();
     const t = useTranslations('dashboard.settings.oauth');
 
@@ -33,6 +38,18 @@ export function OAuthConnections({ user, githubConnection }: OAuthConnectionsPro
     const handleGitHubConnect = () => {
         startTransition(async () => {
             const result = await connectGitHub(ROUTES.DASHBOARD_SETTINGS_OAUTH);
+
+            if (result.success && result.url) {
+                window.location.href = result.url;
+            } else {
+                toast.error(result.error || t('github.messages.connectError'));
+            }
+        });
+    };
+
+    const handleGitHubReconnect = () => {
+        startTransition(async () => {
+            const result = await reconnectGitHub(ROUTES.DASHBOARD_SETTINGS_OAUTH);
 
             if (result.success && result.url) {
                 window.location.href = result.url;
@@ -147,20 +164,53 @@ export function OAuthConnections({ user, githubConnection }: OAuthConnectionsPro
                         </div>
                     </div>
 
-                    <div>
+                    <div className="flex items-center gap-2">
                         {githubConnected ? (
-                            <button
-                                onClick={handleGitHubDisconnect}
-                                disabled={isPending}
-                                className={cn(
-                                    'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
-                                    'bg-red-500/10 text-red-600 dark:text-red-400',
-                                    'hover:bg-red-500/20',
-                                    'disabled:opacity-50 disabled:cursor-not-allowed',
-                                )}
-                            >
-                                {isPending ? 'Disconnecting...' : t('github.actions.disconnect')}
-                            </button>
+                            <>
+                                <button
+                                    onClick={handleGitHubReconnect}
+                                    disabled={isPending}
+                                    className={cn(
+                                        'px-4 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer',
+                                        'bg-surface dark:bg-surface-dark',
+                                        'text-text dark:text-text-dark',
+                                        'border border-card-border dark:border-card-border-dark',
+                                        'hover:bg-surface-hover dark:hover:bg-surface-hover-dark',
+                                        'hover:border-primary/50 hover:shadow-sm',
+                                        'disabled:opacity-50 disabled:cursor-not-allowed',
+                                        'flex items-center gap-2',
+                                    )}
+                                >
+                                    {isPending ? (
+                                        <>
+                                            <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                                            Reconnecting...
+                                        </>
+                                    ) : (
+                                        t('github.actions.reconnect')
+                                    )}
+                                </button>
+                                <button
+                                    onClick={handleGitHubDisconnect}
+                                    disabled={isPending}
+                                    className={cn(
+                                        'px-4 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer',
+                                        'bg-red-500/10 text-red-600 dark:text-red-400',
+                                        'hover:bg-red-500/20 hover:shadow-sm',
+                                        'disabled:opacity-50 disabled:cursor-not-allowed',
+                                        'flex items-center gap-2',
+                                    )}
+                                >
+                                    {isPending ? (
+                                        <>
+                                            <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                                            Disconnecting...
+                                        </>
+                                    ) : (
+                                        t('github.actions.disconnect')
+                                    )}
+                                </button>
+                            </>
                         ) : (
                             <button
                                 onClick={handleGitHubConnect}
@@ -194,6 +244,54 @@ export function OAuthConnections({ user, githubConnection }: OAuthConnectionsPro
                         )}
                     </div>
                 </div>
+
+                {/* Organizations List */}
+                {githubConnected && organizations.length > 0 && (
+                    <div className="mt-6 pt-6 border-t border-card-border dark:border-card-border-dark">
+                        <h4 className="text-sm font-medium text-text dark:text-text-dark mb-3">
+                            {t('github.organizations')}
+                        </h4>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                            {organizations.map((org) => (
+                                <Link
+                                    key={org.id}
+                                    href={`https://github.com/${org.login}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className={cn(
+                                        'flex items-center gap-3 p-3 rounded-lg',
+                                        'bg-surface dark:bg-surface-dark',
+                                        'border border-card-border dark:border-card-border-dark',
+                                        'hover:border-primary/50 transition-colors',
+                                    )}
+                                >
+                                    <div className="relative w-8 h-8 flex-shrink-0">
+                                        <Image
+                                            src={org.avatar_url}
+                                            alt={org.login}
+                                            fill
+                                            className="rounded-md"
+                                            sizes="32px"
+                                        />
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <p className="text-sm font-medium text-text dark:text-text-dark truncate">
+                                            {org.login}
+                                        </p>
+                                        {org.description && (
+                                            <p className="text-xs text-text-muted dark:text-text-muted-dark truncate">
+                                                {org.description}
+                                            </p>
+                                        )}
+                                    </div>
+                                </Link>
+                            ))}
+                        </div>
+                        <p className="mt-3 text-xs text-text-muted dark:text-text-muted-dark">
+                            {t('github.organizationsHint')}
+                        </p>
+                    </div>
+                )}
             </div>
         </div>
     );

@@ -274,10 +274,12 @@ export const authAPI = {
             provider: OAuthProvider,
             callbackUrl?: string,
             state?: string,
+            forceConsent?: boolean,
         ): Promise<{ url: string; state: string }> => {
             const params = new URLSearchParams();
             if (callbackUrl) params.append('callbackUrl', callbackUrl);
             if (state) params.append('state', state);
+            if (forceConsent) params.append('forceConsent', 'true');
             const query = params.toString() ? `?${params.toString()}` : '';
 
             return serverFetch<{ url: string; state: string }>(
