@@ -1,13 +1,13 @@
 import { Injectable, Logger, Inject } from '@nestjs/common';
 import * as fs from 'node:fs/promises';
 import { GithubService } from '../../git/github.service';
-import { Category } from '../../items-generator/dto/category.dto';
+import type { Category, Identifiable, ItemData, Tag } from '@ever-works/contracts';
 import { Directory } from '../../entities/directory.entity';
 import { User } from '../../entities/user.entity';
 import { DataRepository, PRUpdate } from '../data-generator/data-repository';
 import { ReadmeBuilder } from './readme-builder';
 import { MarkdownRepository } from './markdown-repository';
-import { GenerationMethod, Identifiable, ItemData, Tag } from '../../items-generator/dto';
+import { GenerationMethod } from '../../items-generator/dto';
 import { DIRECTORY_OPERATIONS } from '@src/directory-operations';
 import type { DirectoryOperations } from '@src/directory-operations';
 
@@ -116,13 +116,16 @@ export class MarkdownGeneratorService {
                     markdowns.add(slug);
                 }
 
-                const item = await dataRepo.getItem(slug);
+                let item = await dataRepo.getItem(slug);
                 if (!item) {
                     continue;
                 }
 
                 if (Array.isArray(item.tags)) {
-                    item.tags = item.tags.map((tag) => this.populate<Tag>(tag, tags));
+                    item = {
+                        ...item,
+                        tags: item.tags.map((tag) => this.populate<Tag>(tag, tags)),
+                    };
                 }
 
                 // Normalize category to array of strings

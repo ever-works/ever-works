@@ -4,15 +4,12 @@ import { Directory } from '../../entities/directory.entity';
 import { User } from '../../entities/user.entity';
 import { DataRepository, PRUpdate } from './data-repository';
 import { slugifyText } from '../../utils/text.utils';
+import type { Identifiable, ItemData, Category, Tag } from '@ever-works/contracts';
 import {
     CreateItemsGeneratorDto,
-    Identifiable,
-    ItemData,
     GenerationMethod,
     CompanyDto,
     ItemsGeneratorMetrics,
-    Category,
-    Tag,
 } from '../../items-generator/dto';
 import { format } from 'date-fns';
 import { GenerateStatusType } from '../../entities/types';

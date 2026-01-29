@@ -90,14 +90,14 @@ export const AddItemForm = memo(function AddItemForm({
                         description: result.data.description || prev.description,
                         tags:
                             result.data.tags && result.data.tags.length > 0
-                                ? result.data.tags
+                                ? ([...result.data.tags] as string[])
                                 : prev.tags,
                         categories: newCategories.length > 0 ? newCategories : prev.categories,
                         brand: result.data.brand || prev.brand,
                         brand_logo_url: result.data.brand_logo_url || prev.brand_logo_url,
                         images:
                             result.data.images && result.data.images.length > 0
-                                ? result.data.images
+                                ? [...result.data.images]
                                 : prev.images,
                     };
                 });

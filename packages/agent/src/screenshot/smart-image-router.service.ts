@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ScreenshotOneService } from './screenshot-one.service';
 import { ImageScraperService } from './image-scraper.service';
 import { User } from '../entities/user.entity';
-import { DomainType } from '../items-generator/interfaces/items-generator.interfaces';
+import { DomainType } from '@ever-works/contracts';
 
 export type ImageSource = 'screenshot' | 'scraped';
 

@@ -1,5 +1,5 @@
 import type { IPlugin } from '../plugin.interface.js';
-import type { FormFieldDefinition, FormSchema, FormFieldType } from '../../common/form-field.types.js';
+import type { FormFieldDefinition, FormSchema, FormFieldType } from '@ever-works/contracts';
 import type { ValidationResult } from '../../settings/validation.types.js';
 
 /**

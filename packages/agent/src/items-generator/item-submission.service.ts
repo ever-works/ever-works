@@ -5,13 +5,13 @@ import { User } from '../entities/user.entity';
 import { DataRepository, IDataConfig } from '../generators/data-generator/data-repository';
 import { slugifyText } from '../utils/text.utils';
 import { SmartImageRouterService } from '../screenshot/smart-image-router.service';
-import { DomainType } from './interfaces/items-generator.interfaces';
+import { DomainType } from '@ever-works/contracts';
+import type { MutableItemData } from '@ever-works/contracts';
 import {
     SubmitItemDto,
     SubmitItemResponseDto,
     RemoveItemDto,
     RemoveItemResponseDto,
-    ItemData,
     UpdateItemDto,
 } from './dto';
 import { format } from 'date-fns';
@@ -97,7 +97,7 @@ export class ItemSubmissionService {
                     ? submitItemDto.categories
                     : submitItemDto.category;
 
-            const itemData: ItemData = {
+            const itemData: MutableItemData = {
                 name: submitItemDto.name,
                 description: submitItemDto.description,
                 source_url: submitItemDto.source_url,

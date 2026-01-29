@@ -1,4 +1,4 @@
-import { ItemData } from './item-data.dto';
+import type { ItemData } from '@ever-works/contracts';
 
 export interface SubmitItemResponseDto {
     status: 'success' | 'error' | 'pending';

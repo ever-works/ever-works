@@ -10,6 +10,7 @@
         "format": "prettier --write \"**/*.{ts,tsx,jsx,json,css,md}\""
     },
     "dependencies": {
+        "@ever-works/contracts": "workspace:*",
         "@headlessui/react": "^2.2.9",
         "@tanstack/react-virtual": "^3.13.13",
         "clsx": "^2.1.1",

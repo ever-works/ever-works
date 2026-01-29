@@ -1,6 +1,5 @@
 import type { IPlugin } from '../plugin.interface.js';
-import type { ItemData, Category, Tag, Brand } from '../../common/item.types.js';
-import type { DomainAnalysis } from '../../common/domain.types.js';
+import type { ItemData, Category, Tag, Brand, DomainAnalysis } from '@ever-works/contracts';
 import type {
 	MutableGenerationContext,
 	GenerationRequest,

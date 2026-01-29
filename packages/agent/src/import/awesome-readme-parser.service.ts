@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { z } from 'zod';
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
 import { AiService, TaskComplexity } from '@src/ai';
-import { Category, ItemData, Tag } from '@src/items-generator/dto';
+import type { Category, ItemData, Tag } from '@ever-works/contracts';
 import { slugifyText } from '@src/utils/text.utils';
 import { accumulateMetrics, MetricsAccumulator } from '@src/utils/metrics.util';
 
@@ -524,7 +524,11 @@ export class AwesomeReadmeParserService {
                 if (item.tags && Array.isArray(item.tags)) {
                     const existingTags = (existing.tags || []) as string[];
                     const newTags = item.tags as string[];
-                    existing.tags = [...new Set([...existingTags, ...newTags])];
+                    const mergedItem: ItemData = {
+                        ...existing,
+                        tags: [...new Set([...existingTags, ...newTags])],
+                    };
+                    seen.set(key, mergedItem);
                 }
             }
         }

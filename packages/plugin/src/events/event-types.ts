@@ -1,4 +1,4 @@
-import type { ItemData, Category, Tag, Brand } from '../common/item.types.js';
+import type { ItemData, Category, Tag, Brand } from '@ever-works/contracts';
 
 /**
  * Plugin lifecycle event names

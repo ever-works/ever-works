@@ -2,7 +2,7 @@ import { Injectable, BadRequestException, NotFoundException } from '@nestjs/comm
 import { DataGeneratorService } from '@src/generators/data-generator/data-generator.service';
 import { DirectoryOwnershipService } from './directory-ownership.service';
 import { CreateCategoryDto, UpdateCategoryDto, CreateTagDto, UpdateTagDto } from '@src/dto';
-import { Category, Tag } from '@src/items-generator/dto';
+import type { Category, Tag } from '@ever-works/contracts';
 import { UserRepository } from '@src/database/repositories/user.repository';
 import { slugifyText } from '@src/utils/text.utils';
 

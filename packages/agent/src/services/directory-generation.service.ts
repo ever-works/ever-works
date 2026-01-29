@@ -59,7 +59,7 @@ import {
     SmartImageRouterService,
     BulkImageRequest,
 } from '@src/screenshot/smart-image-router.service';
-import { DomainType } from '@src/items-generator/interfaces/items-generator.interfaces';
+import { DomainType } from '@ever-works/contracts';
 
 export interface BulkCaptureImagesDto {
     itemSlugs?: string[];

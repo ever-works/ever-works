@@ -1,5 +1,4 @@
-import type { ItemData, Category, Tag, Brand } from '../common/item.types.js';
-import type { DomainAnalysis, WebPageData } from '../common/domain.types.js';
+import type { ItemData, Category, Tag, Brand, DomainAnalysis, WebPageData } from '@ever-works/contracts';
 
 /**
  * Built-in pipeline step identifiers

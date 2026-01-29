@@ -61,5 +61,7 @@
 		"typescript": "^5.9.3"
 	},
 	"peerDependencies": {},
-	"dependencies": {}
+	"dependencies": {
+		"@ever-works/contracts": "workspace:*"
+	}
 }

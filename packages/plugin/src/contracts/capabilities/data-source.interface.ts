@@ -1,5 +1,5 @@
 import type { IPlugin } from '../plugin.interface.js';
-import type { ItemData, Category, Tag, Brand } from '../../common/item.types.js';
+import type { ItemData, Category, Tag, Brand } from '@ever-works/contracts';
 
 /**
  * Data source query options

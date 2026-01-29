@@ -1,5 +1,12 @@
-import type { ItemData, Category, Tag, Brand, MutableItemData } from '../common/item.types.js';
-import type { DomainAnalysis, WebPageData } from '../common/domain.types.js';
+import type {
+	ItemData,
+	Category,
+	Tag,
+	Brand,
+	MutableItemData,
+	DomainAnalysis,
+	WebPageData
+} from '@ever-works/contracts';
 import type { PipelineMetrics } from './step-types.js';
 
 /**

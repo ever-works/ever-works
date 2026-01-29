@@ -4,7 +4,8 @@ import * as yaml from 'yaml';
 import deepmerge from 'deepmerge';
 import { format } from 'date-fns';
 import semver from 'semver';
-import { Category, CreateItemsGeneratorDto, ItemData, Tag } from '../../items-generator/dto';
+import type { Category, ItemData, Tag } from '@ever-works/contracts';
+import { CreateItemsGeneratorDto } from '../../items-generator/dto';
 
 export type PRUpdate = {
     branch: string;
