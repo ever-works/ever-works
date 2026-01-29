@@ -131,32 +131,3 @@ export interface CreateRepositoryOptions {
 export function isOAuthPlugin(plugin: IPlugin): plugin is IOAuthPlugin {
 	return plugin.capabilities.includes('oauth');
 }
-
-// ====================================
-// Backwards Compatibility Aliases
-// ====================================
-
-/**
- * @deprecated Use OAuthConfig instead
- */
-export type GitOAuthConfig = OAuthConfig;
-
-/**
- * @deprecated Use OAuthToken instead
- */
-export type GitOAuthToken = OAuthToken;
-
-/**
- * @deprecated Use OAuthUser instead
- */
-export type GitOAuthUser = OAuthUser;
-
-/**
- * @deprecated Use IOAuthPlugin instead
- */
-export type IGitOAuthPlugin = IOAuthPlugin;
-
-/**
- * @deprecated Use isOAuthPlugin instead
- */
-export const isGitOAuthPlugin = isOAuthPlugin;

@@ -1,9 +1,4 @@
 /**
- * Note: Uses ZodType from zod package which should be installed as a peer dependency.
- * If zod is not available, use Record<string, unknown> for schema parameter.
- */
-
-/**
  * Task complexity levels for AI model routing.
  * Used to select appropriate model tier based on task requirements.
  */
