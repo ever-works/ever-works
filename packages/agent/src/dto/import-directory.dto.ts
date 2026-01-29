@@ -2,6 +2,7 @@ import { Transform } from 'class-transformer';
 import {
     IsBoolean,
     IsEnum,
+    IsIn,
     IsNotEmpty,
     IsNumber,
     IsOptional,
@@ -124,7 +125,7 @@ export class GetUserRepositoriesDto {
     owner?: string;
 
     @IsOptional()
-    @IsString()
+    @IsIn(['user', 'org'])
     type?: 'user' | 'org';
 }
 

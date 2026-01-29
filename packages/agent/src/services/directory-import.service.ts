@@ -197,8 +197,21 @@ export class DirectoryImportService {
                 perPage,
                 hasMore: repos.length === perPage,
             };
-        } catch (error) {
+        } catch (error: any) {
             this.logger.error('Failed to fetch user repositories', error);
+
+            // Handle specific GitHub API errors
+            if (error?.status === 404) {
+                throw new BadRequestException(
+                    `Organization "${dto.owner}" not found or you don't have access`,
+                );
+            }
+            if (error?.status === 403) {
+                throw new BadRequestException(
+                    `Access denied to organization "${dto.owner}". Please check your permissions.`,
+                );
+            }
+
             throw new BadRequestException('Failed to fetch GitHub repositories');
         }
     }
