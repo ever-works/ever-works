@@ -8,6 +8,7 @@ import type {
     ExistingItems,
     MutableGenerationContext,
     BuiltInStepId,
+    StepExecutionContext,
 } from '@ever-works/plugin';
 
 // Silence logger during tests
@@ -40,6 +41,20 @@ describe('StepAdapterService', () => {
         name,
         run: jest.fn().mockImplementation((ctx) => Promise.resolve(ctx)),
     });
+
+    const mockExecContext: StepExecutionContext = {
+        aiFacade: {} as StepExecutionContext['aiFacade'],
+        searchFacade: {} as StepExecutionContext['searchFacade'],
+        screenshotFacade: {} as StepExecutionContext['screenshotFacade'],
+        contentExtractorFacade: {} as StepExecutionContext['contentExtractorFacade'],
+        logger: {
+            log: jest.fn(),
+            debug: jest.fn(),
+            warn: jest.fn(),
+            error: jest.fn(),
+        },
+        directory: mockDirectory,
+    };
 
     beforeEach(async () => {
         const module: TestingModule = await Test.createTestingModule({
@@ -285,7 +300,7 @@ describe('StepAdapterService', () => {
             const wrapper = service.createExecutorWrapper('prompt-processing');
             const context = createGenerationContext(mockDirectory, mockRequest, mockExisting);
 
-            await wrapper!.run(context);
+            await wrapper!.run(context, mockExecContext);
 
             expect(step.run).toHaveBeenCalledWith(context);
         });

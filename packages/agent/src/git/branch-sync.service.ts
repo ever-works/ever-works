@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { GithubService } from './github.service';
-import { WEBSITE_TEMPLATE_CONFIG } from '../website-generator/config/website-template.config';
+import { WEBSITE_TEMPLATE_CONFIG } from '../generators/website-generator/config/website-template.config';
 import { ICommitter } from './git.provider';
 import * as fs from 'node:fs/promises';
 

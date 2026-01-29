@@ -4,6 +4,7 @@ import type {
     BuiltInStepId,
     StepExecutionOptions,
     StepProgressCallback,
+    StepExecutionContext,
 } from '@ever-works/plugin';
 // Import the NestJS wrapper which delegates to the standalone plugin
 import { DefaultPipelinePlugin, type IBuiltInStepExecutor } from './default-pipeline.plugin';
@@ -164,6 +165,8 @@ export class StepAdapterService {
      * Create an IBuiltInStepExecutor wrapper for a step
      * This allows the step to be used with the DefaultPipelinePlugin
      *
+     * Note: Legacy steps don't use StepExecutionContext, so the wrapper accepts but ignores it.
+     *
      * @param stepId - The step ID
      */
     createExecutorWrapper(stepId: BuiltInStepId): IBuiltInStepExecutor | undefined {
@@ -174,7 +177,9 @@ export class StepAdapterService {
 
         return {
             name: service.name,
-            run: (context: MutableGenerationContext) => service.run(context),
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            run: (context: MutableGenerationContext, _execContext: StepExecutionContext) =>
+                service.run(context),
         };
     }
 

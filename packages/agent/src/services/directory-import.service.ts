@@ -10,10 +10,10 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Octokit } from 'octokit';
 import { DirectoryRepository } from '@src/database/repositories/directory.repository';
 import { DirectoryGenerationHistoryRepository } from '@src/database/repositories/directory-generation-history.repository';
-import { DataGeneratorService } from '@src/data-generator/data-generator.service';
-import { DataRepository } from '@src/data-generator/data-repository';
-import { MarkdownGeneratorService } from '@src/markdown-generator/markdown-generator.service';
-import { WebsiteGeneratorService } from '@src/website-generator/website-generator.service';
+import { DataGeneratorService } from '@src/generators/data-generator/data-generator.service';
+import { DataRepository } from '@src/generators/data-generator/data-repository';
+import { MarkdownGeneratorService } from '@src/generators/markdown-generator/markdown-generator.service';
+import { WebsiteGeneratorService } from '@src/generators/website-generator/website-generator.service';
 import { GithubService } from '@src/git/github.service';
 import { SourceRepoAnalyzerService } from '@src/import/source-repo-analyzer.service';
 import { AwesomeReadmeParserService } from '@src/import/awesome-readme-parser.service';
@@ -42,7 +42,7 @@ import {
 import { DirectoryScheduleService } from './directory-schedule.service';
 import { DirectoryScheduleCadence, GenerateStatusType } from '@src/entities/types';
 import { normalizeGeneratorError } from './utils/error.utils';
-import { slugifyText } from '@src/items-generator/utils/text.utils';
+import { slugifyText } from '@src/utils/text.utils';
 import { GenerationMethod } from '@src/items-generator/dto';
 import { DirectoryGenerationHistory } from '@src/entities/directory-generation-history.entity';
 

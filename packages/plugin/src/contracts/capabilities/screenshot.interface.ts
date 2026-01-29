@@ -1,4 +1,5 @@
 import type { IPlugin } from '../plugin.interface.js';
+import type { PluginSettings } from '../../settings/settings.types.js';
 
 /**
  * Screenshot format options
@@ -45,6 +46,12 @@ export interface ScreenshotOptions {
 	readonly headers?: Record<string, string>;
 	/** Cookies to set */
 	readonly cookies?: readonly ScreenshotCookie[];
+	/**
+	 * Resolved settings for this operation.
+	 * Passed by the facade with user/directory-scoped settings.
+	 * Plugins should use these settings instead of their stored defaults.
+	 */
+	readonly settings?: PluginSettings;
 }
 
 /**

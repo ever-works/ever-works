@@ -8,10 +8,13 @@ import {
     Optional,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { DataGeneratorService, GenerationStats } from '@src/data-generator/data-generator.service';
-import { MarkdownGeneratorService } from '@src/markdown-generator/markdown-generator.service';
-import { WebsiteGeneratorService } from '@src/website-generator/website-generator.service';
-import { WebsiteUpdateService } from '@src/website-generator/website-update.service';
+import {
+    DataGeneratorService,
+    GenerationStats,
+} from '@src/generators/data-generator/data-generator.service';
+import { MarkdownGeneratorService } from '@src/generators/markdown-generator/markdown-generator.service';
+import { WebsiteGeneratorService } from '@src/generators/website-generator/website-generator.service';
+import { WebsiteUpdateService } from '@src/generators/website-generator/website-update.service';
 import {
     CreateItemsGeneratorDto,
     GenerationMethod,
@@ -27,14 +30,13 @@ import {
 } from '@src/items-generator/dto';
 import { ItemsGeneratorResponseDto } from '@src/items-generator/dto/items-generator-response.dto';
 import { ItemSubmissionService } from '@src/items-generator/item-submission.service';
-import { ItemsGeneratorService } from '@src/items-generator/items-generator.service';
 import { Directory } from '@src/entities/directory.entity';
 import { User } from '@src/entities/user.entity';
 import { DirectoryRepository } from '@src/database/repositories/directory.repository';
 import { DirectoryGenerationHistoryRepository } from '@src/database/repositories/directory-generation-history.repository';
 import { DirectoryGenerationHistory } from '@src/entities/directory-generation-history.entity';
 import { DirectoryGenerationCompletedEvent } from '@src/events';
-import { UpdateWebsiteRepositoryResponseDto } from '@src/website-generator/dto/update-website-repository.dto';
+import { UpdateWebsiteRepositoryResponseDto } from '@src/generators/website-generator/dto/update-website-repository.dto';
 import {
     DIRECTORY_GENERATION_MODE,
     DirectoryGenerationMode,
@@ -110,7 +112,6 @@ export class DirectoryGenerationService {
         private readonly websiteGenerator: WebsiteGeneratorService,
         private readonly websiteUpdateService: WebsiteUpdateService,
         private readonly itemSubmissionService: ItemSubmissionService,
-        private readonly itemsGeneratorService: ItemsGeneratorService,
         private readonly directoryRepository: DirectoryRepository,
         private readonly eventEmitter: EventEmitter2,
         private readonly generationHistoryRepository: DirectoryGenerationHistoryRepository,
@@ -390,39 +391,13 @@ export class DirectoryGenerationService {
     }
 
     async extractItemDetails(dto: ExtractItemDetailsDto): Promise<ExtractItemDetailsResponseDto> {
-        try {
-            const item = await this.itemsGeneratorService.extractItemDetailsFromUrl(
-                dto.source_url,
-                dto.existing_categories || [],
-            );
-
-            if (!item) {
-                throw new BadRequestException({
-                    status: 'error',
-                    source_url: dto.source_url,
-                    message: 'No item data could be extracted from the URL content',
-                });
-            }
-
-            return {
-                status: 'success',
-                item,
-                source_url: dto.source_url,
-                message: `Successfully extracted item details: "${item.name}"`,
-            };
-        } catch (error) {
-            if (error instanceof HttpException) {
-                throw error;
-            }
-
-            this.logger.error('Error extracting item details:', error);
-
-            throw new BadRequestException({
-                status: 'error',
-                source_url: dto.source_url,
-                message: normalizeGeneratorError(error),
-            });
-        }
+        // TODO: Implement using pipeline step executor for item extraction
+        // This method needs refactoring to use the plugin-based pipeline system
+        throw new BadRequestException({
+            status: 'error',
+            source_url: dto.source_url,
+            message: 'Item extraction is not yet implemented in the pipeline system',
+        });
     }
 
     async bulkCaptureImages(

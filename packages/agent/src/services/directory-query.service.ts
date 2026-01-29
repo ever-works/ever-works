@@ -2,7 +2,7 @@ import { BadRequestException, HttpException, Injectable, Logger } from '@nestjs/
 import { DirectoryRepository } from '@src/database/repositories/directory.repository';
 import { DirectoryMemberRepository } from '@src/database/repositories/directory-member.repository';
 import { DirectoryGenerationHistoryRepository } from '@src/database/repositories/directory-generation-history.repository';
-import { DataGeneratorService } from '@src/data-generator/data-generator.service';
+import { DataGeneratorService } from '@src/generators/data-generator/data-generator.service';
 import { User } from '@src/entities/user.entity';
 import { Directory } from '@src/entities/directory.entity';
 import { DirectoryMemberRole } from '@src/entities/types';

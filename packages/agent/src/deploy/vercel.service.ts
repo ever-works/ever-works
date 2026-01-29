@@ -4,8 +4,8 @@ import { DeployProvider, VercelInput } from './deploy.types';
 import { GithubService } from '../git/github.service';
 import { Directory } from '../entities/directory.entity';
 import { User } from '../entities/user.entity';
-import { WebsiteUpdateService } from '../website-generator/website-update.service';
-import { WEBSITE_TEMPLATE_CONFIG } from '../website-generator';
+import { WebsiteUpdateService } from '../generators/website-generator/website-update.service';
+import { WEBSITE_TEMPLATE_CONFIG } from '../generators/website-generator';
 
 interface RepoContext {
     owner: string;

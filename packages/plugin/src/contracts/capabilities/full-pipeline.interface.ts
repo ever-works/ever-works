@@ -1,5 +1,6 @@
 import type { IPlugin } from '../plugin.interface.js';
 import type { ItemData, Category, Tag, Brand } from '../../common/item.types.js';
+import type { DomainAnalysis } from '../../common/domain.types.js';
 import type {
 	MutableGenerationContext,
 	GenerationRequest,
@@ -8,6 +9,7 @@ import type {
 } from '../../pipeline/generation-context.interface.js';
 import type { ExecutionPlan } from '../../pipeline/parallel-group.types.js';
 import type { PipelineStepDefinition, PipelineState } from '../../pipeline/step-definition.types.js';
+import type { PipelineMetrics } from '../../pipeline/step-types.js';
 
 /**
  * Pipeline execution options
@@ -68,6 +70,10 @@ export interface PipelineResult {
 	readonly tags: readonly Tag[];
 	/** Generated brands */
 	readonly brands: readonly Brand[];
+	/** Domain analysis from generation */
+	readonly domainAnalysis?: DomainAnalysis;
+	/** Pipeline execution metrics */
+	readonly metrics?: PipelineMetrics;
 	/** Execution duration in ms */
 	readonly duration: number;
 	/** Steps completed */

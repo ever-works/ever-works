@@ -72,43 +72,45 @@ export interface StepDataTypes {
 }
 
 /**
- * Pipeline execution metrics
+ * Pipeline execution metrics.
+ * Mutable during pipeline execution to allow step metrics accumulation.
  */
 export interface PipelineMetrics {
 	/** When pipeline execution started */
-	readonly startTime: number;
+	startTime: number;
 	/** Total execution duration in ms */
-	readonly duration?: number;
+	duration?: number;
 	/** Number of items processed */
-	readonly itemsProcessed: number;
+	itemsProcessed: number;
 	/** Number of URLs extracted */
-	readonly urlsExtracted: number;
+	urlsExtracted: number;
 	/** Number of web pages retrieved */
-	readonly pagesRetrieved: number;
+	pagesRetrieved: number;
 	/** Number of items extracted from web content */
-	readonly itemsExtracted: number;
+	itemsExtracted: number;
 	/** Number of items after deduplication */
-	readonly itemsAfterDedup: number;
+	itemsAfterDedup: number;
 	/** Step-level metrics */
-	readonly steps: Record<string, StepMetrics>;
+	steps: Record<string, StepMetrics>;
 }
 
 /**
- * Metrics for a single pipeline step
+ * Metrics for a single pipeline step.
+ * Mutable to allow updating during step execution.
  */
 export interface StepMetrics {
 	/** Step name */
-	readonly name: string;
+	name: string;
 	/** Step start time */
-	readonly startTime: number;
+	startTime: number;
 	/** Step duration in ms */
-	readonly duration?: number;
+	duration?: number;
 	/** Whether the step completed successfully */
-	readonly success: boolean;
+	success: boolean;
 	/** Error message if failed */
-	readonly error?: string;
+	error?: string;
 	/** Custom step-specific metrics */
-	readonly custom?: Record<string, unknown>;
+	custom?: Record<string, unknown>;
 }
 
 /**

@@ -1,0 +1,88 @@
+/**
+ * Search result from web search (facade-specific)
+ */
+export interface SearchFacadeResult {
+	/** Result title */
+	readonly title: string;
+	/** Result URL */
+	readonly url: string;
+	/** Relevance score */
+	readonly score: number;
+	/** Published date if available */
+	readonly publishedDate?: string;
+}
+
+/**
+ * Search options for web search (facade-specific)
+ */
+export interface SearchFacadeOptions {
+	/** Maximum number of results to return */
+	readonly maxResults?: number;
+	/** Domains to include */
+	readonly includeDomains?: readonly string[];
+	/** Domains to exclude */
+	readonly excludeDomains?: readonly string[];
+}
+
+/**
+ * Content extraction result
+ */
+export interface ExtractedContent {
+	/** Source URL */
+	readonly url: string;
+	/** Extracted raw text/markdown content */
+	readonly rawContent: string;
+	/** Extracted images */
+	readonly images?: readonly string[];
+}
+
+/**
+ * Search Facade interface for pipeline steps.
+ *
+ * Provides web search and content extraction capabilities.
+ * The actual implementation handles provider resolution and settings.
+ */
+export interface ISearchFacade {
+	/**
+	 * Perform a web search.
+	 *
+	 * @param query - Search query string
+	 * @param options - Optional search configuration
+	 * @returns Array of search results sorted by relevance
+	 *
+	 * @example
+	 * ```typescript
+	 * const results = await searchFacade.search('best react frameworks', {
+	 *     maxResults: 20
+	 * });
+	 * ```
+	 */
+	search(query: string, options?: SearchFacadeOptions): Promise<SearchFacadeResult[]>;
+
+	/**
+	 * Extract content from a URL.
+	 *
+	 * Fetches the page and extracts the main content as markdown/text.
+	 *
+	 * @param url - URL to extract content from
+	 * @returns Extracted content with raw text and images
+	 *
+	 * @example
+	 * ```typescript
+	 * const content = await searchFacade.extractContent('https://example.com');
+	 * console.log(content.rawContent);
+	 * ```
+	 */
+	extractContent(url: string): Promise<ExtractedContent>;
+
+	/**
+	 * Check if search service is configured and available.
+	 */
+	isConfigured(): boolean;
+
+	/**
+	 * Check if local content extraction is configured.
+	 * When true, content is extracted locally instead of via API.
+	 */
+	isLocalExtractionConfigured(): boolean;
+}

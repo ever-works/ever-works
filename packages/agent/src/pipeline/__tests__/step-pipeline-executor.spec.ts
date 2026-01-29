@@ -17,6 +17,11 @@ import { PipelineBuilderService } from '../pipeline-builder.service';
 import { DefaultPipelinePlugin } from '../default-pipeline.plugin';
 import { PluginRegistryService } from '../../plugins/services/plugin-registry.service';
 import { createGenerationContext } from '../generation-context';
+import { AiFacadeService } from '../../facades/ai.facade';
+import { SearchFacadeService } from '../../facades/search.facade';
+import { ScreenshotFacadeService } from '../../facades/screenshot.facade';
+import { ContentExtractorFacadeService } from '../../facades/content-extractor.facade';
+import { PluginSettingsService } from '../../plugins/services/plugin-settings.service';
 import type {
     DirectoryReference,
     GenerationRequest,
@@ -76,6 +81,43 @@ describe('StepPipelineExecutorService', () => {
                 {
                     provide: CACHE_MANAGER,
                     useValue: cacheManager,
+                },
+                {
+                    provide: AiFacadeService,
+                    useValue: {
+                        generateText: jest.fn().mockResolvedValue(''),
+                        generateStructuredOutput: jest.fn().mockResolvedValue({}),
+                        isConfigured: jest.fn().mockReturnValue(true),
+                    },
+                },
+                {
+                    provide: SearchFacadeService,
+                    useValue: {
+                        search: jest.fn().mockResolvedValue([]),
+                        extractContent: jest.fn().mockResolvedValue(null),
+                        isConfigured: jest.fn().mockReturnValue(true),
+                    },
+                },
+                {
+                    provide: ScreenshotFacadeService,
+                    useValue: {
+                        capture: jest.fn().mockResolvedValue(null),
+                        isConfigured: jest.fn().mockReturnValue(true),
+                    },
+                },
+                {
+                    provide: ContentExtractorFacadeService,
+                    useValue: {
+                        extractContent: jest.fn().mockResolvedValue(null),
+                        canHandle: jest.fn().mockReturnValue(false),
+                        isConfigured: jest.fn().mockReturnValue(true),
+                    },
+                },
+                {
+                    provide: PluginSettingsService,
+                    useValue: {
+                        getSettings: jest.fn().mockResolvedValue({}),
+                    },
                 },
             ],
         }).compile();

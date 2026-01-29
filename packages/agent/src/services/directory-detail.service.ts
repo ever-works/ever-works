@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { AiService, BaseChatModel } from '../ai';
 import { User } from '../entities';
 import { DirectoryRepository } from '../database';
-import { slugifyText } from '../items-generator';
+import { slugifyText } from '../utils/text.utils';
 import { sanitizeDescription, sanitizeStringArray } from '../utils/sanitize.util';
 
 // Prompt for extracting directory details

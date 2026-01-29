@@ -26,7 +26,7 @@ import {
 } from '@src/entities/types';
 import { UsageLedgerService } from '@src/subscriptions/usage-ledger.service';
 import { UsageLedgerTriggerType } from '@src/entities/usage-ledger-entry.entity';
-import { DataGeneratorService } from '@src/data-generator/data-generator.service';
+import { DataGeneratorService } from '@src/generators/data-generator/data-generator.service';
 import { Directory } from '@src/entities/directory.entity';
 import {
     NOTIFICATION_OPERATIONS,

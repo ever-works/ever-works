@@ -16,6 +16,14 @@ export interface AdvancedPromptsContext {
 }
 
 /**
+ * User reference for settings resolution and context.
+ * Settings are resolved through the plugin system, not stored here.
+ */
+export interface UserReference {
+	readonly id: string;
+}
+
+/**
  * Directory reference for generation context
  */
 export interface DirectoryReference {
@@ -24,12 +32,15 @@ export interface DirectoryReference {
 	readonly slug: string;
 	readonly description?: string;
 	readonly settings?: Record<string, unknown>;
+	readonly user?: UserReference;
 }
 
 /**
  * Items generation request parameters
  */
 export interface GenerationRequest {
+	/** Name/title for the generation (topic name) */
+	readonly name?: string;
 	/** Number of items to generate */
 	readonly count?: number;
 	/** Prompt or topic for generation */
@@ -48,6 +59,33 @@ export interface GenerationRequest {
 	readonly existingCategoryNames?: readonly string[];
 	/** Existing tag names */
 	readonly existingTagNames?: readonly string[];
+	/** Configuration options for the generation pipeline */
+	readonly config?: Record<string, unknown>;
+	/** Generation method (create-update or recreate) */
+	readonly generationMethod?: 'CREATE_UPDATE' | 'RECREATE' | string;
+	/** Initial categories for generation */
+	readonly initialCategories?: readonly string[];
+	/** Priority categories for generation */
+	readonly priorityCategories?: readonly string[];
+	/** Source URLs to extract items from */
+	readonly sourceUrls?: readonly string[];
+	/** Company information */
+	readonly company?: { name: string; website: string };
+	/** Whether to capture screenshots */
+	readonly captureScreenshots?: boolean;
+	/** Whether badge evaluation is enabled */
+	readonly badgeEvaluationEnabled?: boolean;
+}
+
+/**
+ * Existing configuration with metadata from previous generation
+ */
+export interface ExistingConfig {
+	readonly metadata?: {
+		readonly initial_prompt?: string;
+		readonly [key: string]: unknown;
+	};
+	readonly [key: string]: unknown;
 }
 
 /**
@@ -58,6 +96,8 @@ export interface ExistingItems {
 	readonly categories: readonly Category[];
 	readonly tags: readonly Tag[];
 	readonly brands?: readonly Brand[];
+	/** Configuration from previous generation */
+	readonly existingConfig?: ExistingConfig;
 }
 
 /**

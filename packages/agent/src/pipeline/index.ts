@@ -75,3 +75,6 @@ export {
     type ProviderOverrideContext,
     type ProviderOverrideResult,
 } from './provider-override.service';
+
+// Pipeline module
+export { PipelineModule } from './pipeline.module';

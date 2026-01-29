@@ -3,7 +3,7 @@ import * as path from 'node:path';
 import * as fs from 'node:fs';
 import * as http from 'isomorphic-git/http/node';
 import git from 'isomorphic-git';
-import { slugifyText } from '../items-generator/utils/text.utils';
+import { slugifyText } from '../utils/text.utils';
 import { Logger } from '@nestjs/common';
 import { config } from '@src/config';
 

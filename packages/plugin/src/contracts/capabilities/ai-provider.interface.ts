@@ -1,4 +1,5 @@
 import type { IPlugin } from '../plugin.interface.js';
+import type { PluginSettings } from '../../settings/settings.types.js';
 
 /**
  * AI provider types
@@ -139,6 +140,12 @@ export interface ChatCompletionOptions {
 	readonly seed?: number;
 	/** User identifier for tracking */
 	readonly user?: string;
+	/**
+	 * Resolved settings for this operation.
+	 * Passed by the facade with user/directory-scoped settings.
+	 * Plugins should use these settings instead of their stored defaults.
+	 */
+	readonly settings?: PluginSettings;
 }
 
 /**

@@ -1,9 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { GithubService } from '@src/git/github.service';
-import { DataGeneratorService } from '@src/data-generator/data-generator.service';
-import { DataRepository } from '@src/data-generator/data-repository';
-import { MarkdownGeneratorService } from '@src/markdown-generator/markdown-generator.service';
-import { WebsiteGeneratorService } from '@src/website-generator/website-generator.service';
+import { DataGeneratorService } from '@src/generators/data-generator/data-generator.service';
+import { DataRepository } from '@src/generators/data-generator/data-repository';
+import { MarkdownGeneratorService } from '@src/generators/markdown-generator/markdown-generator.service';
+import { WebsiteGeneratorService } from '@src/generators/website-generator/website-generator.service';
 import { SourceRepoAnalyzerService } from './source-repo-analyzer.service';
 import { AwesomeReadmeParserService } from './awesome-readme-parser.service';
 import { Directory, ImportSourceType } from '@src/entities/directory.entity';

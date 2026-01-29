@@ -3,8 +3,8 @@ import { z } from 'zod';
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
 import { AiService, TaskComplexity } from '@src/ai';
 import { Category, ItemData, Tag } from '@src/items-generator/dto';
-import { slugifyText } from '@src/items-generator/utils/text.utils';
-import { accumulateMetrics, MetricsAccumulator } from '@src/items-generator/utils/metrics.util';
+import { slugifyText } from '@src/utils/text.utils';
+import { accumulateMetrics, MetricsAccumulator } from '@src/utils/metrics.util';
 
 const categorySchema = z.object({
     id: z.string().describe('URL-friendly ID for the category, lowercase with hyphens'),

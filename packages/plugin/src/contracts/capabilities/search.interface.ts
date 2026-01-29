@@ -1,4 +1,5 @@
 import type { IPlugin } from '../plugin.interface.js';
+import type { PluginSettings } from '../../settings/settings.types.js';
 
 /**
  * Search query options
@@ -26,6 +27,12 @@ export interface SearchOptions {
 	readonly excludeDomains?: readonly string[];
 	/** Include only these domains */
 	readonly includeDomains?: readonly string[];
+	/**
+	 * Resolved settings for this operation.
+	 * Passed by the facade with user/directory-scoped settings.
+	 * Plugins should use these settings instead of their stored defaults.
+	 */
+	readonly settings?: PluginSettings;
 }
 
 /**

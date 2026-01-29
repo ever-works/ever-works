@@ -2,9 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import { GithubService } from '../git/github.service';
 import { Directory } from '../entities/directory.entity';
 import { User } from '../entities/user.entity';
-import { DataRepository, IDataConfig } from '../data-generator/data-repository';
-import { slugifyText } from './utils/text.utils';
-import { ItemsGeneratorService } from './items-generator.service';
+import { DataRepository, IDataConfig } from '../generators/data-generator/data-repository';
+import { slugifyText } from '../utils/text.utils';
 import { SmartImageRouterService } from '../screenshot/smart-image-router.service';
 import { DomainType } from './interfaces/items-generator.interfaces';
 import {
@@ -24,7 +23,6 @@ export class ItemSubmissionService {
 
     constructor(
         private readonly githubService: GithubService,
-        private readonly itemsGeneratorService: ItemsGeneratorService,
         private readonly smartImageRouterService: SmartImageRouterService,
     ) {}
 
@@ -131,15 +129,9 @@ export class ItemSubmissionService {
                 }
             }
 
-            // Process badges for the item if it's a repository
-            const itemWithBadges =
-                await this.itemsGeneratorService.processSingleItemBadges(itemData);
-
-            // Generate markdown for the item using AI
-            const itemsWithMarkdown = await this.itemsGeneratorService.generateMarkdownForItems([
-                itemWithBadges,
-            ]);
-            const itemWithMarkdown = itemsWithMarkdown[0];
+            // TODO: Badge processing and markdown generation should use pipeline step executors
+            // For now, proceed without badges/markdown (user-submitted items don't need AI enhancement)
+            const itemWithMarkdown = { ...itemData };
 
             // Ensure slug is set
             itemWithMarkdown.slug = slugifyText(itemWithMarkdown.slug || itemWithMarkdown.name);

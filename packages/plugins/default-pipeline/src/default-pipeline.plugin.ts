@@ -12,16 +12,26 @@ import type {
 	StepExecutionOptions,
 	StepProgressCallback,
 	IPipelineStepPlugin,
-	BuiltInStepId
+	BuiltInStepId,
+	IBuiltInStepExecutor,
+	StepExecutionContext
 } from '@ever-works/plugin';
 
-/**
- * Interface for built-in step executor services
- */
-export interface IBuiltInStepExecutor {
-	name: string;
-	run(context: MutableGenerationContext): Promise<MutableGenerationContext>;
-}
+// Import all step implementations
+import { PromptComparisonStep } from './steps/prompt-comparison.step.js';
+import { PromptProcessingStep } from './steps/prompt-processing.step.js';
+import { DomainDetectionStep } from './steps/domain-detection.step.js';
+import { AiItemGenerationStep } from './steps/ai-item-generation.step.js';
+import { SearchQueryGenerationStep } from './steps/search-query-generation.step.js';
+import { WebSearchStep } from './steps/web-search.step.js';
+import { ContentFilteringStep } from './steps/content-filtering.step.js';
+import { ItemExtractionStep } from './steps/item-extraction.step.js';
+import { DataAggregationStep } from './steps/data-aggregation.step.js';
+import { CategoryProcessingStep } from './steps/category-processing.step.js';
+import { SourceValidationStep } from './steps/source-validation.step.js';
+import { BadgeProcessingStep } from './steps/badge-processing.step.js';
+import { ImageCaptureStep } from './steps/image-capture.step.js';
+import { MarkdownGenerationStep } from './steps/markdown-generation.step.js';
 
 /**
  * Default Pipeline Plugin - System plugin providing the standard generation pipeline.
@@ -456,6 +466,9 @@ export class DefaultPipelinePlugin implements IPlugin, IPipelineStepPlugin {
 
 	/**
 	 * Execute a pipeline step
+	 *
+	 * Note: The stepId and execContext should be passed through options.settings
+	 * This method is part of IPipelineStepPlugin interface.
 	 */
 	async execute(
 		context: MutableGenerationContext,
@@ -463,14 +476,19 @@ export class DefaultPipelinePlugin implements IPlugin, IPipelineStepPlugin {
 		onProgress?: StepProgressCallback
 	): Promise<MutableGenerationContext> {
 		// This method is called when the pipeline executes a specific step
-		// The stepId should be passed through options.settings.stepId
+		// The stepId and execContext should be passed through options.settings
 		const stepId = options?.settings?.stepId as string;
+		const execContext = options?.settings?.execContext as StepExecutionContext;
 
 		if (!stepId) {
 			throw new Error('DefaultPipelinePlugin.execute() requires stepId in options.settings');
 		}
 
-		return this.executeStep(stepId, context, options, onProgress);
+		if (!execContext) {
+			throw new Error('DefaultPipelinePlugin.execute() requires execContext in options.settings');
+		}
+
+		return this.executeStep(stepId, context, execContext, options, onProgress);
 	}
 
 	/**
@@ -479,6 +497,7 @@ export class DefaultPipelinePlugin implements IPlugin, IPipelineStepPlugin {
 	async executeStep(
 		stepId: string,
 		context: MutableGenerationContext,
+		execContext: StepExecutionContext,
 		options?: StepExecutionOptions,
 		onProgress?: StepProgressCallback
 	): Promise<MutableGenerationContext> {
@@ -505,7 +524,7 @@ export class DefaultPipelinePlugin implements IPlugin, IPipelineStepPlugin {
 		}
 
 		try {
-			const result = await executor.run(context);
+			const result = await executor.run(context, execContext);
 
 			// Report progress complete
 			if (onProgress) {
@@ -545,7 +564,41 @@ export class DefaultPipelinePlugin implements IPlugin, IPipelineStepPlugin {
 
 	async onLoad(context: PluginContext): Promise<void> {
 		this.context = context;
-		context.logger.log('Default Pipeline Plugin loaded');
+		context.logger.log('Default Pipeline Plugin loading...');
+
+		// Register all built-in step executors
+		this.registerBuiltInStepExecutors();
+
+		context.logger.log(`Default Pipeline Plugin loaded with ${this.stepExecutors.size} step executors`);
+	}
+
+	/**
+	 * Register all built-in step executors.
+	 * This method is called during plugin load to set up all step implementations.
+	 */
+	private registerBuiltInStepExecutors(): void {
+		// Map of step IDs to their executor instances
+		const stepExecutors: Record<string, IBuiltInStepExecutor> = {
+			'prompt-comparison': new PromptComparisonStep(),
+			'prompt-processing': new PromptProcessingStep(),
+			'domain-detection': new DomainDetectionStep(),
+			'ai-first-items-generation': new AiItemGenerationStep(),
+			'search-queries-generation': new SearchQueryGenerationStep(),
+			'web-search': new WebSearchStep(),
+			'content-filtering': new ContentFilteringStep(),
+			'items-extraction': new ItemExtractionStep(),
+			'deduplication-and-data-aggregation': new DataAggregationStep(),
+			'categories-tags-processing': new CategoryProcessingStep(),
+			'sources-validation': new SourceValidationStep(),
+			'badges-processing': new BadgeProcessingStep(),
+			'image-capture': new ImageCaptureStep(),
+			'markdown-generation': new MarkdownGenerationStep()
+		};
+
+		// Register each step executor
+		for (const [stepId, executor] of Object.entries(stepExecutors)) {
+			this.registerStepExecutor(stepId as BuiltInStepId, executor);
+		}
 	}
 
 	async onEnable(_context: PluginContext): Promise<void> {

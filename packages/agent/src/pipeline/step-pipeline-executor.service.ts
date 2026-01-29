@@ -21,7 +21,13 @@ import type {
     PipelineCompletedPayload,
     PipelineFailedPayload,
     GenerationContextSnapshot,
+    StepExecutionContext,
+    StepLogger,
 } from '@ever-works/plugin';
+import { AiFacadeService } from '../facades/ai.facade';
+import { SearchFacadeService } from '../facades/search.facade';
+import { ScreenshotFacadeService } from '../facades/screenshot.facade';
+import { ContentExtractorFacadeService } from '../facades/content-extractor.facade';
 
 /**
  * Type guard for pipeline step plugins (inlined to avoid ESM import issues)
@@ -94,8 +100,45 @@ export class StepPipelineExecutorService {
         private readonly defaultPlugin: DefaultPipelinePlugin,
         private readonly registry: PluginRegistryService,
         private readonly eventEmitter: EventEmitter2,
+        private readonly aiFacade: AiFacadeService,
+        private readonly searchFacade: SearchFacadeService,
+        private readonly screenshotFacade: ScreenshotFacadeService,
+        private readonly contentExtractorFacade: ContentExtractorFacadeService,
         @Optional() @Inject(CACHE_MANAGER) private readonly cacheManager?: Cache,
     ) {}
+
+    /**
+     * Create a StepExecutionContext for step executors.
+     * Provides access to facades and utilities needed for step execution.
+     */
+    private createStepExecutionContext(
+        directory: DirectoryReference,
+        signal?: AbortSignal,
+    ): StepExecutionContext {
+        const stepLogger: StepLogger = {
+            log: (msg: string, ...args: unknown[]) =>
+                this.logger.log(`[${directory.slug}] ${msg}`, ...args),
+            debug: (msg: string, ...args: unknown[]) =>
+                this.logger.debug(`[${directory.slug}] ${msg}`, ...args),
+            warn: (msg: string, ...args: unknown[]) =>
+                this.logger.warn(`[${directory.slug}] ${msg}`, ...args),
+            error: (msg: string, trace?: string, ...args: unknown[]) =>
+                this.logger.error(`[${directory.slug}] ${msg}`, trace, ...args),
+            verbose: (msg: string, ...args: unknown[]) =>
+                this.logger.verbose?.(`[${directory.slug}] ${msg}`, ...args),
+        };
+
+        return {
+            aiFacade: this.aiFacade,
+            searchFacade: this.searchFacade,
+            screenshotFacade: this.screenshotFacade,
+            contentExtractorFacade: this.contentExtractorFacade,
+            logger: stepLogger,
+            directory,
+            user: directory.user,
+            signal,
+        };
+    }
 
     /**
      * Execute the pipeline for a directory
@@ -409,9 +452,12 @@ export class StepPipelineExecutorService {
         context: TypedGenerationContext,
         options?: PipelineExecutionOptions,
     ): Promise<void> {
+        // Create execution context with facades for step executors
+        const execContext = this.createStepExecutionContext(context.directory, options?.signal);
+
         if (executor.type === 'builtin') {
             // Execute via DefaultPipelinePlugin
-            await this.defaultPlugin.executeStep(step.id, context, {
+            await this.defaultPlugin.executeStep(step.id, context, execContext, {
                 timeout: options?.timeout,
                 signal: options?.signal,
                 settings: options?.stepSettings?.[step.id] ?? {},
@@ -423,11 +469,13 @@ export class StepPipelineExecutorService {
                 throw new Error(`Plugin "${executor.pluginId}" not found for step "${step.id}"`);
             }
 
+            // For plugin steps, pass execContext through settings
             await plugin.execute(context, {
                 timeout: options?.timeout,
                 signal: options?.signal,
                 settings: {
                     stepId: executor.stepId,
+                    execContext,
                     ...(options?.stepSettings?.[step.id] ?? {}),
                 },
             });

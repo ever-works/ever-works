@@ -8,7 +8,10 @@
  * @packageDocumentation
  */
 
-export { DefaultPipelinePlugin, type IBuiltInStepExecutor } from './default-pipeline.plugin';
+export { DefaultPipelinePlugin } from './default-pipeline.plugin.js';
+
+// Step implementations
+export * from './steps/index.js';
 
 // Default export for plugin loader
-export { default } from './default-pipeline.plugin';
+export { default } from './default-pipeline.plugin.js';

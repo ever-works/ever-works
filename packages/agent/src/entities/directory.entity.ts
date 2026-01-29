@@ -16,7 +16,7 @@ import type {
     GenerateStatus,
     DirectoryMemberRole,
 } from './types';
-import type { PRUpdate } from '@src/data-generator';
+import type { PRUpdate } from '@src/generators/data-generator';
 import { DirectoryGenerationHistory } from './directory-generation-history.entity';
 import { TimestampColumn } from './_types';
 import { DirectorySchedule } from './directory-schedule.entity';

@@ -7,16 +7,13 @@
  * @packageDocumentation
  */
 
-import { Injectable, Logger } from '@nestjs/common';
-import type { PluginContext, BuiltInStepId } from '@ever-works/plugin';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import type { PluginContext, BuiltInStepId, IBuiltInStepExecutor } from '@ever-works/plugin';
 // Import from the standalone plugin package (single source of truth for built-in steps)
-import {
-    DefaultPipelinePlugin as StandalonePlugin,
-    type IBuiltInStepExecutor,
-} from '@ever-works/default-pipeline-plugin';
+import { DefaultPipelinePlugin as StandalonePlugin } from '@ever-works/default-pipeline-plugin';
 
-// Re-export types and static methods from the standalone plugin
-export type { IBuiltInStepExecutor } from '@ever-works/default-pipeline-plugin';
+// Re-export types from plugin package
+export type { IBuiltInStepExecutor } from '@ever-works/plugin';
 
 /**
  * NestJS-injectable wrapper for DefaultPipelinePlugin.
@@ -28,14 +25,16 @@ export type { IBuiltInStepExecutor } from '@ever-works/default-pipeline-plugin';
  * The standalone plugin is the single source of truth for:
  * - Built-in step definitions
  * - Step service mappings
+ * - Step executors (registered in the standalone plugin's onLoad)
  * - Type guards (isBuiltInStep)
  *
  * This wrapper provides:
  * - NestJS @Injectable() compatibility
  * - Instance methods that delegate to the standalone plugin
+ * - Plugin lifecycle integration with NestJS
  */
 @Injectable()
-export class DefaultPipelinePlugin {
+export class DefaultPipelinePlugin implements OnModuleInit {
     private readonly logger = new Logger(DefaultPipelinePlugin.name);
     private readonly plugin: StandalonePlugin;
 
@@ -43,6 +42,110 @@ export class DefaultPipelinePlugin {
         // Create an instance of the standalone plugin
         this.plugin = new StandalonePlugin();
         this.logger.log('DefaultPipelinePlugin wrapper initialized');
+    }
+
+    /**
+     * Initialize the plugin when the NestJS module initializes.
+     * This triggers the standalone plugin's onLoad which registers all step executors.
+     */
+    async onModuleInit(): Promise<void> {
+        // Create a minimal plugin context for initialization
+        // The context is primarily used for logging during plugin load
+        const pluginContext = this.createMinimalPluginContext();
+
+        // Initialize the standalone plugin - this registers all step executors
+        await this.plugin.onLoad(pluginContext);
+        this.logger.log('DefaultPipelinePlugin initialized with step executors');
+    }
+
+    /**
+     * Create a minimal PluginContext for plugin initialization.
+     * This provides the necessary interfaces for the plugin to initialize.
+     */
+    private createMinimalPluginContext(): PluginContext {
+        const noopCache = {
+            get: async () => undefined,
+            set: async () => {},
+            delete: async () => false,
+            has: async () => false,
+            clear: async () => {},
+        };
+
+        const noopHttp = {
+            get: async () => ({
+                status: 501,
+                statusText: 'Not Implemented',
+                headers: {},
+                data: null,
+            }),
+            post: async () => ({
+                status: 501,
+                statusText: 'Not Implemented',
+                headers: {},
+                data: null,
+            }),
+            put: async () => ({
+                status: 501,
+                statusText: 'Not Implemented',
+                headers: {},
+                data: null,
+            }),
+            patch: async () => ({
+                status: 501,
+                statusText: 'Not Implemented',
+                headers: {},
+                data: null,
+            }),
+            delete: async () => ({
+                status: 501,
+                statusText: 'Not Implemented',
+                headers: {},
+                data: null,
+            }),
+        };
+
+        return {
+            pluginId: 'default-pipeline',
+            logger: {
+                log: (msg: string) => this.logger.log(msg),
+                debug: (msg: string) => this.logger.debug(msg),
+                warn: (msg: string) => this.logger.warn(msg),
+                error: (msg: string) => this.logger.error(msg),
+            },
+            cache: noopCache,
+            http: noopHttp,
+            env: {
+                platform: 'ever-works',
+                platformVersion: '1.0.0',
+                nodeVersion: process.version,
+                isDevelopment: process.env.NODE_ENV === 'development',
+                isProduction: process.env.NODE_ENV === 'production',
+                isTest: process.env.NODE_ENV === 'test',
+                tempDir: '/tmp',
+                dataDir: '/tmp/plugins/default-pipeline',
+                features: new Set<string>(),
+            },
+            envVars: {
+                get: (key: string) => process.env[key],
+                getOrDefault: (key: string, defaultValue: string) =>
+                    process.env[key] ?? defaultValue,
+                has: (key: string) => key in process.env,
+                getRequired: (key: string) => {
+                    const value = process.env[key];
+                    if (value === undefined) throw new Error(`Required env var ${key} not set`);
+                    return value;
+                },
+            },
+            services: {},
+            getSettings: async () => ({}),
+            getResolvedSettings: async () => ({}) as never,
+            onEvent: () => ({ unsubscribe: () => {} }),
+            emitEvent: () => {},
+            registerCustomCapability: () => {},
+            getCustomCapability: () => undefined,
+            hasCustomCapability: () => false,
+            listCustomCapabilities: () => [],
+        };
     }
 
     // ============================================================================

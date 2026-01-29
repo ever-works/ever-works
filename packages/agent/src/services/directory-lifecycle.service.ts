@@ -6,9 +6,9 @@ import {
     NotFoundException,
 } from '@nestjs/common';
 import { DirectoryRepository } from '@src/database/repositories/directory.repository';
-import { DataGeneratorService } from '@src/data-generator/data-generator.service';
-import { MarkdownGeneratorService } from '@src/markdown-generator/markdown-generator.service';
-import { WebsiteGeneratorService } from '@src/website-generator/website-generator.service';
+import { DataGeneratorService } from '@src/generators/data-generator/data-generator.service';
+import { MarkdownGeneratorService } from '@src/generators/markdown-generator/markdown-generator.service';
+import { WebsiteGeneratorService } from '@src/generators/website-generator/website-generator.service';
 import { CreateDirectoryDto } from '@src/dto/create-directory.dto';
 import { UpdateDirectoryDto } from '@src/dto';
 import { DeleteDirectoryDto, DeleteDirectoryResponseDto } from '@src/items-generator/dto';
