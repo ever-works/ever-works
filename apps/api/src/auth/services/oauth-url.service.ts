@@ -29,7 +29,7 @@ export class OAuthUrlService {
         return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
     }
 
-    generateGitHubAuthUrl(callbackUrl?: string, state?: string): string {
+    generateGitHubAuthUrl(callbackUrl?: string, state?: string, forceConsent?: boolean): string {
         const clientId = config.github.clientId();
         const defaultCallbackUrl = config.github.callbackUrl();
 
@@ -45,7 +45,7 @@ export class OAuthUrlService {
             client_id: clientId,
             redirect_uri: callbackUrl || defaultCallbackUrl,
             scope: GitHubScopePresets.AGENT.join(' '),
-            prompt: 'consent',
+            ...(forceConsent && { prompt: 'consent' }),
             ...(state && { state }),
         });
 

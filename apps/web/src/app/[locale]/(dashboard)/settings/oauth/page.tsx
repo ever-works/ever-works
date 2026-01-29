@@ -8,11 +8,17 @@ export default async function OAuthSettingsPage() {
         authAPI.oauth_connections.checkConnection(RepoProvider.GITHUB),
     ]);
 
+    // Fetch organizations only if GitHub is connected
+    const organizations = githubConnection?.connected
+        ? await authAPI.oauth_connections.getGitHubOrgs().catch(() => [])
+        : [];
+
     return (
         <OAuthConnections
             user={profile}
             githubConnection={githubConnection}
             googleConnection={null}
+            organizations={organizations}
         />
     );
 }
