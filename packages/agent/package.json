@@ -92,6 +92,10 @@
         "./plugins": {
             "types": "./dist/plugins/index.d.ts",
             "default": "./dist/plugins/index.js"
+        },
+        "./pipeline": {
+            "types": "./dist/pipeline/index.d.ts",
+            "default": "./dist/pipeline/index.js"
         }
     },
     "scripts": {

@@ -79,29 +79,42 @@ Refactor the pipeline to be fully plugin-driven with step injection support.
 
 **⚠️ TYPE SAFETY:** Pipeline must use typed step IDs (`BuiltInStepId`), data keys (`StepDataKey`), and result types (`StepDataTypes`).
 
-- [ ] **3.1** Refactor GenerationContext for dependency-based data flow (**TYPE-SAFE:** generic `getStepResult<K>()`)
-- [ ] **3.2** Define BUILT_IN_STEPS array with explicit dependencies (**TYPE-SAFE:** uses step-types.ts)
-- [ ] **3.3** Create default pipeline plugin wrapping built-in steps (systemPlugin: true, hidden from UI)
-- [ ] **3.4** Create PipelineBuilderService for pipeline compilation
-- [ ] **3.5** Implement step replacement in PipelineBuilderService
-- [ ] **3.6** Implement step injection in PipelineBuilderService
-- [ ] **3.7** Implement step disabling in PipelineBuilderService
-- [ ] **3.8** Implement append/prepend positioning
-- [ ] **3.9** Implement topological sort for step ordering
-- [ ] **3.10** Identify steps that can run in parallel
-- [ ] **3.11** Apply provider overrides to category steps
-- [ ] **3.12** Create ExecutablePipeline class
-- [ ] **3.13** Create StepPipelineExecutor (step-based pipeline executor)
-- [ ] **3.14** Create FullPipelineExecutor
-- [ ] **3.15** Check providers.pipeline for full vs step-based execution
-- [ ] **3.16** Skip steps when previous step already provided data
-- [ ] **3.17** Track per-step execution metrics
-- [ ] **3.18** Save context after each step (checkpoint saving)
-- [ ] **3.19** Add pipeline event hooks (beforePipeline, afterStep, onStepError, afterPipeline)
-- [ ] **3.20** Map step IDs to executors
-- [ ] **3.21** Validate step dependencies before execution
-- [ ] **3.22** Detect circular dependencies in step graph
-- [ ] **3.23** Refactor existing 14 services to new step interface
+**Implementation files:**
+
+- `packages/agent/src/pipeline/generation-context.ts` - TypedGenerationContext
+- `packages/agent/src/pipeline/built-in-steps.ts` - BUILT_IN_STEPS array
+- `packages/agent/src/pipeline/default-pipeline.plugin.ts` - DefaultPipelinePlugin
+- `packages/agent/src/pipeline/pipeline-builder.service.ts` - PipelineBuilderService
+- `packages/agent/src/pipeline/step-adapter.service.ts` - StepAdapterService
+- `packages/agent/src/pipeline/executable-pipeline.class.ts` - ExecutablePipelineRunner
+- `packages/agent/src/pipeline/step-pipeline-executor.service.ts` - StepPipelineExecutorService
+- `packages/agent/src/pipeline/full-pipeline-executor.service.ts` - FullPipelineExecutorService
+- `packages/agent/src/pipeline/pipeline-orchestrator.service.ts` - PipelineOrchestratorService
+- `packages/agent/src/pipeline/provider-override.service.ts` - ProviderOverrideService
+
+- [x] **3.1** Refactor GenerationContext for dependency-based data flow (**TYPE-SAFE:** generic `getStepResult<K>()`)
+- [x] **3.2** Define BUILT_IN_STEPS array with explicit dependencies (**TYPE-SAFE:** uses step-types.ts)
+- [x] **3.3** Create default pipeline plugin wrapping built-in steps (systemPlugin: true, hidden from UI)
+- [x] **3.4** Create PipelineBuilderService for pipeline compilation
+- [x] **3.5** Implement step replacement in PipelineBuilderService
+- [x] **3.6** Implement step injection in PipelineBuilderService
+- [x] **3.7** Implement step disabling in PipelineBuilderService
+- [x] **3.8** Implement append/prepend positioning
+- [x] **3.9** Implement topological sort for step ordering
+- [x] **3.10** Identify steps that can run in parallel
+- [x] **3.11** Apply provider overrides to category steps (ProviderOverrideService)
+- [x] **3.12** Create ExecutablePipeline class (ExecutablePipelineRunner)
+- [x] **3.13** Create StepPipelineExecutor (StepPipelineExecutorService)
+- [x] **3.14** Create FullPipelineExecutor (FullPipelineExecutorService)
+- [x] **3.15** Check providers.pipeline for full vs step-based execution (PipelineOrchestratorService)
+- [x] **3.16** Skip steps when previous step already provided data
+- [x] **3.17** Track per-step execution metrics
+- [x] **3.18** Save context after each step (checkpoint saving)
+- [x] **3.19** Add pipeline event hooks (beforePipeline, afterStep, onStepError, afterPipeline)
+- [x] **3.20** Map step IDs to executors
+- [x] **3.21** Validate step dependencies before execution
+- [x] **3.22** Detect circular dependencies in step graph
+- [x] **3.23** Create step adapter for existing services (StepAdapterService)
 
 ---
 
@@ -334,8 +347,8 @@ Create comprehensive testing infrastructure for the plugin system.
 - [x] **18.5** Create unit tests for plugin discovery and loading (PluginLoaderService)
 - [x] **18.6** Create unit tests for plugin registry (PluginRegistryService)
 - [x] **18.7** Create tests for plugin lifecycle management
-- [ ] **18.8** Create unit tests for PipelineBuilderService
-- [ ] **18.9** Create unit tests for pipeline execution (StepPipelineExecutor)
+- [x] **18.8** Create unit tests for PipelineBuilderService
+- [x] **18.9** Create unit tests for pipeline execution (StepPipelineExecutor, PipelineOrchestrator)
 - [ ] **18.10** Create unit tests for GitHub plugin
 - [ ] **18.11** Create unit tests for Vercel plugin
 - [ ] **18.12** Create unit tests for ScreenshotOne plugin
