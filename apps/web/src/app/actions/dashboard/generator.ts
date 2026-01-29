@@ -17,37 +17,61 @@ import {
     sanitizeStringArray,
 } from '@/lib/utils/sanitize';
 
+/**
+ * Sanitize plugin-specific configuration values.
+ * Applies sanitization to common patterns (string arrays, URLs) while
+ * leaving other values unchanged.
+ */
+function sanitizePluginConfig(config: Record<string, unknown>): Record<string, unknown> {
+    const sanitized: Record<string, unknown> = {};
+
+    for (const [key, value] of Object.entries(config)) {
+        if (value === undefined || value === null) {
+            continue;
+        }
+
+        // String arrays (categories, keywords, tags, etc.)
+        if (Array.isArray(value) && value.every((v) => typeof v === 'string')) {
+            // URL arrays get trimmed, other string arrays get sanitized
+            if (key.includes('url')) {
+                sanitized[key] = value.map((v: string) => v.trim()).filter(Boolean);
+            } else {
+                sanitized[key] = sanitizeStringArray(value);
+            }
+        }
+        // Pass through all other values
+        else {
+            sanitized[key] = value;
+        }
+    }
+
+    return sanitized;
+}
+
 export async function generateItems(directoryId: string, data: CreateItemsGeneratorDto) {
     const t = await getTranslations('actions.generator');
     const tDirectories = await getTranslations('actions.directories');
 
     try {
-        // Sanitize input data
+        // Sanitize core data
         const sanitizedData: CreateItemsGeneratorDto = {
-            ...data,
             name: sanitizeName(data.name, 200),
             prompt: sanitizePrompt(data.prompt, 5000),
             repository_description: data.repository_description
                 ? sanitizeDescription(data.repository_description, 500)
                 : undefined,
-            initial_categories: data.initial_categories
-                ? sanitizeStringArray(data.initial_categories)
-                : undefined,
-            priority_categories: data.priority_categories
-                ? sanitizeStringArray(data.priority_categories)
-                : undefined,
-            target_keywords: data.target_keywords
-                ? sanitizeStringArray(data.target_keywords)
-                : undefined,
-            source_urls: data.source_urls
-                ? data.source_urls.map((url) => url.trim()).filter(Boolean)
-                : undefined,
+            generation_method: data.generation_method,
+            update_with_pull_request: data.update_with_pull_request,
+            website_repository_creation_method: data.website_repository_creation_method,
             company: data.company
                 ? {
                       name: sanitizeName(data.company.name, 200),
                       website: data.company.website.trim(),
                   }
                 : undefined,
+            providers: data.providers,
+            // Pass pluginConfig through (sanitization is plugin-specific)
+            pluginConfig: data.pluginConfig ? sanitizePluginConfig(data.pluginConfig) : undefined,
         };
 
         // Validate required fields

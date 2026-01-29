@@ -1,6 +1,7 @@
 import type { IPlugin } from '../plugin.interface.js';
 import type { FormFieldDefinition, FormFieldGroup } from '../../common/form-field.types.js';
 import type { ValidationResult } from '../../settings/validation.types.js';
+import type { PluginIcon } from '../plugin-manifest.types.js';
 
 /**
  * Interface for plugins that provide form fields for the generator form.
@@ -127,5 +128,5 @@ export interface ProviderOption {
 	/** Whether this is the default/recommended provider */
 	isDefault?: boolean;
 	/** Icon for the provider */
-	icon?: string;
+	icon?: PluginIcon;
 }

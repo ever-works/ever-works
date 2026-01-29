@@ -40,8 +40,10 @@ describe('ContentRetrievalStep', () => {
 	const createMockRequest = (overrides?: Partial<GenerationRequest>): GenerationRequest =>
 		({
 			prompt: 'Test prompt',
-			sourceUrls: [],
-			config: {},
+			config: {
+				source_urls: [],
+				...((overrides?.config as Record<string, unknown>) || {})
+			},
 			...overrides
 		}) as GenerationRequest;
 
@@ -89,10 +91,10 @@ describe('ContentRetrievalStep', () => {
 			);
 		});
 
-		it('should combine extractedUrls and sourceUrls', async () => {
+		it('should combine extractedUrls and sourceUrls from config', async () => {
 			mockContext.extractedUrls = ['https://example1.com'];
 			mockContext.request = createMockRequest({
-				sourceUrls: ['https://example2.com']
+				config: { source_urls: ['https://example2.com'] }
 			});
 
 			await step.run(mockContext, mockExecContext);
@@ -104,7 +106,7 @@ describe('ContentRetrievalStep', () => {
 		it('should deduplicate URLs', async () => {
 			mockContext.extractedUrls = ['https://example.com'];
 			mockContext.request = createMockRequest({
-				sourceUrls: ['https://example.com'] // Same URL
+				config: { source_urls: ['https://example.com'] } // Same URL
 			});
 
 			await step.run(mockContext, mockExecContext);
@@ -243,9 +245,9 @@ describe('ContentRetrievalStep', () => {
 	});
 
 	describe('Edge Cases', () => {
-		it('should handle empty sourceUrls in request', async () => {
+		it('should handle empty sourceUrls in config', async () => {
 			mockContext.extractedUrls = ['https://example.com'];
-			mockContext.request = createMockRequest({ sourceUrls: undefined });
+			mockContext.request = createMockRequest({ config: { source_urls: [] } });
 
 			const result = await step.run(mockContext, mockExecContext);
 

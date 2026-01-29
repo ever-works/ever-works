@@ -2,13 +2,18 @@
 
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { CreateItemsGeneratorDto } from '@/lib/api/types-only';
 import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
 
+interface CoreFormData {
+    name: string;
+    prompt: string;
+    repository_description?: string;
+}
+
 interface RequiredFieldsProps {
-    formData: Partial<CreateItemsGeneratorDto>;
-    onChange: (updates: Partial<CreateItemsGeneratorDto>) => void;
+    formData: Partial<CoreFormData>;
+    onChange: (updates: Partial<CoreFormData>) => void;
 }
 
 export function RequiredFields({ formData, onChange }: RequiredFieldsProps) {

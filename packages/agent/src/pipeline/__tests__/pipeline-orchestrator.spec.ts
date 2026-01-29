@@ -41,10 +41,8 @@ describe('PipelineOrchestratorService', () => {
     };
 
     const mockRequest: GenerationRequest = {
-        count: 10,
         prompt: 'Generate test items',
-        includeAiItems: true,
-        includeWebItems: true,
+        config: {},
     };
 
     const mockExisting: ExistingItems = {

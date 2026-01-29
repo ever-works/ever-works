@@ -36,45 +36,42 @@ export interface DirectoryReference {
 }
 
 /**
- * Items generation request parameters
+ * Items generation request parameters.
+ *
+ * Core fields are defined here. All plugin-specific configuration
+ * (search limits, feature flags, etc.) goes in `config` and is
+ * defined dynamically by the pipeline plugin via IFormSchemaProvider.
  */
 export interface GenerationRequest {
+	// ============================================================================
+	// Core Fields (Platform-level)
+	// ============================================================================
+
 	/** Name/title for the generation (topic name) */
 	readonly name?: string;
-	/** Number of items to generate */
-	readonly count?: number;
+
 	/** Prompt or topic for generation */
 	readonly prompt?: string;
-	/** Additional search queries */
-	readonly searchQueries?: readonly string[];
-	/** URLs to extract items from */
-	readonly urls?: readonly string[];
-	/** Whether to include AI-generated items */
-	readonly includeAiItems?: boolean;
-	/** Whether to include web-extracted items */
-	readonly includeWebItems?: boolean;
-	/** Existing item names to avoid duplicates */
-	readonly existingItemNames?: readonly string[];
-	/** Existing category names */
-	readonly existingCategoryNames?: readonly string[];
-	/** Existing tag names */
-	readonly existingTagNames?: readonly string[];
-	/** Configuration options for the generation pipeline */
-	readonly config?: Record<string, unknown>;
+
 	/** Generation method (create-update or recreate) */
-	readonly generationMethod?: 'CREATE_UPDATE' | 'RECREATE' | string;
-	/** Initial categories for generation */
-	readonly initialCategories?: readonly string[];
-	/** Priority categories for generation */
-	readonly priorityCategories?: readonly string[];
-	/** Source URLs to extract items from */
-	readonly sourceUrls?: readonly string[];
+	readonly generationMethod?: 'create-update' | 'recreate' | string;
+
 	/** Company information */
 	readonly company?: { name: string; website: string };
-	/** Whether to capture screenshots */
-	readonly captureScreenshots?: boolean;
-	/** Whether badge evaluation is enabled */
-	readonly badgeEvaluationEnabled?: boolean;
+
+	// ============================================================================
+	// Plugin Configuration (Dynamic)
+	// ============================================================================
+
+	/**
+	 * Plugin-specific configuration.
+	 *
+	 * All pipeline-specific settings are passed here as an opaque object.
+	 * The structure is defined dynamically by the pipeline plugin via
+	 * IFormSchemaProvider.getFormFields(). The platform does not hardcode
+	 * any field names - plugins are fully responsible for their own config.
+	 */
+	readonly config?: Record<string, unknown>;
 }
 
 /**

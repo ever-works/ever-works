@@ -253,11 +253,4 @@ export class ScreenshotOneService {
             };
         }
     }
-
-    /**
-     * @deprecated Use validateKeys instead
-     */
-    async validateAccessKey(accessKey: string): Promise<ScreenshotValidationResult> {
-        return this.validateKeys(accessKey);
-    }
 }

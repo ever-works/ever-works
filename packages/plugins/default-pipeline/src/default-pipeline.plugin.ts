@@ -459,9 +459,8 @@ export class DefaultPipelinePlugin implements IPlugin, IPipelineStepPlugin, IFor
 	/**
 	 * Get a specific step definition by ID.
 	 *
-	 * @param stepId - Optional step ID. If not provided, returns the first step (for backward compatibility).
+	 * @param stepId - Optional step ID. If not provided, returns the first step.
 	 * @returns The step definition or undefined if not found.
-	 * @deprecated Use getStepDefinitions() to get all steps or static getBuiltInStep() for a specific step.
 	 */
 	getStepDefinition(stepId?: string): PipelineStepDefinition | undefined {
 		if (stepId) {

@@ -157,8 +157,8 @@ export class PromptProcessingStep implements IBuiltInStepExecutor {
 			prompt
 		};
 
-		// Merge extracted URLs with source URLs
-		const sourceUrls = request.urls || [];
+		// Merge extracted URLs with source URLs from config
+		const sourceUrls = (config.source_urls as string[]) || [];
 		let extractedUrls = [...extractedUrlsFromPrompt, ...sourceUrls];
 
 		// Filter out already processed URLs for CREATE_UPDATE generation method

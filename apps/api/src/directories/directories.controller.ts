@@ -59,6 +59,7 @@ import {
     DirectoryOwnershipService,
     DirectoryAdvancedPromptsService,
     DirectoryTaxonomyService,
+    GeneratorFormSchemaService,
 } from '@packages/agent/services';
 import {
     AnalyzeRepositoryDto,
@@ -97,6 +98,7 @@ export class DirectoriesController {
         private readonly directoryOwnershipService: DirectoryOwnershipService,
         private readonly directoryAdvancedPromptsService: DirectoryAdvancedPromptsService,
         private readonly directoryTaxonomyService: DirectoryTaxonomyService,
+        private readonly generatorFormSchemaService: GeneratorFormSchemaService,
     ) {}
 
     @Get('directories')
@@ -282,6 +284,29 @@ export class DirectoriesController {
             generateDirectoryDetailDto.prompt,
             user,
         );
+    }
+
+    @Get('directories/:id/generator-form')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Get generator form schema',
+        description:
+            'Get the dynamic form schema for the generator based on the selected pipeline plugin',
+    })
+    @ApiParam({ name: 'id', description: 'Directory ID' })
+    @ApiQuery({ name: 'pipelineId', required: false, description: 'Selected pipeline plugin ID' })
+    @ApiResponse({ status: 200, description: 'Generator form schema' })
+    async getGeneratorFormSchema(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id') id: string,
+        @Query('pipelineId') pipelineId?: string,
+    ) {
+        // Verify user has access to the directory
+        const user = await this.authService.getUser(auth.userId);
+        await this.directoryOwnershipService.ensureAccess(id, user.id);
+
+        // Get the form schema based on selected pipeline
+        return this.generatorFormSchemaService.getFormSchema(pipelineId);
     }
 
     @Post('directories/:id/generate')

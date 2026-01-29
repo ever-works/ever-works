@@ -1,24 +1,20 @@
 import {
     IsString,
-    IsArray,
     IsOptional,
     ValidateNested,
-    IsInt,
-    Min,
-    Max,
     IsBoolean,
     IsUrl,
     IsEnum,
     IsNotEmpty,
     MaxLength,
+    IsObject,
 } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
-import {
-    sanitizeName,
-    sanitizeDescription,
-    sanitizePrompt,
-    sanitizeText,
-} from '../../utils/sanitize.util';
+import { sanitizeName, sanitizeDescription, sanitizePrompt } from '../../utils/sanitize.util';
+
+// ============================================================================
+// Enums
+// ============================================================================
 
 export enum GenerationMethod {
     CREATE_UPDATE = 'create-update',
@@ -30,17 +26,9 @@ export enum WebsiteRepositoryCreationMethod {
     CREATE_USING_TEMPLATE = 'create-using-template',
 }
 
-export enum DataVolumeMode {
-    REAL = 'real',
-    SAMPLE = 'sample',
-}
-
-export const SAMPLE_MODE_CONFIG = {
-    max_search_queries: 2,
-    max_results_per_query: 3,
-    max_pages_to_process: 5,
-    max_items: 10,
-} as const;
+// ============================================================================
+// Supporting DTOs
+// ============================================================================
 
 export class CompanyDto {
     @IsString()
@@ -55,189 +43,136 @@ export class CompanyDto {
     website: string;
 }
 
-export class ConfigDto {
+/**
+ * Provider selection for each capability category.
+ * Allows users to select which plugin to use for search, AI, etc.
+ */
+export class ProvidersDto {
+    /** Search provider plugin ID (e.g., "tavily", "exa:search") */
     @IsOptional()
-    @IsInt()
-    @Min(1)
-    @Max(100) // Sensible upper limit
-    max_search_queries: number = 10;
+    @IsString()
+    search?: string;
 
+    /** Screenshot provider plugin ID (e.g., "screenshotone") */
     @IsOptional()
-    @IsInt()
-    @Min(1)
-    @Max(100) // Sensible upper limit
-    max_results_per_query: number = 5;
+    @IsString()
+    screenshot?: string;
 
+    /** AI provider plugin ID (e.g., "openai", "anthropic") */
     @IsOptional()
-    @IsInt()
-    @Min(1)
-    @Max(1000) // Sensible upper limit
-    max_pages_to_process: number = 10;
+    @IsString()
+    ai?: string;
 
+    /** Pipeline plugin ID (null = default pipeline, "exa:websets" = full pipeline replacement) */
     @IsOptional()
-    @Min(0.01)
-    @Max(1.0)
-    relevance_threshold_content: number = 0.6;
-
-    @IsOptional()
-    @IsInt()
-    @Min(0)
-    min_content_length_for_extraction: number = 100;
-
-    @IsOptional()
-    @IsBoolean()
-    ai_first_generation_enabled: boolean = false;
-
-    @IsOptional()
-    @IsBoolean()
-    content_filtering_enabled: boolean = true;
-
-    @IsOptional()
-    @Min(0.01)
-    @Max(1.0)
-    prompt_comparison_confidence_threshold: number = 0.5;
-
-    @IsOptional()
-    @IsEnum(DataVolumeMode)
-    data_volume_mode: DataVolumeMode = DataVolumeMode.REAL;
-
-    @IsOptional()
-    @IsBoolean()
-    generate_categories: boolean = true;
-
-    @IsOptional()
-    @IsBoolean()
-    generate_tags: boolean = true;
-
-    @IsOptional()
-    @IsBoolean()
-    generate_brands: boolean = true;
-
-    @IsOptional()
-    @IsInt()
-    @Min(1)
-    @Max(1000)
-    max_items?: number;
+    @IsString()
+    pipeline?: string;
 }
 
+// ============================================================================
+// Main DTO
+// ============================================================================
+
 /**
- * Returns an effective configuration by applying sample mode overrides when applicable.
- * This function merges the user-provided config with SAMPLE_MODE_CONFIG values when
- * data_volume_mode is set to SAMPLE.
+ * DTO for creating/triggering item generation.
  *
- * @param config The original ConfigDto
- * @returns A new ConfigDto with sample mode overrides applied if applicable
+ * This is the minimal core DTO. All pipeline-specific configuration
+ * is passed via `pluginConfig`, with fields defined dynamically by
+ * the selected pipeline plugin via IFormSchemaProvider.getFormFields().
  */
-export function getEffectiveConfig(config: ConfigDto): ConfigDto {
-    if (config.data_volume_mode !== DataVolumeMode.SAMPLE) {
-        return config;
-    }
-
-    return {
-        ...config,
-        max_search_queries: SAMPLE_MODE_CONFIG.max_search_queries,
-        max_results_per_query: SAMPLE_MODE_CONFIG.max_results_per_query,
-        max_pages_to_process: SAMPLE_MODE_CONFIG.max_pages_to_process,
-        max_items: config.max_items ?? SAMPLE_MODE_CONFIG.max_items,
-    };
-}
-
-/**
- * Helper to sanitize string arrays by trimming and removing empty values
- */
-function sanitizeStringArray(value: unknown): string[] {
-    if (!Array.isArray(value)) {
-        return value as string[];
-    }
-    return value
-        .map((item) => (typeof item === 'string' ? sanitizeText(item) : item))
-        .filter((item) => typeof item === 'string' && item.length > 0);
-}
-
 export class CreateItemsGeneratorDto {
+    // ============================================================================
+    // Required Fields
+    // ============================================================================
+
+    /** Directory name */
     @IsString()
     @IsNotEmpty()
     @MaxLength(200)
     @Transform(({ value }) => (typeof value === 'string' ? sanitizeName(value, 200) : value))
     name: string;
 
+    /** Generation prompt describing what items to generate */
     @IsString()
     @IsNotEmpty()
     @MaxLength(5000)
     @Transform(({ value }) => (typeof value === 'string' ? sanitizePrompt(value, 5000) : value))
     prompt: string;
 
+    // ============================================================================
+    // Optional Core Fields
+    // ============================================================================
+
+    /** Company context for generation */
     @IsOptional()
     @ValidateNested()
     @Type(() => CompanyDto)
     company?: CompanyDto;
 
-    @IsOptional()
-    @IsArray()
-    @IsString({ each: true })
-    @Transform(({ value }) => sanitizeStringArray(value))
-    initial_categories?: string[];
-
-    @IsOptional()
-    @IsArray()
-    @IsString({ each: true })
-    @Transform(({ value }) => sanitizeStringArray(value))
-    priority_categories?: string[]; // Categories that should appear first in the final output
-
-    @IsOptional()
-    @IsArray()
-    @IsString({ each: true })
-    @Transform(({ value }) => sanitizeStringArray(value))
-    target_keywords?: string[];
-
-    @IsOptional()
-    @IsArray()
-    @IsString({ each: true })
-    @IsUrl({ protocols: ['http', 'https'], require_tld: true }, { each: true })
-    @Transform(({ value }) =>
-        Array.isArray(value) ? value.map((url: string) => url?.trim()).filter(Boolean) : value,
-    )
-    source_urls?: string[] = [];
-
-    @IsOptional()
-    @ValidateNested()
-    @Type(() => ConfigDto)
-    config: ConfigDto = new ConfigDto();
-
+    /** Description for the repository */
     @IsOptional()
     @IsString()
     @MaxLength(500)
     @Transform(({ value }) => (typeof value === 'string' ? sanitizeDescription(value, 500) : value))
     repository_description?: string;
 
+    /** How to handle existing items during generation */
     @IsOptional()
     @IsEnum(GenerationMethod)
     generation_method?: GenerationMethod = GenerationMethod.CREATE_UPDATE;
 
+    /** Whether to create a PR for updates or commit directly */
     @IsOptional()
     @IsBoolean()
     update_with_pull_request?: boolean = true;
 
-    @IsOptional()
-    @IsBoolean()
-    badge_evaluation_enabled?: boolean = false;
-
+    /** How to create the website repository */
     @IsOptional()
     @IsEnum(WebsiteRepositoryCreationMethod)
     website_repository_creation_method?: WebsiteRepositoryCreationMethod =
         WebsiteRepositoryCreationMethod.CREATE_USING_TEMPLATE;
 
+    // ============================================================================
+    // Plugin System Fields
+    // ============================================================================
+
     /**
-     * When enabled, captures images for each generated item using smart routing:
-     * - SOFTWARE/SERVICES: Takes screenshots of the source URLs
-     * - ECOMMERCE/GENERAL: Extracts product images (og:image, JSON-LD), falls back to screenshots
+     * Provider selection for each capability category.
+     * Allows selecting specific plugins for search, AI, screenshots, and pipeline.
      *
-     * Default: false (lazy mode - images are not captured during generation)
+     * Example:
+     * ```
+     * providers: {
+     *   search: "tavily",
+     *   ai: "openai",
+     *   pipeline: "default-pipeline"
+     * }
+     * ```
      */
     @IsOptional()
-    @IsBoolean()
-    capture_screenshots?: boolean = false;
+    @ValidateNested()
+    @Type(() => ProvidersDto)
+    providers?: ProvidersDto;
+
+    /**
+     * Plugin-specific configuration.
+     *
+     * All pipeline-specific settings are passed here as an opaque object.
+     * The structure is defined dynamically by the pipeline plugin via
+     * IFormSchemaProvider.getFormFields(). The platform does not hardcode
+     * any field names - plugins are fully responsible for their own config.
+     *
+     * The frontend fetches the form schema from /generator-form endpoint
+     * and renders fields accordingly based on the selected pipeline.
+     */
+    @IsOptional()
+    @IsObject()
+    pluginConfig?: Record<string, unknown>;
 }
+
+// ============================================================================
+// Update DTO
+// ============================================================================
 
 export class UpdateItemsGeneratorDto {
     @IsOptional()

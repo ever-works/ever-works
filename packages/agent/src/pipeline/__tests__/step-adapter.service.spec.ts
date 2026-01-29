@@ -27,8 +27,8 @@ describe('StepAdapterService', () => {
     };
 
     const mockRequest: GenerationRequest = {
-        count: 10,
         prompt: 'Generate test items',
+        config: {},
     };
 
     const mockExisting: ExistingItems = {

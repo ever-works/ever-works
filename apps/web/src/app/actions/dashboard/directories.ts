@@ -236,7 +236,9 @@ export async function createDirectoryWithAI(request: AIDirectoryOptions) {
         await itemsGeneratorAPI.generate(directory.id, {
             name: validation.data.name,
             prompt: validation.data.prompt,
-            target_keywords: directoryDetails.keywords,
+            pluginConfig: {
+                target_keywords: directoryDetails.keywords,
+            },
         });
 
         return {

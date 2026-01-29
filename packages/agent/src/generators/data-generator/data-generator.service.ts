@@ -13,8 +13,6 @@ import {
     ItemsGeneratorMetrics,
     Category,
     Tag,
-    getEffectiveConfig,
-    ConfigDto,
 } from '../../items-generator/dto';
 import { format } from 'date-fns';
 import { GenerateStatusType } from '../../entities/types';
@@ -32,24 +30,6 @@ import type {
 } from '@ever-works/plugin';
 
 const PARALLEL_WRITE_CONCURRENCY = 10;
-
-/**
- * Default config values for stored request data.
- * These conservative values are applied when saving last_request_data
- * to ensure scheduled runs use efficient, cost-effective settings.
- */
-const STORED_CONFIG_DEFAULTS = {
-    max_search_queries: 10,
-    max_results_per_query: 5,
-    max_pages_to_process: 10,
-    ai_first_generation_enabled: false,
-    // Data generation defaults - ensure all entities are generated
-    generate_categories: true,
-    generate_tags: true,
-    generate_brands: true,
-    // Default to real mode for stored configs (sample mode is for quick tests)
-    data_volume_mode: 'real',
-};
 
 const DEFAULT_ITEM_MARKDOWN = (item: ItemData) =>
     `# ${item.name}\n\n${item.description}\n\n[${item.source_url}](${item.source_url})`;
@@ -324,19 +304,10 @@ export class DataGeneratorService {
                 );
             }
 
-            // Build metadata - always update last_request_data and generation_method
-            // Apply conservative config defaults before storing to ensure scheduled runs
-            // use efficient, cost-effective settings regardless of manual run config
-            const sanitizedDto = {
-                ...createItemsGeneratorDto,
-                config: {
-                    ...createItemsGeneratorDto.config,
-                    ...STORED_CONFIG_DEFAULTS,
-                },
-            };
-
+            // Build metadata - store the request data for scheduled runs
+            // Plugin config is stored as-is; plugins handle their own defaults
             const metadata: Record<string, unknown> = {
-                last_request_data: sanitizedDto,
+                last_request_data: createItemsGeneratorDto,
             };
 
             // Only set initial_prompt if it doesn't exist yet (first creation)
@@ -885,15 +856,9 @@ export class DataGeneratorService {
         },
         onProgress?: (step: string) => void,
     ): Promise<PipelineResult> {
-        // Apply effective config (handles sample mode overrides)
-        const effectiveDto = { ...dto };
-        if (effectiveDto.config) {
-            effectiveDto.config = getEffectiveConfig(effectiveDto.config) as ConfigDto;
-        }
-
         // Handle existing data reset for RECREATE mode
         let existing = { ...existingData };
-        if (effectiveDto.generation_method === GenerationMethod.RECREATE) {
+        if (dto.generation_method === GenerationMethod.RECREATE) {
             existing = {
                 existingItems: [],
                 existingCategories: [],
@@ -913,17 +878,15 @@ export class DataGeneratorService {
         };
 
         // Convert DTO to GenerationRequest (plugin type)
+        // Core fields are explicit; all plugin-specific config goes in config
         const request: GenerationRequest = {
-            name: effectiveDto.name,
-            prompt: effectiveDto.prompt,
-            generationMethod: effectiveDto.generation_method,
-            initialCategories: effectiveDto.initial_categories,
-            priorityCategories: effectiveDto.priority_categories,
-            sourceUrls: effectiveDto.source_urls,
-            captureScreenshots: effectiveDto.capture_screenshots,
-            badgeEvaluationEnabled: effectiveDto.badge_evaluation_enabled,
-            company: effectiveDto.company,
-            config: effectiveDto.config as unknown as Record<string, unknown>,
+            name: dto.name,
+            prompt: dto.prompt,
+            generationMethod: dto.generation_method,
+            company: dto.company,
+            // All plugin-specific configuration passes through as-is
+            // The pipeline plugin applies its own defaults via getDefaultValues()
+            config: dto.pluginConfig || {},
         };
 
         // Convert existing data to ExistingItems (plugin type)
@@ -1166,13 +1129,13 @@ export class DataGeneratorService {
             // 1. Not an awesome_readme import (they use sync, not AI)
             // 2. The imported config doesn't already have one
             if (!isAwesomeReadme && !existingMetadata.last_request_data) {
-                const initialRequestData = new CreateItemsGeneratorDto();
-                initialRequestData.name = directory.name;
-                initialRequestData.prompt = initialPrompt;
-                initialRequestData.initial_categories = initialCategories;
-                if (importedData.importRequest?.sourceUrl) {
-                    initialRequestData.source_urls = [importedData.importRequest.sourceUrl];
-                }
+                // Store minimal request data - plugin-specific defaults come from plugins
+                const initialRequestData: Partial<CreateItemsGeneratorDto> = {
+                    name: directory.name,
+                    prompt: initialPrompt,
+                    // pluginConfig is intentionally empty - plugins provide defaults
+                    pluginConfig: {},
+                };
                 configData.metadata.last_request_data = initialRequestData;
             }
 

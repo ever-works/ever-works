@@ -3,7 +3,6 @@ import { serverFetch, serverMutation } from './server-api';
 import {
     GenerateStatusType,
     GenerationMethod,
-    ItemsGeneratorStep,
     RepoProvider,
     DirectoryScheduleCadence,
     DirectoryScheduleStatus,
@@ -53,7 +52,17 @@ export interface GenerateDirectoryDetailDto {
 
 export type GenerateStatus = {
     status: GenerateStatusType;
-    step?: ItemsGeneratorStep;
+    /** Current step ID (e.g., "prompt-processing") */
+    step?: string;
+    /** Human-readable step name (from pipeline plugin) */
+    stepName?: string;
+    /** Current step index (0-based) */
+    stepIndex?: number;
+    /** Total number of steps in the pipeline */
+    totalSteps?: number;
+    /** Progress percentage (0-100) */
+    progress?: number;
+    /** Error message if status is ERROR */
     error?: string;
 };
 

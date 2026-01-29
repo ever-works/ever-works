@@ -857,6 +857,9 @@
                 "promptRequired": "Prompt is required",
                 "operationStartedSuccessfully": "Operation started successfully",
                 "failedToStartOperation": "Failed to start operation",
+                "loadingFormSchema": "Loading form configuration...",
+                "failedToLoadFormSchema": "Failed to load form configuration",
+                "selectOption": "Select an option",
                 "directoryName": "Directory Name",
                 "generationPrompt": "Generation Prompt",
                 "recommended": "Recommended",
@@ -946,7 +949,21 @@
                 "generateTags": "Generate Tags",
                 "generateTagsDescription": "Create tags for flexible item labeling",
                 "generateBrands": "Generate Brands",
-                "generateBrandsDescription": "Extract and create brand entities from items"
+                "generateBrandsDescription": "Extract and create brand entities from items",
+                "pipelineMode": "Pipeline Mode",
+                "standardPipeline": "Standard Pipeline",
+                "standardPipelineDescription": "Use the step-by-step pipeline with individual provider selection",
+                "providerSelection": "Provider Selection",
+                "providerSelectionDescription": "Choose which providers to use for each capability",
+                "searchProvider": "Search Provider",
+                "searchProviderDescription": "Provider for web search and content discovery",
+                "screenshotProvider": "Screenshot Provider",
+                "screenshotProviderDescription": "Provider for capturing screenshots of items",
+                "aiProvider": "AI Provider",
+                "aiProviderDescription": "AI model provider for content generation and extraction",
+                "useDirectoryDefault": "Use Directory Default",
+                "default": "Default",
+                "notConfigured": "Not configured"
             },
             "progress": {
                 "title": "Generation in Progress",
@@ -1788,7 +1805,8 @@
             "failedToUpdateItems": "Failed to update items",
             "markdownRegeneratedSuccessfully": "Markdown regenerated successfully",
             "failedToRegenerateMarkdown": "Failed to regenerate markdown",
-            "notAuthorizedToAccessOrganization": "You are not authorized to access this organization. Please contact the owner ({owner}) for assistance."
+            "notAuthorizedToAccessOrganization": "You are not authorized to access this organization. Please contact the owner ({owner}) for assistance.",
+            "failedToLoadFormSchema": "Failed to load form configuration"
         },
         "settings": {
             "profile": {

@@ -1,7 +1,6 @@
 'use client';
 
 import { Directory } from '@/lib/api/types-only';
-import { ItemsGeneratorStep } from '@/lib/api/enums';
 import { cn } from '@/lib/utils/cn';
 import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
@@ -23,10 +22,10 @@ export function GenerationProgress({ directory }: GenerationProgressProps) {
         return () => clearInterval(interval);
     }, []);
 
-    // Get current step and progress
-    const currentStep = directory.generateStatus?.step as ItemsGeneratorStep | undefined;
-    const progressPercentage = currentStep ? getStepProgress(currentStep) : 0;
-    const stepText = getStepText(currentStep, t);
+    // Get current step and progress (supports both dynamic and legacy)
+    const generateStatus = directory.generateStatus;
+    const progressPercentage = getStepProgress(generateStatus);
+    const stepText = getStepText(generateStatus, t('steps.processing'));
 
     return (
         <div className="max-w-2xl mx-auto py-12">

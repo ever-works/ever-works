@@ -27,11 +27,12 @@ export class ContentRetrievalStep implements IBuiltInStepExecutor {
 	async run(context: MutableGenerationContext, execContext: StepExecutionContext): Promise<MutableGenerationContext> {
 		const { request, directory, extractedUrls, processedSourceUrls } = context;
 		const { logger, searchFacade, contentExtractorFacade } = execContext;
+		const config = request.config || {};
 
 		logger.log(`[${directory.slug}] Content Retrieval - Starting`);
 
-		// Combine extractedUrls from previous steps with sourceUrls from request
-		const sourceUrls = request.sourceUrls || [];
+		// Combine extractedUrls from previous steps with sourceUrls from config
+		const sourceUrls = (config.source_urls as string[]) || [];
 		const allUrls = [...new Set([...extractedUrls, ...sourceUrls])];
 
 		if (allUrls.length === 0) {

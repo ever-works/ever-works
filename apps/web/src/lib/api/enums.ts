@@ -24,28 +24,6 @@ export enum WebsiteRepositoryCreationMethod {
     CREATE_USING_TEMPLATE = 'create-using-template',
 }
 
-export enum DataVolumeMode {
-    REAL = 'real',
-    SAMPLE = 'sample',
-}
-
-export enum ItemsGeneratorStep {
-    PROMPT_COMPARISON = 'prompt-comparison',
-    PROMPT_PROCESSING = 'prompt-processing',
-    DOMAIN_DETECTION = 'domain-detection',
-    AI_FIRST_ITEMS_GENERATION = 'ai-first-items-generation',
-    SEARCH_QUERIES_GENERATION = 'search-queries-generation',
-    WEB_SEARCH = 'web-search',
-    CONTENT_RETRIEVAL = 'content-retrieval',
-    CONTENT_FILTERING = 'content-filtering',
-    ITEMS_EXTRACTION = 'items-extraction',
-    DEDUPLICATION_AND_DATA_AGGREGATION = 'deduplication-and-data-aggregation',
-    CATEGORIES_TAGS_PROCESSING = 'categories-tags-processing',
-    SOURCES_VALIDATION = 'sources-validation',
-    BADGES_PROCESSING = 'badges-processing',
-    MARKDOWN_GENERATION = 'markdown-generation',
-}
-
 export enum OAuthProcessType {
     LOGIN = 'login',
     CONNECT = 'connect',

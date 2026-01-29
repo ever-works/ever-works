@@ -86,7 +86,7 @@ export class BadgeProcessingStep implements IBuiltInStepExecutor {
 		const config = request.config || {};
 		const domainType: DomainType = (domainAnalysis?.domain_type as DomainType) ?? 'software';
 
-		if (config.badge_evaluation_enabled || request.badgeEvaluationEnabled) {
+		if (config.badge_evaluation_enabled) {
 			const processedItems = await this.processBadges(finalItems, domainType, metrics, logger, aiFacade);
 			context.finalItems = processedItems;
 		}

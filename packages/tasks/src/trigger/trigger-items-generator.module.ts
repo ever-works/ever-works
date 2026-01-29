@@ -1,11 +1,14 @@
 import { Module } from '@nestjs/common';
 import { GitModule } from '@packages/agent/git';
-import { STEP_SERVICES, STEP_SERVICES_EXPORTS } from '@packages/agent/items-generator';
 import { TriggerAiModule } from './trigger-ai.module';
 
+/**
+ * Module for Trigger.dev items generator jobs.
+ * Step services have been moved to plugins (default-pipeline-plugin).
+ */
 @Module({
     imports: [TriggerAiModule, GitModule],
-    providers: STEP_SERVICES,
-    exports: STEP_SERVICES_EXPORTS,
+    providers: [],
+    exports: [],
 })
 export class TriggerItemsGeneratorModule {}

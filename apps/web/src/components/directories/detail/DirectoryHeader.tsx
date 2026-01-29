@@ -143,7 +143,10 @@ export function DirectoryHeader({ directory }: DirectoryHeaderProps) {
                                 <span className="text-xs opacity-75">
                                     •{' '}
                                     <span className="ml-1">
-                                        {getStepText(directory.generateStatus.step, tProgress)}
+                                        {getStepText(
+                                            directory.generateStatus,
+                                            tProgress('steps.processing'),
+                                        )}
                                     </span>
                                 </span>
                             )}

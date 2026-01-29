@@ -40,12 +40,13 @@ export type {
     SyncDirectoryResponse,
     RepositoryStatus,
     RepositoryType,
+    // GenerateStatus now has dynamic step support
 } from './directory';
 
 export type {
     // From items-generator.ts
     CompanyDto,
-    ConfigDto,
+    ProvidersDto,
     CreateItemsGeneratorDto,
     UpdateItemsGeneratorDto,
     SubmitItemDto,
@@ -55,6 +56,12 @@ export type {
     ItemsGeneratorResponse,
     ExtractItemDetailsResponse,
     RegenerateMarkdownResponse,
+    // Generator form schema types
+    PluginIcon,
+    ProviderOption,
+    FormFieldDefinition,
+    FormFieldGroup,
+    GeneratorFormSchema,
 } from './items-generator';
 
 export type {

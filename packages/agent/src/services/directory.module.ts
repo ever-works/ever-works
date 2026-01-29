@@ -20,8 +20,10 @@ import { DirectoryMemberService } from './directory-member.service';
 import { DirectoryImportService } from './directory-import.service';
 import { DirectoryAdvancedPromptsService } from './directory-advanced-prompts.service';
 import { DirectoryTaxonomyService } from './directory-taxonomy.service';
+import { GeneratorFormSchemaService } from './generator-form-schema.service';
 import { SubscriptionsModule } from '@src/subscriptions';
 import { RepositoryManagementService } from './repository-management.service';
+import { PluginsModule } from '@src/plugins/plugins.module';
 import { NotificationsModule } from '@src/notifications';
 import { NotificationOperationsModule } from '@src/notification-operations';
 
@@ -40,6 +42,7 @@ import { NotificationOperationsModule } from '@src/notification-operations';
         SubscriptionsModule,
         NotificationsModule,
         NotificationOperationsModule,
+        PluginsModule,
     ],
     providers: [
         DirectoryOwnershipService,
@@ -54,6 +57,7 @@ import { NotificationOperationsModule } from '@src/notification-operations';
         DirectoryAdvancedPromptsService,
         DirectoryTaxonomyService,
         RepositoryManagementService,
+        GeneratorFormSchemaService,
     ],
     exports: [
         DirectoryOwnershipService,
@@ -68,6 +72,7 @@ import { NotificationOperationsModule } from '@src/notification-operations';
         DirectoryAdvancedPromptsService,
         DirectoryTaxonomyService,
         RepositoryManagementService,
+        GeneratorFormSchemaService,
     ],
 })
 export class DirectoryModule {}
