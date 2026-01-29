@@ -8,18 +8,33 @@
 // Type-safe generation context
 export { TypedGenerationContext, createGenerationContext } from './generation-context';
 
-// Built-in steps
-export {
-    BUILT_IN_STEPS,
-    BUILT_IN_STEPS_MAP,
-    BUILT_IN_STEP_SERVICE_MAP,
-    getBuiltInStep,
-    isBuiltInStep,
-    getBuiltInStepIds,
-} from './built-in-steps';
-
-// Default pipeline plugin
+// Default pipeline plugin (NestJS wrapper around standalone plugin)
+// The standalone plugin in @ever-works/default-pipeline-plugin is the single source of truth
 export { DefaultPipelinePlugin, type IBuiltInStepExecutor } from './default-pipeline.plugin';
+
+// Backwards-compatible exports - these now delegate to DefaultPipelinePlugin static methods
+// Prefer using DefaultPipelinePlugin.getBuiltInSteps() etc. directly
+import { DefaultPipelinePlugin } from './default-pipeline.plugin';
+
+/** @deprecated Use DefaultPipelinePlugin.getBuiltInSteps() instead */
+export const BUILT_IN_STEPS = DefaultPipelinePlugin.getBuiltInSteps();
+
+/** @deprecated Use DefaultPipelinePlugin.getBuiltInSteps() to get a Map instead */
+export const BUILT_IN_STEPS_MAP = new Map(
+    DefaultPipelinePlugin.getBuiltInSteps().map((step) => [step.id, step]),
+);
+
+/** @deprecated Use DefaultPipelinePlugin.getServiceMap() instead */
+export const BUILT_IN_STEP_SERVICE_MAP = DefaultPipelinePlugin.getServiceMap();
+
+/** @deprecated Use DefaultPipelinePlugin.getBuiltInStep() instead */
+export const getBuiltInStep = DefaultPipelinePlugin.getBuiltInStep;
+
+/** @deprecated Use DefaultPipelinePlugin.isBuiltInStep() instead */
+export const isBuiltInStep = DefaultPipelinePlugin.isBuiltInStep;
+
+/** @deprecated Use DefaultPipelinePlugin.getBuiltInStepIds() instead */
+export const getBuiltInStepIds = DefaultPipelinePlugin.getBuiltInStepIds;
 
 // Pipeline builder service
 export {

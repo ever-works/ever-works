@@ -1,0 +1,47 @@
+{
+	"name": "@ever-works/default-pipeline-plugin",
+	"version": "1.0.0",
+	"description": "Default Pipeline Plugin - System plugin providing the standard generation pipeline",
+	"private": true,
+	"main": "./dist/index.js",
+	"module": "./dist/index.mjs",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"import": "./dist/index.mjs",
+			"require": "./dist/index.js",
+			"types": "./dist/index.d.ts"
+		}
+	},
+	"scripts": {
+		"build": "tsup",
+		"dev": "tsup --watch",
+		"type-check": "tsc --noEmit",
+		"clean": "rm -rf dist"
+	},
+	"peerDependencies": {
+		"@ever-works/plugin": "workspace:*"
+	},
+	"devDependencies": {
+		"@ever-works/plugin": "workspace:*",
+		"tsup": "^8.4.0",
+		"typescript": "^5.7.3"
+	},
+	"everworks": {
+		"plugin": {
+			"id": "default-pipeline",
+			"name": "Default Pipeline",
+			"version": "1.0.0",
+			"category": "pipeline",
+			"capabilities": [
+				"pipeline-step"
+			],
+			"description": "System plugin providing the standard 15-step generation pipeline",
+			"autoInstall": true,
+			"systemPlugin": true,
+			"icon": {
+				"svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M3 12h4l3-9 4 18 3-9h4\"/></svg>"
+			}
+		}
+	}
+}

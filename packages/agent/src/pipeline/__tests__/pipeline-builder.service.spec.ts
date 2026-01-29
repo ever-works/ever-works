@@ -6,7 +6,7 @@ import {
     MissingDependencyError,
 } from '../pipeline-builder.service';
 import { PluginRegistryService } from '../../plugins/services/plugin-registry.service';
-import { BUILT_IN_STEPS } from '../built-in-steps';
+import { DefaultPipelinePlugin } from '../default-pipeline.plugin';
 import type {
     IPlugin,
     PluginManifest,
@@ -79,7 +79,7 @@ describe('PipelineBuilderService', () => {
         it('should return built-in steps when no plugins enabled', () => {
             const pipeline = service.build();
 
-            expect(pipeline.steps.length).toBe(BUILT_IN_STEPS.length);
+            expect(pipeline.steps.length).toBe(DefaultPipelinePlugin.getBuiltInSteps().length);
             expect(pipeline.source).toBe('standard');
             expect(pipeline.disabledSteps.size).toBe(0);
             expect(pipeline.replacedSteps.size).toBe(0);
@@ -90,7 +90,7 @@ describe('PipelineBuilderService', () => {
             const pipeline = service.build();
 
             const stepIds = pipeline.steps.map((s) => s.id);
-            for (const builtIn of BUILT_IN_STEPS) {
+            for (const builtIn of DefaultPipelinePlugin.getBuiltInSteps()) {
                 expect(stepIds).toContain(builtIn.id);
             }
         });
@@ -98,7 +98,7 @@ describe('PipelineBuilderService', () => {
         it('should create executor map for built-in steps', () => {
             const pipeline = service.build();
 
-            for (const step of BUILT_IN_STEPS) {
+            for (const step of DefaultPipelinePlugin.getBuiltInSteps()) {
                 const executor = pipeline.executorMap.get(step.id);
                 expect(executor).toBeDefined();
                 expect(executor?.type).toBe('builtin');
@@ -373,8 +373,8 @@ describe('PipelineBuilderService', () => {
         it('should return copy of built-in steps', () => {
             const steps = service.getBuiltInSteps();
 
-            expect(steps).toHaveLength(BUILT_IN_STEPS.length);
-            expect(steps).not.toBe(BUILT_IN_STEPS);
+            expect(steps).toHaveLength(DefaultPipelinePlugin.getBuiltInSteps().length);
+            expect(steps).not.toBe(DefaultPipelinePlugin.getBuiltInSteps());
         });
     });
 

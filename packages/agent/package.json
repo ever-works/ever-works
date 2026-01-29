@@ -160,6 +160,7 @@
         "typescript-eslint": "^8.51.0"
     },
     "dependencies": {
+        "@ever-works/default-pipeline-plugin": "workspace:*",
         "@ever-works/plugin": "workspace:*",
         "@langchain/core": "^0.3.80",
         "@langchain/langgraph": "^0.2.74",

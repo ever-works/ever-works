@@ -6,14 +6,14 @@ import type {
     ParallelGroup,
     StepExecutor,
     IPipelineStepPlugin,
-    BuiltInStepId,
     IPlugin,
 } from '@ever-works/plugin';
 import {
     PluginRegistryService,
     RegisteredPlugin,
 } from '../plugins/services/plugin-registry.service';
-import { BUILT_IN_STEPS, isBuiltInStep } from './built-in-steps';
+// Import the NestJS wrapper which delegates to the standalone plugin
+import { DefaultPipelinePlugin } from './default-pipeline.plugin';
 
 /**
  * Create an empty executable pipeline
@@ -114,8 +114,8 @@ export class PipelineBuilderService {
     build(directoryId?: string): ExecutablePipeline {
         this.logger.debug(`Building pipeline for directory: ${directoryId || 'global'}`);
 
-        // 1. Start with built-in steps
-        let steps = [...BUILT_IN_STEPS];
+        // 1. Start with built-in steps from DefaultPipelinePlugin (single source of truth)
+        let steps = DefaultPipelinePlugin.getBuiltInSteps();
 
         // 2. Initialize build context
         const buildContext: BuildContext = {
@@ -600,7 +600,7 @@ export class PipelineBuilderService {
                     pluginId: pluginInfo.pluginId,
                     stepId: pluginInfo.originalStepId,
                 });
-            } else if (isBuiltInStep(step.id)) {
+            } else if (DefaultPipelinePlugin.isBuiltInStep(step.id)) {
                 // Built-in step
                 executorMap.set(step.id, {
                     type: 'builtin',
@@ -637,6 +637,6 @@ export class PipelineBuilderService {
      * Get the current built-in steps (for testing/inspection)
      */
     getBuiltInSteps(): PipelineStepDefinition[] {
-        return [...BUILT_IN_STEPS];
+        return DefaultPipelinePlugin.getBuiltInSteps();
     }
 }

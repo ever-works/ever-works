@@ -14,8 +14,6 @@
         "build": "nest build -b swc",
         "build:deps": "pnpm --filter '@packages/*' build",
         "format": "prettier --write \"**/*.{ts,tsx,jsx,json,css,md}\"",
-        "test:watch": "jest --watch",
-        "test:cov": "jest --coverage",
         "typeorm": "ts-node --project tsconfig.typeorm.json -r tsconfig-paths/register ./node_modules/typeorm/cli.js",
         "migration:generate": "npm run typeorm -- migration:generate -d typeorm.config.ts",
         "migration:run": "npm run typeorm -- migration:run -d typeorm.config.ts",

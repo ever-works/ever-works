@@ -25,7 +25,9 @@
 		"lint": {
 			"outputs": []
 		},
-		"test": {},
+		"test": {
+			"outputs": []
+		},
 		"type-check": {
 			"outputs": []
 		},

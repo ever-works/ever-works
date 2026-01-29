@@ -5,9 +5,9 @@ import type {
     StepExecutionOptions,
     StepProgressCallback,
 } from '@ever-works/plugin';
-import type { IBuiltInStepExecutor } from './default-pipeline.plugin';
+// Import the NestJS wrapper which delegates to the standalone plugin
+import { DefaultPipelinePlugin, type IBuiltInStepExecutor } from './default-pipeline.plugin';
 import { TypedGenerationContext } from './generation-context';
-import { BUILT_IN_STEP_SERVICE_MAP } from './built-in-steps';
 
 /**
  * Interface for services that can be registered with the adapter.
@@ -84,7 +84,7 @@ export class StepAdapterService {
      * Get the expected service name for a step ID
      */
     getExpectedServiceName(stepId: BuiltInStepId): string | undefined {
-        return BUILT_IN_STEP_SERVICE_MAP[stepId];
+        return DefaultPipelinePlugin.getServiceNameForStep(stepId);
     }
 
     /**
@@ -105,7 +105,7 @@ export class StepAdapterService {
         const service = this.serviceMap.get(stepId);
 
         if (!service) {
-            const expectedService = BUILT_IN_STEP_SERVICE_MAP[stepId];
+            const expectedService = DefaultPipelinePlugin.getServiceNameForStep(stepId);
             throw new Error(
                 `No service registered for step "${stepId}". ` +
                     `Expected service: ${expectedService || 'unknown'}. ` +

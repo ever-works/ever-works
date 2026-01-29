@@ -16,7 +16,6 @@ jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => {});
 import { PipelineBuilderService } from '../pipeline-builder.service';
 import { DefaultPipelinePlugin } from '../default-pipeline.plugin';
 import { PluginRegistryService } from '../../plugins/services/plugin-registry.service';
-import { BUILT_IN_STEPS } from '../built-in-steps';
 import { createGenerationContext } from '../generation-context';
 import type {
     DirectoryReference,
@@ -96,7 +95,7 @@ describe('StepPipelineExecutorService', () => {
     describe('execute()', () => {
         beforeEach(() => {
             // Register mock executors for all built-in steps
-            for (const step of BUILT_IN_STEPS) {
+            for (const step of DefaultPipelinePlugin.getBuiltInSteps()) {
                 defaultPlugin.registerStepExecutor(step.id as any, {
                     name: step.name,
                     run: jest.fn().mockImplementation((ctx: MutableGenerationContext) => {
@@ -156,7 +155,7 @@ describe('StepPipelineExecutorService', () => {
 
         it('should skip steps in skipSteps option', async () => {
             // Reset shouldStop behavior
-            for (const step of BUILT_IN_STEPS) {
+            for (const step of DefaultPipelinePlugin.getBuiltInSteps()) {
                 defaultPlugin.registerStepExecutor(step.id as any, {
                     name: step.name,
                     run: jest.fn().mockImplementation((ctx) => Promise.resolve(ctx)),
@@ -238,7 +237,7 @@ describe('StepPipelineExecutorService', () => {
     describe('skip steps when data already provided', () => {
         it('should skip step when all provided data keys are available', async () => {
             // Register executors that check for skipping
-            for (const step of BUILT_IN_STEPS) {
+            for (const step of DefaultPipelinePlugin.getBuiltInSteps()) {
                 defaultPlugin.registerStepExecutor(step.id as any, {
                     name: step.name,
                     run: jest.fn().mockImplementation((ctx) => {
@@ -332,7 +331,7 @@ describe('StepPipelineExecutorService', () => {
     describe('executeWithContext()', () => {
         it('should execute using provided context', async () => {
             // Register mock executors
-            for (const step of BUILT_IN_STEPS) {
+            for (const step of DefaultPipelinePlugin.getBuiltInSteps()) {
                 defaultPlugin.registerStepExecutor(step.id as any, {
                     name: step.name,
                     run: jest.fn().mockImplementation((ctx) => {

@@ -408,6 +408,9 @@ importers:
 
   packages/agent:
     dependencies:
+      '@ever-works/default-pipeline-plugin':
+        specifier: workspace:*
+        version: link:../plugins/default-pipeline
       '@ever-works/plugin':
         specifier: workspace:*
         version: link:../plugin
@@ -746,6 +749,18 @@ importers:
         version: 8.5.1(@swc/core@1.15.8(@swc/helpers@0.5.18))(jiti@2.6.1)(postcss@8.5.6)(typescript@5.9.3)(yaml@2.8.2)
       typescript:
         specifier: ^5.9.3
+        version: 5.9.3
+
+  packages/plugins/default-pipeline:
+    devDependencies:
+      '@ever-works/plugin':
+        specifier: workspace:*
+        version: link:../../plugin
+      tsup:
+        specifier: ^8.4.0
+        version: 8.5.1(@swc/core@1.15.8(@swc/helpers@0.5.18))(jiti@2.6.1)(postcss@8.5.6)(typescript@5.9.3)(yaml@2.8.2)
+      typescript:
+        specifier: ^5.7.3
         version: 5.9.3
 
   packages/tasks:

@@ -10,7 +10,6 @@ import { FullPipelineExecutorService } from '../full-pipeline-executor.service';
 import { PipelineBuilderService } from '../pipeline-builder.service';
 import { DefaultPipelinePlugin } from '../default-pipeline.plugin';
 import { PluginRegistryService } from '../../plugins/services/plugin-registry.service';
-import { BUILT_IN_STEPS } from '../built-in-steps';
 import type {
     DirectoryReference,
     GenerationRequest,
@@ -130,7 +129,7 @@ describe('PipelineOrchestratorService', () => {
         defaultPlugin = module.get<DefaultPipelinePlugin>(DefaultPipelinePlugin);
 
         // Register mock executors for built-in steps
-        for (const step of BUILT_IN_STEPS) {
+        for (const step of DefaultPipelinePlugin.getBuiltInSteps()) {
             defaultPlugin.registerStepExecutor(step.id as any, {
                 name: step.name,
                 run: jest.fn().mockImplementation((ctx: MutableGenerationContext) => {

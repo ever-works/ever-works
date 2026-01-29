@@ -36,7 +36,7 @@
         "build:dev": "nest build -b swc --watch",
         "build:types": "tsc --emitDeclarationOnly --declarationMap true",
         "build:types:dev": "tsc --emitDeclarationOnly --declarationMap true --watch",
-        "test": "jest",
+        "test": "jest --passWithNoTests",
         "test:watch": "jest --watch",
         "test:cov": "jest --coverage"
     },

@@ -1,268 +1,202 @@
-import { Injectable, Logger } from '@nestjs/common';
-import type {
-    IPlugin,
-    PluginContext,
-    PluginCategory,
-    PluginManifest,
-    PluginHealthCheck,
-    JsonSchema,
-    ValidationResult,
-    PluginSettings,
-    MutableGenerationContext,
-    PipelineStepDefinition,
-    StepExecutionOptions,
-    StepProgressCallback,
-    IPipelineStepPlugin,
-} from '@ever-works/plugin';
-import { BUILT_IN_STEPS, BUILT_IN_STEP_SERVICE_MAP } from './built-in-steps';
-import type { BuiltInStepId } from '@ever-works/plugin';
-
 /**
- * Interface for built-in step executor services
+ * NestJS Provider for DefaultPipelinePlugin
+ *
+ * This file provides NestJS integration for the standalone DefaultPipelinePlugin.
+ * The actual plugin implementation is in @ever-works/default-pipeline-plugin package.
+ *
+ * @packageDocumentation
  */
-export interface IBuiltInStepExecutor {
-    name: string;
-    run(context: MutableGenerationContext): Promise<MutableGenerationContext>;
-}
+
+import { Injectable, Logger } from '@nestjs/common';
+import type { PluginContext, BuiltInStepId } from '@ever-works/plugin';
+// Import from the standalone plugin package (single source of truth for built-in steps)
+import {
+    DefaultPipelinePlugin as StandalonePlugin,
+    type IBuiltInStepExecutor,
+} from '@ever-works/default-pipeline-plugin';
+
+// Re-export types and static methods from the standalone plugin
+export type { IBuiltInStepExecutor } from '@ever-works/default-pipeline-plugin';
 
 /**
- * Default Pipeline Plugin - System plugin that wraps built-in pipeline steps.
+ * NestJS-injectable wrapper for DefaultPipelinePlugin.
  *
- * This plugin is always enabled and provides the standard generation pipeline.
- * It acts as a bridge between the new plugin-based pipeline system and the
- * existing step services (like PromptComparisonService, DomainDetectionService, etc.)
+ * This class wraps the standalone DefaultPipelinePlugin to make it compatible
+ * with NestJS dependency injection while keeping the actual implementation
+ * in a standalone package.
  *
- * Key characteristics:
- * - System plugin (cannot be disabled by users)
- * - Lowest priority (plugins can replace or modify its steps)
- * - Wraps existing NestJS services as pipeline steps
+ * The standalone plugin is the single source of truth for:
+ * - Built-in step definitions
+ * - Step service mappings
+ * - Type guards (isBuiltInStep)
+ *
+ * This wrapper provides:
+ * - NestJS @Injectable() compatibility
+ * - Instance methods that delegate to the standalone plugin
  */
 @Injectable()
-export class DefaultPipelinePlugin implements IPlugin, IPipelineStepPlugin {
+export class DefaultPipelinePlugin {
     private readonly logger = new Logger(DefaultPipelinePlugin.name);
+    private readonly plugin: StandalonePlugin;
 
-    // IPlugin interface properties
-    readonly id = 'default-pipeline';
-    readonly name = 'Default Pipeline';
-    readonly version = '1.0.0';
-    readonly category: PluginCategory = 'pipeline';
-    readonly capabilities: readonly string[] = ['pipeline-step'];
-    readonly settingsSchema: JsonSchema = {
-        type: 'object',
-        properties: {},
-    };
+    constructor() {
+        // Create an instance of the standalone plugin
+        this.plugin = new StandalonePlugin();
+        this.logger.log('DefaultPipelinePlugin wrapper initialized');
+    }
 
-    /**
-     * Marks this as a system plugin that cannot be disabled
-     */
-    readonly systemPlugin = true;
+    // ============================================================================
+    // Static Methods (delegate to standalone plugin)
+    // ============================================================================
 
     /**
-     * Map of step ID to the service that executes it
+     * Check if a step ID is a built-in step (type guard)
      */
-    private stepExecutors = new Map<string, IBuiltInStepExecutor>();
+    static isBuiltInStep(stepId: string): stepId is BuiltInStepId {
+        return StandalonePlugin.isBuiltInStep(stepId);
+    }
 
-    private context?: PluginContext;
+    /**
+     * Get a built-in step definition by ID
+     */
+    static getBuiltInStep(stepId: BuiltInStepId) {
+        return StandalonePlugin.getBuiltInStep(stepId);
+    }
+
+    /**
+     * Get all built-in step IDs
+     */
+    static getBuiltInStepIds() {
+        return StandalonePlugin.getBuiltInStepIds();
+    }
+
+    /**
+     * Get all built-in step definitions (returns a copy)
+     */
+    static getBuiltInSteps() {
+        return StandalonePlugin.getBuiltInSteps();
+    }
+
+    /**
+     * Get the service name mapping for built-in steps
+     */
+    static getServiceMap() {
+        return StandalonePlugin.getServiceMap();
+    }
+
+    /**
+     * Get the service name for a specific step
+     */
+    static getServiceNameForStep(stepId: BuiltInStepId) {
+        return StandalonePlugin.getServiceNameForStep(stepId);
+    }
+
+    // ============================================================================
+    // Instance Methods (delegate to plugin instance)
+    // ============================================================================
+
+    /**
+     * Initialize the plugin with context
+     */
+    async initialize(context: PluginContext): Promise<void> {
+        await this.plugin.onLoad(context);
+    }
 
     /**
      * Register a built-in step executor service
      */
     registerStepExecutor(stepId: BuiltInStepId, executor: IBuiltInStepExecutor): void {
-        this.stepExecutors.set(stepId, executor);
-        this.logger.debug(`Registered executor for step: ${stepId}`);
+        this.plugin.registerStepExecutor(stepId, executor);
     }
 
     /**
      * Register multiple step executors at once
      */
     registerStepExecutors(executors: Map<BuiltInStepId, IBuiltInStepExecutor>): void {
-        for (const [stepId, executor] of executors) {
-            this.registerStepExecutor(stepId, executor);
-        }
+        this.plugin.registerStepExecutors(executors);
     }
 
     /**
      * Check if an executor is registered for a step
      */
     hasExecutor(stepId: string): boolean {
-        return this.stepExecutors.has(stepId);
+        return this.plugin.hasExecutor(stepId);
     }
 
     /**
      * Get the service name for a built-in step
      */
     getServiceName(stepId: BuiltInStepId): string | undefined {
-        return BUILT_IN_STEP_SERVICE_MAP[stepId];
-    }
-
-    // ============================================================================
-    // IPipelineStepPlugin interface
-    // ============================================================================
-
-    /**
-     * Get step definitions for all built-in steps
-     */
-    getStepDefinition(): PipelineStepDefinition {
-        // This returns the first step - in practice, getStepDefinitions is used
-        return BUILT_IN_STEPS[0];
+        return this.plugin.getServiceName(stepId);
     }
 
     /**
      * Get all step definitions provided by this plugin
      */
-    getStepDefinitions(): PipelineStepDefinition[] {
-        return [...BUILT_IN_STEPS];
-    }
-
-    /**
-     * Execute a pipeline step
-     */
-    async execute(
-        context: MutableGenerationContext,
-        options?: StepExecutionOptions,
-        onProgress?: StepProgressCallback,
-    ): Promise<MutableGenerationContext> {
-        // This method is called when the pipeline executes a specific step
-        // The stepId should be passed through options.settings.stepId
-        const stepId = options?.settings?.stepId as string;
-
-        if (!stepId) {
-            throw new Error('DefaultPipelinePlugin.execute() requires stepId in options.settings');
-        }
-
-        return this.executeStep(stepId, context, options, onProgress);
+    getStepDefinitions() {
+        return this.plugin.getStepDefinitions();
     }
 
     /**
      * Execute a specific step by ID
      */
-    async executeStep(
-        stepId: string,
-        context: MutableGenerationContext,
-        options?: StepExecutionOptions,
-        onProgress?: StepProgressCallback,
-    ): Promise<MutableGenerationContext> {
-        const executor = this.stepExecutors.get(stepId);
-
-        if (!executor) {
-            const serviceName = BUILT_IN_STEP_SERVICE_MAP[stepId as BuiltInStepId];
-            throw new Error(
-                `No executor registered for step "${stepId}". ` +
-                    `Expected service: ${serviceName || 'unknown'}`,
-            );
-        }
-
-        // Report progress start
-        if (onProgress) {
-            onProgress({
-                percent: 0,
-                message: `Starting ${executor.name}`,
-            });
-        }
-
-        // Check for cancellation
-        if (options?.signal?.aborted) {
-            throw new Error(`Step "${stepId}" was cancelled before execution`);
-        }
-
-        try {
-            const result = await executor.run(context);
-
-            // Report progress complete
-            if (onProgress) {
-                onProgress({
-                    percent: 100,
-                    message: `Completed ${executor.name}`,
-                });
-            }
-
-            return result;
-        } catch (error) {
-            this.logger.error(`Step "${stepId}" failed: ${(error as Error).message}`);
-            throw error;
-        }
+    async executeStep(...args: Parameters<StandalonePlugin['executeStep']>) {
+        return this.plugin.executeStep(...args);
     }
 
     /**
-     * Check if a step can be skipped (built-in steps use shouldStop flag)
+     * Check if a step can be skipped
      */
-    async canSkip(context: MutableGenerationContext): Promise<boolean> {
-        return context.shouldStop === true;
+    async canSkip(...args: Parameters<StandalonePlugin['canSkip']>) {
+        return this.plugin.canSkip(...args);
     }
 
     /**
      * Validate that a step can run
      */
-    async validate(context: MutableGenerationContext): Promise<{ valid: boolean; error?: string }> {
-        if (context.shouldStop) {
-            return { valid: false, error: 'Pipeline stopped' };
-        }
-        return { valid: true };
+    async validate(...args: Parameters<StandalonePlugin['validate']>) {
+        return this.plugin.validate(...args);
+    }
+
+    /**
+     * Get the underlying standalone plugin instance
+     */
+    getPlugin(): StandalonePlugin {
+        return this.plugin;
+    }
+
+    /**
+     * Get plugin health check
+     */
+    async healthCheck() {
+        return this.plugin.healthCheck();
     }
 
     // ============================================================================
-    // IPlugin lifecycle interface
+    // Plugin Properties (expose from standalone plugin)
     // ============================================================================
 
-    async onLoad(context: PluginContext): Promise<void> {
-        this.context = context;
-        this.logger.log('Default Pipeline Plugin loaded');
+    get id() {
+        return this.plugin.id;
     }
 
-    async onEnable(_context: PluginContext): Promise<void> {
-        this.logger.log('Default Pipeline Plugin enabled');
+    get name() {
+        return this.plugin.name;
     }
 
-    async onDisable(_context: PluginContext): Promise<void> {
-        // System plugins should not be disabled, but handle gracefully
-        this.logger.warn('Attempted to disable system plugin - this should not happen');
+    get version() {
+        return this.plugin.version;
     }
 
-    async onUnload(): Promise<void> {
-        this.stepExecutors.clear();
-        this.context = undefined;
-        this.logger.log('Default Pipeline Plugin unloaded');
+    get category() {
+        return this.plugin.category;
     }
 
-    async validateSettings(_settings: PluginSettings): Promise<ValidationResult> {
-        return { valid: true };
+    get capabilities() {
+        return this.plugin.capabilities;
     }
 
-    async healthCheck(): Promise<PluginHealthCheck> {
-        const registeredSteps = this.stepExecutors.size;
-        const totalSteps = BUILT_IN_STEPS.length;
-        const allRegistered = registeredSteps === totalSteps;
-
-        const missingSteps = BUILT_IN_STEPS.filter((s) => !this.stepExecutors.has(s.id)).map(
-            (s) => s.id,
-        );
-
-        return {
-            status: allRegistered ? 'healthy' : 'degraded',
-            message: allRegistered
-                ? `All ${totalSteps} built-in steps registered`
-                : `Only ${registeredSteps}/${totalSteps} steps registered`,
-            checkedAt: Date.now(),
-            checks: missingSteps.map((stepId) => ({
-                name: `step-${stepId}`,
-                status: 'unhealthy' as const,
-                message: `Missing executor for step: ${stepId}`,
-                data: { stepId },
-            })),
-        };
-    }
-
-    getManifest(): PluginManifest {
-        return {
-            id: this.id,
-            name: this.name,
-            version: this.version,
-            description: 'System plugin providing the default generation pipeline',
-            category: this.category,
-            capabilities: [...this.capabilities],
-            author: { name: 'Ever Works Team' },
-            license: 'MIT',
-            builtIn: true,
-        };
+    get systemPlugin() {
+        return this.plugin.systemPlugin;
     }
 }

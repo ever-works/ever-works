@@ -1609,9 +1609,46 @@ Plugins can modify the pipeline in four ways:
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
+### Plugin as Single Source of Truth
+
+The `default-pipeline` plugin owns all built-in step definitions. The pipeline engine is fully generic with no hardcoded knowledge of steps.
+
+**Architecture:**
+
+```
+packages/plugins/default-pipeline/      ← Standalone plugin package
+└── src/default-pipeline.plugin.ts     ← OWNS all 15 step definitions
+    ├── private static readonly STEPS   ← Step definitions array
+    ├── private static readonly SERVICE_MAP  ← Step-to-service mapping
+    ├── static isBuiltInStep()          ← Type guard
+    └── getStepDefinitions()            ← Returns steps
+
+packages/agent/src/pipeline/
+├── default-pipeline.plugin.ts         ← NestJS wrapper (delegates to standalone)
+└── pipeline-builder.service.ts        ← Gets steps from plugin, NOT hardcoded
+```
+
+**How it works:**
+
+```typescript
+// PipelineBuilderService gets steps via static method:
+const steps = DefaultPipelinePlugin.getBuiltInSteps();
+
+// NOT via hardcoded constant:
+import { BUILT_IN_STEPS } from './built-in-steps'; // ❌ Don't do this
+```
+
+**Benefits:**
+
+1. **Single Location** - All step definitions in one place
+2. **Easy Maintenance** - Add/remove steps by modifying only the plugin
+3. **Generic Engine** - Pipeline builder has no hardcoded step knowledge
+4. **Consistent Architecture** - Built-in steps work like plugin-provided steps
+5. **Testable** - Easy to mock steps in tests
+
 ### Built-in Steps Definition
 
-The current pipeline has **14 steps** defined with explicit dependencies:
+The current pipeline has **15 steps** defined with explicit dependencies:
 
 ```typescript
 // Built-in step definitions with explicit dependencies

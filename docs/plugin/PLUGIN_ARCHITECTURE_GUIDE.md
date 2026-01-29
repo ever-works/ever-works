@@ -670,12 +670,46 @@ The pipeline is a series of steps that transform a user's prompt into a complete
 
 ### The Default Pipeline Plugin (System Plugin)
 
-The standard 14-step pipeline is provided by the **Default Pipeline Plugin**. This is a **system plugin** with special characteristics:
+The standard 15-step pipeline is provided by the **Default Pipeline Plugin**. This plugin is the **single source of truth** for all built-in pipeline steps - the pipeline engine itself has no hardcoded knowledge of steps.
+
+**Package Structure:**
+
+```
+packages/plugins/default-pipeline/    ← Standalone plugin package
+└── src/
+    └── default-pipeline.plugin.ts   ← Owns all 15 step definitions
+
+packages/agent/src/pipeline/
+└── default-pipeline.plugin.ts       ← NestJS wrapper (delegates to standalone)
+```
+
+**Architecture Principle:**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  Pipeline Engine (Generic)          │  Plugins                  │
+│  ├── PipelineBuilderService         │  ├── default-pipeline     │
+│  ├── StepPipelineExecutorService    │  │   └── 15 built-in steps│
+│  └── PipelineOrchestratorService    │  ├── exa-search (replace) │
+│                                     │  └── exa-websets (full)   │
+│  Engine queries plugins for steps   │  Plugins provide steps    │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**System Plugin Characteristics:**
 
 | Property       | Value  | Meaning                                                   |
 | -------------- | ------ | --------------------------------------------------------- |
 | `autoInstall`  | `true` | Automatically installed for all users                     |
 | `systemPlugin` | `true` | Cannot be uninstalled, **NOT visible in user plugins UI** |
+
+**Why the plugin is the single source of truth:**
+
+1. **Single Location** - All 15 step definitions live in one place
+2. **Easy Maintenance** - Add/remove steps by modifying only the plugin
+3. **Generic Engine** - Pipeline builder has no hardcoded step knowledge
+4. **Consistent Architecture** - Built-in steps work like plugin steps
+5. **Future Flexibility** - Could create alternative pipeline profiles
 
 **Why is it hidden from users?**
 
@@ -693,22 +727,23 @@ The standard 14-step pipeline is provided by the **Default Pipeline Plugin**. Th
 
 ### Standard Pipeline Steps
 
-The standard pipeline has 14 built-in steps:
+The standard pipeline has 15 built-in steps:
 
 1. **Prompt Comparison** - Compare with previous prompts for incremental generation
 2. **Prompt Processing** - Extract intent and parameters from the prompt
 3. **Domain Detection** - Identify the type of directory (software, restaurants, etc.)
-4. **Search Query Generation** - Create search queries based on the prompt
-5. **AI Item Generation** - Generate initial items using AI (runs parallel with search)
-6. **Web Page Retrieval** - Fetch web pages from search results
-7. **Content Filtering** - Remove irrelevant content
-8. **Item Extraction** - Extract structured items from content
-9. **Data Aggregation** - Combine and deduplicate items from all sources
-10. **Category Processing** - Organize items into categories
-11. **Source Validation** - Verify item source URLs are valid
-12. **Badge Processing** - Add badges to items (optional)
-13. **Image Capture** - Take screenshots for items
-14. **Markdown Generation** - Generate final markdown content
+4. **AI First Items Generation** - Generate initial items using AI based on the prompt
+5. **Search Query Generation** - Create search queries based on the prompt and items
+6. **Web Search** - Execute search queries to find relevant URLs
+7. **Content Retrieval** - Fetch web pages from search results
+8. **Content Filtering** - Remove irrelevant content
+9. **Item Extraction** - Extract structured items from content
+10. **Data Aggregation** - Combine and deduplicate items from all sources
+11. **Category Processing** - Organize items into categories and process tags
+12. **Source Validation** - Verify item source URLs are valid
+13. **Badge Processing** - Add badges to items (optional)
+14. **Image Capture** - Take screenshots for items
+15. **Markdown Generation** - Generate final markdown content
 
 ### How Plugins Modify the Pipeline
 
@@ -750,7 +785,7 @@ Is Full Pipeline selected? ───Yes───► Run Full Pipeline Plugin's s
       │
       ▼
 Build Standard Pipeline:
-  • Start with 14 built-in steps
+  • Start with 15 built-in steps
   • Apply plugin step replacements
   • Apply plugin step injections
   • Remove disabled steps
