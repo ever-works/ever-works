@@ -553,6 +553,8 @@ interface GetUserRepositoriesParams {
     page?: number;
     perPage?: number;
     search?: string;
+    owner?: string;
+    type?: 'user' | 'org';
 }
 
 export async function analyzeForLinking(sourceUrl: string) {
@@ -618,6 +620,8 @@ export async function getUserRepositories(params: GetUserRepositoriesParams = {}
             page: params.page,
             perPage: params.perPage,
             search: params.search,
+            owner: params.owner,
+            type: params.type,
         });
 
         return {

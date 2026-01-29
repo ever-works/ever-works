@@ -1438,6 +1438,11 @@
                     "weeksAgo": "{weeks} weeks ago",
                     "repositoriesLoaded": "repositories loaded",
                     "moreAvailable": "more available",
+                    "ownerLabel": "Repository Owner",
+                    "personalAccount": "Personal Account",
+                    "organizations": "Organizations",
+                    "showingPersonalRepos": "Showing your personal repositories",
+                    "showingOrgRepos": "Showing repositories for {org}",
                     "errors": {
                         "fetchFailed": "Failed to load repositories"
                     }

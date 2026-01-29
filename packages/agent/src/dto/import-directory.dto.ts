@@ -118,6 +118,14 @@ export class GetUserRepositoriesDto {
     @IsOptional()
     @IsString()
     search?: string;
+
+    @IsOptional()
+    @IsString()
+    owner?: string;
+
+    @IsOptional()
+    @IsString()
+    type?: 'user' | 'org';
 }
 
 export class GetUserRepositoriesResponseDto {

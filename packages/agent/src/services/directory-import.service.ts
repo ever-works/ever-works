@@ -123,12 +123,50 @@ export class DirectoryImportService {
         const perPage = dto.perPage || 30;
 
         try {
-            const { data: repos } = await octokit.rest.repos.listForAuthenticatedUser({
-                sort: 'updated',
-                direction: 'desc',
-                per_page: perPage,
-                page,
-            });
+            // Define a common repo type that works with both listForAuthenticatedUser and listForOrg
+            type RepoItem = {
+                id: number;
+                name: string;
+                full_name: string;
+                owner: { login: string };
+                description: string | null;
+                html_url: string;
+                private: boolean;
+                updated_at?: string | null;
+                default_branch: string;
+            };
+            let repos: RepoItem[];
+
+            if (dto.owner && dto.type === 'org') {
+                // Fetch repos for a specific organization
+                const { data } = await octokit.rest.repos.listForOrg({
+                    org: dto.owner,
+                    sort: 'updated',
+                    direction: 'desc',
+                    per_page: perPage,
+                    page,
+                });
+                repos = data as RepoItem[];
+            } else if (dto.owner && dto.type === 'user') {
+                // Fetch repos for a specific user (personal account)
+                const { data } = await octokit.rest.repos.listForAuthenticatedUser({
+                    sort: 'updated',
+                    direction: 'desc',
+                    per_page: perPage,
+                    page,
+                    affiliation: 'owner',
+                });
+                repos = data as RepoItem[];
+            } else {
+                // Fetch all accessible repos (current behavior)
+                const { data } = await octokit.rest.repos.listForAuthenticatedUser({
+                    sort: 'updated',
+                    direction: 'desc',
+                    per_page: perPage,
+                    page,
+                });
+                repos = data as RepoItem[];
+            }
 
             let filteredRepos = repos;
             if (dto.search) {

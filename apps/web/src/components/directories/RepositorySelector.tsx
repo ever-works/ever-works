@@ -13,8 +13,12 @@ import {
     ChevronDown,
     ChevronUp,
     RefreshCw,
+    Building2,
+    User,
 } from 'lucide-react';
 import { getUserRepositories } from '@/app/actions/dashboard/directories';
+import { getGitHubOrganizations } from '@/app/actions/dashboard/organizations';
+import { GitHubOrganization } from '@/lib/api';
 
 export interface GitHubRepo {
     id: number;
@@ -36,15 +40,37 @@ interface RepositorySelectorProps {
 
 export function RepositorySelector({ onSelect, selectedUrl }: RepositorySelectorProps) {
     const [repositories, setRepositories] = useState<GitHubRepo[]>([]);
+    const [organizations, setOrganizations] = useState<GitHubOrganization[]>([]);
     const [loading, setLoading] = useState(true);
+    const [loadingOrgs, setLoadingOrgs] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [search, setSearch] = useState('');
     const [page, setPage] = useState(1);
     const [hasMore, setHasMore] = useState(false);
     const [expanded, setExpanded] = useState(true);
+    const [selectedOwner, setSelectedOwner] = useState<string>('');
+    const [ownerType, setOwnerType] = useState<'user' | 'org'>('user');
     const t = useTranslations('dashboard.directoryCreation.import.repositorySelector');
 
     const perPage = 30;
+
+    // Fetch organizations on mount
+    useEffect(() => {
+        const loadOrganizations = async () => {
+            setLoadingOrgs(true);
+            try {
+                const result = await getGitHubOrganizations();
+                if (result.success && result.organizations) {
+                    setOrganizations(result.organizations);
+                }
+            } catch (err) {
+                console.error('Failed to load organizations:', err);
+            } finally {
+                setLoadingOrgs(false);
+            }
+        };
+        loadOrganizations();
+    }, []);
 
     const fetchRepositories = useCallback(
         async (pageNum: number, searchQuery: string, append = false) => {
@@ -56,6 +82,8 @@ export function RepositorySelector({ onSelect, selectedUrl }: RepositorySelector
                     page: pageNum,
                     perPage,
                     search: searchQuery || undefined,
+                    owner: selectedOwner || undefined,
+                    type: selectedOwner ? ownerType : undefined,
                 });
 
                 if (result.success && result.data) {
@@ -74,12 +102,15 @@ export function RepositorySelector({ onSelect, selectedUrl }: RepositorySelector
                 setLoading(false);
             }
         },
-        [t],
+        [t, selectedOwner, ownerType],
     );
 
+    // Fetch repositories on mount and when owner changes
     useEffect(() => {
+        setPage(1);
+        setSearch('');
         fetchRepositories(1, '');
-    }, [fetchRepositories]);
+    }, [selectedOwner, ownerType, fetchRepositories]);
 
     const handleSearch = (value: string) => {
         setSearch(value);
@@ -96,6 +127,19 @@ export function RepositorySelector({ onSelect, selectedUrl }: RepositorySelector
     const handleRefresh = () => {
         setPage(1);
         fetchRepositories(1, search);
+    };
+
+    const handleOwnerChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const value = e.target.value;
+        if (value === '') {
+            // Personal account selected
+            setSelectedOwner('');
+            setOwnerType('user');
+        } else {
+            // Organization selected
+            setSelectedOwner(value);
+            setOwnerType('org');
+        }
     };
 
     const formatDate = (dateStr: string) => {
@@ -151,6 +195,69 @@ export function RepositorySelector({ onSelect, selectedUrl }: RepositorySelector
             {/* Content */}
             {expanded && (
                 <div className="border-t border-border dark:border-border-dark">
+                    {/* Owner Selector */}
+                    <div className="p-3 border-b border-border dark:border-border-dark">
+                        <label
+                            htmlFor="repo-owner-select"
+                            className="block text-xs font-medium text-text-secondary dark:text-text-secondary-dark mb-2"
+                        >
+                            {t('ownerLabel')}
+                        </label>
+                        <div className="flex items-center gap-2">
+                            <select
+                                id="repo-owner-select"
+                                value={selectedOwner}
+                                onChange={handleOwnerChange}
+                                disabled={loadingOrgs}
+                                className={cn(
+                                    'flex-1 px-3 py-2 rounded-md text-sm',
+                                    'bg-card dark:bg-card-dark',
+                                    'border border-border dark:border-border-dark',
+                                    'text-text dark:text-text-dark',
+                                    'focus:outline-none focus:ring-2 focus:ring-primary/50',
+                                    'disabled:opacity-50 disabled:cursor-not-allowed',
+                                )}
+                            >
+                                <option value="">{t('personalAccount')}</option>
+                                {organizations.length > 0 && (
+                                    <optgroup label={t('organizations')}>
+                                        {organizations.map((org) => (
+                                            <option key={org.login} value={org.login}>
+                                                {org.login}
+                                            </option>
+                                        ))}
+                                    </optgroup>
+                                )}
+                            </select>
+                            {loadingOrgs && (
+                                <Loader2 className="w-4 h-4 text-text-muted animate-spin" />
+                            )}
+                        </div>
+                        {/* Visual indicator of current selection */}
+                        <div
+                            className={cn(
+                                'flex items-center gap-2 px-2 py-1.5 mt-2 rounded',
+                                'bg-surface-secondary dark:bg-surface-secondary-dark',
+                            )}
+                        >
+                            {selectedOwner === '' ? (
+                                <>
+                                    <User className="w-3.5 h-3.5 text-text-muted dark:text-text-muted-dark" />
+                                    <span className="text-xs text-text-secondary dark:text-text-secondary-dark">
+                                        {t('showingPersonalRepos')}
+                                    </span>
+                                </>
+                            ) : (
+                                <>
+                                    <Building2 className="w-3.5 h-3.5 text-primary dark:text-primary-dark" />
+                                    <span className="text-xs text-text dark:text-text-dark">
+                                        {t('showingOrgRepos', { org: selectedOwner })}
+                                    </span>
+                                </>
+                            )}
+                        </div>
+                    </div>
+
                     {/* Search and Refresh */}
                     <div className="p-3 flex gap-2 border-b border-border dark:border-border-dark">
                         <div className="relative flex-1">
