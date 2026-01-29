@@ -152,9 +152,9 @@ export class DirectoryImportService {
                     page,
                 });
                 repos = data as RepoItem[];
-            } else if (dto.owner && dto.type === 'user') {
-                this.logger.log(`Fetching repos for personal account (owner filter)`);
-                // Fetch repos for a specific user (personal account)
+            } else if (dto.type === 'user') {
+                this.logger.log(`Fetching repos for personal account only (affiliation: owner)`);
+                // Fetch only repos owned by the authenticated user (personal repos)
                 const { data } = await octokit.rest.repos.listForAuthenticatedUser({
                     sort: 'updated',
                     direction: 'desc',
@@ -196,6 +196,10 @@ export class DirectoryImportService {
                 updated_at: repo.updated_at || new Date().toISOString(),
                 default_branch: repo.default_branch,
             }));
+
+            this.logger.log(
+                `Returning ${repositories.length} repos. Owners: ${[...new Set(repositories.map((r) => r.owner))].join(', ')}`,
+            );
 
             return {
                 repositories,

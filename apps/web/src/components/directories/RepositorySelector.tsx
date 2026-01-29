@@ -94,7 +94,7 @@ export function RepositorySelector({ onSelect, selectedUrl }: RepositorySelector
                 perPage,
                 search: searchQuery || undefined,
                 owner: owner || undefined,
-                type: owner ? type : undefined,
+                type: type, // Always send type ('user' for personal, 'org' for organization)
             };
             console.log('[RepositorySelector] Fetching repos with params:', params);
 
@@ -108,10 +108,16 @@ export function RepositorySelector({ onSelect, selectedUrl }: RepositorySelector
                 }
 
                 if (result.success && result.data) {
+                    const repos = result.data.repositories;
+                    const uniqueOwners = [...new Set(repos.map((r) => r.owner))];
+                    console.log(
+                        `[RepositorySelector] Received ${repos.length} repos. Owners: ${uniqueOwners.join(', ')}`,
+                    );
+
                     if (append) {
-                        setRepositories((prev) => [...prev, ...result.data!.repositories]);
+                        setRepositories((prev) => [...prev, ...repos]);
                     } else {
-                        setRepositories(result.data.repositories);
+                        setRepositories(repos);
                     }
                     setHasMore(result.data.hasMore);
                 } else {
@@ -369,6 +375,9 @@ export function RepositorySelector({ onSelect, selectedUrl }: RepositorySelector
                                                         <Globe className="w-4 h-4 text-success shrink-0" />
                                                     )}
                                                     <span className="font-medium text-text dark:text-text-dark">
+                                                        <span className="text-text-muted dark:text-text-muted-dark">
+                                                            {repo.owner}/
+                                                        </span>
                                                         {repo.name}
                                                     </span>
                                                 </div>
@@ -413,6 +422,7 @@ export function RepositorySelector({ onSelect, selectedUrl }: RepositorySelector
                         <div className="p-2 text-center border-t border-border dark:border-border-dark">
                             <span className="text-xs text-text-muted dark:text-text-muted-dark">
                                 {repositories.length} {t('repositoriesLoaded')}
+                                {selectedOwner && ` from ${selectedOwner}`}
                                 {hasMore && ` (${t('moreAvailable')})`}
                             </span>
                         </div>
