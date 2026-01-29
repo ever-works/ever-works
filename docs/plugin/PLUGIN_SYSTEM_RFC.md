@@ -26,7 +26,8 @@
 22. [Plugin Testing](#plugin-testing)
 23. [Security Considerations](#security-considerations)
 24. [Migration Strategy](#migration-strategy)
-25. [Key Principles](#key-principles)
+25. [Migration from Hardcoded Infrastructure](#migration-from-hardcoded-infrastructure)
+26. [Key Principles](#key-principles)
 
 ---
 
@@ -292,8 +293,8 @@ packages/
 │       │   │   ├── user-plugin.entity.ts
 │       │   │   └── directory-plugin.entity.ts
 │       │   └── plugins.module.ts
-│       ├── facades/
-│       │   ├── git.facade.ts
+│       ├── facades/                 # Design docs: docs/plugin/designs/
+│       │   ├── git.facade.ts        # Design ready, impl pending Story 2
 │       │   ├── deploy.facade.ts
 │       │   ├── screenshot.facade.ts
 │       │   ├── search.facade.ts
@@ -3609,6 +3610,162 @@ jobs:
                       exit 1
                     fi
                   done
+```
+
+---
+
+## Migration from Hardcoded Infrastructure
+
+This section documents the mapping from current hardcoded entity fields to the plugin system entities. These migrations will occur as facades are implemented in Phase 6.
+
+### User Entity Migrations
+
+The following fields in `packages/agent/src/entities/user.entity.ts` will migrate to `UserPlugin`:
+
+| Current Field            | Type     | Migration Target                    | Plugin        |
+| ------------------------ | -------- | ----------------------------------- | ------------- |
+| `vercelToken`            | `string` | `UserPlugin.settings.apiToken`      | vercel        |
+| `screenshotoneAccessKey` | `string` | `UserPlugin.settings.accessKey`     | screenshotone |
+| `screenshotoneSecretKey` | `string` | `UserPlugin.settings.secretKey`     | screenshotone |
+| `registrationProvider`   | `string` | **Keep** (auth concern, not plugin) | N/A           |
+
+**Methods to Refactor:**
+
+| Current Method               | Location             | Migration Target                             |
+| ---------------------------- | -------------------- | -------------------------------------------- |
+| `User.getGitToken(provider)` | `user.entity.ts:114` | `GitFacade.getToken(userId, providerId)`     |
+| `User.asCommitter(provider)` | `user.entity.ts:138` | `GitFacade.getCommitter(userId, providerId)` |
+
+### OAuthToken Entity Migration
+
+The **entire** `OAuthToken` entity (`packages/agent/src/entities/oauth-token.entity.ts`) migrates to `UserPlugin`:
+
+| Current Field  | Migration Target                   |
+| -------------- | ---------------------------------- |
+| `provider`     | `UserPlugin.pluginId`              |
+| `accessToken`  | `UserPlugin.settings.accessToken`  |
+| `refreshToken` | `UserPlugin.settings.refreshToken` |
+| `scope`        | `UserPlugin.settings.scope`        |
+| `expiresAt`    | `UserPlugin.settings.expiresAt`    |
+| `username`     | `UserPlugin.settings.username`     |
+| `email`        | `UserPlugin.settings.email`        |
+| `metadata`     | `UserPlugin.settings.metadata`     |
+
+After migration, `User.oauthTokens[]` relationship is removed and replaced with `UserPlugin` lookups.
+
+### Directory Entity Migrations
+
+The following fields in `packages/agent/src/entities/directory.entity.ts` will migrate:
+
+| Current Field      | Type     | Migration Target                                | Notes                        |
+| ------------------ | -------- | ----------------------------------------------- | ---------------------------- |
+| `repoProvider`     | `string` | `DirectoryPlugin` with capability defaults      | Stores selected git provider |
+| `sourceRepository` | `JSON`   | `DirectoryPlugin.settings` (data-source plugin) | Import source metadata       |
+| `lastPullRequest`  | `JSON`   | `DirectoryPlugin.settings` (git plugin)         | PR tracking per provider     |
+
+**Methods to Refactor:**
+
+| Current Method             | Location                  | Migration Target                              |
+| -------------------------- | ------------------------- | --------------------------------------------- |
+| `Directory.getRepoOwner()` | `directory.entity.ts:168` | `GitFacade.getRepoOwner(directoryId, userId)` |
+
+### DirectorySchedule Entity Migrations
+
+| Current Field             | Migration Target                        | Notes           |
+| ------------------------- | --------------------------------------- | --------------- |
+| `alwaysCreatePullRequest` | `DirectoryPlugin.settings` (git plugin) | Git PR behavior |
+
+### Future Migrations (Billing)
+
+The following fields are **future scope** and will be addressed when billing plugins are implemented:
+
+| Entity             | Field               | Future Plugin           |
+| ------------------ | ------------------- | ----------------------- |
+| `UserSubscription` | `billingProvider`   | billing plugin          |
+| `UserSubscription` | `paymentMethodMeta` | billing plugin settings |
+
+### DirectoryPlugin Provider Defaults
+
+The `DirectoryPlugin` entity will store default provider selections per capability:
+
+```typescript
+// DirectoryPlugin.settings structure for capability defaults
+interface DirectoryCapabilityDefaults {
+	defaults: {
+		'git-provider'?: string; // "github" | "gitlab" | "bitbucket"
+		deployment?: string; // "vercel" | "netlify" | "railway"
+		screenshot?: string; // "screenshotone" | "playwright"
+		search?: string; // "tavily" | "exa:search" | "serpapi"
+		'ai-provider'?: string; // "openai" | "anthropic" | "gemini"
+		'full-pipeline'?: string; // null = standard, "exa:websets" = full
+	};
+}
+```
+
+### Facade Resolution Flow
+
+All facades follow this pattern for resolving which plugin to use:
+
+```typescript
+@Injectable()
+export class [Capability]Facade {
+    constructor(
+        private readonly registry: PluginRegistryService,
+        private readonly settingsService: PluginSettingsService,
+    ) {}
+
+    private async getPlugin(
+        directoryId: string,
+        providerOverride?: string  // From GenerationOptions.providers
+    ): Promise<I[Capability]Plugin> {
+        // 1. Determine which provider to use
+        const providerId = providerOverride
+            ?? await this.settingsService.getDirectoryProvider(directoryId, '[capability]')
+            ?? await this.settingsService.getPlatformDefault('[capability]');
+
+        // 2. Get plugin from registry
+        return this.registry.getByCapability<I[Capability]Plugin>(
+            '[capability]',
+            providerId
+        );
+    }
+
+    private async getSettings(
+        userId: string,
+        directoryId: string,
+        pluginId: string
+    ): Promise<PluginSettings> {
+        // Resolves: plugin defaults → admin → user → directory
+        return this.settingsService.resolveSettings(userId, directoryId, pluginId);
+    }
+}
+```
+
+### Settings Storage After Migration
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│ BEFORE (Hardcoded)                                                    │
+├──────────────────────────────────────────────────────────────────────┤
+│ User.vercelToken          → Direct column on User entity             │
+│ User.screenshotoneKeys    → Direct columns on User entity            │
+│ User.oauthTokens[]        → Separate OAuthToken entity               │
+│ Directory.repoProvider    → Direct column on Directory entity        │
+└──────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────┐
+│ AFTER (Plugin System)                                                 │
+├──────────────────────────────────────────────────────────────────────┤
+│ UserPlugin (userId, pluginId, settings)                              │
+│   ├─ userId: "user-123"                                              │
+│   ├─ pluginId: "github"                                              │
+│   └─ settings: { accessToken, refreshToken, username, ... }          │
+│                                                                       │
+│ DirectoryPlugin (directoryId, pluginId, settings)                    │
+│   ├─ directoryId: "dir-456"                                          │
+│   ├─ pluginId: "github"                                              │
+│   └─ settings: { defaults: { 'git-provider': 'github' } }            │
+└──────────────────────────────────────────────────────────────────────┘
 ```
 
 ---

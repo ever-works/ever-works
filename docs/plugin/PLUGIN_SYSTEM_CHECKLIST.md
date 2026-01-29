@@ -2,7 +2,7 @@
 
 This checklist tracks the implementation progress of the Plugin System as defined in [PLUGIN_SYSTEM_JIRA_TICKETS.md](./PLUGIN_SYSTEM_JIRA_TICKETS.md).
 
-**Total Tasks:** 164 across 18 Stories
+**Total Tasks:** 177 across 19 Stories
 
 **Note:** The package is named `@ever-works/plugin` (not `plugin-contracts` as originally planned) to reflect its expanded scope including base classes, helpers, and testing utilities.
 
@@ -17,11 +17,11 @@ This checklist tracks the implementation progress of the Plugin System as define
 | Phase 3: Module Decoupling | 5-8     | 16      | 0         |
 | Phase 4: Built-in Plugins  | 4       | 12      | 0         |
 | Phase 5: Data Sources      | 9       | 3       | 0         |
-| Phase 6: Service Facades   | 10      | 7       | 0         |
+| Phase 6: Service Facades   | 10, 10a | 20      | 0         |
 | Phase 7: API Refactoring   | 11      | 12      | 0         |
 | Phase 8: Frontend          | 12-17   | 36      | 0         |
 | Phase 9: Testing & CI      | 18      | 15      | 0         |
-| **Total**                  | **18**  | **164** | **28**    |
+| **Total**                  | **19**  | **177** | **28**    |
 
 ---
 
@@ -208,6 +208,41 @@ Create thin facade services in packages/agent wrapping plugin registry calls.
 - [ ] **10.5** Create AiFacade service with model routing (complexity → tier → provider selection)
 - [ ] **10.6** Create GitOAuthFacade service
 - [ ] **10.7** Update all agent consumers to use facades
+
+### Story 10a: Migrate Hardcoded Infrastructure to Plugin System (13 tasks)
+
+Migrate hardcoded entity fields to the plugin system. See [PLUGIN_SYSTEM_RFC.md - Migration from Hardcoded Infrastructure](./PLUGIN_SYSTEM_RFC.md#migration-from-hardcoded-infrastructure) for details.
+
+**User Entity Migrations:**
+
+- [ ] **10a.1** Migrate `User.vercelToken` to `UserPlugin.settings` (vercel plugin)
+- [ ] **10a.2** Migrate `User.screenshotoneAccessKey` to `UserPlugin.settings` (screenshotone plugin)
+- [ ] **10a.3** Migrate `User.screenshotoneSecretKey` to `UserPlugin.settings` (screenshotone plugin)
+
+**OAuthToken Entity Migration:**
+
+- [ ] **10a.4** Migrate `OAuthToken` entity to `UserPlugin.settings` for git providers (github, gitlab, bitbucket)
+- [ ] **10a.5** Remove `User.oauthTokens[]` relationship after migration
+
+**Directory Entity Migrations:**
+
+- [ ] **10a.6** Migrate `Directory.repoProvider` to `DirectoryPlugin` capability defaults
+- [ ] **10a.7** Migrate `Directory.sourceRepository` to `DirectoryPlugin.settings` (data-source plugin)
+- [ ] **10a.8** Migrate `Directory.lastPullRequest` to `DirectoryPlugin.settings` (git plugin)
+
+**DirectorySchedule Entity Migration:**
+
+- [ ] **10a.9** Migrate `DirectorySchedule.alwaysCreatePullRequest` to `DirectoryPlugin.settings` (git plugin)
+
+**Method Refactoring:**
+
+- [ ] **10a.10** Refactor `User.getGitToken()` to use `GitFacade.getToken()`
+- [ ] **10a.11** Refactor `User.asCommitter()` to use `GitFacade.getCommitter()`
+- [ ] **10a.12** Refactor `Directory.getRepoOwner()` to use `GitFacade.getRepoOwner()`
+
+**Data Migration:**
+
+- [ ] **10a.13** Create database migration script to move existing data to plugin tables
 
 ---
 

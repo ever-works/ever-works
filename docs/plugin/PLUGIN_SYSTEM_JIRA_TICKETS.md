@@ -4338,6 +4338,263 @@ Refactor all services in packages/agent to use facades instead of direct service
 
 ---
 
+# Story 10a: Migrate Hardcoded Infrastructure to Plugin System
+
+**Story Title:** Migrate Hardcoded Infrastructure to Plugin System
+
+**Story Description:**
+Migrate hardcoded entity fields (User tokens, Directory provider selection, OAuthToken) to the plugin system entities (UserPlugin, DirectoryPlugin). This story depends on Story 2 (Plugin Runtime) and Story 10 (Service Facades).
+
+See [PLUGIN_SYSTEM_RFC.md - Migration from Hardcoded Infrastructure](./PLUGIN_SYSTEM_RFC.md#migration-from-hardcoded-infrastructure) for detailed field mappings.
+
+**Acceptance Criteria:**
+
+- All User entity token fields migrated to UserPlugin.settings
+- OAuthToken entity replaced by UserPlugin for git providers
+- Directory provider selection stored in DirectoryPlugin capability defaults
+- Entity methods refactored to use facades
+- Database migration script created and tested
+- Backwards compatibility maintained during transition
+
+---
+
+## Task 10a.1: Migrate User.vercelToken
+
+**Title:** Migrate User.vercelToken to UserPlugin
+
+**Description:**
+Migrate the `User.vercelToken` field to `UserPlugin.settings.apiToken` for the vercel plugin.
+
+**Implementation Details:**
+
+1. Update DeployFacade to read token from UserPlugin instead of User entity
+2. Keep User.vercelToken as deprecated during migration
+3. Create migration script to move existing tokens
+
+---
+
+## Task 10a.2-3: Migrate User.screenshotoneAccessKey/SecretKey
+
+**Title:** Migrate ScreenshotOne credentials to UserPlugin
+
+**Description:**
+Migrate `User.screenshotoneAccessKey` and `User.screenshotoneSecretKey` to `UserPlugin.settings` for the screenshotone plugin.
+
+**Implementation Details:**
+
+1. Update ScreenshotFacade to read credentials from UserPlugin
+2. Ensure credentials are encrypted in UserPlugin.settings (marked as `secret: true`)
+3. Create migration script to move existing credentials
+
+---
+
+## Task 10a.4: Migrate OAuthToken to UserPlugin
+
+**Title:** Migrate OAuthToken entity to UserPlugin for git providers
+
+**Description:**
+Migrate the entire OAuthToken entity to UserPlugin.settings for git provider plugins (github, gitlab, bitbucket).
+
+**Field Mappings:**
+
+| OAuthToken Field | UserPlugin.settings Field |
+| ---------------- | ------------------------- |
+| `provider`       | `UserPlugin.pluginId`     |
+| `accessToken`    | `settings.accessToken`    |
+| `refreshToken`   | `settings.refreshToken`   |
+| `scope`          | `settings.scope`          |
+| `expiresAt`      | `settings.expiresAt`      |
+| `username`       | `settings.username`       |
+| `email`          | `settings.email`          |
+| `metadata`       | `settings.metadata`       |
+
+**Implementation Details:**
+
+1. Update GitFacade.getToken() to read from UserPlugin
+2. Update GitOAuthFacade to write tokens to UserPlugin
+3. Create migration script to move existing OAuthToken records
+4. Mark OAuthToken entity as deprecated
+
+---
+
+## Task 10a.5: Remove User.oauthTokens Relationship
+
+**Title:** Remove User.oauthTokens relationship after migration
+
+**Description:**
+After migration is complete and verified, remove the `User.oauthTokens[]` relationship.
+
+**Prerequisites:**
+
+- Task 10a.4 completed
+- All services using GitFacade instead of direct OAuthToken access
+- Migration verified in production
+
+---
+
+## Task 10a.6: Migrate Directory.repoProvider
+
+**Title:** Migrate Directory.repoProvider to DirectoryPlugin capability defaults
+
+**Description:**
+Migrate `Directory.repoProvider` to `DirectoryPlugin.settings.defaults['git-provider']`.
+
+**Implementation Details:**
+
+```typescript
+// DirectoryPlugin.settings structure
+{
+    defaults: {
+        'git-provider': 'github' | 'gitlab' | 'bitbucket'
+    }
+}
+```
+
+1. Update GitFacade to read provider selection from DirectoryPlugin
+2. Keep Directory.repoProvider as fallback during migration
+3. Create migration script to move existing provider selections
+
+---
+
+## Task 10a.7: Migrate Directory.sourceRepository
+
+**Title:** Migrate Directory.sourceRepository to DirectoryPlugin
+
+**Description:**
+Migrate `Directory.sourceRepository` to `DirectoryPlugin.settings` for data-source plugins.
+
+---
+
+## Task 10a.8: Migrate Directory.lastPullRequest
+
+**Title:** Migrate Directory.lastPullRequest to DirectoryPlugin
+
+**Description:**
+Migrate `Directory.lastPullRequest` to `DirectoryPlugin.settings` for git provider plugins. This tracks PR state per provider.
+
+---
+
+## Task 10a.9: Migrate DirectorySchedule.alwaysCreatePullRequest
+
+**Title:** Migrate alwaysCreatePullRequest to DirectoryPlugin
+
+**Description:**
+Migrate `DirectorySchedule.alwaysCreatePullRequest` to `DirectoryPlugin.settings` for git provider plugins.
+
+---
+
+## Task 10a.10: Refactor User.getGitToken
+
+**Title:** Refactor User.getGitToken to use GitFacade
+
+**Description:**
+Replace all usages of `User.getGitToken(provider)` with `GitFacade.getToken(userId, providerId)`.
+
+**Files to Update:**
+
+- All services that call `user.getGitToken()`
+- DataGeneratorService
+- WebsiteGeneratorService
+- MarkdownGeneratorService
+- BranchSyncService
+
+---
+
+## Task 10a.11: Refactor User.asCommitter
+
+**Title:** Refactor User.asCommitter to use GitFacade
+
+**Description:**
+Replace all usages of `User.asCommitter(provider)` with `GitFacade.getCommitter(userId, providerId)`.
+
+---
+
+## Task 10a.12: Refactor Directory.getRepoOwner
+
+**Title:** Refactor Directory.getRepoOwner to use GitFacade
+
+**Description:**
+Replace all usages of `Directory.getRepoOwner()` with `GitFacade.getRepoOwner(directoryId, userId)`.
+
+---
+
+## Task 10a.13: Database Migration Script
+
+**Title:** Create database migration script for plugin system
+
+**Description:**
+Create a migration script that:
+
+1. Creates UserPlugin records from existing User fields and OAuthToken records
+2. Creates DirectoryPlugin records from existing Directory fields
+3. Maintains backwards compatibility by keeping old fields during transition
+4. Provides rollback capability
+
+**Migration Steps:**
+
+```sql
+-- 1. Migrate OAuthToken to UserPlugin (git providers)
+INSERT INTO user_plugins (id, userId, pluginId, settings, enabled, installedAt)
+SELECT
+    uuid_generate_v4(),
+    o.userId,
+    o.provider,
+    json_build_object(
+        'accessToken', o.accessToken,
+        'refreshToken', o.refreshToken,
+        'scope', o.scope,
+        'expiresAt', o.expiresAt,
+        'username', o.username,
+        'email', o.email,
+        'metadata', o.metadata
+    ),
+    true,
+    NOW()
+FROM oauth_tokens o
+WHERE o.provider IN ('github', 'gitlab', 'bitbucket');
+
+-- 2. Migrate User.vercelToken to UserPlugin
+INSERT INTO user_plugins (id, userId, pluginId, settings, enabled, installedAt)
+SELECT
+    uuid_generate_v4(),
+    u.id,
+    'vercel',
+    json_build_object('apiToken', u.vercelToken),
+    true,
+    NOW()
+FROM users u
+WHERE u.vercelToken IS NOT NULL;
+
+-- 3. Migrate User.screenshotone keys to UserPlugin
+INSERT INTO user_plugins (id, userId, pluginId, settings, enabled, installedAt)
+SELECT
+    uuid_generate_v4(),
+    u.id,
+    'screenshotone',
+    json_build_object(
+        'accessKey', u.screenshotoneAccessKey,
+        'secretKey', u.screenshotoneSecretKey
+    ),
+    true,
+    NOW()
+FROM users u
+WHERE u.screenshotoneAccessKey IS NOT NULL;
+
+-- 4. Migrate Directory.repoProvider to DirectoryPlugin
+INSERT INTO directory_plugins (id, directoryId, pluginId, settings, enabled, enabledAt)
+SELECT
+    uuid_generate_v4(),
+    d.id,
+    d.repoProvider,
+    json_build_object('defaults', json_build_object('git-provider', d.repoProvider)),
+    true,
+    NOW()
+FROM directories d
+WHERE d.repoProvider IS NOT NULL;
+```
+
+---
+
 # Story 11: API App Refactoring
 
 **Story Title:** Refactor API App for Plugin System
