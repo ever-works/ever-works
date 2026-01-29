@@ -9,7 +9,10 @@ export class VerifyEmailDto {
 }
 
 export class ResendVerificationDto {
-    @ApiProperty({ description: 'Email address to resend verification to', example: 'john@example.com' })
+    @ApiProperty({
+        description: 'Email address to resend verification to',
+        example: 'john@example.com',
+    })
     @IsEmail()
     @IsNotEmpty()
     email: string;
@@ -34,7 +37,8 @@ export class ResetPasswordDto {
     token: string;
 
     @ApiProperty({
-        description: 'New password (min 8 chars, must contain lowercase letter and number/special char)',
+        description:
+            'New password (min 8 chars, must contain lowercase letter and number/special char)',
         example: 'NewSecure456!',
         minLength: 8,
     })

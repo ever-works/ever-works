@@ -88,6 +88,10 @@
         "./screenshot": {
             "types": "./dist/screenshot/index.d.ts",
             "default": "./dist/screenshot/index.js"
+        },
+        "./plugins": {
+            "types": "./dist/plugins/index.d.ts",
+            "default": "./dist/plugins/index.js"
         }
     },
     "scripts": {
@@ -95,7 +99,10 @@
         "build": "nest build -b swc && tsc -p tsconfig.types.json",
         "build:dev": "nest build -b swc --watch",
         "build:types": "tsc -p tsconfig.types.json",
-        "build:types:dev": "tsc -p tsconfig.types.json --watch"
+        "build:types:dev": "tsc -p tsconfig.types.json --watch",
+        "test": "jest",
+        "test:watch": "jest --watch",
+        "test:cov": "jest --coverage"
     },
     "peerDependencies": {
         "@nestjs/common": "^11.1",
@@ -149,6 +156,7 @@
         "typescript-eslint": "^8.51.0"
     },
     "dependencies": {
+        "@ever-works/plugin": "workspace:*",
         "@langchain/core": "^0.3.80",
         "@langchain/langgraph": "^0.2.74",
         "@langchain/openai": "^0.6.17",

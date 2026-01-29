@@ -674,7 +674,9 @@ export const directoryAPI = {
 
     // Website Settings
     getWebsiteSettings: async (id: string) => {
-        return serverFetch<APIResponse<WebsiteSettingsResponse>>(`/directories/${id}/website-settings`);
+        return serverFetch<APIResponse<WebsiteSettingsResponse>>(
+            `/directories/${id}/website-settings`,
+        );
     },
 
     updateWebsiteSettings: async (id: string, data: UpdateWebsiteSettingsDto) => {

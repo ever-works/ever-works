@@ -16,20 +16,34 @@ import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class ConversationOptionsDto {
-    @ApiPropertyOptional({ description: 'Role context for the AI', example: 'assistant', maxLength: 100 })
+    @ApiPropertyOptional({
+        description: 'Role context for the AI',
+        example: 'assistant',
+        maxLength: 100,
+    })
     @IsOptional()
     @IsString()
     @MaxLength(100)
     role?: string;
 
-    @ApiPropertyOptional({ description: 'Temperature for response randomness (0-2)', example: 0.7, minimum: 0, maximum: 2 })
+    @ApiPropertyOptional({
+        description: 'Temperature for response randomness (0-2)',
+        example: 0.7,
+        minimum: 0,
+        maximum: 2,
+    })
     @IsOptional()
     @IsNumber()
     @Min(0)
     @Max(2)
     temperature?: number;
 
-    @ApiPropertyOptional({ description: 'Maximum tokens in response', example: 1000, minimum: 1, maximum: 32000 })
+    @ApiPropertyOptional({
+        description: 'Maximum tokens in response',
+        example: 1000,
+        minimum: 1,
+        maximum: 32000,
+    })
     @IsOptional()
     @IsNumber()
     @Min(1)
@@ -42,7 +56,10 @@ export class ConversationOptionsDto {
     @MaxLength(2000)
     systemPrompt?: string;
 
-    @ApiPropertyOptional({ description: 'Additional context for the conversation', maxLength: 1000 })
+    @ApiPropertyOptional({
+        description: 'Additional context for the conversation',
+        maxLength: 1000,
+    })
     @IsOptional()
     @IsString()
     @MaxLength(1000)
@@ -60,7 +77,12 @@ export class ConversationOptionsDto {
     @IsBoolean()
     useDefaultSystemPrompt?: boolean;
 
-    @ApiPropertyOptional({ description: 'Maximum number of messages to include in context', example: 20, minimum: 1, maximum: 100 })
+    @ApiPropertyOptional({
+        description: 'Maximum number of messages to include in context',
+        example: 20,
+        minimum: 1,
+        maximum: 100,
+    })
     @IsOptional()
     @IsNumber()
     @Min(1)
@@ -74,7 +96,11 @@ export class ConversationOptionsDto {
 }
 
 export class SendMessageDto {
-    @ApiProperty({ description: 'Message to send to the AI', example: 'Hello, can you help me with...', maxLength: 10000 })
+    @ApiProperty({
+        description: 'Message to send to the AI',
+        example: 'Hello, can you help me with...',
+        maxLength: 10000,
+    })
     @IsString()
     @MinLength(1)
     @MaxLength(10000)
@@ -88,7 +114,12 @@ export class SendMessageDto {
 }
 
 export class SendMessageWithLimitDto extends SendMessageDto {
-    @ApiPropertyOptional({ description: 'Override message limit for this request', example: 10, minimum: 1, maximum: 50 })
+    @ApiPropertyOptional({
+        description: 'Override message limit for this request',
+        example: 10,
+        minimum: 1,
+        maximum: 50,
+    })
     @IsOptional()
     @IsNumber()
     @Min(1)
@@ -110,24 +141,42 @@ export enum ExpertiseType {
 }
 
 export class ChatAsExpertDto {
-    @ApiProperty({ description: 'Message to send to the expert', example: 'How do I optimize this query?', maxLength: 10000 })
+    @ApiProperty({
+        description: 'Message to send to the expert',
+        example: 'How do I optimize this query?',
+        maxLength: 10000,
+    })
     @IsString()
     @MinLength(1)
     @MaxLength(10000)
     message: string;
 
-    @ApiProperty({ description: 'Area of expertise', enum: ExpertiseType, example: ExpertiseType.BACKEND })
+    @ApiProperty({
+        description: 'Area of expertise',
+        enum: ExpertiseType,
+        example: ExpertiseType.BACKEND,
+    })
     @IsEnum(ExpertiseType)
     expertise: ExpertiseType;
 
-    @ApiPropertyOptional({ description: 'Temperature for response randomness', example: 0.7, minimum: 0, maximum: 2 })
+    @ApiPropertyOptional({
+        description: 'Temperature for response randomness',
+        example: 0.7,
+        minimum: 0,
+        maximum: 2,
+    })
     @IsOptional()
     @IsNumber()
     @Min(0)
     @Max(2)
     temperature?: number;
 
-    @ApiPropertyOptional({ description: 'Message limit for context', example: 10, minimum: 1, maximum: 50 })
+    @ApiPropertyOptional({
+        description: 'Message limit for context',
+        example: 10,
+        minimum: 1,
+        maximum: 50,
+    })
     @IsOptional()
     @IsNumber()
     @Min(1)

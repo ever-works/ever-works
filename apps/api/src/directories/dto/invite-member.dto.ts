@@ -3,7 +3,10 @@ import { ApiProperty } from '@nestjs/swagger';
 import { DirectoryMemberRole, ASSIGNABLE_MEMBER_ROLES } from '@packages/agent/entities';
 
 export class InviteMemberDto {
-    @ApiProperty({ description: 'Email address of the user to invite', example: 'collaborator@example.com' })
+    @ApiProperty({
+        description: 'Email address of the user to invite',
+        example: 'collaborator@example.com',
+    })
     @IsEmail()
     @IsNotEmpty()
     email: string;

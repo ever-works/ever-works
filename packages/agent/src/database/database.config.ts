@@ -17,6 +17,7 @@ import {
     UsageLedgerEntry,
     Notification,
 } from '../entities';
+import { PluginEntity, UserPluginEntity, DirectoryPluginEntity } from '../plugins/entities';
 import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs';
@@ -63,6 +64,10 @@ export const ENTITIES = [
     DirectorySchedule,
     UsageLedgerEntry,
     Notification,
+    // Plugin entities
+    PluginEntity,
+    UserPluginEntity,
+    DirectoryPluginEntity,
 ];
 
 export const databaseConfig = registerAs('database', (): DatabaseConfig => {

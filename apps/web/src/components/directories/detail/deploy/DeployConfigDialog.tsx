@@ -231,7 +231,9 @@ export function DeployConfigDialog({
                         <div className="grid grid-cols-2 gap-3 pt-2">
                             <Switch
                                 checked={formData.settings.categories_enabled ?? true}
-                                onChange={(checked) => updateSettings('categories_enabled', checked)}
+                                onChange={(checked) =>
+                                    updateSettings('categories_enabled', checked)
+                                }
                                 label={tSettings('global.categories')}
                             />
                             <Switch
@@ -259,27 +261,37 @@ export function DeployConfigDialog({
                         <div className="grid grid-cols-2 gap-3">
                             <Switch
                                 checked={formData.settings.header?.submit_enabled ?? true}
-                                onChange={(checked) => updateHeaderSettings('submit_enabled', checked)}
+                                onChange={(checked) =>
+                                    updateHeaderSettings('submit_enabled', checked)
+                                }
                                 label={tSettings('header.submit')}
                             />
                             <Switch
                                 checked={formData.settings.header?.pricing_enabled ?? true}
-                                onChange={(checked) => updateHeaderSettings('pricing_enabled', checked)}
+                                onChange={(checked) =>
+                                    updateHeaderSettings('pricing_enabled', checked)
+                                }
                                 label={tSettings('header.pricing')}
                             />
                             <Switch
                                 checked={formData.settings.header?.layout_enabled ?? true}
-                                onChange={(checked) => updateHeaderSettings('layout_enabled', checked)}
+                                onChange={(checked) =>
+                                    updateHeaderSettings('layout_enabled', checked)
+                                }
                                 label={tSettings('header.layoutSelector')}
                             />
                             <Switch
                                 checked={formData.settings.header?.language_enabled ?? true}
-                                onChange={(checked) => updateHeaderSettings('language_enabled', checked)}
+                                onChange={(checked) =>
+                                    updateHeaderSettings('language_enabled', checked)
+                                }
                                 label={tSettings('header.languageSelector')}
                             />
                             <Switch
                                 checked={formData.settings.header?.theme_enabled ?? true}
-                                onChange={(checked) => updateHeaderSettings('theme_enabled', checked)}
+                                onChange={(checked) =>
+                                    updateHeaderSettings('theme_enabled', checked)
+                                }
                                 label={tSettings('header.themeSelector')}
                             />
                         </div>
@@ -287,7 +299,9 @@ export function DeployConfigDialog({
                             <Select
                                 label={tSettings('header.defaultLayout')}
                                 value={formData.settings.header?.layout_default || 'home1'}
-                                onChange={(e) => updateHeaderSettings('layout_default', e.target.value)}
+                                onChange={(e) =>
+                                    updateHeaderSettings('layout_default', e.target.value)
+                                }
                                 variant="form"
                             >
                                 <option value="home1">Home 1</option>
@@ -297,7 +311,9 @@ export function DeployConfigDialog({
                             <Select
                                 label={tSettings('header.defaultTheme')}
                                 value={formData.settings.header?.theme_default || 'light'}
-                                onChange={(e) => updateHeaderSettings('theme_default', e.target.value)}
+                                onChange={(e) =>
+                                    updateHeaderSettings('theme_default', e.target.value)
+                                }
                                 variant="form"
                             >
                                 <option value="light">{tSettings('header.themeLight')}</option>
@@ -307,12 +323,20 @@ export function DeployConfigDialog({
                             <Select
                                 label={tSettings('header.defaultPagination')}
                                 value={formData.settings.header?.pagination_default || 'standard'}
-                                onChange={(e) => updateHeaderSettings('pagination_default', e.target.value)}
+                                onChange={(e) =>
+                                    updateHeaderSettings('pagination_default', e.target.value)
+                                }
                                 variant="form"
                             >
-                                <option value="standard">{tSettings('header.paginationStandard')}</option>
-                                <option value="infinite">{tSettings('header.paginationInfinite')}</option>
-                                <option value="loadmore">{tSettings('header.paginationLoadMore')}</option>
+                                <option value="standard">
+                                    {tSettings('header.paginationStandard')}
+                                </option>
+                                <option value="infinite">
+                                    {tSettings('header.paginationInfinite')}
+                                </option>
+                                <option value="loadmore">
+                                    {tSettings('header.paginationLoadMore')}
+                                </option>
                             </Select>
                         </div>
                     </div>
@@ -324,12 +348,16 @@ export function DeployConfigDialog({
                         <div className="grid grid-cols-2 gap-3">
                             <Switch
                                 checked={formData.settings.homepage?.hero_enabled ?? true}
-                                onChange={(checked) => updateHomepageSettings('hero_enabled', checked)}
+                                onChange={(checked) =>
+                                    updateHomepageSettings('hero_enabled', checked)
+                                }
                                 label={tSettings('homepage.hero')}
                             />
                             <Switch
                                 checked={formData.settings.homepage?.search_enabled ?? true}
-                                onChange={(checked) => updateHomepageSettings('search_enabled', checked)}
+                                onChange={(checked) =>
+                                    updateHomepageSettings('search_enabled', checked)
+                                }
                                 label={tSettings('homepage.search')}
                             />
                         </div>
@@ -337,7 +365,9 @@ export function DeployConfigDialog({
                             <Select
                                 label={tSettings('homepage.defaultView')}
                                 value={formData.settings.homepage?.default_view || 'classic'}
-                                onChange={(e) => updateHomepageSettings('default_view', e.target.value)}
+                                onChange={(e) =>
+                                    updateHomepageSettings('default_view', e.target.value)
+                                }
                                 variant="form"
                             >
                                 <option value="classic">{tSettings('homepage.viewClassic')}</option>
@@ -347,12 +377,18 @@ export function DeployConfigDialog({
                             <Select
                                 label={tSettings('homepage.defaultSort')}
                                 value={formData.settings.homepage?.default_sort || 'popularity'}
-                                onChange={(e) => updateHomepageSettings('default_sort', e.target.value)}
+                                onChange={(e) =>
+                                    updateHomepageSettings('default_sort', e.target.value)
+                                }
                                 variant="form"
                             >
-                                <option value="popularity">{tSettings('homepage.sortPopularity')}</option>
+                                <option value="popularity">
+                                    {tSettings('homepage.sortPopularity')}
+                                </option>
                                 <option value="newest">{tSettings('homepage.sortNewest')}</option>
-                                <option value="alphabetical">{tSettings('homepage.sortAlphabetical')}</option>
+                                <option value="alphabetical">
+                                    {tSettings('homepage.sortAlphabetical')}
+                                </option>
                             </Select>
                         </div>
                     </div>
@@ -363,7 +399,9 @@ export function DeployConfigDialog({
                     <div className="grid grid-cols-2 gap-3">
                         <Switch
                             checked={formData.settings.footer?.subscribe_enabled ?? true}
-                            onChange={(checked) => updateFooterSettings('subscribe_enabled', checked)}
+                            onChange={(checked) =>
+                                updateFooterSettings('subscribe_enabled', checked)
+                            }
                             label={tSettings('footer.subscribe')}
                         />
                         <Switch
@@ -373,7 +411,9 @@ export function DeployConfigDialog({
                         />
                         <Switch
                             checked={formData.settings.footer?.theme_selector_enabled ?? true}
-                            onChange={(checked) => updateFooterSettings('theme_selector_enabled', checked)}
+                            onChange={(checked) =>
+                                updateFooterSettings('theme_selector_enabled', checked)
+                            }
                             label={tSettings('footer.themeSelector')}
                         />
                     </div>
@@ -421,7 +461,12 @@ export function DeployConfigDialog({
                 )}
 
                 <DialogFooter className="flex-col sm:flex-row gap-2 pt-2">
-                    <Button type="button" variant="ghost" onClick={onCancel} disabled={isSubmitting}>
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={onCancel}
+                        disabled={isSubmitting}
+                    >
                         {t('cancel')}
                     </Button>
                     <Button

@@ -28,7 +28,10 @@ export class MarkdownReadmeConfigDto implements MarkdownReadmeConfig {
     )
     header?: string;
 
-    @ApiPropertyOptional({ description: 'Whether to replace the default header entirely', default: false })
+    @ApiPropertyOptional({
+        description: 'Whether to replace the default header entirely',
+        default: false,
+    })
     @IsOptional()
     @IsBoolean()
     overwriteDefaultHeader?: boolean;
@@ -43,7 +46,10 @@ export class MarkdownReadmeConfigDto implements MarkdownReadmeConfig {
     )
     footer?: string;
 
-    @ApiPropertyOptional({ description: 'Whether to replace the default footer entirely', default: false })
+    @ApiPropertyOptional({
+        description: 'Whether to replace the default footer entirely',
+        default: false,
+    })
     @IsOptional()
     @IsBoolean()
     overwriteDefaultFooter?: boolean;
@@ -62,7 +68,11 @@ export class CreateDirectoryDto {
     @Transform(({ value }) => (typeof value === 'string' ? value.trim().toLowerCase() : value))
     slug: string;
 
-    @ApiProperty({ description: 'Display name for the directory', example: 'My Awesome Directory', maxLength: 100 })
+    @ApiProperty({
+        description: 'Display name for the directory',
+        example: 'My Awesome Directory',
+        maxLength: 100,
+    })
     @IsString()
     @IsNotEmpty()
     @MaxLength(100)
@@ -80,7 +90,9 @@ export class CreateDirectoryDto {
     @Transform(({ value }) => (typeof value === 'string' ? sanitizeDescription(value, 500) : value))
     description: string;
 
-    @ApiPropertyOptional({ description: 'GitHub username or organization for repository ownership' })
+    @ApiPropertyOptional({
+        description: 'GitHub username or organization for repository ownership',
+    })
     @IsOptional()
     @IsString()
     @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
@@ -90,12 +102,19 @@ export class CreateDirectoryDto {
     @IsBoolean()
     organization: boolean;
 
-    @ApiPropertyOptional({ description: 'Repository provider', enum: RepoProvider, default: RepoProvider.GITHUB })
+    @ApiPropertyOptional({
+        description: 'Repository provider',
+        enum: RepoProvider,
+        default: RepoProvider.GITHUB,
+    })
     @IsEnum(RepoProvider)
     @IsOptional()
     repoProvider: RepoProvider = RepoProvider.GITHUB;
 
-    @ApiPropertyOptional({ description: 'Custom README configuration', type: MarkdownReadmeConfigDto })
+    @ApiPropertyOptional({
+        description: 'Custom README configuration',
+        type: MarkdownReadmeConfigDto,
+    })
     @IsOptional()
     @ValidateNested()
     @Type(() => MarkdownReadmeConfigDto)

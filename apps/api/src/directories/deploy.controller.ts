@@ -22,7 +22,10 @@ export class DeployController {
     ) {}
 
     @Post('/directories/:id/vercel')
-    @ApiOperation({ summary: 'Deploy to Vercel', description: 'Deploy a directory website to Vercel' })
+    @ApiOperation({
+        summary: 'Deploy to Vercel',
+        description: 'Deploy a directory website to Vercel',
+    })
     @ApiParam({ name: 'id', description: 'Directory ID' })
     @ApiResponse({ status: 200, description: 'Deployment started' })
     @ApiResponse({ status: 400, description: 'Invalid Vercel token or missing configuration' })
@@ -98,7 +101,10 @@ export class DeployController {
     }
 
     @Post('/vercel/validate-token')
-    @ApiOperation({ summary: 'Validate Vercel token', description: 'Check if a Vercel API token is valid' })
+    @ApiOperation({
+        summary: 'Validate Vercel token',
+        description: 'Check if a Vercel API token is valid',
+    })
     @ApiResponse({ status: 200, description: 'Token validation result' })
     async validateToken(@Body() deployToken: VercelTokenDto) {
         const userInfo = await this.vercelService.validateToken(deployToken.token);

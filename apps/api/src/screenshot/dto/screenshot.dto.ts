@@ -19,31 +19,53 @@ export class CaptureScreenshotDto {
     @IsUrl()
     url: string;
 
-    @ApiPropertyOptional({ description: 'Viewport width in pixels', example: 1280, minimum: 320, maximum: 3840 })
+    @ApiPropertyOptional({
+        description: 'Viewport width in pixels',
+        example: 1280,
+        minimum: 320,
+        maximum: 3840,
+    })
     @IsOptional()
     @IsNumber()
     @Min(320)
     @Max(3840)
     viewportWidth?: number;
 
-    @ApiPropertyOptional({ description: 'Viewport height in pixels', example: 720, minimum: 240, maximum: 2160 })
+    @ApiPropertyOptional({
+        description: 'Viewport height in pixels',
+        example: 720,
+        minimum: 240,
+        maximum: 2160,
+    })
     @IsOptional()
     @IsNumber()
     @Min(240)
     @Max(2160)
     viewportHeight?: number;
 
-    @ApiPropertyOptional({ description: 'Image format', enum: ['png', 'jpg', 'webp'], default: 'png' })
+    @ApiPropertyOptional({
+        description: 'Image format',
+        enum: ['png', 'jpg', 'webp'],
+        default: 'png',
+    })
     @IsOptional()
     @IsIn(['png', 'jpg', 'webp'])
     format?: 'png' | 'jpg' | 'webp';
 
-    @ApiPropertyOptional({ description: 'Capture full page instead of viewport only', default: false })
+    @ApiPropertyOptional({
+        description: 'Capture full page instead of viewport only',
+        default: false,
+    })
     @IsOptional()
     @IsBoolean()
     fullPage?: boolean;
 
-    @ApiPropertyOptional({ description: 'Delay in ms before capture', example: 1000, minimum: 0, maximum: 10000 })
+    @ApiPropertyOptional({
+        description: 'Delay in ms before capture',
+        example: 1000,
+        minimum: 0,
+        maximum: 10000,
+    })
     @IsOptional()
     @IsNumber()
     @Min(0)

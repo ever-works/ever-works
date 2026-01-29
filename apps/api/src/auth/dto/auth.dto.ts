@@ -14,7 +14,8 @@ export class RegisterDto {
     email: string;
 
     @ApiProperty({
-        description: 'Password (min 6 chars, must contain lowercase letter and number/special char)',
+        description:
+            'Password (min 6 chars, must contain lowercase letter and number/special char)',
         example: 'MySecure123!',
         minLength: 6,
     })
@@ -46,7 +47,10 @@ export class LoginDto {
 }
 
 export class RefreshTokenDto {
-    @ApiProperty({ description: 'Refresh token obtained from login', example: 'eyJhbGciOiJIUzI1NiIs...' })
+    @ApiProperty({
+        description: 'Refresh token obtained from login',
+        example: 'eyJhbGciOiJIUzI1NiIs...',
+    })
     @IsString()
     @IsNotEmpty()
     refreshToken: string;
@@ -59,7 +63,8 @@ export class UpdatePasswordDto {
     currentPassword: string;
 
     @ApiProperty({
-        description: 'New password (min 8 chars, must contain lowercase letter and number/special char)',
+        description:
+            'New password (min 8 chars, must contain lowercase letter and number/special char)',
         example: 'NewSecure456!',
         minLength: 8,
     })

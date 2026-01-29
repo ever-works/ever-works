@@ -184,7 +184,7 @@ describe('MyPlugin', () => {
 | Capability          | Interface                 | Description                       |
 | ------------------- | ------------------------- | --------------------------------- |
 | `git-provider`      | `IGitProviderPlugin`      | Git repository & API operations   |
-| `git-oauth`         | `IGitOAuthPlugin`         | OAuth-based git authentication    |
+| `oauth`             | `IOAuthPlugin`            | OAuth-based authentication        |
 | `deployment`        | `IDeploymentPlugin`       | Deploy to hosting platforms       |
 | `screenshot`        | `IScreenshotPlugin`       | Capture web page screenshots      |
 | `search`            | `ISearchPlugin`           | Web search integration            |
@@ -210,7 +210,7 @@ The git provider system separates concerns:
     - Each provider implements their own API calls
     - Includes: createRepository, getPullRequest, getUser, etc.
 
-3. **`IGitOAuthPlugin`** - OAuth authentication (separate capability)
+3. **`IOAuthPlugin`** - OAuth authentication (separate capability)
     - For providers that support OAuth
     - Can be combined with git-provider capability
 

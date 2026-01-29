@@ -227,7 +227,7 @@ Plugins can declare how their settings can be configured:
 | ScreenshotFacade | `screenshot`   | capture, bulkCapture                      | [screenshot-facade-design.md](./screenshot-facade-design.md) |
 | SearchFacade     | `search`       | search                                    | [search-facade-design.md](./search-facade-design.md)         |
 | AiFacade         | `ai-provider`  | chat, chatStream, askJson, route          | [ai-facade-design.md](./ai-facade-design.md)                 |
-| GitOAuthFacade   | `git-oauth`    | getAuthUrl, handleCallback                | [git-facade-design.md](./git-facade-design.md)               |
+| OAuthFacade      | `oauth`        | getAuthorizationUrl, exchangeCodeForToken | [git-facade-design.md](./git-facade-design.md)               |
 
 ---
 
@@ -283,7 +283,7 @@ packages/agent/src/facades/
 ├── screenshot.facade.ts        # Screenshot capture
 ├── search.facade.ts            # Web search
 ├── ai.facade.ts                # AI operations with routing
-├── git-oauth.facade.ts         # Git provider OAuth
+├── oauth.facade.ts              # OAuth authentication
 └── errors/
     ├── index.ts
     ├── git-facade.errors.ts
@@ -307,9 +307,9 @@ import { DeployFacade } from './deploy.facade';
 import { ScreenshotFacade } from './screenshot.facade';
 import { SearchFacade } from './search.facade';
 import { AiFacade } from './ai.facade';
-import { GitOAuthFacade } from './git-oauth.facade';
+import { OAuthFacade } from './oauth.facade';
 
-const facades = [GitFacade, DeployFacade, ScreenshotFacade, SearchFacade, AiFacade, GitOAuthFacade];
+const facades = [GitFacade, DeployFacade, ScreenshotFacade, SearchFacade, AiFacade, OAuthFacade];
 
 @Module({
 	imports: [PluginsModule],

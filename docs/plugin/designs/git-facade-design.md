@@ -410,13 +410,13 @@ import { DeployFacade } from './deploy.facade';
 import { ScreenshotFacade } from './screenshot.facade';
 import { SearchFacade } from './search.facade';
 import { AiFacade } from './ai.facade';
-import { GitOAuthFacade } from './git-oauth.facade';
+import { OAuthFacade } from './oauth.facade';
 import { PluginsModule } from '../plugins/plugins.module';
 
 @Module({
 	imports: [PluginsModule],
-	providers: [GitFacade, DeployFacade, ScreenshotFacade, SearchFacade, AiFacade, GitOAuthFacade],
-	exports: [GitFacade, DeployFacade, ScreenshotFacade, SearchFacade, AiFacade, GitOAuthFacade]
+	providers: [GitFacade, DeployFacade, ScreenshotFacade, SearchFacade, AiFacade, OAuthFacade],
+	exports: [GitFacade, DeployFacade, ScreenshotFacade, SearchFacade, AiFacade, OAuthFacade]
 })
 export class FacadesModule {}
 ```

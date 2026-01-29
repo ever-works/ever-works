@@ -7,14 +7,20 @@ export class BatchDeployItemDto {
     @IsString()
     directoryId: string;
 
-    @ApiPropertyOptional({ description: 'Vercel team scope for this directory (overrides default)' })
+    @ApiPropertyOptional({
+        description: 'Vercel team scope for this directory (overrides default)',
+    })
     @IsOptional()
     @IsString()
     vercelTeamScope?: string;
 }
 
 export class BatchDeployVercelDto {
-    @ApiProperty({ description: 'List of directories to deploy', type: [BatchDeployItemDto], minItems: 1 })
+    @ApiProperty({
+        description: 'List of directories to deploy',
+        type: [BatchDeployItemDto],
+        minItems: 1,
+    })
     @IsArray()
     @ValidateNested({ each: true })
     @Type(() => BatchDeployItemDto)

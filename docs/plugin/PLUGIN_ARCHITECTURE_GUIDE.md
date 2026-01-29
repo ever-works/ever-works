@@ -334,18 +334,18 @@ Plugins are organized into categories based on what type of functionality they p
 
 **Examples:** Content enrichment, spam filtering, translation, Exa Websets
 
-### Git OAuth Providers
+### OAuth Providers
 
-**Purpose:** Connect user accounts to git providers for repository access
+**Purpose:** Connect user accounts to OAuth providers for resource access
 
 **What they do:**
 
-- Generate OAuth authorization URLs for git providers
+- Generate OAuth authorization URLs
 - Handle OAuth callbacks to obtain access tokens
-- Manage user access tokens for repository operations
-- Define required permission scopes (repo access, etc.)
+- Manage user access tokens for operations
+- Define required permission scopes
 
-This is **NOT** for app authentication (logging into Ever Works). App authentication is hardcoded in the platform. Git OAuth is specifically for connecting a user's git provider account so the platform can create repositories, push code, and create pull requests on their behalf.
+This is **NOT** for app authentication (logging into Ever Works). App authentication is hardcoded in the platform. OAuth plugins are specifically for connecting a user's provider account so the platform can perform actions on their behalf (e.g., create repositories, push code, create pull requests for git providers).
 
 **Why OAuth instead of access tokens?**
 Most Ever Works users are not technical and shouldn't need to manually create and paste access tokens. OAuth provides a familiar "Connect with GitHub" flow that non-technical users understand.
@@ -1070,7 +1070,7 @@ By accessing environment variables through `context.env`, you can easily provide
 
 **Full Pipeline** - A plugin that provides a complete alternative to the standard generation pipeline
 
-**Git OAuth** - OAuth authentication flow used by git provider plugins (GitHub, GitLab, Bitbucket) to connect user accounts for repository access. This is different from app authentication.
+**OAuth** - OAuth authentication flow used by plugins (GitHub, GitLab, Bitbucket, etc.) to connect user accounts for resource access. This is different from app authentication.
 
 **Lifecycle Hook** - A method called at specific points in a plugin's lifetime (load, enable, disable, unload)
 

@@ -13,7 +13,14 @@ import {
     Query,
     UseGuards,
 } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger';
+import {
+    ApiTags,
+    ApiBearerAuth,
+    ApiOperation,
+    ApiResponse,
+    ApiParam,
+    ApiQuery,
+} from '@nestjs/swagger';
 import {
     CreateDirectoryDto,
     UpdateDirectoryDto,
@@ -94,7 +101,10 @@ export class DirectoriesController {
 
     @Get('directories')
     @HttpCode(HttpStatus.OK)
-    @ApiOperation({ summary: 'List directories', description: 'Get all directories accessible to the authenticated user' })
+    @ApiOperation({
+        summary: 'List directories',
+        description: 'Get all directories accessible to the authenticated user',
+    })
     @ApiQuery({ name: 'limit', required: false, description: 'Maximum number of results' })
     @ApiQuery({ name: 'offset', required: false, description: 'Number of results to skip' })
     @ApiQuery({ name: 'search', required: false, description: 'Search term to filter directories' })
@@ -276,7 +286,10 @@ export class DirectoriesController {
 
     @Post('directories/:id/generate')
     @HttpCode(HttpStatus.ACCEPTED)
-    @ApiOperation({ summary: 'Generate items', description: 'Start AI-powered item generation for a directory' })
+    @ApiOperation({
+        summary: 'Generate items',
+        description: 'Start AI-powered item generation for a directory',
+    })
     @ApiParam({ name: 'id', description: 'Directory ID' })
     @ApiResponse({ status: 202, description: 'Generation started' })
     async generateItems(

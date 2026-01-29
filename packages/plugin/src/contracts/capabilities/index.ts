@@ -1,5 +1,5 @@
 export * from './git-provider.interface.js';
-export * from './git-oauth.interface.js';
+export * from './oauth.interface.js';
 export * from './deployment.interface.js';
 export * from './screenshot.interface.js';
 export * from './search.interface.js';

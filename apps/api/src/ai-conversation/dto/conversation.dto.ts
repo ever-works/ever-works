@@ -17,7 +17,11 @@ export class StartConversationDto {
     @IsObject()
     metadata?: Record<string, any>;
 
-    @ApiPropertyOptional({ description: 'Title for the conversation', example: 'Project Discussion', maxLength: 200 })
+    @ApiPropertyOptional({
+        description: 'Title for the conversation',
+        example: 'Project Discussion',
+        maxLength: 200,
+    })
     @IsOptional()
     @IsString()
     @MaxLength(200)
@@ -25,7 +29,11 @@ export class StartConversationDto {
 }
 
 export class UpdateConversationTitleDto {
-    @ApiProperty({ description: 'New title for the conversation', example: 'Updated Discussion', maxLength: 200 })
+    @ApiProperty({
+        description: 'New title for the conversation',
+        example: 'Updated Discussion',
+        maxLength: 200,
+    })
     @IsString()
     @MinLength(1)
     @MaxLength(200)
@@ -39,7 +47,12 @@ export class UpdateConversationContextDto {
 }
 
 export class PruneMessagesDto {
-    @ApiProperty({ description: 'Number of recent messages to keep', example: 10, minimum: 1, maximum: 1000 })
+    @ApiProperty({
+        description: 'Number of recent messages to keep',
+        example: 10,
+        minimum: 1,
+        maximum: 1000,
+    })
     @IsNumber()
     @Min(1)
     @Max(1000)
@@ -47,7 +60,12 @@ export class PruneMessagesDto {
 }
 
 export class ConversationQueryDto {
-    @ApiPropertyOptional({ description: 'Maximum number of conversations to return', example: 20, minimum: 1, maximum: 100 })
+    @ApiPropertyOptional({
+        description: 'Maximum number of conversations to return',
+        example: 20,
+        minimum: 1,
+        maximum: 100,
+    })
     @IsOptional()
     @IsNumber()
     @Type(() => Number)
@@ -64,7 +82,12 @@ export class ConversationQueryDto {
 }
 
 export class HistoryQueryDto {
-    @ApiPropertyOptional({ description: 'Maximum number of messages to return', example: 50, minimum: 1, maximum: 200 })
+    @ApiPropertyOptional({
+        description: 'Maximum number of messages to return',
+        example: 50,
+        minimum: 1,
+        maximum: 200,
+    })
     @IsOptional()
     @IsNumber()
     @Type(() => Number)

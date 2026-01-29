@@ -259,7 +259,10 @@ export class VercelService {
             // Create/update a deployment trigger file
             const triggerFile = `${repoDir}/.deployment-trigger`;
             const fs = await import('node:fs/promises');
-            await fs.writeFile(triggerFile, `Deployment triggered at ${new Date().toISOString()}\n`);
+            await fs.writeFile(
+                triggerFile,
+                `Deployment triggered at ${new Date().toISOString()}\n`,
+            );
 
             await this.githubService.add(repoDir, '.deployment-trigger');
             await this.githubService.commit(

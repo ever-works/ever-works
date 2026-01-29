@@ -32,7 +32,10 @@ export class SubscriptionsController {
 
     @Get('plan')
     @HttpCode(HttpStatus.OK)
-    @ApiOperation({ summary: 'Get subscription plan', description: 'Get the current subscription plan for the user' })
+    @ApiOperation({
+        summary: 'Get subscription plan',
+        description: 'Get the current subscription plan for the user',
+    })
     @ApiResponse({ status: 200, description: 'Subscription plan details' })
     async getPlan(@CurrentUser() auth: AuthenticatedUser) {
         const user = await this.authService.getUser(auth.userId);
@@ -58,7 +61,10 @@ export class SubscriptionsController {
 
     @Post('plan')
     @HttpCode(HttpStatus.OK)
-    @ApiOperation({ summary: 'Update subscription plan', description: 'Update the subscription plan for the user' })
+    @ApiOperation({
+        summary: 'Update subscription plan',
+        description: 'Update the subscription plan for the user',
+    })
     @ApiResponse({ status: 200, description: 'Subscription plan updated' })
     @ApiResponse({ status: 400, description: 'Subscriptions are disabled' })
     async updatePlan(

@@ -271,7 +271,7 @@ packages/
 │       │   ├── pipeline-step.interface.ts
 │       │   ├── full-pipeline.interface.ts
 │       │   ├── form-field.interface.ts
-│       │   ├── git-oauth.interface.ts       # Git provider OAuth (NOT app auth)
+│       │   ├── oauth.interface.ts           # OAuth authentication (NOT app auth)
 │       │   └── custom-capability.interface.ts
 │       └── types/
 │           ├── settings.types.ts
@@ -1201,20 +1201,20 @@ interface IFormFieldPlugin extends IPlugin {
 }
 ```
 
-### IGitOAuthPlugin
+### IOAuthPlugin
 
-Git OAuth is specifically for connecting user accounts to git providers (GitHub, GitLab, Bitbucket) so the platform can manage repositories on their behalf. This is **NOT** for app authentication (logging into Ever Works), which remains hardcoded.
+OAuth is specifically for connecting user accounts to OAuth providers (GitHub, GitLab, Bitbucket, etc.) so the platform can manage resources on their behalf. This is **NOT** for app authentication (logging into Ever Works), which remains hardcoded.
 
 **Why OAuth instead of access tokens?**
 Most Ever Works users are not technical and shouldn't need to manually create and paste access tokens. OAuth provides a familiar "Connect with GitHub" flow.
 
 ```typescript
-interface IGitOAuthPlugin extends IPlugin {
-	getAuthUrl(state: string, scopes?: string[]): string;
-	handleCallback(code: string, state: string): Promise<GitOAuthTokens>;
-	refreshToken(refreshToken: string): Promise<GitOAuthTokens>;
-	getScopes(): GitOAuthScope[];
-	getUserInfo(tokens: GitOAuthTokens): Promise<GitUserInfo>;
+interface IOAuthPlugin extends IPlugin {
+	getAuthorizationUrl(state: string, config?: Partial<OAuthConfig>): string;
+	exchangeCodeForToken(code: string, config?: Partial<OAuthConfig>): Promise<OAuthToken>;
+	refreshAccessToken?(refreshToken: string, config?: Partial<OAuthConfig>): Promise<OAuthToken>;
+	revokeToken?(token: string): Promise<void>;
+	getAuthenticatedUser(token: string): Promise<OAuthUser>;
 }
 ```
 
@@ -2881,9 +2881,9 @@ class DirectoryPlugin {
 
 | Plugin          | Category   | Capabilities                               | Description                     |
 | --------------- | ---------- | ------------------------------------------ | ------------------------------- |
-| `github`        | git        | `IGitProviderPlugin`, `IGitOAuthPlugin`    | GitHub repository management    |
-| `gitlab`        | git        | `IGitProviderPlugin`, `IGitOAuthPlugin`    | GitLab repository management    |
-| `bitbucket`     | git        | `IGitProviderPlugin`, `IGitOAuthPlugin`    | Bitbucket repository management |
+| `github`        | git        | `IGitProviderPlugin`, `IOAuthPlugin`       | GitHub repository management    |
+| `gitlab`        | git        | `IGitProviderPlugin`, `IOAuthPlugin`       | GitLab repository management    |
+| `bitbucket`     | git        | `IGitProviderPlugin`, `IOAuthPlugin`       | Bitbucket repository management |
 | `vercel`        | deployment | `IDeploymentPlugin`                        | Vercel deployment               |
 | `netlify`       | deployment | `IDeploymentPlugin`                        | Netlify deployment              |
 | `screenshotone` | screenshot | `IScreenshotPlugin`                        | ScreenshotOne API               |

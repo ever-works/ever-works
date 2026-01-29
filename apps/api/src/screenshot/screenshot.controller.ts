@@ -28,7 +28,10 @@ export class ScreenshotController {
      * Validate ScreenshotOne access key and optional secret key.
      */
     @Post('/validate-credentials')
-    @ApiOperation({ summary: 'Validate credentials', description: 'Validate ScreenshotOne API credentials' })
+    @ApiOperation({
+        summary: 'Validate credentials',
+        description: 'Validate ScreenshotOne API credentials',
+    })
     @ApiResponse({ status: 200, description: 'Validation result' })
     async validateCredentials(@Body() dto: ValidateCredentialsDto) {
         const result = await this.screenshotOneService.validateKeys(dto.accessKey, dto.secretKey);
@@ -45,7 +48,10 @@ export class ScreenshotController {
      * Returns whether global or user-specific key is configured.
      */
     @Get('/check-availability')
-    @ApiOperation({ summary: 'Check availability', description: 'Check if screenshot service is available' })
+    @ApiOperation({
+        summary: 'Check availability',
+        description: 'Check if screenshot service is available',
+    })
     @ApiResponse({ status: 200, description: 'Availability status' })
     async checkAvailability(@CurrentUser() auth: AuthenticatedUser) {
         const user = await this.authService.getUser(auth.userId);
@@ -69,7 +75,10 @@ export class ScreenshotController {
     @Post('/capture')
     @ApiOperation({ summary: 'Capture screenshot', description: 'Capture a screenshot of a URL' })
     @ApiResponse({ status: 200, description: 'Screenshot captured successfully' })
-    @ApiResponse({ status: 400, description: 'Screenshot capture failed or service not configured' })
+    @ApiResponse({
+        status: 400,
+        description: 'Screenshot capture failed or service not configured',
+    })
     async capture(@CurrentUser() auth: AuthenticatedUser, @Body() dto: CaptureScreenshotDto) {
         const user = await this.authService.getUser(auth.userId);
 
@@ -162,7 +171,10 @@ export class ScreenshotController {
      * Routes to product image extraction for ecommerce, screenshots for software.
      */
     @Post('/smart-preview')
-    @ApiOperation({ summary: 'Smart image preview', description: 'Get a smart image for a URL based on domain type' })
+    @ApiOperation({
+        summary: 'Smart image preview',
+        description: 'Get a smart image for a URL based on domain type',
+    })
     @ApiResponse({ status: 200, description: 'Smart image preview result' })
     async getSmartImagePreview(
         @CurrentUser() auth: AuthenticatedUser,

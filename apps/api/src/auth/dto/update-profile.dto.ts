@@ -8,7 +8,10 @@ export class UpdateProfileDto {
     @MinLength(3)
     username?: string;
 
-    @ApiPropertyOptional({ description: 'Avatar image URL', example: 'https://example.com/avatar.jpg' })
+    @ApiPropertyOptional({
+        description: 'Avatar image URL',
+        example: 'https://example.com/avatar.jpg',
+    })
     @IsUrl()
     @IsOptional()
     avatar?: string;

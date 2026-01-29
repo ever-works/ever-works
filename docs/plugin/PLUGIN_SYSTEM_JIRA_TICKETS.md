@@ -1194,14 +1194,14 @@ export interface FormFieldOption {
 
 ---
 
-## Task 1.14: IGitOAuthPlugin Interface
+## Task 1.14: IOAuthPlugin Interface
 
-**Title:** Define IGitOAuthPlugin capability interface for git provider OAuth
+**Title:** Define IOAuthPlugin capability interface for OAuth authentication
 
 **Description:**
-Create the interface for git provider plugins that use OAuth to connect user accounts (GitHub, GitLab, Bitbucket).
+Create the interface for plugins that use OAuth to connect user accounts (GitHub, GitLab, Bitbucket, etc.).
 
-**Important:** This is specifically for connecting user's git provider accounts so the platform can manage repositories on their behalf. This is NOT for app authentication (logging into Ever Works), which remains hardcoded in the platform.
+**Important:** This is specifically for connecting user's OAuth provider accounts so the platform can manage resources on their behalf. This is NOT for app authentication (logging into Ever Works), which remains hardcoded in the platform.
 
 **Why OAuth instead of access tokens?**
 Most Ever Works users are not technical and shouldn't need to manually create and paste access tokens. OAuth provides a familiar "Connect with GitHub" flow.
@@ -1209,46 +1209,42 @@ Most Ever Works users are not technical and shouldn't need to manually create an
 **Implementation Details:**
 
 ```typescript
-// src/capabilities/git-oauth.interface.ts
-export interface IGitOAuthPlugin extends IPlugin {
-	getAuthUrl(state: string, scopes?: string[]): string;
-	handleCallback(code: string, state: string): Promise<GitOAuthTokens>;
-	refreshToken(refreshToken: string): Promise<GitOAuthTokens>;
-	revokeToken(token: string): Promise<void>;
-
-	getScopes(): GitOAuthScope[];
-	getDefaultScopes(): string[];
-
-	getUserInfo(tokens: GitOAuthTokens): Promise<GitUserInfo>;
+// src/capabilities/oauth.interface.ts
+export interface IOAuthPlugin extends IPlugin {
+	getAuthorizationUrl(state: string, config?: Partial<OAuthConfig>): string;
+	exchangeCodeForToken(code: string, config?: Partial<OAuthConfig>): Promise<OAuthToken>;
+	refreshAccessToken?(refreshToken: string, config?: Partial<OAuthConfig>): Promise<OAuthToken>;
+	revokeToken?(token: string): Promise<void>;
+	getAuthenticatedUser(token: string): Promise<OAuthUser>;
 }
 
-export interface GitOAuthTokens {
-	accessToken: string;
-	refreshToken?: string;
-	expiresAt?: Date;
-	tokenType: string;
-	scope?: string;
+export interface OAuthConfig {
+	readonly clientId: string;
+	readonly clientSecret: string;
+	readonly redirectUri: string;
+	readonly scopes: readonly string[];
 }
 
-export interface GitOAuthScope {
-	id: string;
-	name: string;
-	description: string;
-	required?: boolean;
+export interface OAuthToken {
+	readonly accessToken: string;
+	readonly tokenType: string;
+	readonly scope?: string;
+	readonly expiresIn?: number;
+	readonly refreshToken?: string;
 }
 
-export interface GitUserInfo {
-	id: string;
-	username: string;
-	email?: string;
-	avatar?: string;
-	name?: string;
+export interface OAuthUser {
+	readonly id: string;
+	readonly username: string;
+	readonly email?: string;
+	readonly name?: string;
+	readonly avatarUrl?: string;
 }
 ```
 
 **Files to Create:**
 
-- `packages/plugin/src/capabilities/git-oauth.interface.ts`
+- `packages/plugin/src/capabilities/oauth.interface.ts`
 
 ---
 
@@ -3645,7 +3641,7 @@ Create the packages/plugins directory with shared configuration and workspace se
 **Title:** Create GitHub plugin package
 
 **Description:**
-Extract GitHub functionality from agent into a standalone plugin implementing IGitProviderPlugin and IGitOAuthPlugin.
+Extract GitHub functionality from agent into a standalone plugin implementing IGitProviderPlugin and IOAuthPlugin.
 
 **Implementation Details:**
 
@@ -3653,7 +3649,7 @@ Extract GitHub functionality from agent into a standalone plugin implementing IG
 2. Create package.json with everworks.plugin manifest
 3. Move github.service.ts logic to plugin
 4. Implement IGitProviderPlugin interface
-5. Implement IGitOAuthPlugin interface
+5. Implement IOAuthPlugin interface
 
 **Files to Create:**
 
@@ -3671,7 +3667,7 @@ Extract GitHub functionality from agent into a standalone plugin implementing IG
 **Title:** Create GitLab plugin package
 
 **Description:**
-Create a new GitLab plugin implementing IGitProviderPlugin and IGitOAuthPlugin.
+Create a new GitLab plugin implementing IGitProviderPlugin and IOAuthPlugin.
 
 **Files to Create:**
 
@@ -4318,12 +4314,12 @@ interface ProviderHealth {
 
 ---
 
-## Task 10.6: GitOAuthFacade
+## Task 10.6: OAuthFacade
 
-**Title:** Create GitOAuthFacade service
+**Title:** Create OAuthFacade service
 
 **Description:**
-Facade for git provider OAuth operations (getAuthUrl, handleCallback, etc.). Handles connecting user accounts to GitHub, GitLab, Bitbucket for repository management.
+Facade for OAuth operations (getAuthorizationUrl, exchangeCodeForToken, etc.). Handles connecting user accounts to OAuth providers like GitHub, GitLab, Bitbucket for repository management.
 
 **Note:** This is NOT for app authentication (logging into Ever Works). App authentication remains hardcoded.
 
@@ -4411,7 +4407,7 @@ Migrate the entire OAuthToken entity to UserPlugin.settings for git provider plu
 **Implementation Details:**
 
 1. Update GitFacade.getToken() to read from UserPlugin
-2. Update GitOAuthFacade to write tokens to UserPlugin
+2. Update OAuthFacade to write tokens to UserPlugin
 3. Create migration script to move existing OAuthToken records
 4. Mark OAuthToken entity as deprecated
 
@@ -4622,12 +4618,12 @@ Remove the Vercel-specific deployment verifier and use the plugin interface.
 
 ---
 
-## Task 11.3: Generic Git OAuth Strategies
+## Task 11.3: Generic OAuth Strategies
 
-**Title:** Replace GitHub strategy with plugin-based Git OAuth
+**Title:** Replace GitHub strategy with plugin-based OAuth
 
 **Description:**
-Create a generic OAuth strategy for git providers that uses IGitOAuthPlugin. This handles connecting user accounts to GitHub, GitLab, Bitbucket etc. for repository management.
+Create a generic OAuth strategy for providers that uses IOAuthPlugin. This handles connecting user accounts to GitHub, GitLab, Bitbucket etc. for repository management.
 
 **Note:** This is NOT for app authentication (logging into Ever Works). App authentication remains hardcoded.
 
@@ -4638,7 +4634,7 @@ Create a generic OAuth strategy for git providers that uses IGitOAuthPlugin. Thi
 **Title:** Remove github-token.service.ts and github-scopes.config.ts
 
 **Description:**
-Remove GitHub-specific services and use GitOAuthFacade instead. The GitHub plugin will handle all GitHub-specific OAuth logic.
+Remove GitHub-specific services and use OAuthFacade instead. The GitHub plugin will handle all GitHub-specific OAuth logic.
 
 ---
 

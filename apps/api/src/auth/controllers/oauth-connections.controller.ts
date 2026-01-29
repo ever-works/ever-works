@@ -33,7 +33,10 @@ export class OAuthConnectionsController {
      * Get all connected OAuth accounts for the current user
      */
     @Get()
-    @ApiOperation({ summary: 'Get OAuth connections', description: 'Get all connected OAuth accounts for the current user' })
+    @ApiOperation({
+        summary: 'Get OAuth connections',
+        description: 'Get all connected OAuth accounts for the current user',
+    })
     @ApiResponse({ status: 200, description: 'List of connected OAuth accounts' })
     async getConnections(@Request() req): Promise<any> {
         return this.oauthConnectionService.getUserConnections(req.user.userId);
@@ -43,7 +46,10 @@ export class OAuthConnectionsController {
      * Check if user has a specific provider connected
      */
     @Get(':provider')
-    @ApiOperation({ summary: 'Check OAuth connection', description: 'Check if user has a specific OAuth provider connected' })
+    @ApiOperation({
+        summary: 'Check OAuth connection',
+        description: 'Check if user has a specific OAuth provider connected',
+    })
     @ApiParam({ name: 'provider', description: 'OAuth provider (github, google)' })
     @ApiResponse({ status: 200, description: 'Connection status' })
     async checkConnection(@Request() req, @Param('provider') provider: string): Promise<any> {
@@ -54,8 +60,15 @@ export class OAuthConnectionsController {
      * Get OAuth URL for connecting a provider (returns JSON)
      */
     @Get(':provider/connect/url')
-    @ApiOperation({ summary: 'Get OAuth connect URL', description: 'Get OAuth URL for connecting a provider' })
-    @ApiParam({ name: 'provider', description: 'OAuth provider (github, google)', enum: ['github', 'google'] })
+    @ApiOperation({
+        summary: 'Get OAuth connect URL',
+        description: 'Get OAuth URL for connecting a provider',
+    })
+    @ApiParam({
+        name: 'provider',
+        description: 'OAuth provider (github, google)',
+        enum: ['github', 'google'],
+    })
     @ApiResponse({ status: 200, description: 'OAuth authorization URL' })
     async getConnectUrl(
         @Request() req,
@@ -148,7 +161,10 @@ export class OAuthConnectionsController {
      * Disconnect an OAuth provider
      */
     @Delete(':provider')
-    @ApiOperation({ summary: 'Disconnect OAuth provider', description: 'Disconnect an OAuth provider from the account' })
+    @ApiOperation({
+        summary: 'Disconnect OAuth provider',
+        description: 'Disconnect an OAuth provider from the account',
+    })
     @ApiParam({ name: 'provider', description: 'OAuth provider to disconnect' })
     @ApiResponse({ status: 204, description: 'Provider disconnected successfully' })
     @HttpCode(HttpStatus.NO_CONTENT)
@@ -170,7 +186,10 @@ export class OAuthConnectionsController {
      * Get GitHub repositories accessible with current permissions
      */
     @Get('github/repositories')
-    @ApiOperation({ summary: 'Get GitHub repositories', description: 'Get GitHub repositories accessible with current permissions' })
+    @ApiOperation({
+        summary: 'Get GitHub repositories',
+        description: 'Get GitHub repositories accessible with current permissions',
+    })
     @ApiResponse({ status: 200, description: 'List of GitHub repositories' })
     async getGitHubRepositories(@Request() req): Promise<any> {
         return this.oauthConnectionService.getGitHubRepositories(req.user.userId);

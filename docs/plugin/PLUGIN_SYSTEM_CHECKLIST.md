@@ -46,7 +46,7 @@ Create `packages/plugin` containing all TypeScript interfaces, types, base class
 - [x] **1.11** Define IPipelineStepPlugin capability interface (**TYPE-SAFE:** uses `BuiltInStepId`, `StepDataKey`, `StepDataTypes`)
 - [x] **1.12** Define IFullPipelinePlugin capability interface
 - [x] **1.13** Define IFormFieldPlugin capability interface
-- [x] **1.14** Define IGitOAuthPlugin capability interface for git provider OAuth (separate from git-provider)
+- [x] **1.14** Define IOAuthPlugin capability interface for OAuth (separate from git-provider)
 - [x] **1.15** Define ICustomCapabilityRegistry interface for plugin-to-plugin communication
 - [x] **1.16** Define CapabilityMetadata and related types
 - [x] **1.17** Define common types for settings, validation, and pipeline (includes `step-types.ts`)
@@ -169,8 +169,8 @@ Decouple AI module and fix provider instantiation.
 Create `packages/plugins/` with all built-in plugins as full packages.
 
 - [ ] **4.1** Set up packages/plugins workspace structure
-- [ ] **4.2** Create GitHub plugin package (IGitProviderPlugin + IGitOAuthPlugin)
-- [ ] **4.3** Create GitLab plugin package (IGitProviderPlugin + IGitOAuthPlugin)
+- [ ] **4.2** Create GitHub plugin package (IGitProviderPlugin + IOAuthPlugin)
+- [ ] **4.3** Create GitLab plugin package (IGitProviderPlugin + IOAuthPlugin)
 - [ ] **4.4** Create Vercel plugin package (IDeploymentPlugin)
 - [ ] **4.5** Create Netlify plugin package (IDeploymentPlugin)
 - [ ] **4.6** Create ScreenshotOne plugin package (IScreenshotPlugin)
@@ -206,7 +206,7 @@ Create thin facade services in packages/agent wrapping plugin registry calls.
 - [ ] **10.3** Create ScreenshotFacade service
 - [ ] **10.4** Create SearchFacade service
 - [ ] **10.5** Create AiFacade service with model routing (complexity → tier → provider selection)
-- [ ] **10.6** Create GitOAuthFacade service
+- [ ] **10.6** Create OAuthFacade service
 - [ ] **10.7** Update all agent consumers to use facades
 
 ### Story 10a: Migrate Hardcoded Infrastructure to Plugin System (13 tasks)
