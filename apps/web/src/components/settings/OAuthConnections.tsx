@@ -171,7 +171,7 @@ export function OAuthConnections({
                                     onClick={handleGitHubReconnect}
                                     disabled={isPending}
                                     className={cn(
-                                        'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
+                                        'px-4 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer',
                                         'bg-surface dark:bg-surface-dark',
                                         'text-text dark:text-text-dark',
                                         'border border-card-border dark:border-card-border-dark',
@@ -185,7 +185,7 @@ export function OAuthConnections({
                                     onClick={handleGitHubDisconnect}
                                     disabled={isPending}
                                     className={cn(
-                                        'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
+                                        'px-4 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer',
                                         'bg-red-500/10 text-red-600 dark:text-red-400',
                                         'hover:bg-red-500/20',
                                         'disabled:opacity-50 disabled:cursor-not-allowed',
