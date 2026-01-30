@@ -33,11 +33,6 @@ import { tavily, TavilyClient } from '@tavily/core';
  * 4. Environment variable: TAVILY_API_KEY (via x-envVar)
  * 5. Not configured (plugin unavailable)
  *
- * This allows:
- * - Platform admins to set a shared API key for all users
- * - Users to bring their own API keys
- * - Per-directory API key overrides
- * - Fallback to environment variable for self-hosted deployments
  */
 export class TavilySearchPlugin implements IPlugin, ISearchPlugin, IContentExtractorPlugin {
 	// ============================================================================
@@ -371,7 +366,9 @@ export class TavilySearchPlugin implements IPlugin, ISearchPlugin, IContentExtra
 			license: 'MIT',
 			builtIn: true,
 			systemPlugin: false,
-			autoInstall: false
+			autoInstall: true,
+			autoEnable: true,
+			isDefault: true
 		};
 	}
 }

@@ -122,12 +122,6 @@ spec:
             - name: TAVILY_API_KEY
               value: "$TAVILY_API_KEY"
 
-            # SEARCH SERVICES
-            - name: EXTRACT_CONTENT_SERVICE
-              value: "$EXTRACT_CONTENT_SERVICE"
-            - name: WEB_SEARCH_SERVICE
-              value: "$WEB_SEARCH_SERVICE"
-
             # Database
             - name: DATABASE_TYPE
               value: "$DATABASE_TYPE"

@@ -45,7 +45,9 @@
 				"content-extractor"
 			],
 			"description": "Web search and content extraction using Tavily API. Supports both search queries and direct URL content extraction.",
-			"autoInstall": false,
+			"autoInstall": true,
+			"autoEnable": true,
+			"isDefault": true,
 			"systemPlugin": false,
 			"builtIn": true,
 			"envVars": [

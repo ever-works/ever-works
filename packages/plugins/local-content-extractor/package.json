@@ -49,6 +49,7 @@
 			],
 			"description": "System plugin for extracting web page content using axios + Readability. Provides fallback content extraction without requiring external API keys.",
 			"autoInstall": true,
+			"autoEnable": true,
 			"systemPlugin": true,
 			"builtIn": true,
 			"isDefault": true,

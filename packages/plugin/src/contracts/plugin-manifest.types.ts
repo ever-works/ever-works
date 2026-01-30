@@ -138,6 +138,8 @@ export interface PluginManifest {
 	readonly autoInstall?: boolean;
 	/** Whether plugin should be auto-enabled for all directories when installed */
 	readonly autoEnable?: boolean;
+	/** Whether this is the default plugin for its capability (used by facades) */
+	readonly isDefault?: boolean;
 	/** Whether plugin is deprecated */
 	readonly deprecated?: boolean;
 	/** Deprecation message */

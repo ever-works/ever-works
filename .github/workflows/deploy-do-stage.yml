@@ -95,10 +95,6 @@ jobs:
           # Tavily
           TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
 
-          # SEARCH SERVICES
-          EXTRACT_CONTENT_SERVICE: ${{ secrets.EXTRACT_CONTENT_SERVICE }}
-          WEB_SEARCH_SERVICE: ${{ secrets.WEB_SEARCH_SERVICE }}
-
           # Database
           DATABASE_TYPE: ${{ secrets.DATABASE_TYPE }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}

@@ -273,16 +273,6 @@ export const config = {
         },
     },
 
-    // Search configuration
-    search: {
-        getExtractContentService() {
-            return (process.env.EXTRACT_CONTENT_SERVICE as 'tavily' | 'local') || 'local';
-        },
-        getWebSearchService() {
-            return (process.env.WEB_SEARCH_SERVICE as 'tavily') || 'tavily';
-        },
-    },
-
     // GitHub configuration
     github: {
         getApiKey() {
@@ -307,13 +297,6 @@ export const config = {
     vercel: {
         getToken() {
             return process.env.VERCEL_TOKEN;
-        },
-    },
-
-    // Tavily configuration
-    tavily: {
-        getApiKey() {
-            return process.env.TAVILY_API_KEY;
         },
     },
 

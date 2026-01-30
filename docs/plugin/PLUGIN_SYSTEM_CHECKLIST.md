@@ -8,6 +8,27 @@ This checklist tracks the implementation progress of the Plugin System as define
 
 ---
 
+## Progress Summary
+
+| Phase                         | Status         | Progress | Notes                                        |
+| ----------------------------- | -------------- | -------- | -------------------------------------------- |
+| Phase 1: Foundation           | ✅ COMPLETE    | 40/40    | Stories 1-2 fully implemented                |
+| Phase 2: Pipeline             | ✅ COMPLETE    | 23/23    | Story 3 fully implemented                    |
+| Phase 3: Module Decoupling    | 🟡 IN PROGRESS | 3/16     | Stories 7-8 partial; 5-6 not started         |
+| Phase 4: Built-in Plugins     | 🟡 IN PROGRESS | 6/14     | 5 plugins created + workspace setup          |
+| Phase 5: Data Sources         | 🟡 IN PROGRESS | 1/3      | DataSourceFacade complete                    |
+| Phase 6: Service Facades      | 🟡 IN PROGRESS | 7/10     | 5 facades + base; Git, Deploy, OAuth missing |
+| Phase 6a: Hardcoded Migration | ❌ BLOCKED     | 0/13     | Blocked by Git/Deploy facades                |
+| Phase 7: API Refactoring      | ❌ NOT STARTED | 0/13     | Blocked by Git/Deploy plugins                |
+| Phase 8: Frontend             | 🟡 IN PROGRESS | 19/36    | Plugin UI complete; Git/Deploy blocked       |
+| Phase 9: Testing & CI         | 🟡 IN PROGRESS | 9/15     | Foundation tests complete                    |
+
+**Overall Progress:** ~108/183 tasks (~59%)
+
+**Key Insight:** Frontend plugin UI is largely complete! The remaining frontend tasks (12.1-12.3, 13.2, 14.1-14.2, 15.x, 16.1-16.2) are all blocked by missing GitFacade and DeployFacade backends.
+
+---
+
 ## Phase 1: Foundation
 
 ### Story 1: Plugin Package (28 tasks) ✅ COMPLETE
@@ -73,7 +94,7 @@ Create the plugin runtime system in `packages/agent` for discovery, loading, and
 
 ## Phase 2: Pipeline
 
-### Story 3: Pipeline Refactoring (23 tasks)
+### Story 3: Pipeline Refactoring (23 tasks) ✅ COMPLETE
 
 Refactor the pipeline to be fully plugin-driven with step injection support.
 
@@ -139,71 +160,82 @@ Abstract deployment operations behind IDeploymentPlugin interface.
 - [ ] **6.3** Abstract deployment triggers (remove hardcoded GitHub Actions dispatch)
 - [ ] **6.4** Update BatchDeployService to use Deploy facade
 
-### Story 7: Screenshot Module Decoupling (3 tasks)
+### Story 7: Screenshot Module Decoupling (3 tasks) 🟡 IN PROGRESS
 
 Abstract screenshot operations behind IScreenshotPlugin interface.
 
 - [ ] **7.1** Move screenshot-one.service.ts to plugin (extract)
-- [ ] **7.2** Create ScreenshotService Facade using plugin registry
+- [x] **7.2** Create ScreenshotService Facade using plugin registry _(implemented: `packages/agent/src/facades/screenshot.facade.ts`)_
 - [ ] **7.3** Update SmartImageRouter to use Screenshot facade
 
-### Story 8: AI Module Decoupling (4 tasks)
+### Story 8: AI Module Decoupling (4 tasks) 🟡 IN PROGRESS
 
 Decouple AI module and fix provider instantiation.
 
 - [ ] **8.1** Fix provider switch (use correct LLM classes per provider)
 - [ ] **8.2** Extract AI providers to plugin packages
-- [ ] **8.3** Create AiService Facade using plugin registry
+- [x] **8.3** Create AiService Facade using plugin registry _(implemented: `packages/agent/src/facades/ai.facade.ts` with model routing, cost calculation)_
 - [ ] **8.4** Implement proper provider factory pattern
 
 ---
 
 ## Phase 4: Built-in Plugins
 
-### Story 4: Built-in Plugins Package (12 tasks)
+### Story 4: Built-in Plugins Package (12 tasks) 🟡 IN PROGRESS
 
 Create `packages/plugins/` with all built-in plugins as full packages.
 
-- [ ] **4.1** Set up packages/plugins workspace structure
+- [x] **4.1** Set up packages/plugins workspace structure _(5 plugins created)_
 - [ ] **4.2** Create GitHub plugin package (IGitProviderPlugin + IOAuthPlugin)
 - [ ] **4.3** Create GitLab plugin package (IGitProviderPlugin + IOAuthPlugin)
 - [ ] **4.4** Create Vercel plugin package (IDeploymentPlugin)
 - [ ] **4.5** Create Netlify plugin package (IDeploymentPlugin)
 - [ ] **4.6** Create ScreenshotOne plugin package (IScreenshotPlugin)
-- [ ] **4.7** Create Tavily plugin package (ISearchPlugin + IContentExtractorPlugin)
+- [x] **4.7** Create Tavily plugin package (ISearchPlugin + IContentExtractorPlugin) _(implemented: `packages/plugins/tavily-search/`)_
 - [ ] **4.8** Create Exa.ai plugin package (IFullPipelinePlugin + ISearchPlugin)
 - [ ] **4.9** Create OpenAI plugin package (IAiProviderPlugin)
 - [ ] **4.10** Create Anthropic plugin package (IAiProviderPlugin)
-- [ ] **4.11** Create Notion plugin package (IDataSourcePlugin)
-- [ ] **4.12** Create Apify plugin package (IDataSourcePlugin)
+- [x] **4.11** Create Notion plugin package (IContentExtractorPlugin) _(implemented: `packages/plugins/notion-extractor/`)_
+- [x] **4.12** Create Apify plugin package (IDataSourcePlugin) _(implemented: `packages/plugins/apify-data-source/`)_
+
+**Additional plugins created (beyond original scope):**
+
+- [x] **4.13** Create Default Pipeline plugin (IPipelineStepPlugin) _(system plugin: `packages/plugins/default-pipeline/`)_
+- [x] **4.14** Create Local Content Extractor plugin (IContentExtractorPlugin) _(fallback: `packages/plugins/local-content-extractor/`)_
 
 ---
 
 ## Phase 5: Data Sources
 
-### Story 9: Data Source Plugins (3 tasks)
+### Story 9: Data Source Plugins (3 tasks) 🟡 IN PROGRESS
 
 Create the data source abstraction and extract existing importers.
 
 - [ ] **9.1** Move Awesome Readme parser to plugin (extract)
-- [ ] **9.2** Create DataSource Facade using plugin registry
+- [x] **9.2** Create DataSource Facade using plugin registry _(implemented: `packages/agent/src/facades/data-source.facade.ts`)_
 - [ ] **9.3** Update import services to use DataSource facade
 
 ---
 
 ## Phase 6: Service Facades
 
-### Story 10: Service Facades (7 tasks)
+### Story 10: Service Facades (7 tasks) 🟡 IN PROGRESS
 
 Create thin facade services in packages/agent wrapping plugin registry calls.
 
-- [ ] **10.1** Create GitFacade service
-- [ ] **10.2** Create DeployFacade service
-- [ ] **10.3** Create ScreenshotFacade service
-- [ ] **10.4** Create SearchFacade service
-- [ ] **10.5** Create AiFacade service with model routing (complexity → tier → provider selection)
+- [ ] **10.1** Create GitFacade service _(CRITICAL: blocks Story 10a)_
+- [ ] **10.2** Create DeployFacade service _(CRITICAL: blocks Story 10a)_
+- [x] **10.3** Create ScreenshotFacade service _(implemented: `packages/agent/src/facades/screenshot.facade.ts`)_
+- [x] **10.4** Create SearchFacade service _(implemented: `packages/agent/src/facades/search.facade.ts`)_
+- [x] **10.5** Create AiFacade service with model routing _(implemented: `packages/agent/src/facades/ai.facade.ts`)_
 - [ ] **10.6** Create OAuthFacade service
 - [ ] **10.7** Update all agent consumers to use facades
+
+**Additional facades created (beyond original scope):**
+
+- [x] **10.8** Create ContentExtractorFacade service _(implemented: `packages/agent/src/facades/content-extractor.facade.ts`)_
+- [x] **10.9** Create DataSourceFacade service _(implemented: `packages/agent/src/facades/data-source.facade.ts`)_
+- [x] **10.10** Create BaseFacadeService _(shared 3-level enable resolution: `packages/agent/src/facades/base.facade.ts`)_
 
 ### Story 10a: Migrate Hardcoded Infrastructure to Plugin System (13 tasks)
 
@@ -266,68 +298,68 @@ Refactor apps/api to use the plugin system instead of hardcoded providers.
 
 ## Phase 8: Frontend
 
-### Story 12: Frontend - API Layer Refactoring (6 tasks)
+### Story 12: Frontend - API Layer Refactoring (6 tasks) 🟡 IN PROGRESS
 
 Refactor apps/web/src/lib/api/ for plugin-based providers.
 
 - [ ] **12.1** Update deploy.ts to be provider-agnostic
 - [ ] **12.2** Update auth.ts to be provider-agnostic
 - [ ] **12.3** Update screenshot.ts to be provider-agnostic
-- [ ] **12.4** Create plugins.ts API functions
-- [ ] **12.5** Update enums.ts for plugin types
-- [ ] **12.6** Add plugin settings API functions
+- [x] **12.4** Create plugins.ts API functions _(implemented: `apps/web/src/lib/api/plugins.ts`)_
+- [x] **12.5** Update enums.ts for plugin types _(implemented: PluginCategory, PluginState, ConfigurationMode types)_
+- [x] **12.6** Add plugin settings API functions _(implemented: updateSettings, updateDirectorySettings, etc.)_
 
-### Story 13: Frontend - Settings Components (5 tasks)
+### Story 13: Frontend - Settings Components (5 tasks) ✅ MOSTLY COMPLETE
 
 Refactor settings UI to be plugin-driven with dynamic forms.
 
-- [ ] **13.1** Create PluginsSettings component
-- [ ] **13.2** Create dynamic OAuthConnections component
-- [ ] **13.3** Create Plugin Settings Page
-- [ ] **13.4** Create Plugin Install Dialog
-- [ ] **13.5** Update existing settings pages to use plugin data
+- [x] **13.1** Create PluginsSettings component _(implemented: `PluginsList.tsx`, `PluginCard.tsx`)_
+- [ ] **13.2** Create dynamic OAuthConnections component _(blocked by OAuthFacade)_
+- [x] **13.3** Create Plugin Settings Page _(implemented: `/plugins/[pluginId]/page.tsx`, `PluginSettings.tsx`)_
+- [ ] **13.4** Create Plugin Install Dialog _(marketplace not implemented)_
+- [x] **13.5** Update existing settings pages to use plugin data _(implemented: plugin pages use API)_
 
-### Story 14: Frontend - Directory Components (6 tasks)
+### Story 14: Frontend - Directory Components (6 tasks) ✅ MOSTLY COMPLETE
 
 Refactor directory UI to support multiple providers.
 
-- [ ] **14.1** Create generic DeployForm component
-- [ ] **14.2** Create generic RepositorySelector component
-- [ ] **14.3** Update Directory Apps Tab for plugins
-- [ ] **14.4** Create Plugin Enable/Disable toggle
-- [ ] **14.5** Create Directory Plugin Settings component
-- [ ] **14.6** Update provider icons to use plugin metadata
+- [ ] **14.1** Create generic DeployForm component _(blocked by DeployFacade)_
+- [ ] **14.2** Create generic RepositorySelector component _(blocked by GitFacade)_
+- [x] **14.3** Update Directory Apps Tab for plugins _(implemented: `/directories/[id]/plugins/page.tsx`)_
+- [x] **14.4** Create Plugin Enable/Disable toggle _(implemented: `DirectoryPluginCard.tsx`)_
+- [x] **14.5** Create Directory Plugin Settings component _(implemented: `DirectoryPluginsList.tsx`, `CapabilitySelector.tsx`)_
+- [x] **14.6** Update provider icons to use plugin metadata _(implemented: `PluginIcon.tsx` with 5 icon types)_
 
-### Story 15: Frontend - Git Provider Connection (5 tasks)
+### Story 15: Frontend - Git Provider Connection (5 tasks) ❌ NOT STARTED
 
 Refactor Git provider connection UI components (for repository access, not app authentication).
 
-- [ ] **15.1** Create generic GitConnectionAlert (GitHub, GitLab, Bitbucket)
-- [ ] **15.2** Create generic GitStatusSidebar
-- [ ] **15.3** Implement dynamic provider icons from plugins
-- [ ] **15.4** Remove GitHub-specific connection components
-- [ ] **15.5** Create generic GitProviderConnectButton
+- [ ] **15.1** Create generic GitConnectionAlert (GitHub, GitLab, Bitbucket) _(blocked by GitFacade)_
+- [ ] **15.2** Create generic GitStatusSidebar _(blocked by GitFacade)_
+- [ ] **15.3** Implement dynamic provider icons from plugins _(PluginIcon ready, needs integration)_
+- [ ] **15.4** Remove GitHub-specific connection components _(blocked by GitFacade)_
+- [ ] **15.5** Create generic GitProviderConnectButton _(blocked by GitFacade)_
 
-### Story 16: Frontend - Actions Refactoring (4 tasks)
+### Story 16: Frontend - Actions Refactoring (4 tasks) 🟡 IN PROGRESS
 
 Refactor server actions to use plugin APIs.
 
-- [ ] **16.1** Create generic deploy actions
-- [ ] **16.2** Create generic oauth actions
-- [ ] **16.3** Create plugin settings actions
-- [ ] **16.4** Create plugin management actions
+- [ ] **16.1** Create generic deploy actions _(blocked by DeployFacade)_
+- [ ] **16.2** Create generic oauth actions _(blocked by OAuthFacade)_
+- [x] **16.3** Create plugin settings actions _(implemented: `apps/web/src/app/actions/plugins.ts`)_
+- [x] **16.4** Create plugin management actions _(implemented: enable/disable/updateSettings actions)_
 
-### Story 17: Generator Form Provider Selection (10 tasks)
+### Story 17: Generator Form Provider Selection (10 tasks) ✅ MOSTLY COMPLETE
 
 Add sub-provider selection to generator form with dynamic fields.
 
-- [ ] **17.1** Create `/directories/:id/generator-form` API endpoint
-- [ ] **17.2** Add `providers` and `pluginOptions` fields to generation DTO
-- [ ] **17.3** Update Pipeline Factory to resolve sub-providers
-- [ ] **17.4** Create SubProviderSelector dropdown component
-- [ ] **17.5** Create DynamicSubProviderFields component (render form fields from plugins)
-- [ ] **17.6** Create PipelineModeSelector component (Standard vs Full toggle)
-- [ ] **17.7** Integrate provider selection into GeneratorForm
+- [x] **17.1** Create `/directories/:id/generator-form` API endpoint _(implemented: getFormSchema action)_
+- [x] **17.2** Add `providers` and `pluginOptions` fields to generation DTO _(implemented: GeneratorForm supports providers)_
+- [ ] **17.3** Update Pipeline Factory to resolve sub-providers _(backend work needed)_
+- [x] **17.4** Create SubProviderSelector dropdown component _(implemented: `ProviderSelector.tsx`)_
+- [x] **17.5** Create DynamicSubProviderFields component _(implemented: `DynamicPluginFields.tsx` with groups, conditions)_
+- [x] **17.6** Create PipelineModeSelector component _(implemented: `PipelineModeSelector.tsx`)_
+- [x] **17.7** Integrate provider selection into GeneratorForm _(implemented: full integration)_
 - [ ] **17.8** Implement ConfigDto field graying (for handled fields)
 - [ ] **17.9** Create "Handled by {sub-provider}" tooltips
 - [ ] **17.10** Create SubProviderResolverService (backend)
@@ -381,3 +413,123 @@ Create comprehensive testing infrastructure for the plugin system.
 - Each task checkbox can be marked with `[x]` when completed
 - Update the Progress Summary table as tasks are completed
 - **Package naming**: `@ever-works/plugin` includes contracts, base classes, helpers, and testing utilities
+
+---
+
+## Next Priorities (Recommended Order)
+
+The following priorities are based on dependency analysis and unblocking subsequent work.
+
+**Key Finding:** Frontend plugin UI is ~53% complete. All remaining frontend work is blocked by GitFacade and DeployFacade.
+
+### 🔴 Priority 1: Git & Deploy Infrastructure (CRITICAL BLOCKERS)
+
+These block **45+ tasks** across Phase 6a, Phase 7, and Phase 8:
+
+| Task                 | Description                                        | Blocks                               |
+| -------------------- | -------------------------------------------------- | ------------------------------------ |
+| **Story 4.2 + 5.1**  | Create GitHub plugin (extract `github.service.ts`) | GitFacade                            |
+| **Story 5.2 + 10.1** | Create GitFacade service                           | 13 Story 10a tasks, 8 frontend tasks |
+| **Story 4.4 + 6.1**  | Create Vercel plugin (extract `vercel.service.ts`) | DeployFacade                         |
+| **Story 6.2 + 10.2** | Create DeployFacade service                        | 3 Story 10a tasks, 5 frontend tasks  |
+
+**Recommended approach:**
+
+1. Create GitHub plugin package first (most used git provider)
+2. Create GitFacade with GitHub as first provider
+3. Create Vercel plugin package
+4. Create DeployFacade with Vercel as first provider
+
+### 🟠 Priority 2: AI Provider Plugins (Non-Blocking Enhancement)
+
+AiFacade already exists. Creating AI plugins enables full plugin-based AI routing:
+
+5. **Story 4.9**: Create OpenAI plugin package _(most used)_
+6. **Story 4.10**: Create Anthropic plugin package
+
+### 🟡 Priority 3: Complete Remaining Frontend
+
+After GitFacade/DeployFacade exist, complete blocked frontend tasks:
+
+7. **Story 12.1-12.3**: Provider-agnostic API layer (deploy, auth, screenshot)
+8. **Story 13.2**: Dynamic OAuthConnections component
+9. **Story 14.1-14.2**: Generic DeployForm, RepositorySelector
+10. **Story 15.1-15.5**: Generic Git provider connection UI
+11. **Story 16.1-16.2**: Generic deploy/oauth actions
+
+### 🟢 Priority 4: Entity Migration (Story 10a)
+
+Once GitFacade and DeployFacade exist:
+
+12. **Story 10a.1-10a.5**: User entity migrations (vercelToken, oauthTokens)
+13. **Story 10a.6-10a.9**: Directory entity migrations (repoProvider, sourceRepository)
+14. **Story 10a.10-10a.12**: Method refactoring (getGitToken, asCommitter)
+15. **Story 10a.13**: Database migration script
+
+### 🔵 Priority 5: API Refactoring (Phase 7)
+
+16. **Story 11.0-11.12**: API app refactoring (plugin endpoints, remove hardcoded providers)
+
+---
+
+## Dependency Graph
+
+```
+[Phase 1-2: Foundation/Pipeline] ✅ COMPLETE
+         │
+         ▼
+[Git/Deploy Facades] ◀── CURRENT BLOCKER
+         │
+         ▼
+[Git/Deploy Plugins] ◀── REQUIRED FOR FACADES
+         │
+         ▼
+[Story 10a: Entity Migration] ◀── BLOCKED
+         │
+         ▼
+[Phase 7: API Refactoring] ◀── BLOCKED
+         │
+         ▼
+[Phase 8: Frontend] ◀── BLOCKED
+```
+
+---
+
+## Implementation Files Reference
+
+### Existing Facades (`packages/agent/src/facades/`)
+
+| Facade                 | File                          | Status         |
+| ---------------------- | ----------------------------- | -------------- |
+| AiFacade               | `ai.facade.ts`                | ✅ Complete    |
+| SearchFacade           | `search.facade.ts`            | ✅ Complete    |
+| ScreenshotFacade       | `screenshot.facade.ts`        | ✅ Complete    |
+| ContentExtractorFacade | `content-extractor.facade.ts` | ✅ Complete    |
+| DataSourceFacade       | `data-source.facade.ts`       | ✅ Complete    |
+| BaseFacade             | `base.facade.ts`              | ✅ Complete    |
+| GitFacade              | -                             | ❌ Not started |
+| DeployFacade           | -                             | ❌ Not started |
+| OAuthFacade            | -                             | ❌ Not started |
+
+### Existing Plugins (`packages/plugins/`)
+
+| Plugin            | Package                   | Capabilities                            | Status      |
+| ----------------- | ------------------------- | --------------------------------------- | ----------- |
+| Default Pipeline  | `default-pipeline`        | `pipeline-step`, `form-schema-provider` | ✅ System   |
+| Tavily Search     | `tavily-search`           | `search`, `content-extractor`           | ✅ Complete |
+| Local Extractor   | `local-content-extractor` | `content-extractor`                     | ✅ Default  |
+| Notion Extractor  | `notion-extractor`        | `content-extractor`                     | ✅ Complete |
+| Apify Data Source | `apify-data-source`       | `data-source`, `form-schema-provider`   | ✅ Complete |
+
+### Missing Plugins (Required)
+
+| Plugin        | Capabilities              | Priority |
+| ------------- | ------------------------- | -------- |
+| GitHub        | `git-provider`, `oauth`   | 🔴 P1    |
+| Vercel        | `deployment`              | 🔴 P1    |
+| OpenAI        | `ai-provider`             | 🟠 P2    |
+| Anthropic     | `ai-provider`             | 🟠 P2    |
+| GitLab        | `git-provider`, `oauth`   | 🟡 P3    |
+| Netlify       | `deployment`              | 🟡 P3    |
+| ScreenshotOne | `screenshot`              | 🟡 P3    |
+| Exa.ai        | `full-pipeline`, `search` | 🟢 P4    |
