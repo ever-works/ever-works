@@ -34,7 +34,7 @@ export async function checkOAuthConnection(provider: `${OAuthProvider}`) {
     }
 }
 
-export async function connectGitHub(returnPath?: string) {
+export async function connectGitHub(returnPath?: string, forceConsent?: boolean) {
     try {
         // Generate state for OAuth
         const state = generateHexToken(16);
@@ -54,6 +54,7 @@ export async function connectGitHub(returnPath?: string) {
             OAuthProvider.GITHUB,
             withAppUrl(callbackPath) + `?${params.toString()}`,
             state,
+            forceConsent,
         );
 
         return {
@@ -68,6 +69,11 @@ export async function connectGitHub(returnPath?: string) {
             error: error instanceof Error ? error.message : 'Failed to connect GitHub',
         };
     }
+}
+
+export async function reconnectGitHub(returnPath?: string) {
+    // Reconnect always forces consent to allow changing organization permissions
+    return connectGitHub(returnPath, true);
 }
 
 export async function disconnectGitHub() {

@@ -325,8 +325,11 @@
                     "connected": "Create and manage directories with GitHub repositories",
                     "disconnected": "Connect to create directories from repositories",
                     "scopes": "Scopes",
+                    "organizations": "Connected Organizations",
+                    "organizationsHint": "Use Reconnect to grant access to additional organizations",
                     "actions": {
                         "connect": "Connect",
+                        "reconnect": "Reconnect",
                         "disconnect": "Disconnect",
                         "confirmDisconnect": "Are you sure you want to disconnect your GitHub account?"
                     },

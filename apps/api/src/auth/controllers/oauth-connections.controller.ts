@@ -75,17 +75,24 @@ export class OAuthConnectionsController {
         @Param('provider') provider: string,
         @Query('callbackUrl') callbackUrl?: string,
         @Query('state') state?: string,
+        @Query('forceConsent') forceConsent?: string,
     ) {
         // Generate state if not provided for CSRF protection
         const finalState = state || this.oauthConnectionService.generateState(req.user.userId);
         this.oauthConnectionService.storeState(finalState, req.user.userId);
+
+        const shouldForceConsent = forceConsent === 'true';
 
         let url: string;
         switch (provider.toLowerCase() as AuthProvider) {
             case 'github':
                 // Use connect callback URL for connections
                 const githubCallbackUrl = callbackUrl || config.github.connectCallbackUrl();
-                url = this.oauthUrlService.generateGitHubAuthUrl(githubCallbackUrl, finalState);
+                url = this.oauthUrlService.generateGitHubAuthUrl(
+                    githubCallbackUrl,
+                    finalState,
+                    shouldForceConsent,
+                );
                 break;
 
             case 'google':
