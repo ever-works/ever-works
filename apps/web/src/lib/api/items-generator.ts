@@ -1,8 +1,17 @@
 import 'server-only';
 import { serverMutation, serverFetch } from './server-api';
-import { GenerationMethod, WebsiteRepositoryCreationMethod } from './enums';
 import { APIResponse, ItemData } from './types';
 import type { GeneratorFormSchema } from '@ever-works/plugin';
+import type {
+    CompanyDto,
+    ProvidersDto,
+    CreateItemsGeneratorDto,
+    UpdateItemsGeneratorDto,
+    SubmitItemDto,
+    RemoveItemDto,
+    UpdateItemDto,
+    ExtractItemDetailsDto,
+} from '@ever-works/contracts/api';
 
 // Re-export types from @ever-works/plugin for use in the web app
 export type {
@@ -17,77 +26,17 @@ export type {
 
 export type { FormFieldDefinition, FormFieldGroup } from '@ever-works/contracts';
 
-// DTOs
-export interface CompanyDto {
-    name: string;
-    website: string;
-}
-
-/** Provider selection for each capability category. */
-export interface ProvidersDto {
-    search?: string;
-    screenshot?: string;
-    ai?: string;
-    contentExtractor?: string;
-    pipeline?: string;
-}
-
-/**
- * Minimal core DTO for creating/triggering item generation.
- * All pipeline-specific configuration is passed via pluginConfig.
- */
-export interface CreateItemsGeneratorDto {
-    name: string;
-    prompt: string;
-    company?: CompanyDto;
-    repository_description?: string;
-    generation_method?: GenerationMethod;
-    update_with_pull_request?: boolean;
-    website_repository_creation_method?: WebsiteRepositoryCreationMethod;
-    providers?: ProvidersDto;
-    /** Plugin-specific configuration - structure defined by selected pipeline plugin */
-    pluginConfig?: Record<string, unknown>;
-}
-
-export interface UpdateItemsGeneratorDto {
-    generation_method?: GenerationMethod;
-    update_with_pull_request?: boolean;
-}
-
-export interface SubmitItemDto {
-    name: string;
-    description: string;
-    source_url: string;
-    category: string;
-    categories?: string[];
-    tags?: string[];
-    featured?: boolean;
-    order?: number;
-    pay_and_publish_now?: boolean;
-    slug?: string;
-    brand?: string;
-    brand_logo_url?: string;
-    images?: string[];
-    create_pull_request?: boolean;
-}
-
-export interface RemoveItemDto {
-    item_slug: string;
-    reason?: string;
-    create_pull_request?: boolean;
-}
-
-export interface UpdateItemDto {
-    item_slug: string;
-    featured?: boolean;
-    order?: number;
-    create_pull_request?: boolean;
-}
-
-export interface ExtractItemDetailsDto {
-    source_url: string;
-    existing_categories?: string[];
-}
+// Re-export DTOs from centralized contracts package
+export type {
+    CompanyDto,
+    ProvidersDto,
+    CreateItemsGeneratorDto,
+    UpdateItemsGeneratorDto,
+    SubmitItemDto,
+    RemoveItemDto,
+    UpdateItemDto,
+    ExtractItemDetailsDto,
+};
 
 // Response Types
 export interface ItemsGeneratorResponse {

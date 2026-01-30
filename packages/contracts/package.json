@@ -28,6 +28,11 @@
 			"types": "./dist/form/index.d.ts",
 			"import": "./dist/form/index.js",
 			"require": "./dist/form/index.cjs"
+		},
+		"./api": {
+			"types": "./dist/api/index.d.ts",
+			"import": "./dist/api/index.js",
+			"require": "./dist/api/index.cjs"
 		}
 	},
 	"files": [

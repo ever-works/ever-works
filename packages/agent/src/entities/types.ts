@@ -1,13 +1,17 @@
+// Re-export enums from centralized contracts
+export {
+    GenerateStatusType,
+    DirectoryScheduleCadence,
+    DirectoryScheduleStatus,
+    DirectoryScheduleBillingMode,
+} from '@ever-works/contracts/api';
+
 export type ClassToObject<T> = {
     [K in keyof T]: T[K];
 };
 
-export enum GenerateStatusType {
-    GENERATING = 'generating',
-    GENERATED = 'generated',
-    ERROR = 'error',
-    CANCELLED = 'cancelled',
-}
+// Re-import types for use in this file
+import type { GenerateStatusType } from '@ever-works/contracts/api';
 
 export type GenerateStatus = {
     status: GenerateStatusType;
@@ -24,25 +28,6 @@ export type GenerateStatus = {
     /** Error message if status is ERROR */
     error?: string;
 };
-
-export enum DirectoryScheduleCadence {
-    HOURLY = 'hourly',
-    DAILY = 'daily',
-    WEEKLY = 'weekly',
-    MONTHLY = 'monthly',
-}
-
-export enum DirectoryScheduleStatus {
-    DISABLED = 'disabled',
-    ACTIVE = 'active',
-    PAUSED = 'paused',
-    CANCELED = 'canceled',
-}
-
-export enum DirectoryScheduleBillingMode {
-    SUBSCRIPTION = 'subscription',
-    USAGE = 'usage',
-}
 
 export enum SubscriptionPlanCode {
     FREE = 'free',

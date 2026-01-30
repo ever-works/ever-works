@@ -2,15 +2,33 @@ import 'server-only';
 import { serverFetch, serverMutation } from './server-api';
 import {
     GenerateStatusType,
-    GenerationMethod,
     RepoProvider,
     DirectoryScheduleCadence,
     DirectoryScheduleStatus,
     DirectoryScheduleBillingMode,
     DirectoryMemberRole,
 } from './enums';
+import {
+    GenerationMethod,
+    type DirectoryScheduleAllowedCadence,
+    type DirectoryScheduleDto,
+    type UpdateDirectorySchedulePayload,
+    type GenerationMetrics,
+    type DirectoryGenerationHistoryEntry,
+    type DirectoryGenerationHistoryResponse,
+} from '@ever-works/contracts/api';
 import { APIResponse, ItemData, Category, Tag } from './types';
 import { CreateItemsGeneratorDto, ItemsGeneratorResponse } from './items-generator';
+
+// Re-export directory types from contracts for convenience
+export type {
+    DirectoryScheduleAllowedCadence,
+    DirectoryScheduleDto,
+    UpdateDirectorySchedulePayload,
+    GenerationMetrics,
+    DirectoryGenerationHistoryEntry,
+    DirectoryGenerationHistoryResponse,
+} from '@ever-works/contracts/api';
 
 export interface MarkdownReadmeConfig {
     header?: string;
@@ -125,36 +143,6 @@ export interface Directory {
     sourceRepository?: SourceRepository;
     repoVisibility?: RepoVisibility;
 }
-
-export interface DirectoryScheduleAllowedCadence {
-    cadence: DirectoryScheduleCadence;
-    reason?: string;
-    payPerUse?: boolean;
-    allowed: boolean;
-}
-
-export interface DirectoryScheduleDto {
-    status: DirectoryScheduleStatus;
-    cadence: DirectoryScheduleCadence | null;
-    billingMode: DirectoryScheduleBillingMode;
-    nextRunAt: string | null;
-    lastRunAt: string | null;
-    lastRunStatus: GenerateStatusType | null;
-    failureCount: number;
-    maxFailureBeforePause: number;
-    alwaysCreatePullRequest: boolean;
-    allowedCadences: DirectoryScheduleAllowedCadence[];
-    planCode?: string;
-    subscriptionsEnabled: boolean;
-}
-
-export type UpdateDirectorySchedulePayload = {
-    enable?: boolean;
-    cadence?: DirectoryScheduleCadence;
-    billingMode?: DirectoryScheduleBillingMode;
-    maxFailureBeforePause?: number;
-    alwaysCreatePullRequest?: boolean;
-};
 
 export interface DirectoriesResponse {
     directories: Directory[];
@@ -308,41 +296,6 @@ export interface UpdateWebsiteSettingsDto {
         header?: CustomMenuItem[];
         footer?: CustomMenuItem[];
     };
-}
-
-export interface GenerationMetrics {
-    urls_scanned?: number;
-    pages_processed?: number;
-    items_extracted_current_run?: number;
-    new_items_added_to_store?: number;
-    total_items_in_store?: number;
-    total_tokens_used?: number;
-    total_cost?: number;
-}
-
-export interface DirectoryGenerationHistoryEntry {
-    id: string;
-    status: GenerateStatusType;
-    generationMethod?: GenerationMethod | null;
-    startedAt?: string | null;
-    finishedAt?: string | null;
-    durationInSeconds?: number | null;
-    newItemsCount: number;
-    updatedItemsCount: number;
-    totalItemsCount: number;
-    metrics?: GenerationMetrics | null;
-    errorMessage?: string | null;
-    parameters?: CreateItemsGeneratorDto | null;
-    createdAt: string;
-    updatedAt: string;
-    triggerRunId?: string;
-}
-
-export interface DirectoryGenerationHistoryResponse {
-    history: DirectoryGenerationHistoryEntry[];
-    total: number;
-    limit: number;
-    offset: number;
 }
 
 export interface SyncDirectoryResponse {

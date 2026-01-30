@@ -11,26 +11,23 @@ import {
 } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
 import { sanitizeName, sanitizeDescription, sanitizePrompt } from '../../utils/sanitize.util';
+import {
+    GenerationMethod,
+    WebsiteRepositoryCreationMethod,
+    type CompanyDto as ICompanyDto,
+    type ProvidersDto as IProvidersDto,
+    type CreateItemsGeneratorDto as ICreateItemsGeneratorDto,
+    type UpdateItemsGeneratorDto as IUpdateItemsGeneratorDto,
+} from '@ever-works/contracts/api';
 
-// ============================================================================
-// Enums
-// ============================================================================
-
-export enum GenerationMethod {
-    CREATE_UPDATE = 'create-update',
-    RECREATE = 'recreate',
-}
-
-export enum WebsiteRepositoryCreationMethod {
-    DUPLICATE = 'duplicate',
-    CREATE_USING_TEMPLATE = 'create-using-template',
-}
+// Re-export enums for backward compatibility
+export { GenerationMethod, WebsiteRepositoryCreationMethod } from '@ever-works/contracts/api';
 
 // ============================================================================
 // Supporting DTOs
 // ============================================================================
 
-export class CompanyDto {
+export class CompanyDto implements ICompanyDto {
     @IsString()
     @IsNotEmpty()
     @MaxLength(200)
@@ -47,7 +44,7 @@ export class CompanyDto {
  * Provider selection for each capability category.
  * Allows users to select which plugin to use for search, AI, etc.
  */
-export class ProvidersDto {
+export class ProvidersDto implements IProvidersDto {
     /** Search provider plugin ID (e.g., "tavily", "exa:search") */
     @IsOptional()
     @IsString()
@@ -85,7 +82,7 @@ export class ProvidersDto {
  * is passed via `pluginConfig`, with fields defined dynamically by
  * the selected pipeline plugin via IFormSchemaProvider.getFormFields().
  */
-export class CreateItemsGeneratorDto {
+export class CreateItemsGeneratorDto implements ICreateItemsGeneratorDto {
     // ============================================================================
     // Required Fields
     // ============================================================================
@@ -179,7 +176,7 @@ export class CreateItemsGeneratorDto {
 // Update DTO
 // ============================================================================
 
-export class UpdateItemsGeneratorDto {
+export class UpdateItemsGeneratorDto implements IUpdateItemsGeneratorDto {
     @IsOptional()
     @IsEnum(GenerationMethod)
     generation_method?: GenerationMethod = GenerationMethod.CREATE_UPDATE;

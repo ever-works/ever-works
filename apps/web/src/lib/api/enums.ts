@@ -1,3 +1,14 @@
+// Re-export enums from centralized contracts package
+export { GenerationMethod, WebsiteRepositoryCreationMethod } from '@ever-works/contracts/api';
+
+export {
+    GenerateStatusType,
+    DirectoryScheduleCadence,
+    DirectoryScheduleStatus,
+    DirectoryScheduleBillingMode,
+} from '@ever-works/contracts/api';
+
+// Web-specific enums (not shared with backend contracts)
 export enum RepoProvider {
     GITHUB = 'github',
 }
@@ -7,45 +18,9 @@ export enum OAuthProvider {
     GOOGLE = 'google',
 }
 
-export enum GenerateStatusType {
-    GENERATING = 'generating',
-    GENERATED = 'generated',
-    ERROR = 'error',
-    CANCELLED = 'cancelled',
-}
-
-export enum GenerationMethod {
-    CREATE_UPDATE = 'create-update',
-    RECREATE = 'recreate',
-}
-
-export enum WebsiteRepositoryCreationMethod {
-    DUPLICATE = 'duplicate',
-    CREATE_USING_TEMPLATE = 'create-using-template',
-}
-
 export enum OAuthProcessType {
     LOGIN = 'login',
     CONNECT = 'connect',
-}
-
-export enum DirectoryScheduleCadence {
-    HOURLY = 'hourly',
-    DAILY = 'daily',
-    WEEKLY = 'weekly',
-    MONTHLY = 'monthly',
-}
-
-export enum DirectoryScheduleStatus {
-    DISABLED = 'disabled',
-    ACTIVE = 'active',
-    PAUSED = 'paused',
-    CANCELED = 'canceled',
-}
-
-export enum DirectoryScheduleBillingMode {
-    SUBSCRIPTION = 'subscription',
-    USAGE = 'usage',
 }
 
 /**

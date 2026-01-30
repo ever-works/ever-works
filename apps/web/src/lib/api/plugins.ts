@@ -1,34 +1,30 @@
 import 'server-only';
 import { serverFetch, serverMutation } from './server-api';
-import type { PluginCategory } from '@ever-works/plugin';
+import type {
+    PluginCategory,
+    PluginState,
+    ConfigurationMode,
+    PluginAuthor,
+    PluginIcon,
+} from '@ever-works/plugin';
 
-// Re-export PluginCategory from @ever-works/plugin for consistency
-export type { PluginCategory } from '@ever-works/plugin';
+// Re-export types from @ever-works/plugin for consistency
+export type {
+    PluginCategory,
+    PluginState,
+    ConfigurationMode,
+    PluginAuthor,
+} from '@ever-works/plugin';
 
-export type PluginState =
-    | 'registered'
-    | 'loaded'
-    | 'enabled'
-    | 'disabled'
-    | 'error'
-    | 'unloading'
-    | 'unloaded';
+// Alias PluginIcon as PluginsApiIcon to avoid conflict with items-generator.ts which also exports PluginIcon
+export type { PluginIcon as PluginsApiIcon } from '@ever-works/plugin';
 
-export type ConfigurationMode = 'admin-only' | 'user-required' | 'hybrid';
+// Local alias for use within this file
+type PluginsApiIcon = PluginIcon;
 
 // ============================================
 // Types
 // ============================================
-
-// Plugin icon - matches backend PluginIconDto
-// Note: There's also a PluginIcon in items-generator.ts, we use 'PluginsApiIcon' to avoid conflict
-export interface PluginsApiIcon {
-    type: 'svg' | 'url' | 'base64' | 'lucide' | 'emoji';
-    value: string;
-    darkValue?: string;
-    backgroundColor?: string;
-    color?: string;
-}
 
 export interface PluginSettingsSchemaProperty {
     type: string;
@@ -64,12 +60,6 @@ export interface Plugin {
     settingsSchema?: PluginSettingsSchema;
     author?: PluginAuthor;
     homepage?: string;
-}
-
-export interface PluginAuthor {
-    name: string;
-    email?: string;
-    url?: string;
 }
 
 export interface UserPlugin extends Plugin {
