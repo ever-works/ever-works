@@ -76,7 +76,7 @@ const CAPABILITY_REQUIREMENTS: Record<string, string[]> = {
         'isAvailable',
         'getCapabilities',
     ],
-    'pipeline-step': ['execute', 'getMetadata'],
+    'pipeline-step': ['execute', 'getStepDefinition'],
     'full-pipeline': ['execute', 'getSteps'],
     'form-field': ['render', 'validate', 'getFieldType'],
     'sub-provider': ['getSubProviders', 'getSubProvider'],

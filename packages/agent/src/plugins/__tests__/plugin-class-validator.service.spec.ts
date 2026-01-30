@@ -337,7 +337,7 @@ describe('PluginClassValidatorService', () => {
                 capabilities: ['pipeline-step'],
             }) as any;
             plugin.execute = jest.fn();
-            plugin.getMetadata = jest.fn();
+            plugin.getStepDefinition = jest.fn();
 
             const result = service.validateCapabilities(plugin);
 
