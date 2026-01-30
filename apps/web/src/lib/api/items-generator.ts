@@ -2,6 +2,20 @@ import 'server-only';
 import { serverMutation, serverFetch } from './server-api';
 import { GenerationMethod, WebsiteRepositoryCreationMethod } from './enums';
 import { APIResponse, ItemData } from './types';
+import type { GeneratorFormSchema } from '@ever-works/plugin';
+
+// Re-export types from @ever-works/plugin for use in the web app
+export type {
+    PluginIcon,
+    ProviderOption,
+    GeneratorFormSchema,
+    FormSchemaProvidersType,
+    ProviderSelectionState,
+    SelectableProviderCategory,
+    ProviderCategoryKey,
+} from '@ever-works/plugin';
+
+export type { FormFieldDefinition, FormFieldGroup } from '@ever-works/contracts';
 
 // DTOs
 export interface CompanyDto {
@@ -9,17 +23,12 @@ export interface CompanyDto {
     website: string;
 }
 
-/**
- * Provider selection for each capability category.
- */
+/** Provider selection for each capability category. */
 export interface ProvidersDto {
-    /** Search provider plugin ID (e.g., "tavily", "exa:search") */
     search?: string;
-    /** Screenshot provider plugin ID (e.g., "screenshotone") */
     screenshot?: string;
-    /** AI provider plugin ID (e.g., "openai", "anthropic") */
     ai?: string;
-    /** Pipeline plugin ID (null = default pipeline) */
+    contentExtractor?: string;
     pipeline?: string;
 }
 
@@ -114,88 +123,6 @@ export interface ExtractItemDetailsResponse {
 export interface RegenerateMarkdownResponse {
     status: string;
     message?: string;
-}
-
-// ============================================================================
-// Generator Form Schema Types
-// ============================================================================
-
-/**
- * Plugin icon definition supporting multiple formats
- */
-export interface PluginIcon {
-    type: 'svg' | 'url' | 'base64' | 'lucide' | 'emoji';
-    value: string;
-    darkValue?: string;
-    backgroundColor?: string;
-    color?: string;
-}
-
-/**
- * Option for selecting a provider in the generator form.
- */
-export interface ProviderOption {
-    id: string;
-    name: string;
-    description?: string;
-    configured: boolean;
-    isDefault?: boolean;
-    icon?: PluginIcon;
-}
-
-/**
- * Form field definition from plugin.
- */
-export interface FormFieldDefinition {
-    name: string;
-    type: 'text' | 'number' | 'boolean' | 'select' | 'tags' | 'textarea' | 'password' | 'url';
-    label: string;
-    description?: string;
-    placeholder?: string;
-    defaultValue?: unknown;
-    required?: boolean;
-    validation?: {
-        min?: number;
-        max?: number;
-        minLength?: number;
-        maxLength?: number;
-        pattern?: string;
-    };
-    options?: Array<{ value: string; label: string }>;
-    showIf?: {
-        field: string;
-        operator: 'eq' | 'ne' | 'gt' | 'lt' | 'in';
-        value: unknown;
-    };
-    group?: string;
-}
-
-/**
- * Form field group for organizing fields in the UI.
- */
-export interface FormFieldGroup {
-    name: string;
-    title: string;
-    description?: string;
-    order?: number;
-    collapsible?: boolean;
-    collapsed?: boolean;
-}
-
-/**
- * Generator form schema returned by the API.
- */
-export interface GeneratorFormSchema {
-    providers: {
-        search: ProviderOption[];
-        screenshot: ProviderOption[];
-        ai: ProviderOption[];
-        fullPipeline: ProviderOption[];
-    };
-    pluginFields: FormFieldDefinition[];
-    pluginGroups?: FormFieldGroup[];
-    handledConfigFields: readonly string[];
-    defaultValues?: Record<string, unknown>;
 }
 
 export const itemsGeneratorAPI = {

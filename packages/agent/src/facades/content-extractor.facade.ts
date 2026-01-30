@@ -5,6 +5,7 @@ import type {
     FacadeExtractedContent,
     FacadeExtractionOptions,
 } from '@ever-works/plugin';
+import { FACADE_CAPABILITIES } from '@ever-works/plugin';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
 import { DirectoryPluginRepository } from '../plugins/repositories/directory-plugin.repository';
@@ -49,7 +50,7 @@ export interface ExtendedFacadeExtractionOptions extends FacadeExtractionOptions
 @Injectable()
 export class ContentExtractorFacadeService implements IContentExtractorFacade {
     private readonly logger = new Logger(ContentExtractorFacadeService.name);
-    private readonly CAPABILITY = 'content-extractor';
+    private readonly CAPABILITY = FACADE_CAPABILITIES.CONTENT_EXTRACTOR;
 
     constructor(
         private readonly registry: PluginRegistryService,

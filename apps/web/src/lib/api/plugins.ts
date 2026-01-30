@@ -1,20 +1,9 @@
 import 'server-only';
 import { serverFetch, serverMutation } from './server-api';
+import type { PluginCategory } from '@ever-works/plugin';
 
-// Plugin types - defined locally to avoid @ever-works/plugin dependency in web app
-export type PluginCategory =
-    | 'git-provider'
-    | 'deployment'
-    | 'screenshot'
-    | 'search'
-    | 'content-extractor'
-    | 'data-source'
-    | 'ai-provider'
-    | 'pipeline'
-    | 'form'
-    | 'integration'
-    | 'utility'
-    | 'theme';
+// Re-export PluginCategory from @ever-works/plugin for consistency
+export type { PluginCategory } from '@ever-works/plugin';
 
 export type PluginState =
     | 'registered'

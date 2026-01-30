@@ -56,12 +56,16 @@ export type {
     ItemsGeneratorResponse,
     ExtractItemDetailsResponse,
     RegenerateMarkdownResponse,
-    // Generator form schema types
+    // Generator form schema types (re-exported from @ever-works/plugin)
     PluginIcon,
     ProviderOption,
     FormFieldDefinition,
     FormFieldGroup,
     GeneratorFormSchema,
+    FormSchemaProvidersType,
+    ProviderCategoryKey,
+    ProviderSelectionState,
+    SelectableProviderCategory,
 } from './items-generator';
 
 export type {

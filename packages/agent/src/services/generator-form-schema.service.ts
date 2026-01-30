@@ -12,7 +12,7 @@ import type {
     FormFieldGroup,
     ValidationResult,
 } from '@ever-works/plugin';
-import { isFormSchemaProvider } from '@ever-works/plugin';
+import { isFormSchemaProvider, SELECTABLE_PROVIDER_CATEGORIES } from '@ever-works/plugin';
 
 /**
  * Service for resolving dynamic generator form schema based on selected plugins.
@@ -117,14 +117,30 @@ export class GeneratorFormSchemaService {
     private async getAvailableProviders(
         options?: FormSchemaOptions,
     ): Promise<GeneratorFormSchema['providers']> {
-        const [search, screenshot, ai, fullPipeline] = await Promise.all([
-            this.getProvidersForCapability('search', options),
-            this.getProvidersForCapability('screenshot', options),
-            this.getProvidersForCapability('ai-provider', options),
-            this.getProvidersForCapability('full-pipeline', options),
+        const { search, screenshot, ai, contentExtractor, fullPipeline } =
+            SELECTABLE_PROVIDER_CATEGORIES;
+
+        const [
+            searchProviders,
+            screenshotProviders,
+            aiProviders,
+            contentExtractorProviders,
+            fullPipelineProviders,
+        ] = await Promise.all([
+            this.getProvidersForCapability(search.capability, options),
+            this.getProvidersForCapability(screenshot.capability, options),
+            this.getProvidersForCapability(ai.capability, options),
+            this.getProvidersForCapability(contentExtractor.capability, options),
+            this.getProvidersForCapability(fullPipeline.capability, options),
         ]);
 
-        return { search, screenshot, ai, fullPipeline };
+        return {
+            search: searchProviders,
+            screenshot: screenshotProviders,
+            ai: aiProviders,
+            contentExtractor: contentExtractorProviders,
+            fullPipeline: fullPipelineProviders,
+        };
     }
 
     /**

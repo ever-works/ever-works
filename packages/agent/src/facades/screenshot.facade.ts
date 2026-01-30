@@ -8,6 +8,7 @@ import type {
     IScreenshotPlugin,
     IPlugin,
 } from '@ever-works/plugin';
+import { FACADE_CAPABILITIES } from '@ever-works/plugin';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
 import { DirectoryPluginRepository } from '../plugins/repositories/directory-plugin.repository';
@@ -53,7 +54,7 @@ export interface ScreenshotFacadeOptions extends BaseFacadeOptions {}
 @Injectable()
 export class ScreenshotFacadeService extends BaseFacadeService implements IScreenshotFacade {
     protected readonly logger = new Logger(ScreenshotFacadeService.name);
-    protected readonly CAPABILITY = 'screenshot';
+    protected readonly CAPABILITY = FACADE_CAPABILITIES.SCREENSHOT;
 
     constructor(
         registry: PluginRegistryService,

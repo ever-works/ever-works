@@ -2,6 +2,7 @@ import type { IPlugin } from '../plugin.interface.js';
 import type { FormFieldDefinition, FormFieldGroup } from '@ever-works/contracts';
 import type { ValidationResult } from '../../settings/validation.types.js';
 import type { PluginIcon } from '../plugin-manifest.types.js';
+import type { FormSchemaProvidersType } from '../provider-categories.js';
 
 /**
  * Interface for plugins that provide form fields for the generator form.
@@ -79,44 +80,13 @@ export function isFormSchemaProvider(plugin: IPlugin): plugin is IFormSchemaProv
 
 /**
  * Generator form schema returned by the API.
- * Contains all information needed to render a dynamic generator form.
  */
 export interface GeneratorFormSchema {
-	/**
-	 * Available providers for each capability category.
-	 * Allows users to select which provider to use for search, AI, etc.
-	 */
-	providers: {
-		/** Available search providers (e.g., "tavily", "exa") */
-		search: ProviderOption[];
-		/** Available screenshot providers (e.g., "screenshotone") */
-		screenshot: ProviderOption[];
-		/** Available AI providers (e.g., "openai", "anthropic") */
-		ai: ProviderOption[];
-		/** Available full pipeline providers that replace the standard pipeline */
-		fullPipeline: ProviderOption[];
-	};
-
-	/**
-	 * Form fields contributed by the selected pipeline plugin.
-	 * These fields are rendered dynamically based on plugin selection.
-	 */
+	/** Available providers for each capability category (derived from SELECTABLE_PROVIDER_CATEGORIES) */
+	providers: FormSchemaProvidersType;
 	pluginFields: FormFieldDefinition[];
-
-	/**
-	 * Form field groups for organizing plugin fields.
-	 */
 	pluginGroups?: FormFieldGroup[];
-
-	/**
-	 * Which standard config fields are handled by the selected plugin.
-	 * UI should hide or disable these fields.
-	 */
 	handledConfigFields: readonly string[];
-
-	/**
-	 * Default values for all plugin fields.
-	 */
 	defaultValues?: Record<string, unknown>;
 }
 

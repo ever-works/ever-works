@@ -11,6 +11,7 @@
     },
     "dependencies": {
         "@ever-works/contracts": "workspace:*",
+        "@ever-works/plugin": "workspace:*",
         "@headlessui/react": "^2.2.9",
         "@tanstack/react-virtual": "^3.13.13",
         "clsx": "^2.1.1",

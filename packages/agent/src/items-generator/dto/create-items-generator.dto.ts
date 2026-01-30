@@ -63,6 +63,11 @@ export class ProvidersDto {
     @IsString()
     ai?: string;
 
+    /** Content extractor provider plugin ID (e.g., "jina", "firecrawl") */
+    @IsOptional()
+    @IsString()
+    contentExtractor?: string;
+
     /** Pipeline plugin ID (null = default pipeline, "exa:websets" = full pipeline replacement) */
     @IsOptional()
     @IsString()

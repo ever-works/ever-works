@@ -9,6 +9,7 @@ import type {
     AiRoutingOptions,
     AiModel,
 } from '@ever-works/plugin';
+import { FACADE_CAPABILITIES } from '@ever-works/plugin';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
 
@@ -60,7 +61,7 @@ export interface AiFacadeOptions {
 @Injectable()
 export class AiFacadeService implements IAiFacade {
     private readonly logger = new Logger(AiFacadeService.name);
-    private readonly CAPABILITY = 'ai-provider';
+    private readonly CAPABILITY = FACADE_CAPABILITIES.AI;
 
     constructor(
         private readonly registry: PluginRegistryService,

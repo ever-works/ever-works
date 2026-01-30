@@ -7,6 +7,8 @@ import {
     DirectoryConfig,
     UpdateItemsGeneratorDto,
     GeneratorFormSchema,
+    ProviderSelectionState,
+    SelectableProviderCategory,
 } from '@/lib/api/types-only';
 import { RequiredFields } from './RequiredFields';
 import { UpdateItemsFields } from './UpdateItemsFields';
@@ -74,15 +76,12 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
     const [pluginConfig, setPluginConfig] = useState<Record<string, unknown>>({});
 
     // Provider selection (null = use directory/system default)
-    const [providers, setProviders] = useState<{
-        search: string | null;
-        screenshot: string | null;
-        ai: string | null;
-        pipeline: string | null;
-    }>({
+    // Uses ProviderSelectionState type derived from FormSchemaProviders for type safety
+    const [providers, setProviders] = useState<ProviderSelectionState>({
         search: lastRequestData?.providers?.search || null,
         screenshot: lastRequestData?.providers?.screenshot || null,
         ai: lastRequestData?.providers?.ai || null,
+        contentExtractor: lastRequestData?.providers?.contentExtractor || null,
         pipeline: lastRequestData?.providers?.pipeline || null,
     });
 
@@ -124,7 +123,7 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
     }, []);
 
     const handleProviderChange = useCallback(
-        (category: 'search' | 'screenshot' | 'ai' | 'pipeline', value: string | null) => {
+        (category: SelectableProviderCategory, value: string | null) => {
             setProviders((prev) => ({ ...prev, [category]: value }));
         },
         [],
@@ -176,6 +175,9 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
                     ...(providers.search && { search: providers.search }),
                     ...(providers.screenshot && { screenshot: providers.screenshot }),
                     ...(providers.ai && { ai: providers.ai }),
+                    ...(providers.contentExtractor && {
+                        contentExtractor: providers.contentExtractor,
+                    }),
                     ...(providers.pipeline && { pipeline: providers.pipeline }),
                 };
 
@@ -318,6 +320,17 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
                                         providers={formSchema.providers.ai}
                                         value={providers.ai}
                                         onChange={(id) => handleProviderChange('ai', id)}
+                                    />
+                                )}
+                                {formSchema.providers.contentExtractor.length > 0 && (
+                                    <ProviderSelector
+                                        label={t('contentExtractorProvider')}
+                                        description={t('contentExtractorProviderDescription')}
+                                        providers={formSchema.providers.contentExtractor}
+                                        value={providers.contentExtractor}
+                                        onChange={(id) =>
+                                            handleProviderChange('contentExtractor', id)
+                                        }
                                     />
                                 )}
                             </div>

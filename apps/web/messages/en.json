@@ -962,6 +962,8 @@
                 "screenshotProviderDescription": "Provider for capturing screenshots of items",
                 "aiProvider": "AI Provider",
                 "aiProviderDescription": "AI model provider for content generation and extraction",
+                "contentExtractorProvider": "Content Extractor",
+                "contentExtractorProviderDescription": "Provider for extracting content from web pages",
                 "useDirectoryDefault": "Use Directory Default",
                 "default": "Default",
                 "notConfigured": "Not configured"

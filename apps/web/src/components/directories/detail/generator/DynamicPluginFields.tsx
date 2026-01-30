@@ -54,35 +54,57 @@ export function DynamicPluginFields({
         [values, onChange],
     );
 
-    const shouldShowField = useCallback(
-        (field: FormFieldDefinition): boolean => {
-            if (!field.showIf) return true;
-
-            const { field: conditionField, operator, value: conditionValue } = field.showIf;
-            const currentValue = values[conditionField];
-
-            switch (operator) {
+    const evaluateCondition = useCallback(
+        (condition: { field: string; operator: string; value: unknown }): boolean => {
+            const currentValue = values[condition.field];
+            switch (condition.operator) {
                 case 'eq':
-                    return currentValue === conditionValue;
+                    return currentValue === condition.value;
+                case 'neq':
                 case 'ne':
-                    return currentValue !== conditionValue;
+                    return currentValue !== condition.value;
                 case 'gt':
                     return (
                         typeof currentValue === 'number' &&
-                        currentValue > (conditionValue as number)
+                        currentValue > (condition.value as number)
+                    );
+                case 'gte':
+                    return (
+                        typeof currentValue === 'number' &&
+                        currentValue >= (condition.value as number)
                     );
                 case 'lt':
                     return (
                         typeof currentValue === 'number' &&
-                        currentValue < (conditionValue as number)
+                        currentValue < (condition.value as number)
                     );
+                case 'lte':
+                    return (
+                        typeof currentValue === 'number' &&
+                        currentValue <= (condition.value as number)
+                    );
+                case 'contains':
+                    return String(currentValue).includes(String(condition.value));
+                case 'not_contains':
+                    return !String(currentValue).includes(String(condition.value));
                 case 'in':
-                    return Array.isArray(conditionValue) && conditionValue.includes(currentValue);
+                    return Array.isArray(condition.value) && condition.value.includes(currentValue);
                 default:
                     return true;
             }
         },
         [values],
+    );
+
+    const shouldShowField = useCallback(
+        (field: FormFieldDefinition): boolean => {
+            if (!field.showIf) return true;
+
+            // Handle both single condition and array of conditions (all must be true)
+            const conditions = Array.isArray(field.showIf) ? field.showIf : [field.showIf];
+            return conditions.every(evaluateCondition);
+        },
+        [evaluateCondition],
     );
 
     const renderField = useCallback(
@@ -110,10 +132,10 @@ export function DynamicPluginFields({
                             onChange={(e) => handleFieldChange(field.name, e.target.value)}
                             placeholder={field.placeholder}
                             helperText={field.description}
-                            required={field.required}
+                            required={field.validation?.required}
                             variant="form"
-                            minLength={field.validation?.minLength}
-                            maxLength={field.validation?.maxLength}
+                            minLength={field.validation?.min}
+                            maxLength={field.validation?.max}
                         />
                     );
 
@@ -129,7 +151,7 @@ export function DynamicPluginFields({
                             }
                             placeholder={field.placeholder}
                             helperText={field.description}
-                            required={field.required}
+                            required={field.validation?.required}
                             variant="form"
                             min={field.validation?.min?.toString()}
                             max={field.validation?.max?.toString()}
@@ -141,7 +163,9 @@ export function DynamicPluginFields({
                         <div key={field.name}>
                             <label className="block text-sm font-medium text-text dark:text-text-dark mb-1">
                                 {field.label}
-                                {field.required && <span className="text-danger ml-1">*</span>}
+                                {field.validation?.required && (
+                                    <span className="text-danger ml-1">*</span>
+                                )}
                             </label>
                             <textarea
                                 value={(value as string) || ''}
@@ -155,8 +179,8 @@ export function DynamicPluginFields({
                                     'focus:outline-none focus:ring-2 focus:ring-primary/50',
                                 )}
                                 rows={4}
-                                minLength={field.validation?.minLength}
-                                maxLength={field.validation?.maxLength}
+                                minLength={field.validation?.min}
+                                maxLength={field.validation?.max}
                             />
                             {field.description && (
                                 <p className="mt-1 text-xs text-text-muted dark:text-text-muted-dark">
@@ -182,7 +206,9 @@ export function DynamicPluginFields({
                         <div key={field.name}>
                             <label className="block text-sm font-medium text-text dark:text-text-dark mb-1">
                                 {field.label}
-                                {field.required && <span className="text-danger ml-1">*</span>}
+                                {field.validation?.required && (
+                                    <span className="text-danger ml-1">*</span>
+                                )}
                             </label>
                             <select
                                 value={(value as string) || ''}
@@ -194,9 +220,11 @@ export function DynamicPluginFields({
                                     'text-text dark:text-text-dark',
                                 )}
                             >
-                                {!field.required && <option value="">{t('selectOption')}</option>}
+                                {!field.validation?.required && (
+                                    <option value="">{t('selectOption')}</option>
+                                )}
                                 {field.options?.map((option) => (
-                                    <option key={option.value} value={option.value}>
+                                    <option key={String(option.value)} value={String(option.value)}>
                                         {option.label}
                                     </option>
                                 ))}
@@ -352,7 +380,7 @@ function TagsField({ field, value, onChange }: TagsFieldProps) {
         <div>
             <label className="block text-sm font-medium text-text dark:text-text-dark mb-1">
                 {field.label}
-                {field.required && <span className="text-danger ml-1">*</span>}
+                {field.validation?.required && <span className="text-danger ml-1">*</span>}
             </label>
             <div
                 className={cn(
