@@ -8,9 +8,10 @@
  */
 
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import type { PluginContext, BuiltInStepId, IBuiltInStepExecutor } from '@ever-works/plugin';
+import type { PluginContext, IBuiltInStepExecutor } from '@ever-works/plugin';
 // Import from the standalone plugin package (single source of truth for built-in steps)
 import { DefaultPipelinePlugin as StandalonePlugin } from '@ever-works/default-pipeline-plugin';
+import type { BuiltInStepId } from '@ever-works/default-pipeline-plugin';
 
 // Re-export types from plugin package
 export type { IBuiltInStepExecutor } from '@ever-works/plugin';

@@ -10,6 +10,10 @@
 
 export { DefaultPipelinePlugin } from './default-pipeline.plugin.js';
 
+// Types - BuiltInStepId is the source of truth for step identifiers
+export type { BuiltInStepId } from './types.js';
+export { BUILT_IN_STEP_IDS, isBuiltInStepId } from './types.js';
+
 // Step implementations
 export * from './steps/index.js';
 

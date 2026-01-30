@@ -7,9 +7,9 @@ import type {
     GenerationRequest,
     ExistingItems,
     MutableGenerationContext,
-    BuiltInStepId,
     StepExecutionContext,
 } from '@ever-works/plugin';
+import type { BuiltInStepId } from '@ever-works/default-pipeline-plugin';
 
 // Silence logger during tests
 jest.spyOn(Logger.prototype, 'error').mockImplementation(() => {});

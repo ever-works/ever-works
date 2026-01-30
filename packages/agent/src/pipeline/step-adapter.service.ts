@@ -1,11 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type {
     MutableGenerationContext,
-    BuiltInStepId,
     StepExecutionOptions,
     StepProgressCallback,
     StepExecutionContext,
 } from '@ever-works/plugin';
+import type { BuiltInStepId } from '@ever-works/default-pipeline-plugin';
 // Import the NestJS wrapper which delegates to the standalone plugin
 import { DefaultPipelinePlugin, type IBuiltInStepExecutor } from './default-pipeline.plugin';
 import { TypedGenerationContext } from './generation-context';

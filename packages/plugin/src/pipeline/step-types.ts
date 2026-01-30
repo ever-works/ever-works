@@ -1,27 +1,6 @@
 import type { ItemData, Category, Tag, Brand, DomainAnalysis, WebPageData } from '@ever-works/contracts';
 
 /**
- * Built-in pipeline step identifiers
- * Based on the existing ItemsGeneratorStep enum
- */
-export type BuiltInStepId =
-	| 'prompt-comparison'
-	| 'prompt-processing'
-	| 'domain-detection'
-	| 'ai-first-items-generation'
-	| 'search-queries-generation'
-	| 'web-search'
-	| 'content-retrieval'
-	| 'content-filtering'
-	| 'items-extraction'
-	| 'deduplication-and-data-aggregation'
-	| 'categories-tags-processing'
-	| 'sources-validation'
-	| 'badges-processing'
-	| 'image-capture'
-	| 'markdown-generation';
-
-/**
  * Keys for data stored in the pipeline context
  */
 export type StepDataKey =

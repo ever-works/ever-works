@@ -8,7 +8,6 @@ import type {
 import type { MutableGenerationContext } from '../pipeline/generation-context.interface.js';
 import type { PipelineStepDefinition, StepPosition } from '../pipeline/step-definition.types.js';
 import type { PluginCategory } from '../contracts/plugin-manifest.types.js';
-import type { BuiltInStepId } from '../pipeline/step-types.js';
 
 /**
  * Abstract base class for pipeline step plugins
@@ -160,23 +159,32 @@ export abstract class BasePipelineStep extends BasePlugin implements IPipelineSt
 	}
 
 	/**
-	 * Create a position after a built-in step
+	 * Create a position after another step.
+	 *
+	 * @param stepId - The step ID to position after (type-safe with generic)
+	 * @example
+	 * // In a custom pipeline step plugin
+	 * readonly stepPosition = MyPipelineStep.after('web-search');
 	 */
-	protected static after(stepId: BuiltInStepId): StepPosition {
+	protected static after<TStepId extends string>(stepId: TStepId): StepPosition<TStepId> {
 		return { type: 'after', stepId };
 	}
 
 	/**
-	 * Create a position before a built-in step
+	 * Create a position before another step.
+	 *
+	 * @param stepId - The step ID to position before (type-safe with generic)
 	 */
-	protected static before(stepId: BuiltInStepId): StepPosition {
+	protected static before<TStepId extends string>(stepId: TStepId): StepPosition<TStepId> {
 		return { type: 'before', stepId };
 	}
 
 	/**
-	 * Create a position replacing a built-in step
+	 * Create a position replacing another step.
+	 *
+	 * @param stepId - The step ID to replace (type-safe with generic)
 	 */
-	protected static replace(stepId: BuiltInStepId): StepPosition {
+	protected static replace<TStepId extends string>(stepId: TStepId): StepPosition<TStepId> {
 		return { type: 'replace', stepId };
 	}
 

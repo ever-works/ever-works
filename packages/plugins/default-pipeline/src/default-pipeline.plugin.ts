@@ -12,13 +12,15 @@ import type {
 	StepExecutionOptions,
 	StepProgressCallback,
 	IPipelineStepPlugin,
-	BuiltInStepId,
 	IBuiltInStepExecutor,
 	StepExecutionContext,
 	FormFieldDefinition,
 	FormFieldGroup,
 	IFormSchemaProvider
 } from '@ever-works/plugin';
+
+// Import BuiltInStepId from local types - this plugin is the source of truth
+import type { BuiltInStepId } from './types.js';
 
 // Import all step implementations
 import { PromptComparisonStep } from './steps/prompt-comparison.step.js';

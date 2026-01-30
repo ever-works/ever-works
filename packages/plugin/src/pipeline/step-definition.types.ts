@@ -1,13 +1,24 @@
-import type { BuiltInStepId, StepStatus } from './step-types.js';
+import type { StepStatus } from './step-types.js';
 import type { JsonSchema } from '../settings/json-schema.types.js';
 
 /**
- * Step position relative to built-in steps
+ * Step position relative to other steps.
+ *
+ * Generic over TStepId to support both:
+ * - Built-in pipelines with specific step ID types (e.g., BuiltInStepId)
+ * - Custom pipelines with their own step ID types
+ *
+ * @example
+ * // Using with default pipeline's BuiltInStepId
+ * const position: StepPosition<BuiltInStepId> = { type: 'after', stepId: 'web-search' };
+ *
+ * // Using with generic string (for custom pipelines)
+ * const customPosition: StepPosition = { type: 'after', stepId: 'my-custom-step' };
  */
-export type StepPosition =
-	| { readonly type: 'before'; readonly stepId: BuiltInStepId }
-	| { readonly type: 'after'; readonly stepId: BuiltInStepId }
-	| { readonly type: 'replace'; readonly stepId: BuiltInStepId }
+export type StepPosition<TStepId extends string = string> =
+	| { readonly type: 'before'; readonly stepId: TStepId }
+	| { readonly type: 'after'; readonly stepId: TStepId }
+	| { readonly type: 'replace'; readonly stepId: TStepId }
 	| { readonly type: 'first' }
 	| { readonly type: 'last' };
 
