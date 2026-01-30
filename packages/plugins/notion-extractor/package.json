@@ -1,0 +1,57 @@
+{
+	"name": "@ever-works/notion-extractor-plugin",
+	"version": "1.0.0",
+	"description": "Notion Page Extractor - Extract content from Notion pages using the Notion API or Splitbee",
+	"private": true,
+	"main": "./dist/index.js",
+	"module": "./dist/index.mjs",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"import": "./dist/index.mjs",
+			"require": "./dist/index.js",
+			"types": "./dist/index.d.ts"
+		}
+	},
+	"scripts": {
+		"build": "tsup",
+		"dev": "tsup --watch",
+		"type-check": "tsc --noEmit",
+		"clean": "rm -rf dist",
+		"test": "vitest run",
+		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage"
+	},
+	"peerDependencies": {
+		"@ever-works/plugin": "workspace:*"
+	},
+	"dependencies": {
+		"@notionhq/client": "^2.3.0",
+		"axios": "^1.13.4"
+	},
+	"devDependencies": {
+		"@ever-works/plugin": "workspace:*",
+		"tsup": "^8.4.0",
+		"typescript": "^5.7.3",
+		"vitest": "^3.0.0"
+	},
+	"everworks": {
+		"plugin": {
+			"id": "notion-extractor",
+			"name": "Notion Page Extractor",
+			"version": "1.0.0",
+			"category": "content-extractor",
+			"capabilities": [
+				"content-extractor"
+			],
+			"description": "Extract content from Notion pages. Supports both public pages (via Splitbee) and private pages (via Notion API).",
+			"autoInstall": false,
+			"systemPlugin": false,
+			"builtIn": false,
+			"isDefault": false,
+			"icon": {
+				"svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z\"/><path d=\"M8 10h8\"/><path d=\"M8 14h6\"/></svg>"
+			}
+		}
+	}
+}

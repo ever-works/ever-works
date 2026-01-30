@@ -1,3 +1,5 @@
+import type { AiModel } from '../../contracts/capabilities/ai-provider.interface.js';
+
 /**
  * Task complexity levels for AI model routing.
  * Used to select appropriate model tier based on task requirements.
@@ -26,6 +28,25 @@ export interface AiRoutingOptions {
 	readonly autoEscalate?: boolean;
 	/** Override specific provider (plugin ID) */
 	readonly providerOverride?: string;
+	/** Override specific model (bypasses complexity-based routing) */
+	readonly modelOverride?: string;
+}
+
+/**
+ * Model routing configuration for AI providers.
+ * Configurable at user or directory level via plugin settings.
+ *
+ * Resolution priority: directory > user > admin > plugin defaults
+ */
+export interface AiModelRoutingSettings {
+	/** Default model when no complexity specified */
+	readonly defaultModel?: string;
+	/** Model for simple tasks (fast, economical) */
+	readonly simpleModel?: string;
+	/** Model for medium complexity tasks (balanced) */
+	readonly mediumModel?: string;
+	/** Model for complex tasks (high quality) */
+	readonly complexModel?: string;
 }
 
 /**
@@ -114,4 +135,12 @@ export interface IAiFacade {
 		responseTime: number;
 		error?: string;
 	}>;
+
+	/**
+	 * Get available models from the configured AI provider.
+	 * Used by UI to populate model selection dropdowns for routing configuration.
+	 *
+	 * @returns List of available models with their capabilities
+	 */
+	getAvailableModels(): Promise<readonly AiModel[]>;
 }

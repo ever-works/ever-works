@@ -28,6 +28,7 @@ import { AiFacadeService } from '../facades/ai.facade';
 import { SearchFacadeService } from '../facades/search.facade';
 import { ScreenshotFacadeService } from '../facades/screenshot.facade';
 import { ContentExtractorFacadeService } from '../facades/content-extractor.facade';
+import { DataSourceFacadeService } from '../facades/data-source.facade';
 
 /**
  * Type guard for pipeline step plugins (inlined to avoid ESM import issues)
@@ -101,6 +102,7 @@ export class StepPipelineExecutorService {
         private readonly searchFacade: SearchFacadeService,
         private readonly screenshotFacade: ScreenshotFacadeService,
         private readonly contentExtractorFacade: ContentExtractorFacadeService,
+        @Optional() private readonly dataSourceFacade?: DataSourceFacadeService,
         @Optional() @Inject(CACHE_MANAGER) private readonly cacheManager?: Cache,
     ) {}
 
@@ -153,6 +155,7 @@ export class StepPipelineExecutorService {
             searchFacade: this.searchFacade,
             screenshotFacade: this.screenshotFacade,
             contentExtractorFacade: this.contentExtractorFacade,
+            dataSourceFacade: this.dataSourceFacade,
             logger: stepLogger,
             directory,
             user: directory.user,

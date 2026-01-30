@@ -6,6 +6,8 @@ import type {
     AskJsonResponse,
     IAiProviderPlugin,
     ChatCompletionOptions,
+    AiRoutingOptions,
+    AiModel,
 } from '@ever-works/plugin';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
@@ -80,6 +82,12 @@ export class AiFacadeService implements IAiFacade {
     /**
      * Send a prompt and get a structured JSON response.
      * Uses the plugin registry to resolve the AI provider.
+     *
+     * Model routing resolution order:
+     * 1. Explicit modelOverride in routing options
+     * 2. Complexity-based model from settings (simpleModel, mediumModel, complexModel)
+     * 3. Default model from settings
+     * 4. Plugin's default model (undefined - plugin decides)
      */
     async askJson<T>(
         promptTemplate: string,
@@ -94,18 +102,22 @@ export class AiFacadeService implements IAiFacade {
             facadeOptions?.directoryId,
         );
 
-        // Get resolved settings for the plugin
+        // Get resolved settings for the plugin (includes model routing config)
         const settings = await this.settingsService.getSettings(plugin.id, {
             userId: facadeOptions?.userId,
             directoryId: facadeOptions?.directoryId,
             includeSecrets: true,
         });
 
+        // Resolve model based on complexity or override
+        const model = this.resolveModel(plugin, settings, options?.routing);
+
         // Render template variables
         const prompt = this.renderTemplate(promptTemplate, options?.variables);
 
         // Build completion options with settings for plugin to use
         const completionOptions: ChatCompletionOptions = {
+            model, // Pass resolved model to plugin
             messages: [{ role: 'user', content: prompt }],
             temperature: options?.temperature ?? 0.7,
             responseFormat: { type: 'json_object' },
@@ -139,6 +151,9 @@ export class AiFacadeService implements IAiFacade {
             );
         }
 
+        // Calculate cost based on model pricing
+        const cost = await this.calculateCost(plugin, response.model, response.usage);
+
         return {
             result: validated.data,
             usage: response.usage
@@ -148,10 +163,39 @@ export class AiFacadeService implements IAiFacade {
                       totalTokens: response.usage.totalTokens,
                   }
                 : null,
-            cost: null, // TODO: Calculate cost based on model pricing
+            cost,
             provider: plugin.id,
             model: response.model,
         };
+    }
+
+    /**
+     * Calculate cost based on model pricing and token usage.
+     * Returns null if pricing info is not available.
+     */
+    private async calculateCost(
+        plugin: IAiProviderPlugin,
+        modelId: string,
+        usage?: { promptTokens: number; completionTokens: number; totalTokens: number },
+    ): Promise<number | null> {
+        if (!usage) {
+            return null;
+        }
+
+        try {
+            const modelInfo = await plugin.getModel(modelId);
+            if (!modelInfo || !modelInfo.inputCostPer1k || !modelInfo.outputCostPer1k) {
+                return null;
+            }
+
+            const inputCost = (usage.promptTokens * modelInfo.inputCostPer1k) / 1000;
+            const outputCost = (usage.completionTokens * modelInfo.outputCostPer1k) / 1000;
+
+            return inputCost + outputCost;
+        } catch {
+            // Model info not available, return null
+            return null;
+        }
     }
 
     /**
@@ -244,8 +288,29 @@ export class AiFacadeService implements IAiFacade {
             throw new AiProviderNotFoundError(providerOverride);
         }
 
-        // TODO: Check directory-level default provider from settings
-        // TODO: Check user-level default provider from settings
+        // Check directory-level default provider from settings
+        if (directoryId) {
+            const directoryProvider = await this.getDefaultProviderFromSettings(
+                directoryId,
+                userId,
+                'directory',
+            );
+            if (directoryProvider) {
+                return directoryProvider;
+            }
+        }
+
+        // Check user-level default provider from settings
+        if (userId) {
+            const userProvider = await this.getDefaultProviderFromSettings(
+                undefined,
+                userId,
+                'user',
+            );
+            if (userProvider) {
+                return userProvider;
+            }
+        }
 
         // Fall back to first enabled AI provider
         const plugins = this.registry.getByCapability(this.CAPABILITY);
@@ -256,6 +321,138 @@ export class AiFacadeService implements IAiFacade {
         }
 
         throw new NoAiProviderError();
+    }
+
+    /**
+     * Get default AI provider from settings at a specific scope.
+     * The 'defaultAiProvider' setting can be set at directory or user level.
+     */
+    private async getDefaultProviderFromSettings(
+        directoryId?: string,
+        userId?: string,
+        scope?: 'directory' | 'user',
+    ): Promise<IAiProviderPlugin | null> {
+        // Get all enabled AI providers
+        const aiProviders = this.registry.getByCapability(this.CAPABILITY);
+        const enabledProviders = aiProviders.filter((p) => p.state === 'enabled');
+
+        if (enabledProviders.length === 0) {
+            return null;
+        }
+
+        // Check each provider's settings for the scope-specific default
+        for (const registered of enabledProviders) {
+            try {
+                const settings = await this.settingsService.getSettings(registered.plugin.id, {
+                    userId,
+                    directoryId,
+                    includeSecrets: false,
+                });
+
+                // Check if this provider is marked as default at the requested scope
+                const isDefault = settings['isDefault'] as boolean | undefined;
+                if (isDefault) {
+                    this.logger.debug(
+                        `Using ${scope}-level default AI provider: ${registered.plugin.id}`,
+                    );
+                    return registered.plugin as IAiProviderPlugin;
+                }
+            } catch {
+                // Continue checking other providers
+            }
+        }
+
+        // Also check for a global 'defaultAiProvider' setting that specifies provider ID
+        // This is stored at platform settings level (scope: admin/user/directory)
+        try {
+            // Try to get platform-level AI settings (provider ID stored directly)
+            // We check if any provider matches the stored defaultAiProvider setting
+            const firstProvider = enabledProviders[0];
+            const settings = await this.settingsService.getSettings(firstProvider.plugin.id, {
+                userId,
+                directoryId,
+                includeSecrets: false,
+            });
+
+            const defaultProviderId = settings['defaultAiProvider'] as string | undefined;
+            if (defaultProviderId) {
+                const defaultProvider = enabledProviders.find(
+                    (p) => p.plugin.id === defaultProviderId,
+                );
+                if (defaultProvider) {
+                    this.logger.debug(
+                        `Using ${scope}-level defaultAiProvider setting: ${defaultProviderId}`,
+                    );
+                    return defaultProvider.plugin as IAiProviderPlugin;
+                }
+            }
+        } catch {
+            // No default provider configured at this scope
+        }
+
+        return null;
+    }
+
+    /**
+     * Get available models from the configured AI provider.
+     * Used by UI to populate model selection dropdowns for routing configuration.
+     */
+    async getAvailableModels(facadeOptions?: AiFacadeOptions): Promise<readonly AiModel[]> {
+        try {
+            const plugin = await this.resolvePlugin(
+                facadeOptions?.providerOverride,
+                facadeOptions?.userId,
+                facadeOptions?.directoryId,
+            );
+            return await plugin.listModels();
+        } catch (error) {
+            this.logger.warn(`Failed to get available models: ${(error as Error).message}`);
+            return [];
+        }
+    }
+
+    /**
+     * Resolve which model to use based on routing options and settings.
+     *
+     * Resolution order:
+     * 1. Explicit modelOverride in routing options
+     * 2. Complexity-based model from settings (simpleModel, mediumModel, complexModel)
+     * 3. Default model from settings
+     * 4. Plugin's default model (returns undefined, plugin uses its default)
+     */
+    private resolveModel(
+        plugin: IAiProviderPlugin,
+        settings: Record<string, unknown>,
+        routing?: AiRoutingOptions,
+    ): string | undefined {
+        // 1. Explicit model override
+        if (routing?.modelOverride) {
+            this.logger.debug(`Using model override: ${routing.modelOverride}`);
+            return routing.modelOverride;
+        }
+
+        // 2. Complexity-based routing from settings
+        if (routing?.complexity) {
+            const complexityModelKey = `${routing.complexity}Model`; // e.g., 'simpleModel'
+            const complexityModel = settings[complexityModelKey] as string | undefined;
+            if (complexityModel) {
+                this.logger.debug(
+                    `Using ${routing.complexity} model for plugin ${plugin.id}: ${complexityModel}`,
+                );
+                return complexityModel;
+            }
+        }
+
+        // 3. Default model from settings
+        const defaultModel = settings['defaultModel'] as string | undefined;
+        if (defaultModel) {
+            this.logger.debug(`Using default model from settings: ${defaultModel}`);
+            return defaultModel;
+        }
+
+        // 4. Let plugin decide (returns undefined, plugin uses its default)
+        this.logger.debug(`No model routing configured, plugin ${plugin.id} will use default`);
+        return undefined;
     }
 
     /**

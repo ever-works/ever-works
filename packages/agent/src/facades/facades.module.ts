@@ -5,6 +5,7 @@ import { AiFacadeService } from './ai.facade';
 import { SearchFacadeService } from './search.facade';
 import { ScreenshotFacadeService } from './screenshot.facade';
 import { ContentExtractorFacadeService } from './content-extractor.facade';
+import { DataSourceFacadeService } from './data-source.facade';
 
 /**
  * All facade providers
@@ -14,6 +15,7 @@ const FACADES = [
     SearchFacadeService,
     ScreenshotFacadeService,
     ContentExtractorFacadeService,
+    DataSourceFacadeService,
 ];
 
 /**

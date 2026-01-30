@@ -2,6 +2,7 @@ import type { IAiFacade } from './facades/ai-facade.interface.js';
 import type { ISearchFacade } from './facades/search-facade.interface.js';
 import type { IScreenshotFacade } from './facades/screenshot-facade.interface.js';
 import type { IContentExtractorFacade } from './facades/content-extractor-facade.interface.js';
+import type { IDataSourceFacade } from './facades/data-source-facade.interface.js';
 import type { DirectoryReference, UserReference } from './generation-context.interface.js';
 
 /**
@@ -73,6 +74,12 @@ export interface StepExecutionContext {
 	 * Content extractor facade for specialized extraction (Notion, etc.).
 	 */
 	readonly contentExtractorFacade: IContentExtractorFacade;
+
+	/**
+	 * Data source facade for external data sources (Apify, etc.).
+	 * Provides access to items from external data sources.
+	 */
+	readonly dataSourceFacade?: IDataSourceFacade;
 
 	/**
 	 * Logger instance for the step.

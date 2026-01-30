@@ -149,6 +149,23 @@ export interface MutableGenerationContext {
 
 	/** Control flag to stop pipeline */
 	shouldStop?: boolean;
+
+	/**
+	 * Plugin configuration from GeneratorForm.
+	 * Maps plugin ID to per-directory settings including 'enabled' flags.
+	 *
+	 * This is passed from the GeneratorForm via CreateItemsGeneratorDto
+	 * and used by DataSourceFacade to determine which plugins to query.
+	 *
+	 * Example:
+	 * ```typescript
+	 * {
+	 *   'apify-data-source': { enabled: true, datasetId: '5uxB4x3zYjV5S7nFd' },
+	 *   'notion-extractor': { enabled: false }
+	 * }
+	 * ```
+	 */
+	pluginConfig?: Record<string, Record<string, unknown>>;
 }
 
 /**
@@ -178,4 +195,5 @@ export interface GenerationContextSnapshot {
 	readonly subject?: string;
 	readonly advancedPrompts?: AdvancedPromptsContext | null;
 	readonly shouldStop?: boolean;
+	readonly pluginConfig?: Record<string, Record<string, unknown>>;
 }

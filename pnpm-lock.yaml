@@ -773,6 +773,24 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
 
+  packages/plugins/apify-data-source:
+    devDependencies:
+      '@ever-works/contracts':
+        specifier: workspace:*
+        version: link:../../contracts
+      '@ever-works/plugin':
+        specifier: workspace:*
+        version: link:../../plugin
+      tsup:
+        specifier: ^8.4.0
+        version: 8.5.1(@swc/core@1.15.8(@swc/helpers@0.5.18))(jiti@2.6.1)(postcss@8.5.6)(typescript@5.9.3)(yaml@2.8.2)
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.4(@types/node@25.0.3)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.44.1)(yaml@2.8.2)
+
   packages/plugins/default-pipeline:
     dependencies:
       string-similarity-js:
@@ -816,6 +834,28 @@ importers:
       '@types/turndown':
         specifier: ^5.0.5
         version: 5.0.6
+      tsup:
+        specifier: ^8.4.0
+        version: 8.5.1(@swc/core@1.15.8(@swc/helpers@0.5.18))(jiti@2.6.1)(postcss@8.5.6)(typescript@5.9.3)(yaml@2.8.2)
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.4(@types/node@25.0.3)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.44.1)(yaml@2.8.2)
+
+  packages/plugins/notion-extractor:
+    dependencies:
+      '@notionhq/client':
+        specifier: ^2.3.0
+        version: 2.3.0
+      axios:
+        specifier: ^1.13.4
+        version: 1.13.4
+    devDependencies:
+      '@ever-works/plugin':
+        specifier: workspace:*
+        version: link:../../plugin
       tsup:
         specifier: ^8.4.0
         version: 8.5.1(@swc/core@1.15.8(@swc/helpers@0.5.18))(jiti@2.6.1)(postcss@8.5.6)(typescript@5.9.3)(yaml@2.8.2)
@@ -2645,6 +2685,10 @@ packages:
     resolution: {integrity: sha512-oGB+UxlgWcgQkgwo8GcEGwemoTFt3FIO9ababBmaGwXIoBKZ+GTy0pP185beGg7Llih/NSHSV2XAs1lnznocSg==}
     engines: {node: '>= 8'}
 
+  '@notionhq/client@2.3.0':
+    resolution: {integrity: sha512-l7WqTCpQqC+HibkB9chghONQTYcxNQT0/rOJemBfmuKQRTu2vuV8B3yA395iKaUdDo7HI+0KvQaz9687Xskzkw==}
+    engines: {node: '>=12'}
+
   '@nuxt/opencollective@0.4.1':
     resolution: {integrity: sha512-GXD3wy50qYbxCJ652bDrDzgMr3NFEkIS374+IgFQKkCvk9yiYcLvX2XDYr7UyQxf4wK0e+yqDYRubZ0DtOxnmQ==}
     engines: {node: ^14.18.0 || >=16.10.0, npm: '>=5.10.0'}
@@ -3855,6 +3899,9 @@ packages:
 
   '@types/mysql@2.15.27':
     resolution: {integrity: sha512-YfWiV16IY0OeBfBCk8+hXKmdTKrKlwKN1MNKAPBu5JYxLwBEZl7QzeEpGnlZb3VMGJrrGmB84gXiH+ofs/TezA==}
+
+  '@types/node-fetch@2.6.13':
+    resolution: {integrity: sha512-QGpRVpzSaUs30JBSGPjOg4Uveu384erbHBoT1zeONvyCfwQxIkUshLAOqN/k9EjGviPRmWTTe6aH2qySWKTVSw==}
 
   '@types/node@20.19.27':
     resolution: {integrity: sha512-N2clP5pJhB2YnZJ3PIHFk5RkygRX5WO/5f0WC08tp0wd+sv0rsJk3MqWn3CbNmT2J505a5336jaQj4ph1AdMug==}
@@ -10855,6 +10902,13 @@ snapshots:
       '@nodelib/fs.scandir': 2.1.5
       fastq: 1.20.1
 
+  '@notionhq/client@2.3.0':
+    dependencies:
+      '@types/node-fetch': 2.6.13
+      node-fetch: 2.7.0
+    transitivePeerDependencies:
+      - encoding
+
   '@nuxt/opencollective@0.4.1':
     dependencies:
       consola: 3.4.2
@@ -11949,7 +12003,7 @@ snapshots:
 
   '@tavily/core@0.3.7':
     dependencies:
-      axios: 1.13.2
+      axios: 1.13.4
       https-proxy-agent: 7.0.6
       js-tiktoken: 1.0.21
     transitivePeerDependencies:
@@ -12216,6 +12270,11 @@ snapshots:
   '@types/mysql@2.15.27':
     dependencies:
       '@types/node': 22.19.3
+
+  '@types/node-fetch@2.6.13':
+    dependencies:
+      '@types/node': 22.19.3
+      form-data: 4.0.5
 
   '@types/node@20.19.27':
     dependencies:

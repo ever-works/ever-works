@@ -48,5 +48,13 @@ export {
     type ExtendedFacadeExtractionOptions,
 } from './content-extractor.facade';
 
+// Data Source Facade
+export { DataSourceFacadeService, DataSourceFacadeError } from './data-source.facade';
+
 // Re-export facade types from plugin for convenience
 export type { FacadeExtractionOptions, FacadeExtractedContent } from '@ever-works/plugin';
+export type {
+    DataSourceFacadeOptions,
+    DataSourceFacadeResult,
+    EnabledDataSource,
+} from '@ever-works/plugin';
