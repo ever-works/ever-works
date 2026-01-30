@@ -1,15 +1,32 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import {
-    type PluginCategory,
-    type PluginState,
-    type ConfigurationMode,
-    type PluginIconType,
-} from '@ever-works/plugin';
+import type {
+    PluginCategory,
+    PluginState,
+    ConfigurationMode,
+    PluginIconType,
+    PluginIcon,
+    PluginAuthor,
+    PluginSettingsSchemaProperty,
+    PluginSettingsSchema,
+    PluginResponse,
+    UserPluginResponse,
+    DirectoryPluginResponse,
+    PluginListResponse,
+    DirectoryPluginListResponse,
+} from '@ever-works/plugin/api';
+
+// Re-export types for convenience
+export type {
+    PluginCategory,
+    PluginState,
+    ConfigurationMode,
+    PluginIconType,
+} from '@ever-works/plugin/api';
 
 /**
  * Plugin icon representation for UI display
  */
-export class PluginIconDto {
+export class PluginIconDto implements PluginIcon {
     @ApiProperty({ description: 'Icon type', enum: ['svg', 'url', 'base64', 'lucide', 'emoji'] })
     type: PluginIconType;
 
@@ -29,7 +46,7 @@ export class PluginIconDto {
 /**
  * Plugin author information
  */
-export class PluginAuthorDto {
+export class PluginAuthorDto implements PluginAuthor {
     @ApiProperty({ description: 'Author name' })
     name: string;
 
@@ -43,7 +60,7 @@ export class PluginAuthorDto {
 /**
  * Plugin settings schema property
  */
-export class PluginSettingsSchemaPropertyDto {
+export class PluginSettingsSchemaPropertyDto implements PluginSettingsSchemaProperty {
     @ApiProperty({ description: 'Property type' })
     type: string;
 
@@ -66,13 +83,13 @@ export class PluginSettingsSchemaPropertyDto {
     writeOnly?: boolean;
 
     @ApiPropertyOptional({ description: 'Enum values', type: [String] })
-    enum?: unknown[];
+    enum?: readonly unknown[];
 }
 
 /**
  * Plugin settings schema
  */
-export class PluginSettingsSchemaDto {
+export class PluginSettingsSchemaDto implements PluginSettingsSchema {
     @ApiProperty({ description: 'Schema type', default: 'object' })
     type: 'object';
 
@@ -92,7 +109,7 @@ export class PluginSettingsSchemaDto {
 /**
  * Response DTO for a single plugin
  */
-export class PluginResponseDto {
+export class PluginResponseDto implements PluginResponse {
     @ApiProperty({ description: 'Plugin entity ID (database)' })
     id: string;
 
@@ -139,7 +156,7 @@ export class PluginResponseDto {
 /**
  * Response DTO for a plugin with user-specific settings
  */
-export class UserPluginResponseDto extends PluginResponseDto {
+export class UserPluginResponseDto extends PluginResponseDto implements UserPluginResponse {
     @ApiProperty({ description: 'Whether user has installed this plugin' })
     installed: boolean;
 
@@ -156,7 +173,10 @@ export class UserPluginResponseDto extends PluginResponseDto {
 /**
  * Response DTO for a plugin in directory context
  */
-export class DirectoryPluginResponseDto extends UserPluginResponseDto {
+export class DirectoryPluginResponseDto
+    extends UserPluginResponseDto
+    implements DirectoryPluginResponse
+{
     @ApiProperty({ description: 'Whether plugin is enabled for this directory' })
     directoryEnabled: boolean;
 
@@ -176,7 +196,7 @@ export class DirectoryPluginResponseDto extends UserPluginResponseDto {
 /**
  * Response for plugin list
  */
-export class PluginListResponseDto {
+export class PluginListResponseDto implements PluginListResponse {
     @ApiProperty({ description: 'List of plugins', type: [UserPluginResponseDto] })
     plugins: UserPluginResponseDto[];
 
@@ -193,7 +213,7 @@ export class PluginListResponseDto {
 /**
  * Response for directory plugin list
  */
-export class DirectoryPluginListResponseDto {
+export class DirectoryPluginListResponseDto implements DirectoryPluginListResponse {
     @ApiProperty({ description: 'List of plugins', type: [DirectoryPluginResponseDto] })
     plugins: DirectoryPluginResponseDto[];
 

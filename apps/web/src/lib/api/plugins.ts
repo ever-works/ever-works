@@ -1,94 +1,32 @@
 import 'server-only';
 import { serverFetch, serverMutation } from './server-api';
 import type {
-    PluginCategory,
-    PluginState,
-    ConfigurationMode,
-    PluginAuthor,
-    PluginIcon,
-} from '@ever-works/plugin';
+    PluginSettingsSchemaProperty,
+    PluginSettingsSchema,
+    PluginResponse,
+    UserPluginResponse,
+    DirectoryPluginResponse,
+    PluginListResponse as IPluginListResponse,
+    DirectoryPluginListResponse as IDirectoryPluginListResponse,
+} from '@ever-works/plugin/api';
 
-// Re-export types from @ever-works/plugin for consistency
+// Re-export types from @ever-works/plugin/api for consistency
 export type {
+    PluginSettingsSchemaProperty,
+    PluginSettingsSchema,
     PluginCategory,
     PluginState,
     ConfigurationMode,
     PluginAuthor,
-} from '@ever-works/plugin';
+    PluginIcon as PluginsApiIcon,
+} from '@ever-works/plugin/api';
 
-// Alias PluginIcon as PluginsApiIcon to avoid conflict with items-generator.ts which also exports PluginIcon
-export type { PluginIcon as PluginsApiIcon } from '@ever-works/plugin';
-
-// Local alias for use within this file
-type PluginsApiIcon = PluginIcon;
-
-// ============================================
-// Types
-// ============================================
-
-export interface PluginSettingsSchemaProperty {
-    type: string;
-    title?: string;
-    description?: string;
-    default?: unknown;
-    secret?: boolean;
-    masked?: boolean;
-    writeOnly?: boolean;
-    enum?: unknown[];
-}
-
-export interface PluginSettingsSchema {
-    type: 'object';
-    title?: string;
-    description?: string;
-    properties: Record<string, PluginSettingsSchemaProperty>;
-    required?: string[];
-}
-
-export interface Plugin {
-    id: string;
-    pluginId: string;
-    name: string;
-    version: string;
-    description?: string;
-    category: PluginCategory;
-    capabilities: string[];
-    configurationMode: ConfigurationMode;
-    builtIn: boolean;
-    state: PluginState;
-    icon?: PluginsApiIcon;
-    settingsSchema?: PluginSettingsSchema;
-    author?: PluginAuthor;
-    homepage?: string;
-}
-
-export interface UserPlugin extends Plugin {
-    installed: boolean;
-    enabled: boolean;
-    settings?: Record<string, unknown>;
-    userPluginId?: string;
-}
-
-export interface DirectoryPlugin extends UserPlugin {
-    directoryEnabled: boolean;
-    activeCapability?: string;
-    directorySettings?: Record<string, unknown>;
-    directoryPluginId?: string;
-    priority?: number;
-}
-
-export interface PluginListResponse {
-    plugins: UserPlugin[];
-    total: number;
-    categories?: PluginCategory[];
-    capabilities?: string[];
-}
-
-export interface DirectoryPluginListResponse {
-    plugins: DirectoryPlugin[];
-    total: number;
-    capabilityProviders?: Record<string, string>;
-}
+// Type aliases for backward compatibility
+export type Plugin = PluginResponse;
+export type UserPlugin = UserPluginResponse;
+export type DirectoryPlugin = DirectoryPluginResponse;
+export type PluginListResponse = IPluginListResponse;
+export type DirectoryPluginListResponse = IDirectoryPluginListResponse;
 
 // ============================================
 // API Client

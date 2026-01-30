@@ -10,7 +10,8 @@ export default defineConfig({
 		'src/common/index.ts',
 		'src/helpers/index.ts',
 		'src/abstract/index.ts',
-		'src/testing/index.ts'
+		'src/testing/index.ts',
+		'src/api/index.ts'
 	],
 	format: ['esm'],
 	dts: true,

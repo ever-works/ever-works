@@ -44,6 +44,10 @@
 		"./testing": {
 			"types": "./dist/testing/index.d.ts",
 			"import": "./dist/testing/index.js"
+		},
+		"./api": {
+			"types": "./dist/api/index.d.ts",
+			"import": "./dist/api/index.js"
 		}
 	},
 	"files": [
