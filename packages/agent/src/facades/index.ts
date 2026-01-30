@@ -9,6 +9,9 @@
 // Facades Module
 export { FacadesModule } from './facades.module';
 
+// Base Facade
+export { BaseFacadeService, type BaseFacadeOptions, type DefaultProviderInfo } from './base.facade';
+
 // AI Facade
 export {
     AiFacadeService,

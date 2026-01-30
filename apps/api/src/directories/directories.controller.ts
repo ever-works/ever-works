@@ -301,12 +301,13 @@ export class DirectoriesController {
         @Param('id') id: string,
         @Query('pipelineId') pipelineId?: string,
     ) {
-        // Verify user has access to the directory
         const user = await this.authService.getUser(auth.userId);
         await this.directoryOwnershipService.ensureAccess(id, user.id);
 
-        // Get the form schema based on selected pipeline
-        return this.generatorFormSchemaService.getFormSchema(pipelineId);
+        return this.generatorFormSchemaService.getFormSchema(pipelineId, {
+            directoryId: id,
+            userId: user.id,
+        });
     }
 
     @Post('directories/:id/generate')

@@ -129,7 +129,9 @@ export class ItemSubmissionService {
                     if (result.success && result.cacheUrl) {
                         if (!itemData.images.includes(result.cacheUrl)) {
                             itemData.images = [result.cacheUrl, ...itemData.images];
-                            this.logger.debug(`Captured screenshot for item: ${submitItemDto.name}`);
+                            this.logger.debug(
+                                `Captured screenshot for item: ${submitItemDto.name}`,
+                            );
                         }
                     }
                 } catch (error) {

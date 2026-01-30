@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import type {
     IScreenshotFacade,
     ScreenshotCaptureOptions,
@@ -6,9 +6,13 @@ import type {
     SmartImageOptions,
     SmartImageResult,
     IScreenshotPlugin,
+    IPlugin,
 } from '@ever-works/plugin';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
+import { DirectoryPluginRepository } from '../plugins/repositories/directory-plugin.repository';
+import { UserPluginRepository } from '../plugins/repositories/user-plugin.repository';
+import { BaseFacadeService, BaseFacadeOptions } from './base.facade';
 
 export class ScreenshotFacadeError extends Error {
     constructor(
@@ -36,25 +40,33 @@ export class ScreenshotProviderNotFoundError extends ScreenshotFacadeError {
     }
 }
 
-export interface ScreenshotFacadeOptions {
-    userId?: string;
-    directoryId?: string;
-    providerOverride?: string;
-}
+export interface ScreenshotFacadeOptions extends BaseFacadeOptions {}
 
 /**
  * Screenshot Facade - simple interface for capturing screenshots.
+ *
+ * Extends BaseFacadeService to inherit:
+ * - Three-level enable resolution (Directory > User > Generation)
+ * - Default provider resolution via activeCapability
+ * - Settings resolution via 4-level hierarchy
  */
 @Injectable()
-export class ScreenshotFacadeService implements IScreenshotFacade {
-    private readonly logger = new Logger(ScreenshotFacadeService.name);
-    private readonly CAPABILITY = 'screenshot';
+export class ScreenshotFacadeService extends BaseFacadeService implements IScreenshotFacade {
+    protected readonly logger = new Logger(ScreenshotFacadeService.name);
+    protected readonly CAPABILITY = 'screenshot';
 
     constructor(
-        private readonly registry: PluginRegistryService,
-        private readonly settingsService: PluginSettingsService,
-    ) {}
+        registry: PluginRegistryService,
+        settingsService: PluginSettingsService,
+        @Optional() directoryPluginRepository?: DirectoryPluginRepository,
+        @Optional() userPluginRepository?: UserPluginRepository,
+    ) {
+        super(registry, settingsService, directoryPluginRepository, userPluginRepository);
+    }
 
+    /**
+     * Capture a screenshot from a URL.
+     */
     async capture(
         options: ScreenshotCaptureOptions,
         facadeOptions?: ScreenshotFacadeOptions,
@@ -65,11 +77,7 @@ export class ScreenshotFacadeService implements IScreenshotFacade {
             facadeOptions?.directoryId,
         );
 
-        const settings = await this.settingsService.getSettings(plugin.id, {
-            userId: facadeOptions?.userId,
-            directoryId: facadeOptions?.directoryId,
-            includeSecrets: true,
-        });
+        const settings = await this.getResolvedSettings(plugin.id, facadeOptions);
 
         const result = await plugin.capture({
             url: options.url,
@@ -95,6 +103,9 @@ export class ScreenshotFacadeService implements IScreenshotFacade {
         };
     }
 
+    /**
+     * Get a smart image (screenshot with sensible defaults).
+     */
     async getSmartImage(
         options: SmartImageOptions,
         facadeOptions?: ScreenshotFacadeOptions,
@@ -118,6 +129,9 @@ export class ScreenshotFacadeService implements IScreenshotFacade {
         };
     }
 
+    /**
+     * Get a screenshot URL without actually capturing.
+     */
     async getScreenshotUrl(
         options: ScreenshotCaptureOptions,
         facadeOptions?: ScreenshotFacadeOptions,
@@ -135,12 +149,18 @@ export class ScreenshotFacadeService implements IScreenshotFacade {
         return plugin.getScreenshotUrl(options);
     }
 
+    /**
+     * Check if screenshot capability is available.
+     * Alias for isConfigured() for interface compatibility.
+     */
     isAvailable(): boolean {
-        const plugins = this.registry.getByCapability(this.CAPABILITY);
-        return plugins.length > 0 && plugins.some((p) => p.state === 'enabled');
+        return this.isConfigured();
     }
 
-    getAvailableProviders(): Array<{
+    /**
+     * Override to use IScreenshotPlugin.providerName.
+     */
+    override getAvailableProviders(): Array<{
         id: string;
         name: string;
         enabled: boolean;
@@ -153,11 +173,27 @@ export class ScreenshotFacadeService implements IScreenshotFacade {
         }));
     }
 
+    /**
+     * Override to use IScreenshotPlugin.providerName.
+     */
+    protected override getProviderName(plugin: IPlugin): string {
+        return (plugin as IScreenshotPlugin).providerName || plugin.name;
+    }
+
+    /**
+     * Resolve which screenshot plugin to use.
+     *
+     * Resolution order:
+     * 1. Explicit provider override
+     * 2. Directory default (activeCapability)
+     * 3. First enabled screenshot provider that passes enable check
+     */
     private async resolvePlugin(
         providerOverride?: string,
         userId?: string,
         directoryId?: string,
     ): Promise<IScreenshotPlugin> {
+        // 1. Explicit override
         if (providerOverride) {
             const registered = this.registry.get(providerOverride);
             if (
@@ -165,16 +201,28 @@ export class ScreenshotFacadeService implements IScreenshotFacade {
                 registered.manifest.capabilities.includes(this.CAPABILITY) &&
                 registered.state === 'enabled'
             ) {
-                return registered.plugin as IScreenshotPlugin;
+                // Check if enabled for this context
+                const isEnabled = await this.isPluginEnabled(providerOverride, directoryId, userId);
+                if (isEnabled) {
+                    return registered.plugin as IScreenshotPlugin;
+                }
             }
             throw new ScreenshotProviderNotFoundError(providerOverride);
         }
 
-        const plugins = this.registry.getByCapability(this.CAPABILITY);
-        const enabled = plugins.find((p) => p.state === 'enabled');
+        // 2. Check for directory default via activeCapability
+        const activePlugin = directoryId
+            ? await this.findActivePluginForDirectory(directoryId)
+            : null;
 
-        if (enabled) {
-            return enabled.plugin as IScreenshotPlugin;
+        if (activePlugin) {
+            return activePlugin.plugin as IScreenshotPlugin;
+        }
+
+        // 3. Fall back to first enabled screenshot provider that passes enable check
+        const enabledPlugins = await this.getEnabledPlugins(directoryId, userId);
+        if (enabledPlugins.length > 0) {
+            return enabledPlugins[0].plugin as IScreenshotPlugin;
         }
 
         throw new NoScreenshotProviderError();

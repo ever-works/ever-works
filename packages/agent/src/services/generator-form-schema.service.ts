@@ -1,8 +1,10 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import {
     PluginRegistryService,
     RegisteredPlugin,
 } from '@src/plugins/services/plugin-registry.service';
+import { DirectoryPluginRepository } from '@src/plugins/repositories/directory-plugin.repository';
+import { UserPluginRepository } from '@src/plugins/repositories/user-plugin.repository';
 import type {
     GeneratorFormSchema,
     ProviderOption,
@@ -20,21 +22,42 @@ import { isFormSchemaProvider } from '@ever-works/plugin';
  * 2. Resolve form fields from the selected pipeline plugin
  * 3. Return a complete GeneratorFormSchema for the frontend
  */
+/**
+ * Options for form schema generation.
+ */
+export interface FormSchemaOptions {
+    /** Directory ID for enable filtering and default provider resolution */
+    directoryId?: string;
+    /** User ID for enable filtering */
+    userId?: string;
+}
+
 @Injectable()
 export class GeneratorFormSchemaService {
     private readonly logger = new Logger(GeneratorFormSchemaService.name);
 
-    constructor(private readonly pluginRegistry: PluginRegistryService) {}
+    constructor(
+        private readonly pluginRegistry: PluginRegistryService,
+        @Optional() private readonly directoryPluginRepository?: DirectoryPluginRepository,
+        @Optional() private readonly userPluginRepository?: UserPluginRepository,
+    ) {}
 
     /**
      * Get the generator form schema based on the selected pipeline.
      *
+     * When directoryId is provided, providers are filtered by enable status
+     * and default providers are marked based on activeCapability.
+     *
      * @param pipelineId - Selected pipeline plugin ID (null for default)
+     * @param options - Optional directoryId and userId for filtering
      * @returns Complete form schema for rendering the generator form
      */
-    async getFormSchema(pipelineId?: string): Promise<GeneratorFormSchema> {
-        // Get available providers for each capability category
-        const providers = this.getAvailableProviders();
+    async getFormSchema(
+        pipelineId?: string,
+        options?: FormSchemaOptions,
+    ): Promise<GeneratorFormSchema> {
+        // Get available providers for each capability category (filtered by enable status)
+        const providers = await this.getAvailableProviders(options);
 
         // Resolve the selected pipeline plugin
         const pipelinePlugin = this.resolvePipelinePlugin(pipelineId);
@@ -89,37 +112,149 @@ export class GeneratorFormSchemaService {
 
     /**
      * Get available providers for all capability categories.
+     * Filters by enable status and marks default providers based on activeCapability.
      */
-    private getAvailableProviders(): GeneratorFormSchema['providers'] {
-        return {
-            search: this.getProvidersForCapability('search'),
-            screenshot: this.getProvidersForCapability('screenshot'),
-            ai: this.getProvidersForCapability('ai-provider'),
-            fullPipeline: this.getProvidersForCapability('full-pipeline'),
-        };
+    private async getAvailableProviders(
+        options?: FormSchemaOptions,
+    ): Promise<GeneratorFormSchema['providers']> {
+        const [search, screenshot, ai, fullPipeline] = await Promise.all([
+            this.getProvidersForCapability('search', options),
+            this.getProvidersForCapability('screenshot', options),
+            this.getProvidersForCapability('ai-provider', options),
+            this.getProvidersForCapability('full-pipeline', options),
+        ]);
+
+        return { search, screenshot, ai, fullPipeline };
     }
 
     /**
      * Get enabled provider options for a specific capability.
+     *
+     * When directoryId is provided:
+     * - Filters plugins by enable status (Directory > User > autoEnable)
+     * - Marks the default provider based on activeCapability
      */
-    private getProvidersForCapability(capability: string): ProviderOption[] {
+    private async getProvidersForCapability(
+        capability: string,
+        options?: FormSchemaOptions,
+    ): Promise<ProviderOption[]> {
         const plugins = this.pluginRegistry.getByCapability(capability);
+        const enabledPlugins = plugins.filter((p) => p.state === 'enabled');
+        const result: ProviderOption[] = [];
 
-        return plugins.filter((p) => p.state === 'enabled').map((p) => this.toProviderOption(p));
+        // Get the active (default) plugin for this capability in the directory
+        let activePluginId: string | null = null;
+        if (options?.directoryId && this.directoryPluginRepository) {
+            try {
+                const activePlugin = await this.directoryPluginRepository.findActiveByCapability(
+                    options.directoryId,
+                    capability,
+                );
+                if (activePlugin) {
+                    activePluginId = activePlugin.pluginId;
+                }
+            } catch {
+                // No active plugin set
+            }
+        }
+
+        for (const registered of enabledPlugins) {
+            // Check if plugin is enabled for this context
+            if (options?.directoryId || options?.userId) {
+                const isEnabled = await this.isPluginEnabled(
+                    registered.plugin.id,
+                    options.directoryId,
+                    options.userId,
+                );
+                if (!isEnabled) {
+                    continue;
+                }
+            }
+
+            result.push(this.toProviderOption(registered, activePluginId));
+        }
+
+        return result;
+    }
+
+    /**
+     * Check if a plugin is enabled for a specific context.
+     *
+     * Resolution order (three-level configuration):
+     * 1. DirectoryPlugin.enabled (Level 2) - if record exists
+     * 2. UserPlugin.enabled (Level 1) - if record exists
+     * 3. autoEnable in manifest or default to enabled
+     */
+    private async isPluginEnabled(
+        pluginId: string,
+        directoryId?: string,
+        userId?: string,
+    ): Promise<boolean> {
+        // Level 2: Check DirectoryPlugin record
+        if (directoryId && this.directoryPluginRepository) {
+            try {
+                const directoryPlugin =
+                    await this.directoryPluginRepository.findByDirectoryAndPlugin(
+                        directoryId,
+                        pluginId,
+                    );
+
+                if (directoryPlugin !== null) {
+                    return directoryPlugin.enabled;
+                }
+            } catch {
+                // Continue to Level 1
+            }
+        }
+
+        // Level 1: Check UserPlugin record
+        if (userId && this.userPluginRepository) {
+            try {
+                const userPlugin = await this.userPluginRepository.findByUserAndPlugin(
+                    userId,
+                    pluginId,
+                );
+
+                if (userPlugin !== null) {
+                    return userPlugin.enabled;
+                }
+            } catch {
+                // Continue to autoEnable
+            }
+        }
+
+        // Check autoEnable in manifest
+        const registered = this.pluginRegistry.get(pluginId);
+        if (registered?.manifest?.autoEnable) {
+            return true;
+        }
+
+        // Default to enabled if no explicit setting
+        return true;
     }
 
     /**
      * Convert a registered plugin to a provider option.
      */
-    private toProviderOption(registered: RegisteredPlugin): ProviderOption {
+    private toProviderOption(
+        registered: RegisteredPlugin,
+        activePluginId?: string | null,
+    ): ProviderOption {
         const { plugin, manifest } = registered;
+
+        // Mark as default if:
+        // 1. It's the active plugin for the directory (via activeCapability)
+        // 2. OR it's a system plugin (if no active plugin is set)
+        const isDefault = activePluginId
+            ? plugin.id === activePluginId
+            : manifest.systemPlugin || false;
 
         return {
             id: plugin.id,
             name: manifest.name,
             description: manifest.description,
             configured: true, // Plugin is enabled, so it's configured
-            isDefault: manifest.systemPlugin || false,
+            isDefault,
             icon: manifest.icon,
         };
     }

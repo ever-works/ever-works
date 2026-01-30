@@ -2145,13 +2145,17 @@ When a user installs a plugin at Level 1:
 2. User can see it in Directory > Apps for any directory
 3. Plugin can be auto-enabled if `autoEnable: true` in manifest
 
-**Enable Resolution Order:**
+**Enable Resolution Order (Facades check in this order):**
 
 ```
 1. DirectoryPlugin.enabled (Level 2) - explicit per-directory config
-2. pluginConfig.enabled (Level 3) - per-generation override
-3. autoEnable in manifest - plugin default when installed
+2. UserPlugin.enabled (Level 1) - user-level toggle (if no Level 2 record)
+3. pluginConfig.enabled (Level 3) - per-generation override
+4. autoEnable in manifest - plugin default when installed
 ```
+
+Level 2 takes precedence over Level 1. This allows directories to override
+the user's global enable/disable preference for specific directories.
 
 **Data Flow:**
 
@@ -2176,6 +2180,26 @@ User runs generation (Level 3)
 - Level 1: API keys, global defaults (settingsSchema)
 - Level 2: Enable/disable, directory settings (DirectoryPlugin entity)
 - Level 3: Per-generation options (IFormSchemaProvider.getFormFields())
+
+**Default Provider Selection (via activeCapability):**
+
+The `DirectoryPlugin.activeCapability` field marks a plugin as the default
+provider for a capability in a directory. Only one plugin can be active
+per capability per directory.
+
+```typescript
+// Set plugin as default for a capability
+await directoryPluginRepo.setAsActiveForCapability(
+	directoryId,
+	pluginId,
+	'search' // capability
+);
+
+// Resolution order for provider selection:
+// 1. Explicit providerOverride in request
+// 2. DirectoryPlugin with activeCapability = 'capability'
+// 3. First enabled plugin with the capability
+```
 
 ### Generator Form UI
 
