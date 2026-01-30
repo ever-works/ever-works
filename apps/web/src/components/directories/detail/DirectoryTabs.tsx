@@ -122,6 +122,27 @@ export function DirectoryTabs({ directory }: DirectoryTabsProps) {
             isActive: pathname.includes('/history'),
         },
         {
+            name: t('plugins'),
+            href: ROUTES.DASHBOARD_DIRECTORY_PLUGINS(directory.id),
+            visible: permissions.canAccessSettings,
+            icon: (
+                <svg
+                    className="w-4 h-4 shrink-0"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                >
+                    <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
+                    />
+                </svg>
+            ),
+            isActive: pathname.includes('/plugins'),
+        },
+        {
             name: t('deploy'),
             href: `${ROUTES.DASHBOARD_DIRECTORY(directory.id)}/deploy`,
             visible: Boolean(config) && permissions.canDeploy,

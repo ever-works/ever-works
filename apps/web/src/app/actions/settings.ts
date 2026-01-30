@@ -9,7 +9,6 @@ import { getTranslations } from 'next-intl/server';
 import { VALIDATION_RULES } from './validation';
 import { OAuthProvider } from '@/lib/api/enums';
 import { deployAPI } from '@/lib/api/deploy';
-import { screenshotAPI } from '@/lib/api/screenshot';
 
 // Note: Validation schemas are now created inside each function with translations
 
@@ -155,82 +154,6 @@ export async function removeVercelToken() {
         }
 
         await authAPI.updateProfile({ vercelToken: '' });
-        revalidatePath(ROUTES.DASHBOARD_SETTINGS_API_TOKENS);
-
-        return { success: true, message: t('removeSuccess') };
-    } catch (error: any) {
-        return {
-            success: false,
-            error: error?.message || t('removeFailed'),
-        };
-    }
-}
-
-// ScreenshotOne Token Actions
-export async function updateScreenshotOneKeys(accessKey: string, secretKey?: string) {
-    const t = await getTranslations('actions.settings.screenshotone');
-
-    // Validation schema with translations
-    const screenshotoneKeysSchema = z.object({
-        accessKey: z.string().min(1, t('accessKeyRequired')),
-        secretKey: z.string().optional(),
-    });
-
-    try {
-        const user = await getAuthFromCookie();
-        if (!user) {
-            return { success: false, error: t('notAuthenticated') };
-        }
-
-        // Validate input
-        const validation = screenshotoneKeysSchema.safeParse({ accessKey, secretKey });
-        if (!validation.success) {
-            return {
-                success: false,
-                error: validation.error.errors[0].message,
-            };
-        }
-
-        const validationResponse = await screenshotAPI.validateCredentials(
-            validation.data.accessKey,
-            validation.data.secretKey,
-        );
-
-        if (validationResponse.status !== 'success' || !validationResponse.valid) {
-            return {
-                success: false,
-                error: t('validationFailed'),
-            };
-        }
-
-        await authAPI.updateProfile({
-            screenshotoneAccessKey: validation.data.accessKey,
-            screenshotoneSecretKey: validation.data.secretKey || '',
-        });
-        revalidatePath(ROUTES.DASHBOARD_SETTINGS_API_TOKENS);
-
-        return { success: true, message: t('saveSuccess') };
-    } catch (error: any) {
-        return {
-            success: false,
-            error: error?.message || t('saveFailed'),
-        };
-    }
-}
-
-export async function removeScreenshotOneKeys() {
-    const t = await getTranslations('actions.settings.screenshotone');
-
-    try {
-        const user = await getAuthFromCookie();
-        if (!user) {
-            return { success: false, error: t('notAuthenticated') };
-        }
-
-        await authAPI.updateProfile({
-            screenshotoneAccessKey: '',
-            screenshotoneSecretKey: '',
-        });
         revalidatePath(ROUTES.DASHBOARD_SETTINGS_API_TOKENS);
 
         return { success: true, message: t('removeSuccess') };

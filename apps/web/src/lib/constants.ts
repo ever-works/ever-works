@@ -73,6 +73,10 @@ export const ROUTES = {
     DASHBOARD_DIRECTORY_DEPLOY: (id: string) => `/directories/${id}/deploy`,
     DASHBOARD_DIRECTORY_MEMBERS: (id: string) => `/directories/${id}/members`,
     DASHBOARD_DIRECTORY_SETTINGS: (id: string) => `/directories/${id}/settings`,
+    DASHBOARD_DIRECTORY_PLUGINS: (id: string) => `/directories/${id}/plugins`,
+    // Plugins
+    DASHBOARD_PLUGINS: '/plugins',
+    DASHBOARD_PLUGIN_DETAIL: (pluginId: string) => `/plugins/${pluginId}`,
     // Settings
     DASHBOARD_SETTINGS: '/settings',
     DASHBOARD_SETTINGS_PROFILE: '/settings',

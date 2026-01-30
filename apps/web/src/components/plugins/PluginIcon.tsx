@@ -1,0 +1,112 @@
+'use client';
+
+import { PluginsApiIcon } from '@/lib/api/plugins';
+import { cn } from '@/lib/utils/cn';
+import { Plug } from 'lucide-react';
+import * as LucideIcons from 'lucide-react';
+
+interface PluginIconProps {
+    icon?: PluginsApiIcon;
+    name: string;
+    size?: number;
+    className?: string;
+}
+
+export function PluginIcon({ icon, name, size = 32, className }: PluginIconProps) {
+    const containerStyle = { width: size, height: size };
+    const containerClass = cn(
+        'flex items-center justify-center rounded-lg bg-surface-secondary dark:bg-surface-secondary-dark',
+        className,
+    );
+
+    if (!icon) {
+        return (
+            <div className={containerClass} style={containerStyle}>
+                <Plug className="w-1/2 h-1/2 text-text-muted dark:text-text-muted-dark" />
+            </div>
+        );
+    }
+
+    // Handle different icon types based on type/value pattern
+    switch (icon.type) {
+        case 'svg':
+            return (
+                <div
+                    className={containerClass}
+                    style={{
+                        ...containerStyle,
+                        backgroundColor: icon.backgroundColor,
+                        color: icon.color,
+                    }}
+                    dangerouslySetInnerHTML={{ __html: icon.value }}
+                />
+            );
+
+        case 'url':
+            return (
+                <div
+                    className={cn(containerClass, 'overflow-hidden')}
+                    style={{ ...containerStyle, backgroundColor: icon.backgroundColor }}
+                >
+                    <img src={icon.value} alt={name} className="w-full h-full object-contain" />
+                </div>
+            );
+
+        case 'base64':
+            const dataUrl = icon.value.startsWith('data:')
+                ? icon.value
+                : `data:image/png;base64,${icon.value}`;
+            return (
+                <div
+                    className={cn(containerClass, 'overflow-hidden')}
+                    style={{ ...containerStyle, backgroundColor: icon.backgroundColor }}
+                >
+                    <img src={dataUrl} alt={name} className="w-full h-full object-contain" />
+                </div>
+            );
+
+        case 'lucide':
+            // Get the Lucide icon component by name
+            const iconName = icon.value.charAt(0).toUpperCase() + icon.value.slice(1);
+            const LucideIcon = (LucideIcons as unknown as Record<string, React.ComponentType<any>>)[
+                iconName
+            ];
+            if (LucideIcon) {
+                return (
+                    <div
+                        className={containerClass}
+                        style={{
+                            ...containerStyle,
+                            backgroundColor: icon.backgroundColor,
+                            color: icon.color,
+                        }}
+                    >
+                        <LucideIcon className="w-1/2 h-1/2" />
+                    </div>
+                );
+            }
+            // Fallback if icon not found
+            return (
+                <div className={containerClass} style={containerStyle}>
+                    <Plug className="w-1/2 h-1/2 text-text-muted dark:text-text-muted-dark" />
+                </div>
+            );
+
+        case 'emoji':
+            return (
+                <div
+                    className={containerClass}
+                    style={{ ...containerStyle, backgroundColor: icon.backgroundColor }}
+                >
+                    <span style={{ fontSize: size * 0.5 }}>{icon.value}</span>
+                </div>
+            );
+
+        default:
+            return (
+                <div className={containerClass} style={containerStyle}>
+                    <Plug className="w-1/2 h-1/2 text-text-muted dark:text-text-muted-dark" />
+                </div>
+            );
+    }
+}

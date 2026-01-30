@@ -399,6 +399,7 @@
                 "generator": "Generator",
                 "schedule": "Schedule",
                 "history": "History",
+                "plugins": "Plugins",
                 "deploy": "Deploy",
                 "members": "Members",
                 "settings": "Settings"
@@ -750,7 +751,7 @@
                     "success": "Screenshot captured successfully",
                     "failed": "Failed to capture screenshot",
                     "error": "An error occurred while capturing screenshot",
-                    "notConfigured": "Screenshot service is not configured. Please add your ScreenshotOne API key in Settings.",
+                    "notConfigured": "Screenshot service is not configured",
                     "captureFailed": "Failed to capture image",
                     "captureSuccess": "Image captured successfully",
                     "captureError": "An error occurred while capturing image",
@@ -1556,34 +1557,6 @@
                     "unexpectedError": "An unexpected error occurred"
                 }
             },
-            "screenshotone": {
-                "title": "ScreenshotOne Integration",
-                "subtitle": "Automatically capture screenshots of directory items using ScreenshotOne",
-                "connected": "Connected",
-                "notConnected": "Not Connected",
-                "connectedMessage": "Your ScreenshotOne account is connected. Screenshots will be automatically captured for directory items.",
-                "disconnect": "Disconnect ScreenshotOne",
-                "disconnecting": "Removing...",
-                "accessKeyLabel": "Access Key",
-                "placeholder": "Your access key...",
-                "secretKeyLabel": "Secret Key (Optional)",
-                "secretKeyPlaceholder": "Your secret key...",
-                "showKey": "Show",
-                "hideKey": "Hide",
-                "accessKeyHelp": "Required. Used to authenticate with the ScreenshotOne API.",
-                "secretKeyHelp": "Optional. Enables signed URLs for enhanced security. Get your keys from",
-                "dashboard": "ScreenshotOne Dashboard",
-                "save": "Save Keys",
-                "saving": "Saving...",
-                "messages": {
-                    "accessKeyRequired": "Please enter a valid ScreenshotOne access key",
-                    "saveSuccess": "ScreenshotOne keys saved successfully",
-                    "saveFailed": "Failed to save ScreenshotOne keys",
-                    "removeSuccess": "ScreenshotOne keys removed successfully",
-                    "removeFailed": "Failed to remove ScreenshotOne keys",
-                    "unexpectedError": "An unexpected error occurred"
-                }
-            },
             "apiKeys": {
                 "title": "API Keys",
                 "subtitle": "Generate and manage API keys for programmatic access",
@@ -1653,6 +1626,7 @@
             "navigation": {
                 "dashboard": "Dashboard",
                 "directories": "Directories",
+                "plugins": "Plugins",
                 "settings": "Settings"
             },
             "signOut": "Sign Out",
@@ -1698,6 +1672,70 @@
             "loadingConversation": "Loading conversation…",
             "inputPlaceholder": "Describe the directory you want to create...",
             "sendButton": "Send"
+        },
+        "plugins": {
+            "title": "Plugins",
+            "subtitle": "Manage your installed plugins and integrations",
+            "empty": "No plugins available",
+            "noDescription": "No description provided",
+            "enabled": "Enabled",
+            "disabled": "Disabled",
+            "enable": "Enable",
+            "disable": "Disable",
+            "settings": "Settings",
+            "saveSettings": "Save Settings",
+            "settingsTitle": "Plugin Settings",
+            "settingsSaved": "Settings saved successfully",
+            "noSettings": "This plugin has no configurable settings",
+            "builtIn": "Built-in",
+            "docs": "Docs",
+            "author": "Author",
+            "documentation": "Documentation",
+            "backToPlugins": "Back to Plugins",
+            "filters": {
+                "all": "All",
+                "enabledOnly": "Enabled only"
+            },
+            "categories": {
+                "git": "Git",
+                "deployment": "Deployment",
+                "screenshot": "Screenshot",
+                "search": "Search",
+                "content": "Content",
+                "dataSource": "Data Source",
+                "ai": "AI",
+                "pipeline": "Pipeline"
+            }
+        },
+        "directoryPlugins": {
+            "title": "Directory Plugins",
+            "subtitle": "Configure plugins for this directory",
+            "active": "Active",
+            "enable": "Enable",
+            "disable": "Disable",
+            "enableForDirectory": "Enable for this directory",
+            "disableForDirectory": "Disable for this directory",
+            "enableAtUserLevelFirst": "Enable this plugin in your settings first",
+            "showSettings": "Show Settings",
+            "hideSettings": "Hide Settings",
+            "directorySettingsInfo": "Configure directory-specific settings here",
+            "showInstalledOnly": "Show installed only",
+            "noInstalledPlugins": "No plugins are installed. Visit Plugins settings to install plugins.",
+            "noPlugins": "No plugins available",
+            "showAllPlugins": "Show all plugins",
+            "capabilityProviders": "Capability Providers",
+            "capabilityProvidersDescription": "Select which plugin provides each capability for this directory",
+            "noProvidersAvailable": "No providers available",
+            "categories": {
+                "git": "Git",
+                "deployment": "Deployment",
+                "screenshot": "Screenshot",
+                "search": "Search",
+                "content": "Content",
+                "dataSource": "Data Source",
+                "ai": "AI",
+                "pipeline": "Pipeline"
+            }
         }
     },
     "layout": {
@@ -1833,15 +1871,6 @@
                 "validationFailed": "The provided Vercel token is invalid. Please double-check and try again.",
                 "removeFailed": "Failed to remove Vercel token",
                 "removeSuccess": "Vercel token removed successfully"
-            },
-            "screenshotone": {
-                "notAuthenticated": "Not authenticated",
-                "accessKeyRequired": "Access key is required",
-                "saveFailed": "Failed to save ScreenshotOne keys",
-                "saveSuccess": "ScreenshotOne keys saved successfully",
-                "validationFailed": "The provided ScreenshotOne keys are invalid. Please double-check and try again.",
-                "removeFailed": "Failed to remove ScreenshotOne keys",
-                "removeSuccess": "ScreenshotOne keys removed successfully"
             },
             "github": {
                 "notAuthenticated": "Not authenticated",

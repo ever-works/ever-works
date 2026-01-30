@@ -17,6 +17,8 @@ import { TwentyCrmModule } from './integrations';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { ScreenshotModule } from './screenshot/screenshot.module';
+import { PluginsModule } from './plugins/plugins.module';
+import { PluginsModule as AgentPluginsModule } from '@packages/agent/plugins';
 import { CacheFactory } from '@packages/agent/cache';
 
 @Module({
@@ -46,6 +48,8 @@ import { CacheFactory } from '@packages/agent/cache';
         SubscriptionsModule,
         NotificationsModule,
         ScreenshotModule,
+        AgentPluginsModule.forRoot(),
+        PluginsModule,
     ],
     providers: [
         {

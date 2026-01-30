@@ -20,9 +20,4 @@ export class UpdateProfileDto {
     @IsString()
     @IsOptional()
     vercelToken?: string;
-
-    @ApiPropertyOptional({ description: 'ScreenshotOne API access key for screenshots' })
-    @IsString()
-    @IsOptional()
-    screenshotoneAccessKey?: string;
 }

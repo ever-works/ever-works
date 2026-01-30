@@ -1,0 +1,205 @@
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import {
+    type PluginCategory,
+    type PluginState,
+    type ConfigurationMode,
+    type PluginIconType,
+} from '@ever-works/plugin';
+
+/**
+ * Plugin icon representation for UI display
+ */
+export class PluginIconDto {
+    @ApiProperty({ description: 'Icon type', enum: ['svg', 'url', 'base64', 'lucide', 'emoji'] })
+    type: PluginIconType;
+
+    @ApiProperty({ description: 'Icon value based on type' })
+    value: string;
+
+    @ApiPropertyOptional({ description: 'Dark mode variant value' })
+    darkValue?: string;
+
+    @ApiPropertyOptional({ description: 'Background color' })
+    backgroundColor?: string;
+
+    @ApiPropertyOptional({ description: 'Foreground/stroke color' })
+    color?: string;
+}
+
+/**
+ * Plugin author information
+ */
+export class PluginAuthorDto {
+    @ApiProperty({ description: 'Author name' })
+    name: string;
+
+    @ApiPropertyOptional({ description: 'Author email' })
+    email?: string;
+
+    @ApiPropertyOptional({ description: 'Author URL' })
+    url?: string;
+}
+
+/**
+ * Plugin settings schema property
+ */
+export class PluginSettingsSchemaPropertyDto {
+    @ApiProperty({ description: 'Property type' })
+    type: string;
+
+    @ApiPropertyOptional({ description: 'Property title' })
+    title?: string;
+
+    @ApiPropertyOptional({ description: 'Property description' })
+    description?: string;
+
+    @ApiPropertyOptional({ description: 'Default value' })
+    default?: unknown;
+
+    @ApiPropertyOptional({ description: 'Is this a secret field' })
+    secret?: boolean;
+
+    @ApiPropertyOptional({ description: 'Should this field be masked in UI' })
+    masked?: boolean;
+
+    @ApiPropertyOptional({ description: 'Is this field write-only (never returned via API)' })
+    writeOnly?: boolean;
+
+    @ApiPropertyOptional({ description: 'Enum values', type: [String] })
+    enum?: unknown[];
+}
+
+/**
+ * Plugin settings schema
+ */
+export class PluginSettingsSchemaDto {
+    @ApiProperty({ description: 'Schema type', default: 'object' })
+    type: 'object';
+
+    @ApiPropertyOptional({ description: 'Schema title' })
+    title?: string;
+
+    @ApiPropertyOptional({ description: 'Schema description' })
+    description?: string;
+
+    @ApiProperty({ description: 'Schema properties' })
+    properties: Record<string, PluginSettingsSchemaPropertyDto>;
+
+    @ApiPropertyOptional({ description: 'Required fields', type: [String] })
+    required?: string[];
+}
+
+/**
+ * Response DTO for a single plugin
+ */
+export class PluginResponseDto {
+    @ApiProperty({ description: 'Plugin entity ID (database)' })
+    id: string;
+
+    @ApiProperty({ description: 'Plugin unique identifier' })
+    pluginId: string;
+
+    @ApiProperty({ description: 'Plugin display name' })
+    name: string;
+
+    @ApiProperty({ description: 'Plugin version' })
+    version: string;
+
+    @ApiPropertyOptional({ description: 'Plugin description' })
+    description?: string;
+
+    @ApiProperty({ description: 'Plugin category' })
+    category: PluginCategory;
+
+    @ApiProperty({ description: 'Plugin capabilities', type: [String] })
+    capabilities: string[];
+
+    @ApiProperty({ description: 'Configuration mode' })
+    configurationMode: ConfigurationMode;
+
+    @ApiProperty({ description: 'Whether plugin is built-in' })
+    builtIn: boolean;
+
+    @ApiProperty({ description: 'Plugin state' })
+    state: PluginState;
+
+    @ApiPropertyOptional({ description: 'Plugin icon' })
+    icon?: PluginIconDto;
+
+    @ApiPropertyOptional({ description: 'Settings schema for configuration' })
+    settingsSchema?: PluginSettingsSchemaDto;
+
+    @ApiPropertyOptional({ description: 'Plugin author' })
+    author?: PluginAuthorDto;
+
+    @ApiPropertyOptional({ description: 'Plugin homepage URL' })
+    homepage?: string;
+}
+
+/**
+ * Response DTO for a plugin with user-specific settings
+ */
+export class UserPluginResponseDto extends PluginResponseDto {
+    @ApiProperty({ description: 'Whether user has installed this plugin' })
+    installed: boolean;
+
+    @ApiProperty({ description: 'Whether user has enabled this plugin' })
+    enabled: boolean;
+
+    @ApiPropertyOptional({ description: 'User-specific settings (masked)' })
+    settings?: Record<string, unknown>;
+
+    @ApiPropertyOptional({ description: 'User plugin entity ID' })
+    userPluginId?: string;
+}
+
+/**
+ * Response DTO for a plugin in directory context
+ */
+export class DirectoryPluginResponseDto extends UserPluginResponseDto {
+    @ApiProperty({ description: 'Whether plugin is enabled for this directory' })
+    directoryEnabled: boolean;
+
+    @ApiPropertyOptional({ description: 'Active capability for this directory' })
+    activeCapability?: string;
+
+    @ApiPropertyOptional({ description: 'Directory-specific settings (masked)' })
+    directorySettings?: Record<string, unknown>;
+
+    @ApiPropertyOptional({ description: 'Directory plugin entity ID' })
+    directoryPluginId?: string;
+
+    @ApiPropertyOptional({ description: 'Priority order for this plugin' })
+    priority?: number;
+}
+
+/**
+ * Response for plugin list
+ */
+export class PluginListResponseDto {
+    @ApiProperty({ description: 'List of plugins', type: [UserPluginResponseDto] })
+    plugins: UserPluginResponseDto[];
+
+    @ApiProperty({ description: 'Total count of plugins' })
+    total: number;
+
+    @ApiPropertyOptional({ description: 'Available categories', type: [String] })
+    categories?: PluginCategory[];
+
+    @ApiPropertyOptional({ description: 'Available capabilities', type: [String] })
+    capabilities?: string[];
+}
+
+/**
+ * Response for directory plugin list
+ */
+export class DirectoryPluginListResponseDto {
+    @ApiProperty({ description: 'List of plugins', type: [DirectoryPluginResponseDto] })
+    plugins: DirectoryPluginResponseDto[];
+
+    @ApiProperty({ description: 'Total count of plugins' })
+    total: number;
+
+    @ApiPropertyOptional({ description: 'Capability providers mapping' })
+    capabilityProviders?: Record<string, string>;
+}

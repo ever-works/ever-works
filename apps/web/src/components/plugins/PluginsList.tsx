@@ -1,0 +1,129 @@
+'use client';
+
+import { useState } from 'react';
+import { useTranslations } from 'next-intl';
+import { UserPlugin, PluginCategory } from '@/lib/api/plugins';
+import { PluginCard } from './PluginCard';
+import { cn } from '@/lib/utils/cn';
+
+interface PluginsListProps {
+    plugins: UserPlugin[];
+    categories?: PluginCategory[];
+    capabilities?: string[];
+}
+
+export function PluginsList({ plugins, categories = [], capabilities = [] }: PluginsListProps) {
+    const t = useTranslations('dashboard.plugins');
+    const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+    const [showEnabledOnly, setShowEnabledOnly] = useState(false);
+
+    // Filter plugins based on selection
+    const filteredPlugins = plugins.filter((plugin) => {
+        if (selectedCategory && plugin.category !== selectedCategory) {
+            return false;
+        }
+        if (showEnabledOnly && !plugin.enabled) {
+            return false;
+        }
+        return true;
+    });
+
+    // Group plugins by category for display
+    const pluginsByCategory = filteredPlugins.reduce(
+        (acc, plugin) => {
+            const category = plugin.category;
+            if (!acc[category]) {
+                acc[category] = [];
+            }
+            acc[category].push(plugin);
+            return acc;
+        },
+        {} as Record<string, UserPlugin[]>,
+    );
+
+    const categoryLabels: Record<string, string> = {
+        git: t('categories.git'),
+        deployment: t('categories.deployment'),
+        screenshot: t('categories.screenshot'),
+        search: t('categories.search'),
+        content: t('categories.content'),
+        'data-source': t('categories.dataSource'),
+        ai: t('categories.ai'),
+        pipeline: t('categories.pipeline'),
+    };
+
+    return (
+        <div className="space-y-6">
+            {/* Filters */}
+            <div className="flex flex-wrap gap-4 items-center">
+                <div className="flex flex-wrap gap-2">
+                    <button
+                        onClick={() => setSelectedCategory(null)}
+                        className={cn(
+                            'px-3 py-1.5 rounded-full text-sm font-medium transition-colors',
+                            selectedCategory === null
+                                ? 'bg-primary text-white'
+                                : 'bg-surface-secondary dark:bg-surface-secondary-dark text-text-secondary dark:text-text-secondary-dark hover:bg-surface-tertiary dark:hover:bg-surface-tertiary-dark',
+                        )}
+                    >
+                        {t('filters.all')}
+                    </button>
+                    {categories.map((category) => (
+                        <button
+                            key={category}
+                            onClick={() => setSelectedCategory(category)}
+                            className={cn(
+                                'px-3 py-1.5 rounded-full text-sm font-medium transition-colors',
+                                selectedCategory === category
+                                    ? 'bg-primary text-white'
+                                    : 'bg-surface-secondary dark:bg-surface-secondary-dark text-text-secondary dark:text-text-secondary-dark hover:bg-surface-tertiary dark:hover:bg-surface-tertiary-dark',
+                            )}
+                        >
+                            {categoryLabels[category] || category}
+                        </button>
+                    ))}
+                </div>
+
+                <label className="flex items-center gap-2 text-sm text-text-secondary dark:text-text-secondary-dark cursor-pointer">
+                    <input
+                        type="checkbox"
+                        checked={showEnabledOnly}
+                        onChange={(e) => setShowEnabledOnly(e.target.checked)}
+                        className="rounded border-border dark:border-border-dark"
+                    />
+                    {t('filters.enabledOnly')}
+                </label>
+            </div>
+
+            {/* Plugin Grid */}
+            {filteredPlugins.length === 0 ? (
+                <div className="text-center py-12">
+                    <p className="text-text-muted dark:text-text-muted-dark">{t('empty')}</p>
+                </div>
+            ) : selectedCategory ? (
+                // Show flat grid when filtering by category
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {filteredPlugins.map((plugin) => (
+                        <PluginCard key={plugin.pluginId} plugin={plugin} />
+                    ))}
+                </div>
+            ) : (
+                // Show grouped by category when no filter
+                <div className="space-y-8">
+                    {Object.entries(pluginsByCategory).map(([category, categoryPlugins]) => (
+                        <div key={category}>
+                            <h2 className="text-lg font-semibold text-text dark:text-text-dark mb-4">
+                                {categoryLabels[category] || category}
+                            </h2>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {categoryPlugins.map((plugin) => (
+                                    <PluginCard key={plugin.pluginId} plugin={plugin} />
+                                ))}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+}
