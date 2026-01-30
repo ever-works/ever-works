@@ -1,8 +1,6 @@
 import 'server-only';
 import { serverFetch, serverMutation } from './server-api';
 import type {
-    PluginSettingsSchemaProperty,
-    PluginSettingsSchema,
     PluginResponse,
     UserPluginResponse,
     DirectoryPluginResponse,
