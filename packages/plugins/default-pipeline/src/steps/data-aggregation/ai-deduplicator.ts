@@ -4,7 +4,7 @@ import { slugifyText } from '../../utils/text.utils.js';
 import { extractedItemsSchema } from '../../schemas/item-extraction.schemas.js';
 import { getErrorMessage, getErrorStack } from '../../utils/error.utils.js';
 import { appendCustomPrompt } from '../../utils/prompt.utils.js';
-import { SharedUtilsService } from './shared-utils.service.js';
+import { SharedUtils } from './shared-utils.js';
 import { DEDUPLICATOR_PROMPT } from './prompts.constants.js';
 
 // Inferred type from schema
@@ -15,15 +15,15 @@ type ExtractedItems = z.infer<typeof extractedItemsSchema>;
  *
  * Deduplicates items using AI with chunking for large arrays.
  */
-export class AiDeduplicatorService {
+export class AiDeduplicator {
 	private readonly CHUNK_DELAY_MS = 500;
 	private readonly GROUP_DELAY_MS = 1000;
 
 	private readonly logger: StepExecutionContext['logger'];
 	private readonly aiFacade: StepExecutionContext['aiFacade'];
-	private readonly sharedUtils: SharedUtilsService;
+	private readonly sharedUtils: SharedUtils;
 
-	constructor(execContext: StepExecutionContext, sharedUtils: SharedUtilsService) {
+	constructor(execContext: StepExecutionContext, sharedUtils: SharedUtils) {
 		this.logger = execContext.logger;
 		this.aiFacade = execContext.aiFacade;
 		this.sharedUtils = sharedUtils;

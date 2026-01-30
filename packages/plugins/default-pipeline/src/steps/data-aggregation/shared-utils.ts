@@ -7,7 +7,7 @@ import type { MutableItemData, StepExecutionContext } from '@ever-works/plugin';
  * Plain utility class (no NestJS decorators) providing common
  * functionality for deduplication and data processing.
  */
-export class SharedUtilsService {
+export class SharedUtils {
 	private readonly logger: StepExecutionContext['logger'];
 
 	// Shared constants

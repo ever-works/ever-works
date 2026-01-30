@@ -8,7 +8,7 @@ import type {
 	IAiFacade
 } from '@ever-works/plugin';
 import { z } from 'zod';
-import { SharedUtilsService, NewItemsExtractorService, AiDeduplicatorService } from './data-aggregation/index.js';
+import { SharedUtils, NewItemsExtractor, AiDeduplicator } from './data-aggregation/index.js';
 
 /**
  * Data Aggregation Step
@@ -119,9 +119,9 @@ export class DataAggregationStep implements IBuiltInStepExecutor {
 		const { logger } = execContext;
 
 		// Create utility instances
-		const sharedUtils = new SharedUtilsService(logger);
-		const newItemsExtractor = new NewItemsExtractorService(execContext, sharedUtils);
-		const aiDeduplicator = new AiDeduplicatorService(execContext, sharedUtils);
+		const sharedUtils = new SharedUtils(logger);
+		const newItemsExtractor = new NewItemsExtractor(execContext, sharedUtils);
+		const aiDeduplicator = new AiDeduplicator(execContext, sharedUtils);
 
 		logger.debug(`[${directorySlug}] Starting data aggregation and deduplication.`);
 

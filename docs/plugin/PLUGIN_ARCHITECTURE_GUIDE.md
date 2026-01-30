@@ -104,7 +104,7 @@ For example, the `GitFacade` provides methods like `createRepository()` and `pus
 
 The plugin system involves many moving parts:
 
-- 14 built-in pipeline steps
+- 15 built-in pipeline steps (defined in `@ever-works/default-pipeline-plugin`)
 - Data flowing between steps
 - Plugin step injections and replacements
 - Configuration and settings
@@ -113,13 +113,14 @@ Without strong typing, typos and misconfigurations would only be discovered at r
 
 ### What's Type-Safe?
 
-| Component                 | Type                                  | Purpose                                              |
-| ------------------------- | ------------------------------------- | ---------------------------------------------------- |
-| **Step IDs**              | `BuiltInStepId` union type            | Ensures only valid step IDs are used in dependencies |
-| **Data Keys**             | `StepDataKey` union type              | Ensures steps produce/consume known data keys        |
-| **Step Results**          | `StepDataTypes` mapped interface      | Maps each data key to its TypeScript type            |
-| **Context Access**        | Generic `getStepResult<K>()`          | Returns correctly typed data based on key            |
-| **Capability Interfaces** | `IPlugin`, `IGitProviderPlugin`, etc. | Strict contracts for plugin implementation           |
+| Component                 | Type                                  | Source                                | Purpose                                              |
+| ------------------------- | ------------------------------------- | ------------------------------------- | ---------------------------------------------------- |
+| **Step IDs**              | `BuiltInStepId` union type            | `@ever-works/default-pipeline-plugin` | Ensures only valid step IDs are used in dependencies |
+| **Step Position**         | `StepPosition<T>` generic type        | `@ever-works/plugin`                  | Type-safe step positioning with any step ID type     |
+| **Data Keys**             | `StepDataKey` union type              | `@ever-works/plugin`                  | Ensures steps produce/consume known data keys        |
+| **Step Results**          | `StepDataTypes` mapped interface      | `@ever-works/plugin`                  | Maps each data key to its TypeScript type            |
+| **Context Access**        | Generic `getStepResult<K>()`          | `@ever-works/plugin`                  | Returns correctly typed data based on key            |
+| **Capability Interfaces** | `IPlugin`, `IGitProviderPlugin`, etc. | `@ever-works/plugin`                  | Strict contracts for plugin implementation           |
 
 ### Example: Type-Safe Pipeline Step
 
@@ -144,22 +145,33 @@ const items = context.getStepResult('extracted-items'); // ✓ Type: ExtractedIt
 ### Key Type Definitions
 
 ```typescript
-// All valid built-in step IDs
+// BuiltInStepId is defined in @ever-works/default-pipeline-plugin
+// This keeps the plugin contracts package (@ever-works/plugin) pipeline-agnostic
+import { BuiltInStepId } from '@ever-works/default-pipeline-plugin';
+
+// All valid built-in step IDs (from default-pipeline-plugin)
 type BuiltInStepId =
 	| 'prompt-comparison'
 	| 'prompt-processing'
 	| 'domain-detection'
-	| 'search-query-generation'
-	| 'ai-item-generation'
-	| 'web-page-retrieval'
+	| 'ai-first-items-generation'
+	| 'search-queries-generation'
+	| 'web-search'
+	| 'content-retrieval'
 	| 'content-filtering'
-	| 'item-extraction'
-	| 'data-aggregation'
-	| 'category-processing'
-	| 'source-validation'
-	| 'badge-processing'
+	| 'items-extraction'
+	| 'deduplication-and-data-aggregation'
+	| 'categories-tags-processing'
+	| 'sources-validation'
+	| 'badges-processing'
 	| 'image-capture'
 	| 'markdown-generation';
+
+// StepPosition is a generic type that accepts step ID types
+import { StepPosition } from '@ever-works/plugin';
+
+// Use StepPosition<BuiltInStepId> for type-safe references to built-in steps
+const position: StepPosition<BuiltInStepId> = { type: 'after', stepId: 'items-extraction' };
 
 // All valid data keys with their types
 interface StepDataTypes {

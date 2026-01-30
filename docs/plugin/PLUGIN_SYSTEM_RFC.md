@@ -166,14 +166,15 @@ class MyPlugin implements IPlugin {
 
 **Type safety applies to:**
 
-| Component             | Type Safety Mechanism                            |
-| --------------------- | ------------------------------------------------ |
-| Step IDs              | `BuiltInStepId` union type                       |
-| Data Keys             | `StepDataKey` union type                         |
-| Step Results          | `StepDataTypes` mapped interface                 |
-| Plugin Settings       | `JsonSchema` with TypeScript inference           |
-| Context Access        | Generic `getStepResult<K extends StepDataKey>()` |
-| Capability Interfaces | Strict interface contracts                       |
+| Component             | Type Safety Mechanism                            | Source Package                        |
+| --------------------- | ------------------------------------------------ | ------------------------------------- |
+| Step IDs              | `BuiltInStepId` union type                       | `@ever-works/default-pipeline-plugin` |
+| Step Position         | `StepPosition<T>` generic type                   | `@ever-works/plugin`                  |
+| Data Keys             | `StepDataKey` union type                         | `@ever-works/plugin`                  |
+| Step Results          | `StepDataTypes` mapped interface                 | `@ever-works/plugin`                  |
+| Plugin Settings       | `JsonSchema` with TypeScript inference           | `@ever-works/plugin`                  |
+| Context Access        | Generic `getStepResult<K extends StepDataKey>()` | `@ever-works/plugin`                  |
+| Capability Interfaces | Strict interface contracts                       | `@ever-works/plugin`                  |
 
 **Benefits:**
 
@@ -184,12 +185,16 @@ class MyPlugin implements IPlugin {
 
 ```typescript
 // Example: Type-safe step definition
-import { BuiltInStepId, StepDataKey, StepDataTypes } from './step-types';
+// BuiltInStepId comes from default-pipeline-plugin (keeps plugin contracts pipeline-agnostic)
+import { BuiltInStepId } from '@ever-works/default-pipeline-plugin';
+import { StepDataKey, StepDataTypes, StepPosition } from '@ever-works/plugin';
 
 interface TypedPipelineStepDefinition {
 	id: BuiltInStepId | `${string}:${string}`;
 	dependencies: (BuiltInStepId | StepDataKey)[];
 	provides: StepDataKey[];
+	// StepPosition is generic - use StepPosition<BuiltInStepId> for type-safe step references
+	position?: StepPosition<BuiltInStepId>;
 }
 
 // Type-safe context access
@@ -879,23 +884,28 @@ Plugins can modify the pipeline in four ways:
 
 ```typescript
 // ============================================
-// TYPE DEFINITIONS (in step-types.ts)
+// TYPE DEFINITIONS
 // ============================================
+
+// NOTE: BuiltInStepId is defined in @ever-works/default-pipeline-plugin
+// This keeps @ever-works/plugin pipeline-agnostic
+// (in packages/plugins/default-pipeline/src/types.ts)
 
 /** All valid built-in step IDs - compile-time validated */
 export const BUILT_IN_STEP_IDS = [
 	'prompt-comparison',
 	'prompt-processing',
 	'domain-detection',
-	'search-query-generation',
-	'ai-item-generation',
-	'web-page-retrieval',
+	'ai-first-items-generation',
+	'search-queries-generation',
+	'web-search',
+	'content-retrieval',
 	'content-filtering',
-	'item-extraction',
-	'data-aggregation',
-	'category-processing',
-	'source-validation',
-	'badge-processing',
+	'items-extraction',
+	'deduplication-and-data-aggregation',
+	'categories-tags-processing',
+	'sources-validation',
+	'badges-processing',
 	'image-capture',
 	'markdown-generation'
 ] as const;
@@ -996,15 +1006,21 @@ interface PipelineStepDefinition {
 
 /**
  * Position directive for step injection/replacement/disable.
- * TYPE-SAFE: stepId must be a valid BuiltInStepId.
+ * TYPE-SAFE: Generic type parameter for step ID validation.
+ *
+ * StepPosition is defined in @ever-works/plugin as a generic type.
+ * Use StepPosition<BuiltInStepId> for the default pipeline.
  */
-type StepPosition =
-	| { type: 'before'; stepId: BuiltInStepId } // Insert before existing step
-	| { type: 'after'; stepId: BuiltInStepId } // Insert after existing step
-	| { type: 'replace'; stepId: BuiltInStepId } // Replace existing step entirely
-	| { type: 'disable'; stepId: BuiltInStepId } // Disable/remove existing step
+type StepPosition<TStepId extends string = string> =
+	| { type: 'before'; stepId: TStepId } // Insert before existing step
+	| { type: 'after'; stepId: TStepId } // Insert after existing step
+	| { type: 'replace'; stepId: TStepId } // Replace existing step entirely
+	| { type: 'disable'; stepId: TStepId } // Disable/remove existing step
 	| { type: 'append' } // Add to end of pipeline
 	| { type: 'prepend' }; // Add to start of pipeline
+
+// Example usage with BuiltInStepId for type safety
+const position: StepPosition<BuiltInStepId> = { type: 'after', stepId: 'items-extraction' };
 
 /**
  * TYPE-SAFE Generation Context for step data flow.

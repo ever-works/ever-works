@@ -3,7 +3,7 @@ import type { MutableItemData, StepExecutionContext, PipelineMetrics } from '@ev
 import { slugifyText } from '../../utils/text.utils.js';
 import { getErrorMessage, getErrorStack } from '../../utils/error.utils.js';
 import { extractedItemsSchema } from '../../schemas/item-extraction.schemas.js';
-import { SharedUtilsService } from './shared-utils.service.js';
+import { SharedUtils } from './shared-utils.js';
 import { EXTRACT_NEW_ITEMS_PROMPT } from './prompts.constants.js';
 
 // Inferred type from schema
@@ -15,12 +15,12 @@ type ExtractedItems = z.infer<typeof extractedItemsSchema>;
  * Extracts new items that don't exist in the existing items list.
  * Uses AI for sophisticated duplicate detection.
  */
-export class NewItemsExtractorService {
+export class NewItemsExtractor {
 	private readonly logger: StepExecutionContext['logger'];
 	private readonly aiFacade: StepExecutionContext['aiFacade'];
-	private readonly sharedUtils: SharedUtilsService;
+	private readonly sharedUtils: SharedUtils;
 
-	constructor(execContext: StepExecutionContext, sharedUtils: SharedUtilsService) {
+	constructor(execContext: StepExecutionContext, sharedUtils: SharedUtils) {
 		this.logger = execContext.logger;
 		this.aiFacade = execContext.aiFacade;
 		this.sharedUtils = sharedUtils;

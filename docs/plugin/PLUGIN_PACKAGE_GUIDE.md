@@ -56,6 +56,24 @@ pnpm add -D @ever-works/plugin
 - TypeScript ≥ 5.0
 - ES2021 target
 
+### Package.json Setup
+
+When creating a plugin package, ensure your `package.json` exports are ordered correctly. **The `types` condition must come FIRST** to avoid build warnings:
+
+```json
+{
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.mjs",
+			"require": "./dist/index.js"
+		}
+	}
+}
+```
+
+> **Warning:** If `types` is not first, bundlers like esbuild will warn: `The condition "types" here will never be used`. This ordering ensures TypeScript finds type definitions before resolving the actual module.
+
 ---
 
 ## Package Structure
@@ -446,10 +464,11 @@ class OpenAIPlugin extends BaseAiProvider {
 
 ### BasePipelineStep
 
-For pipeline step plugins:
+For pipeline step plugins. This abstract class provides helper methods for defining step positions with type safety.
 
 ```typescript
-import { BasePipelineStep } from '@ever-works/plugin';
+import { BasePipelineStep, PipelineStepDefinition, StepExecutionResult } from '@ever-works/plugin';
+import { BuiltInStepId } from '@ever-works/default-pipeline-plugin';
 
 class MyStep extends BasePipelineStep {
 	readonly stepId = 'my-plugin:my-step';
@@ -459,7 +478,8 @@ class MyStep extends BasePipelineStep {
 		return {
 			id: this.stepId,
 			name: this.stepName,
-			position: { type: 'after', stepId: 'item-extraction' },
+			// Use the type-safe helper method with BuiltInStepId
+			position: BasePipelineStep.after<BuiltInStepId>('items-extraction'),
 			provides: ['enriched-items'],
 			requires: ['extracted-items']
 		};
@@ -471,6 +491,21 @@ class MyStep extends BasePipelineStep {
 		return { success: true, data: { 'enriched-items': enrichedItems } };
 	}
 }
+```
+
+**BasePipelineStep Static Helpers:**
+
+```typescript
+// These methods are generic and accept any step ID type
+BasePipelineStep.before<BuiltInStepId>('web-search'); // { type: 'before', stepId: 'web-search' }
+BasePipelineStep.after<BuiltInStepId>('items-extraction'); // { type: 'after', stepId: 'items-extraction' }
+BasePipelineStep.replace<BuiltInStepId>('image-capture'); // { type: 'replace', stepId: 'image-capture' }
+BasePipelineStep.first(); // { type: 'first' }
+BasePipelineStep.last(); // { type: 'last' }
+
+// For custom pipelines with different step IDs:
+type CustomStepId = 'step-a' | 'step-b' | 'step-c';
+BasePipelineStep.after<CustomStepId>('step-b'); // Type-safe for custom pipelines
 ```
 
 ---
@@ -497,33 +532,43 @@ interface PipelineStepDefinition {
 
 ### StepPosition
 
+`StepPosition` is a generic type that accepts a step ID type parameter:
+
 ```typescript
-type StepPosition =
-	| { type: 'before'; stepId: BuiltInStepId } // Before a built-in step
-	| { type: 'after'; stepId: BuiltInStepId } // After a built-in step
-	| { type: 'replace'; stepId: BuiltInStepId } // Replace a built-in step
+type StepPosition<TStepId extends string = string> =
+	| { type: 'before'; stepId: TStepId } // Before a step
+	| { type: 'after'; stepId: TStepId } // After a step
+	| { type: 'replace'; stepId: TStepId } // Replace a step
 	| { type: 'first' } // First in pipeline
 	| { type: 'last' }; // Last in pipeline
 ```
 
+When working with the default pipeline, use `StepPosition<BuiltInStepId>` for type-safe step references.
+
 ### BuiltInStepId
 
-All 14 built-in pipeline steps:
+> **Note:** `BuiltInStepId` is defined in `@ever-works/default-pipeline-plugin`, not in `@ever-works/plugin`. This keeps the plugin contracts package pipeline-agnostic.
+
+All 15 built-in pipeline steps:
 
 ```typescript
+// Import from default-pipeline-plugin
+import { BuiltInStepId } from '@ever-works/default-pipeline-plugin';
+
 type BuiltInStepId =
 	| 'prompt-comparison'
 	| 'prompt-processing'
 	| 'domain-detection'
-	| 'search-query-generation'
-	| 'ai-item-generation'
-	| 'web-page-retrieval'
+	| 'ai-first-items-generation'
+	| 'search-queries-generation'
+	| 'web-search'
+	| 'content-retrieval'
 	| 'content-filtering'
-	| 'item-extraction'
-	| 'data-aggregation'
-	| 'category-processing'
-	| 'source-validation'
-	| 'badge-processing'
+	| 'items-extraction'
+	| 'deduplication-and-data-aggregation'
+	| 'categories-tags-processing'
+	| 'sources-validation'
+	| 'badges-processing'
 	| 'image-capture'
 	| 'markdown-generation';
 ```
@@ -986,27 +1031,27 @@ export class ContentEnricherPlugin extends BasePlugin implements IPipelineStepPl
 
 ### Type Exports
 
-| Type                     | Description               |
-| ------------------------ | ------------------------- |
-| `PluginContext`          | Context passed to plugins |
-| `PluginCategory`         | Plugin category enum      |
-| `PluginManifest`         | Plugin metadata           |
-| `PluginSettings`         | Settings object           |
-| `ValidationResult`       | Validation result         |
-| `JsonSchema`             | JSON Schema type          |
-| `ConfigurationMode`      | Settings mode             |
-| `PluginIcon`             | Icon definition           |
-| `PluginIconType`         | Icon type enum            |
-| `PipelineStepDefinition` | Step definition           |
-| `StepPosition`           | Step position             |
-| `BuiltInStepId`          | Built-in step IDs         |
-| `ExecutablePipeline`     | Compiled pipeline         |
-| `StepExecutor`           | Step executor             |
-| `ParallelGroup`          | Parallel execution group  |
-| `GenerationContext`      | Pipeline context          |
-| `StepExecutionResult`    | Step result               |
-| `PluginEventName`        | Event names               |
-| `PluginEventPayloads`    | Event payload types       |
+| Type                     | Description                                                    |
+| ------------------------ | -------------------------------------------------------------- |
+| `PluginContext`          | Context passed to plugins                                      |
+| `PluginCategory`         | Plugin category enum                                           |
+| `PluginManifest`         | Plugin metadata                                                |
+| `PluginSettings`         | Settings object                                                |
+| `ValidationResult`       | Validation result                                              |
+| `JsonSchema`             | JSON Schema type                                               |
+| `ConfigurationMode`      | Settings mode                                                  |
+| `PluginIcon`             | Icon definition                                                |
+| `PluginIconType`         | Icon type enum                                                 |
+| `PipelineStepDefinition` | Step definition                                                |
+| `StepPosition<T>`        | Step position (generic)                                        |
+| `BuiltInStepId`          | Built-in step IDs (from `@ever-works/default-pipeline-plugin`) |
+| `ExecutablePipeline`     | Compiled pipeline                                              |
+| `StepExecutor`           | Step executor                                                  |
+| `ParallelGroup`          | Parallel execution group                                       |
+| `GenerationContext`      | Pipeline context                                               |
+| `StepExecutionResult`    | Step result                                                    |
+| `PluginEventName`        | Event names                                                    |
+| `PluginEventPayloads`    | Event payload types                                            |
 
 ---
 

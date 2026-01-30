@@ -52,7 +52,7 @@
 - [ ] ItemExtractionService uses `itemExtraction`
 - [ ] SearchQueryGenerationService uses `searchQuery`
 - [ ] CategoryProcessingService uses `categorization`
-- [ ] AiDeduplicatorService uses `deduplication`
+- [ ] AiDeduplicator uses `deduplication`
 - [ ] SourceValidationService uses `sourceValidation`
 
 ## Frontend

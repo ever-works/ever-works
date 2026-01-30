@@ -249,7 +249,7 @@ Prioritize tools with documentation in English.
 | `itemExtraction`      | ItemExtractionService (Step 7)         | Customize how items are extracted from pages  |
 | `searchQuery`         | SearchQueryGenerationService (Step 4b) | Customize search query generation             |
 | `categorization`      | CategoryProcessingService (Step 9)     | Customize category/tag assignment             |
-| `deduplication`       | AiDeduplicatorService (Step 8)         | Customize duplicate detection rules           |
+| `deduplication`       | AiDeduplicator (Step 8)                | Customize duplicate detection rules           |
 | `sourceValidation`    | SourceValidationService (Step 10)      | Customize URL validation rules                |
 
 ## API Endpoints
