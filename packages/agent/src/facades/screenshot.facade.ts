@@ -64,9 +64,6 @@ export class ScreenshotFacadeService extends BaseFacadeService implements IScree
         super(registry, settingsService, directoryPluginRepository, userPluginRepository);
     }
 
-    /**
-     * Capture a screenshot from a URL.
-     */
     async capture(
         options: ScreenshotCaptureOptions,
         facadeOptions?: ScreenshotFacadeOptions,
@@ -103,9 +100,6 @@ export class ScreenshotFacadeService extends BaseFacadeService implements IScree
         };
     }
 
-    /**
-     * Get a smart image (screenshot with sensible defaults).
-     */
     async getSmartImage(
         options: SmartImageOptions,
         facadeOptions?: ScreenshotFacadeOptions,
@@ -129,9 +123,6 @@ export class ScreenshotFacadeService extends BaseFacadeService implements IScree
         };
     }
 
-    /**
-     * Get a screenshot URL without actually capturing.
-     */
     async getScreenshotUrl(
         options: ScreenshotCaptureOptions,
         facadeOptions?: ScreenshotFacadeOptions,
@@ -149,17 +140,11 @@ export class ScreenshotFacadeService extends BaseFacadeService implements IScree
         return plugin.getScreenshotUrl(options);
     }
 
-    /**
-     * Check if screenshot capability is available.
-     * Alias for isConfigured() for interface compatibility.
-     */
+    /** Alias for isConfigured() for interface compatibility */
     isAvailable(): boolean {
         return this.isConfigured();
     }
 
-    /**
-     * Override to use IScreenshotPlugin.providerName.
-     */
     override getAvailableProviders(): Array<{
         id: string;
         name: string;
@@ -173,9 +158,6 @@ export class ScreenshotFacadeService extends BaseFacadeService implements IScree
         }));
     }
 
-    /**
-     * Override to use IScreenshotPlugin.providerName.
-     */
     protected override getProviderName(plugin: IPlugin): string {
         return (plugin as IScreenshotPlugin).providerName || plugin.name;
     }

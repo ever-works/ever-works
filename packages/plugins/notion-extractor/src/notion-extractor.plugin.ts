@@ -228,9 +228,6 @@ export class NotionExtractorPlugin implements IPlugin, IContentExtractorPlugin {
 		}
 	}
 
-	/**
-	 * Extract content from multiple Notion URLs.
-	 */
 	async extractBatch(
 		urls: readonly string[],
 		options?: Partial<ContentExtractionOptions>
@@ -262,9 +259,6 @@ export class NotionExtractorPlugin implements IPlugin, IContentExtractorPlugin {
 		return true;
 	}
 
-	/**
-	 * Get supported output formats
-	 */
 	getSupportedFormats(): readonly ('text' | 'html' | 'markdown')[] {
 		return ['text', 'markdown'];
 	}

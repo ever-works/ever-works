@@ -119,9 +119,6 @@ export class LocalContentExtractorPlugin implements IPlugin, IContentExtractorPl
 	// IContentExtractorPlugin Interface
 	// ============================================================================
 
-	/**
-	 * Extract content from a URL
-	 */
 	async extract(options: ContentExtractionOptions): Promise<ContentExtractionResult> {
 		const startTime = Date.now();
 		const { url, settings } = options;
@@ -273,9 +270,6 @@ export class LocalContentExtractorPlugin implements IPlugin, IContentExtractorPl
 		}
 	}
 
-	/**
-	 * Extract content from multiple URLs
-	 */
 	async extractBatch(
 		urls: readonly string[],
 		options?: Partial<ContentExtractionOptions>
@@ -326,9 +320,6 @@ export class LocalContentExtractorPlugin implements IPlugin, IContentExtractorPl
 		}
 	}
 
-	/**
-	 * Get supported output formats
-	 */
 	getSupportedFormats(): readonly ('text' | 'html' | 'markdown')[] {
 		return ['text', 'html', 'markdown'];
 	}
@@ -337,9 +328,6 @@ export class LocalContentExtractorPlugin implements IPlugin, IContentExtractorPl
 	// Private Helper Methods
 	// ============================================================================
 
-	/**
-	 * Extract metadata from the document
-	 */
 	private extractMetadata(document: Document, baseUrl: string): PageMetadata {
 		const getMeta = (names: string[]): string | undefined => {
 			for (const name of names) {
@@ -378,9 +366,6 @@ export class LocalContentExtractorPlugin implements IPlugin, IContentExtractorPl
 		};
 	}
 
-	/**
-	 * Extract images from the document
-	 */
 	private extractImages(document: Document, baseUrl: string): ExtractedImage[] {
 		const images: ExtractedImage[] = [];
 		const imgElements = document.querySelectorAll('img');
@@ -406,9 +391,6 @@ export class LocalContentExtractorPlugin implements IPlugin, IContentExtractorPl
 		return images;
 	}
 
-	/**
-	 * Extract links from the document
-	 */
 	private extractLinks(document: Document, baseUrl: string): ExtractedLink[] {
 		const links: ExtractedLink[] = [];
 		const anchorElements = document.querySelectorAll('a[href]');
@@ -440,9 +422,6 @@ export class LocalContentExtractorPlugin implements IPlugin, IContentExtractorPl
 		return links;
 	}
 
-	/**
-	 * Remove unwanted elements from the document
-	 */
 	private removeUnwantedElements(document: Document): void {
 		const selectorsToRemove = [
 			'script',
@@ -472,9 +451,6 @@ export class LocalContentExtractorPlugin implements IPlugin, IContentExtractorPl
 		}
 	}
 
-	/**
-	 * Resolve a relative URL to an absolute URL
-	 */
 	private resolveUrl(url: string, baseUrl: string): string {
 		try {
 			return new URL(url, baseUrl).href;
@@ -483,16 +459,10 @@ export class LocalContentExtractorPlugin implements IPlugin, IContentExtractorPl
 		}
 	}
 
-	/**
-	 * Count words in text
-	 */
 	private countWords(text: string): number {
 		return text.split(/\s+/).filter((word) => word.length > 0).length;
 	}
 
-	/**
-	 * Delay helper
-	 */
 	private delay(ms: number): Promise<void> {
 		return new Promise((resolve) => setTimeout(resolve, ms));
 	}

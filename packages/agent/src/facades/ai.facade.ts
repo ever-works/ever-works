@@ -12,9 +12,6 @@ import type {
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
 
-/**
- * AI Facade Error Base
- */
 export class AiFacadeError extends Error {
     constructor(
         message: string,
@@ -27,9 +24,6 @@ export class AiFacadeError extends Error {
     }
 }
 
-/**
- * No AI provider configured error
- */
 export class NoAiProviderError extends AiFacadeError {
     constructor() {
         super('No AI provider configured or available', 'getPlugin');
@@ -37,9 +31,6 @@ export class NoAiProviderError extends AiFacadeError {
     }
 }
 
-/**
- * AI provider not found error
- */
 export class AiProviderNotFoundError extends AiFacadeError {
     constructor(providerId: string) {
         super(`AI provider not found: ${providerId}`, 'getPlugin', providerId);
@@ -47,9 +38,6 @@ export class AiProviderNotFoundError extends AiFacadeError {
     }
 }
 
-/**
- * Facade options for provider resolution
- */
 export interface AiFacadeOptions {
     /** User ID for settings resolution */
     userId?: string;
@@ -198,17 +186,11 @@ export class AiFacadeService implements IAiFacade {
         }
     }
 
-    /**
-     * Check if any AI provider plugin is configured and available.
-     */
     isConfigured(): boolean {
         const plugins = this.registry.getByCapability(this.CAPABILITY);
         return plugins.length > 0 && plugins.some((p) => p.state === 'enabled');
     }
 
-    /**
-     * Test the AI provider connection.
-     */
     async testConnection(facadeOptions?: AiFacadeOptions): Promise<{
         success: boolean;
         provider: string;
@@ -245,9 +227,6 @@ export class AiFacadeService implements IAiFacade {
         }
     }
 
-    /**
-     * Get all available AI provider plugins.
-     */
     getAvailableProviders(): Array<{
         id: string;
         name: string;
@@ -455,9 +434,6 @@ export class AiFacadeService implements IAiFacade {
         return undefined;
     }
 
-    /**
-     * Render template with variables.
-     */
     private renderTemplate(template: string, variables?: Record<string, string>): string {
         if (!variables) {
             return template;
@@ -468,9 +444,6 @@ export class AiFacadeService implements IAiFacade {
         });
     }
 
-    /**
-     * Convert Zod schema to JSON Schema for structured output.
-     */
     private zodToJsonSchema(schema: z.ZodSchema): Record<string, unknown> {
         // Use zod-to-json-schema or manual conversion
         // For now, return a simplified version

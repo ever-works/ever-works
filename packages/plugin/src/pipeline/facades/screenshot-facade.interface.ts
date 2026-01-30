@@ -1,6 +1,3 @@
-/**
- * Screenshot capture options
- */
 export interface ScreenshotCaptureOptions {
 	/** URL to capture */
 	readonly url: string;
@@ -26,9 +23,6 @@ export interface ScreenshotCaptureOptions {
 	readonly cacheTtl?: number;
 }
 
-/**
- * Screenshot capture result
- */
 export interface ScreenshotCaptureResult {
 	/** Whether capture was successful */
 	readonly success: boolean;
@@ -42,9 +36,6 @@ export interface ScreenshotCaptureResult {
 	readonly error?: string;
 }
 
-/**
- * Smart image options
- */
 export interface SmartImageOptions {
 	/** URL to capture */
 	readonly url: string;
@@ -54,9 +45,6 @@ export interface SmartImageOptions {
 	readonly itemName?: string;
 }
 
-/**
- * Smart image result
- */
 export interface SmartImageResult {
 	/** Primary image URL */
 	readonly primaryImage?: string;

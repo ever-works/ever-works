@@ -43,9 +43,6 @@ export class DataSourceFacadeService implements IDataSourceFacade {
         @Optional() private readonly userPluginRepository?: UserPluginRepository,
     ) {}
 
-    /**
-     * Query all enabled data sources and aggregate their items.
-     */
     async queryAll(options?: DataSourceFacadeOptions): Promise<DataSourceFacadeResult> {
         const plugins = this.registry.getByCapability(this.CAPABILITY);
         const enabledPlugins = plugins.filter((p) => p.state === 'enabled');
@@ -225,9 +222,6 @@ export class DataSourceFacadeService implements IDataSourceFacade {
         return registered?.manifest?.autoEnable ?? false;
     }
 
-    /**
-     * Get default provider via activeCapability, falls back to first enabled.
-     */
     async getDefaultProvider(
         capability: string,
         directoryId?: string,

@@ -100,7 +100,7 @@ describe('ContentRetrievalStep', () => {
 			await step.run(mockContext, mockExecContext);
 
 			// Should have processed both URLs
-			expect(mockExecContext.searchFacade.extractContent).toHaveBeenCalledTimes(2);
+			expect(mockExecContext.contentExtractorFacade.extractContent).toHaveBeenCalledTimes(2);
 		});
 
 		it('should deduplicate URLs', async () => {
@@ -112,7 +112,7 @@ describe('ContentRetrievalStep', () => {
 			await step.run(mockContext, mockExecContext);
 
 			// Should only process once
-			expect(mockExecContext.searchFacade.extractContent).toHaveBeenCalledTimes(1);
+			expect(mockExecContext.contentExtractorFacade.extractContent).toHaveBeenCalledTimes(1);
 		});
 
 		it('should skip already processed URLs', async () => {
@@ -126,23 +126,12 @@ describe('ContentRetrievalStep', () => {
 			);
 		});
 
-		it('should use contentExtractorFacade for data source URLs', async () => {
-			mockContext.extractedUrls = ['https://notion.so/page'];
-			mockExecContext.contentExtractorFacade.canHandle = vi.fn().mockReturnValue(true);
-
-			await step.run(mockContext, mockExecContext);
-
-			expect(mockExecContext.contentExtractorFacade.extractContent).toHaveBeenCalled();
-			expect(mockExecContext.searchFacade.extractContent).not.toHaveBeenCalled();
-		});
-
-		it('should use searchFacade for regular URLs', async () => {
+		it('should use contentExtractorFacade for all URLs', async () => {
 			mockContext.extractedUrls = ['https://example.com'];
-			mockExecContext.contentExtractorFacade.canHandle = vi.fn().mockReturnValue(false);
 
 			await step.run(mockContext, mockExecContext);
 
-			expect(mockExecContext.searchFacade.extractContent).toHaveBeenCalled();
+			expect(mockExecContext.contentExtractorFacade.extractContent).toHaveBeenCalledWith('https://example.com');
 		});
 
 		it('should add retrieved pages to webPages array', async () => {
@@ -152,7 +141,7 @@ describe('ContentRetrievalStep', () => {
 
 			expect(result.webPages.length).toBe(1);
 			expect(result.webPages[0].source_url).toBe('https://example.com');
-			expect(result.webPages[0].raw_content).toBe('test content');
+			expect(result.webPages[0].raw_content).toBe('extracted content');
 		});
 
 		it('should populate contentCache', async () => {
@@ -160,7 +149,7 @@ describe('ContentRetrievalStep', () => {
 
 			const result = await step.run(mockContext, mockExecContext);
 
-			expect(result.contentCache.get('https://example.com')).toBe('test content');
+			expect(result.contentCache.get('https://example.com')).toBe('extracted content');
 		});
 
 		it('should mark URLs as processed', async () => {
@@ -173,7 +162,9 @@ describe('ContentRetrievalStep', () => {
 
 		it('should handle extraction errors gracefully', async () => {
 			mockContext.extractedUrls = ['https://example.com'];
-			mockExecContext.searchFacade.extractContent = vi.fn().mockRejectedValue(new Error('Network error'));
+			mockExecContext.contentExtractorFacade.extractContent = vi
+				.fn()
+				.mockRejectedValue(new Error('Network error'));
 
 			const result = await step.run(mockContext, mockExecContext);
 
@@ -183,7 +174,7 @@ describe('ContentRetrievalStep', () => {
 
 		it('should skip URLs with no content', async () => {
 			mockContext.extractedUrls = ['https://example.com'];
-			mockExecContext.searchFacade.extractContent = vi.fn().mockResolvedValue({ rawContent: null });
+			mockExecContext.contentExtractorFacade.extractContent = vi.fn().mockResolvedValue({ rawContent: null });
 
 			const result = await step.run(mockContext, mockExecContext);
 
@@ -201,18 +192,6 @@ describe('ContentRetrievalStep', () => {
 			);
 			expect(mockExecContext.logger.log).toHaveBeenCalledWith(
 				expect.stringContaining('Content Retrieval complete')
-			);
-		});
-
-		it('should handle unconfigured data source plugins', async () => {
-			mockContext.extractedUrls = ['https://notion.so/page'];
-			mockExecContext.contentExtractorFacade.canHandle = vi.fn().mockReturnValue(true);
-			mockExecContext.contentExtractorFacade.isConfigured = vi.fn().mockReturnValue(false);
-
-			await step.run(mockContext, mockExecContext);
-
-			expect(mockExecContext.logger.warn).toHaveBeenCalledWith(
-				expect.stringContaining('Data source plugin not configured')
 			);
 		});
 
@@ -240,7 +219,7 @@ describe('ContentRetrievalStep', () => {
 			await step.run(mockContext, mockExecContext);
 
 			// Should have processed all URLs
-			expect(mockExecContext.searchFacade.extractContent).toHaveBeenCalledTimes(15);
+			expect(mockExecContext.contentExtractorFacade.extractContent).toHaveBeenCalledTimes(15);
 		});
 	});
 
@@ -254,16 +233,17 @@ describe('ContentRetrievalStep', () => {
 			expect(result.webPages.length).toBe(1);
 		});
 
-		it('should handle mixed data source and regular URLs', async () => {
+		it('should process all URLs through contentExtractorFacade', async () => {
 			mockContext.extractedUrls = ['https://notion.so/page', 'https://example.com'];
-			mockExecContext.contentExtractorFacade.canHandle = vi
-				.fn()
-				.mockImplementation((url: string) => url.includes('notion.so'));
 
 			await step.run(mockContext, mockExecContext);
 
-			expect(mockExecContext.contentExtractorFacade.extractContent).toHaveBeenCalledTimes(1);
-			expect(mockExecContext.searchFacade.extractContent).toHaveBeenCalledTimes(1);
+			// All URLs go through the unified contentExtractorFacade
+			expect(mockExecContext.contentExtractorFacade.extractContent).toHaveBeenCalledTimes(2);
+			expect(mockExecContext.contentExtractorFacade.extractContent).toHaveBeenCalledWith(
+				'https://notion.so/page'
+			);
+			expect(mockExecContext.contentExtractorFacade.extractContent).toHaveBeenCalledWith('https://example.com');
 		});
 	});
 });

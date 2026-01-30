@@ -149,9 +149,6 @@ export class ApifyDataSourcePlugin implements IPlugin, IDataSourcePlugin, IFormS
 		];
 	}
 
-	/**
-	 * Get form field groups for organizing fields in the UI.
-	 */
 	getFormGroups(): FormFieldGroup[] {
 		return [
 			{
@@ -165,9 +162,6 @@ export class ApifyDataSourcePlugin implements IPlugin, IDataSourcePlugin, IFormS
 		];
 	}
 
-	/**
-	 * Validate plugin-specific form input.
-	 */
 	validateFormInput(values: Record<string, unknown>): ValidationResult {
 		const datasetId = values['apify_datasetId'] as string | undefined;
 		const actorRunId = values['apify_actorRunId'] as string | undefined;
@@ -188,9 +182,6 @@ export class ApifyDataSourcePlugin implements IPlugin, IDataSourcePlugin, IFormS
 		return { valid: true };
 	}
 
-	/**
-	 * Transform form values for the API.
-	 */
 	transformFormValues(values: Record<string, unknown>): Record<string, unknown> {
 		return {
 			...values,
@@ -203,9 +194,6 @@ export class ApifyDataSourcePlugin implements IPlugin, IDataSourcePlugin, IFormS
 		};
 	}
 
-	/**
-	 * Get default values for form fields.
-	 */
 	getDefaultValues(): Record<string, unknown> {
 		return {
 			apify_maxItems: 100,
@@ -301,9 +289,6 @@ export class ApifyDataSourcePlugin implements IPlugin, IDataSourcePlugin, IFormS
 		}
 	}
 
-	/**
-	 * Get data source metadata.
-	 */
 	async getMetadata(): Promise<DataSourceMetadata> {
 		return {
 			name: 'Apify',
@@ -348,9 +333,6 @@ export class ApifyDataSourcePlugin implements IPlugin, IDataSourcePlugin, IFormS
 		};
 	}
 
-	/**
-	 * Generate a URL-friendly slug from a name.
-	 */
 	private generateSlug(name: string): string {
 		return name
 			.toLowerCase()

@@ -114,9 +114,6 @@ export class TavilySearchPlugin implements IPlugin, ISearchPlugin, IContentExtra
 	// ISearchPlugin Interface
 	// ============================================================================
 
-	/**
-	 * Perform a web search using Tavily
-	 */
 	async search(options: SearchOptions): Promise<SearchResponse> {
 		const client = this.getClient(options.settings);
 		const startTime = Date.now();
@@ -185,9 +182,6 @@ export class TavilySearchPlugin implements IPlugin, ISearchPlugin, IContentExtra
 	// IContentExtractorPlugin Interface
 	// ============================================================================
 
-	/**
-	 * Extract content from a URL using Tavily's extract API
-	 */
 	async extract(options: ContentExtractionOptions): Promise<ContentExtractionResult> {
 		const client = this.getClient(options.settings);
 		const startTime = Date.now();
@@ -225,9 +219,6 @@ export class TavilySearchPlugin implements IPlugin, ISearchPlugin, IContentExtra
 		}
 	}
 
-	/**
-	 * Extract content from multiple URLs
-	 */
 	async extractBatch(
 		urls: readonly string[],
 		options?: Partial<ContentExtractionOptions>
@@ -270,9 +261,6 @@ export class TavilySearchPlugin implements IPlugin, ISearchPlugin, IContentExtra
 		}
 	}
 
-	/**
-	 * Get supported output formats
-	 */
 	getSupportedFormats(): readonly ('text' | 'html' | 'markdown')[] {
 		return ['text', 'markdown'];
 	}

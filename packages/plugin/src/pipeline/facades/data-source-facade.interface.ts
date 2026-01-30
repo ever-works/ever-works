@@ -1,9 +1,6 @@
 import type { MutableItemData, Category, Tag, Brand } from '@ever-works/contracts';
 import type { DataSourceFilterContext } from '../../contracts/capabilities/data-source.interface.js';
 
-/**
- * Options for querying data sources via the facade.
- */
 export interface DataSourceFacadeOptions {
 	/** User ID for settings resolution */
 	readonly userId?: string;
@@ -24,9 +21,6 @@ export interface DataSourceFacadeOptions {
 	readonly filterContext?: DataSourceFilterContext;
 }
 
-/**
- * Result from querying all enabled data sources.
- */
 export interface DataSourceFacadeResult {
 	/** All items collected from data sources (already filtered by each plugin) */
 	readonly items: MutableItemData[];
@@ -42,9 +36,6 @@ export interface DataSourceFacadeResult {
 	readonly brands?: readonly Brand[];
 }
 
-/**
- * Information about an enabled data source.
- */
 export interface EnabledDataSource {
 	/** Plugin ID */
 	readonly id: string;

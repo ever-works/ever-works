@@ -6,29 +6,18 @@ import type { AiModel } from '../../contracts/capabilities/ai-provider.interface
  */
 export type TaskComplexity = 'simple' | 'medium' | 'complex';
 
-/**
- * Token usage information from AI calls
- * Re-exported from contracts for convenience
- */
 export interface AiFacadeTokenUsage {
 	readonly inputTokens: number;
 	readonly outputTokens: number;
 	readonly totalTokens: number;
 }
 
-/**
- * Routing options for AI requests
- */
 export interface AiRoutingOptions {
-	/** Task complexity for model selection */
 	readonly complexity?: TaskComplexity;
-	/** Task identifier for tracking */
 	readonly taskId?: string;
-	/** Allow auto-escalation on failure */
 	readonly autoEscalate?: boolean;
-	/** Override specific provider (plugin ID) */
 	readonly providerOverride?: string;
-	/** Override specific model (bypasses complexity-based routing) */
+	/** Bypasses complexity-based routing */
 	readonly modelOverride?: string;
 }
 
@@ -49,9 +38,6 @@ export interface AiModelRoutingSettings {
 	readonly complexModel?: string;
 }
 
-/**
- * Options for askJson method
- */
 export interface AskJsonOptions {
 	/** Temperature for response generation (0-2) */
 	readonly temperature?: number;
@@ -61,9 +47,6 @@ export interface AskJsonOptions {
 	readonly routing?: AiRoutingOptions;
 }
 
-/**
- * Response from askJson method
- */
 export interface AskJsonResponse<T> {
 	/** Parsed result matching the schema */
 	readonly result: T;
