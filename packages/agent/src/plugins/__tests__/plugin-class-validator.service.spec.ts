@@ -223,11 +223,18 @@ describe('PluginClassValidatorService', () => {
             const plugin = createValidPlugin({
                 capabilities: ['git-provider'],
             }) as any;
-            plugin.getRepositories = jest.fn();
-            plugin.getRepository = jest.fn();
+            plugin.providerName = 'github';
+            plugin.getAuth = jest.fn();
+            plugin.getCloneUrl = jest.fn();
+            plugin.getWebUrl = jest.fn();
             plugin.createRepository = jest.fn();
-            plugin.getFile = jest.fn();
-            plugin.getFiles = jest.fn();
+            plugin.getRepository = jest.fn();
+            plugin.deleteRepository = jest.fn();
+            plugin.getUser = jest.fn();
+            plugin.getOrganizations = jest.fn();
+            plugin.listBranches = jest.fn();
+            plugin.createPullRequest = jest.fn();
+            plugin.mergePullRequest = jest.fn();
 
             const result = service.validateCapabilities(plugin);
 
@@ -242,7 +249,29 @@ describe('PluginClassValidatorService', () => {
             const result = service.validateCapabilities(plugin);
 
             expect(result.valid).toBe(false);
-            expect(result.errors?.some((e) => e.message.includes('getRepositories'))).toBe(true);
+            expect(result.errors?.some((e) => e.message.includes('getAuth'))).toBe(true);
+        });
+
+        it('should fail when git-provider property is missing', () => {
+            const plugin = createValidPlugin({
+                capabilities: ['git-provider'],
+            }) as any;
+            plugin.getAuth = jest.fn();
+            plugin.getCloneUrl = jest.fn();
+            plugin.getWebUrl = jest.fn();
+            plugin.createRepository = jest.fn();
+            plugin.getRepository = jest.fn();
+            plugin.deleteRepository = jest.fn();
+            plugin.getUser = jest.fn();
+            plugin.getOrganizations = jest.fn();
+            plugin.listBranches = jest.fn();
+            plugin.createPullRequest = jest.fn();
+            plugin.mergePullRequest = jest.fn();
+
+            const result = service.validateCapabilities(plugin);
+
+            expect(result.valid).toBe(false);
+            expect(result.errors?.some((e) => e.message.includes('providerName'))).toBe(true);
         });
 
         it('should validate oauth capability', () => {
@@ -262,9 +291,9 @@ describe('PluginClassValidatorService', () => {
             const plugin = createValidPlugin({
                 capabilities: ['deployment'],
             }) as any;
+            plugin.providerName = 'vercel';
             plugin.deploy = jest.fn();
             plugin.getDeploymentStatus = jest.fn();
-            plugin.getDeployments = jest.fn();
 
             const result = service.validateCapabilities(plugin);
 
@@ -275,7 +304,9 @@ describe('PluginClassValidatorService', () => {
             const plugin = createValidPlugin({
                 capabilities: ['screenshot'],
             }) as any;
-            plugin.takeScreenshot = jest.fn();
+            plugin.providerName = 'screenshotone';
+            plugin.capture = jest.fn();
+            plugin.isAvailable = jest.fn();
 
             const result = service.validateCapabilities(plugin);
 
@@ -286,7 +317,9 @@ describe('PluginClassValidatorService', () => {
             const plugin = createValidPlugin({
                 capabilities: ['search'],
             }) as any;
+            plugin.providerName = 'tavily';
             plugin.search = jest.fn();
+            plugin.isAvailable = jest.fn();
 
             const result = service.validateCapabilities(plugin);
 
@@ -297,8 +330,9 @@ describe('PluginClassValidatorService', () => {
             const plugin = createValidPlugin({
                 capabilities: ['content-extractor'],
             }) as any;
+            plugin.providerName = 'firecrawl';
             plugin.extract = jest.fn();
-            plugin.supports = jest.fn();
+            plugin.isAvailable = jest.fn();
 
             const result = service.validateCapabilities(plugin);
 
@@ -309,8 +343,9 @@ describe('PluginClassValidatorService', () => {
             const plugin = createValidPlugin({
                 capabilities: ['data-source'],
             }) as any;
-            plugin.fetch = jest.fn();
-            plugin.validate = jest.fn();
+            plugin.sourceName = 'csv';
+            plugin.query = jest.fn();
+            plugin.isAvailable = jest.fn();
 
             const result = service.validateCapabilities(plugin);
 
@@ -318,6 +353,23 @@ describe('PluginClassValidatorService', () => {
         });
 
         it('should validate ai-provider capability', () => {
+            const plugin = createValidPlugin({
+                capabilities: ['ai-provider'],
+            }) as any;
+            plugin.providerType = 'openai';
+            plugin.providerName = 'OpenAI';
+            plugin.createChatCompletion = jest.fn();
+            plugin.listModels = jest.fn();
+            plugin.getModel = jest.fn();
+            plugin.isAvailable = jest.fn();
+            plugin.getCapabilities = jest.fn();
+
+            const result = service.validateCapabilities(plugin);
+
+            expect(result.valid).toBe(true);
+        });
+
+        it('should fail when ai-provider properties are missing', () => {
             const plugin = createValidPlugin({
                 capabilities: ['ai-provider'],
             }) as any;
@@ -329,7 +381,8 @@ describe('PluginClassValidatorService', () => {
 
             const result = service.validateCapabilities(plugin);
 
-            expect(result.valid).toBe(true);
+            expect(result.valid).toBe(false);
+            expect(result.errors?.some((e) => e.message.includes('providerType'))).toBe(true);
         });
 
         it('should validate pipeline-step capability', () => {
@@ -349,7 +402,75 @@ describe('PluginClassValidatorService', () => {
                 capabilities: ['full-pipeline'],
             }) as any;
             plugin.execute = jest.fn();
-            plugin.getSteps = jest.fn();
+            plugin.getStepDefinitions = jest.fn();
+            plugin.createExecutionPlan = jest.fn();
+
+            const result = service.validateCapabilities(plugin);
+
+            expect(result.valid).toBe(true);
+        });
+
+        it('should validate form-field capability', () => {
+            const plugin = createValidPlugin({
+                capabilities: ['form-field'],
+            }) as any;
+            plugin.fieldType = 'custom-input';
+            plugin.getRegistration = jest.fn();
+            plugin.validate = jest.fn();
+
+            const result = service.validateCapabilities(plugin);
+
+            expect(result.valid).toBe(true);
+        });
+
+        it('should validate sub-provider capability', () => {
+            const plugin = createValidPlugin({
+                capabilities: ['sub-provider'],
+            }) as any;
+            plugin.parentCapability = 'ai-provider';
+            plugin.subProviderId = 'gpt-4';
+            plugin.getRegistration = jest.fn();
+            plugin.canHandle = jest.fn();
+            plugin.getPriority = jest.fn();
+            plugin.isAvailable = jest.fn();
+
+            const result = service.validateCapabilities(plugin);
+
+            expect(result.valid).toBe(true);
+        });
+
+        it('should validate config-aware capability', () => {
+            const plugin = createValidPlugin({
+                capabilities: ['config-aware'],
+            }) as any;
+            plugin.onConfigurationChange = jest.fn();
+            plugin.getEffectiveConfig = jest.fn();
+
+            const result = service.validateCapabilities(plugin);
+
+            expect(result.valid).toBe(true);
+        });
+
+        it('should validate form-schema-provider capability', () => {
+            const plugin = createValidPlugin({
+                capabilities: ['form-schema-provider'],
+            }) as any;
+            plugin.getFormFields = jest.fn();
+            plugin.validateFormInput = jest.fn();
+
+            const result = service.validateCapabilities(plugin);
+
+            expect(result.valid).toBe(true);
+        });
+
+        it('should validate custom-capability capability', () => {
+            const plugin = createValidPlugin({
+                capabilities: ['custom-capability'],
+            }) as any;
+            plugin.getCustomCapabilities = jest.fn();
+            plugin.getCapabilityImplementation = jest.fn();
+            plugin.hasCapability = jest.fn();
+            plugin.getCapabilityVersion = jest.fn();
 
             const result = service.validateCapabilities(plugin);
 
@@ -374,8 +495,10 @@ describe('PluginClassValidatorService', () => {
             const plugin = createValidPlugin({
                 capabilities: ['screenshot', 'search'],
             }) as any;
-            plugin.takeScreenshot = jest.fn();
+            plugin.providerName = 'multi-provider';
+            plugin.capture = jest.fn();
             plugin.search = jest.fn();
+            plugin.isAvailable = jest.fn();
 
             const result = service.validateCapabilities(plugin);
 

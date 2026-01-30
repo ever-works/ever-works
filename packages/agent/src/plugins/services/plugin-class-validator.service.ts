@@ -58,17 +58,26 @@ function isPluginClass(obj: unknown): obj is new () => IPlugin {
     );
 }
 
-/**
- * Known capability interfaces and their required methods/properties
- */
-const CAPABILITY_REQUIREMENTS: Record<string, string[]> = {
-    'git-provider': ['getRepositories', 'getRepository', 'createRepository', 'getFile', 'getFiles'],
+const CAPABILITY_METHOD_REQUIREMENTS: Record<string, string[]> = {
+    'git-provider': [
+        'getAuth',
+        'getCloneUrl',
+        'getWebUrl',
+        'createRepository',
+        'getRepository',
+        'deleteRepository',
+        'getUser',
+        'getOrganizations',
+        'listBranches',
+        'createPullRequest',
+        'mergePullRequest',
+    ],
     oauth: ['getAuthorizationUrl', 'exchangeCodeForToken', 'getAuthenticatedUser'],
-    deployment: ['deploy', 'getDeploymentStatus', 'getDeployments'],
-    screenshot: ['takeScreenshot'],
-    search: ['search'],
-    'content-extractor': ['extract', 'supports'],
-    'data-source': ['fetch', 'validate'],
+    deployment: ['deploy', 'getDeploymentStatus'],
+    screenshot: ['capture', 'isAvailable'],
+    search: ['search', 'isAvailable'],
+    'content-extractor': ['extract', 'isAvailable'],
+    'data-source': ['query', 'isAvailable'],
     'ai-provider': [
         'createChatCompletion',
         'listModels',
@@ -77,10 +86,29 @@ const CAPABILITY_REQUIREMENTS: Record<string, string[]> = {
         'getCapabilities',
     ],
     'pipeline-step': ['execute', 'getStepDefinition'],
-    'full-pipeline': ['execute', 'getSteps'],
-    'form-field': ['render', 'validate', 'getFieldType'],
-    'sub-provider': ['getSubProviders', 'getSubProvider'],
-    'config-aware': ['onConfigChange'],
+    'full-pipeline': ['getStepDefinitions', 'createExecutionPlan', 'execute'],
+    'form-field': ['getRegistration', 'validate'],
+    'sub-provider': ['getRegistration', 'canHandle', 'getPriority', 'isAvailable'],
+    'config-aware': ['onConfigurationChange', 'getEffectiveConfig'],
+    'form-schema-provider': ['getFormFields', 'validateFormInput'],
+    'custom-capability': [
+        'getCustomCapabilities',
+        'getCapabilityImplementation',
+        'hasCapability',
+        'getCapabilityVersion',
+    ],
+};
+
+const CAPABILITY_PROPERTY_REQUIREMENTS: Record<string, string[]> = {
+    'git-provider': ['providerName'],
+    screenshot: ['providerName'],
+    search: ['providerName'],
+    'content-extractor': ['providerName'],
+    deployment: ['providerName'],
+    'data-source': ['sourceName'],
+    'ai-provider': ['providerType', 'providerName'],
+    'form-field': ['fieldType'],
+    'sub-provider': ['parentCapability', 'subProviderId'],
 };
 
 /**
@@ -189,10 +217,10 @@ export class PluginClassValidatorService {
         const p = plugin as unknown as Record<string, unknown>;
 
         for (const capability of plugin.capabilities) {
-            const requirements = CAPABILITY_REQUIREMENTS[capability];
+            const methodRequirements = CAPABILITY_METHOD_REQUIREMENTS[capability];
+            const propertyRequirements = CAPABILITY_PROPERTY_REQUIREMENTS[capability];
 
-            if (!requirements) {
-                // Unknown capability - this is fine, just a warning
+            if (!methodRequirements && !propertyRequirements) {
                 warnings.push({
                     path: `capabilities.${capability}`,
                     message: `Unknown capability "${capability}". No validation rules available.`,
@@ -200,15 +228,29 @@ export class PluginClassValidatorService {
                 continue;
             }
 
-            // Check if plugin implements required methods for this capability
-            for (const method of requirements) {
-                if (typeof p[method] !== 'function') {
-                    errors.push({
-                        path: `capabilities.${capability}.${method}`,
-                        message: `Plugin declares "${capability}" capability but does not implement required method "${method}"`,
-                        expected: 'function',
-                        actual: typeof p[method],
-                    });
+            if (methodRequirements) {
+                for (const method of methodRequirements) {
+                    if (typeof p[method] !== 'function') {
+                        errors.push({
+                            path: `capabilities.${capability}.${method}`,
+                            message: `Plugin declares "${capability}" capability but does not implement required method "${method}"`,
+                            expected: 'function',
+                            actual: typeof p[method],
+                        });
+                    }
+                }
+            }
+
+            if (propertyRequirements) {
+                for (const prop of propertyRequirements) {
+                    if (!(prop in p)) {
+                        errors.push({
+                            path: `capabilities.${capability}.${prop}`,
+                            message: `Plugin declares "${capability}" capability but is missing required property "${prop}"`,
+                            expected: 'defined',
+                            actual: 'undefined',
+                        });
+                    }
                 }
             }
         }
