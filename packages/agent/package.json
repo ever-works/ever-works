@@ -85,9 +85,9 @@
             "types": "./dist/import/index.d.ts",
             "default": "./dist/import/index.js"
         },
-        "./screenshot": {
-            "types": "./dist/screenshot/index.d.ts",
-            "default": "./dist/screenshot/index.js"
+        "./facades": {
+            "types": "./dist/facades/index.d.ts",
+            "default": "./dist/facades/index.js"
         },
         "./plugins": {
             "types": "./dist/plugins/index.d.ts",

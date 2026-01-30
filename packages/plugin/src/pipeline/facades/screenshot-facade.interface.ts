@@ -43,13 +43,13 @@ export interface ScreenshotCaptureResult {
 }
 
 /**
- * Smart image routing options
+ * Smart image options
  */
 export interface SmartImageOptions {
 	/** URL to capture */
 	readonly url: string;
-	/** Domain type for routing strategy */
-	readonly domainType: string;
+	/** Domain type (optional, not used for routing) */
+	readonly domainType?: string;
 	/** Item name for context */
 	readonly itemName?: string;
 }

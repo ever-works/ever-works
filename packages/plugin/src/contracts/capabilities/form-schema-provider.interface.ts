@@ -5,12 +5,19 @@ import type { PluginIcon } from '../plugin-manifest.types.js';
 
 /**
  * Interface for plugins that provide form fields for the generator form.
- * Any plugin (pipeline, search, AI, etc.) can implement this to add fields.
  *
  * This is different from IFormFieldPlugin which provides custom field types.
  * IFormSchemaProvider provides the actual form schema/fields for configuration.
  *
  * Capability: 'form-schema-provider'
+ *
+ * Configuration Levels:
+ * - Level 1: Settings > Plugins (API keys via settingsSchema)
+ * - Level 2: Directory > Apps (enable/disable via DirectoryPlugin entity)
+ * - Level 3: Generator Form (per-generation options via this interface)
+ *
+ * getFormFields() should return Level 3 fields only (per-generation options).
+ * Enable/disable checkboxes belong at Level 2, not here.
  */
 export interface IFormSchemaProvider extends IPlugin {
 	/**

@@ -3,7 +3,7 @@ import { ItemSubmissionService } from './item-submission.service';
 import { AiModule } from '../ai';
 import { GitModule } from '../git';
 import { DatabaseModule } from '../database/database.module';
-import { ScreenshotModule } from '../screenshot/screenshot.module';
+import { FacadesModule } from '../facades/facades.module';
 import { PipelineModule } from '../pipeline/pipeline.module';
 
 /**
@@ -13,7 +13,7 @@ import { PipelineModule } from '../pipeline/pipeline.module';
  * This module only provides the ItemSubmissionService for single-item operations.
  */
 @Module({
-    imports: [AiModule, GitModule, DatabaseModule, ScreenshotModule, PipelineModule],
+    imports: [AiModule, GitModule, DatabaseModule, FacadesModule, PipelineModule],
     providers: [ItemSubmissionService],
     exports: [ItemSubmissionService],
 })

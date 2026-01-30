@@ -65,26 +65,18 @@ describe('ApifyDataSourcePlugin', () => {
 			expect(fields.length).toBeGreaterThan(0);
 		});
 
-		it('should include the "enabled" checkbox field', () => {
+		it('should NOT include enable checkbox (Level 2 handles this)', () => {
 			const fields = plugin.getFormFields();
 			const enabledField = fields.find((f) => f.name === 'apify_enabled');
-
-			expect(enabledField).toBeDefined();
-			expect(enabledField?.type).toBe('boolean');
-			expect(enabledField?.defaultValue).toBe(false);
+			expect(enabledField).toBeUndefined();
 		});
 
-		it('should include datasetId field with showIf condition', () => {
+		it('should include datasetId field', () => {
 			const fields = plugin.getFormFields();
 			const datasetField = fields.find((f) => f.name === 'apify_datasetId');
 
 			expect(datasetField).toBeDefined();
 			expect(datasetField?.type).toBe('text');
-			expect(datasetField?.showIf).toEqual({
-				field: 'apify_enabled',
-				operator: 'eq',
-				value: true
-			});
 		});
 
 		it('should include maxItems field', () => {
@@ -115,14 +107,8 @@ describe('ApifyDataSourcePlugin', () => {
 	});
 
 	describe('IFormSchemaProvider - validateFormInput', () => {
-		it('should pass validation when disabled', () => {
-			const result = plugin.validateFormInput({ apify_enabled: false });
-			expect(result.valid).toBe(true);
-		});
-
-		it('should fail when enabled but no dataset ID provided', () => {
+		it('should fail when no dataset ID or actor run ID provided', () => {
 			const result = plugin.validateFormInput({
-				apify_enabled: true,
 				apify_datasetId: '',
 				apify_actorRunId: ''
 			});
@@ -130,17 +116,15 @@ describe('ApifyDataSourcePlugin', () => {
 			expect(result.errors?.[0]?.path).toBe('apify_datasetId');
 		});
 
-		it('should pass when enabled with dataset ID', () => {
+		it('should pass with dataset ID', () => {
 			const result = plugin.validateFormInput({
-				apify_enabled: true,
 				apify_datasetId: 'abc123'
 			});
 			expect(result.valid).toBe(true);
 		});
 
-		it('should pass when enabled with actor run ID', () => {
+		it('should pass with actor run ID', () => {
 			const result = plugin.validateFormInput({
-				apify_enabled: true,
 				apify_actorRunId: 'run123'
 			});
 			expect(result.valid).toBe(true);
@@ -150,7 +134,6 @@ describe('ApifyDataSourcePlugin', () => {
 	describe('IFormSchemaProvider - transformFormValues', () => {
 		it('should transform form values to pluginConfig structure', () => {
 			const values = {
-				apify_enabled: true,
 				apify_datasetId: 'dataset123',
 				apify_maxItems: 50,
 				apify_filterByRelevance: true
@@ -159,7 +142,6 @@ describe('ApifyDataSourcePlugin', () => {
 			const transformed = plugin.transformFormValues(values);
 
 			expect(transformed['apify-data-source']).toEqual({
-				enabled: true,
 				datasetId: 'dataset123',
 				actorRunId: undefined,
 				maxItems: 50,

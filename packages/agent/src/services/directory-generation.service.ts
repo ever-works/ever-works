@@ -55,11 +55,7 @@ import {
     NOTIFICATION_OPERATIONS,
     NotificationOperations,
 } from '@src/notification-operations/notification-operations.interface';
-import {
-    SmartImageRouterService,
-    BulkImageRequest,
-} from '@src/screenshot/smart-image-router.service';
-import { DomainType } from '@ever-works/contracts';
+import { ScreenshotFacadeService } from '@src/facades';
 
 export interface BulkCaptureImagesDto {
     itemSlugs?: string[];
@@ -119,7 +115,7 @@ export class DirectoryGenerationService {
         private readonly directoryScheduleService: DirectoryScheduleService,
         private readonly directoryImportService: DirectoryImportService,
         private readonly userRepository: UserRepository,
-        private readonly smartImageRouterService: SmartImageRouterService,
+        private readonly screenshotFacade: ScreenshotFacadeService,
         @Optional()
         @Inject(DIRECTORY_GENERATION_DISPATCHER)
         private readonly generationDispatcher?: DirectoryGenerationDispatcher,
@@ -454,22 +450,52 @@ export class DirectoryGenerationService {
                 };
             }
 
-            // Get domain type for routing
-            const domainType = (directory.domainType as DomainType) || DomainType.GENERAL;
+            // Check if screenshot facade is available
+            if (!this.screenshotFacade.isAvailable()) {
+                return {
+                    status: 'error',
+                    results: [],
+                    totalProcessed: 0,
+                    successCount: 0,
+                    errorCount: 0,
+                    message: 'Screenshot service is not available',
+                };
+            }
 
-            // Build bulk request
-            const bulkRequests: BulkImageRequest[] = itemsToProcess.map((item) => ({
-                url: item.source_url,
-                itemName: item.name,
-                itemSlug: item.slug,
-            }));
+            // Process items sequentially using facade
+            const bulkResults: BulkCaptureResultDto[] = [];
 
-            // Process bulk capture
-            const bulkResults = await this.smartImageRouterService.bulkGetSmartImages(
-                bulkRequests,
-                domainType,
-                user,
-            );
+            for (const item of itemsToProcess) {
+                try {
+                    const result = await this.screenshotFacade.capture(
+                        {
+                            url: item.source_url,
+                            blockAds: true,
+                            blockCookieBanners: true,
+                            cache: true,
+                        },
+                        {
+                            userId: user.id,
+                            directoryId: directory.id,
+                        },
+                    );
+
+                    bulkResults.push({
+                        itemSlug: item.slug,
+                        itemName: item.name,
+                        primaryImage: result.cacheUrl || result.imageUrl,
+                        source: 'screenshot',
+                    });
+                } catch (error) {
+                    bulkResults.push({
+                        itemSlug: item.slug,
+                        itemName: item.name,
+                        primaryImage: null,
+                        source: 'screenshot',
+                        error: error instanceof Error ? error.message : 'Unknown error',
+                    });
+                }
+            }
 
             // Calculate stats
             const successCount = bulkResults.filter((r) => r.primaryImage !== null).length;

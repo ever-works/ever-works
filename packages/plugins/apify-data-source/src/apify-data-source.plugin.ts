@@ -31,26 +31,12 @@ interface FieldMapping {
  * Apify Data Source Plugin
  *
  * Imports items from Apify datasets into directories.
+ * Implements IDataSourcePlugin and IFormSchemaProvider.
  *
- * This plugin implements BOTH:
- * 1. IDataSourcePlugin - for querying items from Apify
- * 2. IFormSchemaProvider - for adding form fields to GeneratorForm
- *
- * Per-Directory Enable Pattern:
- * - Plugin must be installed at user level (Settings > Plugins)
- * - User enables it per-directory via the "Enable Apify" checkbox in GeneratorForm
- * - The `enabled` flag is stored in `pluginConfig['apify-data-source'].enabled`
- * - DataSourceFacade checks this flag before querying
- *
- * Flow:
- * 1. User installs plugin (Settings > Plugins)
- * 2. User creates/edits directory in GeneratorForm
- * 3. User checks "Enable Apify Data Source" checkbox
- * 4. User enters Dataset ID
- * 5. On generation, DataSourceFacade queries this plugin
- * 6. Plugin fetches items from Apify API
- * 7. Plugin optionally filters items by relevance (via filterContext)
- * 8. Filtered items are merged into the aggregation step
+ * Configuration levels:
+ * - Level 1: API token (Settings > Plugins)
+ * - Level 2: Enable/disable per-directory (DirectoryPlugin entity)
+ * - Level 3: Dataset ID, filters (GeneratorForm via IFormSchemaProvider)
  */
 export class ApifyDataSourcePlugin implements IPlugin, IDataSourcePlugin, IFormSchemaProvider {
 	// ============================================================================
@@ -122,44 +108,27 @@ export class ApifyDataSourcePlugin implements IPlugin, IDataSourcePlugin, IFormS
 	// ============================================================================
 
 	/**
-	 * Get form fields for the GeneratorForm.
-	 *
-	 * These fields appear in the GeneratorForm when the plugin is installed.
-	 * The key field is `enabled` - a checkbox that controls whether this
-	 * data source is used for the current directory.
+	 * Get form fields for the GeneratorForm (Level 3 configuration).
+	 * Note: Enable/disable is at Level 2 (DirectoryPlugin), not here.
 	 */
 	getFormFields(): FormFieldDefinition[] {
 		return [
-			// "Enable" checkbox - THE KEY FIELD for per-directory enablement
-			{
-				name: 'apify_enabled',
-				type: 'boolean',
-				label: 'Enable Apify Data Source',
-				description: 'Import items from an Apify dataset for this directory',
-				defaultValue: false,
-				group: 'apify-data-source'
-			},
-			// Dataset ID field - shown only when enabled
 			{
 				name: 'apify_datasetId',
 				type: 'text',
 				label: 'Dataset ID',
 				description: 'The Apify dataset ID to import items from',
 				placeholder: 'e.g., 5uxB4x3zYjV5S7nFd',
-				group: 'apify-data-source',
-				showIf: { field: 'apify_enabled', operator: 'eq', value: true }
+				group: 'apify-data-source'
 			},
-			// Actor Run ID field (alternative to dataset ID)
 			{
 				name: 'apify_actorRunId',
 				type: 'text',
 				label: 'Actor Run ID (alternative)',
 				description: 'Import from a specific actor run instead of a dataset',
 				placeholder: 'Leave empty to use Dataset ID',
-				group: 'apify-data-source',
-				showIf: { field: 'apify_enabled', operator: 'eq', value: true }
+				group: 'apify-data-source'
 			},
-			// Maximum items limit
 			{
 				name: 'apify_maxItems',
 				type: 'number',
@@ -167,18 +136,15 @@ export class ApifyDataSourcePlugin implements IPlugin, IDataSourcePlugin, IFormS
 				description: 'Limit the number of items to import (0 = no limit)',
 				defaultValue: 100,
 				group: 'apify-data-source',
-				showIf: { field: 'apify_enabled', operator: 'eq', value: true },
 				validation: { min: 0, max: 10000 }
 			},
-			// Enable relevance filtering
 			{
 				name: 'apify_filterByRelevance',
 				type: 'boolean',
 				label: 'Filter by Relevance',
 				description: 'Only import items relevant to the directory prompt',
 				defaultValue: true,
-				group: 'apify-data-source',
-				showIf: { field: 'apify_enabled', operator: 'eq', value: true }
+				group: 'apify-data-source'
 			}
 		];
 	}
@@ -203,23 +169,20 @@ export class ApifyDataSourcePlugin implements IPlugin, IDataSourcePlugin, IFormS
 	 * Validate plugin-specific form input.
 	 */
 	validateFormInput(values: Record<string, unknown>): ValidationResult {
-		const enabled = values['apify_enabled'];
 		const datasetId = values['apify_datasetId'] as string | undefined;
 		const actorRunId = values['apify_actorRunId'] as string | undefined;
 
-		if (enabled) {
-			// Either datasetId or actorRunId must be provided
-			if (!datasetId && !actorRunId) {
-				return {
-					valid: false,
-					errors: [
-						{
-							path: 'apify_datasetId',
-							message: 'Either Dataset ID or Actor Run ID is required when Apify is enabled'
-						}
-					]
-				};
-			}
+		// Either datasetId or actorRunId must be provided when plugin is enabled at Level 2
+		if (!datasetId && !actorRunId) {
+			return {
+				valid: false,
+				errors: [
+					{
+						path: 'apify_datasetId',
+						message: 'Either Dataset ID or Actor Run ID is required'
+					}
+				]
+			};
 		}
 
 		return { valid: true };
@@ -227,15 +190,11 @@ export class ApifyDataSourcePlugin implements IPlugin, IDataSourcePlugin, IFormS
 
 	/**
 	 * Transform form values for the API.
-	 * Maps the prefixed form fields to the pluginConfig structure.
 	 */
 	transformFormValues(values: Record<string, unknown>): Record<string, unknown> {
-		// Transform apify_* fields to plugin config structure
 		return {
 			...values,
-			// The pluginConfig structure expected by DataSourceFacade
 			'apify-data-source': {
-				enabled: values['apify_enabled'] ?? false,
 				datasetId: values['apify_datasetId'],
 				actorRunId: values['apify_actorRunId'],
 				maxItems: values['apify_maxItems'] ?? 100,
@@ -249,7 +208,6 @@ export class ApifyDataSourcePlugin implements IPlugin, IDataSourcePlugin, IFormS
 	 */
 	getDefaultValues(): Record<string, unknown> {
 		return {
-			apify_enabled: false,
 			apify_maxItems: 100,
 			apify_filterByRelevance: true
 		};

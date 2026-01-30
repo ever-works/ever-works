@@ -136,6 +136,8 @@ export interface PluginManifest {
 	readonly systemPlugin?: boolean;
 	/** Whether plugin should be auto-installed on first load */
 	readonly autoInstall?: boolean;
+	/** Whether plugin should be auto-enabled for all directories when installed */
+	readonly autoEnable?: boolean;
 	/** Whether plugin is deprecated */
 	readonly deprecated?: boolean;
 	/** Deprecation message */

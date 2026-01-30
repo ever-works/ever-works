@@ -1,6 +1,6 @@
 'use server';
 
-import { itemsGeneratorAPI, SubmitItemDto, RemoveItemDto, UpdateItemDto } from '@/lib/api';
+import { itemsGeneratorAPI, SubmitItemDto, UpdateItemDto } from '@/lib/api';
 import { screenshotAPI } from '@/lib/api/screenshot';
 import { getAuthFromCookie } from '@/lib/auth';
 import { redirect } from 'next/navigation';
@@ -20,7 +20,6 @@ export async function addItem(directoryId: string, data: SubmitItemDto) {
         const response = await itemsGeneratorAPI.submitItem(directoryId, data);
 
         if (response.status === 'success') {
-            // Revalidate the directory items page to show the new item
             revalidatePath(`/directories/${directoryId}/items`);
             revalidatePath(`/directories/${directoryId}`);
         }
@@ -29,7 +28,6 @@ export async function addItem(directoryId: string, data: SubmitItemDto) {
             status: response.status,
             message:
                 response.message || (response.status === 'success' ? t('success') : t('failed')),
-            // Return the full item data for immediate list update
             item: response.item,
             item_slug: response.item_slug,
             auto_merged: response.auto_merged,
@@ -65,7 +63,6 @@ export async function removeItem(
         });
 
         if (response.status) {
-            // Revalidate the directory items page to remove the item from the list
             revalidatePath(`/directories/${directoryId}/items`);
             revalidatePath(`/directories/${directoryId}`);
         }
@@ -109,7 +106,6 @@ export async function extractItemDetails(sourceUrl: string, existingCategories?:
             };
         }
 
-        // Normalize category to string (take first if array)
         const normalizedCategory = Array.isArray(response.item.category)
             ? response.item.category[0]
             : response.item.category;
@@ -186,7 +182,6 @@ export async function captureScreenshot(sourceUrl: string) {
     const t = await getTranslations('dashboard.directoryDetail.items.screenshot');
 
     try {
-        // First check if the service is available
         const availability = await screenshotAPI.checkAvailability();
 
         if (!availability.available) {
@@ -196,7 +191,6 @@ export async function captureScreenshot(sourceUrl: string) {
             };
         }
 
-        // Get the screenshot URL
         const response = await screenshotAPI.getScreenshotUrl({
             url: sourceUrl,
             blockAds: true,
@@ -235,96 +229,9 @@ export async function checkScreenshotAvailability() {
         const availability = await screenshotAPI.checkAvailability();
         return {
             available: availability.available,
-            hasGlobalKey: availability.hasGlobalKey,
-            hasUserKey: availability.hasUserKey,
+            providers: availability.providers,
         };
     } catch {
         return { available: false };
-    }
-}
-
-export async function captureSmartImage(
-    sourceUrl: string,
-    domainType?: 'software' | 'ecommerce' | 'services' | 'general',
-    itemName?: string,
-) {
-    const user = await getAuthFromCookie();
-    if (!user) {
-        redirect(ROUTES.AUTH_LOGIN);
-    }
-
-    const t = await getTranslations('dashboard.directoryDetail.items.screenshot');
-
-    try {
-        const response = await screenshotAPI.getSmartImage({
-            url: sourceUrl,
-            domainType,
-            itemName,
-        });
-
-        if (response.status !== 'success' || !response.primaryImage) {
-            return {
-                success: false,
-                error: response.error || t('captureFailed'),
-            };
-        }
-
-        return {
-            success: true,
-            imageUrl: response.primaryImage,
-            source: response.source,
-            confidence: response.confidence,
-            message: t('captureSuccess'),
-        };
-    } catch (error) {
-        console.error('Smart image capture error:', error);
-        return {
-            success: false,
-            error: error instanceof Error ? error.message : t('captureError'),
-        };
-    }
-}
-
-export async function bulkCaptureImages(
-    directoryId: string,
-    options: { itemSlugs?: string[]; mode: 'missing' | 'all' },
-) {
-    const user = await getAuthFromCookie();
-    if (!user) {
-        redirect(ROUTES.AUTH_LOGIN);
-    }
-
-    const t = await getTranslations('dashboard.directoryDetail.items.screenshot');
-
-    try {
-        const response = await screenshotAPI.bulkCaptureImages(directoryId, {
-            itemSlugs: options.itemSlugs,
-            mode: options.mode,
-        });
-
-        // Revalidate the directory items page
-        revalidatePath(`/directories/${directoryId}/items`);
-        revalidatePath(`/directories/${directoryId}`);
-
-        return {
-            success: response.status !== 'error',
-            status: response.status,
-            results: response.results,
-            totalProcessed: response.totalProcessed,
-            successCount: response.successCount,
-            errorCount: response.errorCount,
-            message: response.message || t('bulkCaptureComplete'),
-        };
-    } catch (error) {
-        console.error('Bulk capture images error:', error);
-        return {
-            success: false,
-            status: 'error' as const,
-            results: [],
-            totalProcessed: 0,
-            successCount: 0,
-            errorCount: 0,
-            message: error instanceof Error ? error.message : t('bulkCaptureError'),
-        };
     }
 }

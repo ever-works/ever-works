@@ -1,18 +1,5 @@
-import { IsString, IsOptional, IsNumber, IsBoolean, IsUrl, Min, Max, IsIn } from 'class-validator';
+import { IsOptional, IsNumber, IsBoolean, IsUrl, Min, Max, IsIn } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-
-export * from './smart-image.dto';
-
-export class ValidateCredentialsDto {
-    @ApiProperty({ description: 'ScreenshotOne API access key' })
-    @IsString()
-    accessKey: string;
-
-    @ApiPropertyOptional({ description: 'ScreenshotOne API secret key (optional for signed URLs)' })
-    @IsOptional()
-    @IsString()
-    secretKey?: string;
-}
 
 export class CaptureScreenshotDto {
     @ApiProperty({ description: 'URL of the page to capture', example: 'https://example.com' })

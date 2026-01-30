@@ -10,9 +10,6 @@ import type {
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
 
-/**
- * Screenshot Facade Error Base
- */
 export class ScreenshotFacadeError extends Error {
     constructor(
         message: string,
@@ -25,9 +22,6 @@ export class ScreenshotFacadeError extends Error {
     }
 }
 
-/**
- * No screenshot provider configured error
- */
 export class NoScreenshotProviderError extends ScreenshotFacadeError {
     constructor() {
         super('No screenshot provider configured or available', 'getPlugin');
@@ -35,9 +29,6 @@ export class NoScreenshotProviderError extends ScreenshotFacadeError {
     }
 }
 
-/**
- * Screenshot provider not found error
- */
 export class ScreenshotProviderNotFoundError extends ScreenshotFacadeError {
     constructor(providerId: string) {
         super(`Screenshot provider not found: ${providerId}`, 'getPlugin', providerId);
@@ -45,23 +36,14 @@ export class ScreenshotProviderNotFoundError extends ScreenshotFacadeError {
     }
 }
 
-/**
- * Facade options for provider resolution
- */
 export interface ScreenshotFacadeOptions {
-    /** User ID for settings resolution */
     userId?: string;
-    /** Directory ID for settings resolution */
     directoryId?: string;
-    /** Override provider (plugin ID) */
     providerOverride?: string;
 }
 
 /**
- * Screenshot Facade service for pipeline steps.
- *
- * Uses the plugin registry to dynamically resolve screenshot providers.
- * Supports 4-level settings resolution hierarchy.
+ * Screenshot Facade - simple interface for capturing screenshots.
  */
 @Injectable()
 export class ScreenshotFacadeService implements IScreenshotFacade {
@@ -73,9 +55,6 @@ export class ScreenshotFacadeService implements IScreenshotFacade {
         private readonly settingsService: PluginSettingsService,
     ) {}
 
-    /**
-     * Capture a screenshot of a URL.
-     */
     async capture(
         options: ScreenshotCaptureOptions,
         facadeOptions?: ScreenshotFacadeOptions,
@@ -86,14 +65,12 @@ export class ScreenshotFacadeService implements IScreenshotFacade {
             facadeOptions?.directoryId,
         );
 
-        // Get resolved settings for the plugin
         const settings = await this.settingsService.getSettings(plugin.id, {
             userId: facadeOptions?.userId,
             directoryId: facadeOptions?.directoryId,
             includeSecrets: true,
         });
 
-        // Pass settings to plugin so it can use API keys, etc.
         const result = await plugin.capture({
             url: options.url,
             viewportWidth: options.viewportWidth,
@@ -106,7 +83,7 @@ export class ScreenshotFacadeService implements IScreenshotFacade {
             blockCookieBanners: options.blockCookieBanners,
             cache: options.cache,
             cacheTtl: options.cacheTtl,
-            settings, // Pass resolved settings to plugin
+            settings,
         });
 
         return {
@@ -118,39 +95,22 @@ export class ScreenshotFacadeService implements IScreenshotFacade {
         };
     }
 
-    /**
-     * Get a smart image for a URL based on domain type.
-     * Routes image capture based on the domain type for optimal results.
-     */
     async getSmartImage(
         options: SmartImageOptions,
         facadeOptions?: ScreenshotFacadeOptions,
     ): Promise<SmartImageResult> {
-        const plugin = await this.resolvePlugin(
-            facadeOptions?.providerOverride,
-            facadeOptions?.userId,
-            facadeOptions?.directoryId,
+        const result = await this.capture(
+            {
+                url: options.url,
+                viewportWidth: 1280,
+                viewportHeight: 800,
+                format: 'png',
+                blockAds: true,
+                blockCookieBanners: true,
+                cache: true,
+            },
+            facadeOptions,
         );
-
-        // Get resolved settings for the plugin
-        const settings = await this.settingsService.getSettings(plugin.id, {
-            userId: facadeOptions?.userId,
-            directoryId: facadeOptions?.directoryId,
-            includeSecrets: true,
-        });
-
-        // For now, use standard screenshot capture
-        // TODO: Implement smart routing logic based on domain type
-        // Pass settings to plugin so it can use API keys, etc.
-        const result = await plugin.capture({
-            url: options.url,
-            viewportWidth: 1280,
-            viewportHeight: 800,
-            format: 'png',
-            blockAds: true,
-            cache: true,
-            settings, // Pass resolved settings to plugin
-        });
 
         return {
             primaryImage: result.cacheUrl || result.imageUrl,
@@ -158,9 +118,6 @@ export class ScreenshotFacadeService implements IScreenshotFacade {
         };
     }
 
-    /**
-     * Get a pre-signed screenshot URL without actually capturing.
-     */
     async getScreenshotUrl(
         options: ScreenshotCaptureOptions,
         facadeOptions?: ScreenshotFacadeOptions,
@@ -178,17 +135,11 @@ export class ScreenshotFacadeService implements IScreenshotFacade {
         return plugin.getScreenshotUrl(options);
     }
 
-    /**
-     * Check if any screenshot provider plugin is available.
-     */
     isAvailable(): boolean {
         const plugins = this.registry.getByCapability(this.CAPABILITY);
         return plugins.length > 0 && plugins.some((p) => p.state === 'enabled');
     }
 
-    /**
-     * Get all available screenshot provider plugins.
-     */
     getAvailableProviders(): Array<{
         id: string;
         name: string;
@@ -202,9 +153,6 @@ export class ScreenshotFacadeService implements IScreenshotFacade {
         }));
     }
 
-    /**
-     * Resolve which screenshot plugin to use.
-     */
     private async resolvePlugin(
         providerOverride?: string,
         userId?: string,
@@ -222,7 +170,6 @@ export class ScreenshotFacadeService implements IScreenshotFacade {
             throw new ScreenshotProviderNotFoundError(providerOverride);
         }
 
-        // Fall back to first enabled screenshot provider
         const plugins = this.registry.getByCapability(this.CAPABILITY);
         const enabled = plugins.find((p) => p.state === 'enabled');
 

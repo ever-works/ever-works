@@ -2132,6 +2132,51 @@ When a plugin handles a config field:
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
+### Plugin Availability vs Enablement
+
+**Key Distinction:**
+
+- **Available** = Plugin is installed by the user (Level 1)
+- **Enabled** = Plugin is activated for a specific directory (Level 2)
+
+When a user installs a plugin at Level 1:
+
+1. Plugin becomes "available" for ALL directories (current and future)
+2. User can see it in Directory > Apps for any directory
+3. Plugin can be auto-enabled if `autoEnable: true` in manifest
+
+**Enable Resolution Order:**
+
+```
+1. DirectoryPlugin.enabled (Level 2) - explicit per-directory config
+2. pluginConfig.enabled (Level 3) - per-generation override
+3. autoEnable in manifest - plugin default when installed
+```
+
+**Data Flow:**
+
+```
+User installs plugin (Level 1)
+    → Creates UserPlugin entity
+    → Plugin "available" for all directories
+    → If autoEnable=true, enabled by default
+
+User enables plugin for Directory X (Level 2)
+    → Creates/updates DirectoryPlugin entity
+    → Can override autoEnable
+
+User runs generation (Level 3)
+    → Passes pluginConfig with per-generation options
+    → DataSourceFacade checks enable state
+    → If enabled, uses pluginConfig for settings
+```
+
+**Configuration at Each Level:**
+
+- Level 1: API keys, global defaults (settingsSchema)
+- Level 2: Enable/disable, directory settings (DirectoryPlugin entity)
+- Level 3: Per-generation options (IFormSchemaProvider.getFormFields())
+
 ### Generator Form UI
 
 ```

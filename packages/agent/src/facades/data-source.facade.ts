@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import type {
     IDataSourceFacade,
     DataSourceFacadeOptions,
@@ -12,6 +12,7 @@ import type {
 } from '@ever-works/plugin';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
+import { DirectoryPluginRepository } from '../plugins/repositories/directory-plugin.repository';
 
 /**
  * Data Source Facade Error Base
@@ -32,33 +33,7 @@ export class DataSourceFacadeError extends Error {
  * Data Source Facade service for pipeline steps.
  *
  * Provides unified access to external data sources (Apify, etc.).
- * Only queries plugins that have been explicitly enabled in pluginConfig.
- *
- * Flow:
- * 1. User enables data source plugin in GeneratorForm (checkbox)
- * 2. pluginConfig passed to facade via queryAll options
- * 3. Facade checks each plugin's enabled flag in pluginConfig
- * 4. Enabled plugins are queried with filterContext
- * 5. Each plugin filters its items based on filterContext
- * 6. Facade aggregates filtered items from all enabled sources
- *
- * @example
- * ```typescript
- * // In pipeline step
- * const result = await dataSourceFacade.queryAll({
- *     pluginConfig: {
- *         'apify-data-source': { enabled: true, datasetId: '5uxB4x3zYjV5S7nFd' }
- *     },
- *     filterContext: {
- *         prompt: 'Top AI tools for developers',
- *         subject: 'AI tools',
- *         keywords: ['AI', 'tools', 'developers']
- *     }
- * });
- *
- * // Items are already filtered by each plugin
- * const dataSourceItems = result.items;
- * ```
+ * Checks DirectoryPlugin.enabled (Level 2) to determine which plugins to query.
  */
 @Injectable()
 export class DataSourceFacadeService implements IDataSourceFacade {
@@ -68,12 +43,13 @@ export class DataSourceFacadeService implements IDataSourceFacade {
     constructor(
         private readonly registry: PluginRegistryService,
         private readonly settingsService: PluginSettingsService,
+        @Optional() private readonly directoryPluginRepository?: DirectoryPluginRepository,
     ) {}
 
     /**
      * Query all enabled data sources and aggregate their items.
      *
-     * Only plugins that have `enabled: true` in pluginConfig will be queried.
+     * Checks both Level 2 (DirectoryPlugin.enabled) and Level 3 (pluginConfig.enabled).
      * Each plugin is responsible for filtering its items based on filterContext.
      */
     async queryAll(options?: DataSourceFacadeOptions): Promise<DataSourceFacadeResult> {
@@ -90,22 +66,22 @@ export class DataSourceFacadeService implements IDataSourceFacade {
         for (const registered of enabledPlugins) {
             const pluginId = registered.plugin.id;
 
-            // ==========================================
-            // KEY CHECK: Read enabled flag from pluginConfig
-            // ==========================================
-            // pluginConfig comes from GeneratorForm's DynamicPluginFields
-            // Each plugin adds its own 'enabled' checkbox via IFormSchemaProvider
+            // Check if plugin is enabled (Level 2 → Level 3 → autoEnable)
+            const isEnabled = await this.isPluginEnabledForDirectory(
+                pluginId,
+                options?.directoryId,
+                options?.pluginConfig,
+            );
+
+            if (!isEnabled) {
+                this.logger.debug(`Data source plugin ${pluginId} not enabled, skipping`);
+                continue;
+            }
+
+            // Get Level 3 settings from pluginConfig
             const pluginSettings = options?.pluginConfig?.[pluginId] as
                 | Record<string, unknown>
                 | undefined;
-
-            // If plugin wasn't enabled in the GeneratorForm, skip it
-            if (!pluginSettings?.enabled) {
-                this.logger.debug(
-                    `Data source plugin ${pluginId} not enabled in pluginConfig, skipping`,
-                );
-                continue;
-            }
 
             try {
                 const plugin = registered.plugin as IDataSourcePlugin;
@@ -183,28 +159,32 @@ export class DataSourceFacadeService implements IDataSourceFacade {
     }
 
     /**
-     * Get a list of all enabled data sources for the current context.
+     * Get a list of all enabled data sources for a directory.
+     * Checks DirectoryPlugin.enabled, then autoEnable in manifest.
      */
-    getEnabledSources(options?: DataSourceFacadeOptions): EnabledDataSource[] {
+    async getEnabledSources(directoryId: string): Promise<EnabledDataSource[]> {
+        if (!directoryId) {
+            return [];
+        }
+
         const plugins = this.registry.getByCapability(this.CAPABILITY);
         const enabledPlugins = plugins.filter((p) => p.state === 'enabled');
+        const result: EnabledDataSource[] = [];
 
-        return enabledPlugins
-            .filter((registered) => {
-                const pluginId = registered.plugin.id;
-                const pluginSettings = options?.pluginConfig?.[pluginId] as
-                    | Record<string, unknown>
-                    | undefined;
-                return pluginSettings?.enabled === true;
-            })
-            .map((registered) => {
-                const plugin = registered.plugin as IDataSourcePlugin;
-                return {
+        for (const registered of enabledPlugins) {
+            const plugin = registered.plugin as IDataSourcePlugin;
+            const isEnabled = await this.isPluginEnabledForDirectory(plugin.id, directoryId);
+
+            if (isEnabled) {
+                result.push({
                     id: plugin.id,
                     name: plugin.name,
                     sourceName: plugin.sourceName,
-                };
-            });
+                });
+            }
+        }
+
+        return result;
     }
 
     /**
@@ -234,5 +214,49 @@ export class DataSourceFacadeService implements IDataSourceFacade {
                 enabled: p.state === 'enabled',
             };
         });
+    }
+
+    /**
+     * Check if a plugin is enabled for a specific directory.
+     *
+     * Resolution order:
+     * 1. DirectoryPlugin.enabled (Level 2) - if record exists
+     * 2. pluginConfig.enabled (Level 3) - if no Level 2 record
+     * 3. autoEnable in manifest - if neither Level 2 nor Level 3
+     */
+    private async isPluginEnabledForDirectory(
+        pluginId: string,
+        directoryId?: string,
+        pluginConfig?: Record<string, Record<string, unknown>>,
+    ): Promise<boolean> {
+        // Level 2: Check DirectoryPlugin record
+        if (directoryId && this.directoryPluginRepository) {
+            try {
+                const directoryPlugin =
+                    await this.directoryPluginRepository.findByDirectoryAndPlugin(
+                        directoryId,
+                        pluginId,
+                    );
+
+                if (directoryPlugin !== null) {
+                    return directoryPlugin.enabled;
+                }
+            } catch {
+                // Continue to Level 3
+            }
+        }
+
+        // Level 3: Check pluginConfig
+        if (pluginConfig?.[pluginId]?.enabled === true) {
+            return true;
+        }
+
+        // Check autoEnable in manifest
+        const registered = this.registry.get(pluginId);
+        if (registered?.manifest?.autoEnable) {
+            return true;
+        }
+
+        return false;
     }
 }

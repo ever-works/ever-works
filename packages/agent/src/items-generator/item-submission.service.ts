@@ -4,8 +4,7 @@ import { Directory } from '../entities/directory.entity';
 import { User } from '../entities/user.entity';
 import { DataRepository, IDataConfig } from '../generators/data-generator/data-repository';
 import { slugifyText } from '../utils/text.utils';
-import { SmartImageRouterService } from '../screenshot/smart-image-router.service';
-import { DomainType } from '@ever-works/contracts';
+import { ScreenshotFacadeService } from '../facades/screenshot.facade';
 import type { MutableItemData } from '@ever-works/contracts';
 import {
     SubmitItemDto,
@@ -23,7 +22,7 @@ export class ItemSubmissionService {
 
     constructor(
         private readonly githubService: GithubService,
-        private readonly smartImageRouterService: SmartImageRouterService,
+        private readonly screenshotFacade: ScreenshotFacadeService,
     ) {}
 
     async submitItem(
@@ -111,20 +110,31 @@ export class ItemSubmissionService {
                 images: submitItemDto.images || [],
             };
 
-            // Smart image capture based on directory domain type
-            if (submitItemDto.source_url) {
-                const smartImage = await this.smartImageRouterService.getSmartImage({
-                    url: submitItemDto.source_url,
-                    domainType: (directory.domainType as DomainType) || DomainType.GENERAL,
-                    itemName: submitItemDto.name,
-                    user: directoryOwner,
-                });
+            // Capture screenshot if source URL provided and no images yet
+            if (submitItemDto.source_url && this.screenshotFacade.isAvailable()) {
+                try {
+                    const result = await this.screenshotFacade.capture(
+                        {
+                            url: submitItemDto.source_url,
+                            blockAds: true,
+                            blockCookieBanners: true,
+                            cache: true,
+                        },
+                        {
+                            userId: directoryOwner.id,
+                            directoryId: directory.id,
+                        },
+                    );
 
-                if (smartImage.primaryImage && !itemData.images.includes(smartImage.primaryImage)) {
-                    // Add smart image as the first image if not already present
-                    itemData.images = [smartImage.primaryImage, ...itemData.images];
-                    this.logger.debug(
-                        `Added ${smartImage.source} image for item: ${submitItemDto.name} (confidence: ${smartImage.confidence})`,
+                    if (result.success && result.cacheUrl) {
+                        if (!itemData.images.includes(result.cacheUrl)) {
+                            itemData.images = [result.cacheUrl, ...itemData.images];
+                            this.logger.debug(`Captured screenshot for item: ${submitItemDto.name}`);
+                        }
+                    }
+                } catch (error) {
+                    this.logger.warn(
+                        `Failed to capture screenshot for ${submitItemDto.name}: ${error instanceof Error ? error.message : 'Unknown'}`,
                     );
                 }
             }

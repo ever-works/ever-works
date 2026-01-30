@@ -282,28 +282,46 @@ describe('ScreenshotFacadeService', () => {
     });
 
     describe('getSmartImage', () => {
-        it('should return smart image result', async () => {
+        it('should return smart image result with default capture settings', async () => {
             const screenshotPlugin = createMockScreenshotPlugin('screenshotone', 'ScreenshotOne');
             const registered = createRegisteredPlugin(screenshotPlugin, {
                 capabilities: ['screenshot'],
             });
             registry.getByCapability.mockReturnValue([registered]);
 
-            const result = await service.getSmartImage({
-                url: 'https://example.com',
-                domainType: 'saas',
-            });
+            const result = await service.getSmartImage({ url: 'https://example.com' });
 
             expect(result.primaryImage).toBe('https://cache.example.com/abc123.png');
             expect(result.source).toBe('screenshot');
         });
 
+        it('should use default viewport and format settings', async () => {
+            const screenshotPlugin = createMockScreenshotPlugin('screenshotone', 'ScreenshotOne');
+            const registered = createRegisteredPlugin(screenshotPlugin, {
+                capabilities: ['screenshot'],
+            });
+            registry.getByCapability.mockReturnValue([registered]);
+
+            await service.getSmartImage({ url: 'https://example.com' });
+
+            expect(screenshotPlugin.capture).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    viewportWidth: 1280,
+                    viewportHeight: 800,
+                    format: 'png',
+                    blockAds: true,
+                    blockCookieBanners: true,
+                    cache: true,
+                }),
+            );
+        });
+
         it('should throw NoScreenshotProviderError when no provider exists', async () => {
             registry.getByCapability.mockReturnValue([]);
 
-            await expect(
-                service.getSmartImage({ url: 'https://example.com', domainType: 'saas' }),
-            ).rejects.toThrow(NoScreenshotProviderError);
+            await expect(service.getSmartImage({ url: 'https://example.com' })).rejects.toThrow(
+                NoScreenshotProviderError,
+            );
         });
     });
 
