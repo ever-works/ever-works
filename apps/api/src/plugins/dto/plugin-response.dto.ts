@@ -13,6 +13,7 @@ import type {
     DirectoryPluginResponse,
     PluginListResponse,
     DirectoryPluginListResponse,
+    SettingScopeApi,
 } from '@ever-works/plugin/api';
 
 // Re-export types for convenience
@@ -81,6 +82,22 @@ export class PluginSettingsSchemaPropertyDto implements PluginSettingsSchemaProp
 
     @ApiPropertyOptional({ description: 'Is this field write-only (never returned via API)' })
     writeOnly?: boolean;
+
+    @ApiPropertyOptional({
+        description: 'Setting scope: global, user, or directory',
+        enum: ['global', 'user', 'directory'],
+        default: 'global',
+    })
+    scope?: SettingScopeApi;
+
+    @ApiPropertyOptional({ description: 'Category for grouping settings in UI' })
+    category?: string;
+
+    @ApiPropertyOptional({ description: 'Placeholder text for input fields' })
+    placeholder?: string;
+
+    @ApiPropertyOptional({ description: 'Whether changes require plugin restart' })
+    requiresRestart?: boolean;
 
     @ApiPropertyOptional({ description: 'Enum values', type: [String] })
     enum?: readonly unknown[];

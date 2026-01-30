@@ -17,6 +17,7 @@ export type {
     ConfigurationMode,
     PluginAuthor,
     PluginIcon as PluginsApiIcon,
+    SettingScopeApi,
 } from '@ever-works/plugin/api';
 
 // Type aliases for backward compatibility

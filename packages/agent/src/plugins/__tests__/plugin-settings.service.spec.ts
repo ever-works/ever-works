@@ -858,4 +858,165 @@ describe('PluginSettingsService', () => {
             }
         });
     });
+
+    describe('scope validation', () => {
+        it('should reject directory-scoped settings at global level', async () => {
+            jest.spyOn(pluginRepository, 'findByPluginId').mockResolvedValue({
+                id: '1',
+                pluginId: 'test-plugin',
+                settings: {},
+                secretSettings: {},
+            } as any);
+
+            // maxItems has 'x-scope': 'directory'
+            await expect(
+                service.updateAdminSettings('test-plugin', { maxItems: 50 }),
+            ).rejects.toThrow('Scope violation');
+        });
+
+        it('should reject directory-scoped settings at user level', async () => {
+            jest.spyOn(pluginRepository, 'findByPluginId').mockResolvedValue({
+                id: '1',
+                pluginId: 'test-plugin',
+                settings: {},
+                secretSettings: {},
+            } as any);
+            jest.spyOn(userPluginRepository, 'findByUserAndPlugin').mockResolvedValue(null);
+
+            // maxItems has 'x-scope': 'directory'
+            await expect(
+                service.updateUserSettings('test-plugin', 'user-1', { maxItems: 50 }),
+            ).rejects.toThrow('Scope violation');
+        });
+
+        it('should allow global-scoped settings at any level', async () => {
+            jest.spyOn(pluginRepository, 'findByPluginId').mockResolvedValue({
+                id: '1',
+                pluginId: 'test-plugin',
+                settings: {},
+                secretSettings: {},
+            } as any);
+            jest.spyOn(directoryPluginRepository, 'findByDirectoryAndPlugin').mockResolvedValue(
+                null,
+            );
+
+            // enabled has no x-scope (defaults to 'global')
+            await expect(
+                service.updateDirectorySettings('test-plugin', 'dir-1', { enabled: false }),
+            ).resolves.not.toThrow();
+        });
+
+        it('should allow user-scoped settings at user level', async () => {
+            jest.spyOn(pluginRepository, 'findByPluginId').mockResolvedValue({
+                id: '1',
+                pluginId: 'test-plugin',
+                settings: {},
+                secretSettings: {},
+            } as any);
+            jest.spyOn(userPluginRepository, 'findByUserAndPlugin').mockResolvedValue(null);
+
+            // theme has 'x-scope': 'user'
+            await expect(
+                service.updateUserSettings('test-plugin', 'user-1', { theme: 'dark' }),
+            ).resolves.not.toThrow();
+        });
+
+        it('should reject user-scoped settings at global level', async () => {
+            jest.spyOn(pluginRepository, 'findByPluginId').mockResolvedValue({
+                id: '1',
+                pluginId: 'test-plugin',
+                settings: {},
+                secretSettings: {},
+            } as any);
+
+            // theme has 'x-scope': 'user'
+            await expect(
+                service.updateAdminSettings('test-plugin', { theme: 'dark' }),
+            ).rejects.toThrow('Scope violation');
+        });
+
+        it('should allow directory-scoped settings at directory level', async () => {
+            jest.spyOn(pluginRepository, 'findByPluginId').mockResolvedValue({
+                id: '1',
+                pluginId: 'test-plugin',
+                settings: {},
+                secretSettings: {},
+            } as any);
+            jest.spyOn(directoryPluginRepository, 'findByDirectoryAndPlugin').mockResolvedValue(
+                null,
+            );
+
+            // maxItems has 'x-scope': 'directory'
+            await expect(
+                service.updateDirectorySettings('test-plugin', 'dir-1', { maxItems: 50 }),
+            ).resolves.not.toThrow();
+        });
+    });
+
+    describe('requiresRestart handling', () => {
+        it('should include requiresRestart in event when setting has x-requiresRestart', async () => {
+            const schema: JsonSchema = {
+                type: 'object',
+                properties: {
+                    port: {
+                        type: 'number',
+                        default: 3000,
+                        'x-requiresRestart': true,
+                    },
+                    debug: {
+                        type: 'boolean',
+                        default: false,
+                    },
+                },
+            } as unknown as JsonSchema;
+
+            const plugin = createMockPlugin(schema);
+            jest.spyOn(registry, 'get').mockReturnValue(createRegisteredPlugin(plugin));
+            jest.spyOn(pluginRepository, 'findByPluginId').mockResolvedValue({
+                id: '1',
+                pluginId: 'test-plugin',
+                settings: {},
+                secretSettings: {},
+            } as any);
+
+            await service.updateAdminSettings('test-plugin', { port: 8080 });
+
+            expect(eventEmitter.emit).toHaveBeenCalledWith(
+                PluginEvents.SETTINGS_CHANGED,
+                expect.objectContaining({
+                    requiresRestart: true,
+                }),
+            );
+        });
+
+        it('should not set requiresRestart when setting does not have x-requiresRestart', async () => {
+            const schema: JsonSchema = {
+                type: 'object',
+                properties: {
+                    debug: {
+                        type: 'boolean',
+                        default: false,
+                    },
+                },
+            } as unknown as JsonSchema;
+
+            const plugin = createMockPlugin(schema);
+            jest.spyOn(registry, 'get').mockReturnValue(createRegisteredPlugin(plugin));
+            jest.spyOn(pluginRepository, 'findByPluginId').mockResolvedValue({
+                id: '1',
+                pluginId: 'test-plugin',
+                settings: {},
+                secretSettings: {},
+            } as any);
+
+            await service.updateAdminSettings('test-plugin', { debug: true });
+
+            expect(eventEmitter.emit).toHaveBeenCalledWith(
+                PluginEvents.SETTINGS_CHANGED,
+                expect.objectContaining({
+                    requiresRestart: false,
+                }),
+            );
+        });
+    });
 });

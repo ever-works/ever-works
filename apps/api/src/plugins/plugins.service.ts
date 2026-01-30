@@ -564,9 +564,14 @@ export class PluginsService {
                     title: propSchema.title as string | undefined,
                     description: propSchema.description as string | undefined,
                     default: propSchema.default,
-                    secret: propSchema.secret as boolean | undefined,
-                    masked: propSchema.masked as boolean | undefined,
-                    writeOnly: propSchema.writeOnly as boolean | undefined,
+                    // Use x-prefixed field names from JsonSchema
+                    secret: propSchema['x-secret'] as boolean | undefined,
+                    masked: propSchema['x-masked'] as boolean | undefined,
+                    writeOnly: propSchema['x-writeOnly'] as boolean | undefined,
+                    scope: (propSchema['x-scope'] as 'global' | 'user' | 'directory') || 'global',
+                    category: propSchema['x-category'] as string | undefined,
+                    placeholder: propSchema['x-placeholder'] as string | undefined,
+                    requiresRestart: propSchema['x-requiresRestart'] as boolean | undefined,
                     enum: propSchema.enum as unknown[] | undefined,
                 };
             }
@@ -594,13 +599,13 @@ export class PluginsService {
         const masked: Record<string, unknown> = {};
         for (const [key, value] of Object.entries(settings)) {
             const propSchema = schema.properties[key] as
-                | { writeOnly?: boolean; masked?: boolean }
+                | { 'x-writeOnly'?: boolean; 'x-masked'?: boolean }
                 | undefined;
-            if (propSchema?.writeOnly) {
+            if (propSchema?.['x-writeOnly']) {
                 // Don't include write-only fields
                 continue;
             }
-            if (propSchema?.masked && value) {
+            if (propSchema?.['x-masked'] && value) {
                 // Mask the value
                 masked[key] = '********';
             } else {

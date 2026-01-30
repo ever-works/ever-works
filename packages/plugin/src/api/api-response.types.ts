@@ -9,10 +9,14 @@ import type { ConfigurationMode } from '../settings/settings.types.js';
 import type { JsonSchema } from '../settings/json-schema.types.js';
 
 /**
+ * Setting scope determines where the setting value is stored and who can configure it.
+ */
+export type SettingScopeApi = 'global' | 'user' | 'directory';
+
+/**
  * Plugin settings schema property for API responses.
  * This is a flattened view of JsonSchema for UI convenience.
- * The API transforms JsonSchema's x-prefixed properties (x-secret, x-masked, x-writeOnly)
- * into flat properties for easier consumption.
+ * The API transforms JsonSchema's x-prefixed properties into flat properties.
  */
 export interface PluginSettingsSchemaProperty {
 	/** Property type (e.g., 'string', 'number', 'boolean') */
@@ -29,6 +33,14 @@ export interface PluginSettingsSchemaProperty {
 	masked?: boolean;
 	/** Whether this field is write-only (from JsonSchema x-writeOnly) */
 	writeOnly?: boolean;
+	/** Setting scope: global, user, or directory (from JsonSchema x-scope) */
+	scope?: SettingScopeApi;
+	/** Category for grouping settings in UI (from JsonSchema x-category) */
+	category?: string;
+	/** Placeholder text for input fields (from JsonSchema x-placeholder) */
+	placeholder?: string;
+	/** Whether changes require plugin restart (from JsonSchema x-requiresRestart) */
+	requiresRestart?: boolean;
 	/** Enumerated allowed values */
 	enum?: readonly unknown[];
 }
@@ -63,6 +75,10 @@ export function toPluginSettingsSchemaProperty(schema: JsonSchema): PluginSettin
 		secret: schema['x-secret'],
 		masked: schema['x-masked'],
 		writeOnly: schema['x-writeOnly'],
+		scope: schema['x-scope'] || 'global',
+		category: schema['x-category'],
+		placeholder: schema['x-placeholder'],
+		requiresRestart: schema['x-requiresRestart'],
 		enum: schema.enum
 	};
 }

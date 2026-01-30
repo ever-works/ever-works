@@ -153,7 +153,20 @@ export class PluginSettingsService {
             throw new Error(`Plugin "${pluginId}" not found`);
         }
 
-        // Validate settings
+        // Extract setting definitions for scope and secret validation
+        const definitions = this.extractSettingDefinitions(registered.plugin.settingsSchema);
+
+        // Validate scope - admin can only set global or user-scoped settings
+        const scopeValidation = this.validateSettingsScope(
+            definitions,
+            Object.keys(settings),
+            'global',
+        );
+        if (!scopeValidation.valid) {
+            throw new Error(`Scope violation: ${scopeValidation.violations.join(', ')}`);
+        }
+
+        // Validate settings against schema
         const validation = await registered.plugin.validateSettings(settings);
         if (!validation.valid) {
             throw new Error(
@@ -167,7 +180,6 @@ export class PluginSettingsService {
         const secretKeys = new Set(options?.secretKeys || []);
 
         // Also check schema for secret definitions
-        const definitions = this.extractSettingDefinitions(registered.plugin.settingsSchema);
         for (const def of definitions) {
             if (def.secret) {
                 secretKeys.add(def.key);
@@ -192,11 +204,16 @@ export class PluginSettingsService {
             );
         }
 
+        // Check if any changed settings require restart
+        const changedKeys = Object.keys(settings);
+        const requiresRestart = this.checkRequiresRestart(definitions, changedKeys);
+
         // Emit settings changed event
         this.eventEmitter.emit(PluginEvents.SETTINGS_CHANGED, {
             pluginId,
-            changedKeys: Object.keys(settings),
+            changedKeys,
             scope: 'global',
+            requiresRestart,
             timestamp: Date.now(),
         });
 
@@ -217,7 +234,20 @@ export class PluginSettingsService {
             throw new Error(`Plugin "${pluginId}" not found`);
         }
 
-        // Validate settings
+        // Extract setting definitions for scope and secret validation
+        const definitions = this.extractSettingDefinitions(registered.plugin.settingsSchema);
+
+        // Validate scope - user can set global or user-scoped settings, not directory-only
+        const scopeValidation = this.validateSettingsScope(
+            definitions,
+            Object.keys(settings),
+            'user',
+        );
+        if (!scopeValidation.valid) {
+            throw new Error(`Scope violation: ${scopeValidation.violations.join(', ')}`);
+        }
+
+        // Validate settings against schema
         const validation = await registered.plugin.validateSettings(settings);
         if (!validation.valid) {
             throw new Error(
@@ -230,7 +260,6 @@ export class PluginSettingsService {
         const secretSettings: Record<string, unknown> = {};
         const secretKeys = new Set(options?.secretKeys || []);
 
-        const definitions = this.extractSettingDefinitions(registered.plugin.settingsSchema);
         for (const def of definitions) {
             if (def.secret) {
                 secretKeys.add(def.key);
@@ -270,12 +299,17 @@ export class PluginSettingsService {
             });
         }
 
+        // Check if any changed settings require restart
+        const changedKeys = Object.keys(settings);
+        const requiresRestart = this.checkRequiresRestart(definitions, changedKeys);
+
         // Emit settings changed event
         this.eventEmitter.emit(PluginEvents.SETTINGS_CHANGED, {
             pluginId,
-            changedKeys: Object.keys(settings),
+            changedKeys,
             scope: 'user',
             userId,
+            requiresRestart,
             timestamp: Date.now(),
         });
 
@@ -296,7 +330,20 @@ export class PluginSettingsService {
             throw new Error(`Plugin "${pluginId}" not found`);
         }
 
-        // Validate settings
+        // Extract setting definitions for scope and secret validation
+        const definitions = this.extractSettingDefinitions(registered.plugin.settingsSchema);
+
+        // Validate scope - directory can set any scope (most permissive level)
+        const scopeValidation = this.validateSettingsScope(
+            definitions,
+            Object.keys(settings),
+            'directory',
+        );
+        if (!scopeValidation.valid) {
+            throw new Error(`Scope violation: ${scopeValidation.violations.join(', ')}`);
+        }
+
+        // Validate settings against schema
         const validation = await registered.plugin.validateSettings(settings);
         if (!validation.valid) {
             throw new Error(
@@ -309,7 +356,6 @@ export class PluginSettingsService {
         const secretSettings: Record<string, unknown> = {};
         const secretKeys = new Set(options?.secretKeys || []);
 
-        const definitions = this.extractSettingDefinitions(registered.plugin.settingsSchema);
         for (const def of definitions) {
             if (def.secret) {
                 secretKeys.add(def.key);
@@ -352,12 +398,17 @@ export class PluginSettingsService {
             });
         }
 
+        // Check if any changed settings require restart
+        const changedKeys = Object.keys(settings);
+        const requiresRestart = this.checkRequiresRestart(definitions, changedKeys);
+
         // Emit settings changed event
         this.eventEmitter.emit(PluginEvents.SETTINGS_CHANGED, {
             pluginId,
-            changedKeys: Object.keys(settings),
+            changedKeys,
             scope: 'directory',
             directoryId,
+            requiresRestart,
             timestamp: Date.now(),
         });
 
@@ -424,14 +475,17 @@ export class PluginSettingsService {
         // Check if setting scope matches request scope
         const requestScope = options?.scope || 'global';
 
-        // Resolution order based on priority
+        // Resolution order based on priority (directory > user > admin > env > default)
+        // isFallback indicates when a value comes from a scope that doesn't match the setting's intended scope
+
         // 1. Directory settings (if directoryId provided)
         if (options?.directoryId && sources.directory[key] !== undefined) {
             return {
                 key,
                 value: sources.directory[key],
                 source: 'directory',
-                isFallback: false,
+                // Only non-fallback if setting is actually directory-scoped
+                isFallback: settingScope !== 'directory',
             };
         }
 
@@ -441,16 +495,18 @@ export class PluginSettingsService {
                 key,
                 value: sources.user[key],
                 source: 'user',
-                isFallback: settingScope === 'directory',
+                // Only non-fallback if setting is user-scoped (directory-scoped should use directory)
+                isFallback: settingScope !== 'user',
             };
         }
 
-        // 3. Admin settings
+        // 3. Admin/Global settings
         if (sources.admin[key] !== undefined) {
             return {
                 key,
                 value: sources.admin[key],
                 source: 'admin',
+                // Only non-fallback if setting is global-scoped
                 isFallback: settingScope !== 'global',
             };
         }
@@ -517,8 +573,11 @@ export class PluginSettingsService {
             const prop = propSchema as JsonSchema & {
                 'x-envVar'?: string;
                 'x-secret'?: boolean;
+                'x-masked'?: boolean;
+                'x-writeOnly'?: boolean;
                 'x-scope'?: SettingScope;
                 'x-category'?: string;
+                'x-placeholder'?: string;
                 'x-requiresRestart'?: boolean;
             };
 
@@ -528,12 +587,76 @@ export class PluginSettingsService {
                 scope: prop['x-scope'] || 'global',
                 envVar: prop['x-envVar'],
                 secret: prop['x-secret'] || false,
+                masked: prop['x-masked'] || false,
+                writeOnly: prop['x-writeOnly'] || false,
                 category: prop['x-category'],
+                placeholder: prop['x-placeholder'],
                 requiresRestart: prop['x-requiresRestart'] || false,
                 defaultValue: prop.default,
             });
         }
 
         return definitions;
+    }
+
+    /**
+     * Validate that settings can be updated at the given scope.
+     * Settings with a specific x-scope can only be updated at that scope or higher.
+     * Hierarchy: global < user < directory
+     *
+     * @param definitions - Setting definitions from the schema
+     * @param settingsKeys - Keys of settings being updated
+     * @param updateScope - The scope at which settings are being updated
+     * @returns Object with valid flag and any scope violations
+     */
+    private validateSettingsScope(
+        definitions: SettingDefinition[],
+        settingsKeys: string[],
+        updateScope: SettingScope,
+    ): { valid: boolean; violations: string[] } {
+        const violations: string[] = [];
+        const defMap = new Map(definitions.map((d) => [d.key, d]));
+
+        for (const key of settingsKeys) {
+            const def = defMap.get(key);
+            if (!def) continue; // Unknown setting, let validation handle it
+
+            const settingScope = def.scope;
+
+            // Check if the update scope matches or is more specific than the setting scope
+            // global settings can be set at any level
+            // user settings can be set at user or directory level
+            // directory settings can only be set at directory level
+            if (settingScope === 'directory' && updateScope !== 'directory') {
+                violations.push(
+                    `Setting "${key}" has scope "directory" and cannot be updated at "${updateScope}" level`,
+                );
+            } else if (settingScope === 'user' && updateScope === 'global') {
+                violations.push(
+                    `Setting "${key}" has scope "user" and cannot be updated at "global" level`,
+                );
+            }
+        }
+
+        return {
+            valid: violations.length === 0,
+            violations,
+        };
+    }
+
+    /**
+     * Check if any of the changed settings require a plugin restart
+     */
+    private checkRequiresRestart(definitions: SettingDefinition[], changedKeys: string[]): boolean {
+        const defMap = new Map(definitions.map((d) => [d.key, d]));
+
+        for (const key of changedKeys) {
+            const def = defMap.get(key);
+            if (def?.requiresRestart) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

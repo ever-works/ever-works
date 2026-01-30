@@ -78,6 +78,12 @@ export interface PluginSettingsChangedPayload extends BaseEventPayload {
 	readonly pluginId: string;
 	readonly changedKeys: readonly string[];
 	readonly scope: 'global' | 'directory' | 'user';
+	/** Whether any changed settings require plugin restart */
+	readonly requiresRestart?: boolean;
+	/** User ID when scope is 'user' */
+	readonly userId?: string;
+	/** Directory ID when scope is 'directory' */
+	readonly directoryId?: string;
 }
 
 /**

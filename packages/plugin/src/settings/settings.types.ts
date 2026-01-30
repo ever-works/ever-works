@@ -30,8 +30,14 @@ export interface SettingDefinition {
 	readonly scope: SettingScope;
 	readonly category?: string;
 	readonly envVar?: string;
-	/** Should be masked in UI */
+	/** Whether this is a secret field (stored separately, encrypted) */
 	readonly secret?: boolean;
+	/** Whether this field should be masked in UI display */
+	readonly masked?: boolean;
+	/** Whether this field is write-only (not returned in API responses) */
+	readonly writeOnly?: boolean;
+	/** Placeholder text for UI input fields */
+	readonly placeholder?: string;
 	readonly requiresRestart?: boolean;
 	readonly defaultValue?: unknown;
 }
