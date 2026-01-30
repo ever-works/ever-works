@@ -260,6 +260,19 @@ export class PluginRegistryService {
     }
 
     /**
+     * Get the default plugin for a specific capability.
+     *
+     * Returns the first enabled plugin that has this capability
+     * listed in its defaultForCapabilities array.
+     */
+    getDefaultForCapability(capability: string): RegisteredPlugin | undefined {
+        const plugins = this.getByCapability(capability);
+        const enabledPlugins = plugins.filter((p) => p.state === 'enabled');
+
+        return enabledPlugins.find((p) => p.manifest.defaultForCapabilities?.includes(capability));
+    }
+
+    /**
      * Get all enabled plugins
      */
     getEnabled(): RegisteredPlugin[] {

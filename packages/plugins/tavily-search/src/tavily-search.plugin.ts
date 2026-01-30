@@ -368,7 +368,7 @@ export class TavilySearchPlugin implements IPlugin, ISearchPlugin, IContentExtra
 			systemPlugin: false,
 			autoInstall: true,
 			autoEnable: true,
-			isDefault: true
+			defaultForCapabilities: ['search']
 		};
 	}
 }

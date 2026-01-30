@@ -309,10 +309,15 @@ interface SubProviderOption {
 	name: string; // "Exa Search", "Tavily", "GitHub"
 	icon: PluginIcon; // Icon for dropdown display
 	description?: string;
-	isDefault?: boolean; // Mark if this is the directory default
+	isDefault?: boolean; // Mark if this is the directory-selected default (runtime value)
 	isInstalled: boolean; // User has configured the parent plugin
 }
 ```
+
+> **Note**: The `isDefault` field here is a runtime value indicating the user's directory selection.
+> This is different from the plugin manifest's `defaultForCapabilities` array, which declares
+> platform-wide defaults for specific capabilities. See [FACADE_CREATION_GUIDE.md](./FACADE_CREATION_GUIDE.md)
+> for the distinction between plugin-level and directory-level defaults.
 
 ---
 

@@ -343,4 +343,60 @@ describe('PluginRegistryService', () => {
             expect(service.getAll()).toHaveLength(0);
         });
     });
+
+    describe('getDefaultForCapability', () => {
+        it('should return plugin with matching defaultForCapabilities', () => {
+            const plugin = createMockPlugin('search-plugin');
+            const manifest: PluginManifest = {
+                ...createMockManifest('search-plugin'),
+                capabilities: ['search'],
+                defaultForCapabilities: ['search'],
+            };
+            service.register(plugin, manifest, { state: 'enabled' });
+
+            const result = service.getDefaultForCapability('search');
+
+            expect(result?.plugin.id).toBe('search-plugin');
+        });
+
+        it('should return undefined when no plugin has defaultForCapabilities', () => {
+            const plugin = createMockPlugin('search-plugin');
+            const manifest: PluginManifest = {
+                ...createMockManifest('search-plugin'),
+                capabilities: ['search'],
+            };
+            service.register(plugin, manifest, { state: 'enabled' });
+
+            const result = service.getDefaultForCapability('search');
+
+            expect(result).toBeUndefined();
+        });
+
+        it('should only return enabled plugins', () => {
+            const plugin = createMockPlugin('search-plugin');
+            const manifest: PluginManifest = {
+                ...createMockManifest('search-plugin'),
+                capabilities: ['search'],
+                defaultForCapabilities: ['search'],
+            };
+            service.register(plugin, manifest); // state is 'unloaded' by default
+
+            const result = service.getDefaultForCapability('search');
+
+            expect(result).toBeUndefined();
+        });
+
+        it('should support multi-capability plugins with selective defaults', () => {
+            const plugin = createMockPlugin('multi-plugin');
+            const manifest: PluginManifest = {
+                ...createMockManifest('multi-plugin'),
+                capabilities: ['search', 'content-extractor'],
+                defaultForCapabilities: ['search'],
+            };
+            service.register(plugin, manifest, { state: 'enabled' });
+
+            expect(service.getDefaultForCapability('search')?.plugin.id).toBe('multi-plugin');
+            expect(service.getDefaultForCapability('content-extractor')).toBeUndefined();
+        });
+    });
 });

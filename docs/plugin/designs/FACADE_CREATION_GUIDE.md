@@ -227,9 +227,34 @@ The `BaseFacadeService` provides these methods:
 | `findActivePluginForDirectory(directoryId)`        | Find plugin marked as default for directory        |
 | `getEnabledPlugins(directoryId?, userId?)`         | Get all enabled plugins after enable check         |
 
-## Default Provider (activeCapability)
+## Default Provider Resolution
 
-The `DirectoryPluginEntity.activeCapability` field marks which plugin is the default for a capability in a directory:
+### Plugin-Level Defaults (defaultForCapabilities)
+
+Plugins can declare which capabilities they should be the default provider for using the `defaultForCapabilities` manifest property:
+
+```typescript
+// In plugin's getManifest()
+getManifest(): PluginManifest {
+    return {
+        id: 'tavily-search',
+        capabilities: ['search', 'content-extractor'],
+        defaultForCapabilities: ['search'], // Only default for search, not content-extractor
+        // ...
+    };
+}
+```
+
+Use `registry.getDefaultForCapability(capability)` to resolve the default:
+
+```typescript
+// Get platform-wide default for a capability
+const defaultExtractor = registry.getDefaultForCapability('content-extractor');
+```
+
+### Directory-Level Defaults (activeCapability)
+
+The `DirectoryPluginEntity.activeCapability` field marks which plugin is the default for a capability in a specific directory:
 
 ```typescript
 // Set default provider for a directory
@@ -239,6 +264,13 @@ await directoryPluginRepository.setAsActiveForCapability(directoryId, pluginId, 
 const defaultProvider = await facade.getDefaultProvider(directoryId, userId);
 // Returns: { id: 'plugin-id', name: 'Plugin Name' } | null
 ```
+
+### Resolution Priority
+
+1. Provider override (explicit request)
+2. Directory-level activeCapability
+3. Plugin-level defaultForCapabilities
+4. First enabled plugin with the capability
 
 ## Testing Facades
 

@@ -172,7 +172,9 @@ export class ContentExtractorFacadeService implements IContentExtractorFacade {
 
         // 3. Non-system extractors first (API-based)
         const nonSystemExtractors = enabledPlugins.filter(
-            (p) => !p.manifest.systemPlugin && !(p.plugin as { isDefault?: boolean }).isDefault,
+            (p) =>
+                !p.manifest.systemPlugin &&
+                !p.manifest.defaultForCapabilities?.includes(this.CAPABILITY),
         );
 
         for (const registered of nonSystemExtractors) {
@@ -187,10 +189,8 @@ export class ContentExtractorFacadeService implements IContentExtractorFacade {
             return plugin;
         }
 
-        // 4. System/default extractor
-        const defaultExtractor = enabledPlugins.find(
-            (p) => p.manifest.systemPlugin || (p.plugin as { isDefault?: boolean }).isDefault,
-        );
+        // 4. System/default extractor (uses registry's default resolution)
+        const defaultExtractor = this.registry.getDefaultForCapability(this.CAPABILITY);
 
         if (defaultExtractor) {
             const plugin = defaultExtractor.plugin as IContentExtractorPlugin;

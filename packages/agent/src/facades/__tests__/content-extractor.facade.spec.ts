@@ -25,10 +25,10 @@ describe('ContentExtractorFacadeService', () => {
         providerName: string,
         options?: {
             systemPlugin?: boolean;
-            isDefault?: boolean;
+            defaultForCapabilities?: string[];
             canExtractImpl?: (url: string) => Promise<boolean>;
         },
-    ): IContentExtractorPlugin & { isDefault?: boolean } => ({
+    ): IContentExtractorPlugin => ({
         id,
         name: `${providerName} Extractor`,
         version: '1.0.0',
@@ -37,7 +37,6 @@ describe('ContentExtractorFacadeService', () => {
         settingsSchema: { type: 'object', properties: {} },
         configurationMode: 'hybrid',
         providerName,
-        isDefault: options?.isDefault,
         onLoad: jest.fn(),
         onEnable: jest.fn(),
         onDisable: jest.fn(),
@@ -68,6 +67,7 @@ describe('ContentExtractorFacadeService', () => {
             category: plugin.category,
             capabilities: manifest.capabilities || plugin.capabilities,
             systemPlugin: manifest.systemPlugin,
+            defaultForCapabilities: manifest.defaultForCapabilities,
             ...manifest,
         } as PluginManifest,
         state,
@@ -85,6 +85,7 @@ describe('ContentExtractorFacadeService', () => {
                     useValue: {
                         get: jest.fn(),
                         getByCapability: jest.fn().mockReturnValue([]),
+                        getDefaultForCapability: jest.fn().mockReturnValue(undefined),
                     },
                 },
                 {
@@ -105,11 +106,12 @@ describe('ContentExtractorFacadeService', () => {
         it('should return true when any content extractor plugin is enabled', () => {
             const localExtractor = createMockExtractorPlugin('local-content-extractor', 'Local', {
                 systemPlugin: true,
-                isDefault: true,
+                defaultForCapabilities: ['content-extractor'],
             });
             const registered = createRegisteredPlugin(localExtractor, {
                 capabilities: ['content-extractor'],
                 systemPlugin: true,
+                defaultForCapabilities: ['content-extractor'],
             });
             registry.getByCapability.mockReturnValue([registered]);
 
@@ -125,12 +127,16 @@ describe('ContentExtractorFacadeService', () => {
         it('should return false when plugins exist but are not enabled', () => {
             const localExtractor = createMockExtractorPlugin('local-content-extractor', 'Local', {
                 systemPlugin: true,
-                isDefault: true,
+                defaultForCapabilities: ['content-extractor'],
             });
             const registered = createRegisteredPlugin(
                 localExtractor,
-                { capabilities: ['content-extractor'], systemPlugin: true },
-                'loaded', // Not enabled
+                {
+                    capabilities: ['content-extractor'],
+                    systemPlugin: true,
+                    defaultForCapabilities: ['content-extractor'],
+                },
+                'loaded',
             );
             registry.getByCapability.mockReturnValue([registered]);
 
@@ -168,7 +174,6 @@ describe('ContentExtractorFacadeService', () => {
                 providerOverride: 'notion-extractor',
             });
 
-            // Should return null due to error handling
             expect(result).toBeNull();
         });
 
@@ -179,15 +184,14 @@ describe('ContentExtractorFacadeService', () => {
                 providerOverride: 'non-existent',
             });
 
-            // Should return null due to error handling
             expect(result).toBeNull();
         });
 
-        it('should prefer non-system extractors over system/default', async () => {
+        it('should prefer non-system extractors over default', async () => {
             const notionExtractor = createMockExtractorPlugin('notion-extractor', 'Notion');
             const localExtractor = createMockExtractorPlugin('local-content-extractor', 'Local', {
                 systemPlugin: true,
-                isDefault: true,
+                defaultForCapabilities: ['content-extractor'],
             });
 
             const notionRegistered = createRegisteredPlugin(notionExtractor, {
@@ -197,6 +201,7 @@ describe('ContentExtractorFacadeService', () => {
             const localRegistered = createRegisteredPlugin(localExtractor, {
                 capabilities: ['content-extractor'],
                 systemPlugin: true,
+                defaultForCapabilities: ['content-extractor'],
             });
 
             registry.getByCapability.mockReturnValue([localRegistered, notionRegistered]);
@@ -207,13 +212,13 @@ describe('ContentExtractorFacadeService', () => {
             expect(localExtractor.extract).not.toHaveBeenCalled();
         });
 
-        it('should fall back to system/default extractor when non-system plugin cannot handle URL', async () => {
+        it('should fall back to default extractor when non-system plugin cannot handle URL', async () => {
             const notionExtractor = createMockExtractorPlugin('notion-extractor', 'Notion', {
-                canExtractImpl: jest.fn().mockResolvedValue(false), // Cannot handle this URL
+                canExtractImpl: jest.fn().mockResolvedValue(false),
             });
             const localExtractor = createMockExtractorPlugin('local-content-extractor', 'Local', {
                 systemPlugin: true,
-                isDefault: true,
+                defaultForCapabilities: ['content-extractor'],
             });
 
             const notionRegistered = createRegisteredPlugin(notionExtractor, {
@@ -223,9 +228,11 @@ describe('ContentExtractorFacadeService', () => {
             const localRegistered = createRegisteredPlugin(localExtractor, {
                 capabilities: ['content-extractor'],
                 systemPlugin: true,
+                defaultForCapabilities: ['content-extractor'],
             });
 
             registry.getByCapability.mockReturnValue([notionRegistered, localRegistered]);
+            registry.getDefaultForCapability.mockReturnValue(localRegistered);
 
             await service.extractContent('https://example.com');
 
@@ -243,10 +250,10 @@ describe('ContentExtractorFacadeService', () => {
 
         it('should use first enabled non-system extractor that can handle URL', async () => {
             const githubExtractor = createMockExtractorPlugin('github-extractor', 'GitHub', {
-                canExtractImpl: jest.fn().mockResolvedValue(false), // Cannot handle
+                canExtractImpl: jest.fn().mockResolvedValue(false),
             });
             const notionExtractor = createMockExtractorPlugin('notion-extractor', 'Notion', {
-                canExtractImpl: jest.fn().mockResolvedValue(true), // Can handle
+                canExtractImpl: jest.fn().mockResolvedValue(true),
             });
 
             const githubRegistered = createRegisteredPlugin(githubExtractor, {
@@ -274,7 +281,7 @@ describe('ContentExtractorFacadeService', () => {
             const notion = createMockExtractorPlugin('notion-extractor', 'Notion');
             const local = createMockExtractorPlugin('local-content-extractor', 'Local', {
                 systemPlugin: true,
-                isDefault: true,
+                defaultForCapabilities: ['content-extractor'],
             });
 
             const notionRegistered = createRegisteredPlugin(notion, {
@@ -282,7 +289,11 @@ describe('ContentExtractorFacadeService', () => {
             });
             const localRegistered = createRegisteredPlugin(
                 local,
-                { capabilities: ['content-extractor'], systemPlugin: true },
+                {
+                    capabilities: ['content-extractor'],
+                    systemPlugin: true,
+                    defaultForCapabilities: ['content-extractor'],
+                },
                 'enabled',
             );
 

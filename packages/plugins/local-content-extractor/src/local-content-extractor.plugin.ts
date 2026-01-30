@@ -90,11 +90,6 @@ export class LocalContentExtractorPlugin implements IPlugin, IContentExtractorPl
 	 */
 	readonly systemPlugin = true;
 
-	/**
-	 * This is the default content extractor
-	 */
-	readonly isDefault = true;
-
 	private context?: PluginContext;
 	private turndownService: TurndownService;
 
@@ -515,7 +510,7 @@ export class LocalContentExtractorPlugin implements IPlugin, IContentExtractorPl
 			systemPlugin: true,
 			autoInstall: true,
 			autoEnable: true,
-			isDefault: true
+			defaultForCapabilities: ['content-extractor']
 		};
 	}
 }
