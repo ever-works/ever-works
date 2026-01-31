@@ -39,15 +39,20 @@ export function useKeyboardShortcuts(options: KeyboardShortcutsOptions = {}) {
                 return;
             }
 
-            // Ctrl/Cmd + N: Create new directory
-            if (modifier && event.key.toLowerCase() === 'n') {
+            // The following shortcuts only work when not in an input field
+            if (isInputField) {
+                return;
+            }
+
+            // C: Create new directory
+            if (event.key.toLowerCase() === 'c' && !modifier) {
                 event.preventDefault();
                 router.push(ROUTES.DASHBOARD_DIRECTORIES_NEW);
                 return;
             }
 
-            // ?: Open help (only when not in an input field)
-            if (event.key === '?' && !isInputField && onOpenHelp) {
+            // ?: Open help
+            if (event.key === '?' && onOpenHelp) {
                 event.preventDefault();
                 onOpenHelp();
                 return;

@@ -41,7 +41,7 @@ export function HelpDrawer({ open, onClose }: HelpDrawerProps) {
 
     const keyboardShortcuts = [
         { keys: ['Ctrl', 'K'], label: t('shortcuts.search') },
-        { keys: ['Ctrl', 'N'], label: t('shortcuts.newDirectory') },
+        { keys: ['C'], label: t('shortcuts.newDirectory') },
         { keys: ['?'], label: t('shortcuts.help') },
     ];
 
