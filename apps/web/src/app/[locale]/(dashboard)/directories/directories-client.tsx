@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Directory } from '@/lib/api/directory';
 import { DirectoryList } from '@/components/directories/DirectoryList';
 import { EmptyState } from '@/components/common/EmptyState';
@@ -20,6 +21,7 @@ export default function DirectoriesClient({
     totalDirectories,
 }: DirectoriesClientProps) {
     const router = useRouter();
+    const searchParams = useSearchParams();
     const t = useTranslations('dashboard.directories');
     const [directories, setDirectories] = useState<Directory[]>(initialDirectories);
     const [total, setTotal] = useState(totalDirectories);
@@ -27,6 +29,18 @@ export default function DirectoriesClient({
     const [searchQuery, setSearchQuery] = useState('');
     const [page, setPage] = useState(1);
     const itemsPerPage = 20;
+    const searchInputRef = useRef<HTMLInputElement>(null);
+
+    // Focus search input when navigating with ?focus=search
+    useEffect(() => {
+        if (searchParams.get('focus') === 'search' && searchInputRef.current) {
+            searchInputRef.current.focus();
+            // Clean up the URL without the focus param
+            const url = new URL(window.location.href);
+            url.searchParams.delete('focus');
+            window.history.replaceState({}, '', url.toString());
+        }
+    }, [searchParams]);
 
     const handleSearch = async () => {
         setLoading(true);
@@ -84,6 +98,7 @@ export default function DirectoriesClient({
                 <div className="flex-1">
                     <div className="relative">
                         <input
+                            ref={searchInputRef}
                             type="text"
                             placeholder={t('search')}
                             value={searchQuery}

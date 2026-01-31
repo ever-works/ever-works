@@ -232,10 +232,10 @@
                 },
                 "shortcuts": {
                     "title": "Keyboard Shortcuts",
-                    "search": "Search",
-                    "newDirectory": "New directory",
+                    "search": "Search directories",
+                    "newDirectory": "Create new directory",
                     "help": "Open help",
-                    "hint": "Keyboard shortcuts are coming soon"
+                    "hint": "Use Cmd on Mac or Ctrl on Windows/Linux"
                 },
                 "links": {
                     "title": "Resources",
