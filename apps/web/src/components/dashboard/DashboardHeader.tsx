@@ -1,9 +1,11 @@
 'use client';
 
+import { useState } from 'react';
 import { AuthUser } from '@/lib/auth';
 import { cn } from '@/lib/utils/cn';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { NotificationDropdown } from './NotificationDropdown';
+import { HelpDrawer } from './HelpDrawer';
 
 interface DashboardHeaderProps {
     user: AuthUser;
@@ -12,6 +14,8 @@ interface DashboardHeaderProps {
 }
 
 export function DashboardHeader({ onMenuClick, isSidebarOpen = true }: DashboardHeaderProps) {
+    const [isHelpOpen, setIsHelpOpen] = useState(false);
+
     return (
         <header
             className={cn(
@@ -82,6 +86,7 @@ export function DashboardHeader({ onMenuClick, isSidebarOpen = true }: Dashboard
                         />
 
                         <button
+                            onClick={() => setIsHelpOpen(true)}
                             className={cn(
                                 'p-2 rounded-md',
                                 'text-text-secondary dark:text-text-secondary-dark',
@@ -106,6 +111,8 @@ export function DashboardHeader({ onMenuClick, isSidebarOpen = true }: Dashboard
                     </div>
                 </div>
             </div>
+
+            <HelpDrawer open={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
         </header>
     );
 }
