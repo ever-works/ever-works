@@ -220,6 +220,31 @@
             "notifications": {
                 "title": "Meldingen",
                 "empty": "Geen nieuwe meldingen"
+            },
+            "help": {
+                "title": "Hulp & bronnen",
+                "subtitle": "Snelle tips en handige links",
+                "quickTips": {
+                    "title": "Snelle tips",
+                    "tip1": "Gebruik de AI-chat om directories te maken met natuurlijke taal",
+                    "tip2": "Importeer bestaande awesome-lijsten of datarepository's",
+                    "tip3": "Pas het uiterlijk van je directory aan in de instellingen"
+                },
+                "shortcuts": {
+                    "title": "Sneltoetsen",
+                    "search": "Zoeken",
+                    "newDirectory": "Nieuwe directory",
+                    "help": "Hulp",
+                    "hint": "Druk overal op ? om alle sneltoetsen te zien"
+                },
+                "links": {
+                    "title": "Handige links",
+                    "github": "GitHub repository",
+                    "issues": "Probleem melden",
+                    "docs": "Documentatie",
+                    "comingSoon": "Binnenkort beschikbaar"
+                },
+                "version": "Versie {version}"
             }
         },
         "directories": {
@@ -1192,7 +1217,8 @@
                 "success": {
                     "started": "Import gestart! Doorverwijzen naar uw directory...",
                     "linked": "Directory succesvol gekoppeld"
-                }
+                },
+                "detectionFailed": "We konden het formaat niet automatisch detecteren. Selecteer hoe je deze repository wilt importeren."
             }
         },
         "github": {
@@ -1358,7 +1384,10 @@
             "newChat": "Nieuwe chat",
             "loadingConversation": "Gesprek laden…",
             "inputPlaceholder": "Beschrijf de directory die u wilt maken...",
-            "sendButton": "Verzenden"
+            "sendButton": "Verzenden",
+            "errors": {
+                "unableToSend": "Kan bericht niet verzenden."
+            }
         }
     },
     "layout": {
@@ -1538,6 +1567,21 @@
             "username": {
                 "minLength": "Gebruikersnaam moet minimaal {length} tekens bevatten"
             }
+        }
+    },
+    "common": {
+        "ui": {
+            "close": "Sluiten",
+            "dismiss": "Negeren"
+        },
+        "theme": {
+            "toggle": "Thema wisselen",
+            "switchToLight": "Naar lichte modus",
+            "switchToDark": "Naar donkere modus"
+        },
+        "visibility": {
+            "private": "Privé",
+            "public": "Openbaar"
         }
     }
 }

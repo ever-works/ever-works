@@ -220,6 +220,31 @@
             "notifications": {
                 "title": "Benachrichtigungen",
                 "empty": "Keine neuen Benachrichtigungen"
+            },
+            "help": {
+                "title": "Hilfe & Ressourcen",
+                "subtitle": "Schnelle Tipps und nützliche Links",
+                "quickTips": {
+                    "title": "Schnelle Tipps",
+                    "tip1": "Nutzen Sie den KI-Chat, um Verzeichnisse mit natürlicher Sprache zu erstellen",
+                    "tip2": "Importieren Sie bestehende Awesome-Listen oder Daten-Repositories",
+                    "tip3": "Passen Sie das Erscheinungsbild Ihres Verzeichnisses in den Einstellungen an"
+                },
+                "shortcuts": {
+                    "title": "Tastaturkürzel",
+                    "search": "Suchen",
+                    "newDirectory": "Neues Verzeichnis",
+                    "help": "Hilfe",
+                    "hint": "Drücken Sie ? überall, um alle Kürzel zu sehen"
+                },
+                "links": {
+                    "title": "Nützliche Links",
+                    "github": "GitHub Repository",
+                    "issues": "Problem melden",
+                    "docs": "Dokumentation",
+                    "comingSoon": "Demnächst verfügbar"
+                },
+                "version": "Version {version}"
             }
         },
         "directories": {
@@ -1192,7 +1217,8 @@
                 "success": {
                     "started": "Import gestartet! Weiterleitung zu Ihrem Verzeichnis...",
                     "linked": "Verzeichnis erfolgreich verknüpft"
-                }
+                },
+                "detectionFailed": "Das Format konnte nicht automatisch erkannt werden. Bitte wählen Sie, wie dieses Repository importiert werden soll."
             }
         },
         "github": {
@@ -1358,7 +1384,10 @@
             "newChat": "Neuer Chat",
             "loadingConversation": "Konversation wird geladen…",
             "inputPlaceholder": "Beschreiben Sie das Verzeichnis, das Sie erstellen möchten...",
-            "sendButton": "Senden"
+            "sendButton": "Senden",
+            "errors": {
+                "unableToSend": "Nachricht konnte nicht gesendet werden."
+            }
         }
     },
     "layout": {
@@ -1538,6 +1567,21 @@
             "username": {
                 "minLength": "Benutzername muss mindestens {length} Zeichen enthalten"
             }
+        }
+    },
+    "common": {
+        "ui": {
+            "close": "Schließen",
+            "dismiss": "Verwerfen"
+        },
+        "theme": {
+            "toggle": "Design umschalten",
+            "switchToLight": "Zum hellen Modus wechseln",
+            "switchToDark": "Zum dunklen Modus wechseln"
+        },
+        "visibility": {
+            "private": "Privat",
+            "public": "Öffentlich"
         }
     }
 }

@@ -220,6 +220,31 @@
             "notifications": {
                 "title": "Powiadomienia",
                 "empty": "Brak nowych powiadomień"
+            },
+            "help": {
+                "title": "Pomoc i zasoby",
+                "subtitle": "Szybkie wskazówki i przydatne linki",
+                "quickTips": {
+                    "title": "Szybkie wskazówki",
+                    "tip1": "Użyj czatu AI do tworzenia katalogów w języku naturalnym",
+                    "tip2": "Importuj istniejące listy awesome lub repozytoria danych",
+                    "tip3": "Dostosuj wygląd katalogu w ustawieniach"
+                },
+                "shortcuts": {
+                    "title": "Skróty klawiszowe",
+                    "search": "Szukaj",
+                    "newDirectory": "Nowy katalog",
+                    "help": "Pomoc",
+                    "hint": "Naciśnij ? w dowolnym miejscu, aby zobaczyć wszystkie skróty"
+                },
+                "links": {
+                    "title": "Przydatne linki",
+                    "github": "Repozytorium GitHub",
+                    "issues": "Zgłoś problem",
+                    "docs": "Dokumentacja",
+                    "comingSoon": "Wkrótce"
+                },
+                "version": "Wersja {version}"
             }
         },
         "directories": {
@@ -1192,7 +1217,8 @@
                 "success": {
                     "started": "Import rozpoczęty! Przekierowywanie do Twojego katalogu...",
                     "linked": "Katalog pomyślnie połączony"
-                }
+                },
+                "detectionFailed": "Nie udało się automatycznie wykryć formatu. Wybierz sposób importu tego repozytorium."
             }
         },
         "github": {
@@ -1358,7 +1384,10 @@
             "newChat": "Nowy czat",
             "loadingConversation": "Ładowanie rozmowy...",
             "inputPlaceholder": "Opisz katalog, który chcesz utworzyć...",
-            "sendButton": "Wyślij"
+            "sendButton": "Wyślij",
+            "errors": {
+                "unableToSend": "Nie można wysłać wiadomości."
+            }
         }
     },
     "layout": {
@@ -1538,6 +1567,21 @@
             "username": {
                 "minLength": "Nazwa użytkownika musi zawierać co najmniej {length} znaków"
             }
+        }
+    },
+    "common": {
+        "ui": {
+            "close": "Zamknij",
+            "dismiss": "Odrzuć"
+        },
+        "theme": {
+            "toggle": "Przełącz motyw",
+            "switchToLight": "Przełącz na jasny tryb",
+            "switchToDark": "Przełącz na ciemny tryb"
+        },
+        "visibility": {
+            "private": "Prywatny",
+            "public": "Publiczny"
         }
     }
 }

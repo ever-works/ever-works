@@ -220,6 +220,31 @@
             "notifications": {
                 "title": "알림",
                 "empty": "새 알림 없음"
+            },
+            "help": {
+                "title": "도움말 및 리소스",
+                "subtitle": "빠른 팁과 유용한 링크",
+                "quickTips": {
+                    "title": "빠른 팁",
+                    "tip1": "AI 채팅을 사용하여 자연어로 디렉토리 생성",
+                    "tip2": "기존 awesome 목록이나 데이터 저장소 가져오기",
+                    "tip3": "설정에서 디렉토리 모양 사용자 정의"
+                },
+                "shortcuts": {
+                    "title": "키보드 단축키",
+                    "search": "검색",
+                    "newDirectory": "새 디렉토리",
+                    "help": "도움말",
+                    "hint": "?를 눌러 모든 단축키 보기"
+                },
+                "links": {
+                    "title": "유용한 링크",
+                    "github": "GitHub 저장소",
+                    "issues": "문제 보고",
+                    "docs": "문서",
+                    "comingSoon": "곧 출시"
+                },
+                "version": "버전 {version}"
             }
         },
         "directories": {
@@ -1192,7 +1217,8 @@
                 "success": {
                     "started": "가져오기 시작! 디렉토리로 리디렉션 중...",
                     "linked": "디렉토리가 성공적으로 연결되었습니다"
-                }
+                },
+                "detectionFailed": "형식을 자동으로 감지할 수 없습니다. 이 저장소를 가져오는 방법을 선택하세요."
             }
         },
         "github": {
@@ -1358,7 +1384,10 @@
             "newChat": "새 채팅",
             "loadingConversation": "대화 로드 중…",
             "inputPlaceholder": "생성하려는 디렉토리를 설명하세요...",
-            "sendButton": "전송"
+            "sendButton": "전송",
+            "errors": {
+                "unableToSend": "메시지를 보낼 수 없습니다."
+            }
         }
     },
     "layout": {
@@ -1538,6 +1567,21 @@
             "username": {
                 "minLength": "사용자명은 최소 {length}자 이상이어야 합니다"
             }
+        }
+    },
+    "common": {
+        "ui": {
+            "close": "닫기",
+            "dismiss": "닫기"
+        },
+        "theme": {
+            "toggle": "테마 전환",
+            "switchToLight": "라이트 모드로 전환",
+            "switchToDark": "다크 모드로 전환"
+        },
+        "visibility": {
+            "private": "비공개",
+            "public": "공개"
         }
     }
 }

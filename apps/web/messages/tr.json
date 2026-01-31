@@ -220,6 +220,31 @@
             "notifications": {
                 "title": "Bildirimler",
                 "empty": "Yeni bildirim yok"
+            },
+            "help": {
+                "title": "Yardım ve Kaynaklar",
+                "subtitle": "Hızlı ipuçları ve yararlı bağlantılar",
+                "quickTips": {
+                    "title": "Hızlı İpuçları",
+                    "tip1": "Doğal dil ile dizinler oluşturmak için AI sohbetini kullanın",
+                    "tip2": "Mevcut awesome listelerini veya veri depolarını içe aktarın",
+                    "tip3": "Dizin görünümünüzü ayarlarda özelleştirin"
+                },
+                "shortcuts": {
+                    "title": "Klavye Kısayolları",
+                    "search": "Ara",
+                    "newDirectory": "Yeni Dizin",
+                    "help": "Yardım",
+                    "hint": "Tüm kısayolları görmek için herhangi bir yerde ? tuşuna basın"
+                },
+                "links": {
+                    "title": "Yararlı Bağlantılar",
+                    "github": "GitHub Deposu",
+                    "issues": "Sorun Bildir",
+                    "docs": "Belgeler",
+                    "comingSoon": "Yakında"
+                },
+                "version": "Sürüm {version}"
             }
         },
         "directories": {
@@ -1192,7 +1217,8 @@
                 "success": {
                     "started": "İçe aktarma başlatıldı! Dizininize yönlendiriliyorsunuz...",
                     "linked": "Dizin başarıyla bağlandı"
-                }
+                },
+                "detectionFailed": "Formatı otomatik olarak algılayamadık. Lütfen bu depoyu nasıl içe aktaracağınızı seçin."
             }
         },
         "github": {
@@ -1358,7 +1384,10 @@
             "newChat": "Yeni sohbet",
             "loadingConversation": "Sohbet yükleniyor…",
             "inputPlaceholder": "Oluşturmak istediğiniz dizini açıklayın...",
-            "sendButton": "Gönder"
+            "sendButton": "Gönder",
+            "errors": {
+                "unableToSend": "Mesaj gönderilemedi."
+            }
         }
     },
     "layout": {
@@ -1538,6 +1567,21 @@
             "username": {
                 "minLength": "Kullanıcı adı en az {length} karakter içermeli"
             }
+        }
+    },
+    "common": {
+        "ui": {
+            "close": "Kapat",
+            "dismiss": "Yoksay"
+        },
+        "theme": {
+            "toggle": "Tema değiştir",
+            "switchToLight": "Açık moda geç",
+            "switchToDark": "Koyu moda geç"
+        },
+        "visibility": {
+            "private": "Özel",
+            "public": "Herkese Açık"
         }
     }
 }

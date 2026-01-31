@@ -475,8 +475,7 @@ export function DirectoryImportForm({ user }: DirectoryImportFormProps) {
                 <div className="space-y-4">
                     <div className="p-4 rounded-lg bg-info/5 border border-info/20">
                         <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
-                            We could not automatically detect the format. Please select how to
-                            import this repository.
+                            {t('detectionFailed')}
                         </p>
                         <p className="text-sm text-text-muted dark:text-text-muted-dark mt-1">
                             {analysisResult.owner}/{analysisResult.repo}

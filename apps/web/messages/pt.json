@@ -220,6 +220,31 @@
             "notifications": {
                 "title": "Notificações",
                 "empty": "Nenhuma notificação nova"
+            },
+            "help": {
+                "title": "Ajuda e recursos",
+                "subtitle": "Dicas rápidas e links úteis",
+                "quickTips": {
+                    "title": "Dicas rápidas",
+                    "tip1": "Use o chat de IA para criar diretórios com linguagem natural",
+                    "tip2": "Importe listas awesome ou repositórios de dados existentes",
+                    "tip3": "Personalize a aparência do seu diretório nas configurações"
+                },
+                "shortcuts": {
+                    "title": "Atalhos de teclado",
+                    "search": "Pesquisar",
+                    "newDirectory": "Novo diretório",
+                    "help": "Ajuda",
+                    "hint": "Pressione ? em qualquer lugar para ver todos os atalhos"
+                },
+                "links": {
+                    "title": "Links úteis",
+                    "github": "Repositório GitHub",
+                    "issues": "Reportar um problema",
+                    "docs": "Documentação",
+                    "comingSoon": "Em breve"
+                },
+                "version": "Versão {version}"
             }
         },
         "directories": {
@@ -1192,7 +1217,8 @@
                 "success": {
                     "started": "Importação iniciada! Redirecionando para seu diretório...",
                     "linked": "Diretório vinculado com sucesso"
-                }
+                },
+                "detectionFailed": "Não conseguimos detectar automaticamente o formato. Por favor, selecione como importar este repositório."
             }
         },
         "github": {
@@ -1358,7 +1384,10 @@
             "newChat": "Novo chat",
             "loadingConversation": "Carregando conversa…",
             "inputPlaceholder": "Descreva o diretório que deseja criar...",
-            "sendButton": "Enviar"
+            "sendButton": "Enviar",
+            "errors": {
+                "unableToSend": "Não foi possível enviar a mensagem."
+            }
         }
     },
     "layout": {
@@ -1538,6 +1567,21 @@
             "username": {
                 "minLength": "Nome de usuário deve conter pelo menos {length} caracteres"
             }
+        }
+    },
+    "common": {
+        "ui": {
+            "close": "Fechar",
+            "dismiss": "Dispensar"
+        },
+        "theme": {
+            "toggle": "Alternar tema",
+            "switchToLight": "Mudar para modo claro",
+            "switchToDark": "Mudar para modo escuro"
+        },
+        "visibility": {
+            "private": "Privado",
+            "public": "Público"
         }
     }
 }

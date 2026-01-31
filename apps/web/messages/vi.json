@@ -220,6 +220,31 @@
             "notifications": {
                 "title": "Thông báo",
                 "empty": "Không có thông báo mới"
+            },
+            "help": {
+                "title": "Trợ giúp & Tài nguyên",
+                "subtitle": "Mẹo nhanh và liên kết hữu ích",
+                "quickTips": {
+                    "title": "Mẹo nhanh",
+                    "tip1": "Sử dụng trò chuyện AI để tạo thư mục bằng ngôn ngữ tự nhiên",
+                    "tip2": "Nhập danh sách awesome hoặc kho dữ liệu hiện có",
+                    "tip3": "Tùy chỉnh giao diện thư mục trong cài đặt"
+                },
+                "shortcuts": {
+                    "title": "Phím tắt",
+                    "search": "Tìm kiếm",
+                    "newDirectory": "Thư mục mới",
+                    "help": "Trợ giúp",
+                    "hint": "Nhấn ? bất kỳ đâu để xem tất cả phím tắt"
+                },
+                "links": {
+                    "title": "Liên kết hữu ích",
+                    "github": "Kho lưu trữ GitHub",
+                    "issues": "Báo cáo vấn đề",
+                    "docs": "Tài liệu",
+                    "comingSoon": "Sắp ra mắt"
+                },
+                "version": "Phiên bản {version}"
             }
         },
         "directories": {
@@ -1192,7 +1217,8 @@
                 "success": {
                     "started": "Đã bắt đầu nhập! Đang chuyển hướng đến thư mục của bạn...",
                     "linked": "Đã liên kết thư mục thành công"
-                }
+                },
+                "detectionFailed": "Chúng tôi không thể tự động phát hiện định dạng. Vui lòng chọn cách nhập kho lưu trữ này."
             }
         },
         "github": {
@@ -1358,7 +1384,10 @@
             "newChat": "Cuộc trò chuyện mới",
             "loadingConversation": "Đang tải cuộc trò chuyện…",
             "inputPlaceholder": "Mô tả thư mục bạn muốn tạo...",
-            "sendButton": "Gửi"
+            "sendButton": "Gửi",
+            "errors": {
+                "unableToSend": "Không thể gửi tin nhắn."
+            }
         }
     },
     "layout": {
@@ -1538,6 +1567,21 @@
             "username": {
                 "minLength": "Tên người dùng phải chứa ít nhất {length} ký tự"
             }
+        }
+    },
+    "common": {
+        "ui": {
+            "close": "Đóng",
+            "dismiss": "Bỏ qua"
+        },
+        "theme": {
+            "toggle": "Chuyển đổi chủ đề",
+            "switchToLight": "Chuyển sang chế độ sáng",
+            "switchToDark": "Chuyển sang chế độ tối"
+        },
+        "visibility": {
+            "private": "Riêng tư",
+            "public": "Công khai"
         }
     }
 }

@@ -220,6 +220,31 @@
             "notifications": {
                 "title": "通知",
                 "empty": "新しい通知はありません"
+            },
+            "help": {
+                "title": "ヘルプとリソース",
+                "subtitle": "クイックヒントと便利なリンク",
+                "quickTips": {
+                    "title": "クイックヒント",
+                    "tip1": "AIチャットを使用して自然言語でディレクトリを作成",
+                    "tip2": "既存のawesomeリストやデータリポジトリをインポート",
+                    "tip3": "設定でディレクトリの外観をカスタマイズ"
+                },
+                "shortcuts": {
+                    "title": "キーボードショートカット",
+                    "search": "検索",
+                    "newDirectory": "新規ディレクトリ",
+                    "help": "ヘルプ",
+                    "hint": "?を押すとすべてのショートカットを表示"
+                },
+                "links": {
+                    "title": "便利なリンク",
+                    "github": "GitHubリポジトリ",
+                    "issues": "問題を報告",
+                    "docs": "ドキュメント",
+                    "comingSoon": "近日公開"
+                },
+                "version": "バージョン {version}"
             }
         },
         "directories": {
@@ -1192,7 +1217,8 @@
                 "success": {
                     "started": "インポートを開始しました！ディレクトリにリダイレクトします...",
                     "linked": "ディレクトリを正常にリンクしました"
-                }
+                },
+                "detectionFailed": "フォーマットを自動検出できませんでした。このリポジトリのインポート方法を選択してください。"
             }
         },
         "github": {
@@ -1358,7 +1384,10 @@
             "newChat": "新しいチャット",
             "loadingConversation": "会話を読み込み中…",
             "inputPlaceholder": "作成したいディレクトリを説明...",
-            "sendButton": "送信"
+            "sendButton": "送信",
+            "errors": {
+                "unableToSend": "メッセージを送信できませんでした。"
+            }
         }
     },
     "layout": {
@@ -1538,6 +1567,21 @@
             "username": {
                 "minLength": "ユーザー名は {length} 文字以上である必要があります"
             }
+        }
+    },
+    "common": {
+        "ui": {
+            "close": "閉じる",
+            "dismiss": "閉じる"
+        },
+        "theme": {
+            "toggle": "テーマを切り替え",
+            "switchToLight": "ライトモードに切り替え",
+            "switchToDark": "ダークモードに切り替え"
+        },
+        "visibility": {
+            "private": "プライベート",
+            "public": "パブリック"
         }
     }
 }

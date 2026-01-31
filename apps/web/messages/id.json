@@ -220,6 +220,31 @@
             "notifications": {
                 "title": "Notifikasi",
                 "empty": "Tidak ada notifikasi baru"
+            },
+            "help": {
+                "title": "Bantuan & Sumber Daya",
+                "subtitle": "Tips cepat dan tautan berguna",
+                "quickTips": {
+                    "title": "Tips Cepat",
+                    "tip1": "Gunakan chat AI untuk membuat direktori dengan bahasa alami",
+                    "tip2": "Impor daftar awesome atau repositori data yang ada",
+                    "tip3": "Kustomisasi tampilan direktori Anda di pengaturan"
+                },
+                "shortcuts": {
+                    "title": "Pintasan Keyboard",
+                    "search": "Cari",
+                    "newDirectory": "Direktori Baru",
+                    "help": "Bantuan",
+                    "hint": "Tekan ? di mana saja untuk melihat semua pintasan"
+                },
+                "links": {
+                    "title": "Tautan Berguna",
+                    "github": "Repositori GitHub",
+                    "issues": "Laporkan Masalah",
+                    "docs": "Dokumentasi",
+                    "comingSoon": "Segera Hadir"
+                },
+                "version": "Versi {version}"
             }
         },
         "directories": {
@@ -1192,7 +1217,8 @@
                 "success": {
                     "started": "Impor dimulai! Mengalihkan ke direktori Anda...",
                     "linked": "Direktori berhasil ditautkan"
-                }
+                },
+                "detectionFailed": "Kami tidak dapat mendeteksi format secara otomatis. Silakan pilih cara mengimpor repositori ini."
             }
         },
         "github": {
@@ -1358,7 +1384,10 @@
             "newChat": "Obrolan baru",
             "loadingConversation": "Memuat percakapan…",
             "inputPlaceholder": "Jelaskan direktori yang ingin Anda buat...",
-            "sendButton": "Kirim"
+            "sendButton": "Kirim",
+            "errors": {
+                "unableToSend": "Tidak dapat mengirim pesan."
+            }
         }
     },
     "layout": {
@@ -1538,6 +1567,21 @@
             "username": {
                 "minLength": "Nama pengguna harus mengandung setidaknya {length} karakter"
             }
+        }
+    },
+    "common": {
+        "ui": {
+            "close": "Tutup",
+            "dismiss": "Abaikan"
+        },
+        "theme": {
+            "toggle": "Ganti tema",
+            "switchToLight": "Beralih ke mode terang",
+            "switchToDark": "Beralih ke mode gelap"
+        },
+        "visibility": {
+            "private": "Pribadi",
+            "public": "Publik"
         }
     }
 }

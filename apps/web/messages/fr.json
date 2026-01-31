@@ -220,6 +220,31 @@
             "notifications": {
                 "title": "Notifications",
                 "empty": "Aucune nouvelle notification"
+            },
+            "help": {
+                "title": "Aide et ressources",
+                "subtitle": "Conseils rapides et liens utiles",
+                "quickTips": {
+                    "title": "Conseils rapides",
+                    "tip1": "Utilisez le chat IA pour créer des répertoires en langage naturel",
+                    "tip2": "Importez des listes awesome ou des dépôts de données existants",
+                    "tip3": "Personnalisez l'apparence de votre répertoire dans les paramètres"
+                },
+                "shortcuts": {
+                    "title": "Raccourcis clavier",
+                    "search": "Rechercher",
+                    "newDirectory": "Nouveau répertoire",
+                    "help": "Aide",
+                    "hint": "Appuyez sur ? n'importe où pour voir tous les raccourcis"
+                },
+                "links": {
+                    "title": "Liens utiles",
+                    "github": "Dépôt GitHub",
+                    "issues": "Signaler un problème",
+                    "docs": "Documentation",
+                    "comingSoon": "Bientôt disponible"
+                },
+                "version": "Version {version}"
             }
         },
         "directories": {
@@ -1192,7 +1217,8 @@
                 "success": {
                     "started": "Importation démarrée ! Redirection vers votre répertoire...",
                     "linked": "Répertoire lié avec succès"
-                }
+                },
+                "detectionFailed": "Nous n'avons pas pu détecter automatiquement le format. Veuillez sélectionner comment importer ce dépôt."
             }
         },
         "github": {
@@ -1358,7 +1384,10 @@
             "newChat": "Nouveau chat",
             "loadingConversation": "Chargement de la conversation…",
             "inputPlaceholder": "Décrivez le répertoire que vous souhaitez créer...",
-            "sendButton": "Envoyer"
+            "sendButton": "Envoyer",
+            "errors": {
+                "unableToSend": "Impossible d'envoyer le message."
+            }
         }
     },
     "layout": {
@@ -1538,6 +1567,21 @@
             "username": {
                 "minLength": "Le nom d'utilisateur doit contenir au moins {length} caractères"
             }
+        }
+    },
+    "common": {
+        "ui": {
+            "close": "Fermer",
+            "dismiss": "Ignorer"
+        },
+        "theme": {
+            "toggle": "Changer de thème",
+            "switchToLight": "Passer au mode clair",
+            "switchToDark": "Passer au mode sombre"
+        },
+        "visibility": {
+            "private": "Privé",
+            "public": "Public"
         }
     }
 }

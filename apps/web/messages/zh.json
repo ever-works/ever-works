@@ -220,6 +220,31 @@
             "notifications": {
                 "title": "通知",
                 "empty": "没有新通知"
+            },
+            "help": {
+                "title": "帮助与资源",
+                "subtitle": "快速提示和有用链接",
+                "quickTips": {
+                    "title": "快速提示",
+                    "tip1": "使用AI聊天以自然语言创建目录",
+                    "tip2": "导入现有的awesome列表或数据仓库",
+                    "tip3": "在设置中自定义目录外观"
+                },
+                "shortcuts": {
+                    "title": "键盘快捷键",
+                    "search": "搜索",
+                    "newDirectory": "新建目录",
+                    "help": "帮助",
+                    "hint": "按?键查看所有快捷键"
+                },
+                "links": {
+                    "title": "有用链接",
+                    "github": "GitHub仓库",
+                    "issues": "报告问题",
+                    "docs": "文档",
+                    "comingSoon": "即将推出"
+                },
+                "version": "版本 {version}"
             }
         },
         "directories": {
@@ -1192,7 +1217,8 @@
                 "success": {
                     "started": "导入已开始！正在跳转到您的目录...",
                     "linked": "目录链接成功"
-                }
+                },
+                "detectionFailed": "无法自动检测格式。请选择如何导入此仓库。"
             }
         },
         "github": {
@@ -1358,7 +1384,10 @@
             "newChat": "新聊天",
             "loadingConversation": "加载对话中…",
             "inputPlaceholder": "描述您想要创建的目录...",
-            "sendButton": "发送"
+            "sendButton": "发送",
+            "errors": {
+                "unableToSend": "无法发送消息。"
+            }
         }
     },
     "layout": {
@@ -1538,6 +1567,21 @@
             "username": {
                 "minLength": "用户名必须包含至少 {length} 个字符"
             }
+        }
+    },
+    "common": {
+        "ui": {
+            "close": "关闭",
+            "dismiss": "忽略"
+        },
+        "theme": {
+            "toggle": "切换主题",
+            "switchToLight": "切换到浅色模式",
+            "switchToDark": "切换到深色模式"
+        },
+        "visibility": {
+            "private": "私有",
+            "public": "公开"
         }
     }
 }
