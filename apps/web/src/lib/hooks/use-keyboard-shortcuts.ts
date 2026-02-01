@@ -11,7 +11,7 @@ interface KeyboardShortcutsOptions {
 /**
  * Global keyboard shortcuts for the dashboard
  * - Ctrl/Cmd + K: Navigate to directories and focus search
- * - Ctrl/Cmd + N: Create new directory
+ * - C: Create new directory
  * - ?: Open help drawer (when not in an input field)
  */
 export function useKeyboardShortcuts(options: KeyboardShortcutsOptions = {}) {
