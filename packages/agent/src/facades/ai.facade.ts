@@ -9,11 +9,12 @@ import type {
     AiRoutingOptions,
     AiModel,
 } from '@ever-works/plugin';
-import { FACADE_CAPABILITIES } from '@ever-works/plugin';
+import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
 import { DirectoryPluginRepository } from '../plugins/repositories/directory-plugin.repository';
 import { UserPluginRepository } from '../plugins/repositories/user-plugin.repository';
+import { getSettingTyped } from './settings-utils';
 
 export class AiFacadeError extends Error {
     constructor(
@@ -65,7 +66,7 @@ export interface AiFacadeOptions {
 @Injectable()
 export class AiFacadeService implements IAiFacade {
     private readonly logger = new Logger(AiFacadeService.name);
-    private readonly CAPABILITY = FACADE_CAPABILITIES.AI;
+    private readonly CAPABILITY = PLUGIN_CAPABILITIES.AI_PROVIDER;
 
     constructor(
         private readonly registry: PluginRegistryService,
@@ -380,7 +381,12 @@ export class AiFacadeService implements IAiFacade {
                 });
 
                 // Check if this provider is marked as default at the requested scope
-                const isDefault = settings['isDefault'] as boolean | undefined;
+                const isDefault = getSettingTyped<boolean>(
+                    settings,
+                    'isDefault',
+                    'boolean',
+                    this.logger,
+                );
                 if (isDefault) {
                     this.logger.debug(
                         `Using ${scope}-level default AI provider: ${registered.plugin.id}`,
@@ -404,7 +410,12 @@ export class AiFacadeService implements IAiFacade {
                 includeSecrets: false,
             });
 
-            const defaultProviderId = settings['defaultAiProvider'] as string | undefined;
+            const defaultProviderId = getSettingTyped<string>(
+                settings,
+                'defaultAiProvider',
+                'string',
+                this.logger,
+            );
             if (defaultProviderId) {
                 const defaultProvider = enabledProviders.find(
                     (p) => p.plugin.id === defaultProviderId,
@@ -464,7 +475,12 @@ export class AiFacadeService implements IAiFacade {
         // 2. Complexity-based routing from settings
         if (routing?.complexity) {
             const complexityModelKey = `${routing.complexity}Model`; // e.g., 'simpleModel'
-            const complexityModel = settings[complexityModelKey] as string | undefined;
+            const complexityModel = getSettingTyped<string>(
+                settings,
+                complexityModelKey,
+                'string',
+                this.logger,
+            );
             if (complexityModel) {
                 this.logger.debug(
                     `Using ${routing.complexity} model for plugin ${plugin.id}: ${complexityModel}`,
@@ -474,7 +490,12 @@ export class AiFacadeService implements IAiFacade {
         }
 
         // 3. Default model from settings
-        const defaultModel = settings['defaultModel'] as string | undefined;
+        const defaultModel = getSettingTyped<string>(
+            settings,
+            'defaultModel',
+            'string',
+            this.logger,
+        );
         if (defaultModel) {
             this.logger.debug(`Using default model from settings: ${defaultModel}`);
             return defaultModel;

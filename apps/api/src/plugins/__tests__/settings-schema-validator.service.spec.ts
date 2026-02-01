@@ -1,0 +1,338 @@
+import { Test, TestingModule } from '@nestjs/testing';
+import {
+    SettingsSchemaValidatorService,
+    SettingsScope,
+} from '../services/settings-schema-validator.service';
+import type { JsonSchema } from '@ever-works/plugin';
+
+describe('SettingsSchemaValidatorService', () => {
+    let service: SettingsSchemaValidatorService;
+
+    beforeEach(async () => {
+        const module: TestingModule = await Test.createTestingModule({
+            providers: [SettingsSchemaValidatorService],
+        }).compile();
+
+        service = module.get<SettingsSchemaValidatorService>(SettingsSchemaValidatorService);
+    });
+
+    afterEach(() => {
+        service.clearCache();
+    });
+
+    describe('validateSettings', () => {
+        it('should return valid for empty settings when no schema', () => {
+            const result = service.validateSettings({}, undefined, 'user');
+            expect(result.valid).toBe(true);
+            expect(result.errors).toHaveLength(0);
+        });
+
+        it('should validate string type correctly', () => {
+            const schema: JsonSchema = {
+                type: 'object',
+                properties: {
+                    apiKey: { type: 'string' },
+                },
+            };
+
+            const validResult = service.validateSettings({ apiKey: 'test-key' }, schema, 'global');
+            expect(validResult.valid).toBe(true);
+
+            const invalidResult = service.validateSettings({ apiKey: 123 }, schema, 'global');
+            expect(invalidResult.valid).toBe(false);
+            expect(invalidResult.errors.length).toBeGreaterThan(0);
+        });
+
+        it('should validate number type correctly', () => {
+            const schema: JsonSchema = {
+                type: 'object',
+                properties: {
+                    maxItems: { type: 'number' },
+                },
+            };
+
+            const validResult = service.validateSettings({ maxItems: 10 }, schema, 'global');
+            expect(validResult.valid).toBe(true);
+
+            const invalidResult = service.validateSettings({ maxItems: 'ten' }, schema, 'global');
+            expect(invalidResult.valid).toBe(false);
+        });
+
+        it('should validate boolean type correctly', () => {
+            const schema: JsonSchema = {
+                type: 'object',
+                properties: {
+                    enabled: { type: 'boolean' },
+                },
+            };
+
+            const validResult = service.validateSettings({ enabled: true }, schema, 'global');
+            expect(validResult.valid).toBe(true);
+
+            const invalidResult = service.validateSettings({ enabled: 'true' }, schema, 'global');
+            expect(invalidResult.valid).toBe(false);
+        });
+
+        it('should validate enum values', () => {
+            const schema: JsonSchema = {
+                type: 'object',
+                properties: {
+                    theme: { type: 'string', enum: ['light', 'dark', 'auto'] },
+                },
+            };
+
+            const validResult = service.validateSettings({ theme: 'dark' }, schema, 'global');
+            expect(validResult.valid).toBe(true);
+
+            const invalidResult = service.validateSettings({ theme: 'blue' }, schema, 'global');
+            expect(invalidResult.valid).toBe(false);
+        });
+
+        it('should filter properties by scope', () => {
+            const schema: JsonSchema = {
+                type: 'object',
+                properties: {
+                    globalSetting: { type: 'string', 'x-scope': 'global' },
+                    userSetting: { type: 'string', 'x-scope': 'user' },
+                    directorySetting: { type: 'string', 'x-scope': 'directory' },
+                },
+            };
+
+            // At global scope, only global settings should be validated
+            const globalResult = service.validateSettings(
+                {
+                    globalSetting: 'value',
+                    userSetting: 123, // Wrong type but should be ignored at global scope
+                },
+                schema,
+                'global',
+            );
+            expect(globalResult.valid).toBe(true);
+
+            // At user scope, global and user settings should be validated
+            const userResult = service.validateSettings(
+                {
+                    globalSetting: 'value',
+                    userSetting: 123, // Wrong type
+                },
+                schema,
+                'user',
+            );
+            expect(userResult.valid).toBe(false);
+
+            // At directory scope, all settings should be validated
+            const directoryResult = service.validateSettings(
+                {
+                    globalSetting: 'value',
+                    userSetting: 'value',
+                    directorySetting: 123, // Wrong type
+                },
+                schema,
+                'directory',
+            );
+            expect(directoryResult.valid).toBe(false);
+        });
+    });
+
+    describe('validateRequiredFields', () => {
+        it('should return valid when all required fields are present', () => {
+            const schema: JsonSchema = {
+                type: 'object',
+                required: ['apiKey'],
+                properties: {
+                    apiKey: { type: 'string' },
+                },
+            };
+
+            const result = service.validateRequiredFields({ apiKey: 'test' }, schema, 'global');
+            expect(result.valid).toBe(true);
+        });
+
+        it('should return invalid when required field is missing', () => {
+            const schema: JsonSchema = {
+                type: 'object',
+                required: ['apiKey'],
+                properties: {
+                    apiKey: { type: 'string' },
+                },
+            };
+
+            const result = service.validateRequiredFields({}, schema, 'global');
+            expect(result.valid).toBe(false);
+            expect(result.errors).toContain('Missing required fields: apiKey');
+        });
+
+        it('should return invalid when required field is empty string', () => {
+            const schema: JsonSchema = {
+                type: 'object',
+                required: ['apiKey'],
+                properties: {
+                    apiKey: { type: 'string' },
+                },
+            };
+
+            const result = service.validateRequiredFields({ apiKey: '' }, schema, 'global');
+            expect(result.valid).toBe(false);
+        });
+
+        it('should only check required fields for the given scope', () => {
+            const schema: JsonSchema = {
+                type: 'object',
+                required: ['globalField', 'directoryField'],
+                properties: {
+                    globalField: { type: 'string', 'x-scope': 'global' },
+                    directoryField: { type: 'string', 'x-scope': 'directory' },
+                },
+            };
+
+            // At global scope, only globalField should be required
+            const result = service.validateRequiredFields(
+                { globalField: 'value' },
+                schema,
+                'global',
+            );
+            expect(result.valid).toBe(true);
+
+            // At directory scope, both should be required
+            const directoryResult = service.validateRequiredFields(
+                { globalField: 'value' },
+                schema,
+                'directory',
+            );
+            expect(directoryResult.valid).toBe(false);
+        });
+    });
+
+    describe('validate', () => {
+        it('should validate both required fields and schema', () => {
+            const schema: JsonSchema = {
+                type: 'object',
+                required: ['apiKey'],
+                properties: {
+                    apiKey: { type: 'string' },
+                    maxItems: { type: 'number' },
+                },
+            };
+
+            // Valid settings
+            const validResult = service.validate(
+                { apiKey: 'test', maxItems: 10 },
+                schema,
+                'global',
+            );
+            expect(validResult.valid).toBe(true);
+
+            // Missing required field
+            const missingResult = service.validate({ maxItems: 10 }, schema, 'global');
+            expect(missingResult.valid).toBe(false);
+
+            // Wrong type
+            const wrongTypeResult = service.validate(
+                { apiKey: 'test', maxItems: 'ten' },
+                schema,
+                'global',
+            );
+            expect(wrongTypeResult.valid).toBe(false);
+        });
+    });
+
+    describe('format validation', () => {
+        it('should validate email format', () => {
+            const schema: JsonSchema = {
+                type: 'object',
+                properties: {
+                    email: { type: 'string', format: 'email' },
+                },
+            };
+
+            const validResult = service.validateSettings(
+                { email: 'test@example.com' },
+                schema,
+                'global',
+            );
+            expect(validResult.valid).toBe(true);
+
+            const invalidResult = service.validateSettings(
+                { email: 'not-an-email' },
+                schema,
+                'global',
+            );
+            expect(invalidResult.valid).toBe(false);
+        });
+
+        it('should validate uri format', () => {
+            const schema: JsonSchema = {
+                type: 'object',
+                properties: {
+                    website: { type: 'string', format: 'uri' },
+                },
+            };
+
+            const validResult = service.validateSettings(
+                { website: 'https://example.com' },
+                schema,
+                'global',
+            );
+            expect(validResult.valid).toBe(true);
+
+            const invalidResult = service.validateSettings(
+                { website: 'not-a-url' },
+                schema,
+                'global',
+            );
+            expect(invalidResult.valid).toBe(false);
+        });
+    });
+
+    describe('minLength/maxLength validation', () => {
+        it('should validate string length constraints', () => {
+            const schema: JsonSchema = {
+                type: 'object',
+                properties: {
+                    password: { type: 'string', minLength: 8, maxLength: 20 },
+                },
+            };
+
+            const validResult = service.validateSettings(
+                { password: 'validpass123' },
+                schema,
+                'global',
+            );
+            expect(validResult.valid).toBe(true);
+
+            const tooShortResult = service.validateSettings(
+                { password: 'short' },
+                schema,
+                'global',
+            );
+            expect(tooShortResult.valid).toBe(false);
+
+            const tooLongResult = service.validateSettings(
+                { password: 'this-password-is-way-too-long' },
+                schema,
+                'global',
+            );
+            expect(tooLongResult.valid).toBe(false);
+        });
+    });
+
+    describe('minimum/maximum validation', () => {
+        it('should validate number range constraints', () => {
+            const schema: JsonSchema = {
+                type: 'object',
+                properties: {
+                    age: { type: 'number', minimum: 0, maximum: 120 },
+                },
+            };
+
+            const validResult = service.validateSettings({ age: 25 }, schema, 'global');
+            expect(validResult.valid).toBe(true);
+
+            const tooLowResult = service.validateSettings({ age: -5 }, schema, 'global');
+            expect(tooLowResult.valid).toBe(false);
+
+            const tooHighResult = service.validateSettings({ age: 150 }, schema, 'global');
+            expect(tooHighResult.valid).toBe(false);
+        });
+    });
+});

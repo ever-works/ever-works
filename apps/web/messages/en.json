@@ -1710,7 +1710,9 @@
                 "dataSource": "Data Source",
                 "ai": "AI",
                 "pipeline": "Pipeline"
-            }
+            },
+            "missingRequiredFields": "Missing required fields: {fields}",
+            "saveError": "Failed to save settings. Please try again."
         },
         "directoryPlugins": {
             "title": "Directory Plugins",
@@ -1742,7 +1744,9 @@
                 "dataSource": "Data Source",
                 "ai": "AI",
                 "pipeline": "Pipeline"
-            }
+            },
+            "missingRequiredFields": "Missing required fields: {fields}",
+            "saveError": "Failed to save settings. Please try again."
         }
     },
     "layout": {

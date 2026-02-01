@@ -54,3 +54,10 @@ export {
 
 // Pipeline module
 export { PipelineModule } from './pipeline.module';
+
+// Pipeline validators
+export {
+    validatePipelineResult,
+    validatePipelineResultOrThrow,
+    type PipelineResultValidation,
+} from './validators';

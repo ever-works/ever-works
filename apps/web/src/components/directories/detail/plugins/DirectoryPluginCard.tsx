@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useTransition, useMemo } from 'react';
+import { useState, useTransition, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { DirectoryPlugin, PluginSettingsSchemaProperty } from '@/lib/api/plugins';
 import { cn } from '@/lib/utils/cn';
 import { Button } from '@/components/ui/button';
-import { Power, PowerOff, Settings, Save, Check } from 'lucide-react';
+import { Power, PowerOff, Settings, Save, Check, AlertCircle } from 'lucide-react';
 import {
     enableDirectoryPlugin,
     disableDirectoryPlugin,
@@ -32,26 +32,60 @@ export function DirectoryPluginCard({ directoryId, plugin }: DirectoryPluginCard
     const [hasChanges, setHasChanges] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [saveSuccess, setSaveSuccess] = useState(false);
+    const [validationError, setValidationError] = useState<string | null>(null);
+
+    const schema = plugin.settingsSchema;
 
     // Plugin must be enabled at user level to be enabled at directory level
     const canEnable = plugin.installed && plugin.enabled;
     const isEnabled = plugin.directoryEnabled;
 
     // Filter properties to show only 'global' or 'directory' scoped settings
-    // User-scoped settings should only be shown in user settings context
+    // Also filter out writeOnly fields which cannot be displayed after being set
     const directoryScopeProperties = useMemo(() => {
-        if (!plugin.settingsSchema?.properties) return {};
+        if (!schema?.properties) return {};
         return Object.fromEntries(
-            Object.entries(plugin.settingsSchema.properties).filter(([_, propSchema]) => {
+            Object.entries(schema.properties).filter(([_, propSchema]) => {
                 const prop = propSchema as PluginSettingsSchemaProperty;
                 const scope = prop.scope || 'global';
+                // Filter out writeOnly fields
+                if (prop.writeOnly) return false;
                 // Show global and directory-scoped settings in directory settings
                 return scope === 'global' || scope === 'directory';
             }),
         );
-    }, [plugin.settingsSchema]);
+    }, [schema]);
 
     const hasDirectorySettings = Object.keys(directoryScopeProperties).length > 0;
+
+    // Get required fields for directory scope
+    const requiredFields = useMemo(() => {
+        if (!schema?.required || !schema.properties) return [];
+        return schema.required.filter((field) => {
+            const propSchema = schema.properties?.[field] as
+                | PluginSettingsSchemaProperty
+                | undefined;
+            if (!propSchema) return false;
+            const scope = propSchema.scope || 'global';
+            return scope === 'global' || scope === 'directory';
+        });
+    }, [schema]);
+
+    // Validate required fields before saving
+    const validateRequiredFields = useCallback((): string[] => {
+        const missingFields: string[] = [];
+        for (const field of requiredFields) {
+            const value = settings[field] ?? secretSettings[field];
+            if (value === undefined || value === null || value === '') {
+                const propSchema = schema?.properties?.[field] as
+                    | PluginSettingsSchemaProperty
+                    | undefined;
+                const label = propSchema?.title || field;
+                missingFields.push(label);
+            }
+        }
+        return missingFields;
+    }, [requiredFields, settings, secretSettings, schema]);
 
     const handleToggle = async () => {
         if (!canEnable && !isEnabled) {
@@ -80,10 +114,19 @@ export function DirectoryPluginCard({ directoryId, plugin }: DirectoryPluginCard
         }
         setHasChanges(true);
         setSaveSuccess(false);
+        setValidationError(null);
     };
 
     const handleSaveSettings = async () => {
+        // Validate required fields before saving
+        const missingFields = validateRequiredFields();
+        if (missingFields.length > 0) {
+            setValidationError(t('missingRequiredFields', { fields: missingFields.join(', ') }));
+            return;
+        }
+
         setIsSaving(true);
+        setValidationError(null);
         try {
             await updateDirectoryPluginSettings(directoryId, plugin.pluginId, {
                 settings: Object.keys(settings).length > 0 ? settings : undefined,
@@ -96,6 +139,14 @@ export function DirectoryPluginCard({ directoryId, plugin }: DirectoryPluginCard
             setTimeout(() => setSaveSuccess(false), 3000);
         } catch (error) {
             console.error('Failed to save directory settings:', error);
+            // Extract error message from response if available
+            const errorMessage =
+                error instanceof Error
+                    ? error.message
+                    : typeof error === 'object' && error !== null && 'message' in error
+                      ? String((error as { message: unknown }).message)
+                      : t('saveError');
+            setValidationError(errorMessage);
         } finally {
             setIsSaving(false);
         }
@@ -222,12 +273,18 @@ export function DirectoryPluginCard({ directoryId, plugin }: DirectoryPluginCard
                                     name={key}
                                     schema={propSchema}
                                     value={settings[key]}
-                                    required={plugin.settingsSchema?.required?.includes(key)}
+                                    required={schema?.required?.includes(key)}
                                     onChange={(value) =>
                                         handleFieldChange(key, value, propSchema.secret || false)
                                     }
                                 />
                             ))}
+                            {validationError && (
+                                <div className="p-2 rounded bg-danger/10 border border-danger/20 flex items-start gap-2">
+                                    <AlertCircle className="w-4 h-4 text-danger shrink-0 mt-0.5" />
+                                    <p className="text-xs text-danger">{validationError}</p>
+                                </div>
+                            )}
                             <div className="flex items-center gap-2 pt-2">
                                 <Button
                                     size="sm"

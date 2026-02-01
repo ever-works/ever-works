@@ -1,5 +1,14 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBoolean, IsObject, IsOptional, IsString, IsNumber, Min } from 'class-validator';
+import {
+    IsBoolean,
+    IsObject,
+    IsOptional,
+    IsString,
+    IsNumber,
+    Min,
+    Validate,
+} from 'class-validator';
+import { IsValidCapabilityConstraint } from './validators/capability.validator';
 
 /**
  * DTO for updating user plugin settings
@@ -65,9 +74,13 @@ export class EnableDirectoryPluginDto {
     @IsOptional()
     settings?: Record<string, unknown>;
 
-    @ApiPropertyOptional({ description: 'Active capability to set' })
+    @ApiPropertyOptional({
+        description: 'Active capability to set',
+        example: 'ai-provider',
+    })
     @IsString()
     @IsOptional()
+    @Validate(IsValidCapabilityConstraint)
     activeCapability?: string;
 
     @ApiPropertyOptional({ description: 'Priority order (lower = higher priority)' })
@@ -81,8 +94,12 @@ export class EnableDirectoryPluginDto {
  * DTO for setting active capability for a directory
  */
 export class SetActiveCapabilityDto {
-    @ApiProperty({ description: 'Capability to set as active' })
+    @ApiProperty({
+        description: 'Capability to set as active',
+        example: 'ai-provider',
+    })
     @IsString()
+    @Validate(IsValidCapabilityConstraint)
     capability: string;
 }
 

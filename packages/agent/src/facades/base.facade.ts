@@ -271,6 +271,92 @@ export abstract class BaseFacadeService {
     }
 
     /**
+     * Get a setting value with type validation at runtime.
+     * Returns undefined if the value doesn't exist or doesn't match the expected type.
+     *
+     * @param settings - The settings object to read from
+     * @param key - The setting key to retrieve
+     * @param expectedType - The expected JavaScript type ('string', 'number', 'boolean', 'object', 'array')
+     * @returns The typed value or undefined if not found or wrong type
+     *
+     * @example
+     * ```typescript
+     * const apiKey = this.getSettingTyped<string>(settings, 'apiKey', 'string');
+     * const maxItems = this.getSettingTyped<number>(settings, 'maxItems', 'number');
+     * const isEnabled = this.getSettingTyped<boolean>(settings, 'enabled', 'boolean');
+     * ```
+     */
+    protected getSettingTyped<T>(
+        settings: Record<string, unknown>,
+        key: string,
+        expectedType: 'string' | 'number' | 'boolean' | 'object' | 'array',
+    ): T | undefined {
+        const value = settings[key];
+
+        if (value === undefined || value === null) {
+            return undefined;
+        }
+
+        const actualType = Array.isArray(value) ? 'array' : typeof value;
+
+        if (actualType !== expectedType) {
+            this.logger.warn(
+                `Setting '${key}' has type '${actualType}', expected '${expectedType}'`,
+            );
+            return undefined;
+        }
+
+        return value as T;
+    }
+
+    /**
+     * Get a required setting value with type validation.
+     * Throws an error if the value doesn't exist or doesn't match the expected type.
+     *
+     * @param settings - The settings object to read from
+     * @param key - The setting key to retrieve
+     * @param expectedType - The expected JavaScript type
+     * @param pluginId - The plugin ID for error messages
+     * @returns The typed value
+     * @throws Error if value is missing or wrong type
+     */
+    protected getSettingRequired<T>(
+        settings: Record<string, unknown>,
+        key: string,
+        expectedType: 'string' | 'number' | 'boolean' | 'object' | 'array',
+        pluginId?: string,
+    ): T {
+        const value = this.getSettingTyped<T>(settings, key, expectedType);
+
+        if (value === undefined) {
+            const plugin = pluginId ? ` for plugin '${pluginId}'` : '';
+            throw new Error(`Required setting '${key}'${plugin} is missing or has wrong type`);
+        }
+
+        return value;
+    }
+
+    /**
+     * Get a setting value with a default fallback.
+     * Returns the default if the value doesn't exist or doesn't match the expected type.
+     *
+     * @param settings - The settings object to read from
+     * @param key - The setting key to retrieve
+     * @param expectedType - The expected JavaScript type
+     * @param defaultValue - The default value to return if not found
+     * @returns The typed value or the default
+     */
+    protected getSettingWithDefault<T>(
+        settings: Record<string, unknown>,
+        key: string,
+        expectedType: 'string' | 'number' | 'boolean' | 'object' | 'array',
+        defaultValue: T,
+    ): T {
+        const value = this.getSettingTyped<T>(settings, key, expectedType);
+        return value ?? defaultValue;
+    }
+
+    /**
      * Find the directory-level active plugin for this capability.
      * Returns null if no active plugin is set for this directory.
      */

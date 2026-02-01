@@ -23,6 +23,7 @@ import {
     PluginSettingsSchemaDto,
     PluginSettingsSchemaPropertyDto,
 } from './dto';
+import { SettingsSchemaValidatorService, type SettingsScope } from './services';
 
 @Injectable()
 export class PluginsService {
@@ -36,6 +37,7 @@ export class PluginsService {
         @InjectRepository(DirectoryPluginEntity)
         private readonly directoryPluginRepository: Repository<DirectoryPluginEntity>,
         private readonly pluginRegistryService: PluginRegistryService,
+        private readonly settingsValidator: SettingsSchemaValidatorService,
     ) {}
 
     // ============================================
@@ -102,6 +104,14 @@ export class PluginsService {
         const registered = this.pluginRegistryService.get(pluginId);
         if (!registered) {
             throw new NotFoundException(`Plugin "${pluginId}" not found`);
+        }
+
+        // Validate settings against schema if provided
+        if (settings) {
+            this.validateSettingsOrThrow(settings, registered.plugin.settingsSchema, 'user');
+        }
+        if (secretSettings) {
+            this.validateSettingsOrThrow(secretSettings, registered.plugin.settingsSchema, 'user');
         }
 
         // Get the plugin entity from database
@@ -193,6 +203,21 @@ export class PluginsService {
             );
         }
 
+        // Validate settings against schema if provided
+        if (settings) {
+            // Validate merged settings to ensure all required fields are present
+            const mergedSettings = { ...userPlugin.settings, ...settings };
+            this.validateSettingsOrThrow(mergedSettings, registered.plugin.settingsSchema, 'user');
+        }
+        if (secretSettings) {
+            const mergedSecretSettings = { ...userPlugin.secretSettings, ...secretSettings };
+            this.validateSettingsOrThrow(
+                mergedSecretSettings,
+                registered.plugin.settingsSchema,
+                'user',
+            );
+        }
+
         // Merge settings
         if (settings) {
             userPlugin.settings = { ...userPlugin.settings, ...settings };
@@ -274,6 +299,15 @@ export class PluginsService {
         const registered = this.pluginRegistryService.get(pluginId);
         if (!registered) {
             throw new NotFoundException(`Plugin "${pluginId}" not found`);
+        }
+
+        // Validate settings against schema if provided
+        if (options?.settings) {
+            this.validateSettingsOrThrow(
+                options.settings,
+                registered.plugin.settingsSchema,
+                'directory',
+            );
         }
 
         // Check if user has the plugin enabled
@@ -390,6 +424,25 @@ export class PluginsService {
         if (!directoryPlugin) {
             throw new BadRequestException(
                 `Plugin "${pluginId}" is not enabled for this directory. Enable it first.`,
+            );
+        }
+
+        // Validate settings against schema if provided
+        if (settings) {
+            // Validate merged settings to ensure all required fields are present
+            const mergedSettings = { ...directoryPlugin.settings, ...settings };
+            this.validateSettingsOrThrow(
+                mergedSettings,
+                registered.plugin.settingsSchema,
+                'directory',
+            );
+        }
+        if (secretSettings) {
+            const mergedSecretSettings = { ...directoryPlugin.secretSettings, ...secretSettings };
+            this.validateSettingsOrThrow(
+                mergedSecretSettings,
+                registered.plugin.settingsSchema,
+                'directory',
             );
         }
 
@@ -603,5 +656,23 @@ export class PluginsService {
             }
         }
         return masked;
+    }
+
+    /**
+     * Validate settings against a plugin's JSON schema.
+     * Throws BadRequestException if validation fails.
+     */
+    private validateSettingsOrThrow(
+        settings: Record<string, unknown>,
+        schema: JsonSchema | undefined,
+        scope: SettingsScope,
+    ): void {
+        const result = this.settingsValidator.validate(settings, schema, scope);
+        if (!result.valid) {
+            throw new BadRequestException({
+                message: 'Invalid plugin settings',
+                errors: result.errors,
+            });
+        }
     }
 }

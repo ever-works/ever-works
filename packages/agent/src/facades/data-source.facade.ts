@@ -10,7 +10,7 @@ import type {
     Tag,
     Brand,
 } from '@ever-works/plugin';
-import { FACADE_CAPABILITIES } from '@ever-works/plugin';
+import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
 import { DirectoryPluginRepository } from '../plugins/repositories/directory-plugin.repository';
@@ -35,7 +35,7 @@ export class DataSourceFacadeError extends Error {
 @Injectable()
 export class DataSourceFacadeService implements IDataSourceFacade {
     private readonly logger = new Logger(DataSourceFacadeService.name);
-    private readonly CAPABILITY = FACADE_CAPABILITIES.DATA_SOURCE;
+    private readonly CAPABILITY = PLUGIN_CAPABILITIES.DATA_SOURCE;
 
     constructor(
         private readonly registry: PluginRegistryService,

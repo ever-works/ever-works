@@ -54,6 +54,9 @@ export {
 // Data Source Facade
 export { DataSourceFacadeService, DataSourceFacadeError } from './data-source.facade';
 
+// Settings Utils
+export { getSettingTyped, getSettingWithDefault, type ExpectedSettingType } from './settings-utils';
+
 // Re-export facade types from plugin for convenience
 export type { FacadeExtractionOptions, FacadeExtractedContent } from '@ever-works/plugin';
 export type {

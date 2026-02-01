@@ -13,6 +13,7 @@ import type {
     PipelineFailedPayload,
 } from '@ever-works/plugin';
 import { PipelineEvents } from './step-pipeline-executor.service';
+import { validatePipelineResult } from './validators';
 
 /**
  * Executor for full pipeline plugins.
@@ -61,7 +62,25 @@ export class FullPipelineExecutorService {
 
         try {
             // Delegate to the plugin's execute method
-            const result = await plugin.execute(directory, request, existing, options, onProgress);
+            const rawResult = await plugin.execute(
+                directory,
+                request,
+                existing,
+                options,
+                onProgress,
+            );
+
+            // Validate the result from the plugin
+            const validation = validatePipelineResult(rawResult);
+            if (!validation.valid) {
+                this.logger.error(
+                    `Plugin "${plugin.id}" returned invalid result: ${validation.errors.join('; ')}`,
+                );
+                throw new Error(
+                    `Plugin "${plugin.id}" returned invalid pipeline result: ${validation.errors.join('; ')}`,
+                );
+            }
+            const result = validation.result!;
 
             const duration = Date.now() - startTime;
 

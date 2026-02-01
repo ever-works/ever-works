@@ -5,7 +5,7 @@ import type {
     SearchFacadeOptions,
     ISearchPlugin,
 } from '@ever-works/plugin';
-import { FACADE_CAPABILITIES } from '@ever-works/plugin';
+import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
 import { DirectoryPluginRepository } from '../plugins/repositories/directory-plugin.repository';
@@ -50,7 +50,7 @@ export interface ExtendedSearchFacadeOptions extends SearchFacadeOptions {
 @Injectable()
 export class SearchFacadeService implements ISearchFacade {
     private readonly logger = new Logger(SearchFacadeService.name);
-    private readonly CAPABILITY = FACADE_CAPABILITIES.SEARCH;
+    private readonly CAPABILITY = PLUGIN_CAPABILITIES.SEARCH;
 
     constructor(
         private readonly registry: PluginRegistryService,

@@ -1,11 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
-import type {
-    IPlugin,
-    PluginContext,
-    PluginManifest,
-    PluginSettings,
-    ValidationResult,
-    ValidationError,
+import {
+    type IPlugin,
+    type PluginContext,
+    type PluginManifest,
+    type PluginSettings,
+    type ValidationResult,
+    type ValidationError,
+    PLUGIN_CAPABILITIES,
+    isValidPluginCapability,
 } from '@ever-works/plugin';
 
 /**
@@ -58,8 +60,12 @@ function isPluginClass(obj: unknown): obj is new () => IPlugin {
     );
 }
 
+/**
+ * Method requirements for each capability.
+ * Uses PLUGIN_CAPABILITIES constants for keys to ensure consistency.
+ */
 const CAPABILITY_METHOD_REQUIREMENTS: Record<string, string[]> = {
-    'git-provider': [
+    [PLUGIN_CAPABILITIES.GIT_PROVIDER]: [
         'getAuth',
         'getCloneUrl',
         'getWebUrl',
@@ -72,26 +78,35 @@ const CAPABILITY_METHOD_REQUIREMENTS: Record<string, string[]> = {
         'createPullRequest',
         'mergePullRequest',
     ],
-    oauth: ['getAuthorizationUrl', 'exchangeCodeForToken', 'getAuthenticatedUser'],
-    deployment: ['deploy', 'getDeploymentStatus'],
-    screenshot: ['capture', 'isAvailable'],
-    search: ['search', 'isAvailable'],
-    'content-extractor': ['extract', 'isAvailable'],
-    'data-source': ['query', 'isAvailable'],
-    'ai-provider': [
+    [PLUGIN_CAPABILITIES.OAUTH]: [
+        'getAuthorizationUrl',
+        'exchangeCodeForToken',
+        'getAuthenticatedUser',
+    ],
+    [PLUGIN_CAPABILITIES.DEPLOYMENT]: ['deploy', 'getDeploymentStatus'],
+    [PLUGIN_CAPABILITIES.SCREENSHOT]: ['capture', 'isAvailable'],
+    [PLUGIN_CAPABILITIES.SEARCH]: ['search', 'isAvailable'],
+    [PLUGIN_CAPABILITIES.CONTENT_EXTRACTOR]: ['extract', 'isAvailable'],
+    [PLUGIN_CAPABILITIES.DATA_SOURCE]: ['query', 'isAvailable'],
+    [PLUGIN_CAPABILITIES.AI_PROVIDER]: [
         'createChatCompletion',
         'listModels',
         'getModel',
         'isAvailable',
         'getCapabilities',
     ],
-    'pipeline-step': ['execute', 'getStepDefinition'],
-    'full-pipeline': ['getStepDefinitions', 'createExecutionPlan', 'execute'],
-    'form-field': ['getRegistration', 'validate'],
-    'sub-provider': ['getRegistration', 'canHandle', 'getPriority', 'isAvailable'],
-    'config-aware': ['onConfigurationChange', 'getEffectiveConfig'],
-    'form-schema-provider': ['getFormFields', 'validateFormInput'],
-    'custom-capability': [
+    [PLUGIN_CAPABILITIES.PIPELINE_STEP]: ['execute', 'getStepDefinition'],
+    [PLUGIN_CAPABILITIES.FULL_PIPELINE]: ['getStepDefinitions', 'createExecutionPlan', 'execute'],
+    [PLUGIN_CAPABILITIES.FORM_FIELD]: ['getRegistration', 'validate'],
+    [PLUGIN_CAPABILITIES.SUB_PROVIDER]: [
+        'getRegistration',
+        'canHandle',
+        'getPriority',
+        'isAvailable',
+    ],
+    [PLUGIN_CAPABILITIES.CONFIG_AWARE]: ['onConfigurationChange', 'getEffectiveConfig'],
+    [PLUGIN_CAPABILITIES.FORM_SCHEMA_PROVIDER]: ['getFormFields', 'validateFormInput'],
+    [PLUGIN_CAPABILITIES.CUSTOM_CAPABILITY]: [
         'getCustomCapabilities',
         'getCapabilityImplementation',
         'hasCapability',
@@ -99,16 +114,20 @@ const CAPABILITY_METHOD_REQUIREMENTS: Record<string, string[]> = {
     ],
 };
 
+/**
+ * Property requirements for each capability.
+ * Uses PLUGIN_CAPABILITIES constants for keys to ensure consistency.
+ */
 const CAPABILITY_PROPERTY_REQUIREMENTS: Record<string, string[]> = {
-    'git-provider': ['providerName'],
-    screenshot: ['providerName'],
-    search: ['providerName'],
-    'content-extractor': ['providerName'],
-    deployment: ['providerName'],
-    'data-source': ['sourceName'],
-    'ai-provider': ['providerType', 'providerName'],
-    'form-field': ['fieldType'],
-    'sub-provider': ['parentCapability', 'subProviderId'],
+    [PLUGIN_CAPABILITIES.GIT_PROVIDER]: ['providerName'],
+    [PLUGIN_CAPABILITIES.SCREENSHOT]: ['providerName'],
+    [PLUGIN_CAPABILITIES.SEARCH]: ['providerName'],
+    [PLUGIN_CAPABILITIES.CONTENT_EXTRACTOR]: ['providerName'],
+    [PLUGIN_CAPABILITIES.DEPLOYMENT]: ['providerName'],
+    [PLUGIN_CAPABILITIES.DATA_SOURCE]: ['sourceName'],
+    [PLUGIN_CAPABILITIES.AI_PROVIDER]: ['providerType', 'providerName'],
+    [PLUGIN_CAPABILITIES.FORM_FIELD]: ['fieldType'],
+    [PLUGIN_CAPABILITIES.SUB_PROVIDER]: ['parentCapability', 'subProviderId'],
 };
 
 /**
@@ -375,6 +394,82 @@ export class PluginClassValidatorService {
      */
     isPluginClass(obj: unknown): obj is new () => IPlugin {
         return isPluginClass(obj);
+    }
+
+    /**
+     * Validate that a plugin has the expected properties for a specific capability.
+     * Useful for facades to validate before casting to capability-specific interfaces.
+     *
+     * @param plugin - The plugin to validate
+     * @param capability - The capability to validate for
+     * @returns Validation result with errors for missing properties
+     */
+    validateCapabilityProperties(
+        plugin: IPlugin,
+        capability: string,
+    ): { valid: boolean; errors: string[] } {
+        const errors: string[] = [];
+        const requirements = CAPABILITY_PROPERTY_REQUIREMENTS[capability];
+
+        if (!requirements) {
+            // No property requirements for this capability
+            return { valid: true, errors: [] };
+        }
+
+        const p = plugin as unknown as Record<string, unknown>;
+
+        for (const prop of requirements) {
+            if (!(prop in p) || p[prop] === undefined) {
+                errors.push(`Missing required property '${prop}' for capability '${capability}'`);
+            }
+        }
+
+        return { valid: errors.length === 0, errors };
+    }
+
+    /**
+     * Validate that a plugin has all required methods for a specific capability.
+     * Useful for facades to validate before calling capability-specific methods.
+     *
+     * @param plugin - The plugin to validate
+     * @param capability - The capability to validate for
+     * @returns Validation result with errors for missing methods
+     */
+    validateCapabilityMethods(
+        plugin: IPlugin,
+        capability: string,
+    ): { valid: boolean; errors: string[] } {
+        const errors: string[] = [];
+        const requirements = CAPABILITY_METHOD_REQUIREMENTS[capability];
+
+        if (!requirements) {
+            // No method requirements for this capability
+            return { valid: true, errors: [] };
+        }
+
+        const p = plugin as unknown as Record<string, unknown>;
+
+        for (const method of requirements) {
+            if (typeof p[method] !== 'function') {
+                errors.push(`Missing required method '${method}' for capability '${capability}'`);
+            }
+        }
+
+        return { valid: errors.length === 0, errors };
+    }
+
+    /**
+     * Get the list of required properties for a capability.
+     */
+    getCapabilityPropertyRequirements(capability: string): string[] {
+        return CAPABILITY_PROPERTY_REQUIREMENTS[capability] || [];
+    }
+
+    /**
+     * Get the list of required methods for a capability.
+     */
+    getCapabilityMethodRequirements(capability: string): string[] {
+        return CAPABILITY_METHOD_REQUIREMENTS[capability] || [];
     }
 
     private checkRequiredProperty(

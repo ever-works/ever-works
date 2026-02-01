@@ -89,6 +89,12 @@ importers:
       '@vercel/sdk':
         specifier: ^1.18.5
         version: 1.18.5(@cfworker/json-schema@4.1.1)(hono@4.11.1)
+      ajv:
+        specifier: ^8.17.1
+        version: 8.17.1
+      ajv-formats:
+        specifier: ^3.0.1
+        version: 3.0.1(ajv@8.17.1)
       axios:
         specifier: ^1.13.2
         version: 1.13.2
@@ -189,12 +195,18 @@ importers:
       globals:
         specifier: ^16.5.0
         version: 16.5.0
+      jest:
+        specifier: ^29.7.0
+        version: 29.7.0(@types/node@22.19.3)(ts-node@10.9.2(@swc/core@1.15.8(@swc/helpers@0.5.18))(@types/node@22.19.3)(typescript@5.9.3))
       source-map-support:
         specifier: ^0.5.21
         version: 0.5.21
       supertest:
         specifier: ^7.1.4
         version: 7.1.4
+      ts-jest:
+        specifier: ^29.2.6
+        version: 29.4.6(@babel/core@7.28.5)(@jest/transform@29.7.0)(@jest/types@29.6.3)(babel-jest@29.7.0(@babel/core@7.28.5))(jest-util@29.7.0)(jest@29.7.0(@types/node@22.19.3)(ts-node@10.9.2(@swc/core@1.15.8(@swc/helpers@0.5.18))(@types/node@22.19.3)(typescript@5.9.3)))(typescript@5.9.3)
       ts-loader:
         specifier: ^9.5.4
         version: 9.5.4(typescript@5.9.3)(webpack@5.103.0(@swc/core@1.15.8(@swc/helpers@0.5.18)))

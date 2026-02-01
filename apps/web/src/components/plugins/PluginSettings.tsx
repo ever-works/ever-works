@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useTransition, useMemo } from 'react';
+import { useState, useTransition, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { UserPlugin, PluginSettingsSchemaProperty } from '@/lib/api/plugins';
 import { cn } from '@/lib/utils/cn';
 import { Button } from '@/components/ui/button';
-import { Power, PowerOff, Save, ArrowLeft, ExternalLink, Check } from 'lucide-react';
+import { Power, PowerOff, Save, ArrowLeft, ExternalLink, Check, AlertCircle } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { enablePlugin, disablePlugin, updatePluginSettings } from '@/app/actions/plugins';
@@ -26,17 +26,20 @@ export function PluginSettings({ plugin }: PluginSettingsProps) {
     const [secretSettings, setSecretSettings] = useState<Record<string, unknown>>({});
     const [hasChanges, setHasChanges] = useState(false);
     const [saveSuccess, setSaveSuccess] = useState(false);
+    const [validationError, setValidationError] = useState<string | null>(null);
 
     const schema = plugin.settingsSchema;
 
     // Filter properties to show only 'global' or 'user' scoped settings
-    // Directory-scoped settings should only be shown in directory context
+    // Also filter out writeOnly fields which cannot be displayed after being set
     const userScopeProperties = useMemo(() => {
         if (!schema?.properties) return {};
         return Object.fromEntries(
             Object.entries(schema.properties).filter(([_, propSchema]) => {
                 const prop = propSchema as PluginSettingsSchemaProperty;
                 const scope = prop.scope || 'global';
+                // Filter out writeOnly fields
+                if (prop.writeOnly) return false;
                 // Show global and user-scoped settings in user settings page
                 return scope === 'global' || scope === 'user';
             }),
@@ -44,6 +47,35 @@ export function PluginSettings({ plugin }: PluginSettingsProps) {
     }, [schema]);
 
     const hasSettings = Object.keys(userScopeProperties).length > 0;
+
+    // Get required fields for user scope (global and user scoped)
+    const requiredFields = useMemo(() => {
+        if (!schema?.required || !schema.properties) return [];
+        return schema.required.filter((field) => {
+            const propSchema = schema.properties?.[field] as
+                | PluginSettingsSchemaProperty
+                | undefined;
+            if (!propSchema) return false;
+            const scope = propSchema.scope || 'global';
+            return scope === 'global' || scope === 'user';
+        });
+    }, [schema]);
+
+    // Validate required fields before saving
+    const validateRequiredFields = useCallback((): string[] => {
+        const missingFields: string[] = [];
+        for (const field of requiredFields) {
+            const value = settings[field] ?? secretSettings[field];
+            if (value === undefined || value === null || value === '') {
+                const propSchema = schema?.properties?.[field] as
+                    | PluginSettingsSchemaProperty
+                    | undefined;
+                const label = propSchema?.title || field;
+                missingFields.push(label);
+            }
+        }
+        return missingFields;
+    }, [requiredFields, settings, secretSettings, schema]);
 
     const handleToggle = async () => {
         startTransition(async () => {
@@ -68,10 +100,19 @@ export function PluginSettings({ plugin }: PluginSettingsProps) {
         }
         setHasChanges(true);
         setSaveSuccess(false);
+        setValidationError(null);
     };
 
     const handleSave = async () => {
+        // Validate required fields before saving
+        const missingFields = validateRequiredFields();
+        if (missingFields.length > 0) {
+            setValidationError(t('missingRequiredFields', { fields: missingFields.join(', ') }));
+            return;
+        }
+
         setIsSaving(true);
+        setValidationError(null);
         try {
             await updatePluginSettings(plugin.pluginId, {
                 settings: Object.keys(settings).length > 0 ? settings : undefined,
@@ -84,6 +125,14 @@ export function PluginSettings({ plugin }: PluginSettingsProps) {
             setTimeout(() => setSaveSuccess(false), 3000);
         } catch (error) {
             console.error('Failed to save settings:', error);
+            // Extract error message from response if available
+            const errorMessage =
+                error instanceof Error
+                    ? error.message
+                    : typeof error === 'object' && error !== null && 'message' in error
+                      ? String((error as { message: unknown }).message)
+                      : t('saveError');
+            setValidationError(errorMessage);
         } finally {
             setIsSaving(false);
         }
@@ -218,6 +267,13 @@ export function PluginSettings({ plugin }: PluginSettingsProps) {
                             />
                         ))}
                     </div>
+
+                    {validationError && (
+                        <div className="mt-4 p-3 rounded-lg bg-danger/10 border border-danger/20 flex items-start gap-2">
+                            <AlertCircle className="w-5 h-5 text-danger flex-shrink-0 mt-0.5" />
+                            <p className="text-sm text-danger">{validationError}</p>
+                        </div>
+                    )}
 
                     <div className="flex items-center gap-3 mt-6 pt-4 border-t border-border dark:border-border-dark">
                         <Button

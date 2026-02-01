@@ -5,7 +5,7 @@ import type {
     FacadeExtractedContent,
     FacadeExtractionOptions,
 } from '@ever-works/plugin';
-import { FACADE_CAPABILITIES } from '@ever-works/plugin';
+import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
 import { DirectoryPluginRepository } from '../plugins/repositories/directory-plugin.repository';
@@ -50,7 +50,7 @@ export interface ExtendedFacadeExtractionOptions extends FacadeExtractionOptions
 @Injectable()
 export class ContentExtractorFacadeService implements IContentExtractorFacade {
     private readonly logger = new Logger(ContentExtractorFacadeService.name);
-    private readonly CAPABILITY = FACADE_CAPABILITIES.CONTENT_EXTRACTOR;
+    private readonly CAPABILITY = PLUGIN_CAPABILITIES.CONTENT_EXTRACTOR;
 
     constructor(
         private readonly registry: PluginRegistryService,
@@ -133,13 +133,22 @@ export class ContentExtractorFacadeService implements IContentExtractorFacade {
                 if (!isEnabled) throw new ContentExtractorProviderNotFoundError(providerOverride);
 
                 const plugin = registered.plugin as IContentExtractorPlugin;
-                if (plugin.canExtract) {
-                    const canHandle = await plugin.canExtract(url);
-                    if (!canHandle) {
+                // Check if plugin can handle this URL using optional canExtract method
+                if (typeof plugin.canExtract === 'function') {
+                    try {
+                        const canHandle = await plugin.canExtract(url);
+                        if (!canHandle) {
+                            this.logger.warn(
+                                `Override plugin ${providerOverride} cannot extract: ${url}`,
+                            );
+                            throw new ContentExtractorProviderNotFoundError(providerOverride);
+                        }
+                    } catch (err) {
+                        if (err instanceof ContentExtractorProviderNotFoundError) throw err;
                         this.logger.warn(
-                            `Override plugin ${providerOverride} cannot extract: ${url}`,
+                            `canExtract failed for ${providerOverride}: ${(err as Error).message}`,
                         );
-                        throw new ContentExtractorProviderNotFoundError(providerOverride);
+                        // Continue with the plugin if canExtract fails
                     }
                 }
                 return plugin;
@@ -158,8 +167,19 @@ export class ContentExtractorFacadeService implements IContentExtractorFacade {
                     const registered = this.registry.get(activePlugin.pluginId);
                     if (registered && registered.state === 'enabled') {
                         const plugin = registered.plugin as IContentExtractorPlugin;
-                        if (!plugin.canExtract || (await plugin.canExtract(url))) {
+                        // Check canExtract if the method exists
+                        if (typeof plugin.canExtract !== 'function') {
                             return plugin;
+                        }
+                        try {
+                            if (await plugin.canExtract(url)) {
+                                return plugin;
+                            }
+                        } catch (err) {
+                            this.logger.warn(
+                                `canExtract failed for ${registered.plugin.id}: ${(err as Error).message}`,
+                            );
+                            // Fall through to try other plugins
                         }
                     }
                 }
@@ -183,9 +203,17 @@ export class ContentExtractorFacadeService implements IContentExtractorFacade {
             if (!isEnabled) continue;
 
             const plugin = registered.plugin as IContentExtractorPlugin;
-            if (plugin.canExtract) {
-                const canHandle = await plugin.canExtract(url);
-                if (!canHandle) continue;
+            // Check canExtract if the method exists
+            if (typeof plugin.canExtract === 'function') {
+                try {
+                    const canHandle = await plugin.canExtract(url);
+                    if (!canHandle) continue;
+                } catch (err) {
+                    this.logger.warn(
+                        `canExtract failed for ${registered.plugin.id}: ${(err as Error).message}`,
+                    );
+                    continue;
+                }
             }
             return plugin;
         }
@@ -195,9 +223,18 @@ export class ContentExtractorFacadeService implements IContentExtractorFacade {
 
         if (defaultExtractor) {
             const plugin = defaultExtractor.plugin as IContentExtractorPlugin;
-            if (plugin.canExtract) {
-                const canHandle = await plugin.canExtract(url);
-                if (!canHandle) throw new NoContentExtractorProviderError();
+            // Check canExtract if the method exists
+            if (typeof plugin.canExtract === 'function') {
+                try {
+                    const canHandle = await plugin.canExtract(url);
+                    if (!canHandle) throw new NoContentExtractorProviderError();
+                } catch (err) {
+                    if (err instanceof NoContentExtractorProviderError) throw err;
+                    this.logger.warn(
+                        `canExtract failed for default extractor ${defaultExtractor.plugin.id}: ${(err as Error).message}`,
+                    );
+                    // Continue with the default extractor if canExtract fails
+                }
             }
             return plugin;
         }
@@ -208,9 +245,17 @@ export class ContentExtractorFacadeService implements IContentExtractorFacade {
             if (!isEnabled) continue;
 
             const plugin = registered.plugin as IContentExtractorPlugin;
-            if (plugin.canExtract) {
-                const canHandle = await plugin.canExtract(url);
-                if (!canHandle) continue;
+            // Check canExtract if the method exists
+            if (typeof plugin.canExtract === 'function') {
+                try {
+                    const canHandle = await plugin.canExtract(url);
+                    if (!canHandle) continue;
+                } catch (err) {
+                    this.logger.warn(
+                        `canExtract failed for ${registered.plugin.id}: ${(err as Error).message}`,
+                    );
+                    continue;
+                }
             }
             return plugin;
         }
