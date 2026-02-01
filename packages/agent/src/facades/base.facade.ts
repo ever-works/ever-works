@@ -8,90 +8,25 @@ import { DirectoryPluginRepository } from '../plugins/repositories/directory-plu
 import { UserPluginRepository } from '../plugins/repositories/user-plugin.repository';
 import type { IPlugin } from '@ever-works/plugin';
 
-/**
- * Options for facade operations that support context-aware resolution.
- */
 export interface BaseFacadeOptions {
-    /** User ID for settings and enable resolution */
     userId?: string;
-    /** Directory ID for settings and enable resolution */
     directoryId?: string;
-    /** Override provider (plugin ID) */
     providerOverride?: string;
 }
 
-/**
- * Default provider information returned by getDefaultProvider.
- */
 export interface DefaultProviderInfo {
     id: string;
     name: string;
 }
 
 /**
- * Abstract base class for all capability facades.
+ * Abstract base class for capability facades.
  *
- * Facades are thin service wrappers that abstract plugin interactions from the rest
- * of the application. They handle:
- * 1. Provider Resolution - Determining which plugin to use
- * 2. Settings Resolution - Getting the correct configuration
- * 3. Enable Resolution - Three-level configuration (Directory > User > Generation)
- * 4. Plugin Invocation - Calling the plugin with resolved settings
- * 5. Error Handling - Uniform error handling across capabilities
- *
- * ## Three-Level Enable Resolution
- *
- * ```
- * isPluginEnabled(pluginId, directoryId, userId)
- *     │
- *     ├─ 1. Check DirectoryPlugin.enabled (Level 2)
- *     │     └─ If DirectoryPluginEntity exists: return directoryPlugin.enabled
- *     │
- *     ├─ 2. Check UserPlugin.enabled (Level 1)
- *     │     └─ If UserPluginEntity exists: return userPlugin.enabled
- *     │
- *     ├─ 3. Check manifest.autoEnable
- *     │     └─ If manifest.autoEnable is true: return true
- *     │
- *     └─ 4. Default to enabled (plugin is in registry with state=enabled)
- * ```
- *
- * ## Settings Resolution (4-Level Hierarchy)
- *
- * Settings are resolved using PluginSettingsService with 4-level hierarchy:
- * 1. Directory settings (highest priority)
- * 2. User settings
- * 3. Admin settings
- * 4. Plugin defaults (lowest priority)
- *
- * ## Usage
- *
- * Extend this class and implement the abstract members:
- *
- * ```typescript
- * @Injectable()
- * export class MyFacadeService extends BaseFacadeService {
- *     protected readonly CAPABILITY = 'my-capability';
- *
- *     // Implement your capability-specific methods
- *     async doSomething(options: MyOptions): Promise<MyResult> {
- *         const plugin = await this.resolvePlugin(options.directoryId, options.userId);
- *         const settings = await this.getResolvedSettings(plugin.id, options);
- *         return plugin.doSomething({ ...options, settings });
- *     }
- * }
- * ```
+ * Handles provider resolution, settings resolution (4-level: Directory > User > Admin > Plugin defaults),
+ * and enable resolution (3-level: Directory > User > autoEnable).
  */
 export abstract class BaseFacadeService {
-    /**
-     * The capability string this facade handles (e.g., 'search', 'screenshot', 'ai-provider').
-     * Must be implemented by subclasses.
-     */
     protected abstract readonly CAPABILITY: string;
-
-    /**
-     * Logger instance. Subclasses should create their own logger with their class name.
-     */
     protected abstract readonly logger: Logger;
 
     constructor(
@@ -101,17 +36,11 @@ export abstract class BaseFacadeService {
         protected readonly userPluginRepository?: UserPluginRepository,
     ) {}
 
-    /**
-     * Check if any provider plugin for this capability is configured and available.
-     */
     isConfigured(): boolean {
         const plugins = this.registry.getByCapability(this.CAPABILITY);
         return plugins.length > 0 && plugins.some((p) => p.state === 'enabled');
     }
 
-    /**
-     * Get all available provider plugins for this capability.
-     */
     getAvailableProviders(): Array<{
         id: string;
         name: string;
@@ -125,18 +54,10 @@ export abstract class BaseFacadeService {
         }));
     }
 
-    /**
-     * Get the default provider for this capability in a directory.
-     *
-     * Resolution order:
-     * 1. DirectoryPlugin with activeCapability matching this capability
-     * 2. First enabled plugin with this capability
-     */
     async getDefaultProvider(
         directoryId?: string,
         userId?: string,
     ): Promise<DefaultProviderInfo | null> {
-        // 1. Check for directory-level default via activeCapability
         if (directoryId && this.directoryPluginRepository) {
             try {
                 const activePlugin = await this.directoryPluginRepository.findActiveByCapability(
@@ -154,11 +75,10 @@ export abstract class BaseFacadeService {
                     }
                 }
             } catch {
-                // Fall through to default resolution
+                // Fall through
             }
         }
 
-        // 2. Fall back to first enabled plugin with this capability
         const plugins = this.registry.getByCapability(this.CAPABILITY);
         const enabledPlugin = plugins.find((p) => p.state === 'enabled');
 
@@ -172,23 +92,12 @@ export abstract class BaseFacadeService {
         return null;
     }
 
-    /**
-     * Check if a plugin is enabled for a specific context.
-     *
-     * Resolution order (three-level configuration):
-     * 1. DirectoryPlugin.enabled (Level 2) - if record exists, use it
-     * 2. UserPlugin.enabled (Level 1) - if record exists, use it
-     * 3. autoEnable in manifest - plugin default
-     * 4. Default to enabled (registry already filtered by enabled state)
-     *
-     * Level 2 takes precedence over Level 1.
-     */
+    /** Enable resolution: Directory > User > autoEnable */
     protected async isPluginEnabled(
         pluginId: string,
         directoryId?: string,
         userId?: string,
     ): Promise<boolean> {
-        // Level 2: Check DirectoryPlugin record (highest priority for directory context)
         if (directoryId && this.directoryPluginRepository) {
             try {
                 const directoryPlugin =
@@ -201,11 +110,10 @@ export abstract class BaseFacadeService {
                     return directoryPlugin.enabled;
                 }
             } catch {
-                // Continue to Level 1
+                // Continue
             }
         }
 
-        // Level 1: Check UserPlugin record (user-level toggle)
         if (userId && this.userPluginRepository) {
             try {
                 const userPlugin = await this.userPluginRepository.findByUserAndPlugin(
@@ -270,22 +178,7 @@ export abstract class BaseFacadeService {
         return plugin.name;
     }
 
-    /**
-     * Get a setting value with type validation at runtime.
-     * Returns undefined if the value doesn't exist or doesn't match the expected type.
-     *
-     * @param settings - The settings object to read from
-     * @param key - The setting key to retrieve
-     * @param expectedType - The expected JavaScript type ('string', 'number', 'boolean', 'object', 'array')
-     * @returns The typed value or undefined if not found or wrong type
-     *
-     * @example
-     * ```typescript
-     * const apiKey = this.getSettingTyped<string>(settings, 'apiKey', 'string');
-     * const maxItems = this.getSettingTyped<number>(settings, 'maxItems', 'number');
-     * const isEnabled = this.getSettingTyped<boolean>(settings, 'enabled', 'boolean');
-     * ```
-     */
+    /** Get a setting value with type validation. Returns undefined if missing or wrong type. */
     protected getSettingTyped<T>(
         settings: Record<string, unknown>,
         key: string,
@@ -309,17 +202,7 @@ export abstract class BaseFacadeService {
         return value as T;
     }
 
-    /**
-     * Get a required setting value with type validation.
-     * Throws an error if the value doesn't exist or doesn't match the expected type.
-     *
-     * @param settings - The settings object to read from
-     * @param key - The setting key to retrieve
-     * @param expectedType - The expected JavaScript type
-     * @param pluginId - The plugin ID for error messages
-     * @returns The typed value
-     * @throws Error if value is missing or wrong type
-     */
+    /** Get a required setting. Throws if missing or wrong type. */
     protected getSettingRequired<T>(
         settings: Record<string, unknown>,
         key: string,
@@ -336,16 +219,7 @@ export abstract class BaseFacadeService {
         return value;
     }
 
-    /**
-     * Get a setting value with a default fallback.
-     * Returns the default if the value doesn't exist or doesn't match the expected type.
-     *
-     * @param settings - The settings object to read from
-     * @param key - The setting key to retrieve
-     * @param expectedType - The expected JavaScript type
-     * @param defaultValue - The default value to return if not found
-     * @returns The typed value or the default
-     */
+    /** Get a setting with fallback to default value. */
     protected getSettingWithDefault<T>(
         settings: Record<string, unknown>,
         key: string,
@@ -356,10 +230,6 @@ export abstract class BaseFacadeService {
         return value ?? defaultValue;
     }
 
-    /**
-     * Find the directory-level active plugin for this capability.
-     * Returns null if no active plugin is set for this directory.
-     */
     protected async findActivePluginForDirectory(
         directoryId: string,
     ): Promise<RegisteredPlugin | null> {
@@ -386,9 +256,6 @@ export abstract class BaseFacadeService {
         return null;
     }
 
-    /**
-     * Get all enabled plugins for this capability that pass the enable check.
-     */
     protected async getEnabledPlugins(
         directoryId?: string,
         userId?: string,

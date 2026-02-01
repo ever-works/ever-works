@@ -16,25 +16,15 @@ import { PluginRegistryService } from '../plugins/services/plugin-registry.servi
 import { DirectoryPluginRepository } from '../plugins/repositories/directory-plugin.repository';
 import { UserPluginRepository } from '../plugins/repositories/user-plugin.repository';
 
-/**
- * Type guard for full pipeline plugins (inlined to avoid ESM import issues)
- */
 function isFullPipelinePlugin(plugin: IPlugin): plugin is IFullPipelinePlugin {
     return plugin.capabilities.includes('full-pipeline');
 }
 
-/**
- * Pipeline execution mode
- */
 export type PipelineExecutionMode = 'step' | 'full';
 
 /**
- * Pipeline orchestrator that decides between step-based and full pipeline execution.
- *
- * This service is the main entry point for pipeline execution. It checks if a full
- * pipeline plugin is available and enabled, and delegates to the appropriate executor.
- *
- * Uses three-level enable resolution: Directory > User > autoEnable.
+ * Main entry point for pipeline execution.
+ * Decides between step-based and full pipeline execution based on available plugins.
  */
 @Injectable()
 export class PipelineOrchestratorService {
@@ -48,20 +38,6 @@ export class PipelineOrchestratorService {
         @Optional() private readonly userPluginRepository?: UserPluginRepository,
     ) {}
 
-    /**
-     * Execute the pipeline for a directory.
-     *
-     * This method checks for available full pipeline plugins and decides the execution mode:
-     * - If a full pipeline plugin is enabled for this directory, uses full pipeline execution
-     * - Otherwise, uses step-based execution
-     *
-     * @param directory - Directory reference
-     * @param request - Generation request parameters
-     * @param existing - Existing items in directory
-     * @param options - Execution options
-     * @param onProgress - Progress callback
-     * @returns Pipeline execution result
-     */
     async execute(
         directory: DirectoryReference,
         request: GenerationRequest,
@@ -69,7 +45,6 @@ export class PipelineOrchestratorService {
         options?: PipelineExecutionOptions,
         onProgress?: PipelineProgressCallback,
     ): Promise<PipelineResult> {
-        // Determine execution mode with directory-scoped plugin resolution
         const fullPipelinePlugin = await this.findFullPipelinePlugin(
             directory.id,
             directory.user?.id,
@@ -95,19 +70,7 @@ export class PipelineOrchestratorService {
         return this.stepExecutor.execute(directory, request, existing, options, onProgress);
     }
 
-    /**
-     * Execute with explicit mode selection.
-     *
-     * Allows forcing a specific execution mode regardless of available plugins.
-     *
-     * @param mode - Execution mode ('step' or 'full')
-     * @param directory - Directory reference
-     * @param request - Generation request parameters
-     * @param existing - Existing items in directory
-     * @param options - Execution options
-     * @param onProgress - Progress callback
-     * @returns Pipeline execution result
-     */
+    /** Execute with explicit mode selection, regardless of available plugins */
     async executeWithMode(
         mode: PipelineExecutionMode,
         directory: DirectoryReference,
@@ -145,13 +108,6 @@ export class PipelineOrchestratorService {
         return this.stepExecutor.execute(directory, request, existing, options, onProgress);
     }
 
-    /**
-     * Get the recommended execution mode for a directory.
-     *
-     * @param directoryId - Directory ID
-     * @param userId - Optional user ID for user-level plugin resolution
-     * @returns Recommended execution mode and reason
-     */
     async getRecommendedMode(
         directoryId?: string,
         userId?: string,
@@ -176,19 +132,10 @@ export class PipelineOrchestratorService {
         };
     }
 
-    /**
-     * Check if a full pipeline plugin is available for a directory.
-     *
-     * @param directoryId - Directory ID (optional, for directory-specific plugins)
-     * @param userId - Optional user ID for user-level plugin resolution
-     */
     async hasFullPipelinePlugin(directoryId?: string, userId?: string): Promise<boolean> {
         return (await this.findFullPipelinePlugin(directoryId, userId)) !== null;
     }
 
-    /**
-     * Get all available full pipeline plugins.
-     */
     getAvailableFullPipelinePlugins(): IFullPipelinePlugin[] {
         return this.registry
             .getByCapability('full-pipeline')
@@ -197,13 +144,6 @@ export class PipelineOrchestratorService {
             .filter(isFullPipelinePlugin);
     }
 
-    /**
-     * Resume pipeline from checkpoint.
-     *
-     * @param directoryId - Directory ID
-     * @param options - Execution options
-     * @param onProgress - Progress callback
-     */
     async resumeFromCheckpoint(
         directoryId: string,
         options?: PipelineExecutionOptions,
@@ -213,22 +153,10 @@ export class PipelineOrchestratorService {
         return this.stepExecutor.resumeFromCheckpoint(directoryId, options, onProgress);
     }
 
-    /**
-     * Clear checkpoint for a directory.
-     *
-     * @param directoryId - Directory ID
-     */
     async clearCheckpoint(directoryId: string): Promise<void> {
         await this.stepExecutor.clearCheckpoint(directoryId);
     }
 
-    /**
-     * Find an enabled full pipeline plugin for the given directory/user context.
-     *
-     * @param directoryId - Optional directory ID for directory-specific plugin resolution
-     * @param userId - Optional user ID for user-level plugin resolution
-     * @returns The full pipeline plugin if found and enabled, null otherwise
-     */
     private async findFullPipelinePlugin(
         directoryId?: string,
         userId?: string,
@@ -236,12 +164,10 @@ export class PipelineOrchestratorService {
         const plugins = this.registry.getByCapability('full-pipeline');
 
         for (const registered of plugins) {
-            // Only consider enabled plugins at the registry level
             if (registered.state !== 'enabled') {
                 continue;
             }
 
-            // Check directory-specific enabled state
             const isEnabled = await this.isPluginEnabledForDirectory(
                 registered.plugin.id,
                 directoryId,
@@ -251,7 +177,6 @@ export class PipelineOrchestratorService {
                 continue;
             }
 
-            // Verify it implements IFullPipelinePlugin
             if (isFullPipelinePlugin(registered.plugin)) {
                 this.logger.debug(`Found full pipeline plugin: ${registered.plugin.id}`);
                 return registered.plugin;
@@ -261,17 +186,11 @@ export class PipelineOrchestratorService {
         return null;
     }
 
-    /**
-     * Check if a plugin is enabled for the given directory/user context.
-     *
-     * Enable resolution: Directory (L2) > User (L1) > autoEnable
-     */
     private async isPluginEnabledForDirectory(
         pluginId: string,
         directoryId?: string,
         userId?: string,
     ): Promise<boolean> {
-        // Level 2: Directory-level enable state
         if (directoryId && this.directoryPluginRepository) {
             try {
                 const dp = await this.directoryPluginRepository.findByDirectoryAndPlugin(
@@ -280,21 +199,19 @@ export class PipelineOrchestratorService {
                 );
                 if (dp !== null) return dp.enabled;
             } catch {
-                // Continue to next level
+                // Continue
             }
         }
 
-        // Level 1: User-level enable state
         if (userId && this.userPluginRepository) {
             try {
                 const up = await this.userPluginRepository.findByUserAndPlugin(userId, pluginId);
                 if (up !== null) return up.enabled;
             } catch {
-                // Continue to fallback
+                // Continue
             }
         }
 
-        // Fallback: autoEnable from manifest
         const registered = this.registry.get(pluginId);
         return registered?.manifest?.autoEnable ?? true;
     }

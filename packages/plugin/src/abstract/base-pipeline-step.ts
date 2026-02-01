@@ -10,53 +10,30 @@ import type { PipelineStepDefinition, StepPosition } from '../pipeline/step-defi
 import type { PluginCategory } from '../contracts/plugin-manifest.types.js';
 
 /**
- * Abstract base class for pipeline step plugins
- * Provides common functionality and sensible defaults
+ * Abstract base class for pipeline step plugins.
+ * Subclasses must implement: stepId, stepName, stepPosition, execute()
  */
 export abstract class BasePipelineStep extends BasePlugin implements IPipelineStepPlugin {
 	readonly category: PluginCategory = 'pipeline';
 	readonly capabilities: readonly string[] = ['pipeline-step'];
 
-	/** Step identifier - must be implemented */
 	abstract readonly stepId: string;
-
-	/** Step display name - must be implemented */
 	abstract readonly stepName: string;
-
-	/** Step description */
-	readonly stepDescription?: string;
-
-	/** Step position relative to built-in steps */
 	abstract readonly stepPosition: StepPosition;
 
-	/** Data keys this step provides */
+	readonly stepDescription?: string;
 	readonly provides: readonly string[] = [];
-
-	/** Data keys this step requires */
 	readonly requires: readonly string[] = [];
-
-	/** Whether step can be skipped */
 	readonly optional: boolean = false;
-
-	/** Whether step can run in parallel */
 	readonly parallelizable: boolean = false;
-
-	/** Estimated duration in seconds */
 	readonly estimatedDuration?: number;
 
-	/**
-	 * Execute the pipeline step
-	 * Must be implemented by subclasses
-	 */
 	abstract execute(
 		context: MutableGenerationContext,
 		options?: StepExecutionOptions,
 		onProgress?: StepProgressCallback
 	): Promise<MutableGenerationContext>;
 
-	/**
-	 * Get the step definition
-	 */
 	getStepDefinition(): PipelineStepDefinition {
 		return {
 			id: this.stepId,
@@ -71,26 +48,15 @@ export abstract class BasePipelineStep extends BasePlugin implements IPipelineSt
 		};
 	}
 
-	/**
-	 * Check if the step can be skipped
-	 * Default: cannot skip unless optional
-	 */
 	async canSkip(_context: MutableGenerationContext): Promise<boolean> {
 		return this.optional;
 	}
 
-	/**
-	 * Estimate step duration
-	 * Default: use estimatedDuration property or 5 seconds
-	 */
 	async estimateDuration(_context: MutableGenerationContext): Promise<number> {
 		return (this.estimatedDuration ?? 5) * 1000;
 	}
 
-	/**
-	 * Validate step can run
-	 * Default: check required data keys are present
-	 */
+	/** Validates that required data keys are present in context */
 	async validate(context: MutableGenerationContext): Promise<{ valid: boolean; error?: string }> {
 		for (const key of this.requires) {
 			if (!(key in context) || context[key as keyof MutableGenerationContext] === undefined) {
@@ -103,19 +69,11 @@ export abstract class BasePipelineStep extends BasePlugin implements IPipelineSt
 		return { valid: true };
 	}
 
-	/**
-	 * Rollback step changes on failure
-	 * Default: no-op (subclasses can override)
-	 */
-	async rollback(_context: MutableGenerationContext, _error: Error): Promise<void> {
-		// Default: no-op
-	}
+	/** Override to implement rollback on failure */
+	async rollback(_context: MutableGenerationContext, _error: Error): Promise<void> {}
 
-	// Helper methods for subclasses
+	// Helper methods
 
-	/**
-	 * Create a step progress object
-	 */
 	protected createProgress(
 		percent: number,
 		message?: string,
@@ -130,9 +88,6 @@ export abstract class BasePipelineStep extends BasePlugin implements IPipelineSt
 		};
 	}
 
-	/**
-	 * Report progress if callback is provided
-	 */
 	protected reportProgress(
 		onProgress: StepProgressCallback | undefined,
 		percent: number,
@@ -145,9 +100,6 @@ export abstract class BasePipelineStep extends BasePlugin implements IPipelineSt
 		}
 	}
 
-	/**
-	 * Check if execution should be aborted
-	 */
 	protected shouldAbort(context: MutableGenerationContext, options?: StepExecutionOptions): boolean {
 		if (context.shouldStop) {
 			return true;
@@ -158,46 +110,22 @@ export abstract class BasePipelineStep extends BasePlugin implements IPipelineSt
 		return false;
 	}
 
-	/**
-	 * Create a position after another step.
-	 *
-	 * @param stepId - The step ID to position after (type-safe with generic)
-	 * @example
-	 * // In a custom pipeline step plugin
-	 * readonly stepPosition = MyPipelineStep.after('web-search');
-	 */
 	protected static after<TStepId extends string>(stepId: TStepId): StepPosition<TStepId> {
 		return { type: 'after', stepId };
 	}
 
-	/**
-	 * Create a position before another step.
-	 *
-	 * @param stepId - The step ID to position before (type-safe with generic)
-	 */
 	protected static before<TStepId extends string>(stepId: TStepId): StepPosition<TStepId> {
 		return { type: 'before', stepId };
 	}
 
-	/**
-	 * Create a position replacing another step.
-	 *
-	 * @param stepId - The step ID to replace (type-safe with generic)
-	 */
 	protected static replace<TStepId extends string>(stepId: TStepId): StepPosition<TStepId> {
 		return { type: 'replace', stepId };
 	}
 
-	/**
-	 * Create a position at the start of the pipeline
-	 */
 	protected static first(): StepPosition {
 		return { type: 'first' };
 	}
 
-	/**
-	 * Create a position at the end of the pipeline
-	 */
 	protected static last(): StepPosition {
 		return { type: 'last' };
 	}

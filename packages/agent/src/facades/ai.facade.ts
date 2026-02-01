@@ -43,25 +43,14 @@ export class AiProviderNotFoundError extends AiFacadeError {
 }
 
 export interface AiFacadeOptions {
-    /** User ID for settings resolution */
     userId?: string;
-    /** Directory ID for settings resolution */
     directoryId?: string;
-    /** Override provider (plugin ID) */
     providerOverride?: string;
 }
 
 /**
  * AI Facade service for pipeline steps.
- *
- * Uses the plugin registry to dynamically resolve AI providers.
- * Supports 4-level settings resolution hierarchy:
- * 1. Directory settings
- * 2. User settings
- * 3. Admin settings
- * 4. Plugin defaults
- *
- * Uses three-level enable resolution: Directory > User > autoEnable.
+ * Uses plugin registry for AI provider resolution with 4-level settings hierarchy.
  */
 @Injectable()
 export class AiFacadeService implements IAiFacade {
@@ -75,62 +64,43 @@ export class AiFacadeService implements IAiFacade {
         @Optional() private readonly userPluginRepository?: UserPluginRepository,
     ) {}
 
-    /**
-     * Send a prompt and get a structured JSON response.
-     * Uses the plugin registry to resolve the AI provider.
-     *
-     * Model routing resolution order:
-     * 1. Explicit modelOverride in routing options
-     * 2. Complexity-based model from settings (simpleModel, mediumModel, complexModel)
-     * 3. Default model from settings
-     * 4. Plugin's default model (undefined - plugin decides)
-     */
+    /** Send a prompt and get a structured JSON response. */
     async askJson<T>(
         promptTemplate: string,
         schema: z.ZodSchema<T>,
         options?: AskJsonOptions,
         facadeOptions?: AiFacadeOptions,
     ): Promise<AskJsonResponse<T>> {
-        // Resolve which plugin to use
         const plugin = await this.resolvePlugin(
             options?.routing?.providerOverride,
             facadeOptions?.userId,
             facadeOptions?.directoryId,
         );
 
-        // Get resolved settings for the plugin (includes model routing config)
         const settings = await this.settingsService.getSettings(plugin.id, {
             userId: facadeOptions?.userId,
             directoryId: facadeOptions?.directoryId,
             includeSecrets: true,
         });
 
-        // Resolve model based on complexity or override
         const model = this.resolveModel(plugin, settings, options?.routing);
-
-        // Render template variables
         const prompt = this.renderTemplate(promptTemplate, options?.variables);
 
-        // Build completion options with settings for plugin to use
         const completionOptions: ChatCompletionOptions = {
-            model, // Pass resolved model to plugin
+            model,
             messages: [{ role: 'user', content: prompt }],
             temperature: options?.temperature ?? 0.7,
             responseFormat: { type: 'json_object' },
             jsonSchema: this.zodToJsonSchema(schema),
-            settings, // Pass resolved settings to plugin
+            settings,
         };
 
-        // Call the AI provider plugin
         const response = await plugin.createChatCompletion(completionOptions);
-
-        // Parse response
         const content = response.choices[0]?.message?.content;
         if (!content || typeof content !== 'string') {
             throw new AiFacadeError('No content in AI response', 'askJson', plugin.id);
         }
 
-        // Parse and validate JSON response
         let parsed: unknown;
         try {
             parsed = JSON.parse(content);
@@ -147,7 +117,6 @@ export class AiFacadeService implements IAiFacade {
             );
         }
 
-        // Calculate cost based on model pricing
         const cost = await this.calculateCost(plugin, response.model, response.usage);
 
         return {
@@ -165,10 +134,6 @@ export class AiFacadeService implements IAiFacade {
         };
     }
 
-    /**
-     * Calculate cost based on model pricing and token usage.
-     * Returns null if pricing info is not available.
-     */
     private async calculateCost(
         plugin: IAiProviderPlugin,
         modelId: string,
@@ -189,7 +154,6 @@ export class AiFacadeService implements IAiFacade {
 
             return inputCost + outputCost;
         } catch {
-            // Model info not available, return null
             return null;
         }
     }
@@ -248,21 +212,12 @@ export class AiFacadeService implements IAiFacade {
         }));
     }
 
-    /**
-     * Resolve which AI provider plugin to use.
-     *
-     * Resolution order:
-     * 1. providerOverride (explicit request)
-     * 2. Directory default provider (if directoryId provided)
-     * 3. User default provider (if userId provided)
-     * 4. First enabled AI provider that passes enable check
-     */
+    /** Resolve AI provider: providerOverride > directory default > user default > first enabled */
     private async resolvePlugin(
         providerOverride?: string,
         userId?: string,
         directoryId?: string,
     ): Promise<IAiProviderPlugin> {
-        // If explicit override, use it
         if (providerOverride) {
             const registered = this.registry.get(providerOverride);
             if (
@@ -270,7 +225,6 @@ export class AiFacadeService implements IAiFacade {
                 registered.manifest.capabilities.includes(this.CAPABILITY) &&
                 registered.state === 'enabled'
             ) {
-                // Check if enabled for this directory/user context
                 const isEnabled = await this.isPluginEnabled(providerOverride, directoryId, userId);
                 if (isEnabled) {
                     return registered.plugin as IAiProviderPlugin;
@@ -279,7 +233,6 @@ export class AiFacadeService implements IAiFacade {
             throw new AiProviderNotFoundError(providerOverride);
         }
 
-        // Check directory-level default provider from settings
         if (directoryId) {
             const directoryProvider = await this.getDefaultProviderFromSettings(
                 directoryId,
@@ -291,7 +244,6 @@ export class AiFacadeService implements IAiFacade {
             }
         }
 
-        // Check user-level default provider from settings
         if (userId) {
             const userProvider = await this.getDefaultProviderFromSettings(
                 undefined,
@@ -303,7 +255,6 @@ export class AiFacadeService implements IAiFacade {
             }
         }
 
-        // Fall back to first enabled AI provider that passes enable check
         const plugins = this.registry.getByCapability(this.CAPABILITY);
         for (const registered of plugins) {
             if (registered.state !== 'enabled') continue;
@@ -316,17 +267,11 @@ export class AiFacadeService implements IAiFacade {
         throw new NoAiProviderError();
     }
 
-    /**
-     * Check if a plugin is enabled for the given directory/user context.
-     *
-     * Enable resolution: Directory (L2) > User (L1) > autoEnable
-     */
     private async isPluginEnabled(
         pluginId: string,
         directoryId?: string,
         userId?: string,
     ): Promise<boolean> {
-        // Level 2: Directory-level enable state
         if (directoryId && this.directoryPluginRepository) {
             try {
                 const dp = await this.directoryPluginRepository.findByDirectoryAndPlugin(
@@ -335,35 +280,28 @@ export class AiFacadeService implements IAiFacade {
                 );
                 if (dp !== null) return dp.enabled;
             } catch {
-                // Continue to next level
+                // Continue
             }
         }
 
-        // Level 1: User-level enable state
         if (userId && this.userPluginRepository) {
             try {
                 const up = await this.userPluginRepository.findByUserAndPlugin(userId, pluginId);
                 if (up !== null) return up.enabled;
             } catch {
-                // Continue to fallback
+                // Continue
             }
         }
 
-        // Fallback: autoEnable from manifest
         const registered = this.registry.get(pluginId);
         return registered?.manifest?.autoEnable ?? true;
     }
 
-    /**
-     * Get default AI provider from settings at a specific scope.
-     * The 'defaultAiProvider' setting can be set at directory or user level.
-     */
     private async getDefaultProviderFromSettings(
         directoryId?: string,
         userId?: string,
         scope?: 'directory' | 'user',
     ): Promise<IAiProviderPlugin | null> {
-        // Get all enabled AI providers
         const aiProviders = this.registry.getByCapability(this.CAPABILITY);
         const enabledProviders = aiProviders.filter((p) => p.state === 'enabled');
 
@@ -371,7 +309,6 @@ export class AiFacadeService implements IAiFacade {
             return null;
         }
 
-        // Check each provider's settings for the scope-specific default
         for (const registered of enabledProviders) {
             try {
                 const settings = await this.settingsService.getSettings(registered.plugin.id, {
@@ -380,7 +317,6 @@ export class AiFacadeService implements IAiFacade {
                     includeSecrets: false,
                 });
 
-                // Check if this provider is marked as default at the requested scope
                 const isDefault = getSettingTyped<boolean>(
                     settings,
                     'isDefault',
@@ -394,15 +330,11 @@ export class AiFacadeService implements IAiFacade {
                     return registered.plugin as IAiProviderPlugin;
                 }
             } catch {
-                // Continue checking other providers
+                // Continue
             }
         }
 
-        // Also check for a global 'defaultAiProvider' setting that specifies provider ID
-        // This is stored at platform settings level (scope: admin/user/directory)
         try {
-            // Try to get platform-level AI settings (provider ID stored directly)
-            // We check if any provider matches the stored defaultAiProvider setting
             const firstProvider = enabledProviders[0];
             const settings = await this.settingsService.getSettings(firstProvider.plugin.id, {
                 userId,
@@ -428,16 +360,12 @@ export class AiFacadeService implements IAiFacade {
                 }
             }
         } catch {
-            // No default provider configured at this scope
+            // Continue
         }
 
         return null;
     }
 
-    /**
-     * Get available models from the configured AI provider.
-     * Used by UI to populate model selection dropdowns for routing configuration.
-     */
     async getAvailableModels(facadeOptions?: AiFacadeOptions): Promise<readonly AiModel[]> {
         try {
             const plugin = await this.resolvePlugin(
@@ -452,27 +380,17 @@ export class AiFacadeService implements IAiFacade {
         }
     }
 
-    /**
-     * Resolve which model to use based on routing options and settings.
-     *
-     * Resolution order:
-     * 1. Explicit modelOverride in routing options
-     * 2. Complexity-based model from settings (simpleModel, mediumModel, complexModel)
-     * 3. Default model from settings
-     * 4. Plugin's default model (returns undefined, plugin uses its default)
-     */
+    /** Resolve model: modelOverride > complexity-based > defaultModel > plugin default */
     private resolveModel(
         plugin: IAiProviderPlugin,
         settings: Record<string, unknown>,
         routing?: AiRoutingOptions,
     ): string | undefined {
-        // 1. Explicit model override
         if (routing?.modelOverride) {
             this.logger.debug(`Using model override: ${routing.modelOverride}`);
             return routing.modelOverride;
         }
 
-        // 2. Complexity-based routing from settings
         if (routing?.complexity) {
             const complexityModelKey = `${routing.complexity}Model`; // e.g., 'simpleModel'
             const complexityModel = getSettingTyped<string>(
@@ -489,7 +407,6 @@ export class AiFacadeService implements IAiFacade {
             }
         }
 
-        // 3. Default model from settings
         const defaultModel = getSettingTyped<string>(
             settings,
             'defaultModel',
@@ -501,7 +418,6 @@ export class AiFacadeService implements IAiFacade {
             return defaultModel;
         }
 
-        // 4. Let plugin decide (returns undefined, plugin uses its default)
         this.logger.debug(`No model routing configured, plugin ${plugin.id} will use default`);
         return undefined;
     }
@@ -517,14 +433,10 @@ export class AiFacadeService implements IAiFacade {
     }
 
     private zodToJsonSchema(schema: z.ZodSchema): Record<string, unknown> {
-        // Use zod-to-json-schema or manual conversion
-        // For now, return a simplified version
         try {
-            // Try to use zod's built-in JSON schema generation
             const zodToJsonSchema = require('zod-to-json-schema').zodToJsonSchema;
             return zodToJsonSchema(schema);
         } catch {
-            // Fallback: return empty schema
             return { type: 'object' };
         }
     }

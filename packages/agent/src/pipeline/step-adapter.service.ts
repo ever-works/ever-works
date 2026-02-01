@@ -6,40 +6,22 @@ import type {
     StepExecutionContext,
 } from '@ever-works/plugin';
 import type { BuiltInStepId } from '@ever-works/default-pipeline-plugin';
-// Import the NestJS wrapper which delegates to the standalone plugin
 import { DefaultPipelinePlugin, type IBuiltInStepExecutor } from './default-pipeline.plugin';
 import { TypedGenerationContext } from './generation-context';
 
-/**
- * Interface for services that can be registered with the adapter.
- * This matches the legacy IPipelineStep interface.
- */
 export interface ILegacyPipelineStep {
     name: string;
     run(context: MutableGenerationContext): Promise<MutableGenerationContext>;
 }
 
 /**
- * Service that adapts legacy step services to the new plugin-based pipeline system.
- *
- * This adapter bridges between:
- * - Legacy step services: `{ name, run(context) }` interface
- * - New plugin system: `IPipelineStepPlugin.execute()` with typed context
+ * Adapts legacy step services to the plugin-based pipeline system.
  */
 @Injectable()
 export class StepAdapterService {
     private readonly logger = new Logger(StepAdapterService.name);
-
-    /**
-     * Map of step ID to the service that executes it
-     */
     private readonly serviceMap = new Map<BuiltInStepId, ILegacyPipelineStep>();
 
-    /**
-     * Register a legacy step service
-     * @param stepId - The built-in step ID
-     * @param service - The service instance implementing ILegacyPipelineStep
-     */
     registerService(stepId: BuiltInStepId, service: ILegacyPipelineStep): void {
         if (this.serviceMap.has(stepId)) {
             this.logger.warn(`Overwriting existing service for step: ${stepId}`);
@@ -48,48 +30,24 @@ export class StepAdapterService {
         this.logger.debug(`Registered service "${service.name}" for step: ${stepId}`);
     }
 
-    /**
-     * Register multiple services at once
-     * @param services - Map of step ID to service
-     */
     registerServices(services: Map<BuiltInStepId, ILegacyPipelineStep>): void {
         for (const [stepId, service] of services) {
             this.registerService(stepId, service);
         }
     }
 
-    /**
-     * Check if a service is registered for a step
-     * @param stepId - The step ID to check
-     */
     hasService(stepId: string): boolean {
         return this.serviceMap.has(stepId as BuiltInStepId);
     }
 
-    /**
-     * Get the registered service for a step
-     * @param stepId - The step ID
-     */
     getService(stepId: BuiltInStepId): ILegacyPipelineStep | undefined {
         return this.serviceMap.get(stepId);
     }
 
-    /**
-     * Get all registered step IDs
-     */
     getRegisteredStepIds(): BuiltInStepId[] {
         return Array.from(this.serviceMap.keys());
     }
 
-    /**
-     * Execute a step using its registered service
-     *
-     * @param stepId - The step ID to execute
-     * @param context - The typed generation context
-     * @param options - Execution options
-     * @param onProgress - Progress callback
-     * @returns The modified context
-     */
     async executeStep(
         stepId: BuiltInStepId,
         context: TypedGenerationContext,
@@ -106,12 +64,10 @@ export class StepAdapterService {
             );
         }
 
-        // Check for cancellation before execution
         if (options?.signal?.aborted) {
             throw new Error(`Step "${stepId}" was cancelled before execution`);
         }
 
-        // Report progress start
         if (onProgress) {
             onProgress({
                 percent: 0,
@@ -122,10 +78,8 @@ export class StepAdapterService {
         this.logger.debug(`Executing step "${stepId}" via service "${service.name}"`);
 
         try {
-            // The legacy services work with MutableGenerationContext, which TypedGenerationContext implements
             const result = await service.run(context);
 
-            // If the result is already a TypedGenerationContext, return it directly
             if (result instanceof TypedGenerationContext) {
                 if (onProgress) {
                     onProgress({
@@ -136,7 +90,6 @@ export class StepAdapterService {
                 return result;
             }
 
-            // Otherwise, convert from MutableGenerationContext to TypedGenerationContext
             const typedResult = TypedGenerationContext.fromMutableContext(result);
 
             if (onProgress) {
@@ -153,14 +106,6 @@ export class StepAdapterService {
         }
     }
 
-    /**
-     * Create an IBuiltInStepExecutor wrapper for a step
-     * This allows the step to be used with the DefaultPipelinePlugin
-     *
-     * Note: Legacy steps don't use StepExecutionContext, so the wrapper accepts but ignores it.
-     *
-     * @param stepId - The step ID
-     */
     createExecutorWrapper(stepId: BuiltInStepId): IBuiltInStepExecutor | undefined {
         const service = this.serviceMap.get(stepId);
         if (!service) {
@@ -175,9 +120,6 @@ export class StepAdapterService {
         };
     }
 
-    /**
-     * Create executor wrappers for all registered services
-     */
     createAllExecutorWrappers(): Map<BuiltInStepId, IBuiltInStepExecutor> {
         const wrappers = new Map<BuiltInStepId, IBuiltInStepExecutor>();
 
@@ -191,17 +133,11 @@ export class StepAdapterService {
         return wrappers;
     }
 
-    /**
-     * Clear all registered services (mainly for testing)
-     */
     clear(): void {
         this.serviceMap.clear();
         this.logger.debug('Cleared all registered step services');
     }
 
-    /**
-     * Get the count of registered services
-     */
     count(): number {
         return this.serviceMap.size;
     }
