@@ -353,13 +353,16 @@
                     "actions": {
                         "connect": "Подключить",
                         "disconnect": "Отключить",
-                        "confirmDisconnect": "Вы уверены, что хотите отключить ваш аккаунт GitHub?"
+                        "confirmDisconnect": "Вы уверены, что хотите отключить ваш аккаунт GitHub?",
+                        "reconnect": "Reconnect"
                     },
                     "messages": {
                         "disconnected": "Аккаунт GitHub отключен",
                         "connectError": "Не удалось подключить GitHub",
                         "disconnectError": "Не удалось отключить GitHub"
-                    }
+                    },
+                    "organizations": "Connected Organizations",
+                    "organizationsHint": "Use Reconnect to grant access to additional organizations"
                 }
             }
         },
@@ -745,7 +748,21 @@
                         "invalidUrl": "Пожалуйста, введите корректный URL, включающий http:// или https://",
                         "invalidImageUrl": "Пожалуйста, введите корректный URL изображения",
                         "requiredFields": "Пожалуйста, заполните все обязательные поля"
-                    }
+                    },
+                    "categories": "Categories",
+                    "existingCategories": "Select from existing",
+                    "addNewCategory": "Or add new category",
+                    "categoryPlaceholder": "Search or create category...",
+                    "addMoreCategories": "Add more...",
+                    "createCategory": "Create",
+                    "noMatchingCategories": "No matching categories",
+                    "noCategories": "No categories yet. Type to create one.",
+                    "categoriesRequired": "Select at least one category",
+                    "captureScreenshot": "Capture Screenshot",
+                    "captureScreenshotHelp": "Auto-capture a screenshot from the source URL",
+                    "screenshotSuccess": "Screenshot captured successfully",
+                    "screenshotFailed": "Failed to capture screenshot",
+                    "screenshotError": "An error occurred while capturing screenshot"
                 },
                 "editDisplay": "Редактировать отображение",
                 "editDisplayDescription": "Переключить статус «Рекомендуемый» и установить порядок отображения.",
@@ -757,7 +774,108 @@
                 "createPRHelp": "Если включено, изменения предлагаются через PR вместо прямого коммита.",
                 "reasonLabel": "Причина (опционально)",
                 "reasonPlaceholder": "Почему вы удаляете этот элемент?",
-                "confirmDelete": "Удалить элемент"
+                "confirmDelete": "Удалить элемент",
+                "captureScreenshot": "Capture screenshot",
+                "screenshot": {
+                    "noSourceUrl": "No source URL available for this item",
+                    "success": "Screenshot captured successfully",
+                    "failed": "Failed to capture screenshot",
+                    "error": "An error occurred while capturing screenshot",
+                    "notConfigured": "Screenshot service is not configured. Please add your ScreenshotOne API key in Settings.",
+                    "captureFailed": "Failed to capture image",
+                    "captureSuccess": "Image captured successfully",
+                    "captureError": "An error occurred while capturing image",
+                    "bulkCaptureComplete": "Bulk image capture completed",
+                    "bulkCaptureError": "An error occurred during bulk image capture"
+                },
+                "tabs": {
+                    "browseItems": "Browse Items",
+                    "categories": "Categories",
+                    "tags": "Tags"
+                },
+                "taxonomy": {
+                    "categories": {
+                        "searchPlaceholder": "Search categories...",
+                        "add": "Add Category",
+                        "addFirst": "Add First Category",
+                        "showing": "Showing {current} of {total} categories",
+                        "empty": "No categories yet",
+                        "noMatch": "No categories match your search",
+                        "columns": {
+                            "name": "Name",
+                            "description": "Description",
+                            "items": "Items",
+                            "priority": "Priority",
+                            "actions": "Actions"
+                        },
+                        "createSuccess": "Category created successfully",
+                        "createFailed": "Failed to create category",
+                        "updateSuccess": "Category updated successfully",
+                        "updateFailed": "Failed to update category",
+                        "deleteSuccess": "Category deleted successfully",
+                        "deleteFailed": "Failed to delete category",
+                        "deleteConfirm": "Are you sure you want to delete \"{name}\"?",
+                        "deleteHasItems": "Cannot delete category with {count} items assigned",
+                        "modal": {
+                            "createTitle": "Create Category",
+                            "editTitle": "Edit Category",
+                            "name": "Name",
+                            "namePlaceholder": "e.g., Monitoring Tools",
+                            "description": "Description",
+                            "descriptionPlaceholder": "Brief description of this category",
+                            "iconUrl": "Icon URL",
+                            "iconUrlPlaceholder": "https://example.com/icon.png",
+                            "iconUrlHelp": "Optional URL to an icon image",
+                            "priority": "Priority",
+                            "priorityPlaceholder": "e.g., 1",
+                            "priorityHelp": "Lower numbers appear first in lists",
+                            "cancel": "Cancel",
+                            "save": "Save",
+                            "create": "Create",
+                            "saving": "Saving...",
+                            "errors": {
+                                "nameRequired": "Category name is required",
+                                "nameExists": "A category with this name already exists"
+                            }
+                        }
+                    },
+                    "tags": {
+                        "searchPlaceholder": "Search tags...",
+                        "add": "Add Tag",
+                        "addFirst": "Add First Tag",
+                        "showing": "Showing {current} of {total} tags",
+                        "empty": "No tags yet",
+                        "noMatch": "No tags match your search",
+                        "columns": {
+                            "name": "Name",
+                            "items": "Items",
+                            "actions": "Actions"
+                        },
+                        "createSuccess": "Tag created successfully",
+                        "createFailed": "Failed to create tag",
+                        "updateSuccess": "Tag updated successfully",
+                        "updateFailed": "Failed to update tag",
+                        "deleteSuccess": "Tag deleted successfully",
+                        "deleteFailed": "Failed to delete tag",
+                        "deleteConfirm": "Are you sure you want to delete \"{name}\"?",
+                        "deleteHasItems": "Cannot delete tag with {count} items assigned",
+                        "modal": {
+                            "createTitle": "Create Tag",
+                            "editTitle": "Edit Tag",
+                            "name": "Name",
+                            "namePlaceholder": "e.g., open-source",
+                            "nameHelp": "Use lowercase with hyphens for multi-word tags",
+                            "cancel": "Cancel",
+                            "save": "Save",
+                            "create": "Create",
+                            "saving": "Saving...",
+                            "errors": {
+                                "nameRequired": "Tag name is required",
+                                "nameExists": "A tag with this name already exists"
+                            }
+                        }
+                    }
+                }
             },
             "generator": {
                 "regenerationWarning": "Предупреждение о повторной генерации",
@@ -828,7 +946,35 @@
                 "recreateConfirmDescription": "Пересоздание удалит существующие элементы и сгенерирует их заново с нуля. Это действие нельзя отменить.",
                 "confirmRecreate": "Да, пересоздать",
                 "recreateInlineTitle": "Пересоздание удалит существующие элементы",
-                "recreateInlineDescription": "Этот режим удаляет текущие элементы и перестраивает их с нуля. Продолжайте, только если хотите заменить всё."
+                "recreateInlineDescription": "Этот режим удаляет текущие элементы и перестраивает их с нуля. Продолжайте, только если хотите заменить всё.",
+                "captureScreenshots": "Capture Item Screenshots",
+                "captureScreenshotsDescription": "Automatically capture screenshots or product images for each item during generation",
+                "companyNameDescription": "Used to personalize generated content with your brand identity.",
+                "companyWebsiteDescription": "AI will analyze your website to better understand your brand context.",
+                "initialCategoriesDescription": "Seed categories to organize items. The AI will use these as a starting point.",
+                "priorityCategoriesDescription": "Categories that will appear first in the generated output. Useful for highlighting important sections.",
+                "targetKeywordsDescription": "Keywords to guide the AI search and content generation. More specific keywords yield better results.",
+                "sourceUrlsFieldDescription": "Specific URLs to extract content from. If empty, the generator will search the web automatically.",
+                "generationMethodDescription": "Choose whether to update existing items or recreate everything from scratch.",
+                "websiteRepositoryCreationMethodDescription": "How the website repository is created. Template is recommended for most cases.",
+                "maxSearchQueriesDescription": "Number of search queries the AI will generate to find relevant content (1-50).",
+                "resultsPerQueryDescription": "Maximum results to retrieve per search query (1-20).",
+                "maxPagesToProcessDescription": "Maximum web pages to process for content extraction (1-100).",
+                "relevanceThresholdDescription": "Minimum relevance score (0-1) for content to be included. Higher values mean stricter filtering.",
+                "dataGeneration": "Data Generation Options",
+                "dataGenerationDescription": "Configure data volume and entity generation",
+                "dataVolumeMode": "Data Volume Mode",
+                "dataVolumeModeReal": "Real",
+                "dataVolumeModeRealDescription": "Generate full production-ready data",
+                "dataVolumeModeSample": "Sample",
+                "dataVolumeModeSampleDescription": "Generate minimal sample data (~10 items)",
+                "entityGeneration": "Entity Generation",
+                "generateCategories": "Generate Categories",
+                "generateCategoriesDescription": "Create category structure for organizing items",
+                "generateTags": "Generate Tags",
+                "generateTagsDescription": "Create tags for flexible item labeling",
+                "generateBrands": "Generate Brands",
+                "generateBrandsDescription": "Extract and create brand entities from items"
             },
             "progress": {
                 "title": "Генерация в процессе",
@@ -902,7 +1048,144 @@
                 "saveChanges": "Сохранить изменения",
                 "updateReadme": "Обновить README",
                 "updateSuccess": "Настройки успешно обновлены",
-                "updateFailed": "Не удалось обновить настройки"
+                "updateFailed": "Не удалось обновить настройки",
+                "visibilityUpdateFailed": "Failed to update repository visibility",
+                "visibilityWarningTitle": "Make Repository Private?",
+                "visibilityWarningDescription": "You are about to make {name} private.",
+                "visibilityWarningPermanent": "This action has permanent consequences:",
+                "visibilityWarningStars": "All stars will be permanently lost",
+                "visibilityWarningWatchers": "All watchers will be removed",
+                "visibilityWarningNotRestored": "Stars and watchers will NOT be restored if you make the repository public again",
+                "visibilityConfirmPrivate": "Yes, Make Private",
+                "advancedPrompts": {
+                    "title": "Advanced Prompts",
+                    "subtitle": "Customize AI prompts for directory generation. Leave empty to use defaults.",
+                    "save": "Save Prompts",
+                    "saveSuccess": "Advanced prompts saved successfully",
+                    "saveFailed": "Failed to save advanced prompts",
+                    "prompts": {
+                        "relevanceAssessment": {
+                            "title": "Relevance Assessment",
+                            "description": "Additional instructions for filtering web pages by relevance to your directory topic.",
+                            "placeholder": "e.g., Only include pages that focus on open-source projects..."
+                        },
+                        "itemGeneration": {
+                            "title": "Item Generation",
+                            "description": "Additional instructions for AI-generated initial items before web search.",
+                            "placeholder": "e.g., Focus on enterprise-grade solutions with active maintenance..."
+                        },
+                        "itemExtraction": {
+                            "title": "Item Extraction",
+                            "description": "Additional instructions for extracting items from web page content.",
+                            "placeholder": "e.g., Prioritize tools with official documentation links..."
+                        },
+                        "searchQuery": {
+                            "title": "Search Query Generation",
+                            "description": "Additional instructions for generating search queries to find content.",
+                            "placeholder": "e.g., Include queries targeting GitHub repositories and official docs..."
+                        },
+                        "categorization": {
+                            "title": "Categorization",
+                            "description": "Additional instructions for categorizing and tagging extracted items.",
+                            "placeholder": "e.g., Use technical categories like 'CLI Tools', 'Libraries', 'Frameworks'..."
+                        },
+                        "deduplication": {
+                            "title": "Deduplication",
+                            "description": "Additional instructions for identifying and removing duplicate items.",
+                            "placeholder": "e.g., Consider items with similar GitHub repos as duplicates..."
+                        },
+                        "sourceValidation": {
+                            "title": "Source Validation",
+                            "description": "Additional instructions for validating item source URLs.",
+                            "placeholder": "e.g., Prefer official project websites over third-party reviews..."
+                        }
+                    }
+                },
+                "websiteConfig": {
+                    "title": "Website Configuration",
+                    "subtitle": "Customize how your directory website looks and behaves",
+                    "loadFailed": "Failed to load website settings",
+                    "saveSuccess": "Website settings saved successfully",
+                    "saveFailed": "Failed to save website settings",
+                    "save": "Save Settings",
+                    "sections": {
+                        "siteName": {
+                            "title": "Site Identity",
+                            "label": "Site Name",
+                            "placeholder": "My Directory",
+                            "helper": "The name displayed on your website header and browser tab"
+                        },
+                        "global": {
+                            "title": "Global Features",
+                            "categories": "Categories",
+                            "categoriesHelper": "Show category filtering and navigation",
+                            "tags": "Tags",
+                            "tagsHelper": "Show tag filtering and navigation",
+                            "companies": "Companies",
+                            "companiesHelper": "Show company information for items",
+                            "surveys": "Surveys",
+                            "surveysHelper": "Enable survey functionality"
+                        },
+                        "header": {
+                            "title": "Header Settings",
+                            "submit": "Submit Button",
+                            "submitHelper": "Show the submit item button in header",
+                            "pricing": "Pricing Link",
+                            "pricingHelper": "Show pricing link in header navigation",
+                            "layoutSelector": "Layout Selector",
+                            "layoutSelectorHelper": "Allow users to switch between layouts",
+                            "languageSelector": "Language Selector",
+                            "languageSelectorHelper": "Allow users to change language",
+                            "themeSelector": "Theme Selector",
+                            "themeSelectorHelper": "Allow users to switch between themes",
+                            "defaultLayout": "Default Layout",
+                            "defaultTheme": "Default Theme",
+                            "themeLight": "Light",
+                            "themeDark": "Dark",
+                            "themeSystem": "System",
+                            "defaultPagination": "Default Pagination",
+                            "paginationStandard": "Standard",
+                            "paginationInfinite": "Infinite Scroll",
+                            "paginationLoadMore": "Load More"
+                        },
+                        "homepage": {
+                            "title": "Homepage Settings",
+                            "hero": "Hero Section",
+                            "heroHelper": "Show the hero section with title and description",
+                            "search": "Search Bar",
+                            "searchHelper": "Show the search bar on homepage",
+                            "defaultView": "Default View",
+                            "viewClassic": "Classic",
+                            "viewGrid": "Grid",
+                            "viewList": "List",
+                            "defaultSort": "Default Sort",
+                            "sortPopularity": "Popularity",
+                            "sortNewest": "Newest",
+                            "sortAlphabetical": "Alphabetical"
+                        },
+                        "footer": {
+                            "title": "Footer Settings",
+                            "subscribe": "Newsletter Subscribe",
+                            "subscribeHelper": "Show newsletter subscription form",
+                            "version": "Version Display",
+                            "versionHelper": "Show version information in footer",
+                            "themeSelector": "Footer Theme Selector",
+                            "themeSelectorHelper": "Show theme toggle in footer"
+                        },
+                        "customMenu": {
+                            "title": "Custom Menu Links",
+                            "description": "Add custom links to your website header and footer navigation",
+                            "headerLinks": "Header Links",
+                            "footerLinks": "Footer Links",
+                            "addLink": "Add Link",
+                            "noLinks": "No custom links added",
+                            "labelPlaceholder": "Link label",
+                            "pathPlaceholder": "/about or https://...",
+                            "targetSelf": "Same tab",
+                            "targetBlank": "New tab"
+                        }
+                    }
+                }
             },
             "deploy": {
                 "noTokenAlert": {
@@ -971,7 +1254,21 @@
                         "lastChecked": "Последняя проверка",
                         "lastError": "Последняя ошибка",
                         "updateSuccess": "Настройки успешно обновлены",
-                        "updateFailed": "Не удалось обновить настройки"
+                        "updateFailed": "Не удалось обновить настройки",
+                        "githubRequired": "GitHub connection required. Please connect your GitHub account in Settings to enable automatic updates."
+                    },
+                    "configDialog": {
+                        "title": "Configure Before Deploy",
+                        "description": "Review and customize your website settings before deployment",
+                        "siteName": "Site Name",
+                        "siteNamePlaceholder": "My Directory",
+                        "siteNameHelper": "The name displayed on your website (default: Acme)",
+                        "advancedSettings": "Advanced Settings",
+                        "advancedSettingsDescription": "Configure additional website options",
+                        "loadFailed": "Failed to load current settings",
+                        "saveAndDeploy": "Save & Deploy",
+                        "skipAndDeploy": "Skip & Deploy",
+                        "cancel": "Cancel"
                     }
                 }
             }
@@ -1280,6 +1577,34 @@
                 "title": "Вебхуки",
                 "subtitle": "Настройте вебхуки для получения обновлений в реальном времени",
                 "configure": "Настроить вебхуки (Скоро)"
+            },
+            "screenshotone": {
+                "title": "ScreenshotOne Integration",
+                "subtitle": "Automatically capture screenshots of directory items using ScreenshotOne",
+                "connected": "Connected",
+                "notConnected": "Not Connected",
+                "connectedMessage": "Your ScreenshotOne account is connected. Screenshots will be automatically captured for directory items.",
+                "disconnect": "Disconnect ScreenshotOne",
+                "disconnecting": "Removing...",
+                "accessKeyLabel": "Access Key",
+                "placeholder": "Your access key...",
+                "secretKeyLabel": "Secret Key (Optional)",
+                "secretKeyPlaceholder": "Your secret key...",
+                "showKey": "Show",
+                "hideKey": "Hide",
+                "accessKeyHelp": "Required. Used to authenticate with the ScreenshotOne API.",
+                "secretKeyHelp": "Optional. Enables signed URLs for enhanced security. Get your keys from",
+                "dashboard": "ScreenshotOne Dashboard",
+                "save": "Save Keys",
+                "saving": "Saving...",
+                "messages": {
+                    "accessKeyRequired": "Please enter a valid ScreenshotOne access key",
+                    "saveSuccess": "ScreenshotOne keys saved successfully",
+                    "saveFailed": "Failed to save ScreenshotOne keys",
+                    "removeSuccess": "ScreenshotOne keys removed successfully",
+                    "removeFailed": "Failed to remove ScreenshotOne keys",
+                    "unexpectedError": "An unexpected error occurred"
+                }
             }
         },
         "notifications": {
@@ -1537,6 +1862,15 @@
                 "notAuthenticated": "Не аутентифицирован",
                 "deleteFailed": "Не удалось удалить аккаунт",
                 "deleteDisabled": "Удаление аккаунта отключено в демо"
+            },
+            "screenshotone": {
+                "notAuthenticated": "Not authenticated",
+                "accessKeyRequired": "Access key is required",
+                "saveFailed": "Failed to save ScreenshotOne keys",
+                "saveSuccess": "ScreenshotOne keys saved successfully",
+                "validationFailed": "The provided ScreenshotOne keys are invalid. Please double-check and try again.",
+                "removeFailed": "Failed to remove ScreenshotOne keys",
+                "removeSuccess": "ScreenshotOne keys removed successfully"
             }
         },
         "deploy": {
