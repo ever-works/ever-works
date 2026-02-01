@@ -1,9 +1,5 @@
-import type {
-	IBuiltInStepExecutor,
-	MutableGenerationContext,
-	StepExecutionContext,
-	WebPageData
-} from '@ever-works/plugin';
+import type { MutableGenerationContext, StepExecutionContext, WebPageData } from '@ever-works/plugin';
+import { BasePipelineStep } from '../base-pipeline-step.js';
 
 /**
  * Web Search Step
@@ -12,8 +8,9 @@ import type {
  * Uses the SearchFacade for web search and ContentExtractorFacade
  * for all content extraction (unified facade).
  */
-export class WebSearchStep implements IBuiltInStepExecutor {
+export class WebSearchStep extends BasePipelineStep {
 	readonly name = 'Web Search';
+	readonly stepId = 'web-search' as const;
 	private readonly BATCH_SIZE = 10;
 
 	async run(context: MutableGenerationContext, execContext: StepExecutionContext): Promise<MutableGenerationContext> {

@@ -222,7 +222,7 @@ describe('CategoryProcessingStep', () => {
 
 			const result = await step.run(mockContext, mockExecContext);
 
-			const stepMetrics = result.metrics.steps?.['category-processing'];
+			const stepMetrics = result.metrics.steps?.['categories-tags-processing'];
 			expect(stepMetrics?.custom?.totalTokens).toBe(150);
 		});
 

@@ -1,12 +1,11 @@
 import { z } from 'zod';
 import type {
-	IBuiltInStepExecutor,
 	MutableGenerationContext,
 	StepExecutionContext,
 	PipelineMetrics,
 	MutableItemData
 } from '@ever-works/plugin';
-import { getErrorMessage } from '../utils/error.utils.js';
+import { BasePipelineStep } from '../base-pipeline-step.js';
 import { appendCustomPrompt } from '../utils/prompt.utils.js';
 
 const urlValidationSchema = z.object({
@@ -55,8 +54,9 @@ Prefer official sources in this order:
  *
  * Validates and corrects source URLs for items using web search and AI.
  */
-export class SourceValidationStep implements IBuiltInStepExecutor {
+export class SourceValidationStep extends BasePipelineStep {
 	readonly name = 'Sources Validation';
+	readonly stepId = 'sources-validation' as const;
 	private readonly BATCH_SIZE = 15;
 
 	async run(context: MutableGenerationContext, execContext: StepExecutionContext): Promise<MutableGenerationContext> {
@@ -133,7 +133,7 @@ export class SourceValidationStep implements IBuiltInStepExecutor {
 				}
 			}
 		} catch (error) {
-			logger.error(`Source URL validation error: ${getErrorMessage(error)}`);
+			logger.error(`Source URL validation error: ${this.formatError(error)}`);
 		}
 
 		const processingTime = (Date.now() - startTime) / 1000;
@@ -293,7 +293,7 @@ export class SourceValidationStep implements IBuiltInStepExecutor {
 
 			return bestUrl || undefined;
 		} catch (error) {
-			logger.error(`Search error for "${itemName}": ${getErrorMessage(error)}`);
+			logger.error(`Search error for "${itemName}": ${this.formatError(error)}`);
 		}
 
 		return undefined;
@@ -383,35 +383,5 @@ export class SourceValidationStep implements IBuiltInStepExecutor {
 			return false;
 		}
 		return /google\.(?:com?\.)?[a-z]{2,3}\/search/i.test(url);
-	}
-
-	/**
-	 * Accumulate token usage and cost metrics
-	 */
-	private accumulateMetrics(
-		metrics: PipelineMetrics,
-		usage: { inputTokens: number; outputTokens: number; totalTokens: number } | null,
-		cost: number | null
-	): void {
-		if (!metrics.steps) {
-			metrics.steps = {};
-		}
-		if (!metrics.steps['source-validation']) {
-			metrics.steps['source-validation'] = {
-				name: this.name,
-				startTime: Date.now(),
-				success: true
-			};
-		}
-		const stepMetrics = metrics.steps['source-validation'];
-		if (!stepMetrics.custom) {
-			stepMetrics.custom = {};
-		}
-		if (usage) {
-			stepMetrics.custom.totalTokens = ((stepMetrics.custom.totalTokens as number) || 0) + usage.totalTokens;
-		}
-		if (cost) {
-			stepMetrics.custom.totalCost = ((stepMetrics.custom.totalCost as number) || 0) + cost;
-		}
 	}
 }

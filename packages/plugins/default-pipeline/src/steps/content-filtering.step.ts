@@ -1,13 +1,13 @@
 import { z } from 'zod';
 import type {
-	IBuiltInStepExecutor,
 	MutableGenerationContext,
 	StepExecutionContext,
 	PipelineMetrics,
 	WebPageData,
 	RelevanceAssessment
 } from '@ever-works/plugin';
-import { getErrorMessage, getErrorStack } from '../utils/error.utils.js';
+import { BasePipelineStep } from '../base-pipeline-step.js';
+import { getErrorStack } from '../utils/error.utils.js';
 import { appendCustomPrompt } from '../utils/prompt.utils.js';
 
 const RELEVANCE_ASSESSMENT_PROMPT =
@@ -37,7 +37,6 @@ const relevanceSchema = z
 	})
 	.strict();
 
-// Inferred type from schema
 type RelevanceResult = z.infer<typeof relevanceSchema>;
 
 /**
@@ -45,8 +44,9 @@ type RelevanceResult = z.infer<typeof relevanceSchema>;
  *
  * Filters web pages based on content length and AI-assessed relevance.
  */
-export class ContentFilteringStep implements IBuiltInStepExecutor {
+export class ContentFilteringStep extends BasePipelineStep {
 	readonly name = 'Content Filtering';
+	readonly stepId = 'content-filtering' as const;
 	private readonly BATCH_SIZE = 10;
 	private readonly SNIPPET_LENGTH = 3000;
 
@@ -82,9 +82,6 @@ export class ContentFilteringStep implements IBuiltInStepExecutor {
 		return context;
 	}
 
-	/**
-	 * Filter and assess page relevance
-	 */
 	private async filterAndAssessPages(
 		directorySlug: string,
 		webPages: WebPageData[],
@@ -101,7 +98,6 @@ export class ContentFilteringStep implements IBuiltInStepExecutor {
 		const minContentLength = (config.min_content_length_for_extraction as number) || 100;
 		const relevanceThreshold = (config.relevance_threshold_content as number) || 0.5;
 
-		// Initial filtering: dedupe and check content length
 		const filteredPages = webPages
 			.filter((page, index, self) => {
 				return index === self.findIndex((t) => t.source_url === page.source_url);
@@ -111,7 +107,6 @@ export class ContentFilteringStep implements IBuiltInStepExecutor {
 				return isLongEnough;
 			});
 
-		// Check if AI is configured
 		if (!aiFacade.isConfigured()) {
 			return filteredPages;
 		}
@@ -122,7 +117,6 @@ export class ContentFilteringStep implements IBuiltInStepExecutor {
 			return [];
 		}
 
-		// Define the relevance assessment function
 		const assessPageRelevance = async (
 			page: WebPageData
 		): Promise<{
@@ -133,7 +127,6 @@ export class ContentFilteringStep implements IBuiltInStepExecutor {
 		}> => {
 			try {
 				const snippet = this.buildSnippet(page.raw_content);
-
 				const finalPrompt = appendCustomPrompt(RELEVANCE_ASSESSMENT_PROMPT, customPrompt);
 
 				const {
@@ -171,7 +164,7 @@ export class ContentFilteringStep implements IBuiltInStepExecutor {
 				};
 			} catch (error) {
 				logger.error(
-					`[${directorySlug}] Error assessing relevance for ${page.source_url}: ${getErrorMessage(error)}`,
+					`[${directorySlug}] Error assessing relevance for ${page.source_url}: ${this.formatError(error)}`,
 					getErrorStack(error)
 				);
 				logger.warn(
@@ -181,26 +174,21 @@ export class ContentFilteringStep implements IBuiltInStepExecutor {
 			}
 		};
 
-		// Process pages in batches
 		const relevantPages: WebPageData[] = [];
 
 		logger.log(`[${directorySlug}] Processing relevance assessment in batches of ${this.BATCH_SIZE}`);
 
 		for (let i = 0; i < filteredPages.length; i += this.BATCH_SIZE) {
 			const batch = filteredPages.slice(i, i + this.BATCH_SIZE);
-
-			// Process the batch in parallel
 			const assessmentPromises = batch.map((page) => assessPageRelevance(page));
 			const assessmentResults = await Promise.all(assessmentPromises);
 
-			// Filter relevant pages from this batch
 			const relevantPagesFromBatch = assessmentResults
 				.filter((result) => result.isRelevant)
 				.map((result) => result.page);
 
 			relevantPages.push(...relevantPagesFromBatch);
 
-			// Add a small delay between batches to avoid rate limiting
 			if (i + this.BATCH_SIZE < filteredPages.length) {
 				await new Promise((resolve) => setTimeout(resolve, 500));
 			}
@@ -212,41 +200,8 @@ export class ContentFilteringStep implements IBuiltInStepExecutor {
 		return relevantPages;
 	}
 
-	/**
-	 * Build a snippet from content
-	 */
 	private buildSnippet(content: string): string {
 		if (!content) return '';
 		return content.length > this.SNIPPET_LENGTH ? content.slice(0, this.SNIPPET_LENGTH) : content;
-	}
-
-	/**
-	 * Accumulate token usage and cost metrics
-	 */
-	private accumulateMetrics(
-		metrics: PipelineMetrics,
-		usage: { inputTokens: number; outputTokens: number; totalTokens: number } | null,
-		cost: number | null
-	): void {
-		if (!metrics.steps) {
-			metrics.steps = {};
-		}
-		if (!metrics.steps['content-filtering']) {
-			metrics.steps['content-filtering'] = {
-				name: this.name,
-				startTime: Date.now(),
-				success: true
-			};
-		}
-		const stepMetrics = metrics.steps['content-filtering'];
-		if (!stepMetrics.custom) {
-			stepMetrics.custom = {};
-		}
-		if (usage) {
-			stepMetrics.custom.totalTokens = ((stepMetrics.custom.totalTokens as number) || 0) + usage.totalTokens;
-		}
-		if (cost) {
-			stepMetrics.custom.totalCost = ((stepMetrics.custom.totalCost as number) || 0) + cost;
-		}
 	}
 }

@@ -171,7 +171,7 @@ describe('SourceValidationStep', () => {
 
 			const result = await step.run(mockContext, mockExecContext);
 
-			const stepMetrics = result.metrics.steps?.['source-validation'];
+			const stepMetrics = result.metrics.steps?.['sources-validation'];
 			expect(stepMetrics?.custom?.totalTokens).toBeDefined();
 		});
 

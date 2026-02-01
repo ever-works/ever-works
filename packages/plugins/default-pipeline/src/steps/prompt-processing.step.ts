@@ -1,10 +1,6 @@
 import { z } from 'zod';
-import type {
-	IBuiltInStepExecutor,
-	MutableGenerationContext,
-	StepExecutionContext,
-	PipelineMetrics
-} from '@ever-works/plugin';
+import type { MutableGenerationContext, StepExecutionContext, PipelineMetrics } from '@ever-works/plugin';
+import { BasePipelineStep } from '../base-pipeline-step.js';
 
 const PROMPT_PROCESSING_PROMPT = `
 # Prompt Extraction and Rewriting Task
@@ -118,7 +114,8 @@ const promptProcessingOutputSchema = z.object({
  * Extracts URLs, categories, priority indicators, and the core subject from
  * user prompts, then rewrites the prompt to focus only on the core task.
  */
-export class PromptProcessingStep implements IBuiltInStepExecutor {
+export class PromptProcessingStep extends BasePipelineStep {
+	readonly stepId = 'prompt-processing' as const;
 	readonly name = 'Prompt Processing';
 
 	async run(context: MutableGenerationContext, execContext: StepExecutionContext): Promise<MutableGenerationContext> {
@@ -282,36 +279,6 @@ export class PromptProcessingStep implements IBuiltInStepExecutor {
 				subject: this.extractSubjectFallback(prompt),
 				rewrittenPrompt
 			};
-		}
-	}
-
-	/**
-	 * Accumulate token usage and cost metrics
-	 */
-	private accumulateMetrics(
-		metrics: PipelineMetrics,
-		usage: { inputTokens: number; outputTokens: number; totalTokens: number } | null,
-		cost: number | null
-	): void {
-		if (!metrics.steps) {
-			metrics.steps = {};
-		}
-		if (!metrics.steps['prompt-processing']) {
-			metrics.steps['prompt-processing'] = {
-				name: this.name,
-				startTime: Date.now(),
-				success: true
-			};
-		}
-		const stepMetrics = metrics.steps['prompt-processing'];
-		if (!stepMetrics.custom) {
-			stepMetrics.custom = {};
-		}
-		if (usage) {
-			stepMetrics.custom.totalTokens = ((stepMetrics.custom.totalTokens as number) || 0) + usage.totalTokens;
-		}
-		if (cost) {
-			stepMetrics.custom.totalCost = ((stepMetrics.custom.totalCost as number) || 0) + cost;
 		}
 	}
 

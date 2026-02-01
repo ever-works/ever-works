@@ -1,14 +1,7 @@
 import { z } from 'zod';
-import type {
-	IBuiltInStepExecutor,
-	MutableGenerationContext,
-	StepExecutionContext,
-	PipelineMetrics
-} from '@ever-works/plugin';
+import type { MutableGenerationContext, StepExecutionContext, PipelineMetrics } from '@ever-works/plugin';
+import { BasePipelineStep } from '../base-pipeline-step.js';
 
-/**
- * Prompt comparison prompt template
- */
 const PROMPT_COMPARISON_PROMPT =
 	`You are a helpful assistant tasked with comparing two prompts to determine if they are related and describe the same or similar data generation context.
 
@@ -56,8 +49,9 @@ export type PromptComparisonResult = z.infer<typeof promptComparisonOutputSchema
  * when updating existing directories. Prevents data inconsistency
  * by rejecting unrelated prompts in CREATE_UPDATE mode.
  */
-export class PromptComparisonStep implements IBuiltInStepExecutor {
+export class PromptComparisonStep extends BasePipelineStep {
 	readonly name = 'Prompt Comparison';
+	readonly stepId = 'prompt-comparison' as const;
 
 	async run(context: MutableGenerationContext, execContext: StepExecutionContext): Promise<MutableGenerationContext> {
 		const { request, existing, directory } = context;
@@ -155,7 +149,7 @@ export class PromptComparisonStep implements IBuiltInStepExecutor {
 
 			return result;
 		} catch (error) {
-			logger.error(`Error comparing prompts: ${error instanceof Error ? error.message : String(error)}`);
+			logger.error(`Error comparing prompts: ${this.formatError(error)}`);
 
 			// Fallback to simple string similarity check
 			const similarity = this.calculateSimpleSimilarity(existingPrompt, newPrompt);
@@ -189,36 +183,5 @@ export class PromptComparisonStep implements IBuiltInStepExecutor {
 		const union = new Set([...words1, ...words2]);
 
 		return union.size > 0 ? intersection.size / union.size : 0;
-	}
-
-	/**
-	 * Accumulate token usage and cost metrics
-	 */
-	private accumulateMetrics(
-		metrics: PipelineMetrics,
-		usage: { inputTokens: number; outputTokens: number; totalTokens: number } | null,
-		cost: number | null
-	): void {
-		if (!metrics.steps) {
-			metrics.steps = {};
-		}
-		if (!metrics.steps['prompt-comparison']) {
-			metrics.steps['prompt-comparison'] = {
-				name: this.name,
-				startTime: Date.now(),
-				success: true
-			};
-		}
-		// Store usage in custom field
-		const stepMetrics = metrics.steps['prompt-comparison'];
-		if (!stepMetrics.custom) {
-			stepMetrics.custom = {};
-		}
-		if (usage) {
-			stepMetrics.custom.totalTokens = ((stepMetrics.custom.totalTokens as number) || 0) + usage.totalTokens;
-		}
-		if (cost) {
-			stepMetrics.custom.totalCost = ((stepMetrics.custom.totalCost as number) || 0) + cost;
-		}
 	}
 }

@@ -1,12 +1,12 @@
 import { z } from 'zod';
 import type {
-	IBuiltInStepExecutor,
 	MutableGenerationContext,
 	StepExecutionContext,
 	PipelineMetrics,
 	MutableItemData
 } from '@ever-works/plugin';
-import { getErrorMessage, getErrorStack } from '../utils/error.utils.js';
+import { BasePipelineStep } from '../base-pipeline-step.js';
+import { getErrorStack } from '../utils/error.utils.js';
 
 export const MARKDOWN_PROMPT = `
 You are directory website builder and your task is to generate markdown summary for item:
@@ -39,8 +39,9 @@ type MarkdownOutput = z.infer<typeof markdownOutputSchema>;
  *
  * Generates detailed markdown summaries for items based on their source content.
  */
-export class MarkdownGenerationStep implements IBuiltInStepExecutor {
+export class MarkdownGenerationStep extends BasePipelineStep {
 	readonly name = 'Markdown Generation';
+	readonly stepId = 'markdown-generation' as const;
 	private readonly BATCH_SIZE = 10;
 
 	async run(context: MutableGenerationContext, execContext: StepExecutionContext): Promise<MutableGenerationContext> {
@@ -170,7 +171,10 @@ export class MarkdownGenerationStep implements IBuiltInStepExecutor {
 
 			return result.markdown || '';
 		} catch (error) {
-			logger.error(`Error generating markdown for ${item.name}: ${getErrorMessage(error)}`, getErrorStack(error));
+			logger.error(
+				`Error generating markdown for ${item.name}: ${this.formatError(error)}`,
+				getErrorStack(error)
+			);
 			return '';
 		}
 	}
@@ -187,38 +191,8 @@ export class MarkdownGenerationStep implements IBuiltInStepExecutor {
 			const content = await contentExtractorFacade.extractContent(url);
 			return content ? { rawContent: content.rawContent } : null;
 		} catch (error) {
-			logger.error(`Error extracting content from ${url}: ${getErrorMessage(error)}`);
+			logger.error(`Error extracting content from ${url}: ${this.formatError(error)}`);
 			return null;
-		}
-	}
-
-	/**
-	 * Accumulate token usage and cost metrics
-	 */
-	private accumulateMetrics(
-		metrics: PipelineMetrics,
-		usage: { inputTokens: number; outputTokens: number; totalTokens: number } | null,
-		cost: number | null
-	): void {
-		if (!metrics.steps) {
-			metrics.steps = {};
-		}
-		if (!metrics.steps['markdown-generation']) {
-			metrics.steps['markdown-generation'] = {
-				name: this.name,
-				startTime: Date.now(),
-				success: true
-			};
-		}
-		const stepMetrics = metrics.steps['markdown-generation'];
-		if (!stepMetrics.custom) {
-			stepMetrics.custom = {};
-		}
-		if (usage) {
-			stepMetrics.custom.totalTokens = ((stepMetrics.custom.totalTokens as number) || 0) + usage.totalTokens;
-		}
-		if (cost) {
-			stepMetrics.custom.totalCost = ((stepMetrics.custom.totalCost as number) || 0) + cost;
 		}
 	}
 }

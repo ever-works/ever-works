@@ -252,7 +252,7 @@ describe('ItemExtractionStep', () => {
 
 			const result = await step.run(mockContext, mockExecContext);
 
-			const stepMetrics = result.metrics.steps?.['item-extraction'];
+			const stepMetrics = result.metrics.steps?.['items-extraction'];
 			expect(stepMetrics?.custom?.totalTokens).toBe(150);
 		});
 

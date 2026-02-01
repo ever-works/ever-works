@@ -210,7 +210,7 @@ describe('AiItemGenerationStep', () => {
 
 			const result = await step.run(mockContext, mockExecContext);
 
-			const stepMetrics = result.metrics.steps?.['ai-item-generation'];
+			const stepMetrics = result.metrics.steps?.['ai-first-items-generation'];
 			expect(stepMetrics?.custom?.totalTokens).toBe(225);
 			expect(stepMetrics?.custom?.totalCost).toBeCloseTo(0.015);
 		});

@@ -38,8 +38,10 @@ export interface StepProgress {
 /**
  * Pipeline step plugin interface
  * Capability: 'pipeline-step'
+ *
+ * @typeParam TStepId - Union type of valid step IDs (defaults to string for single-step plugins)
  */
-export interface IPipelineStepPlugin extends IPlugin {
+export interface IPipelineStepPlugin<TStepId extends string = string> extends IPlugin {
 	/**
 	 * Get step definition(s).
 	 *
@@ -50,13 +52,13 @@ export interface IPipelineStepPlugin extends IPlugin {
 	 * @param stepId - Optional step ID for multi-step plugins
 	 * @returns The step definition, or undefined if stepId not found
 	 */
-	getStepDefinition(stepId?: string): PipelineStepDefinition | undefined;
+	getStepDefinition(stepId?: TStepId | string): PipelineStepDefinition<TStepId> | undefined;
 
 	/**
 	 * Get all step definitions (for multi-step plugins).
 	 * Single-step plugins should return an array with one element.
 	 */
-	getStepDefinitions?(): PipelineStepDefinition[];
+	getStepDefinitions?(): PipelineStepDefinition<TStepId>[];
 
 	/**
 	 * Execute the pipeline step
@@ -103,6 +105,8 @@ export interface IPipelineStepPlugin extends IPlugin {
 /**
  * Type guard for pipeline step plugins
  */
-export function isPipelineStepPlugin(plugin: IPlugin): plugin is IPipelineStepPlugin {
+export function isPipelineStepPlugin<TStepId extends string = string>(
+	plugin: IPlugin
+): plugin is IPipelineStepPlugin<TStepId> {
 	return plugin.capabilities.includes('pipeline-step');
 }

@@ -162,7 +162,7 @@ describe('SearchQueryGenerationStep', () => {
 
 			const result = await step.run(mockContext, mockExecContext);
 
-			const stepMetrics = result.metrics.steps?.['search-query-generation'];
+			const stepMetrics = result.metrics.steps?.['search-queries-generation'];
 			expect(stepMetrics?.custom?.totalTokens).toBe(150);
 			expect(stepMetrics?.custom?.totalCost).toBeCloseTo(0.01);
 		});

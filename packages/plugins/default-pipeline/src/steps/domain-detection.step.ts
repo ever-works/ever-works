@@ -1,12 +1,6 @@
 import { z } from 'zod';
-import type {
-	IBuiltInStepExecutor,
-	MutableGenerationContext,
-	StepExecutionContext,
-	PipelineMetrics,
-	DomainType,
-	DomainAnalysis
-} from '@ever-works/plugin';
+import type { MutableGenerationContext, StepExecutionContext, DomainType } from '@ever-works/plugin';
+import { BasePipelineStep } from '../base-pipeline-step.js';
 
 /**
  * Domain detection prompt template
@@ -37,8 +31,9 @@ const domainDetectionSchema = z.object({
  * Analyzes the prompt to detect the domain type for specialized handling.
  * The domain type affects how items are searched, extracted, and validated.
  */
-export class DomainDetectionStep implements IBuiltInStepExecutor {
+export class DomainDetectionStep extends BasePipelineStep {
 	readonly name = 'Domain Detection';
+	readonly stepId = 'domain-detection' as const;
 
 	async run(context: MutableGenerationContext, execContext: StepExecutionContext): Promise<MutableGenerationContext> {
 		const { request, directory, metrics } = context;
@@ -76,7 +71,7 @@ export class DomainDetectionStep implements IBuiltInStepExecutor {
 			);
 		} catch (error) {
 			logger.error(
-				`[${directory.slug}] Domain detection failed, defaulting to software. ${error instanceof Error ? error.message : String(error)}`
+				`[${directory.slug}] Domain detection failed, defaulting to software. ${this.formatError(error)}`
 			);
 			context.domainAnalysis = {
 				domain_type: 'software' as DomainType,
@@ -85,35 +80,5 @@ export class DomainDetectionStep implements IBuiltInStepExecutor {
 		}
 
 		return context;
-	}
-
-	/**
-	 * Accumulate token usage and cost metrics
-	 */
-	private accumulateMetrics(
-		metrics: PipelineMetrics,
-		usage: { inputTokens: number; outputTokens: number; totalTokens: number } | null,
-		cost: number | null
-	): void {
-		if (!metrics.steps) {
-			metrics.steps = {};
-		}
-		if (!metrics.steps['domain-detection']) {
-			metrics.steps['domain-detection'] = {
-				name: this.name,
-				startTime: Date.now(),
-				success: true
-			};
-		}
-		const stepMetrics = metrics.steps['domain-detection'];
-		if (!stepMetrics.custom) {
-			stepMetrics.custom = {};
-		}
-		if (usage) {
-			stepMetrics.custom.totalTokens = ((stepMetrics.custom.totalTokens as number) || 0) + usage.totalTokens;
-		}
-		if (cost) {
-			stepMetrics.custom.totalCost = ((stepMetrics.custom.totalCost as number) || 0) + cost;
-		}
 	}
 }

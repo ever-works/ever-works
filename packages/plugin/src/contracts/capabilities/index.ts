@@ -13,3 +13,4 @@ export * from './form-schema-provider.interface.js';
 export * from './sub-provider.interface.js';
 export * from './config-aware.interface.js';
 export * from './custom-capability.interface.js';
+export * from './default-pipeline.interface.js';

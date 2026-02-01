@@ -1,12 +1,12 @@
 import type {
-	IBuiltInStepExecutor,
 	MutableGenerationContext,
 	StepExecutionContext,
 	PipelineMetrics,
 	MutableItemData
 } from '@ever-works/plugin';
+import { BasePipelineStep } from '../base-pipeline-step.js';
 import { slugifyText } from '../utils/text.utils.js';
-import { getErrorMessage, getErrorStack } from '../utils/error.utils.js';
+import { getErrorStack } from '../utils/error.utils.js';
 import { appendCustomPrompt } from '../utils/prompt.utils.js';
 import { z } from 'zod';
 import {
@@ -71,8 +71,9 @@ Generate the list of items according to the specified schema.` as const;
  * Generates initial items using AI based on the topic description.
  * This step runs before web search to seed the directory with AI-curated items.
  */
-export class AiItemGenerationStep implements IBuiltInStepExecutor {
+export class AiItemGenerationStep extends BasePipelineStep {
 	readonly name = 'AI Item Generation';
+	readonly stepId = 'ai-first-items-generation' as const;
 
 	async run(context: MutableGenerationContext, execContext: StepExecutionContext): Promise<MutableGenerationContext> {
 		const { request, directory, featuredItemHints, metrics, advancedPrompts } = context;
@@ -171,7 +172,7 @@ export class AiItemGenerationStep implements IBuiltInStepExecutor {
 			);
 		} catch (error) {
 			logger.error(
-				`[${directorySlug}] Error during AI prompt understanding assessment for topic "${topicName}": ${getErrorMessage(error)}. Proceeding with caution (will attempt item generation).`,
+				`[${directorySlug}] Error during AI prompt understanding assessment for topic "${topicName}": ${this.formatError(error)}. Proceeding with caution (will attempt item generation).`,
 				getErrorStack(error)
 			);
 		}
@@ -228,7 +229,7 @@ export class AiItemGenerationStep implements IBuiltInStepExecutor {
 			}
 		} catch (error) {
 			logger.error(
-				`[${directorySlug}] Error generating initial items with AI for topic ${topicName}: ${getErrorMessage(error)}`,
+				`[${directorySlug}] Error generating initial items with AI for topic ${topicName}: ${this.formatError(error)}`,
 				getErrorStack(error)
 			);
 		}
@@ -237,36 +238,6 @@ export class AiItemGenerationStep implements IBuiltInStepExecutor {
 			`[${directorySlug}] AI-First Item Generation - Complete. Validated ${allGeneratedItems.length} items.`
 		);
 		return allGeneratedItems;
-	}
-
-	/**
-	 * Accumulate token usage and cost metrics
-	 */
-	private accumulateMetrics(
-		metrics: PipelineMetrics,
-		usage: { inputTokens: number; outputTokens: number; totalTokens: number } | null,
-		cost: number | null
-	): void {
-		if (!metrics.steps) {
-			metrics.steps = {};
-		}
-		if (!metrics.steps['ai-item-generation']) {
-			metrics.steps['ai-item-generation'] = {
-				name: this.name,
-				startTime: Date.now(),
-				success: true
-			};
-		}
-		const stepMetrics = metrics.steps['ai-item-generation'];
-		if (!stepMetrics.custom) {
-			stepMetrics.custom = {};
-		}
-		if (usage) {
-			stepMetrics.custom.totalTokens = ((stepMetrics.custom.totalTokens as number) || 0) + usage.totalTokens;
-		}
-		if (cost) {
-			stepMetrics.custom.totalCost = ((stepMetrics.custom.totalCost as number) || 0) + cost;
-		}
 	}
 
 	/**

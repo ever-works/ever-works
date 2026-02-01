@@ -22,18 +22,28 @@ export type StepPosition<TStepId extends string = string> =
 	| { readonly type: 'first' }
 	| { readonly type: 'last' };
 
-export interface StepDependency {
-	readonly stepId: string;
+/**
+ * Step dependency definition.
+ *
+ * @typeParam TStepId - Union type of valid step IDs
+ */
+export interface StepDependency<TStepId extends string = string> {
+	readonly stepId: TStepId;
 	readonly required?: boolean;
 	readonly requiredData?: readonly string[];
 }
 
-export interface PipelineStepDefinition {
-	readonly id: string;
+/**
+ * Pipeline step definition.
+ *
+ * @typeParam TStepId - Union type of valid step IDs
+ */
+export interface PipelineStepDefinition<TStepId extends string = string> {
+	readonly id: TStepId;
 	readonly name: string;
 	readonly description?: string;
-	readonly position: StepPosition;
-	readonly dependencies?: readonly StepDependency[];
+	readonly position: StepPosition<TStepId>;
+	readonly dependencies?: readonly StepDependency<TStepId>[];
 	readonly optional?: boolean;
 	readonly parallelizable?: boolean;
 	readonly settingsSchema?: JsonSchema;
@@ -42,8 +52,13 @@ export interface PipelineStepDefinition {
 	readonly estimatedDuration?: number;
 }
 
-export interface StepState {
-	readonly definition: PipelineStepDefinition;
+/**
+ * State of a single step during pipeline execution.
+ *
+ * @typeParam TStepId - Union type of valid step IDs
+ */
+export interface StepState<TStepId extends string = string> {
+	readonly definition: PipelineStepDefinition<TStepId>;
 	readonly status: StepStatus;
 	readonly startedAt?: number;
 	readonly completedAt?: number;
@@ -51,11 +66,16 @@ export interface StepState {
 	readonly result?: Record<string, unknown>;
 }
 
-export interface PipelineState {
-	readonly steps: Map<string, StepState>;
-	readonly currentStep?: string;
-	readonly completedSteps: readonly string[];
-	readonly failedSteps: readonly string[];
+/**
+ * State of the entire pipeline during execution.
+ *
+ * @typeParam TStepId - Union type of valid step IDs
+ */
+export interface PipelineState<TStepId extends string = string> {
+	readonly steps: Map<TStepId, StepState<TStepId>>;
+	readonly currentStep?: TStepId;
+	readonly completedSteps: readonly TStepId[];
+	readonly failedSteps: readonly TStepId[];
 	readonly isRunning: boolean;
 	readonly isCancelled: boolean;
 	readonly startedAt?: number;

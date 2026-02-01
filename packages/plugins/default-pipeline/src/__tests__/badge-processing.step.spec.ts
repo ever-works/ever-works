@@ -213,7 +213,7 @@ describe('BadgeProcessingStep', () => {
 		it('should accumulate metrics correctly', async () => {
 			const result = await step.run(mockContext, mockExecContext);
 
-			const stepMetrics = result.metrics.steps?.['badge-processing'];
+			const stepMetrics = result.metrics.steps?.['badges-processing'];
 			expect(stepMetrics?.custom?.totalTokens).toBe(150);
 		});
 

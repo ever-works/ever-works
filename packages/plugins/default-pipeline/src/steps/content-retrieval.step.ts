@@ -1,26 +1,15 @@
-import type {
-	IBuiltInStepExecutor,
-	MutableGenerationContext,
-	StepExecutionContext,
-	WebPageData
-} from '@ever-works/plugin';
+import type { MutableGenerationContext, StepExecutionContext, WebPageData } from '@ever-works/plugin';
+import { BasePipelineStep } from '../base-pipeline-step.js';
 
 /**
  * Content Retrieval Step
  *
  * Retrieves web page content from URLs discovered during web search.
- * This step is responsible for:
- * - Fetching content from extractedUrls
- * - Processing source_urls from the request
- * - Populating webPages array and contentCache map
- * - Tracking processedSourceUrls to avoid duplicates
- *
  * Uses ContentExtractorFacade for all content extraction (unified facade).
- * The facade internally handles routing to the appropriate plugin.
  */
-export class ContentRetrievalStep implements IBuiltInStepExecutor {
+export class ContentRetrievalStep extends BasePipelineStep {
 	readonly name = 'Content Retrieval';
-	readonly stepId = 'content-retrieval';
+	readonly stepId = 'content-retrieval' as const;
 	private readonly BATCH_SIZE = 10;
 	private readonly BATCH_DELAY_MS = 500;
 

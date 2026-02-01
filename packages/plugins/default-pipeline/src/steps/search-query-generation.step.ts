@@ -1,11 +1,7 @@
 import { z } from 'zod';
-import type {
-	IBuiltInStepExecutor,
-	MutableGenerationContext,
-	StepExecutionContext,
-	PipelineMetrics
-} from '@ever-works/plugin';
-import { getErrorMessage, getErrorStack } from '../utils/error.utils.js';
+import type { MutableGenerationContext, StepExecutionContext, PipelineMetrics } from '@ever-works/plugin';
+import { BasePipelineStep } from '../base-pipeline-step.js';
+import { getErrorStack } from '../utils/error.utils.js';
 import { appendCustomPrompt } from '../utils/prompt.utils.js';
 
 const SEARCH_QUERY_PROMPT =
@@ -32,8 +28,9 @@ const searchQuerySchema = z
  *
  * Generates search queries using AI based on the topic.
  */
-export class SearchQueryGenerationStep implements IBuiltInStepExecutor {
+export class SearchQueryGenerationStep extends BasePipelineStep {
 	readonly name = 'Search Query Generation';
+	readonly stepId = 'search-queries-generation' as const;
 
 	async run(context: MutableGenerationContext, execContext: StepExecutionContext): Promise<MutableGenerationContext> {
 		const { request, directory, metrics, advancedPrompts } = context;
@@ -114,7 +111,7 @@ export class SearchQueryGenerationStep implements IBuiltInStepExecutor {
 			return uniqueQueries.slice(0, maxSearchQueries);
 		} catch (error) {
 			logger.error(
-				`[${name}] Error generating search queries with LLM: ${getErrorMessage(error)}`,
+				`[${name}] Error generating search queries with LLM: ${this.formatError(error)}`,
 				getErrorStack(error)
 			);
 			logger.warn(`[${name}] Falling back to basic query generation due to LLM error.`);
@@ -142,36 +139,6 @@ export class SearchQueryGenerationStep implements IBuiltInStepExecutor {
 			);
 		}
 		return [...new Set(fallbackQueries)].slice(0, maxSearchQueries);
-	}
-
-	/**
-	 * Accumulate token usage and cost metrics
-	 */
-	private accumulateMetrics(
-		metrics: PipelineMetrics,
-		usage: { inputTokens: number; outputTokens: number; totalTokens: number } | null,
-		cost: number | null
-	): void {
-		if (!metrics.steps) {
-			metrics.steps = {};
-		}
-		if (!metrics.steps['search-query-generation']) {
-			metrics.steps['search-query-generation'] = {
-				name: this.name,
-				startTime: Date.now(),
-				success: true
-			};
-		}
-		const stepMetrics = metrics.steps['search-query-generation'];
-		if (!stepMetrics.custom) {
-			stepMetrics.custom = {};
-		}
-		if (usage) {
-			stepMetrics.custom.totalTokens = ((stepMetrics.custom.totalTokens as number) || 0) + usage.totalTokens;
-		}
-		if (cost) {
-			stepMetrics.custom.totalCost = ((stepMetrics.custom.totalCost as number) || 0) + cost;
-		}
 	}
 
 	/**

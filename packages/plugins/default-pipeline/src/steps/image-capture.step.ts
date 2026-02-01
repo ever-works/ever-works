@@ -1,10 +1,5 @@
-import type {
-	IBuiltInStepExecutor,
-	MutableGenerationContext,
-	StepExecutionContext,
-	MutableItemData,
-	DomainType
-} from '@ever-works/plugin';
+import type { MutableGenerationContext, StepExecutionContext, DomainType } from '@ever-works/plugin';
+import { BasePipelineStep } from '../base-pipeline-step.js';
 
 const IMAGE_CAPTURE_DELAY_MS = 500;
 
@@ -14,8 +9,9 @@ const IMAGE_CAPTURE_DELAY_MS = 500;
  * Captures screenshots for items that don't have images.
  * Uses the Screenshot Facade for smart image routing based on domain type.
  */
-export class ImageCaptureStep implements IBuiltInStepExecutor {
+export class ImageCaptureStep extends BasePipelineStep {
 	readonly name = 'Image Capture';
+	readonly stepId = 'image-capture' as const;
 
 	async run(context: MutableGenerationContext, execContext: StepExecutionContext): Promise<MutableGenerationContext> {
 		const { directory, request, finalItems, domainAnalysis } = context;

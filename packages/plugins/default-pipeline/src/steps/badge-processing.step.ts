@@ -1,6 +1,5 @@
 import { z } from 'zod';
 import type {
-	IBuiltInStepExecutor,
 	MutableGenerationContext,
 	StepExecutionContext,
 	PipelineMetrics,
@@ -8,11 +7,8 @@ import type {
 	ItemBadges,
 	DomainType
 } from '@ever-works/plugin';
-import { getErrorMessage } from '../utils/error.utils.js';
+import { BasePipelineStep } from '../base-pipeline-step.js';
 
-/**
- * Badge evaluation result
- */
 interface BadgeEvaluationResult {
 	badges: ItemBadges;
 	evaluation_summary: string;
@@ -76,8 +72,9 @@ Return a JSON object with badges and evaluation_summary. Omit badges you cannot 
  *
  * Evaluates and assigns badges to items based on domain type.
  */
-export class BadgeProcessingStep implements IBuiltInStepExecutor {
+export class BadgeProcessingStep extends BasePipelineStep {
 	readonly name = 'Badges Processing';
+	readonly stepId = 'badges-processing' as const;
 	private readonly CONCURRENCY_LIMIT = 10;
 
 	async run(context: MutableGenerationContext, execContext: StepExecutionContext): Promise<MutableGenerationContext> {
@@ -118,15 +115,12 @@ export class BadgeProcessingStep implements IBuiltInStepExecutor {
 			return items.map((item) => {
 				const badgeResult = badgeResults.get(item.source_url || '');
 				if (badgeResult) {
-					return {
-						...item,
-						badges: badgeResult.badges
-					};
+					return { ...item, badges: badgeResult.badges };
 				}
 				return item;
 			});
 		} catch (error) {
-			logger.error(`Failed to process badges: ${getErrorMessage(error)}`);
+			logger.error(`Failed to process badges: ${this.formatError(error)}`);
 			return items;
 		}
 	}
@@ -212,7 +206,7 @@ export class BadgeProcessingStep implements IBuiltInStepExecutor {
 				domain_type: domainType
 			};
 		} catch (error) {
-			logger.error(`Failed to evaluate badges for ${item.name}: ${getErrorMessage(error)}`);
+			logger.error(`Failed to evaluate badges for ${item.name}: ${this.formatError(error)}`);
 			return null;
 		}
 	}
@@ -221,11 +215,9 @@ export class BadgeProcessingStep implements IBuiltInStepExecutor {
 		if (!item.source_url) {
 			return false;
 		}
-
 		if (domainType === 'software') {
 			return this.isRepositoryUrl(item.source_url);
 		}
-
 		return true;
 	}
 
@@ -272,35 +264,5 @@ export class BadgeProcessingStep implements IBuiltInStepExecutor {
 		return Object.entries(config)
 			.map(([key, def]) => `- ${key}: [${def.values.join(', ')}] - ${def.description}`)
 			.join('\n');
-	}
-
-	/**
-	 * Accumulate token usage and cost metrics
-	 */
-	private accumulateMetrics(
-		metrics: PipelineMetrics,
-		usage: { inputTokens: number; outputTokens: number; totalTokens: number } | null,
-		cost: number | null
-	): void {
-		if (!metrics.steps) {
-			metrics.steps = {};
-		}
-		if (!metrics.steps['badge-processing']) {
-			metrics.steps['badge-processing'] = {
-				name: this.name,
-				startTime: Date.now(),
-				success: true
-			};
-		}
-		const stepMetrics = metrics.steps['badge-processing'];
-		if (!stepMetrics.custom) {
-			stepMetrics.custom = {};
-		}
-		if (usage) {
-			stepMetrics.custom.totalTokens = ((stepMetrics.custom.totalTokens as number) || 0) + usage.totalTokens;
-		}
-		if (cost) {
-			stepMetrics.custom.totalCost = ((stepMetrics.custom.totalCost as number) || 0) + cost;
-		}
 	}
 }

@@ -1,6 +1,5 @@
 import { z } from 'zod';
 import type {
-	IBuiltInStepExecutor,
 	MutableGenerationContext,
 	StepExecutionContext,
 	PipelineMetrics,
@@ -9,8 +8,9 @@ import type {
 	Tag,
 	Brand
 } from '@ever-works/plugin';
+import { BasePipelineStep } from '../base-pipeline-step.js';
 import { slugifyText, unSlugifyText } from '../utils/text.utils.js';
-import { getErrorMessage, getErrorStack } from '../utils/error.utils.js';
+import { getErrorStack } from '../utils/error.utils.js';
 import { appendCustomPrompt } from '../utils/prompt.utils.js';
 import { itemDataWithCategoriesAndTagsSchema } from '../schemas/item-extraction.schemas.js';
 
@@ -114,8 +114,9 @@ type CategorizeResult = z.infer<typeof categorizeOutputSchema>;
  *
  * Processes items to generate categories, tags, and brands using AI.
  */
-export class CategoryProcessingStep implements IBuiltInStepExecutor {
+export class CategoryProcessingStep extends BasePipelineStep {
 	readonly name = 'Categories Tags Processing';
+	readonly stepId = 'categories-tags-processing' as const;
 	private readonly BATCH_SIZE = 30;
 
 	async run(context: MutableGenerationContext, execContext: StepExecutionContext): Promise<MutableGenerationContext> {
@@ -313,7 +314,7 @@ export class CategoryProcessingStep implements IBuiltInStepExecutor {
 			return { finalItems, categories, tags, brands };
 		} catch (error) {
 			logger.error(
-				`[${directorySlug}] Error during category processing: ${getErrorMessage(error)}`,
+				`[${directorySlug}] Error during category processing: ${this.formatError(error)}`,
 				getErrorStack(error)
 			);
 
@@ -408,7 +409,7 @@ export class CategoryProcessingStep implements IBuiltInStepExecutor {
 			this.accumulateMetrics(metrics, usage, cost);
 			return (result?.items || []) as MutableItemData[];
 		} catch (error) {
-			logger.error(`Error during AI categorization: ${getErrorMessage(error)}`, getErrorStack(error));
+			logger.error(`Error during AI categorization: ${this.formatError(error)}`, getErrorStack(error));
 
 			// Fallback to items with default category and tags
 			return items.map((item) => ({
@@ -512,7 +513,7 @@ export class CategoryProcessingStep implements IBuiltInStepExecutor {
 					await new Promise((resolve) => setTimeout(resolve, 500));
 				}
 			} catch (error) {
-				logger.error(`Error during batch categorization: ${getErrorMessage(error)}`, getErrorStack(error));
+				logger.error(`Error during batch categorization: ${this.formatError(error)}`, getErrorStack(error));
 
 				// Fallback for this batch - use existing categories if available
 				const fallbackCategory = existingCategories.size > 0 ? Array.from(existingCategories)[0] : 'others';
@@ -740,35 +741,5 @@ export class CategoryProcessingStep implements IBuiltInStepExecutor {
 			brand: brandSlug,
 			brand_logo_url: brandLogoUrl || null
 		};
-	}
-
-	/**
-	 * Accumulate token usage and cost metrics
-	 */
-	private accumulateMetrics(
-		metrics: PipelineMetrics,
-		usage: { inputTokens: number; outputTokens: number; totalTokens: number } | null,
-		cost: number | null
-	): void {
-		if (!metrics.steps) {
-			metrics.steps = {};
-		}
-		if (!metrics.steps['category-processing']) {
-			metrics.steps['category-processing'] = {
-				name: this.name,
-				startTime: Date.now(),
-				success: true
-			};
-		}
-		const stepMetrics = metrics.steps['category-processing'];
-		if (!stepMetrics.custom) {
-			stepMetrics.custom = {};
-		}
-		if (usage) {
-			stepMetrics.custom.totalTokens = ((stepMetrics.custom.totalTokens as number) || 0) + usage.totalTokens;
-		}
-		if (cost) {
-			stepMetrics.custom.totalCost = ((stepMetrics.custom.totalCost as number) || 0) + cost;
-		}
 	}
 }

@@ -1,14 +1,14 @@
 import { z } from 'zod';
 import type {
-	IBuiltInStepExecutor,
 	MutableGenerationContext,
 	StepExecutionContext,
 	PipelineMetrics,
 	WebPageData,
 	MutableItemData
 } from '@ever-works/plugin';
+import { BasePipelineStep } from '../base-pipeline-step.js';
 import { slugifyText } from '../utils/text.utils.js';
-import { getErrorMessage, getErrorStack } from '../utils/error.utils.js';
+import { getErrorStack } from '../utils/error.utils.js';
 import { appendCustomPrompt } from '../utils/prompt.utils.js';
 import {
 	extractedItemsSchema,
@@ -63,7 +63,8 @@ Exclude any invalid or irrelevant content, and align the findings with the topic
  *
  * Extracts items from web pages using AI.
  */
-export class ItemExtractionStep implements IBuiltInStepExecutor {
+export class ItemExtractionStep extends BasePipelineStep {
+	readonly stepId = 'items-extraction' as const;
 	readonly name = 'Item Extraction';
 
 	// Constants for content chunking
@@ -180,7 +181,7 @@ export class ItemExtractionStep implements IBuiltInStepExecutor {
 								return result?.items || [];
 							} catch (chunkError) {
 								logger.error(
-									`[${directorySlug}] Error processing chunk ${index + 1} from ${page.source_url}: ${getErrorMessage(chunkError)}`
+									`[${directorySlug}] Error processing chunk ${index + 1} from ${page.source_url}: ${this.formatError(chunkError)}`
 								);
 								return [];
 							}
@@ -261,7 +262,7 @@ export class ItemExtractionStep implements IBuiltInStepExecutor {
 				}
 			} catch (error) {
 				logger.error(
-					`[${directorySlug}] Error extracting items from ${page.source_url}: ${getErrorMessage(error)}`,
+					`[${directorySlug}] Error extracting items from ${page.source_url}: ${this.formatError(error)}`,
 					getErrorStack(error)
 				);
 			}
@@ -389,35 +390,5 @@ The user has provided the following specifications for which items should be mar
 ${featuredItemHints.map((hint) => `- ${hint}`).join('\n')}
 
 When determining the 'featured' status for items, carefully consider these specifications. Items that match these criteria, guidelines, or instructions should be marked as featured=true.`;
-	}
-
-	/**
-	 * Accumulate token usage and cost metrics
-	 */
-	private accumulateMetrics(
-		metrics: PipelineMetrics,
-		usage: { inputTokens: number; outputTokens: number; totalTokens: number } | null,
-		cost: number | null
-	): void {
-		if (!metrics.steps) {
-			metrics.steps = {};
-		}
-		if (!metrics.steps['item-extraction']) {
-			metrics.steps['item-extraction'] = {
-				name: this.name,
-				startTime: Date.now(),
-				success: true
-			};
-		}
-		const stepMetrics = metrics.steps['item-extraction'];
-		if (!stepMetrics.custom) {
-			stepMetrics.custom = {};
-		}
-		if (usage) {
-			stepMetrics.custom.totalTokens = ((stepMetrics.custom.totalTokens as number) || 0) + usage.totalTokens;
-		}
-		if (cost) {
-			stepMetrics.custom.totalCost = ((stepMetrics.custom.totalCost as number) || 0) + cost;
-		}
 	}
 }

@@ -1,5 +1,4 @@
 import type {
-	IBuiltInStepExecutor,
 	MutableGenerationContext,
 	StepExecutionContext,
 	PipelineMetrics,
@@ -8,6 +7,7 @@ import type {
 	IAiFacade
 } from '@ever-works/plugin';
 import { z } from 'zod';
+import { BasePipelineStep } from '../base-pipeline-step.js';
 import { SharedUtils, NewItemsExtractor, AiDeduplicator } from './data-aggregation/index.js';
 
 /**
@@ -17,8 +17,9 @@ import { SharedUtils, NewItemsExtractor, AiDeduplicator } from './data-aggregati
  * web-extracted items, and external data sources). Uses both field-based and
  * AI-based deduplication for comprehensive duplicate removal.
  */
-export class DataAggregationStep implements IBuiltInStepExecutor {
+export class DataAggregationStep extends BasePipelineStep {
 	readonly name = 'Deduplication and Data Aggregation';
+	readonly stepId = 'deduplication-and-data-aggregation' as const;
 
 	async run(context: MutableGenerationContext, execContext: StepExecutionContext): Promise<MutableGenerationContext> {
 		const {
