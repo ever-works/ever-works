@@ -19,7 +19,7 @@ interface HelpDrawerProps {
 
 const GITHUB_REPO_URL = 'https://github.com/ever-works/ever-works';
 const GITHUB_ISSUES_URL = 'https://github.com/ever-works/ever-works/issues';
-const DOCS_URL = 'https://docs.ever.works';
+const DOCS_URL = 'https://docs.ever.works/docs';
 
 // GitHub icon component (lucide's Github is deprecated)
 function GitHubIcon({ className }: { className?: string }) {
@@ -63,7 +63,6 @@ export function HelpDrawer({ open, onClose }: HelpDrawerProps) {
             href: DOCS_URL,
             icon: BookOpen,
             external: true,
-            comingSoon: true,
         },
     ];
 
