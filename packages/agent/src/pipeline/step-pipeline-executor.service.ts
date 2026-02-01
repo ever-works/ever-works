@@ -23,6 +23,25 @@ import type {
     GenerationContextSnapshot,
     StepExecutionContext,
     StepLogger,
+    IAiFacade,
+    ISearchFacade,
+    IScreenshotFacade,
+    IContentExtractorFacade,
+    IDataSourceFacade,
+    AskJsonOptions,
+    AskJsonResponse,
+    SchemaType,
+    SearchFacadeOptions,
+    SearchFacadeResult,
+    ScreenshotCaptureOptions,
+    ScreenshotCaptureResult,
+    SmartImageOptions,
+    SmartImageResult,
+    FacadeExtractionOptions,
+    FacadeExtractedContent,
+    DataSourceFacadeOptions,
+    DataSourceFacadeResult,
+    EnabledDataSource,
 } from '@ever-works/plugin';
 import { AiFacadeService } from '../facades/ai.facade';
 import { SearchFacadeService } from '../facades/search.facade';
@@ -63,6 +82,15 @@ export interface CheckpointData {
  * Checkpoint TTL in milliseconds (24 hours)
  */
 const CHECKPOINT_TTL_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Context for binding facades to a specific directory/user.
+ * This allows facades to automatically include directory context in their calls.
+ */
+interface FacadeBindingContext {
+    readonly directoryId: string;
+    readonly userId?: string;
+}
 
 /**
  * Pipeline event names for lifecycle notifications.
@@ -130,8 +158,125 @@ export class StepPipelineExecutorService {
     }
 
     /**
+     * Create a bound AI facade that automatically includes directory context.
+     * Steps use this facade without needing to pass facadeOptions.
+     */
+    private createBoundAiFacade(ctx: FacadeBindingContext): IAiFacade {
+        const facade = this.aiFacade;
+        return {
+            askJson: <T>(
+                promptTemplate: string,
+                schema: SchemaType<T>,
+                options?: AskJsonOptions,
+            ): Promise<AskJsonResponse<T>> =>
+                // Cast schema to any since both ZodSchema and SchemaType satisfy the contract
+                // The runtime implementation in AiFacadeService handles Zod schemas
+                facade.askJson(promptTemplate, schema as any, options, {
+                    directoryId: ctx.directoryId,
+                    userId: ctx.userId,
+                }),
+            isConfigured: () => facade.isConfigured(),
+            testConnection: () =>
+                facade.testConnection({
+                    directoryId: ctx.directoryId,
+                    userId: ctx.userId,
+                }),
+            getAvailableModels: () =>
+                facade.getAvailableModels({
+                    directoryId: ctx.directoryId,
+                    userId: ctx.userId,
+                }),
+        };
+    }
+
+    /**
+     * Create a bound search facade that automatically includes directory context.
+     */
+    private createBoundSearchFacade(ctx: FacadeBindingContext): ISearchFacade {
+        const facade = this.searchFacade;
+        return {
+            search: (query: string, options?: SearchFacadeOptions): Promise<SearchFacadeResult[]> =>
+                facade.search(query, {
+                    ...options,
+                    userId: ctx.userId,
+                    directoryId: ctx.directoryId,
+                } as SearchFacadeOptions),
+            isConfigured: () => facade.isConfigured(),
+        };
+    }
+
+    /**
+     * Create a bound screenshot facade that automatically includes directory context.
+     */
+    private createBoundScreenshotFacade(ctx: FacadeBindingContext): IScreenshotFacade {
+        const facade = this.screenshotFacade;
+        return {
+            capture: (options: ScreenshotCaptureOptions): Promise<ScreenshotCaptureResult> =>
+                facade.capture(options, {
+                    directoryId: ctx.directoryId,
+                    userId: ctx.userId,
+                }),
+            getSmartImage: (options: SmartImageOptions): Promise<SmartImageResult> =>
+                facade.getSmartImage(options, {
+                    directoryId: ctx.directoryId,
+                    userId: ctx.userId,
+                }),
+            getScreenshotUrl: (options: ScreenshotCaptureOptions): Promise<string | null> =>
+                facade.getScreenshotUrl(options, {
+                    directoryId: ctx.directoryId,
+                    userId: ctx.userId,
+                }),
+            isAvailable: () => facade.isAvailable(),
+        };
+    }
+
+    /**
+     * Create a bound content extractor facade that automatically includes directory context.
+     */
+    private createBoundContentExtractorFacade(ctx: FacadeBindingContext): IContentExtractorFacade {
+        const facade = this.contentExtractorFacade;
+        return {
+            extractContent: (
+                url: string,
+                options?: FacadeExtractionOptions,
+            ): Promise<FacadeExtractedContent | null> =>
+                facade.extractContent(url, {
+                    ...options,
+                    userId: ctx.userId,
+                    directoryId: ctx.directoryId,
+                } as FacadeExtractionOptions),
+            isConfigured: () => facade.isConfigured(),
+        };
+    }
+
+    /**
+     * Create a bound data source facade that automatically includes directory context.
+     */
+    private createBoundDataSourceFacade(ctx: FacadeBindingContext): IDataSourceFacade | undefined {
+        if (!this.dataSourceFacade) {
+            return undefined;
+        }
+        const facade = this.dataSourceFacade;
+        return {
+            queryAll: (options?: DataSourceFacadeOptions): Promise<DataSourceFacadeResult> =>
+                facade.queryAll({
+                    ...options,
+                    directoryId: ctx.directoryId,
+                    userId: ctx.userId,
+                }),
+            getEnabledSources: (directoryId: string): Promise<EnabledDataSource[]> =>
+                facade.getEnabledSources(directoryId, ctx.userId),
+            isConfigured: () => facade.isConfigured(),
+        };
+    }
+
+    /**
      * Create a StepExecutionContext for step executors.
-     * Provides access to facades and utilities needed for step execution.
+     * Provides access to bound facades that automatically include directory context.
+     *
+     * This is the key integration point for directory-scoped plugin resolution.
+     * Each facade is wrapped to automatically include directoryId/userId in all calls,
+     * so pipeline steps don't need to manage this context themselves.
      */
     private createStepExecutionContext(
         directory: DirectoryReference,
@@ -150,12 +295,18 @@ export class StepPipelineExecutorService {
                 this.logger.verbose?.(`[${directory.slug}] ${msg}`, ...args),
         };
 
+        // Create binding context with directory info
+        const facadeContext: FacadeBindingContext = {
+            directoryId: directory.id,
+            userId: directory.user?.id,
+        };
+
         return {
-            aiFacade: this.aiFacade,
-            searchFacade: this.searchFacade,
-            screenshotFacade: this.screenshotFacade,
-            contentExtractorFacade: this.contentExtractorFacade,
-            dataSourceFacade: this.dataSourceFacade,
+            aiFacade: this.createBoundAiFacade(facadeContext),
+            searchFacade: this.createBoundSearchFacade(facadeContext),
+            screenshotFacade: this.createBoundScreenshotFacade(facadeContext),
+            contentExtractorFacade: this.createBoundContentExtractorFacade(facadeContext),
+            dataSourceFacade: this.createBoundDataSourceFacade(facadeContext),
             logger: stepLogger,
             directory,
             user: directory.user,
@@ -184,8 +335,8 @@ export class StepPipelineExecutorService {
 
         this.logger.log(`Starting step-based pipeline execution for directory: ${directory.id}`);
 
-        // 1. Build the pipeline
-        const pipeline = this.pipelineBuilder.build(directory.id);
+        // 1. Build the pipeline (with directory-scoped plugin resolution)
+        const pipeline = await this.pipelineBuilder.build(directory.id, directory.user?.id);
         const runner = new ExecutablePipelineRunner(pipeline, this.eventEmitter);
 
         // 2. Create the generation context

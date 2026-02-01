@@ -76,8 +76,8 @@ describe('PipelineBuilderService', () => {
     });
 
     describe('build()', () => {
-        it('should return built-in steps when no plugins enabled', () => {
-            const pipeline = service.build();
+        it('should return built-in steps when no plugins enabled', async () => {
+            const pipeline = await service.build();
 
             expect(pipeline.steps.length).toBe(DefaultPipelinePlugin.getBuiltInSteps().length);
             expect(pipeline.source).toBe('standard');
@@ -86,8 +86,8 @@ describe('PipelineBuilderService', () => {
             expect(pipeline.injectedSteps.size).toBe(0);
         });
 
-        it('should include all built-in step IDs', () => {
-            const pipeline = service.build();
+        it('should include all built-in step IDs', async () => {
+            const pipeline = await service.build();
 
             const stepIds = pipeline.steps.map((s) => s.id);
             for (const builtIn of DefaultPipelinePlugin.getBuiltInSteps()) {
@@ -95,8 +95,8 @@ describe('PipelineBuilderService', () => {
             }
         });
 
-        it('should create executor map for built-in steps', () => {
-            const pipeline = service.build();
+        it('should create executor map for built-in steps', async () => {
+            const pipeline = await service.build();
 
             for (const step of DefaultPipelinePlugin.getBuiltInSteps()) {
                 const executor = pipeline.executorMap.get(step.id);
@@ -105,8 +105,8 @@ describe('PipelineBuilderService', () => {
             }
         });
 
-        it('should identify parallel groups', () => {
-            const pipeline = service.build();
+        it('should identify parallel groups', async () => {
+            const pipeline = await service.build();
 
             expect(pipeline.groups.length).toBeGreaterThan(0);
             // Verify all steps are in groups
@@ -116,15 +116,15 @@ describe('PipelineBuilderService', () => {
             }
         });
 
-        it('should calculate estimated duration', () => {
-            const pipeline = service.build();
+        it('should calculate estimated duration', async () => {
+            const pipeline = await service.build();
 
             expect(pipeline.estimatedDuration).toBeGreaterThan(0);
         });
     });
 
     describe('step replacement (Task 3.5)', () => {
-        it('should replace step when plugin provides replacement', () => {
+        it('should replace step when plugin provides replacement', async () => {
             const replacementStep: PipelineStepDefinition = {
                 id: 'custom-domain-detection',
                 name: 'Custom Domain Detection',
@@ -138,7 +138,7 @@ describe('PipelineBuilderService', () => {
                 state: 'enabled',
             });
 
-            const pipeline = service.build();
+            const pipeline = await service.build();
 
             // The replacement step takes on the original step's ID for dependency resolution
             // but the name should be the replacement's name
@@ -151,7 +151,7 @@ describe('PipelineBuilderService', () => {
             expect(pipeline.replacedSteps.get('domain-detection')).toBe('custom-domain-detection');
         });
 
-        it('should use plugin executor for replaced steps', () => {
+        it('should use plugin executor for replaced steps', async () => {
             const replacementStep: PipelineStepDefinition = {
                 id: 'custom-prompt-processing',
                 name: 'Custom Prompt Processing',
@@ -164,7 +164,7 @@ describe('PipelineBuilderService', () => {
                 state: 'enabled',
             });
 
-            const pipeline = service.build();
+            const pipeline = await service.build();
 
             // The executor is keyed by the original step ID (which the replacement step now uses)
             const executor = pipeline.executorMap.get('prompt-processing');
@@ -178,7 +178,7 @@ describe('PipelineBuilderService', () => {
     });
 
     describe('step injection (Task 3.6)', () => {
-        it('should inject step before existing step', () => {
+        it('should inject step before existing step', async () => {
             const injectedStep: PipelineStepDefinition = {
                 id: 'pre-domain-step',
                 name: 'Pre Domain Step',
@@ -191,7 +191,7 @@ describe('PipelineBuilderService', () => {
                 state: 'enabled',
             });
 
-            const pipeline = service.build();
+            const pipeline = await service.build();
 
             const domainIndex = pipeline.steps.findIndex((s) => s.id === 'domain-detection');
             const injectedIndex = pipeline.steps.findIndex((s) => s.id === 'pre-domain-step');
@@ -201,7 +201,7 @@ describe('PipelineBuilderService', () => {
             expect(pipeline.injectedSteps.has('pre-domain-step')).toBe(true);
         });
 
-        it('should inject step after existing step', () => {
+        it('should inject step after existing step', async () => {
             const injectedStep: PipelineStepDefinition = {
                 id: 'post-search-step',
                 name: 'Post Search Step',
@@ -216,7 +216,7 @@ describe('PipelineBuilderService', () => {
                 { state: 'enabled' },
             );
 
-            const pipeline = service.build();
+            const pipeline = await service.build();
 
             // After topological sort, the injected step should come after web-search
             // but before any step that depends on web-search's output
@@ -229,10 +229,10 @@ describe('PipelineBuilderService', () => {
     });
 
     describe('step disabling (Task 3.7)', () => {
-        it('should not include disabled steps', () => {
+        it('should not include disabled steps', async () => {
             // We need to test the disableStep method indirectly through build context
             // For now, verify that disabled steps set is properly tracked
-            const pipeline = service.build();
+            const pipeline = await service.build();
 
             // Initially no steps should be disabled
             expect(pipeline.disabledSteps.size).toBe(0);
@@ -240,7 +240,7 @@ describe('PipelineBuilderService', () => {
     });
 
     describe('append/prepend positioning (Task 3.8)', () => {
-        it('should prepend step to pipeline start', () => {
+        it('should prepend step to pipeline start', async () => {
             const prependStep: PipelineStepDefinition = {
                 id: 'init-step',
                 name: 'Initialization Step',
@@ -253,7 +253,7 @@ describe('PipelineBuilderService', () => {
                 state: 'enabled',
             });
 
-            const pipeline = service.build();
+            const pipeline = await service.build();
 
             // After topological sort, step should still be early (no dependencies)
             const initIndex = pipeline.steps.findIndex((s) => s.id === 'init-step');
@@ -261,7 +261,7 @@ describe('PipelineBuilderService', () => {
             expect(pipeline.injectedSteps.has('init-step')).toBe(true);
         });
 
-        it('should append step to pipeline end', () => {
+        it('should append step to pipeline end', async () => {
             const appendStep: PipelineStepDefinition = {
                 id: 'cleanup-step',
                 name: 'Cleanup Step',
@@ -275,7 +275,7 @@ describe('PipelineBuilderService', () => {
                 state: 'enabled',
             });
 
-            const pipeline = service.build();
+            const pipeline = await service.build();
 
             const cleanupIndex = pipeline.steps.findIndex((s) => s.id === 'cleanup-step');
             expect(cleanupIndex).toBeGreaterThanOrEqual(0);
@@ -284,8 +284,8 @@ describe('PipelineBuilderService', () => {
     });
 
     describe('topological sort', () => {
-        it('should topologically sort steps by dependencies', () => {
-            const pipeline = service.build();
+        it('should topologically sort steps by dependencies', async () => {
+            const pipeline = await service.build();
 
             // Verify dependency order is maintained
             const stepIndexMap = new Map(pipeline.steps.map((s, i) => [s.id, i]));
@@ -305,7 +305,7 @@ describe('PipelineBuilderService', () => {
             }
         });
 
-        it('should detect circular dependencies and throw', () => {
+        it('should detect circular dependencies and throw', async () => {
             // Create two steps that depend on each other
             const stepA: PipelineStepDefinition = {
                 id: 'step-a',
@@ -333,13 +333,13 @@ describe('PipelineBuilderService', () => {
                 state: 'enabled',
             });
 
-            expect(() => service.build()).toThrow(CircularDependencyError);
+            await expect(service.build()).rejects.toThrow(CircularDependencyError);
         });
     });
 
     describe('parallel groups', () => {
-        it('should identify parallel groups for concurrent execution', () => {
-            const pipeline = service.build();
+        it('should identify parallel groups for concurrent execution', async () => {
+            const pipeline = await service.build();
 
             // Find groups with multiple steps (parallelizable)
             const parallelGroups = pipeline.groups.filter((g) => g.stepIds.length > 1);
@@ -349,8 +349,8 @@ describe('PipelineBuilderService', () => {
             expect(pipeline.groups.length).toBeGreaterThan(0);
         });
 
-        it('should set maxConcurrent for parallel groups', () => {
-            const pipeline = service.build();
+        it('should set maxConcurrent for parallel groups', async () => {
+            const pipeline = await service.build();
 
             for (const group of pipeline.groups) {
                 if (group.stepIds.length > 1) {
@@ -360,8 +360,8 @@ describe('PipelineBuilderService', () => {
             }
         });
 
-        it('should track allRequired flag for groups', () => {
-            const pipeline = service.build();
+        it('should track allRequired flag for groups', async () => {
+            const pipeline = await service.build();
 
             for (const group of pipeline.groups) {
                 expect(typeof group.allRequired).toBe('boolean');
@@ -379,7 +379,7 @@ describe('PipelineBuilderService', () => {
     });
 
     describe('plugin filtering', () => {
-        it('should only include enabled plugins', () => {
+        it('should only include enabled plugins', async () => {
             const enabledStep: PipelineStepDefinition = {
                 id: 'enabled-step',
                 name: 'Enabled Step',
@@ -406,7 +406,7 @@ describe('PipelineBuilderService', () => {
                 { state: 'loaded' }, // Not enabled
             );
 
-            const pipeline = service.build();
+            const pipeline = await service.build();
 
             expect(pipeline.steps.some((s) => s.id === 'enabled-step')).toBe(true);
             expect(pipeline.steps.some((s) => s.id === 'disabled-step')).toBe(false);

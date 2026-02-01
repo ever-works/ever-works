@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import type {
     PipelineStepDefinition,
     StepPosition,
@@ -12,6 +12,8 @@ import {
     PluginRegistryService,
     RegisteredPlugin,
 } from '../plugins/services/plugin-registry.service';
+import { DirectoryPluginRepository } from '../plugins/repositories/directory-plugin.repository';
+import { UserPluginRepository } from '../plugins/repositories/user-plugin.repository';
 // Import the NestJS wrapper which delegates to the standalone plugin
 import { DefaultPipelinePlugin } from './default-pipeline.plugin';
 
@@ -98,20 +100,27 @@ export class MissingDependencyError extends Error {
  * - 3.6: Step injection (before/after)
  * - 3.7: Step disabling
  * - 3.8: Append/prepend positioning
+ *
+ * Uses three-level enable resolution: Directory > User > autoEnable.
  */
 @Injectable()
 export class PipelineBuilderService {
     private readonly logger = new Logger(PipelineBuilderService.name);
 
-    constructor(private readonly registry: PluginRegistryService) {}
+    constructor(
+        private readonly registry: PluginRegistryService,
+        @Optional() private readonly directoryPluginRepository?: DirectoryPluginRepository,
+        @Optional() private readonly userPluginRepository?: UserPluginRepository,
+    ) {}
 
     /**
      * Build an executable pipeline for a directory.
      *
      * @param directoryId - The directory to build the pipeline for
+     * @param userId - Optional user ID for user-level plugin resolution
      * @returns A fully compiled ExecutablePipeline ready for execution
      */
-    build(directoryId?: string): ExecutablePipeline {
+    async build(directoryId?: string, userId?: string): Promise<ExecutablePipeline> {
         this.logger.debug(`Building pipeline for directory: ${directoryId || 'global'}`);
 
         // 1. Start with built-in steps from DefaultPipelinePlugin (single source of truth)
@@ -127,8 +136,8 @@ export class PipelineBuilderService {
             appendSteps: [],
         };
 
-        // 3. Get enabled pipeline plugins
-        const plugins = this.getEnabledPipelinePlugins();
+        // 3. Get enabled pipeline plugins (with directory-scoped filtering)
+        const plugins = await this.getEnabledPipelinePlugins(directoryId, userId);
         this.logger.debug(`Found ${plugins.length} enabled pipeline plugins`);
 
         // 4. Process each plugin's step contributions
@@ -196,12 +205,18 @@ export class PipelineBuilderService {
     }
 
     /**
-     * Get enabled plugins that provide pipeline steps
+     * Get enabled plugins that provide pipeline steps.
+     * Uses directory-scoped filtering to only include plugins enabled for this context.
      */
-    private getEnabledPipelinePlugins(): Array<{
-        registered: RegisteredPlugin;
-        pipelinePlugin: IPipelineStepPlugin;
-    }> {
+    private async getEnabledPipelinePlugins(
+        directoryId?: string,
+        userId?: string,
+    ): Promise<
+        Array<{
+            registered: RegisteredPlugin;
+            pipelinePlugin: IPipelineStepPlugin;
+        }>
+    > {
         const result: Array<{
             registered: RegisteredPlugin;
             pipelinePlugin: IPipelineStepPlugin;
@@ -211,8 +226,18 @@ export class PipelineBuilderService {
         const pluginsWithCapability = this.registry.getByCapability('pipeline-step');
 
         for (const registered of pluginsWithCapability) {
-            // Only include enabled plugins
+            // Only include enabled plugins at registry level
             if (registered.state !== 'enabled') {
+                continue;
+            }
+
+            // Check directory-specific enabled state
+            const isEnabled = await this.isPluginEnabledForDirectory(
+                registered.plugin.id,
+                directoryId,
+                userId,
+            );
+            if (!isEnabled) {
                 continue;
             }
 
@@ -226,6 +251,44 @@ export class PipelineBuilderService {
         }
 
         return result;
+    }
+
+    /**
+     * Check if a plugin is enabled for the given directory/user context.
+     *
+     * Enable resolution: Directory (L2) > User (L1) > autoEnable
+     */
+    private async isPluginEnabledForDirectory(
+        pluginId: string,
+        directoryId?: string,
+        userId?: string,
+    ): Promise<boolean> {
+        // Level 2: Directory-level enable state
+        if (directoryId && this.directoryPluginRepository) {
+            try {
+                const dp = await this.directoryPluginRepository.findByDirectoryAndPlugin(
+                    directoryId,
+                    pluginId,
+                );
+                if (dp !== null) return dp.enabled;
+            } catch {
+                // Continue to next level
+            }
+        }
+
+        // Level 1: User-level enable state
+        if (userId && this.userPluginRepository) {
+            try {
+                const up = await this.userPluginRepository.findByUserAndPlugin(userId, pluginId);
+                if (up !== null) return up.enabled;
+            } catch {
+                // Continue to fallback
+            }
+        }
+
+        // Fallback: autoEnable from manifest
+        const registered = this.registry.get(pluginId);
+        return registered?.manifest?.autoEnable ?? true;
     }
 
     /**

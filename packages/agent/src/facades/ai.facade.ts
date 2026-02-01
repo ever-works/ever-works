@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { z } from 'zod';
 import type {
     IAiFacade,
@@ -12,6 +12,8 @@ import type {
 import { FACADE_CAPABILITIES } from '@ever-works/plugin';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
+import { DirectoryPluginRepository } from '../plugins/repositories/directory-plugin.repository';
+import { UserPluginRepository } from '../plugins/repositories/user-plugin.repository';
 
 export class AiFacadeError extends Error {
     constructor(
@@ -57,6 +59,8 @@ export interface AiFacadeOptions {
  * 2. User settings
  * 3. Admin settings
  * 4. Plugin defaults
+ *
+ * Uses three-level enable resolution: Directory > User > autoEnable.
  */
 @Injectable()
 export class AiFacadeService implements IAiFacade {
@@ -66,6 +70,8 @@ export class AiFacadeService implements IAiFacade {
     constructor(
         private readonly registry: PluginRegistryService,
         private readonly settingsService: PluginSettingsService,
+        @Optional() private readonly directoryPluginRepository?: DirectoryPluginRepository,
+        @Optional() private readonly userPluginRepository?: UserPluginRepository,
     ) {}
 
     /**
@@ -248,7 +254,7 @@ export class AiFacadeService implements IAiFacade {
      * 1. providerOverride (explicit request)
      * 2. Directory default provider (if directoryId provided)
      * 3. User default provider (if userId provided)
-     * 4. First enabled AI provider
+     * 4. First enabled AI provider that passes enable check
      */
     private async resolvePlugin(
         providerOverride?: string,
@@ -263,7 +269,11 @@ export class AiFacadeService implements IAiFacade {
                 registered.manifest.capabilities.includes(this.CAPABILITY) &&
                 registered.state === 'enabled'
             ) {
-                return registered.plugin as IAiProviderPlugin;
+                // Check if enabled for this directory/user context
+                const isEnabled = await this.isPluginEnabled(providerOverride, directoryId, userId);
+                if (isEnabled) {
+                    return registered.plugin as IAiProviderPlugin;
+                }
             }
             throw new AiProviderNotFoundError(providerOverride);
         }
@@ -292,15 +302,59 @@ export class AiFacadeService implements IAiFacade {
             }
         }
 
-        // Fall back to first enabled AI provider
+        // Fall back to first enabled AI provider that passes enable check
         const plugins = this.registry.getByCapability(this.CAPABILITY);
-        const enabled = plugins.find((p) => p.state === 'enabled');
-
-        if (enabled) {
-            return enabled.plugin as IAiProviderPlugin;
+        for (const registered of plugins) {
+            if (registered.state !== 'enabled') continue;
+            const isEnabled = await this.isPluginEnabled(
+                registered.plugin.id,
+                directoryId,
+                userId,
+            );
+            if (isEnabled) {
+                return registered.plugin as IAiProviderPlugin;
+            }
         }
 
         throw new NoAiProviderError();
+    }
+
+    /**
+     * Check if a plugin is enabled for the given directory/user context.
+     *
+     * Enable resolution: Directory (L2) > User (L1) > autoEnable
+     */
+    private async isPluginEnabled(
+        pluginId: string,
+        directoryId?: string,
+        userId?: string,
+    ): Promise<boolean> {
+        // Level 2: Directory-level enable state
+        if (directoryId && this.directoryPluginRepository) {
+            try {
+                const dp = await this.directoryPluginRepository.findByDirectoryAndPlugin(
+                    directoryId,
+                    pluginId,
+                );
+                if (dp !== null) return dp.enabled;
+            } catch {
+                // Continue to next level
+            }
+        }
+
+        // Level 1: User-level enable state
+        if (userId && this.userPluginRepository) {
+            try {
+                const up = await this.userPluginRepository.findByUserAndPlugin(userId, pluginId);
+                if (up !== null) return up.enabled;
+            } catch {
+                // Continue to fallback
+            }
+        }
+
+        // Fallback: autoEnable from manifest
+        const registered = this.registry.get(pluginId);
+        return registered?.manifest?.autoEnable ?? true;
     }
 
     /**

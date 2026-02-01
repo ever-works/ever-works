@@ -284,20 +284,20 @@ describe('PipelineOrchestratorService', () => {
     });
 
     describe('getRecommendedMode()', () => {
-        it('should recommend step mode when no full pipeline plugin', () => {
-            const recommendation = service.getRecommendedMode();
+        it('should recommend step mode when no full pipeline plugin', async () => {
+            const recommendation = await service.getRecommendedMode();
 
             expect(recommendation.mode).toBe('step');
             expect(recommendation.plugin).toBeUndefined();
         });
 
-        it('should recommend full mode when full pipeline plugin enabled', () => {
+        it('should recommend full mode when full pipeline plugin enabled', async () => {
             const plugin = createMockFullPipelinePlugin('full-plugin');
             registry.register(plugin as unknown as IPlugin, createMockManifest('full-plugin'), {
                 state: 'enabled',
             });
 
-            const recommendation = service.getRecommendedMode();
+            const recommendation = await service.getRecommendedMode();
 
             expect(recommendation.mode).toBe('full');
             expect(recommendation.plugin).toBe('full-plugin');
@@ -305,17 +305,17 @@ describe('PipelineOrchestratorService', () => {
     });
 
     describe('hasFullPipelinePlugin()', () => {
-        it('should return false when no full pipeline plugin', () => {
-            expect(service.hasFullPipelinePlugin()).toBe(false);
+        it('should return false when no full pipeline plugin', async () => {
+            expect(await service.hasFullPipelinePlugin()).toBe(false);
         });
 
-        it('should return true when full pipeline plugin enabled', () => {
+        it('should return true when full pipeline plugin enabled', async () => {
             const plugin = createMockFullPipelinePlugin('full-plugin');
             registry.register(plugin as unknown as IPlugin, createMockManifest('full-plugin'), {
                 state: 'enabled',
             });
 
-            expect(service.hasFullPipelinePlugin()).toBe(true);
+            expect(await service.hasFullPipelinePlugin()).toBe(true);
         });
     });
 
