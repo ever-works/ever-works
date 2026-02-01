@@ -10,25 +10,14 @@ import {
 } from '@headlessui/react';
 import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
-import { X, ExternalLink, BookOpen, MessageCircle, Keyboard } from 'lucide-react';
+import { X, ExternalLink, BookOpen, Keyboard } from 'lucide-react';
 
 interface HelpDrawerProps {
     open: boolean;
     onClose: () => void;
 }
 
-const GITHUB_REPO_URL = 'https://github.com/ever-works/ever-works';
-const GITHUB_ISSUES_URL = 'https://github.com/ever-works/ever-works/issues';
 const DOCS_URL = 'https://docs.ever.works/docs';
-
-// GitHub icon component (lucide's Github is deprecated)
-function GitHubIcon({ className }: { className?: string }) {
-    return (
-        <svg className={className} fill="currentColor" viewBox="0 0 24 24">
-            <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
-        </svg>
-    );
-}
 
 export function HelpDrawer({ open, onClose }: HelpDrawerProps) {
     const t = useTranslations('dashboard.header.help');
@@ -42,22 +31,9 @@ export function HelpDrawer({ open, onClose }: HelpDrawerProps) {
     const keyboardShortcuts = [
         { keys: ['Ctrl', 'K'], label: t('shortcuts.search') },
         { keys: ['C'], label: t('shortcuts.newDirectory') },
-        { keys: ['?'], label: t('shortcuts.help') },
     ];
 
     const links = [
-        {
-            label: t('links.github'),
-            href: GITHUB_REPO_URL,
-            icon: GitHubIcon,
-            external: true,
-        },
-        {
-            label: t('links.issues'),
-            href: GITHUB_ISSUES_URL,
-            icon: MessageCircle,
-            external: true,
-        },
         {
             label: t('links.docs'),
             href: DOCS_URL,
@@ -241,7 +217,7 @@ export function HelpDrawer({ open, onClose }: HelpDrawerProps) {
                                                     {links.map((link, index) => (
                                                         <a
                                                             key={index}
-                                                            href={link.comingSoon ? undefined : link.href}
+                                                            href={link.href}
                                                             target={link.external ? '_blank' : undefined}
                                                             rel={
                                                                 link.external
@@ -251,31 +227,16 @@ export function HelpDrawer({ open, onClose }: HelpDrawerProps) {
                                                             className={cn(
                                                                 'flex items-center justify-between py-3 px-4 rounded-lg transition-colors',
                                                                 'border border-border dark:border-border-dark',
-                                                                link.comingSoon
-                                                                    ? 'cursor-not-allowed opacity-60'
-                                                                    : 'hover:bg-surface dark:hover:bg-surface-secondary-dark hover:border-primary/50',
+                                                                'hover:bg-surface dark:hover:bg-surface-secondary-dark hover:border-primary/50',
                                                             )}
                                                         >
                                                             <div className="flex items-center gap-3">
                                                                 <link.icon className="w-5 h-5 text-text-secondary dark:text-text-secondary-dark" />
-                                                                <div>
-                                                                    <span className="text-sm font-medium text-text dark:text-text-dark">
-                                                                        {link.label}
-                                                                    </span>
-                                                                    {link.comingSoon && (
-                                                                        <span
-                                                                            className={cn(
-                                                                                'ml-2 px-2 py-0.5 text-xs rounded-full',
-                                                                                'bg-yellow-100 dark:bg-yellow-900/30',
-                                                                                'text-yellow-700 dark:text-yellow-400',
-                                                                            )}
-                                                                        >
-                                                                            {t('links.comingSoon')}
-                                                                        </span>
-                                                                    )}
-                                                                </div>
+                                                                <span className="text-sm font-medium text-text dark:text-text-dark">
+                                                                    {link.label}
+                                                                </span>
                                                             </div>
-                                                            {link.external && !link.comingSoon && (
+                                                            {link.external && (
                                                                 <ExternalLink className="w-4 h-4 text-text-muted dark:text-text-muted-dark" />
                                                             )}
                                                         </a>
