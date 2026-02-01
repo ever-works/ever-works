@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Directory } from '@/lib/api/directory';
 import { DirectoryList } from '@/components/directories/DirectoryList';
 import { EmptyState } from '@/components/common/EmptyState';
@@ -10,6 +11,9 @@ import { Link, useRouter } from '@/i18n/navigation';
 import { getDirectories } from '@/app/actions/dashboard/directories';
 import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
+
+const MIN_SEARCH_CHARS = 3;
+const DEBOUNCE_MS = 300;
 
 interface DirectoriesClientProps {
     initialDirectories: Directory[];
@@ -27,6 +31,7 @@ export default function DirectoriesClient({
     const [total, setTotal] = useState(totalDirectories);
     const [loading, setLoading] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
+    const [debouncedQuery, setDebouncedQuery] = useState('');
     const [page, setPage] = useState(1);
     const itemsPerPage = 20;
     const searchInputRef = useRef<HTMLInputElement>(null);
@@ -42,43 +47,70 @@ export default function DirectoriesClient({
         }
     }, [searchParams]);
 
-    const handleSearch = async () => {
-        setLoading(true);
-        try {
-            const response = await getDirectories({
-                search: searchQuery,
-                limit: itemsPerPage,
-                offset: (page - 1) * itemsPerPage,
-            });
-            if (response.success) {
-                setDirectories(response.directories);
-                setTotal(response.total);
+    // Request tracking to ignore stale responses
+    const requestIdRef = useRef(0);
+    const isInitialMount = useRef(true);
+
+    const performSearch = useCallback(
+        async (query: string, currentPage: number) => {
+            // Increment request ID to track this specific request
+            const currentRequestId = ++requestIdRef.current;
+
+            setLoading(true);
+            try {
+                const response = await getDirectories({
+                    search: query || undefined,
+                    limit: itemsPerPage,
+                    offset: (currentPage - 1) * itemsPerPage,
+                });
+
+                // Only update state if this is still the latest request
+                if (currentRequestId === requestIdRef.current && response.success) {
+                    setDirectories(response.directories);
+                    setTotal(response.total);
+                }
+            } catch (error) {
+                // Only log error if this is still the latest request
+                if (currentRequestId === requestIdRef.current) {
+                    console.error('Failed to search directories:', error);
+                }
+            } finally {
+                // Only clear loading if this is still the latest request
+                if (currentRequestId === requestIdRef.current) {
+                    setLoading(false);
+                }
             }
-        } catch (error) {
-            console.error('Failed to search directories:', error);
-        } finally {
-            setLoading(false);
+        },
+        [itemsPerPage],
+    );
+
+    // Debounce search query
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedQuery(searchQuery);
+        }, DEBOUNCE_MS);
+
+        return () => clearTimeout(timer);
+    }, [searchQuery]);
+
+    // Perform search when debounced query changes
+    useEffect(() => {
+        // Skip initial mount to avoid duplicate fetch
+        if (isInitialMount.current) {
+            isInitialMount.current = false;
+            return;
         }
-    };
+
+        // Search when query is empty (to reset) or has MIN_SEARCH_CHARS+ characters
+        if (debouncedQuery === '' || debouncedQuery.length >= MIN_SEARCH_CHARS) {
+            setPage(1); // Reset to first page on new search
+            performSearch(debouncedQuery, 1);
+        }
+    }, [debouncedQuery, performSearch]);
 
     const handlePageChange = async (newPage: number) => {
         setPage(newPage);
-        setLoading(true);
-        try {
-            const response = await getDirectories({
-                search: searchQuery,
-                limit: itemsPerPage,
-                offset: (newPage - 1) * itemsPerPage,
-            });
-            if (response.success) {
-                setDirectories(response.directories);
-                setTotal(response.total);
-            }
-        } catch (error) {
-            console.error('Failed to fetch directories:', error);
-        } finally {
-            setLoading(false);
-        }
+        performSearch(debouncedQuery, newPage);
     };
 
     const totalPages = Math.ceil(total / itemsPerPage);
@@ -103,7 +135,6 @@ export default function DirectoriesClient({
                             placeholder={t('search')}
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                             className={cn(
                                 'w-full px-4 py-2 pl-10 rounded-lg',
                                 'bg-surface dark:bg-surface-dark',
