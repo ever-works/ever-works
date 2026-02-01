@@ -115,7 +115,8 @@ export class PipelineBuilderService {
         this.logger.debug(`Building pipeline for directory: ${directoryId || 'global'}`);
 
         // 1. Start with built-in steps from DefaultPipelinePlugin (single source of truth)
-        let steps = DefaultPipelinePlugin.getBuiltInSteps();
+        // We widen the type to PipelineStepDefinition[] since plugins can inject custom steps
+        let steps: PipelineStepDefinition[] = DefaultPipelinePlugin.getBuiltInSteps();
 
         // 2. Initialize build context
         const buildContext: BuildContext = {

@@ -181,20 +181,6 @@ export class DefaultPipelinePlugin implements OnModuleInit {
         return StandalonePlugin.getBuiltInSteps();
     }
 
-    /**
-     * Get the service name mapping for built-in steps
-     */
-    static getServiceMap() {
-        return StandalonePlugin.getServiceMap();
-    }
-
-    /**
-     * Get the service name for a specific step
-     */
-    static getServiceNameForStep(stepId: BuiltInStepId) {
-        return StandalonePlugin.getServiceNameForStep(stepId);
-    }
-
     // ============================================================================
     // Instance Methods (delegate to plugin instance)
     // ============================================================================
@@ -223,15 +209,8 @@ export class DefaultPipelinePlugin implements OnModuleInit {
     /**
      * Check if an executor is registered for a step
      */
-    hasExecutor(stepId: string): boolean {
+    hasExecutor(stepId: BuiltInStepId): boolean {
         return this.plugin.hasExecutor(stepId);
-    }
-
-    /**
-     * Get the service name for a built-in step
-     */
-    getServiceName(stepId: BuiltInStepId): string | undefined {
-        return this.plugin.getServiceName(stepId);
     }
 
     /**

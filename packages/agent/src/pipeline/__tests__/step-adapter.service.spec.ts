@@ -149,20 +149,6 @@ describe('StepAdapterService', () => {
         });
     });
 
-    describe('getExpectedServiceName()', () => {
-        it('should return expected service name for known step', () => {
-            const name = service.getExpectedServiceName('prompt-processing');
-
-            expect(name).toBe('PromptProcessingService');
-        });
-
-        it('should return undefined for unknown step', () => {
-            const name = service.getExpectedServiceName('unknown-step' as BuiltInStepId);
-
-            expect(name).toBeUndefined();
-        });
-    });
-
     describe('executeStep()', () => {
         it('should execute registered service', async () => {
             const step = createMockLegacyStep('Test Step');
@@ -179,7 +165,7 @@ describe('StepAdapterService', () => {
             const context = createGenerationContext(mockDirectory, mockRequest, mockExisting);
 
             await expect(service.executeStep('prompt-processing', context)).rejects.toThrow(
-                /No service registered for step/,
+                /No executor registered for step/,
             );
         });
 

@@ -8,7 +8,11 @@ import {
     PluginRegistryService,
 } from '@packages/agent/plugins';
 import type { RegisteredPlugin } from '@packages/agent/plugins';
-import { type JsonSchema, type PluginManifest } from '@ever-works/plugin';
+import {
+    type JsonSchema,
+    type PluginManifest,
+    toPluginSettingsSchemaProperty,
+} from '@ever-works/plugin';
 import {
     PluginResponseDto,
     UserPluginResponseDto,
@@ -549,31 +553,17 @@ export class PluginsService {
     }
 
     /**
-     * Extract and convert settings schema
+     * Extract and convert settings schema.
+     * Uses the shared toPluginSettingsSchemaProperty utility from @ever-works/plugin.
      */
     private extractSettingsSchema(schema?: JsonSchema): PluginSettingsSchemaDto | undefined {
         if (!schema) return undefined;
 
-        // Convert properties to the DTO format
+        // Convert properties using the shared utility function
         const properties: Record<string, PluginSettingsSchemaPropertyDto> = {};
         if (schema.properties) {
             for (const [key, prop] of Object.entries(schema.properties)) {
-                const propSchema = prop as Record<string, unknown>;
-                properties[key] = {
-                    type: (propSchema.type as string) || 'string',
-                    title: propSchema.title as string | undefined,
-                    description: propSchema.description as string | undefined,
-                    default: propSchema.default,
-                    // Use x-prefixed field names from JsonSchema
-                    secret: propSchema['x-secret'] as boolean | undefined,
-                    masked: propSchema['x-masked'] as boolean | undefined,
-                    writeOnly: propSchema['x-writeOnly'] as boolean | undefined,
-                    scope: (propSchema['x-scope'] as 'global' | 'user' | 'directory') || 'global',
-                    category: propSchema['x-category'] as string | undefined,
-                    placeholder: propSchema['x-placeholder'] as string | undefined,
-                    requiresRestart: propSchema['x-requiresRestart'] as boolean | undefined,
-                    enum: propSchema.enum as unknown[] | undefined,
-                };
+                properties[key] = toPluginSettingsSchemaProperty(prop);
             }
         }
 
@@ -587,7 +577,8 @@ export class PluginsService {
     }
 
     /**
-     * Mask secret settings based on schema
+     * Mask secret settings based on schema.
+     * Uses JsonSchema type for type-safe property access.
      */
     private maskSecretSettings(
         settings: Record<string, unknown>,
@@ -598,9 +589,8 @@ export class PluginsService {
 
         const masked: Record<string, unknown> = {};
         for (const [key, value] of Object.entries(settings)) {
-            const propSchema = schema.properties[key] as
-                | { 'x-writeOnly'?: boolean; 'x-masked'?: boolean }
-                | undefined;
+            // propSchema is already typed as JsonSchema from the schema.properties definition
+            const propSchema: JsonSchema | undefined = schema.properties[key];
             if (propSchema?.['x-writeOnly']) {
                 // Don't include write-only fields
                 continue;

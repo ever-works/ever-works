@@ -218,7 +218,7 @@ export interface DirectoryConfig {
         generation_method?: GenerationMethod;
         pr_update?: PRUpdate | null;
         last_request_data?: CreateItemsGeneratorDto;
-    } & (Record<string, any> & {});
+    } & Record<string, unknown>;
 }
 
 export interface DirectoryCount {

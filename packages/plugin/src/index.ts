@@ -30,3 +30,17 @@ export * from './abstract/index.js';
 
 // Testing utilities
 export * from './testing/index.js';
+
+// API response utilities (for transforming JsonSchema to API response types)
+export {
+	toPluginSettingsSchemaProperty,
+	toPluginSettingsSchema,
+	type PluginSettingsSchemaProperty,
+	type PluginSettingsSchema,
+	type PluginResponse,
+	type UserPluginResponse,
+	type DirectoryPluginResponse,
+	type PluginListResponse,
+	type DirectoryPluginListResponse,
+	type SettingScopeApi
+} from './api/index.js';

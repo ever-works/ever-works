@@ -5,8 +5,8 @@ import type {
 	PipelineMetrics,
 	MutableItemData,
 	ItemBadges,
-	DomainType
 } from '@ever-works/plugin';
+import { DomainType } from '@ever-works/plugin';
 import { BasePipelineStep } from '../base-pipeline-step.js';
 
 interface BadgeEvaluationResult {
@@ -81,7 +81,7 @@ export class BadgeProcessingStep extends BasePipelineStep {
 		const { request, finalItems, metrics, domainAnalysis } = context;
 		const { logger, aiFacade } = execContext;
 		const config = request.config || {};
-		const domainType: DomainType = (domainAnalysis?.domain_type as DomainType) ?? 'software';
+		const domainType: DomainType = domainAnalysis?.domain_type ?? DomainType.SOFTWARE;
 
 		if (config.badge_evaluation_enabled) {
 			const processedItems = await this.processBadges(finalItems, domainType, metrics, logger, aiFacade);

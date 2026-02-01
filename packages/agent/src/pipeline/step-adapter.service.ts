@@ -82,13 +82,6 @@ export class StepAdapterService {
     }
 
     /**
-     * Get the expected service name for a step ID
-     */
-    getExpectedServiceName(stepId: BuiltInStepId): string | undefined {
-        return DefaultPipelinePlugin.getServiceNameForStep(stepId);
-    }
-
-    /**
      * Execute a step using its registered service
      *
      * @param stepId - The step ID to execute
@@ -106,11 +99,10 @@ export class StepAdapterService {
         const service = this.serviceMap.get(stepId);
 
         if (!service) {
-            const expectedService = DefaultPipelinePlugin.getServiceNameForStep(stepId);
+            const registeredSteps = this.getRegisteredStepIds();
             throw new Error(
-                `No service registered for step "${stepId}". ` +
-                    `Expected service: ${expectedService || 'unknown'}. ` +
-                    `Registered steps: ${this.getRegisteredStepIds().join(', ') || 'none'}`,
+                `No executor registered for step "${stepId}". ` +
+                    `Registered steps: ${registeredSteps.length > 0 ? registeredSteps.join(', ') : 'none'}`,
             );
         }
 
