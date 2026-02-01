@@ -1,8 +1,7 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { useSearchParams } from 'next/navigation';
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Directory } from '@/lib/api/directory';
 import { DirectoryList } from '@/components/directories/DirectoryList';
 import { EmptyState } from '@/components/common/EmptyState';
