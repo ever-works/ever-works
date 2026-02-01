@@ -1,12 +1,16 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PluginRegistryService } from '../services/plugin-registry.service';
+import { DirectoryPluginRepository } from '../repositories/directory-plugin.repository';
+import { UserPluginRepository } from '../repositories/user-plugin.repository';
 import { PluginEvents } from '../plugins.constants';
 import type { IPlugin, PluginManifest, PluginCategory } from '@ever-works/plugin';
 
 describe('PluginRegistryService', () => {
     let service: PluginRegistryService;
     let eventEmitter: EventEmitter2;
+    let directoryPluginRepository: jest.Mocked<DirectoryPluginRepository>;
+    let userPluginRepository: jest.Mocked<UserPluginRepository>;
 
     const createMockPlugin = (id: string, category: PluginCategory = 'utility'): IPlugin =>
         ({
@@ -37,6 +41,14 @@ describe('PluginRegistryService', () => {
     });
 
     beforeEach(async () => {
+        directoryPluginRepository = {
+            findByDirectoryAndPlugin: jest.fn(),
+        } as unknown as jest.Mocked<DirectoryPluginRepository>;
+
+        userPluginRepository = {
+            findByUserAndPlugin: jest.fn(),
+        } as unknown as jest.Mocked<UserPluginRepository>;
+
         const module: TestingModule = await Test.createTestingModule({
             providers: [
                 PluginRegistryService,
@@ -47,6 +59,14 @@ describe('PluginRegistryService', () => {
                         on: jest.fn(),
                         off: jest.fn(),
                     },
+                },
+                {
+                    provide: DirectoryPluginRepository,
+                    useValue: directoryPluginRepository,
+                },
+                {
+                    provide: UserPluginRepository,
+                    useValue: userPluginRepository,
                 },
             ],
         }).compile();
@@ -397,6 +417,242 @@ describe('PluginRegistryService', () => {
 
             expect(service.getDefaultForCapability('search')?.plugin.id).toBe('multi-plugin');
             expect(service.getDefaultForCapability('content-extractor')).toBeUndefined();
+        });
+    });
+
+    describe('getDefaultForCapabilityScoped', () => {
+        it('should return plugin enabled at directory level first', async () => {
+            const plugin = createMockPlugin('search-plugin');
+            const manifest: PluginManifest = {
+                ...createMockManifest('search-plugin'),
+                capabilities: ['search'],
+            };
+            service.register(plugin, manifest, { state: 'enabled' });
+
+            directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue({
+                id: '1',
+                directoryId: 'dir-1',
+                pluginId: 'search-plugin',
+                enabled: true,
+                activeCapability: 'search',
+            } as any);
+
+            const result = await service.getDefaultForCapabilityScoped('search', 'dir-1');
+
+            expect(result?.plugin.id).toBe('search-plugin');
+            expect(directoryPluginRepository.findByDirectoryAndPlugin).toHaveBeenCalledWith(
+                'dir-1',
+                'search-plugin',
+            );
+        });
+
+        it('should skip plugin disabled at directory level', async () => {
+            const plugin1 = createMockPlugin('plugin-1');
+            const plugin2 = createMockPlugin('plugin-2');
+            const manifest1: PluginManifest = {
+                ...createMockManifest('plugin-1'),
+                capabilities: ['search'],
+            };
+            const manifest2: PluginManifest = {
+                ...createMockManifest('plugin-2'),
+                capabilities: ['search'],
+            };
+            service.register(plugin1, manifest1, { state: 'enabled' });
+            service.register(plugin2, manifest2, { state: 'enabled' });
+
+            // plugin-1 is disabled at directory level
+            directoryPluginRepository.findByDirectoryAndPlugin.mockImplementation(
+                async (dirId, pluginId) => {
+                    if (pluginId === 'plugin-1') {
+                        return { enabled: false, directoryId: dirId, pluginId } as any;
+                    }
+                    return { enabled: true, directoryId: dirId, pluginId } as any;
+                },
+            );
+
+            const result = await service.getDefaultForCapabilityScoped('search', 'dir-1');
+
+            expect(result?.plugin.id).toBe('plugin-2');
+        });
+
+        it('should check user level when directory level returns null', async () => {
+            const plugin = createMockPlugin('search-plugin');
+            const manifest: PluginManifest = {
+                ...createMockManifest('search-plugin'),
+                capabilities: ['search'],
+                autoEnable: true,
+            };
+            service.register(plugin, manifest, { state: 'enabled' });
+
+            // No directory-level config
+            directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue(null);
+            // User has it enabled
+            userPluginRepository.findByUserAndPlugin.mockResolvedValue({
+                enabled: true,
+                userId: 'user-1',
+                pluginId: 'search-plugin',
+            } as any);
+
+            const result = await service.getDefaultForCapabilityScoped('search', 'dir-1', 'user-1');
+
+            expect(result?.plugin.id).toBe('search-plugin');
+        });
+
+        it('should fall back to autoEnable when no scope config exists', async () => {
+            const plugin = createMockPlugin('search-plugin');
+            const manifest: PluginManifest = {
+                ...createMockManifest('search-plugin'),
+                capabilities: ['search'],
+                autoEnable: true,
+            };
+            service.register(plugin, manifest, { state: 'enabled' });
+
+            directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue(null);
+            userPluginRepository.findByUserAndPlugin.mockResolvedValue(null);
+
+            const result = await service.getDefaultForCapabilityScoped('search');
+
+            expect(result?.plugin.id).toBe('search-plugin');
+        });
+
+        it('should return undefined when plugin autoEnable is false and no config', async () => {
+            const plugin = createMockPlugin('search-plugin');
+            const manifest: PluginManifest = {
+                ...createMockManifest('search-plugin'),
+                capabilities: ['search'],
+                autoEnable: false,
+            };
+            service.register(plugin, manifest, { state: 'enabled' });
+
+            directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue(null);
+            userPluginRepository.findByUserAndPlugin.mockResolvedValue(null);
+
+            const result = await service.getDefaultForCapabilityScoped('search');
+
+            expect(result).toBeUndefined();
+        });
+
+        it('should prefer plugin with defaultForCapabilities when enabled', async () => {
+            const plugin1 = createMockPlugin('plugin-1');
+            const plugin2 = createMockPlugin('plugin-2');
+            const manifest1: PluginManifest = {
+                ...createMockManifest('plugin-1'),
+                capabilities: ['search'],
+            };
+            const manifest2: PluginManifest = {
+                ...createMockManifest('plugin-2'),
+                capabilities: ['search'],
+                defaultForCapabilities: ['search'],
+            };
+            service.register(plugin1, manifest1, { state: 'enabled' });
+            service.register(plugin2, manifest2, { state: 'enabled' });
+
+            // No directory-level config (returns null)
+            directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue(null);
+            userPluginRepository.findByUserAndPlugin.mockResolvedValue(null);
+
+            const result = await service.getDefaultForCapabilityScoped('search');
+
+            expect(result?.plugin.id).toBe('plugin-2');
+        });
+    });
+
+    describe('getEnabledPluginsScoped', () => {
+        it('should return all enabled plugins when no scope provided', async () => {
+            const plugin1 = createMockPlugin('plugin-1');
+            const plugin2 = createMockPlugin('plugin-2');
+            service.register(plugin1, createMockManifest('plugin-1'), { state: 'enabled' });
+            service.register(plugin2, createMockManifest('plugin-2'), { state: 'enabled' });
+
+            // With no scope IDs, falls back to autoEnable (defaults to true)
+            directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue(null);
+            userPluginRepository.findByUserAndPlugin.mockResolvedValue(null);
+
+            const result = await service.getEnabledPluginsScoped();
+
+            expect(result).toHaveLength(2);
+        });
+
+        it('should filter by capability when provided', async () => {
+            const plugin1 = createMockPlugin('plugin-1');
+            const plugin2 = createMockPlugin('plugin-2');
+            const manifest1 = { ...createMockManifest('plugin-1'), capabilities: ['cap-a'] };
+            const manifest2 = { ...createMockManifest('plugin-2'), capabilities: ['cap-b'] };
+            service.register(plugin1, manifest1 as PluginManifest, { state: 'enabled' });
+            service.register(plugin2, manifest2 as PluginManifest, { state: 'enabled' });
+
+            directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue(null);
+            userPluginRepository.findByUserAndPlugin.mockResolvedValue(null);
+
+            const result = await service.getEnabledPluginsScoped('cap-a');
+
+            expect(result).toHaveLength(1);
+            expect(result[0].plugin.id).toBe('plugin-1');
+        });
+
+        it('should exclude plugins disabled at directory level', async () => {
+            const plugin1 = createMockPlugin('plugin-1');
+            const plugin2 = createMockPlugin('plugin-2');
+            service.register(plugin1, createMockManifest('plugin-1'), { state: 'enabled' });
+            service.register(plugin2, createMockManifest('plugin-2'), { state: 'enabled' });
+
+            directoryPluginRepository.findByDirectoryAndPlugin.mockImplementation(
+                async (dirId, pluginId) => {
+                    if (pluginId === 'plugin-1') {
+                        return { enabled: false, directoryId: dirId, pluginId } as any;
+                    }
+                    return { enabled: true, directoryId: dirId, pluginId } as any;
+                },
+            );
+
+            const result = await service.getEnabledPluginsScoped(undefined, 'dir-1');
+
+            expect(result).toHaveLength(1);
+            expect(result[0].plugin.id).toBe('plugin-2');
+        });
+
+        it('should include plugins enabled at user level when directory is null', async () => {
+            const plugin = createMockPlugin('plugin-1');
+            service.register(plugin, createMockManifest('plugin-1'), { state: 'enabled' });
+
+            directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue(null);
+            userPluginRepository.findByUserAndPlugin.mockResolvedValue({
+                enabled: true,
+                userId: 'user-1',
+                pluginId: 'plugin-1',
+            } as any);
+
+            const result = await service.getEnabledPluginsScoped(undefined, 'dir-1', 'user-1');
+
+            expect(result).toHaveLength(1);
+        });
+
+        it('should exclude plugins disabled at user level when no directory config', async () => {
+            const plugin = createMockPlugin('plugin-1');
+            service.register(plugin, createMockManifest('plugin-1'), { state: 'enabled' });
+
+            directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue(null);
+            userPluginRepository.findByUserAndPlugin.mockResolvedValue({
+                enabled: false,
+                userId: 'user-1',
+                pluginId: 'plugin-1',
+            } as any);
+
+            const result = await service.getEnabledPluginsScoped(undefined, undefined, 'user-1');
+
+            expect(result).toHaveLength(0);
+        });
+
+        it('should not include plugins that are not enabled at registry level', async () => {
+            const plugin = createMockPlugin('plugin-1');
+            service.register(plugin, createMockManifest('plugin-1'), { state: 'loaded' }); // Not 'enabled'
+
+            directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue(null);
+            userPluginRepository.findByUserAndPlugin.mockResolvedValue(null);
+
+            const result = await service.getEnabledPluginsScoped();
+
+            expect(result).toHaveLength(0);
         });
     });
 });

@@ -306,11 +306,7 @@ export class AiFacadeService implements IAiFacade {
         const plugins = this.registry.getByCapability(this.CAPABILITY);
         for (const registered of plugins) {
             if (registered.state !== 'enabled') continue;
-            const isEnabled = await this.isPluginEnabled(
-                registered.plugin.id,
-                directoryId,
-                userId,
-            );
+            const isEnabled = await this.isPluginEnabled(registered.plugin.id, directoryId, userId);
             if (isEnabled) {
                 return registered.plugin as IAiProviderPlugin;
             }

@@ -4,7 +4,7 @@ import type {
 	StepExecutionContext,
 	PipelineMetrics,
 	MutableItemData,
-	ItemBadges,
+	ItemBadges
 } from '@ever-works/plugin';
 import { DomainType } from '@ever-works/plugin';
 import { BasePipelineStep } from '../base-pipeline-step.js';

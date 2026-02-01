@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import type {
     IPlugin,
@@ -9,6 +9,8 @@ import type {
     PluginStateTransition,
 } from '@ever-works/plugin';
 import { PluginEvents } from '../plugins.constants';
+import { DirectoryPluginRepository } from '../repositories/directory-plugin.repository';
+import { UserPluginRepository } from '../repositories/user-plugin.repository';
 
 /**
  * Registered plugin with metadata and runtime info
@@ -88,7 +90,11 @@ export class PluginRegistryService {
      */
     private readonly byCapability = new Map<string, Set<string>>();
 
-    constructor(private readonly eventEmitter: EventEmitter2) {}
+    constructor(
+        private readonly eventEmitter: EventEmitter2,
+        @Optional() private readonly directoryPluginRepository?: DirectoryPluginRepository,
+        @Optional() private readonly userPluginRepository?: UserPluginRepository,
+    ) {}
 
     /**
      * Register a plugin in the registry
@@ -394,5 +400,134 @@ export class PluginRegistryService {
         this.byCategory.clear();
         this.byCapability.clear();
         this.logger.warn('Registry cleared');
+    }
+
+    /**
+     * Get the default plugin for a capability with scope resolution.
+     *
+     * Resolution priority:
+     * 1. Directory activeCapability setting (if directoryId provided)
+     * 2. User preference (if userId provided)
+     * 3. Manifest defaultForCapabilities
+     *
+     * Also checks that the plugin is enabled at the appropriate scope level.
+     */
+    async getDefaultForCapabilityScoped(
+        capability: string,
+        directoryId?: string,
+        userId?: string,
+    ): Promise<RegisteredPlugin | undefined> {
+        const plugins = this.getByCapability(capability);
+        const enabledPlugins = plugins.filter((p) => p.state === 'enabled');
+
+        // Check directory-level activeCapability first
+        if (directoryId && this.directoryPluginRepository) {
+            for (const registered of enabledPlugins) {
+                try {
+                    const dp = await this.directoryPluginRepository.findByDirectoryAndPlugin(
+                        directoryId,
+                        registered.plugin.id,
+                    );
+                    if (dp?.activeCapability === capability && dp.enabled) {
+                        return registered;
+                    }
+                } catch {
+                    // Continue checking
+                }
+            }
+        }
+
+        // Check if any plugin passes the enable check and is marked as default
+        for (const registered of enabledPlugins) {
+            const isEnabled = await this.isPluginEnabledForScope(
+                registered.plugin.id,
+                directoryId,
+                userId,
+            );
+            if (isEnabled && registered.manifest.defaultForCapabilities?.includes(capability)) {
+                return registered;
+            }
+        }
+
+        // Return first enabled plugin that passes scope check
+        for (const registered of enabledPlugins) {
+            const isEnabled = await this.isPluginEnabledForScope(
+                registered.plugin.id,
+                directoryId,
+                userId,
+            );
+            if (isEnabled) {
+                return registered;
+            }
+        }
+
+        return undefined;
+    }
+
+    /**
+     * Get all enabled plugins with scope filtering.
+     *
+     * Only returns plugins that are enabled at the directory/user level.
+     */
+    async getEnabledPluginsScoped(
+        capability?: string,
+        directoryId?: string,
+        userId?: string,
+    ): Promise<RegisteredPlugin[]> {
+        const plugins = capability ? this.getByCapability(capability) : this.getEnabled();
+        const result: RegisteredPlugin[] = [];
+
+        for (const registered of plugins) {
+            if (registered.state !== 'enabled') continue;
+
+            const isEnabled = await this.isPluginEnabledForScope(
+                registered.plugin.id,
+                directoryId,
+                userId,
+            );
+            if (isEnabled) {
+                result.push(registered);
+            }
+        }
+
+        return result;
+    }
+
+    /**
+     * Check if a plugin is enabled for the given scope.
+     *
+     * Enable resolution: Directory (L2) > User (L1) > autoEnable
+     */
+    private async isPluginEnabledForScope(
+        pluginId: string,
+        directoryId?: string,
+        userId?: string,
+    ): Promise<boolean> {
+        // Level 2: Directory-level enable state
+        if (directoryId && this.directoryPluginRepository) {
+            try {
+                const dp = await this.directoryPluginRepository.findByDirectoryAndPlugin(
+                    directoryId,
+                    pluginId,
+                );
+                if (dp !== null) return dp.enabled;
+            } catch {
+                // Continue to next level
+            }
+        }
+
+        // Level 1: User-level enable state
+        if (userId && this.userPluginRepository) {
+            try {
+                const up = await this.userPluginRepository.findByUserAndPlugin(userId, pluginId);
+                if (up !== null) return up.enabled;
+            } catch {
+                // Continue to fallback
+            }
+        }
+
+        // Fallback: autoEnable from manifest
+        const registered = this.plugins.get(pluginId);
+        return registered?.manifest?.autoEnable ?? true;
     }
 }

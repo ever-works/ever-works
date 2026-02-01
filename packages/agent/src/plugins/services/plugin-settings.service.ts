@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import type {
     PluginSettings,
@@ -440,21 +440,43 @@ export class PluginSettingsService {
     }
 
     /**
-     * Validate settings against a plugin's schema
+     * Validate settings against a plugin's schema.
+     * Optionally validates scope constraints when a scope is provided.
      */
     async validateSettings(
         pluginId: string,
         settings: Record<string, unknown>,
+        options?: { scope?: SettingScope },
     ): Promise<{ valid: boolean; errors?: string[] }> {
         const registered = this.registry.get(pluginId);
         if (!registered) {
             return { valid: false, errors: [`Plugin "${pluginId}" not found`] };
         }
 
+        const errors: string[] = [];
+
+        // Validate scope constraints if scope is provided
+        if (options?.scope) {
+            const definitions = this.extractSettingDefinitions(registered.plugin.settingsSchema);
+            const scopeValidation = this.validateSettingsScope(
+                definitions,
+                Object.keys(settings),
+                options.scope,
+            );
+            if (!scopeValidation.valid) {
+                errors.push(...scopeValidation.violations);
+            }
+        }
+
+        // Validate settings against schema
         const result = await registered.plugin.validateSettings(settings);
+        if (!result.valid && result.errors) {
+            errors.push(...result.errors.map((e) => e.message));
+        }
+
         return {
-            valid: result.valid,
-            errors: result.errors?.map((e) => e.message),
+            valid: errors.length === 0,
+            errors: errors.length > 0 ? errors : undefined,
         };
     }
 
@@ -528,6 +550,24 @@ export class PluginSettingsService {
             source: 'default',
             isFallback: true,
         };
+    }
+
+    /**
+     * Validate that the scope has the required ID parameter.
+     * Throws BadRequestException if scope requires an ID that is missing.
+     *
+     * @param scope - The scope being requested
+     * @param directoryId - Directory ID (required when scope='directory')
+     * @param userId - User ID (required when scope='user')
+     * @throws BadRequestException if scope/ID mismatch
+     */
+    validateScopeRequirements(scope: SettingScope, directoryId?: string, userId?: string): void {
+        if (scope === 'directory' && !directoryId) {
+            throw new BadRequestException('directoryId required for directory scope');
+        }
+        if (scope === 'user' && !userId) {
+            throw new BadRequestException('userId required for user scope');
+        }
     }
 
     /**
@@ -658,5 +698,61 @@ export class PluginSettingsService {
         }
 
         return false;
+    }
+
+    /**
+     * Get the settings schema filtered by scope context.
+     *
+     * This method filters the plugin's settings schema to only include
+     * properties that are appropriate for the given context:
+     * - 'user' context: shows global + user scoped settings
+     * - 'directory' context: shows global + directory scoped settings
+     *
+     * @param pluginId - Plugin ID
+     * @param context - 'user' shows global+user, 'directory' shows global+directory
+     * @returns Filtered schema or undefined if plugin not found
+     */
+    getSettingsSchemaForContext(
+        pluginId: string,
+        context: 'user' | 'directory',
+    ): JsonSchema | undefined {
+        const schema = this.getSettingsSchema(pluginId);
+        if (!schema?.properties) return schema;
+
+        const allowedScopes: SettingScope[] =
+            context === 'user' ? ['global', 'user'] : ['global', 'directory'];
+
+        const filteredProperties: Record<string, JsonSchema> = {};
+
+        for (const [key, prop] of Object.entries(schema.properties)) {
+            const propWithScope = prop as JsonSchema & { 'x-scope'?: SettingScope };
+            const propScope = propWithScope['x-scope'] || 'global';
+            if (allowedScopes.includes(propScope)) {
+                filteredProperties[key] = prop;
+            }
+        }
+
+        return {
+            ...schema,
+            properties: filteredProperties,
+            required: (schema.required || []).filter((r) => r in filteredProperties),
+        };
+    }
+
+    /**
+     * Validate that event emission data has correct scope/ID pairing.
+     * This is a defense-in-depth check to catch programming errors.
+     */
+    private validateEventScopeData(
+        scope: SettingScope,
+        userId?: string,
+        directoryId?: string,
+    ): void {
+        if (scope === 'user' && !userId) {
+            this.logger.warn('Settings changed event for user scope missing userId');
+        }
+        if (scope === 'directory' && !directoryId) {
+            this.logger.warn('Settings changed event for directory scope missing directoryId');
+        }
     }
 }

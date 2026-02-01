@@ -280,16 +280,25 @@ export class PluginContextFactoryService {
     }
 
     /**
-     * Create PluginServices for a plugin
+     * Create PluginServices for a plugin.
+     *
+     * Note: scopeOptions contains userId/directoryId that are used for settings
+     * resolution in getSettings/getResolvedSettings methods. The service refs
+     * (directory, user) require actual service implementations to be injected
+     * by the consuming module if plugins need to access directory/user data.
+     *
+     * For settings resolution, the scope context is passed via scopeOptions and
+     * used in buildSettingsOptions() when getSettings() is called.
      */
-    private createServices(scopeOptions?: {
+    private createServices(_scopeOptions?: {
         userId?: string;
         directoryId?: string;
     }): PluginServices {
-        // Basic service stubs - these can be enhanced with actual implementations
+        // Service refs need actual implementations - can be populated by consuming module
+        // if plugins need access to directory/user data beyond settings
         return {
-            directory: undefined, // Can be populated by the module if needed
-            user: undefined, // Can be populated by the module if needed
+            directory: undefined,
+            user: undefined,
         };
     }
 

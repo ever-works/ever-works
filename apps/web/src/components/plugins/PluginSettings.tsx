@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState, useTransition, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { UserPlugin } from '@/lib/api/plugins';
+import { UserPlugin, PluginSettingsSchemaProperty } from '@/lib/api/plugins';
 import { cn } from '@/lib/utils/cn';
 import { Button } from '@/components/ui/button';
 import { Power, PowerOff, Save, ArrowLeft, ExternalLink, Check } from 'lucide-react';
@@ -28,7 +28,22 @@ export function PluginSettings({ plugin }: PluginSettingsProps) {
     const [saveSuccess, setSaveSuccess] = useState(false);
 
     const schema = plugin.settingsSchema;
-    const hasSettings = schema && Object.keys(schema.properties || {}).length > 0;
+
+    // Filter properties to show only 'global' or 'user' scoped settings
+    // Directory-scoped settings should only be shown in directory context
+    const userScopeProperties = useMemo(() => {
+        if (!schema?.properties) return {};
+        return Object.fromEntries(
+            Object.entries(schema.properties).filter(([_, propSchema]) => {
+                const prop = propSchema as PluginSettingsSchemaProperty;
+                const scope = prop.scope || 'global';
+                // Show global and user-scoped settings in user settings page
+                return scope === 'global' || scope === 'user';
+            }),
+        );
+    }, [schema]);
+
+    const hasSettings = Object.keys(userScopeProperties).length > 0;
 
     const handleToggle = async () => {
         startTransition(async () => {
@@ -190,13 +205,13 @@ export function PluginSettings({ plugin }: PluginSettingsProps) {
                     </h3>
 
                     <div className="space-y-4">
-                        {Object.entries(schema.properties).map(([key, propSchema]) => (
+                        {Object.entries(userScopeProperties).map(([key, propSchema]) => (
                             <PluginSettingsField
                                 key={key}
                                 name={key}
                                 schema={propSchema}
                                 value={settings[key]}
-                                required={schema.required?.includes(key)}
+                                required={schema?.required?.includes(key)}
                                 onChange={(value) =>
                                     handleFieldChange(key, value, propSchema.secret || false)
                                 }

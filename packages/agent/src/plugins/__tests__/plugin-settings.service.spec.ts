@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { Logger } from '@nestjs/common';
+import { Logger, BadRequestException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PluginSettingsService } from '../services/plugin-settings.service';
 import { PluginRegistryService, RegisteredPlugin } from '../services/plugin-registry.service';
@@ -1017,6 +1017,165 @@ describe('PluginSettingsService', () => {
                     requiresRestart: false,
                 }),
             );
+        });
+    });
+
+    describe('getSettingsSchemaForContext', () => {
+        it('should filter properties for user context', () => {
+            // Default schema has: apiKey (global), enabled (global), maxItems (directory), theme (user)
+            const result = service.getSettingsSchemaForContext('test-plugin', 'user');
+
+            expect(result).toBeDefined();
+            expect(result?.properties).toBeDefined();
+            expect('apiKey' in result!.properties!).toBe(true); // global
+            expect('enabled' in result!.properties!).toBe(true); // global
+            expect('theme' in result!.properties!).toBe(true); // user
+            expect('maxItems' in result!.properties!).toBe(false); // directory - should be filtered out
+        });
+
+        it('should filter properties for directory context', () => {
+            const result = service.getSettingsSchemaForContext('test-plugin', 'directory');
+
+            expect(result).toBeDefined();
+            expect(result?.properties).toBeDefined();
+            expect('apiKey' in result!.properties!).toBe(true); // global
+            expect('enabled' in result!.properties!).toBe(true); // global
+            expect('maxItems' in result!.properties!).toBe(true); // directory
+            expect('theme' in result!.properties!).toBe(false); // user - should be filtered out
+        });
+
+        it('should return undefined for non-existent plugin', () => {
+            jest.spyOn(registry, 'get').mockReturnValue(undefined);
+
+            const result = service.getSettingsSchemaForContext('non-existent', 'user');
+
+            expect(result).toBeUndefined();
+        });
+
+        it('should filter required array to only included properties', () => {
+            const schema: JsonSchema = {
+                type: 'object',
+                properties: {
+                    globalSetting: {
+                        type: 'string',
+                    },
+                    directorySetting: {
+                        type: 'string',
+                        'x-scope': 'directory',
+                    },
+                },
+                required: ['globalSetting', 'directorySetting'],
+            } as unknown as JsonSchema;
+
+            const plugin = createMockPlugin(schema);
+            jest.spyOn(registry, 'get').mockReturnValue(createRegisteredPlugin(plugin));
+
+            const result = service.getSettingsSchemaForContext('test-plugin', 'user');
+
+            expect(result?.required).toEqual(['globalSetting']);
+            expect(result?.required).not.toContain('directorySetting');
+        });
+
+        it('should return schema unchanged if no properties', () => {
+            const schema: JsonSchema = {
+                type: 'object',
+            } as unknown as JsonSchema;
+
+            const plugin = createMockPlugin(schema);
+            jest.spyOn(registry, 'get').mockReturnValue(createRegisteredPlugin(plugin));
+
+            const result = service.getSettingsSchemaForContext('test-plugin', 'user');
+
+            expect(result).toEqual(schema);
+        });
+    });
+
+    describe('validateScopeRequirements', () => {
+        it('should throw BadRequestException for directory scope without directoryId', () => {
+            expect(() => {
+                service.validateScopeRequirements('directory', undefined, 'user-1');
+            }).toThrow(BadRequestException);
+            expect(() => {
+                service.validateScopeRequirements('directory', undefined, 'user-1');
+            }).toThrow('directoryId required for directory scope');
+        });
+
+        it('should throw BadRequestException for user scope without userId', () => {
+            expect(() => {
+                service.validateScopeRequirements('user', 'dir-1', undefined);
+            }).toThrow(BadRequestException);
+            expect(() => {
+                service.validateScopeRequirements('user', 'dir-1', undefined);
+            }).toThrow('userId required for user scope');
+        });
+
+        it('should not throw for directory scope with directoryId', () => {
+            expect(() => {
+                service.validateScopeRequirements('directory', 'dir-1', undefined);
+            }).not.toThrow();
+        });
+
+        it('should not throw for user scope with userId', () => {
+            expect(() => {
+                service.validateScopeRequirements('user', undefined, 'user-1');
+            }).not.toThrow();
+        });
+
+        it('should not throw for global scope without any IDs', () => {
+            expect(() => {
+                service.validateScopeRequirements('global', undefined, undefined);
+            }).not.toThrow();
+        });
+    });
+
+    describe('validateSettings with scope option', () => {
+        it('should validate scope when scope option is provided', async () => {
+            const result = await service.validateSettings(
+                'test-plugin',
+                { maxItems: 50 }, // directory-scoped setting
+                { scope: 'global' }, // trying to set at global scope
+            );
+
+            expect(result.valid).toBe(false);
+            expect(result.errors).toContain(
+                'Setting "maxItems" has scope "directory" and cannot be updated at "global" level',
+            );
+        });
+
+        it('should pass validation when scope matches', async () => {
+            const result = await service.validateSettings(
+                'test-plugin',
+                { maxItems: 50 },
+                { scope: 'directory' },
+            );
+
+            expect(result.valid).toBe(true);
+        });
+
+        it('should validate both scope and schema', async () => {
+            const plugin = createMockPlugin();
+            (plugin.validateSettings as jest.Mock).mockResolvedValue({
+                valid: false,
+                errors: [{ path: 'maxItems', message: 'Must be a number' }],
+            });
+            jest.spyOn(registry, 'get').mockReturnValue(createRegisteredPlugin(plugin));
+
+            const result = await service.validateSettings(
+                'test-plugin',
+                { maxItems: 'not-a-number' },
+                { scope: 'global' },
+            );
+
+            expect(result.valid).toBe(false);
+            // Should have both scope violation and schema validation error
+            expect(result.errors).toHaveLength(2);
+        });
+
+        it('should skip scope validation when no scope option provided', async () => {
+            const result = await service.validateSettings('test-plugin', { maxItems: 50 });
+
+            // Without scope option, only schema validation runs
+            expect(result.valid).toBe(true);
         });
     });
 });

@@ -1724,6 +1724,8 @@
             "showSettings": "Show Settings",
             "hideSettings": "Hide Settings",
             "directorySettingsInfo": "Configure directory-specific settings here",
+            "save": "Save",
+            "saved": "Saved",
             "showInstalledOnly": "Show installed only",
             "noInstalledPlugins": "No plugins are installed. Visit Plugins settings to install plugins.",
             "noPlugins": "No plugins available",

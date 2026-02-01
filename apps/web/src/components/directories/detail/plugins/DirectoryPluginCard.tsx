@@ -1,14 +1,19 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState, useTransition, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { DirectoryPlugin } from '@/lib/api/plugins';
+import { DirectoryPlugin, PluginSettingsSchemaProperty } from '@/lib/api/plugins';
 import { cn } from '@/lib/utils/cn';
 import { Button } from '@/components/ui/button';
-import { Power, PowerOff, Settings } from 'lucide-react';
-import { enableDirectoryPlugin, disableDirectoryPlugin } from '@/app/actions/plugins';
+import { Power, PowerOff, Settings, Save, Check } from 'lucide-react';
+import {
+    enableDirectoryPlugin,
+    disableDirectoryPlugin,
+    updateDirectoryPluginSettings,
+} from '@/app/actions/plugins';
 import { PluginIcon } from '@/components/plugins/PluginIcon';
+import { PluginSettingsField } from '@/components/plugins/PluginSettingsField';
 
 interface DirectoryPluginCardProps {
     directoryId: string;
@@ -20,10 +25,33 @@ export function DirectoryPluginCard({ directoryId, plugin }: DirectoryPluginCard
     const router = useRouter();
     const [isPending, startTransition] = useTransition();
     const [showSettings, setShowSettings] = useState(false);
+    const [settings, setSettings] = useState<Record<string, unknown>>(
+        plugin.directorySettings || {},
+    );
+    const [secretSettings, setSecretSettings] = useState<Record<string, unknown>>({});
+    const [hasChanges, setHasChanges] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
+    const [saveSuccess, setSaveSuccess] = useState(false);
 
     // Plugin must be enabled at user level to be enabled at directory level
     const canEnable = plugin.installed && plugin.enabled;
     const isEnabled = plugin.directoryEnabled;
+
+    // Filter properties to show only 'global' or 'directory' scoped settings
+    // User-scoped settings should only be shown in user settings context
+    const directoryScopeProperties = useMemo(() => {
+        if (!plugin.settingsSchema?.properties) return {};
+        return Object.fromEntries(
+            Object.entries(plugin.settingsSchema.properties).filter(([_, propSchema]) => {
+                const prop = propSchema as PluginSettingsSchemaProperty;
+                const scope = prop.scope || 'global';
+                // Show global and directory-scoped settings in directory settings
+                return scope === 'global' || scope === 'directory';
+            }),
+        );
+    }, [plugin.settingsSchema]);
+
+    const hasDirectorySettings = Object.keys(directoryScopeProperties).length > 0;
 
     const handleToggle = async () => {
         if (!canEnable && !isEnabled) {
@@ -42,6 +70,35 @@ export function DirectoryPluginCard({ directoryId, plugin }: DirectoryPluginCard
                 console.error('Failed to toggle directory plugin:', error);
             }
         });
+    };
+
+    const handleFieldChange = (key: string, value: unknown, isSecret: boolean) => {
+        if (isSecret) {
+            setSecretSettings((prev) => ({ ...prev, [key]: value }));
+        } else {
+            setSettings((prev) => ({ ...prev, [key]: value }));
+        }
+        setHasChanges(true);
+        setSaveSuccess(false);
+    };
+
+    const handleSaveSettings = async () => {
+        setIsSaving(true);
+        try {
+            await updateDirectoryPluginSettings(directoryId, plugin.pluginId, {
+                settings: Object.keys(settings).length > 0 ? settings : undefined,
+                secretSettings: Object.keys(secretSettings).length > 0 ? secretSettings : undefined,
+            });
+            setHasChanges(false);
+            setSaveSuccess(true);
+            router.refresh();
+            // Clear success message after 3 seconds
+            setTimeout(() => setSaveSuccess(false), 3000);
+        } catch (error) {
+            console.error('Failed to save directory settings:', error);
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     const categoryLabels: Record<string, string> = {
@@ -147,7 +204,7 @@ export function DirectoryPluginCard({ directoryId, plugin }: DirectoryPluginCard
                 )}
             </div>
 
-            {isEnabled && plugin.settingsSchema && (
+            {isEnabled && hasDirectorySettings && (
                 <div className="mt-3 pt-3 border-t border-border dark:border-border-dark">
                     <button
                         onClick={() => setShowSettings(!showSettings)}
@@ -158,9 +215,36 @@ export function DirectoryPluginCard({ directoryId, plugin }: DirectoryPluginCard
                     </button>
 
                     {showSettings && (
-                        <div className="mt-3 text-sm text-text-muted dark:text-text-muted-dark">
-                            {/* Directory-specific settings could be rendered here */}
-                            <p>{t('directorySettingsInfo')}</p>
+                        <div className="mt-3 space-y-3">
+                            {Object.entries(directoryScopeProperties).map(([key, propSchema]) => (
+                                <PluginSettingsField
+                                    key={key}
+                                    name={key}
+                                    schema={propSchema}
+                                    value={settings[key]}
+                                    required={plugin.settingsSchema?.required?.includes(key)}
+                                    onChange={(value) =>
+                                        handleFieldChange(key, value, propSchema.secret || false)
+                                    }
+                                />
+                            ))}
+                            <div className="flex items-center gap-2 pt-2">
+                                <Button
+                                    size="sm"
+                                    onClick={handleSaveSettings}
+                                    disabled={!hasChanges || isSaving}
+                                    loading={isSaving}
+                                >
+                                    <Save className="w-3 h-3 mr-1" />
+                                    {t('save')}
+                                </Button>
+                                {saveSuccess && (
+                                    <span className="inline-flex items-center gap-1 text-sm text-success">
+                                        <Check className="w-4 h-4" />
+                                        {t('saved')}
+                                    </span>
+                                )}
+                            </div>
                         </div>
                     )}
                 </div>
