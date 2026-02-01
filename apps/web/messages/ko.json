@@ -220,6 +220,28 @@
             "notifications": {
                 "title": "알림",
                 "empty": "새 알림 없음"
+            },
+            "help": {
+                "title": "도움말 및 리소스",
+                "subtitle": "빠른 팁과 유용한 링크",
+                "quickTips": {
+                    "title": "빠른 팁",
+                    "tip1": "AI 채팅을 사용하여 자연어로 디렉토리 생성",
+                    "tip2": "기존 awesome 목록이나 데이터 저장소 가져오기",
+                    "tip3": "설정에서 디렉토리 모양 사용자 지정"
+                },
+                "shortcuts": {
+                    "title": "키보드 단축키",
+                    "search": "검색",
+                    "newDirectory": "새 디렉토리",
+                    "help": "도움말",
+                    "hint": "?를 누르면 모든 단축키 표시"
+                },
+                "links": {
+                    "title": "유용한 링크",
+                    "docs": "문서"
+                },
+                "version": "버전 {version}"
             }
         },
         "directories": {

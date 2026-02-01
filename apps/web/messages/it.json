@@ -220,6 +220,28 @@
             "notifications": {
                 "title": "Notifiche",
                 "empty": "Nessuna nuova notifica"
+            },
+            "help": {
+                "title": "Aiuto e risorse",
+                "subtitle": "Suggerimenti rapidi e link utili",
+                "quickTips": {
+                    "title": "Suggerimenti rapidi",
+                    "tip1": "Usa la chat AI per creare directory con linguaggio naturale",
+                    "tip2": "Importa liste awesome o repository di dati esistenti",
+                    "tip3": "Personalizza l'aspetto della tua directory nelle impostazioni"
+                },
+                "shortcuts": {
+                    "title": "Scorciatoie da tastiera",
+                    "search": "Cerca",
+                    "newDirectory": "Nuova directory",
+                    "help": "Aiuto",
+                    "hint": "Premi ? ovunque per vedere tutte le scorciatoie"
+                },
+                "links": {
+                    "title": "Link utili",
+                    "docs": "Documentazione"
+                },
+                "version": "Versione {version}"
             }
         },
         "directories": {

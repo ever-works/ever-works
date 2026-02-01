@@ -220,6 +220,28 @@
             "notifications": {
                 "title": "通知",
                 "empty": "新しい通知はありません"
+            },
+            "help": {
+                "title": "ヘルプとリソース",
+                "subtitle": "クイックヒントと便利なリンク",
+                "quickTips": {
+                    "title": "クイックヒント",
+                    "tip1": "AIチャットを使用して自然言語でディレクトリを作成",
+                    "tip2": "既存のawesomeリストやデータリポジトリをインポート",
+                    "tip3": "設定でディレクトリの外観をカスタマイズ"
+                },
+                "shortcuts": {
+                    "title": "キーボードショートカット",
+                    "search": "検索",
+                    "newDirectory": "新規ディレクトリ",
+                    "help": "ヘルプ",
+                    "hint": "?を押すとすべてのショートカットを表示"
+                },
+                "links": {
+                    "title": "便利なリンク",
+                    "docs": "ドキュメント"
+                },
+                "version": "バージョン {version}"
             }
         },
         "directories": {

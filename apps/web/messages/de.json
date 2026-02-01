@@ -220,6 +220,28 @@
             "notifications": {
                 "title": "Benachrichtigungen",
                 "empty": "Keine neuen Benachrichtigungen"
+            },
+            "help": {
+                "title": "Hilfe & Ressourcen",
+                "subtitle": "Schnelle Tipps und nützliche Links",
+                "quickTips": {
+                    "title": "Schnelle Tipps",
+                    "tip1": "Nutzen Sie den KI-Chat, um Verzeichnisse mit natürlicher Sprache zu erstellen",
+                    "tip2": "Importieren Sie bestehende Awesome-Listen oder Daten-Repositories",
+                    "tip3": "Passen Sie das Erscheinungsbild Ihres Verzeichnisses in den Einstellungen an"
+                },
+                "shortcuts": {
+                    "title": "Tastaturkürzel",
+                    "search": "Suchen",
+                    "newDirectory": "Neues Verzeichnis",
+                    "help": "Hilfe",
+                    "hint": "Drücken Sie ? überall, um alle Kürzel zu sehen"
+                },
+                "links": {
+                    "title": "Nützliche Links",
+                    "docs": "Dokumentation"
+                },
+                "version": "Version {version}"
             }
         },
         "directories": {

@@ -220,6 +220,28 @@
             "notifications": {
                 "title": "Notifications",
                 "empty": "Aucune nouvelle notification"
+            },
+            "help": {
+                "title": "Aide et ressources",
+                "subtitle": "Conseils rapides et liens utiles",
+                "quickTips": {
+                    "title": "Conseils rapides",
+                    "tip1": "Utilisez le chat IA pour créer des répertoires en langage naturel",
+                    "tip2": "Importez des listes awesome ou des dépôts de données existants",
+                    "tip3": "Personnalisez l'apparence de votre répertoire dans les paramètres"
+                },
+                "shortcuts": {
+                    "title": "Raccourcis clavier",
+                    "search": "Rechercher",
+                    "newDirectory": "Nouveau répertoire",
+                    "help": "Aide",
+                    "hint": "Appuyez sur ? n'importe où pour voir tous les raccourcis"
+                },
+                "links": {
+                    "title": "Liens utiles",
+                    "docs": "Documentation"
+                },
+                "version": "Version {version}"
             }
         },
         "directories": {

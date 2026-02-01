@@ -220,6 +220,28 @@
             "notifications": {
                 "title": "Powiadomienia",
                 "empty": "Brak nowych powiadomień"
+            },
+            "help": {
+                "title": "Pomoc i zasoby",
+                "subtitle": "Szybkie wskazówki i przydatne linki",
+                "quickTips": {
+                    "title": "Szybkie wskazówki",
+                    "tip1": "Użyj czatu AI do tworzenia katalogów w języku naturalnym",
+                    "tip2": "Importuj istniejące listy awesome lub repozytoria danych",
+                    "tip3": "Dostosuj wygląd katalogu w ustawieniach"
+                },
+                "shortcuts": {
+                    "title": "Skróty klawiaturowe",
+                    "search": "Szukaj",
+                    "newDirectory": "Nowy katalog",
+                    "help": "Pomoc",
+                    "hint": "Naciśnij ? gdziekolwiek, aby zobaczyć wszystkie skróty"
+                },
+                "links": {
+                    "title": "Przydatne linki",
+                    "docs": "Dokumentacja"
+                },
+                "version": "Wersja {version}"
             }
         },
         "directories": {

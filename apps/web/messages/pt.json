@@ -220,6 +220,28 @@
             "notifications": {
                 "title": "Notificações",
                 "empty": "Nenhuma notificação nova"
+            },
+            "help": {
+                "title": "Ajuda e Recursos",
+                "subtitle": "Dicas rápidas e links úteis",
+                "quickTips": {
+                    "title": "Dicas Rápidas",
+                    "tip1": "Use o chat de IA para criar diretórios com linguagem natural",
+                    "tip2": "Importe listas awesome ou repositórios de dados existentes",
+                    "tip3": "Personalize a aparência do seu diretório nas configurações"
+                },
+                "shortcuts": {
+                    "title": "Atalhos de Teclado",
+                    "search": "Pesquisar",
+                    "newDirectory": "Novo diretório",
+                    "help": "Ajuda",
+                    "hint": "Pressione ? em qualquer lugar para ver todos os atalhos"
+                },
+                "links": {
+                    "title": "Links Úteis",
+                    "docs": "Documentação"
+                },
+                "version": "Versão {version}"
             }
         },
         "directories": {

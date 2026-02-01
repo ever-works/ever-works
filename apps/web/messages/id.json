@@ -220,6 +220,28 @@
             "notifications": {
                 "title": "Notifikasi",
                 "empty": "Tidak ada notifikasi baru"
+            },
+            "help": {
+                "title": "Bantuan & Sumber Daya",
+                "subtitle": "Tips cepat dan tautan berguna",
+                "quickTips": {
+                    "title": "Tips Cepat",
+                    "tip1": "Gunakan chat AI untuk membuat direktori dengan bahasa alami",
+                    "tip2": "Impor daftar awesome atau repositori data yang ada",
+                    "tip3": "Sesuaikan tampilan direktori Anda di pengaturan"
+                },
+                "shortcuts": {
+                    "title": "Pintasan Keyboard",
+                    "search": "Cari",
+                    "newDirectory": "Direktori Baru",
+                    "help": "Bantuan",
+                    "hint": "Tekan ? di mana saja untuk melihat semua pintasan"
+                },
+                "links": {
+                    "title": "Tautan Berguna",
+                    "docs": "Dokumentasi"
+                },
+                "version": "Versi {version}"
             }
         },
         "directories": {

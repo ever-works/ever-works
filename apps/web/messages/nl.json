@@ -220,6 +220,28 @@
             "notifications": {
                 "title": "Meldingen",
                 "empty": "Geen nieuwe meldingen"
+            },
+            "help": {
+                "title": "Help & Bronnen",
+                "subtitle": "Snelle tips en handige links",
+                "quickTips": {
+                    "title": "Snelle Tips",
+                    "tip1": "Gebruik de AI-chat om mappen te maken met natuurlijke taal",
+                    "tip2": "Importeer bestaande awesome-lijsten of data repositories",
+                    "tip3": "Pas het uiterlijk van je map aan in de instellingen"
+                },
+                "shortcuts": {
+                    "title": "Sneltoetsen",
+                    "search": "Zoeken",
+                    "newDirectory": "Nieuwe map",
+                    "help": "Help",
+                    "hint": "Druk overal op ? om alle sneltoetsen te zien"
+                },
+                "links": {
+                    "title": "Handige Links",
+                    "docs": "Documentatie"
+                },
+                "version": "Versie {version}"
             }
         },
         "directories": {

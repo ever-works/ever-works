@@ -220,6 +220,28 @@
             "notifications": {
                 "title": "Bildirimler",
                 "empty": "Yeni bildirim yok"
+            },
+            "help": {
+                "title": "Yardım ve Kaynaklar",
+                "subtitle": "Hızlı ipuçları ve faydalı bağlantılar",
+                "quickTips": {
+                    "title": "Hızlı İpuçları",
+                    "tip1": "Doğal dille dizin oluşturmak için AI sohbetini kullanın",
+                    "tip2": "Mevcut awesome listelerini veya veri depolarını içe aktarın",
+                    "tip3": "Dizininizin görünümünü ayarlardan özelleştirin"
+                },
+                "shortcuts": {
+                    "title": "Klavye Kısayolları",
+                    "search": "Ara",
+                    "newDirectory": "Yeni Dizin",
+                    "help": "Yardım",
+                    "hint": "Tüm kısayolları görmek için herhangi bir yerde ? tuşuna basın"
+                },
+                "links": {
+                    "title": "Faydalı Bağlantılar",
+                    "docs": "Dokümantasyon"
+                },
+                "version": "Sürüm {version}"
             }
         },
         "directories": {

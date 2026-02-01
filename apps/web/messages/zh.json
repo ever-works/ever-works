@@ -220,6 +220,28 @@
             "notifications": {
                 "title": "通知",
                 "empty": "没有新通知"
+            },
+            "help": {
+                "title": "帮助与资源",
+                "subtitle": "快速提示和有用链接",
+                "quickTips": {
+                    "title": "快速提示",
+                    "tip1": "使用AI聊天以自然语言创建目录",
+                    "tip2": "导入现有的awesome列表或数据仓库",
+                    "tip3": "在设置中自定义目录外观"
+                },
+                "shortcuts": {
+                    "title": "键盘快捷键",
+                    "search": "搜索",
+                    "newDirectory": "新建目录",
+                    "help": "帮助",
+                    "hint": "按?键查看所有快捷键"
+                },
+                "links": {
+                    "title": "有用链接",
+                    "docs": "文档"
+                },
+                "version": "版本 {version}"
             }
         },
         "directories": {
