@@ -147,7 +147,7 @@ export function ChatInterface() {
         try {
             await streamMessage(endpoint, { message: trimmed });
         } catch (error) {
-            const message = error instanceof Error ? error.message : 'Unable to send message.';
+            const message = error instanceof Error ? error.message : t('errors.unableToSend');
             setErrorMessage(message);
             updatePendingMessage((current) => ({
                 ...current,

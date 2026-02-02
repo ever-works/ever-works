@@ -220,6 +220,31 @@
             "notifications": {
                 "title": "התראות",
                 "empty": "אין התראות חדשות"
+            },
+            "help": {
+                "title": "עזרה ומשאבים",
+                "subtitle": "טיפים מהירים וקישורים שימושיים",
+                "quickTips": {
+                    "title": "טיפים מהירים",
+                    "tip1": "השתמש בצ'אט הבינה המלאכותית ליצירת ספריות בשפה טבעית",
+                    "tip2": "יבא רשימות awesome או מאגרי נתונים קיימים",
+                    "tip3": "התאם אישית את מראה הספרייה שלך בהגדרות"
+                },
+                "shortcuts": {
+                    "title": "קיצורי מקלדת",
+                    "search": "חיפוש",
+                    "newDirectory": "ספרייה חדשה",
+                    "help": "עזרה",
+                    "hint": "לחץ ? בכל מקום לראות את כל הקיצורים"
+                },
+                "links": {
+                    "title": "קישורים שימושיים",
+                    "github": "מאגר GitHub",
+                    "issues": "דווח על בעיה",
+                    "docs": "תיעוד",
+                    "comingSoon": "בקרוב"
+                },
+                "version": "גרסה {version}"
             }
         },
         "directories": {
@@ -328,13 +353,16 @@
                     "actions": {
                         "connect": "חבר",
                         "disconnect": "נתק",
-                        "confirmDisconnect": "האם אתה בטוח שברצונך לנתק את חשבון ה-GitHub שלך?"
+                        "confirmDisconnect": "האם אתה בטוח שברצונך לנתק את חשבון ה-GitHub שלך?",
+                        "reconnect": "חיבור מחדש"
                     },
                     "messages": {
                         "disconnected": "חשבון GitHub נותק",
                         "connectError": "החיבור ל-GitHub נכשל",
                         "disconnectError": "הניתוק מ-GitHub נכשל"
-                    }
+                    },
+                    "organizations": "ארגונים מחוברים",
+                    "organizationsHint": "השתמש בחיבור מחדש כדי להעניק גישה לארגונים נוספים"
                 }
             }
         },
@@ -624,7 +652,21 @@
                         "invalidUrl": "אנא הזן כתובת URL חוקית הכוללת http:// או https://",
                         "invalidImageUrl": "אנא הזן כתובת URL תמונה חוקית",
                         "requiredFields": "אנא מלא את כל השדות הנדרשים"
-                    }
+                    },
+                    "categories": "קטגוריות",
+                    "existingCategories": "בחר מהקיימות",
+                    "addNewCategory": "או הוסף קטגוריה חדשה",
+                    "categoryPlaceholder": "חפש או צור קטגוריה...",
+                    "addMoreCategories": "הוסף עוד...",
+                    "createCategory": "צור",
+                    "noMatchingCategories": "לא נמצאו קטגוריות תואמות",
+                    "noCategories": "אין קטגוריות עדיין. הקלד כדי ליצור אחת.",
+                    "categoriesRequired": "בחר לפחות קטגוריה אחת",
+                    "captureScreenshot": "צלם צילום מסך",
+                    "captureScreenshotHelp": "צלם אוטומטית צילום מסך מכתובת המקור",
+                    "screenshotSuccess": "צילום המסך צולם בהצלחה",
+                    "screenshotFailed": "נכשל בצילום המסך",
+                    "screenshotError": "אירעה שגיאה בעת צילום המסך"
                 },
                 "updateSuccess": "הפריט עודכן בהצלחה",
                 "updateFailed": "עדכון הפריט נכשל",
@@ -639,7 +681,108 @@
                 "createPRHelp": "אם מופעל, השינויים מוצעים באמצעות PR במקום קומיט ישיר.",
                 "reasonLabel": "סיבה (אופציונלית)",
                 "reasonPlaceholder": "למה אתה מוחק פריט זה?",
-                "confirmDelete": "מחק פריט"
+                "confirmDelete": "מחק פריט",
+                "captureScreenshot": "צלם צילום מסך",
+                "screenshot": {
+                    "noSourceUrl": "אין כתובת מקור זמינה לפריט זה",
+                    "success": "צילום המסך צולם בהצלחה",
+                    "failed": "נכשל בצילום המסך",
+                    "error": "אירעה שגיאה בעת צילום המסך",
+                    "notConfigured": "שירות צילום המסך אינו מוגדר. אנא הוסף את מפתח ה-API של ScreenshotOne בהגדרות.",
+                    "captureFailed": "נכשל בצילום התמונה",
+                    "captureSuccess": "התמונה צולמה בהצלחה",
+                    "captureError": "אירעה שגיאה בעת צילום התמונה",
+                    "bulkCaptureComplete": "צילום תמונות בכמות הושלם",
+                    "bulkCaptureError": "אירעה שגיאה בעת צילום תמונות בכמות"
+                },
+                "tabs": {
+                    "browseItems": "עיין בפריטים",
+                    "categories": "קטגוריות",
+                    "tags": "תגיות"
+                },
+                "taxonomy": {
+                    "categories": {
+                        "searchPlaceholder": "חפש קטגוריות...",
+                        "add": "הוסף קטגוריה",
+                        "addFirst": "הוסף קטגוריה ראשונה",
+                        "showing": "מציג {current} מתוך {total} קטגוריות",
+                        "empty": "אין קטגוריות עדיין",
+                        "noMatch": "לא נמצאו קטגוריות תואמות לחיפוש",
+                        "columns": {
+                            "name": "שם",
+                            "description": "תיאור",
+                            "items": "פריטים",
+                            "priority": "עדיפות",
+                            "actions": "פעולות"
+                        },
+                        "createSuccess": "הקטגוריה נוצרה בהצלחה",
+                        "createFailed": "נכשל ביצירת הקטגוריה",
+                        "updateSuccess": "הקטגוריה עודכנה בהצלחה",
+                        "updateFailed": "נכשל בעדכון הקטגוריה",
+                        "deleteSuccess": "הקטגוריה נמחקה בהצלחה",
+                        "deleteFailed": "נכשל במחיקת הקטגוריה",
+                        "deleteConfirm": "האם אתה בטוח שברצונך למחוק את \"{name}\"?",
+                        "deleteHasItems": "לא ניתן למחוק קטגוריה עם {count} פריטים משויכים",
+                        "modal": {
+                            "createTitle": "צור קטגוריה",
+                            "editTitle": "ערוך קטגוריה",
+                            "name": "שם",
+                            "namePlaceholder": "לדוגמה: כלי ניטור",
+                            "description": "תיאור",
+                            "descriptionPlaceholder": "תיאור קצר של הקטגוריה",
+                            "iconUrl": "כתובת URL לאייקון",
+                            "iconUrlPlaceholder": "https://example.com/icon.png",
+                            "iconUrlHelp": "כתובת URL אופציונלית לתמונת אייקון",
+                            "priority": "עדיפות",
+                            "priorityPlaceholder": "לדוגמה: 1",
+                            "priorityHelp": "מספרים נמוכים יותר יופיעו ראשונים ברשימות",
+                            "cancel": "ביטול",
+                            "save": "שמור",
+                            "create": "צור",
+                            "saving": "שומר...",
+                            "errors": {
+                                "nameRequired": "שם הקטגוריה נדרש",
+                                "nameExists": "קטגוריה עם שם זה כבר קיימת"
+                            }
+                        }
+                    },
+                    "tags": {
+                        "searchPlaceholder": "חפש תגיות...",
+                        "add": "הוסף תגית",
+                        "addFirst": "הוסף תגית ראשונה",
+                        "showing": "מציג {current} מתוך {total} תגיות",
+                        "empty": "אין תגיות עדיין",
+                        "noMatch": "לא נמצאו תגיות תואמות לחיפוש",
+                        "columns": {
+                            "name": "שם",
+                            "items": "פריטים",
+                            "actions": "פעולות"
+                        },
+                        "createSuccess": "התגית נוצרה בהצלחה",
+                        "createFailed": "נכשל ביצירת התגית",
+                        "updateSuccess": "התגית עודכנה בהצלחה",
+                        "updateFailed": "נכשל בעדכון התגית",
+                        "deleteSuccess": "התגית נמחקה בהצלחה",
+                        "deleteFailed": "נכשל במחיקת התגית",
+                        "deleteConfirm": "האם אתה בטוח שברצונך למחוק את \"{name}\"?",
+                        "deleteHasItems": "לא ניתן למחוק תגית עם {count} פריטים משויכים",
+                        "modal": {
+                            "createTitle": "צור תגית",
+                            "editTitle": "ערוך תגית",
+                            "name": "שם",
+                            "namePlaceholder": "לדוגמה: open-source",
+                            "nameHelp": "השתמש באותיות קטנות עם מקפים לתגיות מרובות מילים",
+                            "cancel": "ביטול",
+                            "save": "שמור",
+                            "create": "צור",
+                            "saving": "שומר...",
+                            "errors": {
+                                "nameRequired": "שם התגית נדרש",
+                                "nameExists": "תגית עם שם זה כבר קיימת"
+                            }
+                        }
+                    }
+                }
             },
             "generator": {
                 "regenerationWarning": "אזהרת יצירה מחדש",
@@ -710,7 +853,35 @@
                 "recreateConfirmDescription": "יצירה מחדש תמחק פריטים קיימים ותיצור אותם מחדש מאפס. פעולה זו אינה ניתנת לביטול.",
                 "confirmRecreate": "כן, צור מחדש",
                 "recreateInlineTitle": "יצירה מחדש תמחק פריטים קיימים",
-                "recreateInlineDescription": "מצב זה מוחק את הפריטים הנוכחיים ובונה מחדש מאפס. המשך רק אם אתה רוצה להחליף הכל."
+                "recreateInlineDescription": "מצב זה מוחק את הפריטים הנוכחיים ובונה מחדש מאפס. המשך רק אם אתה רוצה להחליף הכל.",
+                "captureScreenshots": "צלם צילומי מסך של פריטים",
+                "captureScreenshotsDescription": "צלם אוטומטית צילומי מסך או תמונות מוצר לכל פריט במהלך היצירה",
+                "companyNameDescription": "משמש להתאמה אישית של תוכן שנוצר עם זהות המותג שלך.",
+                "companyWebsiteDescription": "הבינה המלאכותית תנתח את האתר שלך כדי להבין טוב יותר את הקשר המותג שלך.",
+                "initialCategoriesDescription": "קטגוריות התחלתיות לארגון פריטים. הבינה המלאכותית תשתמש באלה כנקודת התחלה.",
+                "priorityCategoriesDescription": "קטגוריות שיופיעו ראשונות בפלט שנוצר. שימושי להדגשת סעיפים חשובים.",
+                "targetKeywordsDescription": "מילות מפתח להנחיית חיפוש הבינה המלאכותית ויצירת תוכן. מילות מפתח ספציפיות יותר מניבות תוצאות טובות יותר.",
+                "sourceUrlsFieldDescription": "כתובות URL ספציפיות לחילוץ תוכן. אם ריק, המחולל יחפש באינטרנט אוטומטית.",
+                "generationMethodDescription": "בחר האם לעדכן פריטים קיימים או ליצור הכל מחדש.",
+                "websiteRepositoryCreationMethodDescription": "כיצד נוצר מאגר האתר. תבנית מומלצת לרוב המקרים.",
+                "maxSearchQueriesDescription": "מספר שאילתות החיפוש שהבינה המלאכותית תיצור כדי למצוא תוכן רלוונטי (1-50).",
+                "resultsPerQueryDescription": "מספר תוצאות מקסימלי לאחזור לכל שאילתת חיפוש (1-20).",
+                "maxPagesToProcessDescription": "מספר דפי אינטרנט מקסימלי לעיבוד לחילוץ תוכן (1-100).",
+                "relevanceThresholdDescription": "ציון רלוונטיות מינימלי (0-1) לכלול תוכן. ערכים גבוהים יותר משמעם סינון מחמיר יותר.",
+                "dataGeneration": "אפשרויות יצירת נתונים",
+                "dataGenerationDescription": "הגדר נפח נתונים ויצירת ישויות",
+                "dataVolumeMode": "מצב נפח נתונים",
+                "dataVolumeModeReal": "אמיתי",
+                "dataVolumeModeRealDescription": "יצור נתונים מלאים מוכנים לייצור",
+                "dataVolumeModeSample": "דוגמה",
+                "dataVolumeModeSampleDescription": "יצור נתוני דוגמה מינימליים (~10 פריטים)",
+                "entityGeneration": "יצירת ישויות",
+                "generateCategories": "יצור קטגוריות",
+                "generateCategoriesDescription": "צור מבנה קטגוריות לארגון פריטים",
+                "generateTags": "יצור תגיות",
+                "generateTagsDescription": "צור תגיות לתיוג גמיש של פריטים",
+                "generateBrands": "יצור מותגים",
+                "generateBrandsDescription": "חלץ וצור ישויות מותג מפריטים"
             },
             "progress": {
                 "title": "יוצר כעת",
@@ -784,7 +955,144 @@
                 "saveChanges": "שמור שינויים",
                 "updateReadme": "עדכן README",
                 "updateSuccess": "ההגדרות עודכנו בהצלחה",
-                "updateFailed": "עדכון ההגדרות נכשל"
+                "updateFailed": "עדכון ההגדרות נכשל",
+                "visibilityUpdateFailed": "נכשל בעדכון נראות המאגר",
+                "visibilityWarningTitle": "להפוך את המאגר לפרטי?",
+                "visibilityWarningDescription": "אתה עומד להפוך את {name} לפרטי.",
+                "visibilityWarningPermanent": "לפעולה זו יש השלכות קבועות:",
+                "visibilityWarningStars": "כל הכוכבים יאבדו לצמיתות",
+                "visibilityWarningWatchers": "כל העוקבים יוסרו",
+                "visibilityWarningNotRestored": "כוכבים ועוקבים לא ישוחזרו אם תפוך את המאגר לציבורי שוב",
+                "visibilityConfirmPrivate": "כן, הפוך לפרטי",
+                "advancedPrompts": {
+                    "title": "הנחיות מתקדמות",
+                    "subtitle": "התאם אישית הנחיות AI ליצירת מדריך. השאר ריק להשתמש בברירות מחדל.",
+                    "save": "שמור הנחיות",
+                    "saveSuccess": "הנחיות מתקדמות נשמרו בהצלחה",
+                    "saveFailed": "נכשל בשמירת הנחיות מתקדמות",
+                    "prompts": {
+                        "relevanceAssessment": {
+                            "title": "הערכת רלוונטיות",
+                            "description": "הוראות נוספות לסינון דפי אינטרנט לפי רלוונטיות לנושא המדריך שלך.",
+                            "placeholder": "לדוגמה: כלול רק דפים שמתמקדים בפרויקטים קוד פתוח..."
+                        },
+                        "itemGeneration": {
+                            "title": "יצירת פריטים",
+                            "description": "הוראות נוספות לפריטים התחלתיים שנוצרו על ידי AI לפני חיפוש באינטרנט.",
+                            "placeholder": "לדוגמה: התמקד בפתרונות ברמת ארגון עם תחזוקה פעילה..."
+                        },
+                        "itemExtraction": {
+                            "title": "חילוץ פריטים",
+                            "description": "הוראות נוספות לחילוץ פריטים מתוכן דפי אינטרנט.",
+                            "placeholder": "לדוגמה: העדף כלים עם קישורי תיעוד רשמי..."
+                        },
+                        "searchQuery": {
+                            "title": "יצירת שאילתות חיפוש",
+                            "description": "הוראות נוספות ליצירת שאילתות חיפוש למציאת תוכן.",
+                            "placeholder": "לדוגמה: כלול שאילתות הממקדות מאגרי GitHub ותיעוד רשמי..."
+                        },
+                        "categorization": {
+                            "title": "קטגוריזציה",
+                            "description": "הוראות נוספות לקטגוריזציה ותיוג פריטים שחולצו.",
+                            "placeholder": "לדוגמה: השתמש בקטגוריות טכניות כמו 'כלי CLI', 'ספריות', 'מסגרות'..."
+                        },
+                        "deduplication": {
+                            "title": "הסרת כפילויות",
+                            "description": "הוראות נוספות לזיהוי והסרת פריטים כפולים.",
+                            "placeholder": "לדוגמה: התייחס לפריטים עם מאגרי GitHub דומים ככפילויות..."
+                        },
+                        "sourceValidation": {
+                            "title": "אימות מקור",
+                            "description": "הוראות נוספות לאימות כתובות URL מקור של פריטים.",
+                            "placeholder": "לדוגמה: העדף אתרי פרויקט רשמיים על פני ביקורות צד שלישי..."
+                        }
+                    }
+                },
+                "websiteConfig": {
+                    "title": "הגדרת אתר",
+                    "subtitle": "התאם אישית את המראה וההתנהגות של אתר המדריך שלך",
+                    "loadFailed": "נכשל בטעינת הגדרות האתר",
+                    "saveSuccess": "הגדרות האתר נשמרו בהצלחה",
+                    "saveFailed": "נכשל בשמירת הגדרות האתר",
+                    "save": "שמור הגדרות",
+                    "sections": {
+                        "siteName": {
+                            "title": "זהות האתר",
+                            "label": "שם האתר",
+                            "placeholder": "המדריך שלי",
+                            "helper": "השם המוצג בכותרת האתר ובכרטיסיית הדפדפן"
+                        },
+                        "global": {
+                            "title": "תכונות גלובליות",
+                            "categories": "קטגוריות",
+                            "categoriesHelper": "הצג סינון וניווט לפי קטגוריה",
+                            "tags": "תגיות",
+                            "tagsHelper": "הצג סינון וניווט לפי תגית",
+                            "companies": "חברות",
+                            "companiesHelper": "הצג מידע על החברה לפריטים",
+                            "surveys": "סקרים",
+                            "surveysHelper": "אפשר פונקציונליות סקרים"
+                        },
+                        "header": {
+                            "title": "הגדרות כותרת",
+                            "submit": "כפתור שליחה",
+                            "submitHelper": "הצג כפתור שליחת פריט בכותרת",
+                            "pricing": "קישור מחירון",
+                            "pricingHelper": "הצג קישור מחירון בניווט הכותרת",
+                            "layoutSelector": "בורר פריסה",
+                            "layoutSelectorHelper": "אפשר למשתמשים להחליף בין פריסות",
+                            "languageSelector": "בורר שפה",
+                            "languageSelectorHelper": "אפשר למשתמשים להחליף שפה",
+                            "themeSelector": "בורר ערכת נושא",
+                            "themeSelectorHelper": "אפשר למשתמשים להחליף בין ערכות נושא",
+                            "defaultLayout": "פריסת ברירת מחדל",
+                            "defaultTheme": "ערכת נושא ברירת מחדל",
+                            "themeLight": "בהיר",
+                            "themeDark": "כהה",
+                            "themeSystem": "מערכת",
+                            "defaultPagination": "עימוד ברירת מחדל",
+                            "paginationStandard": "סטנדרטי",
+                            "paginationInfinite": "גלילה אינסופית",
+                            "paginationLoadMore": "טען עוד"
+                        },
+                        "homepage": {
+                            "title": "הגדרות דף הבית",
+                            "hero": "אזור הירו",
+                            "heroHelper": "הצג אזור הירו עם כותרת ותיאור",
+                            "search": "שורת חיפוש",
+                            "searchHelper": "הצג שורת חיפוש בדף הבית",
+                            "defaultView": "תצוגת ברירת מחדל",
+                            "viewClassic": "קלאסי",
+                            "viewGrid": "רשת",
+                            "viewList": "רשימה",
+                            "defaultSort": "מיון ברירת מחדל",
+                            "sortPopularity": "פופולריות",
+                            "sortNewest": "חדש ביותר",
+                            "sortAlphabetical": "אלפביתי"
+                        },
+                        "footer": {
+                            "title": "הגדרות תחתית",
+                            "subscribe": "הרשמה לניוזלטר",
+                            "subscribeHelper": "הצג טופס הרשמה לניוזלטר",
+                            "version": "תצוגת גרסה",
+                            "versionHelper": "הצג מידע גרסה בתחתית",
+                            "themeSelector": "בורר ערכת נושא בתחתית",
+                            "themeSelectorHelper": "הצג בורר ערכת נושא בתחתית"
+                        },
+                        "customMenu": {
+                            "title": "קישורי תפריט מותאמים אישית",
+                            "description": "הוסף קישורים מותאמים אישית לניווט הכותרת והתחתית של האתר שלך",
+                            "headerLinks": "קישורי כותרת",
+                            "footerLinks": "קישורי תחתית",
+                            "addLink": "הוסף קישור",
+                            "noLinks": "לא נוספו קישורים מותאמים אישית",
+                            "labelPlaceholder": "תווית הקישור",
+                            "pathPlaceholder": "/about או https://...",
+                            "targetSelf": "אותו כרטיסייה",
+                            "targetBlank": "כרטיסייה חדשה"
+                        }
+                    }
+                }
             },
             "deploy": {
                 "noTokenAlert": {
@@ -853,7 +1161,21 @@
                         "lastChecked": "נבדק לאחרונה",
                         "lastError": "שגיאה אחרונה",
                         "updateSuccess": "ההגדרות עודכנו בהצלחה",
-                        "updateFailed": "עדכון ההגדרות נכשל"
+                        "updateFailed": "עדכון ההגדרות נכשל",
+                        "githubRequired": "נדרש חיבור GitHub. אנא חבר את חשבון GitHub שלך בהגדרות כדי לאפשר עדכונים אוטומטיים."
+                    },
+                    "configDialog": {
+                        "title": "הגדר לפני הפריסה",
+                        "description": "סקור והתאם אישית את הגדרות האתר שלך לפני הפריסה",
+                        "siteName": "שם האתר",
+                        "siteNamePlaceholder": "המדריך שלי",
+                        "siteNameHelper": "השם המוצג באתר שלך (ברירת מחדל: Acme)",
+                        "advancedSettings": "הגדרות מתקדמות",
+                        "advancedSettingsDescription": "הגדר אפשרויות אתר נוספות",
+                        "loadFailed": "נכשל בטעינת ההגדרות הנוכחיות",
+                        "saveAndDeploy": "שמור ופרוס",
+                        "skipAndDeploy": "דלג ופרוס",
+                        "cancel": "ביטול"
                     }
                 }
             },
@@ -1192,7 +1514,8 @@
                 "success": {
                     "started": "היבוא התחיל! מפנה אותך למדריך שלך...",
                     "linked": "המדריך נקשר בהצלחה"
-                }
+                },
+                "detectionFailed": "לא הצלחנו לזהות אוטומטית את הפורמט. אנא בחר כיצד לייבא את המאגר הזה."
             }
         },
         "github": {
@@ -1254,6 +1577,34 @@
                 "title": "Webhooks",
                 "subtitle": "הגדר webhooks לקבלת עדכונים בזמן אמת",
                 "configure": "הגדר webhooks (בקרוב זמין)"
+            },
+            "screenshotone": {
+                "title": "אינטגרציית ScreenshotOne",
+                "subtitle": "צלם אוטומטית צילומי מסך של פריטי מדריך באמצעות ScreenshotOne",
+                "connected": "מחובר",
+                "notConnected": "לא מחובר",
+                "connectedMessage": "חשבון ScreenshotOne שלך מחובר. צילומי מסך יילכדו אוטומטית לפריטי מדריך.",
+                "disconnect": "נתק ScreenshotOne",
+                "disconnecting": "מסיר...",
+                "accessKeyLabel": "מפתח גישה",
+                "placeholder": "מפתח הגישה שלך...",
+                "secretKeyLabel": "מפתח סודי (אופציונלי)",
+                "secretKeyPlaceholder": "המפתח הסודי שלך...",
+                "showKey": "הצג",
+                "hideKey": "הסתר",
+                "accessKeyHelp": "נדרש. משמש לאימות עם ה-API של ScreenshotOne.",
+                "secretKeyHelp": "אופציונלי. מאפשר כתובות URL חתומות לאבטחה משופרת. קבל את המפתחות שלך מ-",
+                "dashboard": "לוח המחוונים של ScreenshotOne",
+                "save": "שמור מפתחות",
+                "saving": "שומר...",
+                "messages": {
+                    "accessKeyRequired": "אנא הזן מפתח גישה תקין של ScreenshotOne",
+                    "saveSuccess": "מפתחות ScreenshotOne נשמרו בהצלחה",
+                    "saveFailed": "נכשל בשמירת מפתחות ScreenshotOne",
+                    "removeSuccess": "מפתחות ScreenshotOne הוסרו בהצלחה",
+                    "removeFailed": "נכשל בהסרת מפתחות ScreenshotOne",
+                    "unexpectedError": "אירעה שגיאה לא צפויה"
+                }
             }
         },
         "notifications": {
@@ -1358,7 +1709,10 @@
             "newChat": "צ'אט חדש",
             "loadingConversation": "טוען שיחה...",
             "inputPlaceholder": "תאר את המדריך שברצונך ליצור...",
-            "sendButton": "שלח"
+            "sendButton": "שלח",
+            "errors": {
+                "unableToSend": "לא ניתן לשלוח את ההודעה."
+            }
         }
     },
     "layout": {
@@ -1508,6 +1862,15 @@
                 "notAuthenticated": "לא מאומת",
                 "deleteFailed": "מחיקת החשבון נכשלה",
                 "deleteDisabled": "מחיקת חשבון מושבתת בהדגמה"
+            },
+            "screenshotone": {
+                "notAuthenticated": "לא מאומת",
+                "accessKeyRequired": "מפתח גישה נדרש",
+                "saveFailed": "נכשל בשמירת מפתחות ScreenshotOne",
+                "saveSuccess": "מפתחות ScreenshotOne נשמרו בהצלחה",
+                "validationFailed": "מפתחות ScreenshotOne שסופקו אינם תקינים. אנא בדוק ונסה שוב.",
+                "removeFailed": "נכשל בהסרת מפתחות ScreenshotOne",
+                "removeSuccess": "מפתחות ScreenshotOne הוסרו בהצלחה"
             }
         },
         "deploy": {
@@ -1538,6 +1901,21 @@
             "username": {
                 "minLength": "שם המשתמש חייב להכיל לפחות {length} תווים"
             }
+        }
+    },
+    "common": {
+        "ui": {
+            "close": "סגור",
+            "dismiss": "בטל"
+        },
+        "theme": {
+            "toggle": "החלף ערכת נושא",
+            "switchToLight": "עבור למצב בהיר",
+            "switchToDark": "עבור למצב כהה"
+        },
+        "visibility": {
+            "private": "פרטי",
+            "public": "ציבורי"
         }
     }
 }

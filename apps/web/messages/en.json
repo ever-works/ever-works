@@ -220,6 +220,31 @@
             "notifications": {
                 "title": "Notifications",
                 "empty": "No new notifications"
+            },
+            "help": {
+                "title": "Help & Resources",
+                "subtitle": "Quick tips and useful links",
+                "quickTips": {
+                    "title": "Quick Tips",
+                    "tip1": "Use the AI chat to create directories with natural language",
+                    "tip2": "Import existing awesome lists or data repositories",
+                    "tip3": "Customize your directory's appearance in settings"
+                },
+                "shortcuts": {
+                    "title": "Keyboard Shortcuts",
+                    "search": "Search",
+                    "newDirectory": "New Directory",
+                    "help": "Help",
+                    "hint": "Press ? anywhere to see all shortcuts"
+                },
+                "links": {
+                    "title": "Useful Links",
+                    "github": "GitHub Repository",
+                    "issues": "Report an Issue",
+                    "docs": "Documentation",
+                    "comingSoon": "Coming Soon"
+                },
+                "version": "Version {version}"
             }
         },
         "directories": {
@@ -1475,6 +1500,7 @@
                     "linking": "Linking...",
                     "linkRepos": "Link repositories"
                 },
+                "detectionFailed": "We could not automatically detect the format. Please select how to import this repository.",
                 "errors": {
                     "urlRequired": "Please enter a GitHub repository URL",
                     "unsupportedFormat": "This repository format is not supported. Please use a Data Repository or Awesome List format.",
@@ -1683,7 +1709,10 @@
             "newChat": "New chat",
             "loadingConversation": "Loading conversation…",
             "inputPlaceholder": "Describe the directory you want to create...",
-            "sendButton": "Send"
+            "sendButton": "Send",
+            "errors": {
+                "unableToSend": "Unable to send message."
+            }
         }
     },
     "layout": {
@@ -1872,6 +1901,21 @@
             "username": {
                 "minLength": "Username must contain at least {length} characters"
             }
+        }
+    },
+    "common": {
+        "ui": {
+            "close": "Close",
+            "dismiss": "Dismiss"
+        },
+        "theme": {
+            "toggle": "Toggle theme",
+            "switchToLight": "Switch to light mode",
+            "switchToDark": "Switch to dark mode"
+        },
+        "visibility": {
+            "private": "Private",
+            "public": "Public"
         }
     }
 }

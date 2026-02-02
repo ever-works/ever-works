@@ -9,6 +9,7 @@ import {
     Transition,
     TransitionChild,
 } from '@headlessui/react';
+import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils/cn';
 import { X } from 'lucide-react';
 
@@ -123,6 +124,7 @@ interface DialogCloseProps {
 }
 
 export function DialogClose({ onClose }: DialogCloseProps) {
+    const t = useTranslations('common.ui');
     return (
         <button
             onClick={onClose}
@@ -135,7 +137,7 @@ export function DialogClose({ onClose }: DialogCloseProps) {
             )}
         >
             <X className="h-4 w-4" />
-            <span className="sr-only">Close</span>
+            <span className="sr-only">{t('close')}</span>
         </button>
     );
 }
