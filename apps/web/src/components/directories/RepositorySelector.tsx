@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
@@ -13,8 +13,12 @@ import {
     ChevronDown,
     ChevronUp,
     RefreshCw,
+    Building2,
+    User,
 } from 'lucide-react';
 import { getUserRepositories } from '@/app/actions/dashboard/directories';
+import { getGitHubOrganizations } from '@/app/actions/dashboard/organizations';
+import { GitHubOrganization } from '@/lib/api';
 
 export interface GitHubRepo {
     id: number;
@@ -36,27 +40,70 @@ interface RepositorySelectorProps {
 
 export function RepositorySelector({ onSelect, selectedUrl }: RepositorySelectorProps) {
     const [repositories, setRepositories] = useState<GitHubRepo[]>([]);
+    const [organizations, setOrganizations] = useState<GitHubOrganization[]>([]);
     const [loading, setLoading] = useState(true);
+    const [loadingOrgs, setLoadingOrgs] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [search, setSearch] = useState('');
     const [page, setPage] = useState(1);
     const [hasMore, setHasMore] = useState(false);
     const [expanded, setExpanded] = useState(true);
+    const [selectedOwner, setSelectedOwner] = useState<string>('');
+    const [ownerType, setOwnerType] = useState<'user' | 'org'>('user');
     const t = useTranslations('dashboard.directoryCreation.import.repositorySelector');
 
     const perPage = 30;
 
+    // Use ref to track the current owner for request cancellation
+    const currentRequestRef = useRef<number>(0);
+
+    // Fetch organizations on mount
+    useEffect(() => {
+        const loadOrganizations = async () => {
+            setLoadingOrgs(true);
+            try {
+                const result = await getGitHubOrganizations();
+                if (result.success && result.organizations) {
+                    setOrganizations(result.organizations);
+                }
+            } catch (err) {
+                console.error('Failed to load organizations:', err);
+            } finally {
+                setLoadingOrgs(false);
+            }
+        };
+        loadOrganizations();
+    }, []);
+
+    // Fetch repositories with explicit owner/type parameters
     const fetchRepositories = useCallback(
-        async (pageNum: number, searchQuery: string, append = false) => {
+        async (
+            pageNum: number,
+            searchQuery: string,
+            owner: string,
+            type: 'user' | 'org',
+            append = false,
+        ) => {
+            const requestId = ++currentRequestRef.current;
+
             setLoading(true);
             setError(null);
 
+            const params = {
+                page: pageNum,
+                perPage,
+                search: searchQuery || undefined,
+                owner: owner || undefined,
+                type: type,
+            };
+
             try {
-                const result = await getUserRepositories({
-                    page: pageNum,
-                    perPage,
-                    search: searchQuery || undefined,
-                });
+                const result = await getUserRepositories(params);
+
+                // Check if this request is still the current one
+                if (requestId !== currentRequestRef.current) {
+                    return;
+                }
 
                 if (result.success && result.data) {
                     if (append) {
@@ -69,33 +116,51 @@ export function RepositorySelector({ onSelect, selectedUrl }: RepositorySelector
                     setError(result.error || t('errors.fetchFailed'));
                 }
             } catch (err) {
-                setError(t('errors.fetchFailed'));
+                if (requestId === currentRequestRef.current) {
+                    setError(t('errors.fetchFailed'));
+                }
             } finally {
-                setLoading(false);
+                if (requestId === currentRequestRef.current) {
+                    setLoading(false);
+                }
             }
         },
         [t],
     );
 
+    // Fetch repositories on mount and when owner changes
     useEffect(() => {
-        fetchRepositories(1, '');
-    }, [fetchRepositories]);
+        setPage(1);
+        setSearch('');
+        fetchRepositories(1, '', selectedOwner, ownerType);
+    }, [selectedOwner, ownerType, fetchRepositories]);
 
     const handleSearch = (value: string) => {
         setSearch(value);
         setPage(1);
-        fetchRepositories(1, value);
+        fetchRepositories(1, value, selectedOwner, ownerType);
     };
 
     const handleLoadMore = () => {
         const nextPage = page + 1;
         setPage(nextPage);
-        fetchRepositories(nextPage, search, true);
+        fetchRepositories(nextPage, search, selectedOwner, ownerType, true);
     };
 
     const handleRefresh = () => {
         setPage(1);
-        fetchRepositories(1, search);
+        fetchRepositories(1, search, selectedOwner, ownerType);
+    };
+
+    const handleOwnerChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const value = e.target.value;
+        if (value === '') {
+            setSelectedOwner('');
+            setOwnerType('user');
+        } else {
+            setSelectedOwner(value);
+            setOwnerType('org');
+        }
     };
 
     const formatDate = (dateStr: string) => {
@@ -151,6 +216,69 @@ export function RepositorySelector({ onSelect, selectedUrl }: RepositorySelector
             {/* Content */}
             {expanded && (
                 <div className="border-t border-border dark:border-border-dark">
+                    {/* Owner Selector */}
+                    <div className="p-3 border-b border-border dark:border-border-dark">
+                        <label
+                            htmlFor="repo-owner-select"
+                            className="block text-xs font-medium text-text-secondary dark:text-text-secondary-dark mb-2"
+                        >
+                            {t('ownerLabel')}
+                        </label>
+                        <div className="flex items-center gap-2">
+                            <select
+                                id="repo-owner-select"
+                                value={selectedOwner}
+                                onChange={handleOwnerChange}
+                                disabled={loadingOrgs}
+                                className={cn(
+                                    'flex-1 px-3 py-2 rounded-md text-sm',
+                                    'bg-card dark:bg-card-dark',
+                                    'border border-border dark:border-border-dark',
+                                    'text-text dark:text-text-dark',
+                                    'focus:outline-none focus:ring-2 focus:ring-primary/50',
+                                    'disabled:opacity-50 disabled:cursor-not-allowed',
+                                )}
+                            >
+                                <option value="">{t('personalAccount')}</option>
+                                {organizations.length > 0 && (
+                                    <optgroup label={t('organizations')}>
+                                        {organizations.map((org) => (
+                                            <option key={org.login} value={org.login}>
+                                                {org.login}
+                                            </option>
+                                        ))}
+                                    </optgroup>
+                                )}
+                            </select>
+                            {loadingOrgs && (
+                                <Loader2 className="w-4 h-4 text-text-muted animate-spin" />
+                            )}
+                        </div>
+                        {/* Visual indicator of current selection */}
+                        <div
+                            className={cn(
+                                'flex items-center gap-2 px-2 py-1.5 mt-2 rounded',
+                                'bg-surface-secondary dark:bg-surface-secondary-dark',
+                            )}
+                        >
+                            {selectedOwner === '' ? (
+                                <>
+                                    <User className="w-3.5 h-3.5 text-text-muted dark:text-text-muted-dark" />
+                                    <span className="text-xs text-text-secondary dark:text-text-secondary-dark">
+                                        {t('showingPersonalRepos')}
+                                    </span>
+                                </>
+                            ) : (
+                                <>
+                                    <Building2 className="w-3.5 h-3.5 text-primary dark:text-primary-dark" />
+                                    <span className="text-xs text-text dark:text-text-dark">
+                                        {t('showingOrgRepos', { org: selectedOwner })}
+                                    </span>
+                                </>
+                            )}
+                        </div>
+                    </div>
+
                     {/* Search and Refresh */}
                     <div className="p-3 flex gap-2 border-b border-border dark:border-border-dark">
                         <div className="relative flex-1">
@@ -228,6 +356,9 @@ export function RepositorySelector({ onSelect, selectedUrl }: RepositorySelector
                                                         <Globe className="w-4 h-4 text-success shrink-0" />
                                                     )}
                                                     <span className="font-medium text-text dark:text-text-dark">
+                                                        <span className="text-text-muted dark:text-text-muted-dark">
+                                                            {repo.owner}/
+                                                        </span>
                                                         {repo.name}
                                                     </span>
                                                 </div>
@@ -272,6 +403,7 @@ export function RepositorySelector({ onSelect, selectedUrl }: RepositorySelector
                         <div className="p-2 text-center border-t border-border dark:border-border-dark">
                             <span className="text-xs text-text-muted dark:text-text-muted-dark">
                                 {repositories.length} {t('repositoriesLoaded')}
+                                {selectedOwner && ` from ${selectedOwner}`}
                                 {hasMore && ` (${t('moreAvailable')})`}
                             </span>
                         </div>
