@@ -10,7 +10,6 @@ import { AuthController } from './controllers/auth.controller';
 import { GithubAuthStrategy } from './strategies/github.strategy';
 import { GoogleAuthStrategy } from './strategies/google.strategy';
 import { TokenCleanupService } from './tasks/token-cleanup.service';
-import { OAuthTokenService } from './services/oauth-token.service';
 import { OAuthUrlService } from './services/oauth-url.service';
 import {
     DatabaseModule,
@@ -43,10 +42,9 @@ import { jwtConstants } from '../config/constants';
         RefreshTokenRepository,
         OAuthTokenRepository,
         TokenCleanupService,
-        OAuthTokenService,
         OAuthUrlService,
     ],
     controllers: [AuthController],
-    exports: [AuthService, OAuthTokenService],
+    exports: [AuthService],
 })
 export class AuthModule {}
