@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { GithubService } from '@src/git/github.service';
+import { GitFacadeService } from '@src/facades/git.facade';
 import { DataGeneratorService } from '@src/generators/data-generator/data-generator.service';
 import { DataRepository } from '@src/generators/data-generator/data-repository';
 import { MarkdownGeneratorService } from '@src/generators/markdown-generator/markdown-generator.service';
@@ -37,7 +37,7 @@ export class ImportExecutorService {
     private readonly logger = new Logger(ImportExecutorService.name);
 
     constructor(
-        private readonly githubService: GithubService,
+        private readonly gitFacade: GitFacadeService,
         private readonly dataGenerator: DataGeneratorService,
         private readonly markdownGenerator: MarkdownGeneratorService,
         private readonly websiteGenerator: WebsiteGeneratorService,
@@ -51,12 +51,14 @@ export class ImportExecutorService {
         try {
             this.logger.log(`Cloning source repo: ${source.owner}/${source.repo}`);
 
-            const sourceDir = await this.githubService.cloneOrPull({
-                owner: source.owner,
-                repo: source.repo,
-                token,
-                committer: user.asCommitter(),
-            });
+            const sourceDir = await this.gitFacade.cloneOrPull(
+                {
+                    owner: source.owner,
+                    repo: source.repo,
+                    committer: user.asCommitter(),
+                },
+                { userId: user.id, providerId: directory.repoProvider, token },
+            );
 
             const sourceData = await DataRepository.create(sourceDir);
             const items = await sourceData.getItems();
@@ -95,7 +97,11 @@ export class ImportExecutorService {
                         },
                     },
                     importRequest: {
-                        sourceUrl: `https://github.com/${source.owner}/${source.repo}`,
+                        sourceUrl: this.gitFacade.getWebUrl(
+                            directory.repoProvider,
+                            source.owner,
+                            source.repo,
+                        ),
                         sourceType: 'data_repo' as ImportSourceType,
                         sourceOwner: source.owner,
                         sourceRepo: source.repo,
@@ -156,7 +162,7 @@ export class ImportExecutorService {
                 `Parsed ${parsedData.items.length} items, ${parsedData.categories.length} categories`,
             );
 
-            const parsed = this.sourceRepoAnalyzer.parseGitHubUrl(sourceUrl);
+            const parsed = this.sourceRepoAnalyzer.parseGitUrl(sourceUrl);
             const initResult = await this.dataGenerator.initializeWithImportedData(
                 directory,
                 user,
@@ -218,7 +224,7 @@ export class ImportExecutorService {
 
         try {
             const linkAnalysis = await this.sourceRepoAnalyzer.analyzeForLinking(
-                `https://github.com/${source.owner}/${source.repo}`,
+                this.gitFacade.getWebUrl(directory.repoProvider, source.owner, source.repo),
                 token,
             );
 
@@ -233,12 +239,14 @@ export class ImportExecutorService {
 
             this.logger.log(`Linking to existing data repo: ${source.owner}/${source.repo}`);
 
-            const dataRepoDir = await this.githubService.cloneOrPull({
-                owner: source.owner,
-                repo: source.repo,
-                token,
-                committer: user.asCommitter(),
-            });
+            const dataRepoDir = await this.gitFacade.cloneOrPull(
+                {
+                    owner: source.owner,
+                    repo: source.repo,
+                    committer: user.asCommitter(),
+                },
+                { userId: user.id, providerId: directory.repoProvider, token },
+            );
 
             const sourceData = await DataRepository.create(dataRepoDir);
             const items = await sourceData.getItems();

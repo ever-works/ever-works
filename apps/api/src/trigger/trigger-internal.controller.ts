@@ -33,11 +33,13 @@ import {
 import { ScheduleRunCompleteDto, ScheduleRunFailureDto } from './dto/schedule-run.dto';
 import { GenerateStatusType } from '@packages/agent/entities';
 import { NotificationService } from '@packages/agent/notifications';
+import { GitFacadeService } from '@packages/agent/facades';
 import { CreateNotificationDto } from './dto/create-notification.dto';
 
 type DirectoryContextResponse = {
     directory: Directory;
     user: any;
+    gitToken?: string;
 };
 
 type CommandHandlerContext = {
@@ -67,6 +69,7 @@ export class TriggerInternalController {
         private readonly scheduleDispatcher: DirectoryScheduleDispatcherService,
         private readonly directoryScheduleService: DirectoryScheduleService,
         private readonly notificationService: NotificationService,
+        private readonly gitFacade: GitFacadeService,
     ) {}
 
     @Get('directories/:id/context')
@@ -82,12 +85,17 @@ export class TriggerInternalController {
             throw new BadRequestException('Missing userId');
         }
 
-        // Use ownership service to verify access (throws if no access)
         const { directory } = await this.ownershipService.ensureAccess(directoryId, userId);
+
+        const gitToken = await this.gitFacade.getAccessToken({
+            userId,
+            providerId: directory.repoProvider,
+        });
 
         return {
             directory: this.stripRelations(directory),
             user: this.stripSensitiveUserData(directory.user),
+            gitToken: gitToken ?? undefined,
         };
     }
 

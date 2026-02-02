@@ -11,6 +11,7 @@ export type TriggerImportOptions = {
     directory: Directory;
     user: User;
     payload: DirectoryImportPayload;
+    gitToken?: string;
 };
 
 export type TriggerImportCancellationOptions = {
@@ -32,7 +33,7 @@ export class TriggerImportOrchestrator {
         private readonly notificationOperations?: NotificationOperations,
     ) {}
 
-    async run({ directory, user, payload }: TriggerImportOptions): Promise<void> {
+    async run({ directory, user, payload, gitToken }: TriggerImportOptions): Promise<void> {
         const startTime = this.resolveStartTime(payload.historyStartedAt);
 
         await Promise.all([
@@ -51,7 +52,7 @@ export class TriggerImportOrchestrator {
         let result: DirectoryImportResult | null = null;
 
         try {
-            const token = this.getGitHubToken(user);
+            const token = gitToken;
 
             if (payload.sourceType === 'data_repo') {
                 if (!token) {
@@ -214,11 +215,6 @@ export class TriggerImportOrchestrator {
         }
 
         return parsed;
-    }
-
-    private getGitHubToken(user: User): string | undefined {
-        const oauthToken = user.oauthTokens?.find((t) => t.provider === 'github');
-        return oauthToken?.accessToken;
     }
 
     private async handleErrorNotification(

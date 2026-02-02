@@ -1146,9 +1146,15 @@ export class DirectoryGenerationService {
         return 'AI Provider';
     }
 
+    /**
+     * Detect git provider name from error message for notification purposes.
+     * This is a heuristic fallback - provider name comes from error strings.
+     */
     private detectGitProvider(error: string): string {
-        if (error.includes('gitlab')) return 'GitLab';
-        if (error.includes('bitbucket')) return 'Bitbucket';
-        return 'GitHub';
+        const errorLower = error.toLowerCase();
+        if (errorLower.includes('github')) return 'GitHub';
+        if (errorLower.includes('gitlab')) return 'GitLab';
+        if (errorLower.includes('bitbucket')) return 'Bitbucket';
+        return 'Git Provider';
     }
 }

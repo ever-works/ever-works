@@ -21,6 +21,14 @@ export type PluginCategory =
 export type PluginIconType = 'svg' | 'url' | 'base64' | 'lucide' | 'emoji';
 
 /**
+ * Plugin visibility determines how the plugin is displayed in the UI.
+ * - 'public': Shown to all users (default)
+ * - 'hidden': Never shown in plugin UI (internal infrastructure plugins)
+ * - 'advanced': Only shown when "Show advanced" is toggled
+ */
+export type PluginVisibility = 'public' | 'hidden' | 'advanced';
+
+/**
  * Plugin icon definition supporting multiple formats
  */
 export interface PluginIcon {
@@ -138,6 +146,8 @@ export interface PluginManifest {
 	readonly autoInstall?: boolean;
 	/** Whether plugin should be auto-enabled for all directories when installed */
 	readonly autoEnable?: boolean;
+	/** UI visibility: 'public' (default), 'hidden', or 'advanced' */
+	readonly visibility?: PluginVisibility;
 	/**
 	 * Capabilities this plugin should be the default provider for.
 	 * Must be a subset of the plugin's capabilities array.

@@ -1,7 +1,7 @@
 # Plugin System - Next Tasks
 
-**Last Updated:** 2026-01-30
-**Current Progress:** ~59% (108/183 tasks)
+**Last Updated:** 2026-02-02
+**Current Progress:** ~65% (119/183 tasks)
 
 This document outlines the immediate next tasks to advance the plugin system implementation.
 
@@ -9,108 +9,84 @@ This document outlines the immediate next tasks to advance the plugin system imp
 
 ## Executive Summary
 
-The plugin system has a **solid foundation** but is **blocked** by two missing pieces:
+The plugin system has made significant progress. Key blockers have been resolved:
 
-| Blocker                          | Impact   | Tasks Blocked                  |
-| -------------------------------- | -------- | ------------------------------ |
-| **GitFacade + GitHub plugin**    | Critical | 21+ tasks (10a, frontend, API) |
-| **DeployFacade + Vercel plugin** | Critical | 16+ tasks (10a, frontend, API) |
+| Completed                         | Status     | Tasks Unblocked                |
+| --------------------------------- | ---------- | ------------------------------ |
+| **GitFacade + GitHub plugin**     | ✅ Done    | 21+ tasks (10a, frontend, API) |
+| **Git Provider OAuth separation** | ✅ Done    | OAuth flow via plugin system   |
+| **DeployFacade + Vercel plugin**  | 🔴 Pending | 16+ tasks (10a, frontend, API) |
 
-**Creating these two facades and plugins will unblock ~45 tasks** across Phase 6a (entity migration), Phase 7 (API), and Phase 8 (Frontend).
+**The DeployFacade and Vercel plugin are the remaining blockers** for ~20 tasks across Phase 6a (entity migration), Phase 7 (API), and Phase 8 (Frontend).
 
 ---
 
 ## What's Working Well
 
-### Fully Complete (86 tasks)
+### Fully Complete (97 tasks)
 
 - Phase 1: Plugin contracts, types, base classes, testing utilities
 - Phase 2: Pipeline refactoring with 15 built-in steps
 - Phase 9 (partial): Foundation testing infrastructure
+- **GitFacade:** Complete with OAuth support via plugin system
+- **GitHub Plugin:** Full IGitProviderPlugin + IOAuthPlugin implementation
 
 ### Mostly Complete (22 tasks)
 
-- **5 Facades:** AI, Search, Screenshot, ContentExtractor, DataSource
-- **5 Plugins:** Default Pipeline, Tavily, Local Extractor, Notion, Apify
+- **6 Facades:** AI, Search, Screenshot, ContentExtractor, DataSource, **Git**
+- **6 Plugins:** Default Pipeline, Tavily, Local Extractor, Notion, Apify, **GitHub**
 - **Frontend Plugin UI:** Pages, components, actions, GeneratorForm integration
+- **Git Provider OAuth:** Separate callback route from auth OAuth, plugin-based OAuth flow
 
 ---
 
-## Immediate Priority: Git & Deploy Infrastructure
+## Immediate Priority: Deploy Infrastructure
 
-### Task 1: Create GitHub Plugin Package
+### ✅ Task 1: Create GitHub Plugin Package - COMPLETED
 
-**Estimated effort:** 1-2 days
-**Unblocks:** GitFacade, Story 5.x, Story 10a.4-10a.5, Story 15.x
+**Status:** ✅ Done (2026-02-02)
+**Location:** `packages/plugins/github/`
 
-**What to do:**
+**What was implemented:**
 
-1. Create `packages/plugins/github/` with standard plugin structure
-2. Extract `packages/agent/src/git/github.service.ts` to plugin
-3. Implement `IGitProviderPlugin` interface
-4. Implement `IOAuthPlugin` interface
-5. Add settings schema (API token, OAuth credentials)
-
-**Files to reference:**
-
-- Interface: `packages/plugin/src/contracts/capabilities/git-provider.interface.ts`
-- Existing service: `packages/agent/src/git/github.service.ts`
-- Example plugin: `packages/plugins/tavily-search/`
-
-**Settings Schema:**
-
-```typescript
-{
-  apiToken: { type: 'string', 'x-secret': true, 'x-envVar': 'GITHUB_TOKEN' },
-  appId: { type: 'string' },
-  appPrivateKey: { type: 'string', 'x-secret': true },
-  clientId: { type: 'string' },
-  clientSecret: { type: 'string', 'x-secret': true }
-}
-```
+- Full `IGitProviderPlugin` interface implementation
+- Full `IOAuthPlugin` interface implementation
+- Settings schema with `x-envVar` annotations for `GH_CLIENT_ID`, `GH_CLIENT_SECRET`
+- `GitHubApiService` using Octokit for all API operations
+- `GitHubActionsService` for workflow and secrets management
+- Support for GitHub Enterprise via configurable `apiBaseUrl`
 
 ---
 
-### Task 2: Create GitFacade Service
+### ✅ Task 2: Create GitFacade Service - COMPLETED
 
-**Estimated effort:** 0.5-1 day
-**Unblocks:** Story 5.2, Story 10.1, Story 10a.4-10a.5, Story 10a.10-10a.11
+**Status:** ✅ Done (2026-02-02)
+**Location:** `packages/agent/src/facades/git.facade.ts`
 
-**What to do:**
+**What was implemented:**
 
-1. Create `packages/agent/src/facades/git.facade.ts`
-2. Extend `BaseFacadeService` (follow existing patterns)
-3. Implement `IGitFacade` interface methods
-4. Add to `FacadesModule` exports
+- Full facade with token resolution from OAuthTokenRepository
+- OAuth methods: `getOAuthUrl()`, `exchangeCodeForToken()`, `getOAuthUser()`
+- Repository operations: list, create, delete, update, fork
+- Branch operations: list, create, delete
+- Pull request operations: create, get, merge
+- Local git operations: clone, pull, add, commit, push
+- Provider resolution with directory/user/default fallback
 
-**Key methods:**
+**OAuth Flow:**
 
-```typescript
-interface IGitFacade {
-	// Repository operations
-	getRepositories(userId: string): Promise<Repository[]>;
-	createRepository(options: CreateRepoOptions): Promise<Repository>;
-
-	// Authentication
-	getToken(userId: string, provider?: string): Promise<string | null>;
-	getCommitter(userId: string): Promise<GitCommitter>;
-
-	// Pull Request operations
-	createPullRequest(options: CreatePROptions): Promise<PullRequest>;
-	getPullRequestStatus(prUrl: string): Promise<PRStatus>;
-
-	// OAuth
-	getOAuthUrl(provider: string, scopes: string[]): string;
-	handleOAuthCallback(code: string, provider: string): Promise<OAuthToken>;
-}
-```
+- Separated from authentication OAuth (login)
+- New endpoint: `/api/git-providers/:providerId/callback`
+- New frontend route: `/api/git-providers/[providerId]/callback`
+- Plugin-based OAuth via `IOAuthPlugin` interface
 
 ---
 
-### Task 3: Create Vercel Plugin Package
+### Task 3: Create Vercel Plugin Package - PRIORITY
 
 **Estimated effort:** 1-2 days
 **Unblocks:** DeployFacade, Story 6.x, Story 10a.1
+**Status:** 🔴 Pending
 
 **What to do:**
 
@@ -123,28 +99,30 @@ interface IGitFacade {
 
 - Interface: `packages/plugin/src/contracts/capabilities/deployment.interface.ts`
 - Existing service: `packages/agent/src/deploy/vercel.service.ts`
+- GitHub plugin (example): `packages/plugins/github/`
 
 **Settings Schema:**
 
 ```typescript
 {
   apiToken: { type: 'string', 'x-secret': true, 'x-envVar': 'VERCEL_TOKEN' },
-  teamId: { type: 'string' },
+  teamId: { type: 'string', 'x-envVar': 'VERCEL_TEAM_ID' },
   defaultProjectSettings: { type: 'object' }
 }
 ```
 
 ---
 
-### Task 4: Create DeployFacade Service
+### Task 4: Create DeployFacade Service - PRIORITY
 
 **Estimated effort:** 0.5-1 day
 **Unblocks:** Story 6.2, Story 10.2, Story 10a.1
+**Status:** 🔴 Pending
 
 **What to do:**
 
 1. Create `packages/agent/src/facades/deploy.facade.ts`
-2. Extend `BaseFacadeService`
+2. Follow GitFacade patterns for plugin resolution
 3. Implement `IDeployFacade` interface methods
 4. Add to `FacadesModule` exports
 
@@ -241,39 +219,45 @@ Directory.getRepoOwner() → GitFacade.getRepoOwner(directoryId)
 ```
                     ┌─────────────────┐
                     │  GitHub Plugin  │
-                    │   (Task 1)      │
+                    │   ✅ DONE       │
                     └────────┬────────┘
                              │
                              ▼
 ┌─────────────────┐   ┌─────────────────┐   ┌─────────────────┐
-│  Vercel Plugin  │   │    GitFacade    │   │  OAuthFacade    │
-│   (Task 3)      │   │   (Task 2)      │   │   (Future)      │
-└────────┬────────┘   └────────┬────────┘   └────────┬────────┘
-         │                     │                     │
-         ▼                     ▼                     ▼
-┌─────────────────┐   ┌─────────────────────────────────────────┐
-│  DeployFacade   │   │           Story 10a: Entity Migration   │
-│   (Task 4)      │   │  (User.vercelToken, OAuthToken, etc.)   │
-└────────┬────────┘   └────────────────────┬────────────────────┘
+│  Vercel Plugin  │   │    GitFacade    │   │  Git OAuth API  │
+│   (Task 3)      │   │   ✅ DONE       │   │   ✅ DONE       │
+│   🔴 PENDING    │   └────────┬────────┘   └────────┬────────┘
+└────────┬────────┘            │                     │
+         │                     ▼                     ▼
+         │            ┌─────────────────────────────────────────┐
+         │            │           Story 10a: Entity Migration   │
+         │            │  (Git operations ready, need deploy)    │
+         │            └────────────────────┬────────────────────┘
          │                                 │
-         └─────────────┬───────────────────┘
-                       ▼
-         ┌─────────────────────────────────┐
-         │   Frontend Completion           │
-         │   (Stories 12, 14, 15, 16)      │
-         │   - DeployForm                  │
-         │   - RepositorySelector          │
-         │   - GitConnectionAlert          │
-         │   - OAuthConnections            │
-         └─────────────────────────────────┘
-                       │
-                       ▼
-         ┌─────────────────────────────────┐
-         │   API Refactoring (Story 11)    │
-         │   - Generic /deploy/:provider   │
-         │   - Plugin-based OAuth          │
-         │   - Remove hardcoded providers  │
-         └─────────────────────────────────┘
+         ▼                                 │
+┌─────────────────┐                        │
+│  DeployFacade   │                        │
+│   (Task 4)      │────────────────────────┘
+│   🔴 PENDING    │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────────────────────┐
+│   Frontend Completion           │
+│   (Stories 12, 14, 15, 16)      │
+│   - DeployForm                  │
+│   - RepositorySelector ✅       │
+│   - GitConnectionAlert ✅       │
+│   - OAuthConnections            │
+└─────────────────────────────────┘
+         │
+         ▼
+┌─────────────────────────────────┐
+│   API Refactoring (Story 11)    │
+│   - Generic /deploy/:provider   │
+│   - Plugin-based OAuth ✅ Git   │
+│   - Remove hardcoded providers  │
+└─────────────────────────────────┘
 ```
 
 ---
@@ -363,17 +347,18 @@ export class MyFacadeService extends BaseFacadeService implements IMyFacade {
 
 ## Estimated Timeline
 
-| Task                   | Effort       | Dependencies         |
-| ---------------------- | ------------ | -------------------- |
-| GitHub Plugin          | 1-2 days     | None                 |
-| GitFacade              | 0.5-1 day    | GitHub Plugin        |
-| Vercel Plugin          | 1-2 days     | None                 |
-| DeployFacade           | 0.5-1 day    | Vercel Plugin        |
-| **Total for blockers** | **3-6 days** |                      |
-| OpenAI Plugin          | 1 day        | None (non-blocking)  |
-| Anthropic Plugin       | 1 day        | None (non-blocking)  |
-| Story 10a Migrations   | 2-3 days     | Git + Deploy facades |
-| Frontend completion    | 2-3 days     | Story 10a            |
-| API refactoring        | 3-5 days     | Frontend completion  |
+| Task                 | Effort         | Status           | Dependencies        |
+| -------------------- | -------------- | ---------------- | ------------------- |
+| GitHub Plugin        | 1-2 days       | ✅ Done          | None                |
+| GitFacade            | 0.5-1 day      | ✅ Done          | GitHub Plugin       |
+| Git OAuth Separation | 0.5 day        | ✅ Done          | GitFacade           |
+| Vercel Plugin        | 1-2 days       | 🔴 Pending       | None                |
+| DeployFacade         | 0.5-1 day      | 🔴 Pending       | Vercel Plugin       |
+| **Total remaining**  | **1.5-3 days** |                  |                     |
+| OpenAI Plugin        | 1 day          | Optional         | None (non-blocking) |
+| Anthropic Plugin     | 1 day          | Optional         | None (non-blocking) |
+| Story 10a Migrations | 2-3 days       | 🟡 Partial ready | Deploy facade       |
+| Frontend completion  | 2-3 days       | 🟡 Partial done  | Story 10a           |
+| API refactoring      | 3-5 days       | 🟡 Partial done  | Frontend completion |
 
-**Estimated time to unblock everything: ~2-3 weeks of focused work**
+**Estimated time to unblock everything: ~1-2 weeks of focused work**

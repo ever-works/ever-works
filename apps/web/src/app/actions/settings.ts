@@ -7,7 +7,6 @@ import { revalidatePath } from 'next/cache';
 import { ROUTES } from '@/lib/constants';
 import { getTranslations } from 'next-intl/server';
 import { VALIDATION_RULES } from './validation';
-import { OAuthProvider } from '@/lib/api/enums';
 import { deployAPI } from '@/lib/api/deploy';
 
 // Note: Validation schemas are now created inside each function with translations
@@ -161,28 +160,6 @@ export async function removeVercelToken() {
         return {
             success: false,
             error: error?.message || t('removeFailed'),
-        };
-    }
-}
-
-// OAuth Actions
-export async function disconnectGitHub() {
-    const t = await getTranslations('actions.settings.github');
-
-    try {
-        const user = await getAuthFromCookie();
-        if (!user) {
-            return { success: false, error: t('notAuthenticated') };
-        }
-
-        await authAPI.oauth_connections.disconnect(OAuthProvider.GITHUB);
-        revalidatePath(ROUTES.DASHBOARD_SETTINGS_OAUTH);
-
-        return { success: true, message: t('disconnectSuccess') };
-    } catch (error: any) {
-        return {
-            success: false,
-            error: error?.message || t('disconnectFailed'),
         };
     }
 }

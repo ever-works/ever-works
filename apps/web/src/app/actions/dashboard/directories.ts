@@ -6,19 +6,17 @@ import {
     CreateDirectoryDto,
     itemsGeneratorAPI,
     UpdateDirectoryDto,
-    ConnectionInfo,
     DeleteDirectoryDto,
-    authAPI,
     SyncDirectoryResponse,
     AnalyzeRepositoryResponseDto,
     ImportSourceType,
     GetUserRepositoriesResponseDto,
     UpdateDirectorySchedulePayload,
     UpdateDirectoryAdvancedPromptsDto,
+    GitProviderConnectionInfo,
 } from '@/lib/api';
 import { getAuthFromCookie } from '@/lib/auth';
-import { checkOAuthConnection } from './oauth';
-import { RepoProvider } from '@/lib/api/enums';
+import { checkGitProviderConnection } from './oauth';
 import { getTranslations } from 'next-intl/server';
 import { revalidatePath } from 'next/cache';
 import { ROUTES } from '@/lib/constants';
@@ -56,7 +54,7 @@ const getCreateDirectorySchema = async () => {
             .optional()
             .transform((val) => val?.trim()),
         organization: z.boolean(),
-        repoProvider: z.nativeEnum(RepoProvider).optional().default(RepoProvider.GITHUB),
+        repoProvider: z.string().optional(),
         readmeConfig: readmeConfigSchema.optional(),
     });
 
@@ -64,37 +62,37 @@ const getCreateDirectorySchema = async () => {
 };
 
 const checkOrganization = (
-    oauthConnect: ConnectionInfo,
+    connectionInfo: GitProviderConnectionInfo | null,
     data: { owner?: string; organization?: boolean },
 ) => {
-    if (!oauthConnect.connected) {
+    if (!connectionInfo?.connected) {
         return {
             organization: data.organization || false,
-            owner: data.owner || null,
+            owner: data.owner || undefined,
         };
     }
 
-    const oauthUsername = oauthConnect.username || oauthConnect.metadata?.login;
+    const username = connectionInfo.username;
 
     if (!data.organization) {
         return {
             organization: false,
-            owner: oauthUsername || null,
+            owner: username || undefined,
         };
     }
 
     const owner = data.owner?.trim();
 
-    if (owner && oauthUsername && owner !== oauthUsername) {
+    if (owner && username && owner !== username) {
         return {
             organization: true,
-            owner: owner || null,
+            owner: owner || undefined,
         };
     }
 
     return {
         organization: false,
-        owner: oauthUsername || null,
+        owner: username || undefined,
     };
 };
 
@@ -113,26 +111,33 @@ export async function createDirectory(data: CreateDirectoryDto) {
             };
         }
 
-        // We need to ensure that oauth connection is valid or revoke it if not
-        await authAPI.oauth_connections.ensureConnection(validation.data.repoProvider);
-
-        // Check GitHub connection first
-        const oauthCheck = await checkOAuthConnection(validation.data.repoProvider);
-        if (!oauthCheck.connected) {
+        const providerId = validation.data.repoProvider;
+        if (!providerId) {
             return {
                 success: false,
-                error: t('githubRequired'),
-                requiresGitHub: true,
+                error: t('oauthRequired', { provider: 'git provider' }),
+                requiresGitProvider: true,
+            };
+        }
+
+        // Check git provider connection
+        const connectionCheck = await checkGitProviderConnection(providerId);
+        if (!connectionCheck.connected) {
+            return {
+                success: false,
+                error: t('oauthRequired', { provider: providerId }),
+                requiresGitProvider: true,
             };
         }
 
         const { organization, owner } = checkOrganization(
-            oauthCheck as ConnectionInfo,
+            connectionCheck as GitProviderConnectionInfo,
             validation.data,
         );
 
         validation.data.organization = organization;
         validation.data.owner = owner;
+        validation.data.repoProvider = providerId;
 
         console.log('Creating directory:', validation.data);
 
@@ -158,6 +163,7 @@ interface AIDirectoryOptions {
     prompt: string;
     organization?: boolean;
     owner?: string;
+    repoProvider?: string;
 }
 
 export async function createDirectoryWithAI(request: AIDirectoryOptions) {
@@ -175,14 +181,18 @@ export async function createDirectoryWithAI(request: AIDirectoryOptions) {
             .min(1, t('name.required'))
             .transform((val) => sanitizeName(val, 100))
             .pipe(z.string().max(100, t('name.maxLength'))),
-        repoProvider: z.nativeEnum(RepoProvider).optional().default(RepoProvider.GITHUB),
+        repoProvider: z.string().optional(),
     });
 
     const createDirectorySchema = await getCreateDirectorySchema();
 
     try {
         // Validate input
-        const validation = aiPromptSchema.safeParse({ prompt: request.prompt, name: request.name });
+        const validation = aiPromptSchema.safeParse({
+            prompt: request.prompt,
+            name: request.name,
+            repoProvider: request.repoProvider,
+        });
         if (!validation.success) {
             return {
                 success: false,
@@ -190,18 +200,22 @@ export async function createDirectoryWithAI(request: AIDirectoryOptions) {
             };
         }
 
-        const repoProvider = validation.data.repoProvider;
-
-        // We need to ensure that oauth connection is valid or revoke it if not
-        await authAPI.oauth_connections.ensureConnection(repoProvider);
-
-        // Check GitHub connection first
-        const oauthCheck = await checkOAuthConnection(repoProvider);
-        if (!oauthCheck.connected) {
+        const providerId = validation.data.repoProvider;
+        if (!providerId) {
             return {
                 success: false,
-                error: t('oauthRequired', { provider: repoProvider }),
-                requiresGitHub: true,
+                error: t('oauthRequired', { provider: 'git provider' }),
+                requiresGitProvider: true,
+            };
+        }
+
+        // Check git provider connection
+        const connectionCheck = await checkGitProviderConnection(providerId);
+        if (!connectionCheck.connected) {
+            return {
+                success: false,
+                error: t('oauthRequired', { provider: providerId }),
+                requiresGitProvider: true,
             };
         }
 
@@ -211,7 +225,10 @@ export async function createDirectoryWithAI(request: AIDirectoryOptions) {
         });
 
         // Determine organization settings
-        const { organization, owner } = checkOrganization(oauthCheck as ConnectionInfo, request);
+        const { organization, owner } = checkOrganization(
+            connectionCheck as GitProviderConnectionInfo,
+            request,
+        );
 
         const directoryData: CreateDirectoryDto = {
             name: validation.data.name,
@@ -219,7 +236,7 @@ export async function createDirectoryWithAI(request: AIDirectoryOptions) {
             description: directoryDetails.description,
             organization,
             owner,
-            repoProvider,
+            repoProvider: providerId,
         };
 
         // Validate the generated directory data
@@ -312,10 +329,13 @@ export async function updateDirectory(directoryId: string, data: UpdateDirectory
             };
         }
 
-        const oauthCheck = await checkOAuthConnection(RepoProvider.GITHUB);
+        const { directory } = await directoryAPI.get(directoryId);
+        const providerId = directory.repoProvider;
+
+        const connectionCheck = providerId ? await checkGitProviderConnection(providerId) : null;
 
         const { organization, owner } = checkOrganization(
-            oauthCheck as ConnectionInfo,
+            connectionCheck as GitProviderConnectionInfo | null,
             validation.data,
         );
 
@@ -429,7 +449,7 @@ export async function getDirectories(params: GetDirectoriesParams = {}) {
 
 // Import actions
 
-export async function analyzeRepository(sourceUrl: string) {
+export async function analyzeRepository(sourceUrl: string, providerId?: string) {
     const t = await getTranslations('actions.directories');
 
     const urlSchema = z.string().url(t('import.invalidUrl'));
@@ -443,16 +463,20 @@ export async function analyzeRepository(sourceUrl: string) {
             };
         }
 
-        // We need to ensure that oauth connection is valid or revoke it if not
-        await authAPI.oauth_connections.ensureConnection(RepoProvider.GITHUB);
-
-        // Check GitHub connection first
-        const oauthCheck = await checkOAuthConnection(RepoProvider.GITHUB);
-        if (!oauthCheck.connected) {
+        if (!providerId) {
             return {
                 success: false,
-                error: t('githubRequired'),
-                requiresGitHub: true,
+                error: t('oauthRequired', { provider: 'git provider' }),
+                requiresGitProvider: true,
+            };
+        }
+
+        const connectionCheck = await checkGitProviderConnection(providerId);
+        if (!connectionCheck.connected) {
+            return {
+                success: false,
+                error: t('oauthRequired', { provider: providerId }),
+                requiresGitProvider: true,
             };
         }
 
@@ -479,6 +503,7 @@ interface ImportDirectoryRequest {
     owner?: string;
     createMissingRepos?: boolean;
     sync?: boolean;
+    repoProvider?: string;
 }
 
 export async function importDirectory(data: ImportDirectoryRequest) {
@@ -496,6 +521,7 @@ export async function importDirectory(data: ImportDirectoryRequest) {
         owner: z.string().optional(),
         createMissingRepos: z.boolean().optional(),
         sync: z.boolean().optional(),
+        repoProvider: z.string().optional(),
     });
 
     try {
@@ -507,21 +533,27 @@ export async function importDirectory(data: ImportDirectoryRequest) {
             };
         }
 
-        // We need to ensure that oauth connection is valid or revoke it if not
-        await authAPI.oauth_connections.ensureConnection(RepoProvider.GITHUB);
-
-        // Check GitHub connection first
-        const oauthCheck = await checkOAuthConnection(RepoProvider.GITHUB);
-        if (!oauthCheck.connected) {
+        const providerId = validation.data.repoProvider;
+        if (!providerId) {
             return {
                 success: false,
-                error: t('githubRequired'),
-                requiresGitHub: true,
+                error: t('oauthRequired', { provider: 'git provider' }),
+                requiresGitProvider: true,
+            };
+        }
+
+        // Check git provider connection
+        const connectionCheck = await checkGitProviderConnection(providerId);
+        if (!connectionCheck.connected) {
+            return {
+                success: false,
+                error: t('oauthRequired', { provider: providerId }),
+                requiresGitProvider: true,
             };
         }
 
         const { organization, owner } = checkOrganization(
-            oauthCheck as ConnectionInfo,
+            connectionCheck as GitProviderConnectionInfo,
             validation.data,
         );
 
@@ -533,6 +565,7 @@ export async function importDirectory(data: ImportDirectoryRequest) {
             owner: owner || undefined,
             createMissingRepos: validation.data.createMissingRepos,
             sync: validation.data.sync,
+            repoProvider: providerId,
         });
 
         return {
@@ -555,9 +588,10 @@ interface GetUserRepositoriesParams {
     page?: number;
     perPage?: number;
     search?: string;
+    providerId: string;
 }
 
-export async function analyzeForLinking(sourceUrl: string) {
+export async function analyzeForLinking(sourceUrl: string, providerId: string) {
     const t = await getTranslations('actions.directories');
 
     const urlSchema = z.string().url(t('import.invalidUrl'));
@@ -571,16 +605,12 @@ export async function analyzeForLinking(sourceUrl: string) {
             };
         }
 
-        // We need to ensure that oauth connection is valid or revoke it if not
-        await authAPI.oauth_connections.ensureConnection(RepoProvider.GITHUB);
-
-        // Check GitHub connection first
-        const oauthCheck = await checkOAuthConnection(RepoProvider.GITHUB);
-        if (!oauthCheck.connected) {
+        const connectionCheck = await checkGitProviderConnection(providerId);
+        if (!connectionCheck.connected) {
             return {
                 success: false,
-                error: t('githubRequired'),
-                requiresGitHub: true,
+                error: t('oauthRequired', { provider: providerId }),
+                requiresGitProvider: true,
             };
         }
 
@@ -599,20 +629,18 @@ export async function analyzeForLinking(sourceUrl: string) {
     }
 }
 
-export async function getUserRepositories(params: GetUserRepositoriesParams = {}) {
+export async function getUserRepositories(params: GetUserRepositoriesParams) {
     const t = await getTranslations('actions.directories');
 
     try {
-        // We need to ensure that oauth connection is valid or revoke it if not
-        await authAPI.oauth_connections.ensureConnection(RepoProvider.GITHUB);
+        const { providerId } = params;
 
-        // Check GitHub connection first
-        const oauthCheck = await checkOAuthConnection(RepoProvider.GITHUB);
-        if (!oauthCheck.connected) {
+        const connectionCheck = await checkGitProviderConnection(providerId);
+        if (!connectionCheck.connected) {
             return {
                 success: false,
-                error: t('githubRequired'),
-                requiresGitHub: true,
+                error: t('oauthRequired', { provider: providerId }),
+                requiresGitProvider: true,
             };
         }
 

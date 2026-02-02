@@ -7,6 +7,12 @@
 export * from './api-response.types.js';
 
 // Re-export core types that are commonly used with API responses
-export type { PluginCategory, PluginAuthor, PluginIcon, PluginIconType } from '../contracts/plugin-manifest.types.js';
+export type {
+	PluginCategory,
+	PluginAuthor,
+	PluginIcon,
+	PluginIconType,
+	PluginVisibility
+} from '../contracts/plugin-manifest.types.js';
 export type { PluginState } from '../contracts/lifecycle.types.js';
 export type { ConfigurationMode } from '../settings/settings.types.js';

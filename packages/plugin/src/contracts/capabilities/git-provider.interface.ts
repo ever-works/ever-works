@@ -158,9 +158,9 @@ export interface IGitOperations {
 
 /**
  * Git provider plugin for provider-specific API operations.
- * Local git operations (clone, push, commit) come from BaseGitProvider.
+ * Also includes local git operations (clone, push, commit) via IGitOperations.
  */
-export interface IGitProviderPlugin extends IPlugin {
+export interface IGitProviderPlugin extends IPlugin, IGitOperations {
 	readonly providerName: string;
 
 	// Authentication
@@ -225,6 +225,28 @@ export interface IGitProviderPlugin extends IPlugin {
 	// Utility
 	repositoryExists?(owner: string, repo: string, token: string): Promise<boolean>;
 	getLatestCommit?(owner: string, repo: string, branch: string, token: string): Promise<GitCommit | null>;
+
+	// Content access (for analyzing repositories)
+	getFileContent?(
+		owner: string,
+		repo: string,
+		path: string,
+		ref?: string,
+		token?: string
+	): Promise<{ content: string; encoding: string } | null>;
+	getReadme?(
+		owner: string,
+		repo: string,
+		ref?: string,
+		token?: string
+	): Promise<{ content: string; path: string } | null>;
+	getRawFileUrl?(owner: string, repo: string, branch: string, path: string): string;
+	getDirectoryContents?(
+		owner: string,
+		repo: string,
+		path: string,
+		token: string
+	): Promise<Array<{ name: string; type: 'file' | 'dir' | 'submodule' | 'symlink'; path: string }> | null>;
 }
 
 export function isGitProviderPlugin(plugin: IPlugin): plugin is IGitProviderPlugin {

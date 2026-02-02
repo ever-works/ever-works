@@ -55,14 +55,6 @@ jobs:
           ALLOWED_ORIGINS: https://appdev.ever.works,https://apidev.ever.works
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
 
-          # Github
-          GH_APIKEY: ${{ secrets.GH_APIKEY }}
-          GH_OWNER: ${{ secrets.GH_OWNER }}
-
-          # Git
-          GIT_NAME: ${{ secrets.GIT_NAME }}
-          GIT_EMAIL: ${{ secrets.GIT_EMAIL }}
-
           # Trigger.dev
           TRIGGER_ENABLED: ${{ secrets.TRIGGER_ENABLED }}
           TRIGGER_SECRET_KEY: ${{ secrets.TRIGGER_SECRET_KEY }}

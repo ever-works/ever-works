@@ -6,25 +6,39 @@ import { cn } from '@/lib/utils/cn';
 import { DirectoryAICreator } from '@/components/directories/DirectoryAICreator';
 import { DirectoryManualForm } from '@/components/directories/DirectoryManualForm';
 import { DirectoryImportForm } from '@/components/directories/DirectoryImportForm';
-import { GitHubConnectionAlert } from './github-connection-alert';
-import { GitHubStatusSidebar } from './github-status-sidebar';
+import { GitProviderConnectionAlert } from './git-provider-connection-alert';
+import { GitProviderSelector } from './git-provider-selector';
 import { useTranslations } from 'next-intl';
-import { ConnectionInfo } from '@/lib/api';
+import type { ProviderWithConnection } from './page';
 
 interface NewDirectoryClientProps {
     user: AuthUser;
-    githubConnection: ConnectionInfo | null;
+    providers: ProviderWithConnection[];
+    defaultProviderId: string | null;
 }
 
-export default function NewDirectoryClient({ user, githubConnection }: NewDirectoryClientProps) {
+export default function NewDirectoryClient({
+    user,
+    providers,
+    defaultProviderId,
+}: NewDirectoryClientProps) {
     const [creationMode, setCreationMode] = useState<'ai' | 'manual' | 'import' | null>(null);
+    const [selectedProviderId, setSelectedProviderId] = useState<string | null>(
+        defaultProviderId || providers[0]?.provider.id || null,
+    );
     const t = useTranslations('dashboard.directoryCreation');
+
+    const selectedProvider = providers.find((p) => p.provider.id === selectedProviderId) || null;
+    const isConnected = selectedProvider?.connectionInfo?.connected ?? false;
 
     if (creationMode === null) {
         return (
             <div className="w-full">
-                {/* GitHub Connection Alert */}
-                <GitHubConnectionAlert githubConnected={!!githubConnection?.connected} />
+                {/* Git Provider Connection Alert */}
+                <GitProviderConnectionAlert
+                    connected={isConnected}
+                    provider={selectedProvider?.connectionInfo || null}
+                />
 
                 <div className="mb-8">
                     <h1 className="text-3xl font-bold text-text dark:text-text-dark">
@@ -35,16 +49,30 @@ export default function NewDirectoryClient({ user, githubConnection }: NewDirect
                     </p>
                 </div>
 
+                {/* Git Provider Selector */}
+                {providers.length > 0 && (
+                    <div className="mb-8">
+                        <GitProviderSelector
+                            providers={providers}
+                            selectedProviderId={selectedProviderId}
+                            onSelect={setSelectedProviderId}
+                        />
+                    </div>
+                )}
+
                 <div className="grid md:grid-cols-3 gap-6">
                     {/* AI Creation Card */}
                     <button
                         onClick={() => setCreationMode('ai')}
+                        disabled={!isConnected}
                         className={cn(
                             'p-6 rounded-lg border-2 text-left transition-all',
                             'bg-card dark:bg-card-dark',
                             'border-card-border dark:border-card-border-dark',
                             'hover:border-primary hover:shadow-lg',
                             'group',
+                            !isConnected &&
+                                'opacity-50 cursor-not-allowed hover:border-card-border',
                         )}
                     >
                         <div className="mb-4">
@@ -96,12 +124,15 @@ export default function NewDirectoryClient({ user, githubConnection }: NewDirect
                     {/* Manual Creation Card */}
                     <button
                         onClick={() => setCreationMode('manual')}
+                        disabled={!isConnected}
                         className={cn(
                             'p-6 rounded-lg border-2 text-left transition-all',
                             'bg-card dark:bg-card-dark',
                             'border-card-border dark:border-card-border-dark',
                             'hover:border-primary hover:shadow-lg',
                             'group',
+                            !isConnected &&
+                                'opacity-50 cursor-not-allowed hover:border-card-border',
                         )}
                     >
                         <div className="mb-4">
@@ -153,12 +184,15 @@ export default function NewDirectoryClient({ user, githubConnection }: NewDirect
                     {/* Import Existing Card */}
                     <button
                         onClick={() => setCreationMode('import')}
+                        disabled={!isConnected}
                         className={cn(
                             'p-6 rounded-lg border-2 text-left transition-all',
                             'bg-card dark:bg-card-dark',
                             'border-card-border dark:border-card-border-dark',
                             'hover:border-primary hover:shadow-lg',
                             'group',
+                            !isConnected &&
+                                'opacity-50 cursor-not-allowed hover:border-card-border',
                         )}
                     >
                         <div className="mb-4">
@@ -237,13 +271,43 @@ export default function NewDirectoryClient({ user, githubConnection }: NewDirect
                     </button>
                 </div>
 
-                {creationMode === 'ai' && <DirectoryAICreator user={user} />}
-                {creationMode === 'manual' && <DirectoryManualForm user={user} />}
-                {creationMode === 'import' && <DirectoryImportForm user={user} />}
+                {creationMode === 'ai' && (
+                    <DirectoryAICreator repoProvider={selectedProviderId || undefined} />
+                )}
+                {creationMode === 'manual' && (
+                    <DirectoryManualForm
+                        user={user}
+                        repoProvider={selectedProviderId || undefined}
+                    />
+                )}
+                {creationMode === 'import' && (
+                    <DirectoryImportForm
+                        user={user}
+                        repoProvider={selectedProviderId || undefined}
+                    />
+                )}
             </div>
 
-            {/* GitHub Status Sidebar */}
-            <GitHubStatusSidebar user={user} githubConnection={githubConnection} />
+            {/* Git Provider Selector Sidebar */}
+            <aside className="w-80 shrink-0">
+                <div
+                    className={cn(
+                        'sticky top-8 p-6 rounded-lg',
+                        'bg-card dark:bg-card-dark',
+                        'border border-card-border dark:border-card-border-dark',
+                    )}
+                >
+                    <h3 className="font-medium text-text dark:text-text-dark mb-4">
+                        {t('sidebar.selectedProvider')}
+                    </h3>
+                    <GitProviderSelector
+                        providers={providers}
+                        selectedProviderId={selectedProviderId}
+                        onSelect={setSelectedProviderId}
+                        compact
+                    />
+                </div>
+            </aside>
         </div>
     );
 }

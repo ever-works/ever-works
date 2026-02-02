@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { AuthUser } from '@/lib/auth';
 import { cn } from '@/lib/utils/cn';
 import { toast } from 'sonner';
 import { createDirectoryWithAI } from '@/app/actions/dashboard';
@@ -15,10 +14,10 @@ import { OrganizationSelector } from './OrganizationSelector';
 import { ChevronDown, Lightbulb, Check } from 'lucide-react';
 
 interface DirectoryAICreatorProps {
-    user: AuthUser;
+    repoProvider?: string;
 }
 
-export function DirectoryAICreator({ user }: DirectoryAICreatorProps) {
+export function DirectoryAICreator({ repoProvider }: DirectoryAICreatorProps) {
     const [prompt, setPrompt] = useState('');
     const [directoryName, setDirectoryName] = useState('');
     const [organization, setOrganization] = useState(false);
@@ -45,6 +44,7 @@ export function DirectoryAICreator({ user }: DirectoryAICreatorProps) {
                 prompt,
                 organization,
                 owner: organization ? owner : undefined,
+                repoProvider,
             });
 
             if (result.success) {
@@ -58,8 +58,8 @@ export function DirectoryAICreator({ user }: DirectoryAICreatorProps) {
                 } else {
                     router.push(ROUTES.DASHBOARD_DIRECTORIES);
                 }
-            } else if (result.requiresGitHub) {
-                toast.error(result.error || t('githubRequired'));
+            } else if (result.requiresGitProvider) {
+                toast.error(result.error || 'Git provider connection required');
                 router.push(ROUTES.DASHBOARD_DIRECTORIES_NEW);
             } else {
                 toast.error(result.error || 'Failed to create directory');
@@ -141,7 +141,7 @@ export function DirectoryAICreator({ user }: DirectoryAICreatorProps) {
                             {/* Organization Selector */}
                             <OrganizationSelector
                                 value={owner}
-                                authId={user.sub}
+                                providerId={repoProvider!}
                                 onChange={(value, isOrganization) => {
                                     setOwner(value);
                                     setOrganization(isOrganization);

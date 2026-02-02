@@ -1,21 +1,21 @@
 import { Module } from '@nestjs/common';
 import { PluginsModule } from '../plugins/plugins.module';
+import { DatabaseModule } from '../database/database.module';
 
 import { AiFacadeService } from './ai.facade';
 import { SearchFacadeService } from './search.facade';
 import { ScreenshotFacadeService } from './screenshot.facade';
 import { ContentExtractorFacadeService } from './content-extractor.facade';
 import { DataSourceFacadeService } from './data-source.facade';
+import { GitFacadeService } from './git.facade';
 
-/**
- * All facade providers
- */
 const FACADES = [
     AiFacadeService,
     SearchFacadeService,
     ScreenshotFacadeService,
     ContentExtractorFacadeService,
     DataSourceFacadeService,
+    GitFacadeService,
 ];
 
 /**
@@ -38,7 +38,7 @@ const FACADES = [
  * 4. Plugin defaults
  */
 @Module({
-    imports: [PluginsModule],
+    imports: [PluginsModule, DatabaseModule],
     providers: FACADES,
     exports: FACADES,
 })

@@ -7,7 +7,6 @@ import { toast } from 'sonner';
 import type { CreateDirectoryDto } from '@/lib/api/directory';
 import { createDirectory } from '@/app/actions/dashboard';
 import { ROUTES } from '@/lib/constants';
-import { RepoProvider } from '@/lib/api/enums';
 import { useRouter } from '@/i18n/navigation';
 import { useTranslations } from 'next-intl';
 import { Input } from '@/components/ui/input';
@@ -19,21 +18,21 @@ import { ChevronDown, Plus } from 'lucide-react';
 
 interface DirectoryManualFormProps {
     user: AuthUser;
+    repoProvider?: string;
 }
 
-export function DirectoryManualForm({ user }: DirectoryManualFormProps) {
+export function DirectoryManualForm({ user, repoProvider }: DirectoryManualFormProps) {
     const [showAdvanced, setShowAdvanced] = useState(false);
     const [isPending, startTransition] = useTransition();
     const router = useRouter();
     const t = useTranslations('dashboard.directoryCreation.manual');
 
-    // Form state
+    // Form state - repoProvider is determined automatically by backend
     const [formData, setFormData] = useState<CreateDirectoryDto>({
         slug: '',
         name: '',
         description: '',
         organization: false,
-        repoProvider: RepoProvider.GITHUB,
         owner: '',
         readmeConfig: {
             header: '',
@@ -61,7 +60,7 @@ export function DirectoryManualForm({ user }: DirectoryManualFormProps) {
         }
 
         startTransition(async () => {
-            const result = await createDirectory(formData);
+            const result = await createDirectory({ ...formData, repoProvider });
 
             if (result.success) {
                 toast.success(result.message || t('success.created'));
@@ -71,8 +70,8 @@ export function DirectoryManualForm({ user }: DirectoryManualFormProps) {
                 } else {
                     router.push(ROUTES.DASHBOARD_DIRECTORIES);
                 }
-            } else if (result.requiresGitHub) {
-                toast.error(result.error || t('githubRequired'));
+            } else if (result.requiresGitProvider) {
+                toast.error(result.error || 'Git provider connection required');
                 router.push(ROUTES.DASHBOARD_DIRECTORIES_NEW);
             } else {
                 toast.error(result.error || 'Failed to create directory');
@@ -198,7 +197,7 @@ export function DirectoryManualForm({ user }: DirectoryManualFormProps) {
                         {/* Organization Selector */}
                         <OrganizationSelector
                             value={formData.owner || ''}
-                            authId={user.sub}
+                            providerId={repoProvider!}
                             onChange={(value, isOrganization) => {
                                 setFormData({
                                     ...formData,

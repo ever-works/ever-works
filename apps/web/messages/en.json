@@ -252,7 +252,7 @@
                 "profile": "Profile",
                 "security": "Security",
                 "apiTokens": "API & Tokens",
-                "oauth": "Connected Accounts",
+                "gitProviders": "Git Providers",
                 "notifications": "Notifications",
                 "dangerZone": "Danger Zone"
             },
@@ -1272,6 +1272,9 @@
             "title": "Create New Directory",
             "subtitle": "Choose how you'd like to create your directory",
             "backToOptions": "Back to options",
+            "sidebar": {
+                "selectedProvider": "Selected Provider"
+            },
             "organizationSelector": {
                 "label": "Repository Owner",
                 "loading": "Loading organizations...",
@@ -1512,26 +1515,41 @@
                 }
             }
         },
-        "github": {
+        "gitProvider": {
             "connection": {
                 "alert": {
-                    "title": "GitHub not connected",
-                    "subtitle": "Connect your GitHub account to create and manage directories",
-                    "connectButton": "Connect GitHub",
+                    "title": "{provider} not connected",
+                    "subtitle": "Connect your {provider} account to create directories",
+                    "connectButton": "Connect {provider}",
                     "connectingButton": "Connecting..."
-                },
-                "status": {
-                    "title": "GitHub Status",
-                    "connected": "Connected",
-                    "notConnected": "Not connected",
-                    "connectedDescription": "Your directories will be stored as GitHub repositories in your account.",
-                    "notConnectedDescription": "Connect your GitHub account to create and manage directories.",
-                    "connectedAccount": "Connected account:",
-                    "requiredNote": "Required to create directories",
-                    "connectButton": "Connect GitHub",
-                    "connectingButton": "Connecting...",
-                    "failedToConnect": "Failed to connect GitHub"
                 }
+            },
+            "selector": {
+                "title": "Select Git Provider",
+                "noProviders": "No git providers available",
+                "notConnected": "Not connected",
+                "connected": "Connected",
+                "connecting": "Connecting...",
+                "connect": "Connect"
+            },
+            "settings": {
+                "title": "Git Provider Connections",
+                "subtitle": "Connect your git provider accounts to import repositories, create directories, and manage your projects.",
+                "connectedCount": "{count, plural, =0 {No providers connected} =1 {1 provider connected} other {# providers connected}}",
+                "noProvidersConnected": "No providers connected",
+                "canImport": "You can import and manage repositories",
+                "connectToStart": "Connect a provider to get started",
+                "noProvidersTitle": "No Git Providers Available",
+                "noProvidersSubtitle": "No git provider plugins are currently enabled. Contact your administrator to enable git provider plugins.",
+                "reconnect": "Reconnect",
+                "reconnecting": "Reconnecting...",
+                "disconnect": "Disconnect",
+                "connect": "Connect {provider}",
+                "connecting": "Connecting...",
+                "organizations": "Organizations ({count})",
+                "organizationsNote": "Only organizations where you have granted access are shown.",
+                "connectDescription": "Connect your {provider} account to import repositories and manage your projects.",
+                "selectedProvider": "Selected Provider"
             }
         },
         "apiTokens": {
@@ -1693,6 +1711,7 @@
             "settingsSaved": "Settings saved successfully",
             "noSettings": "This plugin has no configurable settings",
             "builtIn": "Built-in",
+            "system": "System",
             "docs": "Docs",
             "author": "Author",
             "documentation": "Documentation",

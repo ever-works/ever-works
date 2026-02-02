@@ -3,7 +3,7 @@
  * These types define the shape of plugin data returned by the API.
  */
 
-import type { PluginCategory, PluginAuthor, PluginIcon } from '../contracts/plugin-manifest.types.js';
+import type { PluginCategory, PluginAuthor, PluginIcon, PluginVisibility } from '../contracts/plugin-manifest.types.js';
 import type { PluginState } from '../contracts/lifecycle.types.js';
 import type { ConfigurationMode } from '../settings/settings.types.js';
 import type { JsonSchema } from '../settings/json-schema.types.js';
@@ -127,6 +127,10 @@ export interface PluginResponse {
 	configurationMode: ConfigurationMode;
 	/** Whether plugin is built-in */
 	builtIn: boolean;
+	/** Whether this is a system plugin that cannot be disabled */
+	systemPlugin: boolean;
+	/** UI visibility: 'public', 'hidden', or 'advanced' */
+	visibility: PluginVisibility;
 	/** Plugin state */
 	state: PluginState;
 	/** Plugin icon */

@@ -60,7 +60,7 @@ export class UserRepository {
 
         if (!username.trim()) {
             throw new Error(
-                'GitHub username or Git name cannot both be empty. Please ensure you have configured these environment variables.',
+                'Git provider username or Git name cannot both be empty. Please ensure you have configured these environment variables.',
             );
         }
 

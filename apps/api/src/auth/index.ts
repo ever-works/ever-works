@@ -7,6 +7,3 @@ export * from './decorators/public.decorator';
 export * from './decorators/user.decorator';
 export * from './dto/auth.dto';
 export * from './services/oauth-token.service';
-export * from './services/oauth-connection.service';
-export * from './services/github-token.service';
-export * from './controllers/oauth-connections.controller';

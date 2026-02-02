@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { GithubService } from './github.service';
-import { WEBSITE_TEMPLATE_CONFIG } from '../generators/website-generator/config/website-template.config';
-import { ICommitter } from './git.provider';
+import { GitFacadeService } from '../../facades/git.facade';
+import { WEBSITE_TEMPLATE_CONFIG } from './config/website-template.config';
+import type { GitCommitter } from '@ever-works/plugin';
 import * as fs from 'node:fs/promises';
 
 export interface BranchSyncResult {
@@ -25,27 +25,30 @@ export class BranchSyncService {
     // Control parallelism to avoid rate limiting
     private readonly MAX_CONCURRENT_SYNCS = 3;
 
-    constructor(private readonly githubService: GithubService) {}
+    constructor(private readonly gitFacade: GitFacadeService) {}
 
     /**
      * Sync branches from template repository to target repository
      * @param params.branchMapping - Optional mapping to also push source branch to different target (e.g., { 'stage': 'main' })
+     * @param params.providerId - Git provider to use (e.g., 'github', 'gitlab')
      */
     async syncAllBranches(params: {
         targetOwner: string;
         targetRepo: string;
-        token: string;
-        committer: ICommitter;
+        userId: string;
+        committer: GitCommitter;
         forcePush?: boolean;
         branchMapping?: { [sourceBranch: string]: string };
+        providerId?: string;
     }): Promise<BranchSyncSummary> {
         const {
             targetOwner,
             targetRepo,
-            token,
+            userId,
             committer,
             forcePush = true,
             branchMapping = {},
+            providerId,
         } = params;
 
         const branchesToSync = [...WEBSITE_TEMPLATE_CONFIG.syncBranches];
@@ -88,9 +91,10 @@ export class BranchSyncService {
                         targetBranch: op.targetBranch,
                         targetOwner,
                         targetRepo,
-                        token,
+                        userId,
                         committer,
                         forcePush,
+                        providerId,
                     }),
                 ),
             );
@@ -137,18 +141,20 @@ export class BranchSyncService {
         targetBranch?: string;
         targetOwner: string;
         targetRepo: string;
-        token: string;
-        committer: ICommitter;
+        userId: string;
+        committer: GitCommitter;
         forcePush?: boolean;
+        providerId?: string;
     }): Promise<BranchSyncResult> {
         const {
             branchName,
             targetBranch = branchName,
             targetOwner,
             targetRepo,
-            token,
+            userId,
             committer,
             forcePush = true,
+            providerId,
         } = params;
 
         const mappingInfo = targetBranch !== branchName ? ` (mapped to '${targetBranch}')` : '';
@@ -159,22 +165,28 @@ export class BranchSyncService {
         let tempDir: string | null = null;
 
         try {
-            tempDir = await this.githubService.cloneBranch({
-                owner: WEBSITE_TEMPLATE_CONFIG.owner,
-                repo: WEBSITE_TEMPLATE_CONFIG.repo,
-                branch: branchName,
-                token,
-            });
+            // Clone template branch
+            tempDir = await this.gitFacade.cloneOrPull(
+                {
+                    owner: WEBSITE_TEMPLATE_CONFIG.owner,
+                    repo: WEBSITE_TEMPLATE_CONFIG.repo,
+                    branch: branchName,
+                    committer,
+                },
+                { userId, providerId },
+            );
 
+            // Rename branch if needed
             if (targetBranch !== branchName) {
-                await this.githubService.renameBranch(tempDir, branchName, targetBranch);
+                await this.renameBranch(tempDir, branchName, targetBranch);
             }
 
-            const targetRepoUrl = this.githubService.getURL(targetOwner, targetRepo);
-            await this.githubService.remoteRemove(tempDir, 'origin');
-            await this.githubService.remoteAdd(tempDir, 'origin', targetRepoUrl);
+            // Update remote to point to target repo
+            const targetRepoUrl = this.gitFacade.getCloneUrl(providerId, targetOwner, targetRepo);
+            await this.updateRemote(tempDir, targetRepoUrl);
 
-            await this.githubService.push(tempDir, token, forcePush);
+            // Push to target
+            await this.gitFacade.push({ dir: tempDir, force: forcePush }, { userId, providerId });
 
             return {
                 branch: branchName,
@@ -194,5 +206,31 @@ export class BranchSyncService {
                 await fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
             }
         }
+    }
+
+    private async renameBranch(dir: string, oldName: string, newName: string): Promise<void> {
+        const git = await import('isomorphic-git');
+        const nodeFs = await import('node:fs');
+
+        await git.renameBranch({
+            fs: nodeFs.default,
+            dir,
+            oldref: oldName,
+            ref: newName,
+            checkout: true,
+        });
+    }
+
+    private async updateRemote(dir: string, newRemoteUrl: string): Promise<void> {
+        const git = await import('isomorphic-git');
+        const nodeFs = await import('node:fs');
+
+        try {
+            await git.deleteRemote({ fs: nodeFs.default, dir, remote: 'origin' });
+        } catch {
+            // Remote might not exist
+        }
+
+        await git.addRemote({ fs: nodeFs.default, dir, remote: 'origin', url: newRemoteUrl });
     }
 }

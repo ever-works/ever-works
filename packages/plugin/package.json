@@ -48,6 +48,10 @@
 		"./api": {
 			"types": "./dist/api/index.d.ts",
 			"import": "./dist/api/index.js"
+		},
+		"./git": {
+			"types": "./dist/git/index.d.ts",
+			"import": "./dist/git/index.js"
 		}
 	},
 	"files": [
@@ -61,10 +65,18 @@
 	},
 	"devDependencies": {
 		"@types/node": "^22.19.3",
+		"isomorphic-git": "^1.36.3",
 		"tsup": "^8.0.0",
 		"typescript": "^5.9.3"
 	},
-	"peerDependencies": {},
+	"peerDependencies": {
+		"isomorphic-git": "^1.27.0"
+	},
+	"peerDependenciesMeta": {
+		"isomorphic-git": {
+			"optional": true
+		}
+	},
 	"dependencies": {
 		"@ever-works/contracts": "workspace:*"
 	}

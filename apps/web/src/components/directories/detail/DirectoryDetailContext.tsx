@@ -1,13 +1,12 @@
 'use client';
 
-import { RepoProvider } from '@/lib/api/enums';
-import { ConnectionInfo, Directory, DirectoryConfig } from '@/lib/api/types-only';
+import { GitProviderConnectionInfo, Directory, DirectoryConfig } from '@/lib/api/types-only';
 import { DirectoryPermissions, getPermissions } from '@/lib/permissions';
 import { createContext, PropsWithChildren, useContext, useMemo } from 'react';
 
 type DirectoryDetailContextType = {
     directory: Directory;
-    oauthConnection: ConnectionInfo | null;
+    oauthConnection: GitProviderConnectionInfo | null;
     config: DirectoryConfig | null;
     repoLinks: {
         main: string | null;
@@ -28,7 +27,7 @@ export const DirectoryDetailProvider = ({
     children,
 }: PropsWithChildren<{
     directory: Directory;
-    oauthConnection: ConnectionInfo | null;
+    oauthConnection: GitProviderConnectionInfo | null;
     config: DirectoryConfig | null;
 }>) => {
     const value = useMemo(() => {
@@ -55,31 +54,35 @@ export const useDirectoryDetail = () => {
     return context;
 };
 
-/**
- * Hook to get just the permissions from the context.
- */
 export const useDirectoryPermissions = () => {
     const { permissions } = useDirectoryDetail();
     return permissions;
 };
 
-function repoLink(directory: Directory, oauthConnection: ConnectionInfo | null) {
+function getProviderBaseUrl(providerId: string): string | null {
+    switch (providerId.toLowerCase()) {
+        case 'github':
+            return 'https://github.com';
+        case 'gitlab':
+            return 'https://gitlab.com';
+        case 'bitbucket':
+            return 'https://bitbucket.org';
+        default:
+            return null;
+    }
+}
+
+function repoLink(directory: Directory, oauthConnection: GitProviderConnectionInfo | null) {
     if (!oauthConnection?.connected) {
         return null;
     }
 
-    let providerUrl: string | null = null;
-
-    switch (directory.repoProvider) {
-        case RepoProvider.GITHUB:
-            providerUrl = 'https://github.com';
-            break;
-
-        default:
-            return null;
+    const providerUrl = getProviderBaseUrl(directory.repoProvider);
+    if (!providerUrl) {
+        return null;
     }
 
-    const username = directory.owner || oauthConnection.username || oauthConnection.metadata?.login;
+    const username = directory.owner || oauthConnection.username;
     if (!username) {
         return null;
     }

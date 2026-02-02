@@ -166,13 +166,7 @@ export class Directory {
     }
 
     getRepoOwner(): string {
-        const oauthToken = (this.user?.oauthTokens || []).find(
-            (token) => token.provider === this.repoProvider,
-        );
-
-        return (
-            this.owner || oauthToken?.username || oauthToken?.metadata?.login || this.user.username
-        );
+        return this.owner || this.user?.username || '';
     }
 
     /**

@@ -156,10 +156,16 @@ export class PluginSettingsService {
         // Extract setting definitions for scope and secret validation
         const definitions = this.extractSettingDefinitions(registered.plugin.settingsSchema);
 
+        // SECURITY: Filter out x-envVar fields - they must NEVER be stored in database
+        const filteredSettings = this.filterEnvVarFields(
+            settings,
+            registered.plugin.settingsSchema,
+        );
+
         // Validate scope - admin can only set global or user-scoped settings
         const scopeValidation = this.validateSettingsScope(
             definitions,
-            Object.keys(settings),
+            Object.keys(filteredSettings),
             'global',
         );
         if (!scopeValidation.valid) {
@@ -167,7 +173,7 @@ export class PluginSettingsService {
         }
 
         // Validate settings against schema
-        const validation = await registered.plugin.validateSettings(settings);
+        const validation = await registered.plugin.validateSettings(filteredSettings);
         if (!validation.valid) {
             throw new Error(
                 `Invalid settings: ${validation.errors?.map((e) => e.message).join(', ')}`,
@@ -186,7 +192,7 @@ export class PluginSettingsService {
             }
         }
 
-        for (const [key, value] of Object.entries(settings)) {
+        for (const [key, value] of Object.entries(filteredSettings)) {
             if (secretKeys.has(key)) {
                 secretSettings[key] = value;
             } else {
@@ -205,7 +211,7 @@ export class PluginSettingsService {
         }
 
         // Check if any changed settings require restart
-        const changedKeys = Object.keys(settings);
+        const changedKeys = Object.keys(filteredSettings);
         const requiresRestart = this.checkRequiresRestart(definitions, changedKeys);
 
         // Emit settings changed event
@@ -237,10 +243,16 @@ export class PluginSettingsService {
         // Extract setting definitions for scope and secret validation
         const definitions = this.extractSettingDefinitions(registered.plugin.settingsSchema);
 
+        // SECURITY: Filter out x-envVar fields - they must NEVER be stored in database
+        const filteredSettings = this.filterEnvVarFields(
+            settings,
+            registered.plugin.settingsSchema,
+        );
+
         // Validate scope - user can set global or user-scoped settings, not directory-only
         const scopeValidation = this.validateSettingsScope(
             definitions,
-            Object.keys(settings),
+            Object.keys(filteredSettings),
             'user',
         );
         if (!scopeValidation.valid) {
@@ -248,7 +260,7 @@ export class PluginSettingsService {
         }
 
         // Validate settings against schema
-        const validation = await registered.plugin.validateSettings(settings);
+        const validation = await registered.plugin.validateSettings(filteredSettings);
         if (!validation.valid) {
             throw new Error(
                 `Invalid settings: ${validation.errors?.map((e) => e.message).join(', ')}`,
@@ -266,7 +278,7 @@ export class PluginSettingsService {
             }
         }
 
-        for (const [key, value] of Object.entries(settings)) {
+        for (const [key, value] of Object.entries(filteredSettings)) {
             if (secretKeys.has(key)) {
                 secretSettings[key] = value;
             } else {
@@ -300,7 +312,7 @@ export class PluginSettingsService {
         }
 
         // Check if any changed settings require restart
-        const changedKeys = Object.keys(settings);
+        const changedKeys = Object.keys(filteredSettings);
         const requiresRestart = this.checkRequiresRestart(definitions, changedKeys);
 
         // Emit settings changed event
@@ -333,10 +345,16 @@ export class PluginSettingsService {
         // Extract setting definitions for scope and secret validation
         const definitions = this.extractSettingDefinitions(registered.plugin.settingsSchema);
 
+        // SECURITY: Filter out x-envVar fields - they must NEVER be stored in database
+        const filteredSettings = this.filterEnvVarFields(
+            settings,
+            registered.plugin.settingsSchema,
+        );
+
         // Validate scope - directory can set any scope (most permissive level)
         const scopeValidation = this.validateSettingsScope(
             definitions,
-            Object.keys(settings),
+            Object.keys(filteredSettings),
             'directory',
         );
         if (!scopeValidation.valid) {
@@ -344,7 +362,7 @@ export class PluginSettingsService {
         }
 
         // Validate settings against schema
-        const validation = await registered.plugin.validateSettings(settings);
+        const validation = await registered.plugin.validateSettings(filteredSettings);
         if (!validation.valid) {
             throw new Error(
                 `Invalid settings: ${validation.errors?.map((e) => e.message).join(', ')}`,
@@ -362,7 +380,7 @@ export class PluginSettingsService {
             }
         }
 
-        for (const [key, value] of Object.entries(settings)) {
+        for (const [key, value] of Object.entries(filteredSettings)) {
             if (secretKeys.has(key)) {
                 secretSettings[key] = value;
             } else {
@@ -399,7 +417,7 @@ export class PluginSettingsService {
         }
 
         // Check if any changed settings require restart
-        const changedKeys = Object.keys(settings);
+        const changedKeys = Object.keys(filteredSettings);
         const requiresRestart = this.checkRequiresRestart(definitions, changedKeys);
 
         // Emit settings changed event
@@ -754,5 +772,33 @@ export class PluginSettingsService {
         if (scope === 'directory' && !directoryId) {
             this.logger.warn('Settings changed event for directory scope missing directoryId');
         }
+    }
+
+    /**
+     * SECURITY: Filter out fields with x-envVar annotation.
+     * These must NEVER be stored in database - only read from environment variables.
+     *
+     * @param settings - The settings to filter
+     * @param schema - The plugin's settings schema
+     * @returns Settings with x-envVar fields removed
+     */
+    private filterEnvVarFields(
+        settings: Record<string, unknown>,
+        schema: JsonSchema,
+    ): Record<string, unknown> {
+        if (!schema.properties) return settings;
+
+        const filtered: Record<string, unknown> = {};
+        for (const [key, value] of Object.entries(settings)) {
+            const propSchema = schema.properties[key] as JsonSchema | undefined;
+            if (propSchema?.['x-envVar']) {
+                this.logger.warn(
+                    `Rejecting x-envVar field "${key}" - must be set via environment variable`,
+                );
+                continue;
+            }
+            filtered[key] = value;
+        }
+        return filtered;
     }
 }

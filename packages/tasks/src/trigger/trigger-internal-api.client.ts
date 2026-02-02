@@ -11,6 +11,7 @@ import { DirectoryCommand, DirectoryCommandAction } from '@packages/agent/tasks'
 type DirectoryContextResponse = {
     directory: Directory;
     user: any;
+    gitToken?: string;
 };
 
 type DispatchSchedulesResponse = {

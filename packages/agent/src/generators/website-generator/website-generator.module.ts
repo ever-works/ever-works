@@ -1,11 +1,12 @@
 import { Module } from '@nestjs/common';
 import { WebsiteGeneratorService } from './website-generator.service';
 import { WebsiteUpdateService } from './website-update.service';
-import { GitModule } from '../../git/git.module';
+import { BranchSyncService } from './branch-sync.service';
+import { FacadesModule } from '../../facades/facades.module';
 
 @Module({
-    imports: [GitModule],
-    providers: [WebsiteGeneratorService, WebsiteUpdateService],
-    exports: [WebsiteGeneratorService, WebsiteUpdateService],
+    imports: [FacadesModule],
+    providers: [WebsiteGeneratorService, WebsiteUpdateService, BranchSyncService],
+    exports: [WebsiteGeneratorService, WebsiteUpdateService, BranchSyncService],
 })
 export class WebsiteGeneratorModule {}

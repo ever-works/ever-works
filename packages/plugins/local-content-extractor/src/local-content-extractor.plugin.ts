@@ -510,6 +510,7 @@ export class LocalContentExtractorPlugin implements IPlugin, IContentExtractorPl
 			systemPlugin: true,
 			autoInstall: true,
 			autoEnable: true,
+			visibility: 'hidden',
 			defaultForCapabilities: ['content-extractor']
 		};
 	}

@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { GithubService } from '../git/github.service';
+import { GitFacadeService } from '../facades/git.facade';
 import { Directory, RepoVisibility } from '../entities/directory.entity';
 import { User } from '../entities/user.entity';
 import { DirectoryRepository } from '../database/repositories/directory.repository';
@@ -19,12 +19,11 @@ export class RepositoryManagementService {
     private readonly logger = new Logger(RepositoryManagementService.name);
 
     constructor(
-        private readonly githubService: GithubService,
+        private readonly gitFacade: GitFacadeService,
         private readonly directoryRepository: DirectoryRepository,
     ) {}
 
     async getRepositoriesStatus(directory: Directory, user: User): Promise<RepositoryStatus[]> {
-        const token = user.getGitToken();
         const owner = directory.getRepoOwner();
 
         const repos: { type: RepositoryType; name: string }[] = [
@@ -36,13 +35,16 @@ export class RepositoryManagementService {
         const results = await Promise.all(
             repos.map(async (repo) => {
                 try {
-                    const data = await this.githubService.getRepository(owner, repo.name, token);
-                    if (data && data.data) {
+                    const data = await this.gitFacade.getRepository(owner, repo.name, {
+                        userId: user.id,
+                        providerId: directory.repoProvider,
+                    });
+                    if (data) {
                         return {
                             type: repo.type,
                             name: repo.name,
-                            url: data.data.html_url,
-                            isPrivate: data.data.private,
+                            url: data.url,
+                            isPrivate: data.isPrivate,
                             exists: true,
                         };
                     }
@@ -88,7 +90,6 @@ export class RepositoryManagementService {
         repoType: RepositoryType,
         isPrivate: boolean,
     ): Promise<RepositoryStatus> {
-        const token = user.getGitToken();
         const owner = directory.getRepoOwner();
         let repoName: string;
 
@@ -106,11 +107,11 @@ export class RepositoryManagementService {
                 throw new Error('Invalid repository type');
         }
 
-        const updated = await this.githubService.updateRepository(
+        const updated = await this.gitFacade.updateRepository(
             owner,
             repoName,
-            { private: isPrivate },
-            token,
+            { isPrivate },
+            { userId: user.id, providerId: directory.repoProvider },
         );
 
         // Update DB cache
@@ -120,7 +121,7 @@ export class RepositoryManagementService {
             website: true,
         };
         const newVisibility = { ...currentVisibility };
-        newVisibility[repoType] = updated.private;
+        newVisibility[repoType] = updated.isPrivate;
 
         await this.directoryRepository.update(directory.id, {
             repoVisibility: newVisibility,
@@ -129,8 +130,8 @@ export class RepositoryManagementService {
         return {
             type: repoType,
             name: repoName,
-            url: updated.html_url,
-            isPrivate: updated.private,
+            url: updated.url,
+            isPrivate: updated.isPrivate,
             exists: true,
         };
     }

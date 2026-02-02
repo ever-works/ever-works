@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { GithubService } from '../../git/github.service';
-import { BranchSyncService } from '../../git/branch-sync.service';
+import { GitFacadeService } from '../../facades/git.facade';
+import { BranchSyncService } from './branch-sync.service';
 import { WebsiteRepositoryCreationMethod } from '../../items-generator/dto/create-items-generator.dto';
 import { Directory } from '../../entities/directory.entity';
 import { User } from '../../entities/user.entity';
@@ -13,69 +13,69 @@ export class WebsiteGeneratorService {
     private readonly logger = new Logger(WebsiteGeneratorService.name);
 
     constructor(
-        private readonly githubService: GithubService,
+        private readonly gitFacade: GitFacadeService,
         private readonly branchSyncService: BranchSyncService,
     ) {}
 
     private async duplicate(directory: Directory, user: User) {
-        // Use directory owner's Git token (they set up the repos)
-        // but use current user as committer for attribution
         const directoryOwner = directory.user as User;
-        const token = directoryOwner.getGitToken();
         const committer = user.asCommitter();
 
         await this.cleanup(directory);
 
-        if (directory.organization) {
-            return this.githubService.duplicateAsOrg({
-                originalRepoOwner: WEBSITE_TEMPLATE_CONFIG.owner,
-                originalRepoName: WEBSITE_TEMPLATE_CONFIG.repo,
-                branch: WEBSITE_TEMPLATE_CONFIG.branch,
-                targetOrg: directory.getRepoOwner(),
-                targetRepoName: directory.getWebsiteRepo(),
-                token,
-                committer,
-            });
-        }
-
-        return this.githubService.duplicate({
-            originalRepoOwner: WEBSITE_TEMPLATE_CONFIG.owner,
-            originalRepoName: WEBSITE_TEMPLATE_CONFIG.repo,
-            branch: WEBSITE_TEMPLATE_CONFIG.branch,
-            targetRepoName: directory.getWebsiteRepo(),
-            token,
-            committer,
-            forcePush: true,
-        });
-    }
-
-    private async fork(directory: Directory, user: User) {
-        // Use directory owner's Git token (they set up the repos)
-        const directoryOwner = directory.user as User;
-        const token = directoryOwner.getGitToken();
-
-        return this.githubService.fork(
+        // Clone template repo
+        const templateDir = await this.gitFacade.cloneOrPull(
             {
                 owner: WEBSITE_TEMPLATE_CONFIG.owner,
                 repo: WEBSITE_TEMPLATE_CONFIG.repo,
-                name: directory.getWebsiteRepo(),
-                isOrganization: directory.organization,
+                branch: WEBSITE_TEMPLATE_CONFIG.branch,
+                committer,
             },
-            token,
+            { userId: directoryOwner.id, providerId: directory.repoProvider },
         );
+
+        // Create target repo
+        await this.gitFacade.createRepository(
+            {
+                name: directory.getWebsiteRepo(),
+                description: `Website for ${directory.name}`,
+                organization: directory.organization ? directory.getRepoOwner() : undefined,
+                isPrivate: true,
+            },
+            { userId: directoryOwner.id, providerId: directory.repoProvider },
+        );
+
+        // Push template to target repo
+        const targetCloneUrl = this.gitFacade.getCloneUrl(
+            directory.repoProvider,
+            directory.getRepoOwner(),
+            directory.getWebsiteRepo(),
+        );
+
+        // Remove origin and add new one pointing to target
+        await this.removeAndAddRemote(templateDir, targetCloneUrl);
+
+        // Push to target
+        await this.gitFacade.push(
+            { dir: templateDir, force: true },
+            { userId: directoryOwner.id, providerId: directory.repoProvider },
+        );
+
+        return templateDir;
     }
 
     private async createUsingTemplate(directory: Directory, user: User) {
-        // Use directory owner's Git token (they set up the repos)
         const directoryOwner = directory.user as User;
-        const token = directoryOwner.getGitToken();
 
-        return this.githubService.createRepoFromTemplate(
+        return this.gitFacade.createRepositoryFromTemplate(
             WEBSITE_TEMPLATE_CONFIG.owner,
             WEBSITE_TEMPLATE_CONFIG.repo,
-            directory.getRepoOwner(),
-            directory.getWebsiteRepo(),
-            token,
+            {
+                name: directory.getWebsiteRepo(),
+                organization: directory.organization ? directory.getRepoOwner() : undefined,
+                isPrivate: true,
+            },
+            { userId: directoryOwner.id, providerId: directory.repoProvider },
         );
     }
 
@@ -112,7 +112,6 @@ export class WebsiteGeneratorService {
     /** Sync all branches from template to directory's website repo */
     async syncAllBranchesFromTemplate(directory: Directory, user: User) {
         const directoryOwner = directory.user as User;
-        const token = directoryOwner.getGitToken();
 
         const branchMapping = directory.websiteTemplateUseBeta
             ? { [config.websiteTemplate.getBetaBranch()]: 'main' }
@@ -127,10 +126,11 @@ export class WebsiteGeneratorService {
             const result = await this.branchSyncService.syncAllBranches({
                 targetOwner: directory.getRepoOwner(),
                 targetRepo: directory.getWebsiteRepo(),
-                token,
+                userId: directoryOwner.id,
                 committer: user.asCommitter(),
                 forcePush: true,
                 branchMapping,
+                providerId: directory.repoProvider,
             });
 
             this.logger.log(
@@ -149,25 +149,40 @@ export class WebsiteGeneratorService {
      * Remove repository for a directory
      */
     async removeRepository(directory: Directory, user: User): Promise<void> {
-        // Use directory owner's Git token (they set up the repos)
         const directoryOwner = directory.user as User;
-        const token = directoryOwner.getGitToken();
         const websiteRepo = directory.getWebsiteRepo();
 
         try {
-            // Delete the GitHub repository
-            await this.githubService.deleteRepository(directory.getRepoOwner(), websiteRepo, token);
+            await this.gitFacade.deleteRepository(directory.getRepoOwner(), websiteRepo, {
+                userId: directoryOwner.id,
+                providerId: directory.repoProvider,
+            });
         } catch (error) {
             throw error;
         }
     }
 
     public cleanup(directory: Directory) {
-        const dataDir = this.githubService.getDir(
+        const dataDir = this.gitFacade.getLocalDir(
+            directory.repoProvider,
             directory.getRepoOwner(),
             directory.getWebsiteRepo(),
         );
 
         return fs.rm(dataDir, { recursive: true, force: true });
+    }
+
+    private async removeAndAddRemote(dir: string, newRemoteUrl: string): Promise<void> {
+        // Use isomorphic-git to remove and add remote
+        const git = await import('isomorphic-git');
+        const nodeFs = await import('node:fs');
+
+        try {
+            await git.deleteRemote({ fs: nodeFs.default, dir, remote: 'origin' });
+        } catch {
+            // Remote might not exist
+        }
+
+        await git.addRemote({ fs: nodeFs.default, dir, remote: 'origin', url: newRemoteUrl });
     }
 }

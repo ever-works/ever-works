@@ -2,7 +2,6 @@ import 'server-only';
 import { serverFetch, serverMutation } from './server-api';
 import {
     GenerateStatusType,
-    RepoProvider,
     DirectoryScheduleCadence,
     DirectoryScheduleStatus,
     DirectoryScheduleBillingMode,
@@ -43,7 +42,7 @@ export interface CreateDirectoryDto {
     description: string;
     owner?: string;
     organization: boolean;
-    repoProvider?: RepoProvider;
+    repoProvider?: string;
     readmeConfig?: MarkdownReadmeConfig;
 }
 
@@ -116,7 +115,7 @@ export interface Directory {
     owner?: string;
     website?: string;
     organization: boolean;
-    repoProvider: RepoProvider;
+    repoProvider: string;
     readmeConfig?: MarkdownReadmeConfig;
     generateStatus?: GenerateStatus;
     createdAt: string;
@@ -336,6 +335,7 @@ export interface ImportDirectoryDto {
     organization?: boolean;
     createMissingRepos?: boolean;
     sync?: boolean;
+    repoProvider: string;
 }
 
 export interface ImportDirectoryResponseDto {
@@ -345,7 +345,7 @@ export interface ImportDirectoryResponseDto {
     message: string;
 }
 
-export interface GitHubRepoDto {
+export interface GitRepoDto {
     id: number;
     name: string;
     full_name: string;
@@ -358,7 +358,7 @@ export interface GitHubRepoDto {
 }
 
 export interface GetUserRepositoriesResponseDto {
-    repositories: GitHubRepoDto[];
+    repositories: GitRepoDto[];
     total: number;
     page: number;
     perPage: number;

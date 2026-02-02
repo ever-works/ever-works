@@ -32,6 +32,11 @@ describe('PluginSettingsService', () => {
                     'x-secret': true,
                     'x-envVar': 'PLUGIN_API_KEY',
                 },
+                secretToken: {
+                    type: 'string',
+                    'x-secret': true,
+                    // Note: no x-envVar, so this can be stored in DB
+                },
                 enabled: {
                     type: 'boolean',
                     default: true,
@@ -360,15 +365,17 @@ describe('PluginSettingsService', () => {
                 secretSettings: {},
             } as any);
 
+            // Use secretToken (which has x-secret but NOT x-envVar)
+            // apiKey has x-envVar and would be filtered out
             await service.updateAdminSettings('test-plugin', {
                 enabled: true,
-                apiKey: 'new-key',
+                secretToken: 'new-secret-token',
             });
 
             expect(pluginRepository.updateSettings).toHaveBeenCalledWith(
                 'test-plugin',
                 { enabled: true },
-                { apiKey: 'new-key' },
+                { secretToken: 'new-secret-token' },
             );
         });
 
@@ -1176,6 +1183,275 @@ describe('PluginSettingsService', () => {
 
             // Without scope option, only schema validation runs
             expect(result.valid).toBe(true);
+        });
+    });
+
+    describe('x-envVar security filtering', () => {
+        const createSchemaWithEnvVars = (): JsonSchema =>
+            ({
+                type: 'object',
+                properties: {
+                    clientId: {
+                        type: 'string',
+                        'x-envVar': 'TEST_CLIENT_ID',
+                    },
+                    clientSecret: {
+                        type: 'string',
+                        'x-envVar': 'TEST_CLIENT_SECRET',
+                        'x-secret': true,
+                    },
+                    normalSetting: {
+                        type: 'string',
+                        default: 'default-value',
+                    },
+                    apiBaseUrl: {
+                        type: 'string',
+                        'x-envVar': 'TEST_API_URL',
+                        default: 'https://api.example.com',
+                    },
+                },
+            }) as unknown as JsonSchema;
+
+        describe('updateAdminSettings', () => {
+            it('should filter out x-envVar fields when updating admin settings', async () => {
+                const schema = createSchemaWithEnvVars();
+                const plugin = createMockPlugin(schema);
+                jest.spyOn(registry, 'get').mockReturnValue(createRegisteredPlugin(plugin));
+                jest.spyOn(pluginRepository, 'findByPluginId').mockResolvedValue({
+                    id: '1',
+                    pluginId: 'test-plugin',
+                    settings: {},
+                    secretSettings: {},
+                } as any);
+
+                await service.updateAdminSettings('test-plugin', {
+                    clientId: 'should-be-filtered',
+                    clientSecret: 'should-also-be-filtered',
+                    normalSetting: 'should-be-saved',
+                });
+
+                // x-envVar fields should NOT be saved
+                expect(pluginRepository.updateSettings).toHaveBeenCalledWith(
+                    'test-plugin',
+                    { normalSetting: 'should-be-saved' },
+                    {},
+                );
+            });
+
+            it('should log warning when x-envVar field is rejected', async () => {
+                const warnSpy = jest.spyOn(Logger.prototype, 'warn');
+                const schema = createSchemaWithEnvVars();
+                const plugin = createMockPlugin(schema);
+                jest.spyOn(registry, 'get').mockReturnValue(createRegisteredPlugin(plugin));
+                jest.spyOn(pluginRepository, 'findByPluginId').mockResolvedValue({
+                    id: '1',
+                    pluginId: 'test-plugin',
+                    settings: {},
+                    secretSettings: {},
+                } as any);
+
+                await service.updateAdminSettings('test-plugin', {
+                    clientId: 'should-be-filtered',
+                });
+
+                expect(warnSpy).toHaveBeenCalledWith(
+                    expect.stringContaining('Rejecting x-envVar field "clientId"'),
+                );
+            });
+
+            it('should allow non-x-envVar fields to be stored normally', async () => {
+                const schema = createSchemaWithEnvVars();
+                const plugin = createMockPlugin(schema);
+                jest.spyOn(registry, 'get').mockReturnValue(createRegisteredPlugin(plugin));
+                jest.spyOn(pluginRepository, 'findByPluginId').mockResolvedValue({
+                    id: '1',
+                    pluginId: 'test-plugin',
+                    settings: { existing: 'value' },
+                    secretSettings: {},
+                } as any);
+
+                await service.updateAdminSettings('test-plugin', {
+                    normalSetting: 'new-value',
+                });
+
+                expect(pluginRepository.updateSettings).toHaveBeenCalledWith(
+                    'test-plugin',
+                    { existing: 'value', normalSetting: 'new-value' },
+                    {},
+                );
+            });
+
+            it('should filter x-envVar but keep other settings in same request', async () => {
+                const schema = createSchemaWithEnvVars();
+                const plugin = createMockPlugin(schema);
+                jest.spyOn(registry, 'get').mockReturnValue(createRegisteredPlugin(plugin));
+                jest.spyOn(pluginRepository, 'findByPluginId').mockResolvedValue({
+                    id: '1',
+                    pluginId: 'test-plugin',
+                    settings: {},
+                    secretSettings: {},
+                } as any);
+
+                await service.updateAdminSettings('test-plugin', {
+                    clientId: 'env-var-filtered',
+                    apiBaseUrl: 'also-env-var-filtered',
+                    normalSetting: 'this-should-be-saved',
+                });
+
+                expect(pluginRepository.updateSettings).toHaveBeenCalledWith(
+                    'test-plugin',
+                    { normalSetting: 'this-should-be-saved' },
+                    {},
+                );
+            });
+        });
+
+        describe('updateUserSettings', () => {
+            it('should filter out x-envVar fields when updating user settings', async () => {
+                const schema = createSchemaWithEnvVars();
+                const plugin = createMockPlugin(schema);
+                jest.spyOn(registry, 'get').mockReturnValue(createRegisteredPlugin(plugin));
+                jest.spyOn(pluginRepository, 'findByPluginId').mockResolvedValue({
+                    id: '1',
+                    pluginId: 'test-plugin',
+                    settings: {},
+                    secretSettings: {},
+                } as any);
+                jest.spyOn(userPluginRepository, 'findByUserAndPlugin').mockResolvedValue(null);
+
+                await service.updateUserSettings('test-plugin', 'user-1', {
+                    clientId: 'should-be-filtered',
+                    normalSetting: 'should-be-saved',
+                });
+
+                expect(userPluginRepository.create).toHaveBeenCalledWith({
+                    userId: 'user-1',
+                    pluginId: 'test-plugin',
+                    pluginEntityId: '1',
+                    settings: { normalSetting: 'should-be-saved' },
+                    secretSettings: {},
+                });
+            });
+
+            it('should filter x-envVar fields when updating existing user settings', async () => {
+                const schema = createSchemaWithEnvVars();
+                const plugin = createMockPlugin(schema);
+                jest.spyOn(registry, 'get').mockReturnValue(createRegisteredPlugin(plugin));
+                jest.spyOn(pluginRepository, 'findByPluginId').mockResolvedValue({
+                    id: '1',
+                    pluginId: 'test-plugin',
+                    settings: {},
+                    secretSettings: {},
+                } as any);
+                jest.spyOn(userPluginRepository, 'findByUserAndPlugin').mockResolvedValue({
+                    id: '1',
+                    userId: 'user-1',
+                    pluginId: 'test-plugin',
+                    settings: { normalSetting: 'old-value' },
+                    secretSettings: {},
+                } as any);
+
+                await service.updateUserSettings('test-plugin', 'user-1', {
+                    clientId: 'should-be-filtered',
+                    normalSetting: 'new-value',
+                });
+
+                expect(userPluginRepository.updateSettings).toHaveBeenCalledWith(
+                    'user-1',
+                    'test-plugin',
+                    { normalSetting: 'new-value' },
+                    {},
+                );
+            });
+        });
+
+        describe('updateDirectorySettings', () => {
+            it('should filter out x-envVar fields when updating directory settings', async () => {
+                const schema = createSchemaWithEnvVars();
+                const plugin = createMockPlugin(schema);
+                jest.spyOn(registry, 'get').mockReturnValue(createRegisteredPlugin(plugin));
+                jest.spyOn(pluginRepository, 'findByPluginId').mockResolvedValue({
+                    id: '1',
+                    pluginId: 'test-plugin',
+                    settings: {},
+                    secretSettings: {},
+                } as any);
+                jest.spyOn(directoryPluginRepository, 'findByDirectoryAndPlugin').mockResolvedValue(
+                    null,
+                );
+
+                await service.updateDirectorySettings('test-plugin', 'dir-1', {
+                    clientId: 'should-be-filtered',
+                    normalSetting: 'should-be-saved',
+                });
+
+                expect(directoryPluginRepository.create).toHaveBeenCalledWith({
+                    directoryId: 'dir-1',
+                    pluginId: 'test-plugin',
+                    pluginEntityId: '1',
+                    settings: { normalSetting: 'should-be-saved' },
+                    secretSettings: {},
+                });
+            });
+
+            it('should filter x-envVar fields when updating existing directory settings', async () => {
+                const schema = createSchemaWithEnvVars();
+                const plugin = createMockPlugin(schema);
+                jest.spyOn(registry, 'get').mockReturnValue(createRegisteredPlugin(plugin));
+                jest.spyOn(pluginRepository, 'findByPluginId').mockResolvedValue({
+                    id: '1',
+                    pluginId: 'test-plugin',
+                    settings: {},
+                    secretSettings: {},
+                } as any);
+                jest.spyOn(directoryPluginRepository, 'findByDirectoryAndPlugin').mockResolvedValue(
+                    {
+                        id: '1',
+                        directoryId: 'dir-1',
+                        pluginId: 'test-plugin',
+                        settings: { normalSetting: 'old-value' },
+                        secretSettings: {},
+                    } as any,
+                );
+
+                await service.updateDirectorySettings('test-plugin', 'dir-1', {
+                    clientSecret: 'should-be-filtered',
+                    normalSetting: 'new-value',
+                });
+
+                expect(directoryPluginRepository.updateSettings).toHaveBeenCalledWith(
+                    'dir-1',
+                    'test-plugin',
+                    { normalSetting: 'new-value' },
+                    {},
+                );
+            });
+        });
+
+        describe('event emission with filtered fields', () => {
+            it('should emit event with only filtered keys in changedKeys', async () => {
+                const schema = createSchemaWithEnvVars();
+                const plugin = createMockPlugin(schema);
+                jest.spyOn(registry, 'get').mockReturnValue(createRegisteredPlugin(plugin));
+                jest.spyOn(pluginRepository, 'findByPluginId').mockResolvedValue({
+                    id: '1',
+                    pluginId: 'test-plugin',
+                    settings: {},
+                    secretSettings: {},
+                } as any);
+
+                await service.updateAdminSettings('test-plugin', {
+                    clientId: 'filtered',
+                    normalSetting: 'saved',
+                });
+
+                expect(eventEmitter.emit).toHaveBeenCalledWith(
+                    PluginEvents.SETTINGS_CHANGED,
+                    expect.objectContaining({
+                        changedKeys: ['normalSetting'],
+                    }),
+                );
+            });
         });
     });
 });

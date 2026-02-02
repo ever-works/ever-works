@@ -48,8 +48,10 @@ export class PluginsService {
      * List all available plugins with user-specific status
      */
     async listPlugins(userId: string): Promise<PluginListResponseDto> {
-        // Get all registered plugins from the registry
-        const registeredPlugins = this.pluginRegistryService.getAll();
+        const allPlugins = this.pluginRegistryService.getAll();
+        const visiblePlugins = allPlugins.filter(
+            (p) => (p.manifest?.visibility ?? 'public') !== 'hidden',
+        );
 
         // Get user's plugin installations
         const userPlugins = await this.userPluginRepository.find({
@@ -59,7 +61,7 @@ export class PluginsService {
         const userPluginMap = new Map(userPlugins.map((up) => [up.pluginId, up]));
 
         // Map to response DTOs
-        const plugins: UserPluginResponseDto[] = registeredPlugins.map((registered) => {
+        const plugins: UserPluginResponseDto[] = visiblePlugins.map((registered) => {
             const userPlugin = userPluginMap.get(registered.plugin.id);
             return this.toUserPluginResponse(registered, userPlugin);
         });
@@ -246,10 +248,11 @@ export class PluginsService {
         directoryId: string,
         userId: string,
     ): Promise<DirectoryPluginListResponseDto> {
-        // Get all registered plugins
-        const registeredPlugins = this.pluginRegistryService.getAll();
+        const allPlugins = this.pluginRegistryService.getAll();
+        const visiblePlugins = allPlugins.filter(
+            (p) => (p.manifest?.visibility ?? 'public') !== 'hidden',
+        );
 
-        // Get user's plugin installations
         const userPlugins = await this.userPluginRepository.find({
             where: { userId },
         });
@@ -270,7 +273,7 @@ export class PluginsService {
         }
 
         // Map to response DTOs
-        const plugins: DirectoryPluginResponseDto[] = registeredPlugins.map((registered) => {
+        const plugins: DirectoryPluginResponseDto[] = visiblePlugins.map((registered) => {
             const userPlugin = userPluginMap.get(registered.plugin.id);
             const directoryPlugin = directoryPluginMap.get(registered.plugin.id);
             return this.toDirectoryPluginResponse(registered, userPlugin, directoryPlugin);
@@ -541,6 +544,8 @@ export class PluginsService {
             capabilities: [...manifest.capabilities],
             configurationMode: registered.plugin.configurationMode || 'hybrid',
             builtIn: registered.builtIn,
+            systemPlugin: manifest.systemPlugin ?? false,
+            visibility: manifest.visibility ?? 'public',
             state: registered.state,
             icon: this.extractIcon(manifest),
             settingsSchema: this.extractSettingsSchema(registered.plugin.settingsSchema),
@@ -632,6 +637,11 @@ export class PluginsService {
     /**
      * Mask secret settings based on schema.
      * Uses JsonSchema type for type-safe property access.
+     *
+     * SECURITY: This method filters out sensitive fields:
+     * - x-envVar: Must come from environment only, never return to client
+     * - x-writeOnly: Write-only fields excluded from responses
+     * - x-masked: Values replaced with asterisks
      */
     private maskSecretSettings(
         settings: Record<string, unknown>,
@@ -644,12 +654,19 @@ export class PluginsService {
         for (const [key, value] of Object.entries(settings)) {
             // propSchema is already typed as JsonSchema from the schema.properties definition
             const propSchema: JsonSchema | undefined = schema.properties[key];
-            if (propSchema?.['x-writeOnly']) {
-                // Don't include write-only fields
+
+            // SECURITY: x-envVar fields must NEVER be returned (must come from env only)
+            if (propSchema?.['x-envVar']) {
                 continue;
             }
+
+            // Don't include write-only fields
+            if (propSchema?.['x-writeOnly']) {
+                continue;
+            }
+
+            // Mask the value
             if (propSchema?.['x-masked'] && value) {
-                // Mask the value
                 masked[key] = '********';
             } else {
                 masked[key] = value;

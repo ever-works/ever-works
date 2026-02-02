@@ -82,7 +82,7 @@ export const ROUTES = {
     DASHBOARD_SETTINGS_PROFILE: '/settings',
     DASHBOARD_SETTINGS_SECURITY: '/settings/security',
     DASHBOARD_SETTINGS_API_TOKENS: '/settings/api-tokens',
-    DASHBOARD_SETTINGS_OAUTH: '/settings/oauth',
+    DASHBOARD_SETTINGS_GIT_PROVIDERS: '/settings/git-providers',
     DASHBOARD_SETTINGS_NOTIFICATIONS: '/settings/notifications',
     DASHBOARD_SETTINGS_DANGER_ZONE: '/settings/danger',
     // Profile
@@ -104,6 +104,8 @@ export const ROUTES = {
     API_AUTH_RESET_PASSWORD: '/api/auth/reset-password',
     API_AI_CONVERSATIONS_ASK_STREAM: '/api/ai-conversations/ask/stream',
     API_AI_CONVERSATIONS_MESSAGE_STREAM: '/api/ai-conversations/:sessionId/stream',
+    // Git provider routes (separate from auth)
+    API_GIT_PROVIDER_CALLBACK: '/api/git-providers/:providerId/callback',
 } as const;
 
 export const routeWithParams = (route: string, params: Record<string, string>) => {

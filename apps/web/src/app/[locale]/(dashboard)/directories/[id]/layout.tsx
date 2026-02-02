@@ -1,4 +1,4 @@
-import { authAPI, ConnectionInfo, Directory, directoryAPI } from '@/lib/api';
+import { Directory, directoryAPI, gitProvidersAPI, GitProviderConnectionInfo } from '@/lib/api';
 import { notFound } from 'next/navigation';
 import { DirectoryLayoutClient } from '@/components/directories/detail/DirectoryLayoutClient';
 
@@ -11,7 +11,7 @@ export default async function DirectoryLayout({ params, children }: LayoutParams
     const { id } = await params;
 
     let directory: Directory;
-    let oauthConnection: ConnectionInfo | null = null;
+    let oauthConnection: GitProviderConnectionInfo | null = null;
     let config = null;
 
     try {
@@ -24,7 +24,7 @@ export default async function DirectoryLayout({ params, children }: LayoutParams
         config = configRes.config;
 
         if (directory) {
-            oauthConnection = await authAPI.oauth_connections
+            oauthConnection = await gitProvidersAPI
                 .checkConnection(directory.repoProvider)
                 .catch(() => null);
         }

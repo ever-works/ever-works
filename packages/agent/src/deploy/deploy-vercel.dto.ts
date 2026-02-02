@@ -7,9 +7,5 @@ export class DeployVercelDto {
 
     @IsOptional()
     @IsString()
-    GITHUB_TOKEN?: string;
-
-    @IsOptional()
-    @IsString()
     vercelTeamScope?: string;
 }

@@ -8,19 +8,9 @@ export {
     DirectoryScheduleBillingMode,
 } from '@ever-works/contracts/api';
 
-// Web-specific enums (not shared with backend contracts)
-export enum RepoProvider {
-    GITHUB = 'github',
-}
-
 export enum OAuthProvider {
     GITHUB = 'github',
     GOOGLE = 'google',
-}
-
-export enum OAuthProcessType {
-    LOGIN = 'login',
-    CONNECT = 'connect',
 }
 
 /**

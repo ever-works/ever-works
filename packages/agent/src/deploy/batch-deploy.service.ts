@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { VercelService } from './vercel.service';
 import { DirectoryRepository } from '../database/repositories/directory.repository';
+import { GitFacadeService } from '../facades/git.facade';
 import { User } from '../entities/user.entity';
 
 export interface BatchDeployItem {
@@ -10,10 +11,7 @@ export interface BatchDeployItem {
 
 export interface BatchDeployOptions {
     directories: BatchDeployItem[];
-    /** Fallback Vercel token if directory owner's token is not available */
     vercelToken?: string;
-    /** Fallback GitHub token if directory owner's token is not available */
-    ghToken?: string;
     defaultTeamScope?: string;
 }
 
@@ -24,9 +22,7 @@ export interface BatchDeployItemResult {
     message: string;
     owner?: string;
     repository?: string;
-    /** Resolved Vercel token used for this deployment (for verification) */
     resolvedVercelToken?: string;
-    /** Team scope used for this deployment (for verification) */
     resolvedTeamScope?: string;
 }
 
@@ -40,18 +36,14 @@ export interface BatchDeployResult {
 @Injectable()
 export class BatchDeployService {
     private readonly logger = new Logger(BatchDeployService.name);
-
-    // Limit concurrent deployments to avoid overwhelming services
     private readonly MAX_CONCURRENT_DEPLOYS = 5;
 
     constructor(
         private readonly vercelService: VercelService,
         private readonly directoryRepository: DirectoryRepository,
+        private readonly gitFacade: GitFacadeService,
     ) {}
 
-    /**
-     * Deploy multiple directories in batch
-     */
     async deployBatch(options: BatchDeployOptions, user: User): Promise<BatchDeployResult> {
         const results: BatchDeployItemResult[] = [];
         let successCount = 0;
@@ -59,7 +51,6 @@ export class BatchDeployService {
 
         this.logger.log(`Starting batch deployment of ${options.directories.length} directories`);
 
-        // Process in batches to avoid overwhelming services
         for (let i = 0; i < options.directories.length; i += this.MAX_CONCURRENT_DEPLOYS) {
             const batch = options.directories.slice(i, i + this.MAX_CONCURRENT_DEPLOYS);
 
@@ -69,7 +60,6 @@ export class BatchDeployService {
                         item.directoryId,
                         {
                             vercelToken: options.vercelToken,
-                            ghToken: options.ghToken,
                             vercelTeamScope: item.vercelTeamScope || options.defaultTeamScope,
                         },
                         user,
@@ -99,7 +89,6 @@ export class BatchDeployService {
                 }
             }
 
-            // Small delay between batches
             if (i + this.MAX_CONCURRENT_DEPLOYS < options.directories.length) {
                 await new Promise((r) => setTimeout(r, 2000));
             }
@@ -115,16 +104,10 @@ export class BatchDeployService {
         };
     }
 
-    /**
-     * Deploy a single directory (includes branch sync via VercelService)
-     * Resolves tokens based on directory ownership - for shared directories,
-     * uses the owner's tokens since they set up the infrastructure.
-     */
     private async deploySingleDirectory(
         directoryId: string,
         tokens: {
             vercelToken?: string;
-            ghToken?: string;
             vercelTeamScope?: string;
         },
         user: User,
@@ -143,14 +126,16 @@ export class BatchDeployService {
 
             this.logger.log(`Deploying directory: ${directory.slug}`);
 
-            // Determine if user is the directory creator
             const directoryOwner = directory.user;
             const isCreator = directoryOwner?.id === user.id;
+            const tokenOwnerId = isCreator ? user.id : directoryOwner?.id;
 
-            // For shared directories, use the directory owner's tokens
-            // The owner set up the infrastructure, collaborators just trigger deployments
-            const resolvedGhToken =
-                tokens.ghToken || (isCreator ? user.getGitToken() : directoryOwner?.getGitToken());
+            const ghToken = tokenOwnerId
+                ? await this.gitFacade.getAccessToken({
+                      userId: tokenOwnerId,
+                      providerId: directory.repoProvider,
+                  })
+                : null;
 
             const resolvedVercelToken =
                 tokens.vercelToken ||
@@ -168,7 +153,6 @@ export class BatchDeployService {
                 };
             }
 
-            // VercelService.deploy already handles branch sync
             const deploymentInitiated = await this.vercelService.deploy(
                 {
                     owner: directory.getRepoOwner(),
@@ -177,7 +161,7 @@ export class BatchDeployService {
                     data: {
                         vercelTeamScope: tokens.vercelTeamScope,
                         vercelToken: resolvedVercelToken,
-                        ghToken: resolvedGhToken,
+                        ghToken,
                     },
                 },
                 directory,
@@ -193,7 +177,6 @@ export class BatchDeployService {
                     : 'Failed to initiate deployment',
                 owner: directory.getRepoOwner(),
                 repository: `${directory.getRepoOwner()}/${directory.getWebsiteRepo()}`,
-                // Include resolved tokens for verification (only on success)
                 resolvedVercelToken: deploymentInitiated ? resolvedVercelToken : undefined,
                 resolvedTeamScope: deploymentInitiated ? tokens.vercelTeamScope : undefined,
             };

@@ -46,10 +46,6 @@ export class GenerateSubCommand extends CommandRunner {
 
             // Get user information
             const user = await this.userRepository.createOrGetLocalUser();
-            const token = user.getGitToken();
-            if (!token) {
-                throw new Error('GitHub token is required');
-            }
 
             // Select directory
             const selection = await this.directoryPrompt.promptDirectorySelection(

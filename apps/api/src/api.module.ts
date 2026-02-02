@@ -18,6 +18,7 @@ import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { ScreenshotModule } from './screenshot/screenshot.module';
 import { PluginsModule } from './plugins/plugins.module';
+import { GitProviderModule } from './git-provider/git-provider.module';
 import { PluginsModule as AgentPluginsModule } from '@packages/agent/plugins';
 import { CacheFactory } from '@packages/agent/cache';
 
@@ -50,6 +51,7 @@ import { CacheFactory } from '@packages/agent/cache';
         ScreenshotModule,
         AgentPluginsModule.forRoot(),
         PluginsModule,
+        GitProviderModule,
     ],
     providers: [
         {

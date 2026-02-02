@@ -2,7 +2,7 @@
 
 import { usePathname } from '@/i18n/navigation';
 import { cn } from '@/lib/utils/cn';
-import { User, Lock, Key, Link2, Bell, AlertTriangle } from 'lucide-react';
+import { User, Lock, Key, GitBranch, Bell, AlertTriangle } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 
@@ -26,7 +26,12 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
             icon: Key,
             href: `/${baseSettingsPath}/api-tokens`,
         },
-        { id: 'oauth', label: t('tabs.oauth'), icon: Link2, href: `/${baseSettingsPath}/oauth` },
+        {
+            id: 'git-providers',
+            label: t('tabs.gitProviders'),
+            icon: GitBranch,
+            href: `/${baseSettingsPath}/git-providers`,
+        },
         {
             id: 'notifications',
             label: t('tabs.notifications'),

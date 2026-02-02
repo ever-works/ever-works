@@ -32,11 +32,6 @@ export class BatchDeployVercelDto {
     @IsString()
     VERCEL_TOKEN?: string;
 
-    @ApiPropertyOptional({ description: 'GitHub token (uses account token if not provided)' })
-    @IsOptional()
-    @IsString()
-    GITHUB_TOKEN?: string;
-
     @ApiPropertyOptional({ description: 'Default Vercel team scope for all directories' })
     @IsOptional()
     @IsString()

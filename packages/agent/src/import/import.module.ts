@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AiModule } from '../ai/ai.module';
-import { GitModule } from '../git/git.module';
+import { FacadesModule } from '../facades/facades.module';
 import { DataGeneratorModule } from '../generators/data-generator/data-generator.module';
 import { MarkdownGeneratorModule } from '../generators/markdown-generator/markdown-generator.module';
 import { WebsiteGeneratorModule } from '../generators/website-generator/website-generator.module';
@@ -11,7 +11,7 @@ import { ImportExecutorService } from './import-executor.service';
 @Module({
     imports: [
         AiModule,
-        GitModule,
+        FacadesModule,
         DataGeneratorModule,
         MarkdownGeneratorModule,
         WebsiteGeneratorModule,

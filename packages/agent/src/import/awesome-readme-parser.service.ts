@@ -46,7 +46,7 @@ export interface ParsedAwesomeData {
 }
 
 const CATEGORY_EXTRACTION_PROMPT =
-    `You are a structured data extractor. Your task is to analyze a GitHub Awesome List README and extract the category/section structure.
+    `You are a structured data extractor. Your task is to analyze an Awesome List README and extract the category/section structure.
 
 <readme_content>
 {content}

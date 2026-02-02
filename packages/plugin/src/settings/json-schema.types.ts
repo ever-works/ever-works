@@ -153,6 +153,8 @@ export interface JsonSchema {
 	readonly 'x-masked'?: boolean;
 	/** Whether field should be write-only (not readable after set) */
 	readonly 'x-writeOnly'?: boolean;
+	/** Whether field is admin-only (not visible to regular users) */
+	readonly 'x-adminOnly'?: boolean;
 }
 
 /**

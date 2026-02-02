@@ -7,14 +7,13 @@ import {
     Optional,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { Octokit } from 'octokit';
 import { DirectoryRepository } from '@src/database/repositories/directory.repository';
 import { DirectoryGenerationHistoryRepository } from '@src/database/repositories/directory-generation-history.repository';
 import { DataGeneratorService } from '@src/generators/data-generator/data-generator.service';
 import { DataRepository } from '@src/generators/data-generator/data-repository';
 import { MarkdownGeneratorService } from '@src/generators/markdown-generator/markdown-generator.service';
 import { WebsiteGeneratorService } from '@src/generators/website-generator/website-generator.service';
-import { GithubService } from '@src/git/github.service';
+import { GitFacadeService } from '@src/facades/git.facade';
 import { SourceRepoAnalyzerService } from '@src/import/source-repo-analyzer.service';
 import { AwesomeReadmeParserService } from '@src/import/awesome-readme-parser.service';
 import { ImportExecutorService } from '@src/import/import-executor.service';
@@ -27,7 +26,7 @@ import {
     ImportSourceTypeEnum,
     GetUserRepositoriesDto,
     GetUserRepositoriesResponseDto,
-    GitHubRepoDto,
+    GitRepoDto,
 } from '@src/dto/import-directory.dto';
 import { Directory, ImportSourceType, SourceRepository } from '@src/entities/directory.entity';
 import { User } from '@src/entities/user.entity';
@@ -63,7 +62,7 @@ export class DirectoryImportService {
         private readonly dataGenerator: DataGeneratorService,
         private readonly markdownGenerator: MarkdownGeneratorService,
         private readonly websiteGenerator: WebsiteGeneratorService,
-        private readonly githubService: GithubService,
+        private readonly gitFacade: GitFacadeService,
         private readonly sourceRepoAnalyzer: SourceRepoAnalyzerService,
         private readonly awesomeReadmeParser: AwesomeReadmeParserService,
         private readonly importExecutor: ImportExecutorService,
@@ -75,13 +74,14 @@ export class DirectoryImportService {
     ) {}
 
     /**
-     * Analyze a GitHub repository to detect its type and structure
+     * Analyze a repository to detect its type and structure
      */
     async analyzeRepository(
         dto: AnalyzeRepositoryDto,
         user: User,
     ): Promise<AnalyzeRepositoryResponseDto> {
-        const token = this.getGitHubToken(user);
+        const providerId = this.getProviderFromUrl(dto.sourceUrl);
+        const token = await this.getProviderToken(user, providerId);
         return this.sourceRepoAnalyzer.analyzeRepository(dto.sourceUrl, token);
     }
 
@@ -89,7 +89,8 @@ export class DirectoryImportService {
         dto: AnalyzeRepositoryDto,
         user: User,
     ): Promise<AnalyzeForLinkingResponseDto> {
-        const token = this.getGitHubToken(user);
+        const providerId = this.getProviderFromUrl(dto.sourceUrl);
+        const token = await this.getProviderToken(user, providerId);
         if (!token) {
             return {
                 canLink: false,
@@ -99,36 +100,31 @@ export class DirectoryImportService {
                     markdown: { exists: false, name: null },
                     website: { exists: false, name: null },
                 },
-                error: 'GitHub token not available',
+                error: 'Git provider token not available',
             };
         }
         return this.sourceRepoAnalyzer.analyzeForLinking(dto.sourceUrl, token);
     }
 
     /**
-     * Get user's GitHub repositories for selection
+     * Get user's repositories for selection (uses git provider facade)
      */
     async getUserRepositories(
         dto: GetUserRepositoriesDto,
         user: User,
     ): Promise<GetUserRepositoriesResponseDto> {
-        const token = this.getGitHubToken(user);
+        const options = { userId: user.id, providerId: dto.providerId };
+        const hasCredentials = await this.gitFacade.hasValidCredentials(options);
 
-        if (!token) {
-            throw new BadRequestException('GitHub account not connected');
+        if (!hasCredentials) {
+            throw new BadRequestException('Git provider account not connected');
         }
 
-        const octokit = new Octokit({ auth: token });
         const page = dto.page || 1;
         const perPage = dto.perPage || 30;
 
         try {
-            const { data: repos } = await octokit.rest.repos.listForAuthenticatedUser({
-                sort: 'updated',
-                direction: 'desc',
-                per_page: perPage,
-                page,
-            });
+            const repos = await this.gitFacade.listRepositories(options, page, perPage);
 
             let filteredRepos = repos;
             if (dto.search) {
@@ -140,16 +136,16 @@ export class DirectoryImportService {
                 );
             }
 
-            const repositories: GitHubRepoDto[] = filteredRepos.map((repo) => ({
-                id: repo.id,
+            const repositories: GitRepoDto[] = filteredRepos.map((repo, index) => ({
+                id: index, // Use index as fallback since generic GitRepository doesn't have id
                 name: repo.name,
-                full_name: repo.full_name,
-                owner: repo.owner.login,
-                description: repo.description,
-                html_url: repo.html_url,
-                private: repo.private,
-                updated_at: repo.updated_at || new Date().toISOString(),
-                default_branch: repo.default_branch,
+                full_name: repo.fullName,
+                owner: repo.owner,
+                description: repo.description ?? null,
+                html_url: repo.url,
+                private: repo.isPrivate,
+                updated_at: new Date().toISOString(),
+                default_branch: repo.defaultBranch,
             }));
 
             return {
@@ -161,7 +157,7 @@ export class DirectoryImportService {
             };
         } catch (error) {
             this.logger.error('Failed to fetch user repositories', error);
-            throw new BadRequestException('Failed to fetch GitHub repositories');
+            throw new BadRequestException('Failed to fetch repositories');
         }
     }
 
@@ -173,11 +169,11 @@ export class DirectoryImportService {
         user: User,
         context: ImportTriggerContext = DEFAULT_IMPORT_CONTEXT,
     ): Promise<ImportDirectoryResponseDto> {
-        const parsed = this.sourceRepoAnalyzer.parseGitHubUrl(dto.sourceUrl);
+        const parsed = this.sourceRepoAnalyzer.parseGitUrl(dto.sourceUrl);
         if (!parsed) {
             return {
                 status: 'error',
-                message: 'Invalid GitHub URL format',
+                message: 'Invalid repository URL format',
             };
         }
 
@@ -198,6 +194,13 @@ export class DirectoryImportService {
         }
 
         try {
+            if (!dto.repoProvider) {
+                return {
+                    status: 'error',
+                    message: 'Git provider is required',
+                };
+            }
+
             const directory = await this.directoryRepository.create(
                 {
                     slug,
@@ -206,7 +209,7 @@ export class DirectoryImportService {
                     userId: user.id,
                     owner: dto.owner,
                     organization: dto.organization || false,
-                    repoProvider: 'github',
+                    repoProvider: dto.repoProvider,
                 },
                 user,
             );
@@ -374,11 +377,11 @@ export class DirectoryImportService {
         let result: DirectoryImportResult | null = null;
 
         try {
-            const token = this.getGitHubToken(user);
+            const token = await this.getProviderToken(user, directory.repoProvider);
 
             if (dto.sourceType === ImportSourceTypeEnum.DATA_REPO) {
                 if (!token) {
-                    throw new Error('GitHub token not available');
+                    throw new Error('Git provider token not available');
                 }
                 result = await this.importExecutor.importFromDataRepo({
                     directory,
@@ -395,7 +398,7 @@ export class DirectoryImportService {
                 });
             } else if (dto.sourceType === ImportSourceTypeEnum.LINK_EXISTING) {
                 if (!token) {
-                    throw new Error('GitHub token not available');
+                    throw new Error('Git provider token not available');
                 }
                 result = await this.importExecutor.linkExistingDataRepo({
                     directory,
@@ -556,24 +559,27 @@ export class DirectoryImportService {
         user: User,
         source: { owner: string; repo: string },
     ): Promise<DirectoryImportResult> {
-        const token = this.getGitHubToken(user);
+        const options = { userId: user.id, providerId: directory.repoProvider };
+        const hasCredentials = await this.gitFacade.hasValidCredentials(options);
 
-        if (!token) {
+        if (!hasCredentials) {
             return {
                 success: false,
                 directoryId: directory.id,
-                error: 'GitHub token not available',
+                error: 'Git provider token not available',
                 errorCode: DirectoryImportErrorCode.REPO_ACCESS_DENIED,
             };
         }
 
         try {
-            const sourceDir = await this.githubService.cloneOrPull({
-                owner: source.owner,
-                repo: source.repo,
-                token,
-                committer: user.asCommitter(),
-            });
+            const sourceDir = await this.gitFacade.cloneOrPull(
+                {
+                    owner: source.owner,
+                    repo: source.repo,
+                    committer: user.asCommitter(),
+                },
+                { userId: user.id, providerId: directory.repoProvider },
+            );
 
             const sourceData = await DataRepository.create(sourceDir);
             const items = await sourceData.getItems();
@@ -632,7 +638,8 @@ export class DirectoryImportService {
         user: User,
         sourceUrl: string,
     ): Promise<DirectoryImportResult> {
-        const token = this.getGitHubToken(user);
+        const providerId = this.getProviderFromUrl(sourceUrl);
+        const token = await this.getProviderToken(user, providerId);
 
         try {
             const readme = await this.sourceRepoAnalyzer.getReadmeContent(sourceUrl, token);
@@ -709,9 +716,17 @@ export class DirectoryImportService {
         }
     }
 
-    private getGitHubToken(user: User): string | undefined {
-        const oauthToken = user.oauthTokens?.find((t) => t.provider === 'github');
-        return oauthToken?.accessToken;
+    private async getProviderToken(user: User, providerId?: string): Promise<string | undefined> {
+        const token = await this.gitFacade.getAccessToken({
+            userId: user.id,
+            providerId: providerId,
+        });
+        return token ?? undefined;
+    }
+
+    private getProviderFromUrl(url: string): string | undefined {
+        const parsed = this.sourceRepoAnalyzer.parseGitUrl(url);
+        return parsed?.provider;
     }
 
     /**

@@ -10,3 +10,4 @@ export * from './search-facade.interface.js';
 export * from './screenshot-facade.interface.js';
 export * from './content-extractor-facade.interface.js';
 export * from './data-source-facade.interface.js';
+export * from './git-facade.interface.js';

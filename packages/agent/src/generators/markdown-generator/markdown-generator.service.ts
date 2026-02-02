@@ -1,6 +1,6 @@
 import { Injectable, Logger, Inject } from '@nestjs/common';
 import * as fs from 'node:fs/promises';
-import { GithubService } from '../../git/github.service';
+import { GitFacadeService } from '../../facades/git.facade';
 import type { Category, Identifiable, ItemData, Tag } from '@ever-works/contracts';
 import { Directory } from '../../entities/directory.entity';
 import { User } from '../../entities/user.entity';
@@ -23,46 +23,46 @@ export class MarkdownGeneratorService {
     private readonly logger = new Logger(MarkdownGeneratorService.name);
 
     constructor(
-        private readonly githubService: GithubService,
+        private readonly gitFacade: GitFacadeService,
         @Inject(DIRECTORY_OPERATIONS)
         private readonly directoryOperations: DirectoryOperations,
     ) {}
 
     async initialize(directory: Directory, user: User, options: InitializeOptions = {}) {
-        // Use directory owner's Git token (they set up the repos)
-        // but use current user as committer for attribution
         const directoryOwner = directory.user as User;
-        const token = directoryOwner.getGitToken();
         const committer = user.asCommitter();
-
         const description = options?.repository_description || directory.description;
 
-        if (directory.organization) {
-            await this.githubService.createEmptyRepoAsOrg(
-                directory.getRepoOwner(),
-                directory.slug,
+        // Create repository through facade
+        await this.gitFacade.createRepository(
+            {
+                name: directory.slug,
                 description,
-                token,
-            );
-        } else {
-            await this.githubService.createEmptyRepo(directory.slug, description, token);
-        }
+                organization: directory.organization ? directory.getRepoOwner() : undefined,
+                isPrivate: true,
+            },
+            { userId: directoryOwner.id, providerId: directory.repoProvider },
+        );
 
-        // Calling CloneOrPull switches to main branch by default
-        const markdownPath = await this.githubService.cloneOrPull({
-            owner: directory.getRepoOwner(),
-            repo: directory.slug,
-            token,
-            committer,
-        });
+        // Clone markdown repo
+        const markdownPath = await this.gitFacade.cloneOrPull(
+            {
+                owner: directory.getRepoOwner(),
+                repo: directory.slug,
+                committer,
+            },
+            { userId: directoryOwner.id, providerId: directory.repoProvider },
+        );
 
-        // Calling CloneOrPull switches to main branch by default
-        const dataPath = await this.githubService.cloneOrPull({
-            owner: directory.getRepoOwner(),
-            repo: directory.getDataRepo(),
-            token,
-            committer,
-        });
+        // Clone data repo
+        const dataPath = await this.gitFacade.cloneOrPull(
+            {
+                owner: directory.getRepoOwner(),
+                repo: directory.getDataRepo(),
+                committer,
+            },
+            { userId: directoryOwner.id, providerId: directory.repoProvider },
+        );
 
         const markdownRepo = new MarkdownRepository(markdownPath);
         const dataRepo = await DataRepository.create(dataPath);
@@ -71,8 +71,9 @@ export class MarkdownGeneratorService {
             const slugs = await fs.readdir(dataRepo.dataDir);
             await markdownRepo.ensureDirectoriesExist();
 
-            const defaultBranch = await this.githubService
-                .getMainBranch(markdownRepo.dir)
+            const provider = directory.repoProvider;
+            const defaultBranch = await this.gitFacade
+                .getMainBranch(provider, markdownRepo.dir)
                 .catch((err) => {
                     this.logger.error('Failed to get main branch', err);
                     return null;
@@ -87,17 +88,21 @@ export class MarkdownGeneratorService {
             // In case of re-creation:
             // Switch to the main branch and remove existing items files.
             if (generation_method === GenerationMethod.RECREATE) {
-                await this.githubService.switchToMainBranch(markdownRepo.dir).catch((err) => {
-                    this.logger.error('Failed to switch to main branch', err);
-                    return null;
-                });
+                if (defaultBranch) {
+                    await this.gitFacade
+                        .switchBranch(provider, markdownRepo.dir, defaultBranch)
+                        .catch((err) => {
+                            this.logger.error('Failed to switch to main branch', err);
+                            return null;
+                        });
+                }
 
                 await markdownRepo.resetFiles();
             } else if (canCreatePR) {
                 // Switch to PR branch (both repos)
                 await Promise.all([
-                    this.githubService.switchToBranch(markdownRepo.dir, pr_update.branch, true),
-                    this.githubService.switchToBranch(dataRepo.dir, pr_update.branch, true),
+                    this.gitFacade.switchBranch(provider, markdownRepo.dir, pr_update.branch, true),
+                    this.gitFacade.switchBranch(provider, dataRepo.dir, pr_update.branch, true),
                 ]).catch((err) => {
                     canCreatePR = false;
                     this.logger.error('Failed to switch to PR branch', err);
@@ -172,17 +177,25 @@ export class MarkdownGeneratorService {
             );
             await markdownRepo.writeReadme(readme);
 
-            await this.githubService.addAll(markdownPath);
-            await this.githubService.commit(markdownPath, 'sync README.md', user.asCommitter());
-            await this.githubService.push(markdownPath, token);
+            await this.gitFacade.addAll(provider, markdownPath);
+            await this.gitFacade.commit(
+                provider,
+                markdownPath,
+                'sync README.md',
+                user.asCommitter(),
+            );
+            await this.gitFacade.push(
+                { dir: markdownPath },
+                { userId: directoryOwner.id, providerId: directory.repoProvider },
+            );
 
             if (canCreatePR && defaultBranch) {
                 this.logger.log(
                     `Creating PR from ${pr_update.branch} to ${defaultBranch} for ${directory.slug}`,
                 );
 
-                const pr = await this.githubService
-                    .createPR(
+                const pr = await this.gitFacade
+                    .createPullRequest(
                         {
                             owner: directory.getRepoOwner(),
                             repo: directory.slug,
@@ -191,7 +204,7 @@ export class MarkdownGeneratorService {
                             title: pr_update.title,
                             body: pr_update.body,
                         },
-                        token,
+                        { userId: directoryOwner.id, providerId: directory.repoProvider },
                     )
                     .catch((err) => {
                         this.logger.error('Failed to create PR', err);
@@ -205,7 +218,7 @@ export class MarkdownGeneratorService {
                             title: pr_update.title,
                             body: pr_update.body,
                             number: pr.number,
-                            url: pr.html_url,
+                            url: pr.url,
                         },
                     });
                 }
@@ -219,24 +232,26 @@ export class MarkdownGeneratorService {
     }
 
     async removeItemDetail(directory: Directory, user: User, slug: string, branch?: string) {
-        // Use directory owner's Git token (they set up the repos)
         const directoryOwner = directory.user as User;
-        const token = directoryOwner.getGitToken();
         const committer = user.asCommitter();
 
-        const markdownPath = await this.githubService.cloneOrPull({
-            owner: directory.getRepoOwner(),
-            repo: directory.slug,
-            token,
-            committer,
-        });
+        const markdownPath = await this.gitFacade.cloneOrPull(
+            {
+                owner: directory.getRepoOwner(),
+                repo: directory.slug,
+                committer,
+            },
+            { userId: directoryOwner.id, providerId: directory.repoProvider },
+        );
 
         const markdownRepo = new MarkdownRepository(markdownPath);
 
         if (branch) {
-            await this.githubService.switchToBranch(markdownRepo.dir, branch, true).catch((err) => {
-                this.logger.error('Failed to switch to PR branch', err);
-            });
+            await this.gitFacade
+                .switchBranch(directory.repoProvider, markdownRepo.dir, branch, true)
+                .catch((err) => {
+                    this.logger.error('Failed to switch to PR branch', err);
+                });
         }
 
         await markdownRepo.removeDetails(slug);
@@ -246,19 +261,17 @@ export class MarkdownGeneratorService {
      * Remove repository for a directory
      */
     async removeRepository(directory: Directory, user: User): Promise<void> {
-        // Use directory owner's Git token (they set up the repos)
         const directoryOwner = directory.user as User;
-        const token = directoryOwner.getGitToken();
 
         try {
-            // Delete the GitHub repository
-            await this.githubService.deleteRepository(
-                directory.getRepoOwner(),
-                directory.slug,
-                token,
-            );
+            // Delete the repository
+            await this.gitFacade.deleteRepository(directory.getRepoOwner(), directory.slug, {
+                userId: directoryOwner.id,
+                providerId: directory.repoProvider,
+            });
 
-            const dataDir = this.githubService.getDir(
+            const dataDir = this.gitFacade.getLocalDir(
+                directory.repoProvider,
                 directory.getRepoOwner(),
                 directory.getMainRepo(),
             );
@@ -278,7 +291,8 @@ export class MarkdownGeneratorService {
     }
 
     async cleanup(directory: Directory) {
-        const dataDir = this.githubService.getDir(
+        const dataDir = this.gitFacade.getLocalDir(
+            directory.repoProvider,
             directory.getRepoOwner(),
             directory.getMainRepo(),
         );

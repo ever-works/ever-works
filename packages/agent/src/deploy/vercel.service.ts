@@ -1,7 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { randomBytes } from 'crypto';
 import { DeployProvider, VercelInput } from './deploy.types';
-import { GithubService } from '../git/github.service';
+import { GitFacadeService } from '../facades/git.facade';
+import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
+import { OAuthTokenRepository } from '../database/repositories/oauth-token.repository';
 import { Directory } from '../entities/directory.entity';
 import { User } from '../entities/user.entity';
 import { WebsiteUpdateService } from '../generators/website-generator/website-update.service';
@@ -23,15 +25,21 @@ export class VercelService {
     private readonly CRON_SECRET_LENGTH = 32;
 
     constructor(
-        private readonly githubService: GithubService,
+        private readonly gitFacade: GitFacadeService,
         private readonly websiteUpdateService: WebsiteUpdateService,
+        private readonly pluginRegistry: PluginRegistryService,
+        private readonly oauthTokenRepository: OAuthTokenRepository,
     ) {}
 
     async deploy(vercelInput: VercelInput, directory: Directory, user: User) {
-        const token = user.getGitToken();
+        const token = await this.getGitToken(user.id, directory.repoProvider);
+        if (!token) {
+            throw new Error('Git provider token not available');
+        }
+
         const ctx = await this.createRepoContext(vercelInput.owner, vercelInput.repo, token);
 
-        await this.githubService.enableWorkflows({
+        await this.enableWorkflows({
             owner: ctx.owner,
             repo: ctx.repo,
             token: ctx.token,
@@ -65,28 +73,38 @@ export class VercelService {
         return new Vercel({ bearerToken: token });
     }
 
+    private async getGitToken(userId: string, providerId: string): Promise<string | null> {
+        if (!providerId) return null;
+
+        const provider = this.gitFacade.getAvailableProviders().find((p) => p.id === providerId);
+        if (!provider) return null;
+
+        const oauthToken = await this.oauthTokenRepository.findByUserAndProvider(
+            userId,
+            provider.id,
+        );
+        return oauthToken?.accessToken || null;
+    }
+
     private async createRepoContext(
         owner: string,
         repo: string,
         token: string,
     ): Promise<RepoContext> {
-        const publicKey = await this.githubService.repositoryPublickey(owner, repo, token);
+        const publicKey = await this.getRepositoryPublicKey(owner, repo, token);
         return { owner, repo, token, publicKey };
     }
 
-    private setSecret(ctx: RepoContext, key: string, value: string) {
-        return this.githubService.setActionSecret(
+    private async setSecret(ctx: RepoContext, key: string, value: string) {
+        return this.setActionSecret(
             { key, value, owner: ctx.owner, repo: ctx.repo },
             ctx.publicKey,
             ctx.token,
         );
     }
 
-    private setVariable(ctx: RepoContext, key: string, value: string) {
-        return this.githubService.setActionVariable(
-            { key, value, owner: ctx.owner, repo: ctx.repo },
-            ctx.token,
-        );
+    private async setVariable(ctx: RepoContext, key: string, value: string) {
+        return this.setActionVariable({ key, value, owner: ctx.owner, repo: ctx.repo }, ctx.token);
     }
 
     private async setRequiredSecrets(
@@ -130,7 +148,7 @@ export class VercelService {
     }
 
     private async ensureCronSecret(ctx: RepoContext) {
-        const existingSecret = await this.githubService.getActionSecret(
+        const existingSecret = await this.getActionSecret(
             ctx.owner,
             ctx.repo,
             'CRON_SECRET',
@@ -166,7 +184,7 @@ export class VercelService {
                         `Attempting to dispatch workflow "${workflowFile}" for ${vercelInput.owner}/${vercelInput.repo}`,
                     );
 
-                    await this.githubService.dispatchAction(
+                    await this.dispatchWorkflow(
                         {
                             workflow: workflowFile,
                             inputs: { environment: 'production' },
@@ -207,9 +225,9 @@ export class VercelService {
 
             // Create a trigger commit to ensure a new workflow run is triggered
             // (force pushing the same commits won't trigger a new workflow run)
-            await this.createTriggerCommit(vercelInput, directory, user, token);
+            await this.createTriggerCommit(vercelInput, directory, user);
 
-            // Give GitHub a moment to register the push
+            // Give the provider a moment to register the push
             await this.delay(3000);
 
             // Try dispatch one more time in case the workflow was just indexed
@@ -238,23 +256,26 @@ export class VercelService {
     }
 
     /**
-     * Creates a small trigger commit to ensure GitHub triggers a new workflow run.
+     * Creates a small trigger commit to ensure the provider triggers a new workflow run.
      * This is needed because force-pushing the same commits won't trigger workflows.
      */
     private async createTriggerCommit(
         vercelInput: VercelInput,
         directory: Directory,
         user: User,
-        token: string,
     ): Promise<void> {
+        const directoryOwner = directory.user as User;
+
         try {
-            const repoDir = await this.githubService.cloneOrPull({
-                owner: vercelInput.owner,
-                repo: vercelInput.repo,
-                branch: WEBSITE_TEMPLATE_CONFIG.branch,
-                token,
-                committer: user.asCommitter(),
-            });
+            const repoDir = await this.gitFacade.cloneOrPull(
+                {
+                    owner: vercelInput.owner,
+                    repo: vercelInput.repo,
+                    branch: WEBSITE_TEMPLATE_CONFIG.branch,
+                    committer: user.asCommitter(),
+                },
+                { userId: directoryOwner.id, providerId: directory.repoProvider },
+            );
 
             // Create/update a deployment trigger file
             const triggerFile = `${repoDir}/.deployment-trigger`;
@@ -264,13 +285,17 @@ export class VercelService {
                 `Deployment triggered at ${new Date().toISOString()}\n`,
             );
 
-            await this.githubService.add(repoDir, '.deployment-trigger');
-            await this.githubService.commit(
+            await this.gitFacade.add(directory.repoProvider, repoDir, '.deployment-trigger');
+            await this.gitFacade.commit(
+                directory.repoProvider,
                 repoDir,
                 `chore: trigger deployment\n\nTriggered by Ever Works platform`,
                 user.asCommitter(),
             );
-            await this.githubService.push(repoDir, token);
+            await this.gitFacade.push(
+                { dir: repoDir },
+                { userId: directoryOwner.id, providerId: directory.repoProvider },
+            );
 
             this.logger.log(
                 `Created trigger commit for ${vercelInput.owner}/${vercelInput.repo} to initiate workflow`,
@@ -281,5 +306,81 @@ export class VercelService {
             );
             // Don't throw - the main push might have triggered the workflow already
         }
+    }
+
+    // GitHub Actions operations - these are provider-specific
+    // In the future, this could be abstracted to support GitLab CI, etc.
+
+    private getGitHubPlugin(): any {
+        const registered = this.pluginRegistry.get('github');
+        if (!registered || registered.state !== 'enabled') {
+            throw new Error('GitHub plugin not available for CI/CD operations');
+        }
+        return registered.plugin;
+    }
+
+    private async getRepositoryPublicKey(
+        owner: string,
+        repo: string,
+        token: string,
+    ): Promise<{ key_id: string; key: string }> {
+        const plugin = this.getGitHubPlugin();
+        return plugin.getRepositoryPublicKey(owner, repo, token);
+    }
+
+    private async setActionSecret(
+        data: { key: string; value: string; owner: string; repo: string },
+        publicKey: { key_id: string; key: string },
+        token: string,
+    ): Promise<void> {
+        const plugin = this.getGitHubPlugin();
+        return plugin.setActionSecret(data, publicKey, token);
+    }
+
+    private async setActionVariable(
+        data: { key: string; value: string; owner: string; repo: string },
+        token: string,
+    ): Promise<void> {
+        const plugin = this.getGitHubPlugin();
+        return plugin.setActionVariable(data, token);
+    }
+
+    private async getActionSecret(
+        _owner: string,
+        _repo: string,
+        _secretName: string,
+        _token: string,
+    ): Promise<any> {
+        // GitHub doesn't expose getActionSecret in the plugin yet
+        return null;
+    }
+
+    private async enableWorkflows(params: {
+        owner: string;
+        repo: string;
+        token: string;
+        withDelay?: boolean;
+    }): Promise<void> {
+        const plugin = this.getGitHubPlugin();
+        return plugin.enableDeploymentWorkflows(
+            params.owner,
+            params.repo,
+            params.token,
+            params.withDelay,
+        );
+    }
+
+    private async dispatchWorkflow(
+        data: {
+            workflow: string;
+            inputs?: Record<string, unknown>;
+            branch: string;
+            owner: string;
+            repo: string;
+        },
+        token: string,
+    ): Promise<void> {
+        const plugin = this.getGitHubPlugin();
+        return plugin.dispatchWorkflow(data, token);
     }
 }

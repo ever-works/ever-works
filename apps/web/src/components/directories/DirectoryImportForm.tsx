@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { OrganizationSelector } from './OrganizationSelector';
-import { RepositorySelector, GitHubRepo } from './RepositorySelector';
+import { RepositorySelector, GitRepo } from './RepositorySelector';
 import {
     ChevronDown,
     Upload,
@@ -34,6 +34,7 @@ import type { AnalyzeForLinkingResponseDto } from '@/lib/api/directory';
 
 interface DirectoryImportFormProps {
     user: AuthUser;
+    repoProvider?: string;
 }
 
 type ImportStep = 'source' | 'analyzing' | 'choose_mode' | 'configure' | 'importing';
@@ -58,7 +59,7 @@ interface AnalysisResult {
     error?: string;
 }
 
-export function DirectoryImportForm({ user }: DirectoryImportFormProps) {
+export function DirectoryImportForm({ user, repoProvider }: DirectoryImportFormProps) {
     const [step, setStep] = useState<ImportStep>('source');
     const [sourceMethod, setSourceMethod] = useState<SourceMethod>('url');
     const [sourceUrl, setSourceUrl] = useState('');
@@ -77,7 +78,7 @@ export function DirectoryImportForm({ user }: DirectoryImportFormProps) {
     const router = useRouter();
     const t = useTranslations('dashboard.directoryCreation.import');
 
-    const handleRepositorySelect = (repo: GitHubRepo) => {
+    const handleRepositorySelect = (repo: GitRepo) => {
         setSourceUrl(repo.html_url);
         setDirectoryName(repo.name);
     };
@@ -139,10 +140,9 @@ export function DirectoryImportForm({ user }: DirectoryImportFormProps) {
     const handleModeSelect = async (mode: ImportMode) => {
         if (mode === 'import') {
             setStep('configure');
-        } else if (mode === 'link_existing' && analysisResult) {
-            // Analyze for linking
+        } else if (mode === 'link_existing' && analysisResult && repoProvider) {
             startTransition(async () => {
-                const result = await analyzeForLinking(analysisResult.sourceUrl);
+                const result = await analyzeForLinking(analysisResult.sourceUrl, repoProvider);
                 if (result.success && result.data) {
                     setLinkAnalysis(result.data);
                     setShowLinkConfirm(true);
@@ -168,6 +168,7 @@ export function DirectoryImportForm({ user }: DirectoryImportFormProps) {
                 organization,
                 owner: organization ? owner : undefined,
                 createMissingRepos,
+                repoProvider,
             });
 
             if (result.success) {
@@ -206,6 +207,7 @@ export function DirectoryImportForm({ user }: DirectoryImportFormProps) {
                 organization,
                 owner: organization ? owner : undefined,
                 sync,
+                repoProvider,
             });
 
             if (result.success) {
@@ -216,8 +218,8 @@ export function DirectoryImportForm({ user }: DirectoryImportFormProps) {
                 } else {
                     router.push(ROUTES.DASHBOARD_DIRECTORIES);
                 }
-            } else if (result.requiresGitHub) {
-                toast.error(result.error || t('errors.githubRequired'));
+            } else if (result.requiresGitProvider) {
+                toast.error(result.error || 'Git provider connection required');
                 setStep('configure');
             } else {
                 toast.error(result.error || t('errors.importFailed'));
@@ -284,7 +286,7 @@ export function DirectoryImportForm({ user }: DirectoryImportFormProps) {
                 />
             ) : (
                 <RepositorySelector
-                    authId={user.sub}
+                    providerId={repoProvider!}
                     onSelect={handleRepositorySelect}
                     selectedUrl={sourceUrl}
                 />
@@ -586,7 +588,7 @@ export function DirectoryImportForm({ user }: DirectoryImportFormProps) {
                 <div className="space-y-4 p-4 rounded-lg bg-surface dark:bg-surface-dark border border-border dark:border-border-dark">
                     <OrganizationSelector
                         value={owner}
-                        authId={user.sub}
+                        providerId={repoProvider!}
                         onChange={(value, isOrganization) => {
                             setOwner(value);
                             setOrganization(isOrganization);

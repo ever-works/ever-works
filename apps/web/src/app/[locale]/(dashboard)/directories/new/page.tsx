@@ -1,18 +1,45 @@
 import { getAuthFromCookie } from '@/lib/auth';
-import { authAPI, ConnectionInfo } from '@/lib/api/auth';
+import { gitProvidersAPI, GitProviderConnectionInfo, GitProviderInfo } from '@/lib/api';
 import NewDirectoryClient from './new-directory-client';
-import { OAuthProvider } from '@/lib/api/enums';
+
+export interface ProviderWithConnection {
+    provider: GitProviderInfo;
+    connectionInfo: GitProviderConnectionInfo | null;
+}
 
 export default async function NewDirectoryPage() {
     const user = await getAuthFromCookie();
 
-    // Check GitHub connection on the server
-    let connection: ConnectionInfo | null = null;
+    // Get all available git providers and their connection status
+    let providers: ProviderWithConnection[] = [];
+    let defaultProviderId: string | null = null;
+
     try {
-        connection = await authAPI.oauth_connections.checkConnection(OAuthProvider.GITHUB);
+        const [providersResult, defaultResult] = await Promise.all([
+            gitProvidersAPI.list(),
+            gitProvidersAPI.getDefault(),
+        ]);
+
+        defaultProviderId = defaultResult.provider?.id || null;
+
+        // Get connection info for each provider
+        providers = await Promise.all(
+            providersResult.providers.map(async (provider) => {
+                const connectionInfo = await gitProvidersAPI
+                    .checkConnection(provider.id)
+                    .catch(() => null);
+                return { provider, connectionInfo };
+            }),
+        );
     } catch (error) {
-        console.error('Failed to check GitHub connection:', error);
+        console.error('Failed to fetch git providers:', error);
     }
 
-    return <NewDirectoryClient user={user!} githubConnection={connection} />;
+    return (
+        <NewDirectoryClient
+            user={user!}
+            providers={providers}
+            defaultProviderId={defaultProviderId}
+        />
+    );
 }

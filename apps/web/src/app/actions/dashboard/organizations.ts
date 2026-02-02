@@ -1,33 +1,42 @@
 'use server';
 
-import { authAPI, GitHubOrganization } from '@/lib/api';
+import { gitProvidersAPI, GitOrganization } from '@/lib/api';
 import { getAuthFromCookie } from '@/lib/auth';
 
-export async function getGitHubOrganizations(): Promise<{
+/**
+ * Get organizations from the git provider (provider-agnostic)
+ */
+export async function getGitProviderOrganizations(providerId: string): Promise<{
     success: boolean;
-    organizations?: GitHubOrganization[];
+    organizations: GitOrganization[];
     error?: string;
 }> {
     const user = await getAuthFromCookie();
     if (!user) {
         return {
             success: false,
+            organizations: [],
             error: 'Not authenticated',
         };
     }
 
-    try {
-        const organizations = await authAPI.oauth_connections.getGitHubOrgs();
-        return {
-            success: true,
-            organizations,
-        };
-    } catch (error) {
-        console.error('Failed to fetch GitHub organizations:', error);
+    if (!providerId) {
         return {
             success: false,
-            error: 'Failed to fetch organizations',
             organizations: [],
+            error: 'Git provider ID is required',
+        };
+    }
+
+    try {
+        const result = await gitProvidersAPI.getOrganizations(providerId);
+        return result;
+    } catch (error) {
+        console.error('Failed to fetch organizations:', error);
+        return {
+            success: false,
+            organizations: [],
+            error: error instanceof Error ? error.message : 'Failed to fetch organizations',
         };
     }
 }

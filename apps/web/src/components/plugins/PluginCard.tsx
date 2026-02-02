@@ -68,7 +68,12 @@ export function PluginCard({ plugin }: PluginCardProps) {
                         <h3 className="font-medium text-text dark:text-text-dark truncate">
                             {plugin.name}
                         </h3>
-                        {plugin.builtIn && (
+                        {plugin.systemPlugin && (
+                            <span className="text-xs px-1.5 py-0.5 rounded bg-primary/10 text-primary">
+                                {t('system')}
+                            </span>
+                        )}
+                        {plugin.builtIn && !plugin.systemPlugin && (
                             <span className="text-xs px-1.5 py-0.5 rounded bg-surface-tertiary dark:bg-surface-tertiary-dark text-text-muted dark:text-text-muted-dark">
                                 {t('builtIn')}
                             </span>
@@ -79,28 +84,34 @@ export function PluginCard({ plugin }: PluginCardProps) {
                     </p>
                 </div>
 
-                <Button
-                    variant={optimisticEnabled ? 'ghost' : 'primary'}
-                    size="sm"
-                    onClick={handleToggle}
-                    disabled={isPending}
-                    loading={isPending}
-                    className={cn(
-                        optimisticEnabled && 'text-danger hover:text-danger hover:bg-danger/10',
-                    )}
-                >
-                    {optimisticEnabled ? (
-                        <>
-                            <PowerOff className="w-4 h-4" />
-                            <span className="sr-only md:not-sr-only md:ml-1">{t('disable')}</span>
-                        </>
-                    ) : (
-                        <>
-                            <Power className="w-4 h-4" />
-                            <span className="sr-only md:not-sr-only md:ml-1">{t('enable')}</span>
-                        </>
-                    )}
-                </Button>
+                {!plugin.systemPlugin && (
+                    <Button
+                        variant={optimisticEnabled ? 'ghost' : 'primary'}
+                        size="sm"
+                        onClick={handleToggle}
+                        disabled={isPending}
+                        loading={isPending}
+                        className={cn(
+                            optimisticEnabled && 'text-danger hover:text-danger hover:bg-danger/10',
+                        )}
+                    >
+                        {optimisticEnabled ? (
+                            <>
+                                <PowerOff className="w-4 h-4" />
+                                <span className="sr-only md:not-sr-only md:ml-1">
+                                    {t('disable')}
+                                </span>
+                            </>
+                        ) : (
+                            <>
+                                <Power className="w-4 h-4" />
+                                <span className="sr-only md:not-sr-only md:ml-1">
+                                    {t('enable')}
+                                </span>
+                            </>
+                        )}
+                    </Button>
+                )}
             </div>
 
             {plugin.description && (

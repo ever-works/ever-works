@@ -54,6 +54,19 @@ export {
 // Data Source Facade
 export { DataSourceFacadeService, DataSourceFacadeError } from './data-source.facade';
 
+// Git Facade
+export {
+    GitFacadeService,
+    GitFacadeError,
+    NoGitProviderError,
+    GitProviderNotFoundError,
+    NoGitCredentialsError,
+    type GitFacadeOptions,
+    type GitProviderInfo,
+    type FacadeCloneOptions,
+    type FacadePushOptions,
+} from './git.facade';
+
 // Settings Utils
 export { getSettingTyped, getSettingWithDefault, type ExpectedSettingType } from './settings-utils';
 

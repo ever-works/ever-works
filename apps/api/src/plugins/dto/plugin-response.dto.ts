@@ -14,6 +14,7 @@ import type {
     PluginListResponse,
     DirectoryPluginListResponse,
     SettingScopeApi,
+    PluginVisibility,
 } from '@ever-works/plugin/api';
 
 // Re-export types for convenience
@@ -22,6 +23,7 @@ export type {
     PluginState,
     ConfigurationMode,
     PluginIconType,
+    PluginVisibility,
 } from '@ever-works/plugin/api';
 
 /**
@@ -153,6 +155,16 @@ export class PluginResponseDto implements PluginResponse {
 
     @ApiProperty({ description: 'Whether plugin is built-in' })
     builtIn: boolean;
+
+    @ApiProperty({ description: 'Whether this is a system plugin that cannot be disabled' })
+    systemPlugin: boolean;
+
+    @ApiProperty({
+        description: 'UI visibility',
+        enum: ['public', 'hidden', 'advanced'],
+        default: 'public',
+    })
+    visibility: PluginVisibility;
 
     @ApiProperty({ description: 'Plugin state' })
     state: PluginState;

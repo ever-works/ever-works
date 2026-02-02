@@ -13,7 +13,6 @@ export type {
     ResetPasswordDto,
     AuthResponse,
     OAuthUrlResponse,
-    ConnectionInfo,
     TokenValidationResponse,
 } from './auth';
 
@@ -103,3 +102,12 @@ export type {
     Brand,
     ItemData,
 } from './types';
+
+export type {
+    // From git-providers.ts (API response types)
+    GitProviderInfo,
+    GitProviderConnectionInfo,
+} from './git-providers';
+
+// Re-export plugin types for client components
+export type { GitUser, GitOrganization, GitRepositoryWithPermissions } from '@ever-works/plugin';

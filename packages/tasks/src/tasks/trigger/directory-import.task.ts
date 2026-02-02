@@ -24,6 +24,7 @@ async function createContext(appContext: INestApplicationContext, payload: Direc
         user,
         directory,
         orchestrator,
+        gitToken: context.gitToken,
     };
 }
 
@@ -57,12 +58,16 @@ export const directoryImportTask = task({
         });
 
         try {
-            const { orchestrator, directory, user } = await createContext(appContext, payload);
+            const { orchestrator, directory, user, gitToken } = await createContext(
+                appContext,
+                payload,
+            );
 
             await orchestrator.run({
                 directory,
                 user,
                 payload,
+                gitToken,
             });
 
             return {

@@ -5,11 +5,10 @@ import {
     CreateItemsGeneratorDto,
     UpdateItemsGeneratorDto,
     directoryAPI,
-    authAPI,
-    ConnectionInfo,
+    gitProvidersAPI,
 } from '@/lib/api';
 import { getTranslations } from 'next-intl/server';
-import { checkOAuthConnection } from './oauth';
+import { checkGitProviderConnection } from './oauth';
 import {
     sanitizeName,
     sanitizeDescription,
@@ -91,25 +90,23 @@ export async function generateItems(directoryId: string, data: CreateItemsGenera
 
         const { directory } = await directoryAPI.get(directoryId);
 
-        // We need to ensure that oauth connection is valid or revoke it if not
-        await authAPI.oauth_connections.ensureConnection(directory.repoProvider);
-
-        // Check GitHub connection first
-        const oauthCheck = await checkOAuthConnection(directory.repoProvider);
-        if (!oauthCheck.connected) {
+        // Check git provider connection
+        const connectionCheck = await checkGitProviderConnection(directory.repoProvider);
+        if (!connectionCheck.connected) {
             return {
                 success: false,
                 error: tDirectories('oauthRequired', { provider: directory.repoProvider }),
-                requiresGitHub: true,
+                requiresGitProvider: true,
             };
         }
 
-        const oauthInfo = oauthCheck as ConnectionInfo;
+        // Get organizations from the git provider
+        const orgsResult = await gitProvidersAPI.getOrganizations(directory.repoProvider);
+        const orgs = orgsResult.organizations || [];
 
-        // Get organizations
-        const orgs = await authAPI.oauth_connections.getGitHubOrgs();
-
-        if (directory.owner && oauthInfo.username !== directory.owner) {
+        // connectionCheck.username is available when connected is true
+        const username = 'username' in connectionCheck ? connectionCheck.username : undefined;
+        if (directory.owner && username !== directory.owner) {
             if (!orgs.some((org) => org.login === directory.owner)) {
                 return {
                     success: false,

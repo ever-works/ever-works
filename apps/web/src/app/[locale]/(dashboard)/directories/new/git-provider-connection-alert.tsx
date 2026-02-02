@@ -2,34 +2,46 @@
 
 import { useTransition } from 'react';
 import { cn } from '@/lib/utils/cn';
-import { connectGitHub } from '@/app/actions/dashboard/oauth';
+import { connectGitProvider } from '@/app/actions/dashboard/oauth';
 import { toast } from 'sonner';
 import { ROUTES } from '@/lib/constants';
 import { useTranslations } from 'next-intl';
+import type { GitProviderInfo } from '@/lib/api';
 
-interface GitHubConnectionAlertProps {
-    githubConnected: boolean;
+interface GitProviderConnectionAlertProps {
+    connected: boolean;
+    provider?: GitProviderInfo | null;
 }
 
-export function GitHubConnectionAlert({ githubConnected }: GitHubConnectionAlertProps) {
+export function GitProviderConnectionAlert({
+    connected,
+    provider,
+}: GitProviderConnectionAlertProps) {
     const [isPending, startTransition] = useTransition();
-    const t = useTranslations('dashboard.github.connection.alert');
+    const t = useTranslations('dashboard.gitProvider.connection.alert');
 
-    const handleGitHubConnect = () => {
+    const handleConnect = () => {
+        if (!provider?.id) {
+            toast.error('No provider selected');
+            return;
+        }
+
         startTransition(async () => {
-            const result = await connectGitHub(ROUTES.DASHBOARD_DIRECTORIES_NEW);
+            const result = await connectGitProvider(provider.id, ROUTES.DASHBOARD_DIRECTORIES_NEW);
 
             if (result.success && result.url) {
                 window.location.href = result.url;
             } else {
-                toast.error(result.error || 'Failed to connect GitHub');
+                toast.error(result.error || 'Failed to connect');
             }
         });
     };
 
-    if (githubConnected) {
+    if (connected) {
         return null;
     }
+
+    const providerName = provider?.name || 'Git';
 
     return (
         <div
@@ -54,15 +66,15 @@ export function GitHubConnectionAlert({ githubConnected }: GitHubConnectionAlert
                 </svg>
                 <div>
                     <p className="text-sm font-medium text-text dark:text-text-dark">
-                        {t('title')}
+                        {t('title', { provider: providerName })}
                     </p>
                     <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                        {t('subtitle')}
+                        {t('subtitle', { provider: providerName })}
                     </p>
                 </div>
             </div>
             <button
-                onClick={handleGitHubConnect}
+                onClick={handleConnect}
                 disabled={isPending}
                 className={cn(
                     'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
@@ -71,7 +83,7 @@ export function GitHubConnectionAlert({ githubConnected }: GitHubConnectionAlert
                     'disabled:opacity-50 disabled:cursor-not-allowed',
                 )}
             >
-                {isPending ? t('connectingButton') : t('connectButton')}
+                {isPending ? t('connectingButton') : t('connectButton', { provider: providerName })}
             </button>
         </div>
     );

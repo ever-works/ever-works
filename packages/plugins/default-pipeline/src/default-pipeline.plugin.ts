@@ -781,7 +781,8 @@ export class DefaultPipelinePlugin implements IPlugin, IDefaultPipelinePlugin<Bu
 			license: 'MIT',
 			builtIn: true,
 			systemPlugin: true,
-			autoInstall: true
+			autoInstall: true,
+			visibility: 'hidden'
 		};
 	}
 }

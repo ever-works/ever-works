@@ -11,7 +11,8 @@ export default defineConfig({
 		'src/helpers/index.ts',
 		'src/abstract/index.ts',
 		'src/testing/index.ts',
-		'src/api/index.ts'
+		'src/api/index.ts',
+		'src/git/index.ts'
 	],
 	format: ['esm'],
 	dts: true,

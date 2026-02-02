@@ -55,18 +55,6 @@ spec:
             - name: JWT_SECRET
               value: "$JWT_SECRET"
 
-            # Github
-            - name: GH_APIKEY
-              value: "$GH_APIKEY"
-            - name: GH_OWNER
-              value: "$GH_OWNER"
-
-            # Git
-            - name: GIT_NAME
-              value: "$GIT_NAME"
-            - name: GIT_EMAIL
-              value: "$GIT_EMAIL"
-
             # Trigger.dev
             - name: TRIGGER_ENABLED
               value: "$TRIGGER_ENABLED"

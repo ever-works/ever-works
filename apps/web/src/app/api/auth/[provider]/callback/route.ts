@@ -1,15 +1,19 @@
 import { redirect } from '@/i18n/navigation';
-import { authAPI, AuthResponse, ConnectionInfo } from '@/lib/api';
-import { OAuthProcessType, OAuthProvider } from '@/lib/api/enums';
+import { authAPI, AuthResponse } from '@/lib/api';
+import { OAuthProvider } from '@/lib/api/enums';
 import { getOAuthStateCookie, setAuthCookies } from '@/lib/auth';
 import { getRedirectUrl } from '@/lib/auth/redirect';
 import { ROUTES } from '@/lib/constants';
 import { getLocale } from 'next-intl/server';
 import { NextRequest } from 'next/server';
 
-// For oAuth connection check file:
-// Check apps/web/src/app/actions/auth.ts
-
+/**
+ * OAuth callback route for user authentication (login/register).
+ * This route handles GitHub and Google login only.
+ *
+ * For git provider connections (repository access), use the separate route:
+ * /api/git-providers/[providerId]/callback
+ */
 export async function GET(
     request: NextRequest,
     { params }: { params: Promise<{ provider: string }> },
@@ -19,8 +23,6 @@ export async function GET(
     const queryParams = request.nextUrl.searchParams;
     const code = queryParams.get('code');
     const state = queryParams.get('state');
-    const returnPath = queryParams.get('returnPath');
-    const process = queryParams.get('process') as OAuthProcessType | undefined;
 
     const locale = await getLocale();
 
@@ -39,46 +41,15 @@ export async function GET(
         });
     }
 
-    // Login process
-    if (process === 'login' || !process) {
-        await loginOauth(provider as OAuthProvider, code, state || '', locale);
-        return;
-    }
-
-    // Connection process
-    await connectOauth(provider as OAuthProvider, returnPath, code, state || '', locale);
+    // Handle authentication OAuth (login/register)
+    await loginOauth(provider as OAuthProvider, code, state || '', locale);
     return;
 }
 
-async function connectOauth(
-    provider: OAuthProvider,
-    returnPath: string | null,
-    code: string,
-    state: string,
-    locale: string,
-) {
-    let href: string = returnPath || ROUTES.DASHBOARD;
-    let connectionResponse: ConnectionInfo | null = null;
-
-    try {
-        switch (provider) {
-            case OAuthProvider.GITHUB: {
-                const response = await authAPI.oauth_connections.connectCallback(
-                    OAuthProvider.GITHUB,
-                    code,
-                    state || undefined,
-                );
-                connectionResponse = response;
-                break;
-            }
-        }
-    } catch (error) {
-        href = ROUTES.AUTH_ERROR + '?error=oauth_callback';
-    }
-
-    return redirect({ locale, href: href + '?oauth_connected=true' });
-}
-
+/**
+ * Handle OAuth login for authentication.
+ * Only supports GitHub and Google for user authentication.
+ */
 async function loginOauth(provider: OAuthProvider, code: string, state: string, locale: string) {
     let href: string = ROUTES.DASHBOARD;
     let authResponse: AuthResponse | null = null;

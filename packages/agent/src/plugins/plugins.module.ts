@@ -9,8 +9,8 @@ import {
     Inject,
 } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { EventEmitterModule, EventEmitter2 } from '@nestjs/event-emitter';
-import { CacheModule, CACHE_MANAGER } from '@nestjs/cache-manager';
+import { EventEmitterModule } from '@nestjs/event-emitter';
+import { CacheModule } from '@nestjs/cache-manager';
 
 // Entities
 import { PluginEntity } from './entities/plugin.entity';

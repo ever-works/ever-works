@@ -20,7 +20,7 @@ export enum ImportSourceTypeEnum {
 }
 
 export class AnalyzeRepositoryDto {
-    @IsUrl({}, { message: 'Please provide a valid GitHub URL' })
+    @IsUrl({}, { message: 'Please provide a valid repository URL' })
     @IsNotEmpty()
     sourceUrl: string;
 }
@@ -44,7 +44,7 @@ export class AnalyzeRepositoryResponseDto {
 }
 
 export class ImportDirectoryDto {
-    @IsUrl({}, { message: 'Please provide a valid GitHub URL' })
+    @IsUrl({}, { message: 'Please provide a valid repository URL' })
     @IsNotEmpty()
     sourceUrl: string;
 
@@ -73,6 +73,10 @@ export class ImportDirectoryDto {
     @IsOptional()
     @IsBoolean()
     sync?: boolean;
+
+    @IsString()
+    @IsNotEmpty({ message: 'Git provider is required' })
+    repoProvider: string;
 }
 
 export class ImportDirectoryResponseDto {
@@ -92,7 +96,10 @@ export class ImportProgressDto {
     error?: string;
 }
 
-export class GitHubRepoDto {
+/**
+ * Generic Git repository DTO for provider-agnostic repository data.
+ */
+export class GitRepoDto {
     id: number;
     name: string;
     full_name: string;
@@ -105,6 +112,10 @@ export class GitHubRepoDto {
 }
 
 export class GetUserRepositoriesDto {
+    @IsString()
+    @IsNotEmpty()
+    providerId: string;
+
     @IsOptional()
     @IsNumber()
     @Min(1)
@@ -121,7 +132,7 @@ export class GetUserRepositoriesDto {
 }
 
 export class GetUserRepositoriesResponseDto {
-    repositories: GitHubRepoDto[];
+    repositories: GitRepoDto[];
     total: number;
     page: number;
     perPage: number;

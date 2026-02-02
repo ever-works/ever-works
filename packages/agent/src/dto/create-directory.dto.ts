@@ -91,14 +91,14 @@ export class CreateDirectoryDto {
     description: string;
 
     @ApiPropertyOptional({
-        description: 'GitHub username or organization for repository ownership',
+        description: 'Username or organization for repository ownership',
     })
     @IsOptional()
     @IsString()
     @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
     owner?: string;
 
-    @ApiProperty({ description: 'Whether the owner is a GitHub organization', example: false })
+    @ApiProperty({ description: 'Whether the owner is an organization', example: false })
     @IsBoolean()
     organization: boolean;
 

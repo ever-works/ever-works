@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { getUserRepositories } from '@/app/actions/dashboard/directories';
 
-export interface GitHubRepo {
+export interface GitRepo {
     id: number;
     name: string;
     full_name: string;
@@ -29,13 +29,13 @@ export interface GitHubRepo {
 }
 
 interface RepositorySelectorProps {
-    authId: string;
-    onSelect: (repo: GitHubRepo) => void;
+    providerId: string;
+    onSelect: (repo: GitRepo) => void;
     selectedUrl?: string;
 }
 
-export function RepositorySelector({ onSelect, selectedUrl }: RepositorySelectorProps) {
-    const [repositories, setRepositories] = useState<GitHubRepo[]>([]);
+export function RepositorySelector({ providerId, onSelect, selectedUrl }: RepositorySelectorProps) {
+    const [repositories, setRepositories] = useState<GitRepo[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [search, setSearch] = useState('');
@@ -53,6 +53,7 @@ export function RepositorySelector({ onSelect, selectedUrl }: RepositorySelector
 
             try {
                 const result = await getUserRepositories({
+                    providerId,
                     page: pageNum,
                     perPage,
                     search: searchQuery || undefined,
@@ -74,7 +75,7 @@ export function RepositorySelector({ onSelect, selectedUrl }: RepositorySelector
                 setLoading(false);
             }
         },
-        [t],
+        [providerId, t],
     );
 
     useEffect(() => {
