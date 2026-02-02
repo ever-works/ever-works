@@ -49,13 +49,13 @@
 			"builtIn": false,
 			"envVars": [
 				{
-					"name": "SCREENSHOTONE_ACCESS_KEY",
+					"name": "PLUGIN_SCREENSHOTONE_ACCESS_KEY",
 					"required": false,
 					"secret": true,
 					"description": "ScreenshotOne access key (optional - can be set via admin/user settings)"
 				},
 				{
-					"name": "SCREENSHOTONE_SECRET_KEY",
+					"name": "PLUGIN_SCREENSHOTONE_SECRET_KEY",
 					"required": false,
 					"secret": true,
 					"description": "ScreenshotOne secret key for signed URLs (optional - can be set via admin/user settings)"

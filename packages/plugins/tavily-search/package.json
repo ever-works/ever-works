@@ -54,7 +54,7 @@
 			"builtIn": true,
 			"envVars": [
 				{
-					"name": "TAVILY_API_KEY",
+					"name": "PLUGIN_TAVILY_API_KEY",
 					"required": false,
 					"secret": true,
 					"description": "Tavily API key (optional - can be set via admin/user settings)"

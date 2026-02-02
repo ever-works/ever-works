@@ -61,7 +61,7 @@ export class GitHubPlugin implements IPlugin, IGitProviderPlugin, IOAuthPlugin {
 				type: 'string',
 				title: 'Client ID',
 				description: 'GitHub OAuth App Client ID',
-				'x-envVar': 'GH_CLIENT_ID',
+				'x-envVar': 'PLUGIN_GITHUB_CLIENT_ID',
 				'x-writeOnly': true,
 				'x-adminOnly': true,
 				'x-scope': 'global'
@@ -73,7 +73,7 @@ export class GitHubPlugin implements IPlugin, IGitProviderPlugin, IOAuthPlugin {
 				'x-secret': true,
 				'x-masked': true,
 				'x-writeOnly': true,
-				'x-envVar': 'GH_CLIENT_SECRET',
+				'x-envVar': 'PLUGIN_GITHUB_CLIENT_SECRET',
 				'x-adminOnly': true,
 				'x-scope': 'global'
 			},
@@ -82,7 +82,7 @@ export class GitHubPlugin implements IPlugin, IGitProviderPlugin, IOAuthPlugin {
 				title: 'API Base URL',
 				description: 'GitHub API base URL (for GitHub Enterprise)',
 				default: 'https://api.github.com',
-				'x-envVar': 'GH_API_URL',
+				'x-envVar': 'PLUGIN_GITHUB_API_URL',
 				'x-scope': 'global'
 			}
 		}

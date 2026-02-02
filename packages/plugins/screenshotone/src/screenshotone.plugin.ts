@@ -42,7 +42,7 @@ interface ScreenshotOneSettings {
  * 1. Directory settings (highest priority)
  * 2. User settings
  * 3. Admin settings
- * 4. Environment variables: SCREENSHOTONE_ACCESS_KEY, SCREENSHOTONE_SECRET_KEY
+ * 4. Environment variables: PLUGIN_SCREENSHOTONE_ACCESS_KEY, PLUGIN_SCREENSHOTONE_SECRET_KEY
  * 5. Not configured (plugin unavailable)
  *
  * Configuration mode: hybrid - allows admin-level defaults with user/directory overrides.
@@ -81,7 +81,7 @@ export class ScreenshotOnePlugin implements IPlugin, IScreenshotPlugin {
 				'x-masked': true,
 				'x-writeOnly': true,
 				// Environment variable fallback
-				'x-envVar': 'SCREENSHOTONE_ACCESS_KEY',
+				'x-envVar': 'PLUGIN_SCREENSHOTONE_ACCESS_KEY',
 				// Scope - can be set at any level
 				'x-scope': 'global'
 			},
@@ -94,7 +94,7 @@ export class ScreenshotOnePlugin implements IPlugin, IScreenshotPlugin {
 				'x-masked': true,
 				'x-writeOnly': true,
 				// Environment variable fallback
-				'x-envVar': 'SCREENSHOTONE_SECRET_KEY',
+				'x-envVar': 'PLUGIN_SCREENSHOTONE_SECRET_KEY',
 				// Scope - can be set at any level
 				'x-scope': 'global'
 			},
@@ -105,7 +105,7 @@ export class ScreenshotOnePlugin implements IPlugin, IScreenshotPlugin {
 				default: 1280,
 				minimum: 320,
 				maximum: 3840,
-				'x-envVar': 'SCREENSHOTONE_VIEWPORT_WIDTH'
+				'x-envVar': 'PLUGIN_SCREENSHOTONE_VIEWPORT_WIDTH'
 			},
 			viewportHeight: {
 				type: 'number',
@@ -114,7 +114,7 @@ export class ScreenshotOnePlugin implements IPlugin, IScreenshotPlugin {
 				default: 800,
 				minimum: 200,
 				maximum: 2160,
-				'x-envVar': 'SCREENSHOTONE_VIEWPORT_HEIGHT'
+				'x-envVar': 'PLUGIN_SCREENSHOTONE_VIEWPORT_HEIGHT'
 			},
 			format: {
 				type: 'string',
@@ -122,7 +122,7 @@ export class ScreenshotOnePlugin implements IPlugin, IScreenshotPlugin {
 				description: 'Default output image format',
 				enum: ['png', 'jpg', 'jpeg', 'webp'],
 				default: 'png',
-				'x-envVar': 'SCREENSHOTONE_FORMAT'
+				'x-envVar': 'PLUGIN_SCREENSHOTONE_FORMAT'
 			},
 			fullPage: {
 				type: 'boolean',
@@ -319,7 +319,7 @@ export class ScreenshotOnePlugin implements IPlugin, IScreenshotPlugin {
 		if (!accessKey) {
 			throw new Error(
 				'ScreenshotOne access key not configured. ' +
-					'Set it in plugin settings or via SCREENSHOTONE_ACCESS_KEY environment variable.'
+					'Set it in plugin settings or via PLUGIN_SCREENSHOTONE_ACCESS_KEY environment variable.'
 			);
 		}
 

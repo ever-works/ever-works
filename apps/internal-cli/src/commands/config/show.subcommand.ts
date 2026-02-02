@@ -74,8 +74,8 @@ export class ShowSubCommand extends CommandRunner {
             this.displaySection('Search Services', {
                 'Content Extraction': config.EXTRACT_CONTENT_SERVICE,
                 'Web Search': config.WEB_SEARCH_SERVICE,
-                'Tavily API Key': config.TAVILY_API_KEY
-                    ? maskSecret(config.TAVILY_API_KEY)
+                'Tavily API Key': config.PLUGIN_TAVILY_API_KEY
+                    ? maskSecret(config.PLUGIN_TAVILY_API_KEY)
                     : 'Not configured',
             });
 

@@ -30,7 +30,7 @@ import { tavily, TavilyClient } from '@tavily/core';
  * 1. Directory settings (highest priority)
  * 2. User settings
  * 3. Admin settings
- * 4. Environment variable: TAVILY_API_KEY (via x-envVar)
+ * 4. Environment variable: PLUGIN_TAVILY_API_KEY (via x-envVar)
  * 5. Not configured (plugin unavailable)
  *
  */
@@ -68,7 +68,7 @@ export class TavilySearchPlugin implements IPlugin, ISearchPlugin, IContentExtra
 				'x-masked': true,
 				'x-writeOnly': true,
 				// Environment variable fallback
-				'x-envVar': 'TAVILY_API_KEY',
+				'x-envVar': 'PLUGIN_TAVILY_API_KEY',
 				// Scope - can be set at any level
 				'x-scope': 'global'
 			},
@@ -276,7 +276,7 @@ export class TavilySearchPlugin implements IPlugin, ISearchPlugin, IContentExtra
 		if (!apiKey) {
 			throw new Error(
 				'Tavily API key not configured. ' +
-					'Set it in plugin settings or via TAVILY_API_KEY environment variable.'
+					'Set it in plugin settings or via PLUGIN_TAVILY_API_KEY environment variable.'
 			);
 		}
 

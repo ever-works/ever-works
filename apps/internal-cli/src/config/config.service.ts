@@ -126,10 +126,10 @@ export class ConfigService {
 
         // Warnings
         if (
-            !config.TAVILY_API_KEY &&
+            !config.PLUGIN_TAVILY_API_KEY &&
             (config.EXTRACT_CONTENT_SERVICE === 'tavily' || config.WEB_SEARCH_SERVICE === 'tavily')
         ) {
-            warnings.push('TAVILY_API_KEY is recommended when using Tavily services');
+            warnings.push('PLUGIN_TAVILY_API_KEY is recommended when using Tavily services');
         }
 
         return {

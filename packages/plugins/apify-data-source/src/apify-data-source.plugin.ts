@@ -69,7 +69,7 @@ export class ApifyDataSourcePlugin implements IPlugin, IDataSourcePlugin, IFormS
 				'x-secret': true,
 				'x-masked': true,
 				'x-writeOnly': true,
-				'x-envVar': 'APIFY_API_TOKEN'
+				'x-envVar': 'PLUGIN_APIFY_API_TOKEN'
 			},
 			defaultFieldMapping: {
 				type: 'object',

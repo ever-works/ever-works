@@ -137,7 +137,7 @@ export class SetupSubCommand extends CommandRunner {
             config.EXTRACT_CONTENT_SERVICE = searchConfig.extractContentService;
             config.WEB_SEARCH_SERVICE = searchConfig.webSearchService;
             if (searchConfig.tavilyApiKey) {
-                config.TAVILY_API_KEY = searchConfig.tavilyApiKey;
+                config.PLUGIN_TAVILY_API_KEY = searchConfig.tavilyApiKey;
             }
 
             // 5. Validate configuration

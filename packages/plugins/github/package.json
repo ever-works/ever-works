@@ -59,19 +59,19 @@
 			],
 			"envVars": [
 				{
-					"name": "GH_CLIENT_ID",
+					"name": "PLUGIN_GITHUB_CLIENT_ID",
 					"required": false,
 					"secret": false,
-					"description": "GitHub OAuth App Client ID"
+					"description": "GitHub OAuth App Client ID (for plugin use, separate from auth GH_CLIENT_ID)"
 				},
 				{
-					"name": "GH_CLIENT_SECRET",
+					"name": "PLUGIN_GITHUB_CLIENT_SECRET",
 					"required": false,
 					"secret": true,
-					"description": "GitHub OAuth App Client Secret"
+					"description": "GitHub OAuth App Client Secret (for plugin use, separate from auth GH_CLIENT_SECRET)"
 				},
 				{
-					"name": "GH_API_URL",
+					"name": "PLUGIN_GITHUB_API_URL",
 					"required": false,
 					"secret": false,
 					"description": "GitHub API base URL (for GitHub Enterprise)"

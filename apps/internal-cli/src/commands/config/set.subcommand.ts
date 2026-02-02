@@ -206,7 +206,7 @@ export class SetSubCommand extends CommandRunner {
             GH_APIKEY: 'Used for GitHub API access. Get from: https://github.com/settings/tokens',
             VERCEL_TOKEN:
                 'Used for Vercel deployments. Get from: https://vercel.com/account/tokens',
-            TAVILY_API_KEY:
+            PLUGIN_TAVILY_API_KEY:
                 'Used for enhanced search and content extraction. Get from: https://tavily.com',
         };
 
@@ -215,7 +215,12 @@ export class SetSubCommand extends CommandRunner {
         }
 
         // Suggest testing after setting important keys
-        const testableKeys = ['AI_DEFAULT_PROVIDER', 'GH_APIKEY', 'VERCEL_TOKEN', 'TAVILY_API_KEY'];
+        const testableKeys = [
+            'AI_DEFAULT_PROVIDER',
+            'GH_APIKEY',
+            'VERCEL_TOKEN',
+            'PLUGIN_TAVILY_API_KEY',
+        ];
         if (testableKeys.includes(key)) {
             console.log(
                 chalk.gray('Run ') +

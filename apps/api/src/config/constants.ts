@@ -88,10 +88,6 @@ export const config = {
             const webUrl = config.webAppUrl();
             return process.env.GH_CALLBACK_URL || `${webUrl}/api/auth/github/callback`;
         },
-        connectCallbackUrl: () => {
-            const webUrl = config.webAppUrl();
-            return process.env.GH_CALLBACK_URL || `${webUrl}/api/auth/github/callback`;
-        },
     },
 
     directory: {

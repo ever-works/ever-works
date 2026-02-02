@@ -56,7 +56,7 @@ export interface EverWorksConfig {
     // Search Services
     EXTRACT_CONTENT_SERVICE: 'tavily' | 'local';
     WEB_SEARCH_SERVICE: 'tavily';
-    TAVILY_API_KEY?: string;
+    PLUGIN_TAVILY_API_KEY?: string;
 
     // Database Configuration (for future use)
     DATABASE_TYPE?: 'sqlite' | 'postgres' | 'mysql' | 'mariadb';

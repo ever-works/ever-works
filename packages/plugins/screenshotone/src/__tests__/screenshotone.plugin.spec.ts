@@ -111,11 +111,11 @@ describe('ScreenshotOnePlugin', () => {
 
 		it('should have environment variable fallbacks', () => {
 			const properties = plugin.settingsSchema.properties as Record<string, any>;
-			expect(properties.accessKey['x-envVar']).toBe('SCREENSHOTONE_ACCESS_KEY');
-			expect(properties.secretKey['x-envVar']).toBe('SCREENSHOTONE_SECRET_KEY');
-			expect(properties.viewportWidth['x-envVar']).toBe('SCREENSHOTONE_VIEWPORT_WIDTH');
-			expect(properties.viewportHeight['x-envVar']).toBe('SCREENSHOTONE_VIEWPORT_HEIGHT');
-			expect(properties.format['x-envVar']).toBe('SCREENSHOTONE_FORMAT');
+			expect(properties.accessKey['x-envVar']).toBe('PLUGIN_SCREENSHOTONE_ACCESS_KEY');
+			expect(properties.secretKey['x-envVar']).toBe('PLUGIN_SCREENSHOTONE_SECRET_KEY');
+			expect(properties.viewportWidth['x-envVar']).toBe('PLUGIN_SCREENSHOTONE_VIEWPORT_WIDTH');
+			expect(properties.viewportHeight['x-envVar']).toBe('PLUGIN_SCREENSHOTONE_VIEWPORT_HEIGHT');
+			expect(properties.format['x-envVar']).toBe('PLUGIN_SCREENSHOTONE_FORMAT');
 		});
 
 		it('should have default values for viewport settings', () => {

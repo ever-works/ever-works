@@ -70,7 +70,7 @@ export class NotionExtractorPlugin implements IPlugin, IContentExtractorPlugin {
 				'x-secret': true,
 				'x-masked': true,
 				'x-writeOnly': true,
-				'x-envVar': 'NOTION_API_KEY'
+				'x-envVar': 'PLUGIN_NOTION_API_KEY'
 			},
 			useSplitbeeForPublicPages: {
 				type: 'boolean',

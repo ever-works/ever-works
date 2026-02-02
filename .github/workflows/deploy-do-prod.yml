@@ -81,8 +81,14 @@ jobs:
           OPENROUTER_MODEL: ${{ secrets.OPENROUTER_MODEL }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
 
-          # Tavily
-          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+          # Plugins
+          PLUGIN_GITHUB_CLIENT_ID: ${{ secrets.PLUGIN_GITHUB_CLIENT_ID }}
+          PLUGIN_GITHUB_CLIENT_SECRET: ${{ secrets.PLUGIN_GITHUB_CLIENT_SECRET }}
+          PLUGIN_TAVILY_API_KEY: ${{ secrets.PLUGIN_TAVILY_API_KEY }}
+          PLUGIN_SCREENSHOTONE_ACCESS_KEY: ${{ secrets.PLUGIN_SCREENSHOTONE_ACCESS_KEY }}
+          PLUGIN_SCREENSHOTONE_SECRET_KEY: ${{ secrets.PLUGIN_SCREENSHOTONE_SECRET_KEY }}
+          PLUGIN_APIFY_API_TOKEN: ${{ secrets.PLUGIN_APIFY_API_TOKEN }}
+          PLUGIN_NOTION_API_KEY: ${{ secrets.PLUGIN_NOTION_API_KEY }}
 
           # Database
           DATABASE_TYPE: ${{ secrets.DATABASE_TYPE }}

@@ -101,9 +101,21 @@ spec:
             - name: OPENROUTER_API_KEY
               value: "$OPENROUTER_API_KEY"
 
-            # Tavily
-            - name: TAVILY_API_KEY
-              value: "$TAVILY_API_KEY"
+            # Plugins
+            - name: PLUGIN_GITHUB_CLIENT_ID
+              value: "$PLUGIN_GITHUB_CLIENT_ID"
+            - name: PLUGIN_GITHUB_CLIENT_SECRET
+              value: "$PLUGIN_GITHUB_CLIENT_SECRET"
+            - name: PLUGIN_TAVILY_API_KEY
+              value: "$PLUGIN_TAVILY_API_KEY"
+            - name: PLUGIN_SCREENSHOTONE_ACCESS_KEY
+              value: "$PLUGIN_SCREENSHOTONE_ACCESS_KEY"
+            - name: PLUGIN_SCREENSHOTONE_SECRET_KEY
+              value: "$PLUGIN_SCREENSHOTONE_SECRET_KEY"
+            - name: PLUGIN_APIFY_API_TOKEN
+              value: "$PLUGIN_APIFY_API_TOKEN"
+            - name: PLUGIN_NOTION_API_KEY
+              value: "$PLUGIN_NOTION_API_KEY"
 
             # Database
             - name: DATABASE_TYPE

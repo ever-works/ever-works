@@ -151,8 +151,8 @@ export class TestSubCommand extends CommandRunner {
         }
 
         // Test Tavily API
-        if (config.TAVILY_API_KEY) {
-            const tavilyResult = await this.testTavilyApi(config.TAVILY_API_KEY);
+        if (config.PLUGIN_TAVILY_API_KEY) {
+            const tavilyResult = await this.testTavilyApi(config.PLUGIN_TAVILY_API_KEY);
             if (!tavilyResult) {
                 allPassed = false;
             }
