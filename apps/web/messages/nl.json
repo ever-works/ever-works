@@ -222,13 +222,13 @@
                 "empty": "Geen nieuwe meldingen"
             },
             "help": {
-                "title": "Hulp & bronnen",
+                "title": "Help & Bronnen",
                 "subtitle": "Snelle tips en handige links",
                 "quickTips": {
-                    "title": "Snelle tips",
-                    "tip1": "Gebruik de AI-chat om directories te maken met natuurlijke taal",
-                    "tip2": "Importeer bestaande awesome-lijsten of datarepository's",
-                    "tip3": "Pas het uiterlijk van je directory aan in de instellingen"
+                    "title": "Snelle Tips",
+                    "tip1": "Gebruik de AI-chat om mappen te maken met natuurlijke taal",
+                    "tip2": "Importeer bestaande awesome-lijsten of data repositories",
+                    "tip3": "Pas het uiterlijk van je map aan in de instellingen"
                 },
                 "shortcuts": {
                     "title": "Sneltoetsen",

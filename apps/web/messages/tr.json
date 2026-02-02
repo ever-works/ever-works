@@ -223,12 +223,12 @@
             },
             "help": {
                 "title": "Yardım ve Kaynaklar",
-                "subtitle": "Hızlı ipuçları ve yararlı bağlantılar",
+                "subtitle": "Hızlı ipuçları ve faydalı bağlantılar",
                 "quickTips": {
                     "title": "Hızlı İpuçları",
-                    "tip1": "Doğal dil ile dizinler oluşturmak için AI sohbetini kullanın",
+                    "tip1": "Doğal dille dizin oluşturmak için AI sohbetini kullanın",
                     "tip2": "Mevcut awesome listelerini veya veri depolarını içe aktarın",
-                    "tip3": "Dizin görünümünüzü ayarlarda özelleştirin"
+                    "tip3": "Dizininizin görünümünü ayarlardan özelleştirin"
                 },
                 "shortcuts": {
                     "title": "Klavye Kısayolları",

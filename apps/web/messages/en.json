@@ -223,28 +223,28 @@
             },
             "help": {
                 "title": "Help & Resources",
-                "subtitle": "Quick tips and useful links",
+                "subtitle": "Quick tips and useful links to help you get started",
                 "quickTips": {
                     "title": "Quick Tips",
-                    "tip1": "Use the AI chat to create directories with natural language",
-                    "tip2": "Import existing awesome lists or data repositories",
-                    "tip3": "Customize your directory's appearance in settings"
+                    "tip1": "Create your first directory by clicking the 'Create Directory' button on the dashboard.",
+                    "tip2": "Use the AI generator to automatically populate your directory with relevant items.",
+                    "tip3": "Connect your GitHub account to sync and deploy your directories as repositories."
                 },
                 "shortcuts": {
                     "title": "Keyboard Shortcuts",
-                    "search": "Search",
-                    "newDirectory": "New Directory",
-                    "help": "Help",
-                    "hint": "Press ? anywhere to see all shortcuts"
+                    "search": "Search directories",
+                    "newDirectory": "Create new directory",
+                    "help": "Open help",
+                    "hint": "Use Cmd on Mac or Ctrl on Windows/Linux"
                 },
                 "links": {
-                    "title": "Useful Links",
+                    "title": "Resources",
                     "github": "GitHub Repository",
                     "issues": "Report an Issue",
                     "docs": "Documentation",
-                    "comingSoon": "Coming Soon"
+                    "comingSoon": "Coming soon"
                 },
-                "version": "Version {version}"
+                "version": "Ever Works v{version}"
             }
         },
         "directories": {

@@ -222,16 +222,16 @@
                 "empty": "Nenhuma notificação nova"
             },
             "help": {
-                "title": "Ajuda e recursos",
+                "title": "Ajuda e Recursos",
                 "subtitle": "Dicas rápidas e links úteis",
                 "quickTips": {
-                    "title": "Dicas rápidas",
+                    "title": "Dicas Rápidas",
                     "tip1": "Use o chat de IA para criar diretórios com linguagem natural",
                     "tip2": "Importe listas awesome ou repositórios de dados existentes",
                     "tip3": "Personalize a aparência do seu diretório nas configurações"
                 },
                 "shortcuts": {
-                    "title": "Atalhos de teclado",
+                    "title": "Atalhos de Teclado",
                     "search": "Pesquisar",
                     "newDirectory": "Novo diretório",
                     "help": "Ajuda",

@@ -9,9 +9,14 @@ interface DashboardHeaderProps {
     user: AuthUser;
     onMenuClick: () => void;
     isSidebarOpen?: boolean;
+    onHelpClick?: () => void;
 }
 
-export function DashboardHeader({ onMenuClick, isSidebarOpen = true }: DashboardHeaderProps) {
+export function DashboardHeader({
+    onMenuClick,
+    isSidebarOpen = true,
+    onHelpClick,
+}: DashboardHeaderProps) {
     return (
         <header
             className={cn(
@@ -59,6 +64,7 @@ export function DashboardHeader({ onMenuClick, isSidebarOpen = true }: Dashboard
                         />
 
                         <button
+                            onClick={onHelpClick}
                             className={cn(
                                 'p-2 rounded-md',
                                 'text-text-secondary dark:text-text-secondary-dark',
