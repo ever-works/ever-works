@@ -627,11 +627,19 @@ export const directoryAPI = {
         });
     },
 
-    getUserRepositories: async (options?: { page?: number; perPage?: number; search?: string }) => {
+    getUserRepositories: async (options?: {
+        page?: number;
+        perPage?: number;
+        search?: string;
+        owner?: string;
+        type?: 'user' | 'org';
+    }) => {
         const params = new URLSearchParams();
         if (options?.page !== undefined) params.append('page', String(options.page));
         if (options?.perPage !== undefined) params.append('perPage', String(options.perPage));
         if (options?.search) params.append('search', options.search);
+        if (options?.owner) params.append('owner', options.owner);
+        if (options?.type) params.append('type', options.type);
         const query = params.toString() ? `?${params.toString()}` : '';
 
         return serverFetch<GetUserRepositoriesResponseDto>(

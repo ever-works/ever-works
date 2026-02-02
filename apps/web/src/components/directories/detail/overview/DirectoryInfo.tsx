@@ -15,18 +15,26 @@ interface DirectoryInfoProps {
 }
 
 // Helper to render visibility icon
-const renderRepoIcon = (isPrivate: boolean | undefined, label: string) => {
+function RepoVisibilityIcon({
+    isPrivate,
+    label,
+}: {
+    isPrivate: boolean | undefined;
+    label: string;
+}) {
+    const t = useTranslations('common.visibility');
     if (isPrivate === undefined) return null;
 
+    const visibilityLabel = isPrivate ? t('private') : t('public');
     return (
         <div
             className="flex items-center gap-1 text-xs text-muted-foreground"
-            title={`${label}: ${isPrivate ? 'Private' : 'Public'}`}
+            title={`${label}: ${visibilityLabel}`}
         >
             {isPrivate ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
         </div>
     );
-};
+}
 
 export function DirectoryInfo({ directory, config }: DirectoryInfoProps) {
     const t = useTranslations('dashboard.directoryDetail.info');
@@ -110,8 +118,12 @@ export function DirectoryInfo({ directory, config }: DirectoryInfoProps) {
             value: (
                 <ul className="flex gap-2 flex-col list-inside">
                     <li className="flex gap-1">
-                        {directory.repoVisibility &&
-                            renderRepoIcon(directory.repoVisibility.data, 'Data Repo')}
+                        {directory.repoVisibility && (
+                            <RepoVisibilityIcon
+                                isPrivate={directory.repoVisibility.data}
+                                label="Data Repo"
+                            />
+                        )}
                         <Link
                             href={repoLinks?.dataRepo || '#'}
                             target="_blank"
@@ -123,8 +135,12 @@ export function DirectoryInfo({ directory, config }: DirectoryInfoProps) {
                     </li>
 
                     <li className="flex gap-1">
-                        {directory.repoVisibility &&
-                            renderRepoIcon(directory.repoVisibility.website, 'Website Repo')}
+                        {directory.repoVisibility && (
+                            <RepoVisibilityIcon
+                                isPrivate={directory.repoVisibility.website}
+                                label="Website Repo"
+                            />
+                        )}
                         <Link
                             href={repoLinks?.websiteRepo || '#'}
                             target="_blank"
@@ -136,8 +152,12 @@ export function DirectoryInfo({ directory, config }: DirectoryInfoProps) {
                     </li>
 
                     <li className="flex gap-1">
-                        {directory.repoVisibility &&
-                            renderRepoIcon(directory.repoVisibility.directory, 'Main Repo')}
+                        {directory.repoVisibility && (
+                            <RepoVisibilityIcon
+                                isPrivate={directory.repoVisibility.directory}
+                                label="Main Repo"
+                            />
+                        )}
                         <Link
                             href={repoLinks?.main || '#'}
                             target="_blank"

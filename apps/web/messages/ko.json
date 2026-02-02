@@ -235,11 +235,14 @@
                     "search": "검색",
                     "newDirectory": "새 디렉토리",
                     "help": "도움말",
-                    "hint": "?를 누르면 모든 단축키 표시"
+                    "hint": "?를 눌러 모든 단축키 보기"
                 },
                 "links": {
                     "title": "유용한 링크",
-                    "docs": "문서"
+                    "github": "GitHub 저장소",
+                    "issues": "문제 보고",
+                    "docs": "문서",
+                    "comingSoon": "곧 출시"
                 },
                 "version": "버전 {version}"
             }
@@ -350,13 +353,16 @@
                     "actions": {
                         "connect": "연결",
                         "disconnect": "연결 해제",
-                        "confirmDisconnect": "GitHub 계정 연결을 해제하시겠습니까?"
+                        "confirmDisconnect": "GitHub 계정 연결을 해제하시겠습니까?",
+                        "reconnect": "Reconnect"
                     },
                     "messages": {
                         "disconnected": "GitHub 계정 연결이 해제되었습니다",
                         "connectError": "GitHub 연결에 실패했습니다",
                         "disconnectError": "GitHub 연결 해제에 실패했습니다"
-                    }
+                    },
+                    "organizations": "Connected Organizations",
+                    "organizationsHint": "Use Reconnect to grant access to additional organizations"
                 }
             }
         },
@@ -742,7 +748,21 @@
                         "invalidUrl": "http:// 또는 https://를 포함한 유효한 URL을 입력해 주세요",
                         "invalidImageUrl": "유효한 이미지 URL을 입력해 주세요",
                         "requiredFields": "모든 필수 필드를 입력해 주세요"
-                    }
+                    },
+                    "categories": "Categories",
+                    "existingCategories": "Select from existing",
+                    "addNewCategory": "Or add new category",
+                    "categoryPlaceholder": "Search or create category...",
+                    "addMoreCategories": "Add more...",
+                    "createCategory": "Create",
+                    "noMatchingCategories": "No matching categories",
+                    "noCategories": "No categories yet. Type to create one.",
+                    "categoriesRequired": "Select at least one category",
+                    "captureScreenshot": "Capture Screenshot",
+                    "captureScreenshotHelp": "Auto-capture a screenshot from the source URL",
+                    "screenshotSuccess": "Screenshot captured successfully",
+                    "screenshotFailed": "Failed to capture screenshot",
+                    "screenshotError": "An error occurred while capturing screenshot"
                 },
                 "editDisplay": "표시 편집",
                 "editDisplayDescription": "추천 상태를 전환하고 표시 순서를 설정하세요.",
@@ -754,7 +774,108 @@
                 "createPRHelp": "활성화하면 변경사항이 직접 커밋 대신 PR로 제안됩니다.",
                 "reasonLabel": "이유 (선택사항)",
                 "reasonPlaceholder": "이 항목을 제거하는 이유는 무엇인가요?",
-                "confirmDelete": "항목 삭제"
+                "confirmDelete": "항목 삭제",
+                "captureScreenshot": "Capture screenshot",
+                "screenshot": {
+                    "noSourceUrl": "No source URL available for this item",
+                    "success": "Screenshot captured successfully",
+                    "failed": "Failed to capture screenshot",
+                    "error": "An error occurred while capturing screenshot",
+                    "notConfigured": "Screenshot service is not configured. Please add your ScreenshotOne API key in Settings.",
+                    "captureFailed": "Failed to capture image",
+                    "captureSuccess": "Image captured successfully",
+                    "captureError": "An error occurred while capturing image",
+                    "bulkCaptureComplete": "Bulk image capture completed",
+                    "bulkCaptureError": "An error occurred during bulk image capture"
+                },
+                "tabs": {
+                    "browseItems": "Browse Items",
+                    "categories": "Categories",
+                    "tags": "Tags"
+                },
+                "taxonomy": {
+                    "categories": {
+                        "searchPlaceholder": "Search categories...",
+                        "add": "Add Category",
+                        "addFirst": "Add First Category",
+                        "showing": "Showing {current} of {total} categories",
+                        "empty": "No categories yet",
+                        "noMatch": "No categories match your search",
+                        "columns": {
+                            "name": "Name",
+                            "description": "Description",
+                            "items": "Items",
+                            "priority": "Priority",
+                            "actions": "Actions"
+                        },
+                        "createSuccess": "Category created successfully",
+                        "createFailed": "Failed to create category",
+                        "updateSuccess": "Category updated successfully",
+                        "updateFailed": "Failed to update category",
+                        "deleteSuccess": "Category deleted successfully",
+                        "deleteFailed": "Failed to delete category",
+                        "deleteConfirm": "Are you sure you want to delete \"{name}\"?",
+                        "deleteHasItems": "Cannot delete category with {count} items assigned",
+                        "modal": {
+                            "createTitle": "Create Category",
+                            "editTitle": "Edit Category",
+                            "name": "Name",
+                            "namePlaceholder": "e.g., Monitoring Tools",
+                            "description": "Description",
+                            "descriptionPlaceholder": "Brief description of this category",
+                            "iconUrl": "Icon URL",
+                            "iconUrlPlaceholder": "https://example.com/icon.png",
+                            "iconUrlHelp": "Optional URL to an icon image",
+                            "priority": "Priority",
+                            "priorityPlaceholder": "e.g., 1",
+                            "priorityHelp": "Lower numbers appear first in lists",
+                            "cancel": "Cancel",
+                            "save": "Save",
+                            "create": "Create",
+                            "saving": "Saving...",
+                            "errors": {
+                                "nameRequired": "Category name is required",
+                                "nameExists": "A category with this name already exists"
+                            }
+                        }
+                    },
+                    "tags": {
+                        "searchPlaceholder": "Search tags...",
+                        "add": "Add Tag",
+                        "addFirst": "Add First Tag",
+                        "showing": "Showing {current} of {total} tags",
+                        "empty": "No tags yet",
+                        "noMatch": "No tags match your search",
+                        "columns": {
+                            "name": "Name",
+                            "items": "Items",
+                            "actions": "Actions"
+                        },
+                        "createSuccess": "Tag created successfully",
+                        "createFailed": "Failed to create tag",
+                        "updateSuccess": "Tag updated successfully",
+                        "updateFailed": "Failed to update tag",
+                        "deleteSuccess": "Tag deleted successfully",
+                        "deleteFailed": "Failed to delete tag",
+                        "deleteConfirm": "Are you sure you want to delete \"{name}\"?",
+                        "deleteHasItems": "Cannot delete tag with {count} items assigned",
+                        "modal": {
+                            "createTitle": "Create Tag",
+                            "editTitle": "Edit Tag",
+                            "name": "Name",
+                            "namePlaceholder": "e.g., open-source",
+                            "nameHelp": "Use lowercase with hyphens for multi-word tags",
+                            "cancel": "Cancel",
+                            "save": "Save",
+                            "create": "Create",
+                            "saving": "Saving...",
+                            "errors": {
+                                "nameRequired": "Tag name is required",
+                                "nameExists": "A tag with this name already exists"
+                            }
+                        }
+                    }
+                }
             },
             "generator": {
                 "regenerationWarning": "재생성 경고",
@@ -825,7 +946,35 @@
                 "recreateConfirmDescription": "재생성은 기존 항목을 삭제하고 처음부터 다시 생성합니다. 이 작업은 취소할 수 없습니다.",
                 "confirmRecreate": "예, 재생성합니다",
                 "recreateInlineTitle": "재생성은 기존 항목을 제거합니다",
-                "recreateInlineDescription": "이 모드는 현재 항목을 삭제하고 처음부터 다시 구축합니다. 모든 것을 교체하려는 경우에만 진행하세요."
+                "recreateInlineDescription": "이 모드는 현재 항목을 삭제하고 처음부터 다시 구축합니다. 모든 것을 교체하려는 경우에만 진행하세요.",
+                "captureScreenshots": "Capture Item Screenshots",
+                "captureScreenshotsDescription": "Automatically capture screenshots or product images for each item during generation",
+                "companyNameDescription": "Used to personalize generated content with your brand identity.",
+                "companyWebsiteDescription": "AI will analyze your website to better understand your brand context.",
+                "initialCategoriesDescription": "Seed categories to organize items. The AI will use these as a starting point.",
+                "priorityCategoriesDescription": "Categories that will appear first in the generated output. Useful for highlighting important sections.",
+                "targetKeywordsDescription": "Keywords to guide the AI search and content generation. More specific keywords yield better results.",
+                "sourceUrlsFieldDescription": "Specific URLs to extract content from. If empty, the generator will search the web automatically.",
+                "generationMethodDescription": "Choose whether to update existing items or recreate everything from scratch.",
+                "websiteRepositoryCreationMethodDescription": "How the website repository is created. Template is recommended for most cases.",
+                "maxSearchQueriesDescription": "Number of search queries the AI will generate to find relevant content (1-50).",
+                "resultsPerQueryDescription": "Maximum results to retrieve per search query (1-20).",
+                "maxPagesToProcessDescription": "Maximum web pages to process for content extraction (1-100).",
+                "relevanceThresholdDescription": "Minimum relevance score (0-1) for content to be included. Higher values mean stricter filtering.",
+                "dataGeneration": "Data Generation Options",
+                "dataGenerationDescription": "Configure data volume and entity generation",
+                "dataVolumeMode": "Data Volume Mode",
+                "dataVolumeModeReal": "Real",
+                "dataVolumeModeRealDescription": "Generate full production-ready data",
+                "dataVolumeModeSample": "Sample",
+                "dataVolumeModeSampleDescription": "Generate minimal sample data (~10 items)",
+                "entityGeneration": "Entity Generation",
+                "generateCategories": "Generate Categories",
+                "generateCategoriesDescription": "Create category structure for organizing items",
+                "generateTags": "Generate Tags",
+                "generateTagsDescription": "Create tags for flexible item labeling",
+                "generateBrands": "Generate Brands",
+                "generateBrandsDescription": "Extract and create brand entities from items"
             },
             "progress": {
                 "title": "생성 진행 중",
@@ -899,7 +1048,144 @@
                 "saveChanges": "변경 사항 저장",
                 "updateReadme": "README 업데이트",
                 "updateSuccess": "설정이 성공적으로 업데이트되었습니다",
-                "updateFailed": "설정 업데이트 실패"
+                "updateFailed": "설정 업데이트 실패",
+                "visibilityUpdateFailed": "Failed to update repository visibility",
+                "visibilityWarningTitle": "Make Repository Private?",
+                "visibilityWarningDescription": "You are about to make {name} private.",
+                "visibilityWarningPermanent": "This action has permanent consequences:",
+                "visibilityWarningStars": "All stars will be permanently lost",
+                "visibilityWarningWatchers": "All watchers will be removed",
+                "visibilityWarningNotRestored": "Stars and watchers will NOT be restored if you make the repository public again",
+                "visibilityConfirmPrivate": "Yes, Make Private",
+                "advancedPrompts": {
+                    "title": "Advanced Prompts",
+                    "subtitle": "Customize AI prompts for directory generation. Leave empty to use defaults.",
+                    "save": "Save Prompts",
+                    "saveSuccess": "Advanced prompts saved successfully",
+                    "saveFailed": "Failed to save advanced prompts",
+                    "prompts": {
+                        "relevanceAssessment": {
+                            "title": "Relevance Assessment",
+                            "description": "Additional instructions for filtering web pages by relevance to your directory topic.",
+                            "placeholder": "e.g., Only include pages that focus on open-source projects..."
+                        },
+                        "itemGeneration": {
+                            "title": "Item Generation",
+                            "description": "Additional instructions for AI-generated initial items before web search.",
+                            "placeholder": "e.g., Focus on enterprise-grade solutions with active maintenance..."
+                        },
+                        "itemExtraction": {
+                            "title": "Item Extraction",
+                            "description": "Additional instructions for extracting items from web page content.",
+                            "placeholder": "e.g., Prioritize tools with official documentation links..."
+                        },
+                        "searchQuery": {
+                            "title": "Search Query Generation",
+                            "description": "Additional instructions for generating search queries to find content.",
+                            "placeholder": "e.g., Include queries targeting GitHub repositories and official docs..."
+                        },
+                        "categorization": {
+                            "title": "Categorization",
+                            "description": "Additional instructions for categorizing and tagging extracted items.",
+                            "placeholder": "e.g., Use technical categories like 'CLI Tools', 'Libraries', 'Frameworks'..."
+                        },
+                        "deduplication": {
+                            "title": "Deduplication",
+                            "description": "Additional instructions for identifying and removing duplicate items.",
+                            "placeholder": "e.g., Consider items with similar GitHub repos as duplicates..."
+                        },
+                        "sourceValidation": {
+                            "title": "Source Validation",
+                            "description": "Additional instructions for validating item source URLs.",
+                            "placeholder": "e.g., Prefer official project websites over third-party reviews..."
+                        }
+                    }
+                },
+                "websiteConfig": {
+                    "title": "Website Configuration",
+                    "subtitle": "Customize how your directory website looks and behaves",
+                    "loadFailed": "Failed to load website settings",
+                    "saveSuccess": "Website settings saved successfully",
+                    "saveFailed": "Failed to save website settings",
+                    "save": "Save Settings",
+                    "sections": {
+                        "siteName": {
+                            "title": "Site Identity",
+                            "label": "Site Name",
+                            "placeholder": "My Directory",
+                            "helper": "The name displayed on your website header and browser tab"
+                        },
+                        "global": {
+                            "title": "Global Features",
+                            "categories": "Categories",
+                            "categoriesHelper": "Show category filtering and navigation",
+                            "tags": "Tags",
+                            "tagsHelper": "Show tag filtering and navigation",
+                            "companies": "Companies",
+                            "companiesHelper": "Show company information for items",
+                            "surveys": "Surveys",
+                            "surveysHelper": "Enable survey functionality"
+                        },
+                        "header": {
+                            "title": "Header Settings",
+                            "submit": "Submit Button",
+                            "submitHelper": "Show the submit item button in header",
+                            "pricing": "Pricing Link",
+                            "pricingHelper": "Show pricing link in header navigation",
+                            "layoutSelector": "Layout Selector",
+                            "layoutSelectorHelper": "Allow users to switch between layouts",
+                            "languageSelector": "Language Selector",
+                            "languageSelectorHelper": "Allow users to change language",
+                            "themeSelector": "Theme Selector",
+                            "themeSelectorHelper": "Allow users to switch between themes",
+                            "defaultLayout": "Default Layout",
+                            "defaultTheme": "Default Theme",
+                            "themeLight": "Light",
+                            "themeDark": "Dark",
+                            "themeSystem": "System",
+                            "defaultPagination": "Default Pagination",
+                            "paginationStandard": "Standard",
+                            "paginationInfinite": "Infinite Scroll",
+                            "paginationLoadMore": "Load More"
+                        },
+                        "homepage": {
+                            "title": "Homepage Settings",
+                            "hero": "Hero Section",
+                            "heroHelper": "Show the hero section with title and description",
+                            "search": "Search Bar",
+                            "searchHelper": "Show the search bar on homepage",
+                            "defaultView": "Default View",
+                            "viewClassic": "Classic",
+                            "viewGrid": "Grid",
+                            "viewList": "List",
+                            "defaultSort": "Default Sort",
+                            "sortPopularity": "Popularity",
+                            "sortNewest": "Newest",
+                            "sortAlphabetical": "Alphabetical"
+                        },
+                        "footer": {
+                            "title": "Footer Settings",
+                            "subscribe": "Newsletter Subscribe",
+                            "subscribeHelper": "Show newsletter subscription form",
+                            "version": "Version Display",
+                            "versionHelper": "Show version information in footer",
+                            "themeSelector": "Footer Theme Selector",
+                            "themeSelectorHelper": "Show theme toggle in footer"
+                        },
+                        "customMenu": {
+                            "title": "Custom Menu Links",
+                            "description": "Add custom links to your website header and footer navigation",
+                            "headerLinks": "Header Links",
+                            "footerLinks": "Footer Links",
+                            "addLink": "Add Link",
+                            "noLinks": "No custom links added",
+                            "labelPlaceholder": "Link label",
+                            "pathPlaceholder": "/about or https://...",
+                            "targetSelf": "Same tab",
+                            "targetBlank": "New tab"
+                        }
+                    }
+                }
             },
             "deploy": {
                 "noTokenAlert": {
@@ -968,7 +1254,21 @@
                         "lastChecked": "마지막 확인",
                         "lastError": "마지막 오류",
                         "updateSuccess": "설정이 성공적으로 업데이트되었습니다",
-                        "updateFailed": "설정 업데이트 실패"
+                        "updateFailed": "설정 업데이트 실패",
+                        "githubRequired": "GitHub connection required. Please connect your GitHub account in Settings to enable automatic updates."
+                    },
+                    "configDialog": {
+                        "title": "Configure Before Deploy",
+                        "description": "Review and customize your website settings before deployment",
+                        "siteName": "Site Name",
+                        "siteNamePlaceholder": "My Directory",
+                        "siteNameHelper": "The name displayed on your website (default: Acme)",
+                        "advancedSettings": "Advanced Settings",
+                        "advancedSettingsDescription": "Configure additional website options",
+                        "loadFailed": "Failed to load current settings",
+                        "saveAndDeploy": "Save & Deploy",
+                        "skipAndDeploy": "Skip & Deploy",
+                        "cancel": "Cancel"
                     }
                 }
             }
@@ -1214,7 +1514,8 @@
                 "success": {
                     "started": "가져오기 시작! 디렉토리로 리디렉션 중...",
                     "linked": "디렉토리가 성공적으로 연결되었습니다"
-                }
+                },
+                "detectionFailed": "형식을 자동으로 감지할 수 없습니다. 이 저장소를 가져오는 방법을 선택하세요."
             }
         },
         "github": {
@@ -1276,6 +1577,34 @@
                 "title": "웹훅",
                 "subtitle": "실시간 업데이트를 받도록 웹훅 구성",
                 "configure": "웹훅 구성 (곧 출시 예정)"
+            },
+            "screenshotone": {
+                "title": "ScreenshotOne Integration",
+                "subtitle": "Automatically capture screenshots of directory items using ScreenshotOne",
+                "connected": "Connected",
+                "notConnected": "Not Connected",
+                "connectedMessage": "Your ScreenshotOne account is connected. Screenshots will be automatically captured for directory items.",
+                "disconnect": "Disconnect ScreenshotOne",
+                "disconnecting": "Removing...",
+                "accessKeyLabel": "Access Key",
+                "placeholder": "Your access key...",
+                "secretKeyLabel": "Secret Key (Optional)",
+                "secretKeyPlaceholder": "Your secret key...",
+                "showKey": "Show",
+                "hideKey": "Hide",
+                "accessKeyHelp": "Required. Used to authenticate with the ScreenshotOne API.",
+                "secretKeyHelp": "Optional. Enables signed URLs for enhanced security. Get your keys from",
+                "dashboard": "ScreenshotOne Dashboard",
+                "save": "Save Keys",
+                "saving": "Saving...",
+                "messages": {
+                    "accessKeyRequired": "Please enter a valid ScreenshotOne access key",
+                    "saveSuccess": "ScreenshotOne keys saved successfully",
+                    "saveFailed": "Failed to save ScreenshotOne keys",
+                    "removeSuccess": "ScreenshotOne keys removed successfully",
+                    "removeFailed": "Failed to remove ScreenshotOne keys",
+                    "unexpectedError": "An unexpected error occurred"
+                }
             }
         },
         "notifications": {
@@ -1380,7 +1709,10 @@
             "newChat": "새 채팅",
             "loadingConversation": "대화 로드 중…",
             "inputPlaceholder": "생성하려는 디렉토리를 설명하세요...",
-            "sendButton": "전송"
+            "sendButton": "전송",
+            "errors": {
+                "unableToSend": "메시지를 보낼 수 없습니다."
+            }
         }
     },
     "layout": {
@@ -1530,6 +1862,15 @@
                 "notAuthenticated": "인증되지 않음",
                 "deleteFailed": "계정 삭제 실패",
                 "deleteDisabled": "데모에서 계정 삭제가 비활성화되었습니다"
+            },
+            "screenshotone": {
+                "notAuthenticated": "Not authenticated",
+                "accessKeyRequired": "Access key is required",
+                "saveFailed": "Failed to save ScreenshotOne keys",
+                "saveSuccess": "ScreenshotOne keys saved successfully",
+                "validationFailed": "The provided ScreenshotOne keys are invalid. Please double-check and try again.",
+                "removeFailed": "Failed to remove ScreenshotOne keys",
+                "removeSuccess": "ScreenshotOne keys removed successfully"
             }
         },
         "deploy": {
@@ -1560,6 +1901,21 @@
             "username": {
                 "minLength": "사용자명은 최소 {length}자 이상이어야 합니다"
             }
+        }
+    },
+    "common": {
+        "ui": {
+            "close": "닫기",
+            "dismiss": "닫기"
+        },
+        "theme": {
+            "toggle": "테마 전환",
+            "switchToLight": "라이트 모드로 전환",
+            "switchToDark": "다크 모드로 전환"
+        },
+        "visibility": {
+            "private": "비공개",
+            "public": "공개"
         }
     }
 }

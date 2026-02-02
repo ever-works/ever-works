@@ -239,7 +239,10 @@
                 },
                 "links": {
                     "title": "Полезни връзки",
-                    "docs": "Документация"
+                    "github": "GitHub хранилище",
+                    "issues": "Докладвай проблем",
+                    "docs": "Документация",
+                    "comingSoon": "Очаквайте скоро"
                 },
                 "version": "Версия {version}"
             }
@@ -350,13 +353,16 @@
                     "actions": {
                         "connect": "Свържи",
                         "disconnect": "Прекъсни връзката",
-                        "confirmDisconnect": "Сигурни ли сте, че искате да прекъснете връзката с акаунта си в GitHub?"
+                        "confirmDisconnect": "Сигурни ли сте, че искате да прекъснете връзката с акаунта си в GitHub?",
+                        "reconnect": "Свързване отново"
                     },
                     "messages": {
                         "disconnected": "Връзката с акаунта в GitHub е прекъсната",
                         "connectError": "Неуспешно свързване с GitHub",
                         "disconnectError": "Неуспешно прекъсване на връзката с GitHub"
-                    }
+                    },
+                    "organizations": "Свързани организации",
+                    "organizationsHint": "Използвайте Свързване отново за достъп до допълнителни организации"
                 }
             }
         },
@@ -742,7 +748,21 @@
                         "invalidUrl": "Моля, въведете валиден URL адрес, който включва http:// или https://",
                         "invalidImageUrl": "Моля, въведете валиден URL адрес на изображение",
                         "requiredFields": "Моля, попълнете всички задължителни полета"
-                    }
+                    },
+                    "categories": "Категории",
+                    "existingCategories": "Избор от съществуващи",
+                    "addNewCategory": "Или добави нова категория",
+                    "categoryPlaceholder": "Търси или създай категория...",
+                    "addMoreCategories": "Добави още...",
+                    "createCategory": "Създай",
+                    "noMatchingCategories": "Няма съвпадащи категории",
+                    "noCategories": "Няма категории. Напиши за създаване.",
+                    "categoriesRequired": "Избери поне една категория",
+                    "captureScreenshot": "Заснемане на екранна снимка",
+                    "captureScreenshotHelp": "Автоматично заснемане от URL адреса",
+                    "screenshotSuccess": "Екранната снимка е заснета успешно",
+                    "screenshotFailed": "Неуспешно заснемане на екранна снимка",
+                    "screenshotError": "Възникна грешка при заснемането"
                 },
                 "editDisplay": "Редактиране на показване",
                 "editDisplayDescription": "Превключвайте статуса на препоръчаност и задайте ред на показване.",
@@ -754,7 +774,108 @@
                 "createPRHelp": "Ако е активирано, промените се предлагат чрез PR вместо директно подаване.",
                 "reasonLabel": "Причина (по избор)",
                 "reasonPlaceholder": "Защо премахвате този елемент?",
-                "confirmDelete": "Изтрий елемент"
+                "confirmDelete": "Изтрий елемент",
+                "captureScreenshot": "Заснемане на екранна снимка",
+                "screenshot": {
+                    "noSourceUrl": "Няма наличен URL адрес за този елемент",
+                    "success": "Екранната снимка е заснета успешно",
+                    "failed": "Неуспешно заснемане на екранна снимка",
+                    "error": "Възникна грешка при заснемането",
+                    "notConfigured": "Услугата за екранни снимки не е конфигурирана. Добавете ScreenshotOne API ключ в Настройки.",
+                    "captureFailed": "Неуспешно заснемане на изображение",
+                    "captureSuccess": "Изображението е заснето успешно",
+                    "captureError": "Възникна грешка при заснемането",
+                    "bulkCaptureComplete": "Груповото заснемане завърши",
+                    "bulkCaptureError": "Възникна грешка при груповото заснемане"
+                },
+                "tabs": {
+                    "browseItems": "Преглед на елементи",
+                    "categories": "Категории",
+                    "tags": "Етикети"
+                },
+                "taxonomy": {
+                    "categories": {
+                        "searchPlaceholder": "Търси категории...",
+                        "add": "Добави категория",
+                        "addFirst": "Добави първа категория",
+                        "showing": "Показване на {current} от {total} категории",
+                        "empty": "Все още няма категории",
+                        "noMatch": "Няма съвпадащи категории",
+                        "columns": {
+                            "name": "Име",
+                            "description": "Описание",
+                            "items": "Елементи",
+                            "priority": "Приоритет",
+                            "actions": "Действия"
+                        },
+                        "createSuccess": "Категорията е създадена успешно",
+                        "createFailed": "Неуспешно създаване на категория",
+                        "updateSuccess": "Категорията е актуализирана успешно",
+                        "updateFailed": "Неуспешно актуализиране на категория",
+                        "deleteSuccess": "Категорията е изтрита успешно",
+                        "deleteFailed": "Неуспешно изтриване на категория",
+                        "deleteConfirm": "Сигурни ли сте, че искате да изтриете \"{name}\"?",
+                        "deleteHasItems": "Не може да се изтрие категория с {count} елемента",
+                        "modal": {
+                            "createTitle": "Създай категория",
+                            "editTitle": "Редактирай категория",
+                            "name": "Име",
+                            "namePlaceholder": "напр. Инструменти за мониторинг",
+                            "description": "Описание",
+                            "descriptionPlaceholder": "Кратко описание на категорията",
+                            "iconUrl": "URL на икона",
+                            "iconUrlPlaceholder": "https://example.com/icon.png",
+                            "iconUrlHelp": "Незадължителен URL към изображение на икона",
+                            "priority": "Приоритет",
+                            "priorityPlaceholder": "напр. 1",
+                            "priorityHelp": "По-малките числа се показват първи",
+                            "cancel": "Отказ",
+                            "save": "Запази",
+                            "create": "Създай",
+                            "saving": "Запазване...",
+                            "errors": {
+                                "nameRequired": "Името на категорията е задължително",
+                                "nameExists": "Категория с това име вече съществува"
+                            }
+                        }
+                    },
+                    "tags": {
+                        "searchPlaceholder": "Търси етикети...",
+                        "add": "Добави етикет",
+                        "addFirst": "Добави първи етикет",
+                        "showing": "Показване на {current} от {total} етикета",
+                        "empty": "Все още няма етикети",
+                        "noMatch": "Няма съвпадащи етикети",
+                        "columns": {
+                            "name": "Име",
+                            "items": "Елементи",
+                            "actions": "Действия"
+                        },
+                        "createSuccess": "Етикетът е създаден успешно",
+                        "createFailed": "Неуспешно създаване на етикет",
+                        "updateSuccess": "Етикетът е актуализиран успешно",
+                        "updateFailed": "Неуспешно актуализиране на етикет",
+                        "deleteSuccess": "Етикетът е изтрит успешно",
+                        "deleteFailed": "Неуспешно изтриване на етикет",
+                        "deleteConfirm": "Сигурни ли сте, че искате да изтриете \"{name}\"?",
+                        "deleteHasItems": "Не може да се изтрие етикет с {count} елемента",
+                        "modal": {
+                            "createTitle": "Създай етикет",
+                            "editTitle": "Редактирай етикет",
+                            "name": "Име",
+                            "namePlaceholder": "напр. open-source",
+                            "nameHelp": "Използвайте малки букви с тирета",
+                            "cancel": "Отказ",
+                            "save": "Запази",
+                            "create": "Създай",
+                            "saving": "Запазване...",
+                            "errors": {
+                                "nameRequired": "Името на етикета е задължително",
+                                "nameExists": "Етикет с това име вече съществува"
+                            }
+                        }
+                    }
+                }
             },
             "generator": {
                 "regenerationWarning": "Предупреждение за повторно генериране",
@@ -825,7 +946,35 @@
                 "recreateConfirmDescription": "Създаването отново ще изтрие съществуващите елементи и ще ги генерира от начало. Това действие не може да бъде отменено.",
                 "confirmRecreate": "Да, създай отново",
                 "recreateInlineTitle": "Създаването отново ще премахне съществуващите елементи",
-                "recreateInlineDescription": "Този режим изтрива текущите елементи и ги пресъздава отначало. Продължете само ако искате да замените всичко."
+                "recreateInlineDescription": "Този режим изтрива текущите елементи и ги пресъздава отначало. Продължете само ако искате да замените всичко.",
+                "captureScreenshots": "Заснемане на екранни снимки",
+                "captureScreenshotsDescription": "Автоматично заснемане на изображения при генериране",
+                "companyNameDescription": "Използва се за персонализиране на съдържанието с вашата марка.",
+                "companyWebsiteDescription": "AI ще анализира сайта ви за по-добър контекст на марката.",
+                "initialCategoriesDescription": "Начални категории за организиране на елементи.",
+                "priorityCategoriesDescription": "Категории, които ще се показват първи.",
+                "targetKeywordsDescription": "Ключови думи за насочване на търсенето и генерирането.",
+                "sourceUrlsFieldDescription": "Конкретни URL адреси за извличане на съдържание.",
+                "generationMethodDescription": "Изберете актуализиране или пресъздаване.",
+                "websiteRepositoryCreationMethodDescription": "Как се създава хранилището на сайта.",
+                "maxSearchQueriesDescription": "Брой търсения, които AI ще генерира (1-50).",
+                "resultsPerQueryDescription": "Максимален брой резултати на търсене (1-20).",
+                "maxPagesToProcessDescription": "Максимален брой страници за обработка (1-100).",
+                "relevanceThresholdDescription": "Минимален праг на релевантност (0-1).",
+                "dataGeneration": "Опции за генериране на данни",
+                "dataGenerationDescription": "Конфигуриране на обема данни и генерирането на обекти",
+                "dataVolumeMode": "Режим на обем данни",
+                "dataVolumeModeReal": "Реален",
+                "dataVolumeModeRealDescription": "Генериране на пълни производствени данни",
+                "dataVolumeModeSample": "Примерен",
+                "dataVolumeModeSampleDescription": "Генериране на минимални примерни данни (~10 елемента)",
+                "entityGeneration": "Генериране на обекти",
+                "generateCategories": "Генериране на категории",
+                "generateCategoriesDescription": "Създаване на структура от категории",
+                "generateTags": "Генериране на етикети",
+                "generateTagsDescription": "Създаване на етикети за гъвкаво маркиране",
+                "generateBrands": "Генериране на марки",
+                "generateBrandsDescription": "Извличане и създаване на обекти за марки"
             },
             "progress": {
                 "title": "Генерирането е в ход",
@@ -899,7 +1048,144 @@
                 "saveChanges": "Запази Промените",
                 "updateReadme": "Актуализирай README",
                 "updateSuccess": "Настройките са актуализирани успешно",
-                "updateFailed": "Неуспешна актуализация на настройките"
+                "updateFailed": "Неуспешна актуализация на настройките",
+                "visibilityUpdateFailed": "Неуспешно актуализиране на видимостта на хранилището",
+                "visibilityWarningTitle": "Направи хранилището частно?",
+                "visibilityWarningDescription": "На път сте да направите {name} частно.",
+                "visibilityWarningPermanent": "Това действие има постоянни последици:",
+                "visibilityWarningStars": "Всички звезди ще бъдат загубени завинаги",
+                "visibilityWarningWatchers": "Всички наблюдатели ще бъдат премахнати",
+                "visibilityWarningNotRestored": "Звездите и наблюдателите НЯМА да бъдат възстановени",
+                "visibilityConfirmPrivate": "Да, направи го частно",
+                "advancedPrompts": {
+                    "title": "Разширени подкани",
+                    "subtitle": "Персонализирайте AI подканите за генериране на директория.",
+                    "save": "Запази подканите",
+                    "saveSuccess": "Разширените подкани са запазени успешно",
+                    "saveFailed": "Неуспешно запазване на разширените подкани",
+                    "prompts": {
+                        "relevanceAssessment": {
+                            "title": "Оценка на релевантността",
+                            "description": "Инструкции за филтриране на страници по релевантност.",
+                            "placeholder": "напр. Включвай само open-source страници..."
+                        },
+                        "itemGeneration": {
+                            "title": "Генериране на елементи",
+                            "description": "Инструкции за AI-генерирани елементи.",
+                            "placeholder": "напр. Фокус върху корпоративни решения..."
+                        },
+                        "itemExtraction": {
+                            "title": "Извличане на елементи",
+                            "description": "Инструкции за извличане на елементи от съдържание.",
+                            "placeholder": "напр. Приоритизирай инструменти с документация..."
+                        },
+                        "searchQuery": {
+                            "title": "Генериране на заявки за търсене",
+                            "description": "Инструкции за генериране на заявки за търсене.",
+                            "placeholder": "напр. Включи заявки за GitHub хранилища..."
+                        },
+                        "categorization": {
+                            "title": "Категоризация",
+                            "description": "Инструкции за категоризиране на елементи.",
+                            "placeholder": "напр. Използвай технически категории..."
+                        },
+                        "deduplication": {
+                            "title": "Премахване на дубликати",
+                            "description": "Инструкции за идентифициране на дубликати.",
+                            "placeholder": "напр. Считай подобни GitHub repos за дубликати..."
+                        },
+                        "sourceValidation": {
+                            "title": "Валидиране на източници",
+                            "description": "Инструкции за валидиране на URL адреси.",
+                            "placeholder": "напр. Предпочитай официални сайтове..."
+                        }
+                    }
+                },
+                "websiteConfig": {
+                    "title": "Конфигурация на сайта",
+                    "subtitle": "Персонализирайте изгледа и поведението на сайта",
+                    "loadFailed": "Неуспешно зареждане на настройките на сайта",
+                    "saveSuccess": "Настройките на сайта са запазени успешно",
+                    "saveFailed": "Неуспешно запазване на настройките на сайта",
+                    "save": "Запази настройките",
+                    "sections": {
+                        "siteName": {
+                            "title": "Идентичност на сайта",
+                            "label": "Име на сайта",
+                            "placeholder": "Моята директория",
+                            "helper": "Името, показвано в заглавката на сайта"
+                        },
+                        "global": {
+                            "title": "Глобални функции",
+                            "categories": "Категории",
+                            "categoriesHelper": "Показване на филтриране по категории",
+                            "tags": "Етикети",
+                            "tagsHelper": "Показване на филтриране по етикети",
+                            "companies": "Компании",
+                            "companiesHelper": "Показване на информация за компанията",
+                            "surveys": "Анкети",
+                            "surveysHelper": "Активиране на функционалност за анкети"
+                        },
+                        "header": {
+                            "title": "Настройки на заглавката",
+                            "submit": "Бутон за изпращане",
+                            "submitHelper": "Показване на бутон за изпращане на елемент",
+                            "pricing": "Връзка към цени",
+                            "pricingHelper": "Показване на връзка към цени в навигацията",
+                            "layoutSelector": "Избор на оформление",
+                            "layoutSelectorHelper": "Позволяване на превключване между оформления",
+                            "languageSelector": "Избор на език",
+                            "languageSelectorHelper": "Позволяване на смяна на езика",
+                            "themeSelector": "Избор на тема",
+                            "themeSelectorHelper": "Позволяване на превключване между теми",
+                            "defaultLayout": "Оформление по подразбиране",
+                            "defaultTheme": "Тема по подразбиране",
+                            "themeLight": "Светла",
+                            "themeDark": "Тъмна",
+                            "themeSystem": "Системна",
+                            "defaultPagination": "Странициране по подразбиране",
+                            "paginationStandard": "Стандартно",
+                            "paginationInfinite": "Безкрайно превъртане",
+                            "paginationLoadMore": "Зареди още"
+                        },
+                        "homepage": {
+                            "title": "Настройки на началната страница",
+                            "hero": "Hero секция",
+                            "heroHelper": "Показване на hero секция със заглавие",
+                            "search": "Лента за търсене",
+                            "searchHelper": "Показване на лента за търсене",
+                            "defaultView": "Изглед по подразбиране",
+                            "viewClassic": "Класически",
+                            "viewGrid": "Решетка",
+                            "viewList": "Списък",
+                            "defaultSort": "Сортиране по подразбиране",
+                            "sortPopularity": "Популярност",
+                            "sortNewest": "Най-нови",
+                            "sortAlphabetical": "Азбучен ред"
+                        },
+                        "footer": {
+                            "title": "Настройки на долния колонтитул",
+                            "subscribe": "Абонамент за бюлетин",
+                            "subscribeHelper": "Показване на форма за абонамент",
+                            "version": "Показване на версия",
+                            "versionHelper": "Показване на версията в долния колонтитул",
+                            "themeSelector": "Избор на тема в долния колонтитул",
+                            "themeSelectorHelper": "Показване на превключвател за тема"
+                        },
+                        "customMenu": {
+                            "title": "Персонализирани връзки в менюто",
+                            "description": "Добавяне на персонализирани връзки към навигацията",
+                            "headerLinks": "Връзки в заглавката",
+                            "footerLinks": "Връзки в долния колонтитул",
+                            "addLink": "Добави връзка",
+                            "noLinks": "Няма добавени персонализирани връзки",
+                            "labelPlaceholder": "Етикет на връзката",
+                            "pathPlaceholder": "/about или https://...",
+                            "targetSelf": "Същият раздел",
+                            "targetBlank": "Нов раздел"
+                        }
+                    }
+                }
             },
             "deploy": {
                 "noTokenAlert": {
@@ -968,7 +1254,21 @@
                         "lastChecked": "Последно проверен",
                         "lastError": "Последна грешка",
                         "updateSuccess": "Настройките са актуализирани успешно",
-                        "updateFailed": "Неуспешна актуализация на настройките"
+                        "updateFailed": "Неуспешна актуализация на настройките",
+                        "githubRequired": "Необходима е връзка с GitHub. Свържете акаунта си в Настройки."
+                    },
+                    "configDialog": {
+                        "title": "Конфигуриране преди публикуване",
+                        "description": "Прегледайте и персонализирайте настройките преди публикуване",
+                        "siteName": "Име на сайта",
+                        "siteNamePlaceholder": "Моята директория",
+                        "siteNameHelper": "Името, показвано на сайта ви",
+                        "advancedSettings": "Разширени настройки",
+                        "advancedSettingsDescription": "Конфигуриране на допълнителни опции",
+                        "loadFailed": "Неуспешно зареждане на настройките",
+                        "saveAndDeploy": "Запази и публикувай",
+                        "skipAndDeploy": "Пропусни и публикувай",
+                        "cancel": "Отказ"
                     }
                 }
             }
@@ -1214,7 +1514,8 @@
                 "success": {
                     "started": "Импортирането започна! Пренасочване към вашата директория...",
                     "linked": "Директорията е свързана успешно"
-                }
+                },
+                "detectionFailed": "Не успяхме автоматично да открием формата. Моля, изберете как да импортирате това хранилище."
             }
         },
         "github": {
@@ -1276,6 +1577,34 @@
                 "title": "Webhooks",
                 "subtitle": "Конфигурирайте webhooks, за да получавате обновления в реално време",
                 "configure": "Конфигурирай Webhooks (Очаквайте скоро)"
+            },
+            "screenshotone": {
+                "title": "ScreenshotOne интеграция",
+                "subtitle": "Автоматично заснемане на екранни снимки с ScreenshotOne",
+                "connected": "Свързано",
+                "notConnected": "Не е свързано",
+                "connectedMessage": "ScreenshotOne акаунтът е свързан. Екранните снимки ще се заснемат автоматично.",
+                "disconnect": "Прекъсни връзката с ScreenshotOne",
+                "disconnecting": "Премахване...",
+                "accessKeyLabel": "Ключ за достъп",
+                "placeholder": "Вашият ключ за достъп...",
+                "secretKeyLabel": "Таен ключ (незадължителен)",
+                "secretKeyPlaceholder": "Вашият таен ключ...",
+                "showKey": "Покажи",
+                "hideKey": "Скрий",
+                "accessKeyHelp": "Задължителен. Използва се за удостоверяване с ScreenshotOne API.",
+                "secretKeyHelp": "Незадължителен. Активира подписани URL адреси. Вземете ключовете си от",
+                "dashboard": "ScreenshotOne табло",
+                "save": "Запази ключовете",
+                "saving": "Запазване...",
+                "messages": {
+                    "accessKeyRequired": "Моля, въведете валиден ключ за достъп",
+                    "saveSuccess": "ScreenshotOne ключовете са запазени успешно",
+                    "saveFailed": "Неуспешно запазване на ScreenshotOne ключовете",
+                    "removeSuccess": "ScreenshotOne ключовете са премахнати успешно",
+                    "removeFailed": "Неуспешно премахване на ScreenshotOne ключовете",
+                    "unexpectedError": "Възникна неочаквана грешка"
+                }
             }
         },
         "notifications": {
@@ -1380,7 +1709,10 @@
             "newChat": "Нов чат",
             "loadingConversation": "Зареждане на разговор...",
             "inputPlaceholder": "Опишете директорията, която искате да създадете...",
-            "sendButton": "Изпрати"
+            "sendButton": "Изпрати",
+            "errors": {
+                "unableToSend": "Съобщението не може да бъде изпратено."
+            }
         }
     },
     "layout": {
@@ -1530,6 +1862,15 @@
                 "notAuthenticated": "Не сте удостоверени",
                 "deleteFailed": "Неуспешно изтриване на акаунт",
                 "deleteDisabled": "Изтриването на акаунт е деактивирано в демо"
+            },
+            "screenshotone": {
+                "notAuthenticated": "Не е удостоверено",
+                "accessKeyRequired": "Ключът за достъп е задължителен",
+                "saveFailed": "Неуспешно запазване на ScreenshotOne ключовете",
+                "saveSuccess": "ScreenshotOne ключовете са запазени успешно",
+                "validationFailed": "Предоставените ключове са невалидни. Моля, проверете и опитайте отново.",
+                "removeFailed": "Неуспешно премахване на ScreenshotOne ключовете",
+                "removeSuccess": "ScreenshotOne ключовете са премахнати успешно"
             }
         },
         "deploy": {
@@ -1560,6 +1901,21 @@
             "username": {
                 "minLength": "Потребителското име трябва да съдържа поне {length} символа"
             }
+        }
+    },
+    "common": {
+        "ui": {
+            "close": "Затвори",
+            "dismiss": "Отхвърли"
+        },
+        "theme": {
+            "toggle": "Превключи тема",
+            "switchToLight": "Превключи към светла тема",
+            "switchToDark": "Превключи към тъмна тема"
+        },
+        "visibility": {
+            "private": "Частен",
+            "public": "Публичен"
         }
     }
 }

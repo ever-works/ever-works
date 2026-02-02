@@ -124,11 +124,13 @@ function NotificationItem({
     onMarkAsRead,
     onDismiss,
     onNavigate,
+    dismissLabel,
 }: {
     notification: Notification;
     onMarkAsRead: (id: string) => void;
     onDismiss: (id: string) => void;
     onNavigate: (url: string) => void;
+    dismissLabel: string;
 }) {
     const styles = typeStyles[notification.type];
 
@@ -175,7 +177,8 @@ function NotificationItem({
                                     onDismiss(notification.id);
                                 }}
                                 className="flex-shrink-0 p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700"
-                                title="Dismiss"
+                                aria-label={dismissLabel}
+                                title={dismissLabel}
                             >
                                 <svg
                                     className="w-4 h-4 text-text-muted dark:text-text-muted-dark"
@@ -216,6 +219,7 @@ function NotificationItem({
 
 export function NotificationDropdown({ className }: NotificationDropdownProps) {
     const t = useTranslations('dashboard.header');
+    const tCommon = useTranslations('common.ui');
     const router = useRouter();
     const [isOpen, setIsOpen] = useState(false);
     const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -401,6 +405,7 @@ export function NotificationDropdown({ className }: NotificationDropdownProps) {
                                         onMarkAsRead={handleMarkAsRead}
                                         onDismiss={handleDismiss}
                                         onNavigate={handleNavigate}
+                                        dismissLabel={tCommon('dismiss')}
                                     />
                                 ))}
                             </div>

@@ -1466,6 +1466,11 @@
                     "weeksAgo": "{weeks} weeks ago",
                     "repositoriesLoaded": "repositories loaded",
                     "moreAvailable": "more available",
+                    "ownerLabel": "Repository Owner",
+                    "personalAccount": "Personal Account",
+                    "organizations": "Organizations",
+                    "showingPersonalRepos": "Showing your personal repositories",
+                    "showingOrgRepos": "Showing repositories for {org}",
                     "errors": {
                         "fetchFailed": "Failed to load repositories"
                     }
@@ -1500,6 +1505,7 @@
                     "linking": "Linking...",
                     "linkRepos": "Link repositories"
                 },
+                "detectionFailed": "We could not automatically detect the format. Please select how to import this repository.",
                 "errors": {
                     "urlRequired": "Please enter a GitHub repository URL",
                     "unsupportedFormat": "This repository format is not supported. Please use a Data Repository or Awesome List format.",
@@ -1708,7 +1714,10 @@
             "newChat": "New chat",
             "loadingConversation": "Loading conversation…",
             "inputPlaceholder": "Describe the directory you want to create...",
-            "sendButton": "Send"
+            "sendButton": "Send",
+            "errors": {
+                "unableToSend": "Unable to send message."
+            }
         }
     },
     "layout": {
@@ -1897,6 +1906,21 @@
             "username": {
                 "minLength": "Username must contain at least {length} characters"
             }
+        }
+    },
+    "common": {
+        "ui": {
+            "close": "Close",
+            "dismiss": "Dismiss"
+        },
+        "theme": {
+            "toggle": "Toggle theme",
+            "switchToLight": "Switch to light mode",
+            "switchToDark": "Switch to dark mode"
+        },
+        "visibility": {
+            "private": "Private",
+            "public": "Public"
         }
     }
 }

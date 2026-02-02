@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils/cn';
 import { Notification, NotificationType } from '@/lib/api/notifications';
 import { getPersistentNotifications, dismissNotification } from '@/app/actions/notifications';
@@ -103,10 +104,12 @@ function NotificationBanner({
     notification,
     onDismiss,
     onAction,
+    dismissLabel,
 }: {
     notification: Notification;
     onDismiss: (id: string) => void;
     onAction: (url: string) => void;
+    dismissLabel: string;
 }) {
     const styles = typeStyles[notification.type];
 
@@ -147,7 +150,7 @@ function NotificationBanner({
                                 'p-1 rounded-md hover:bg-black/10 dark:hover:bg-white/10',
                                 styles.text,
                             )}
-                            title="Dismiss"
+                            title={dismissLabel}
                         >
                             <svg
                                 className="w-5 h-5"
@@ -171,6 +174,7 @@ function NotificationBanner({
 }
 
 export function GlobalNotificationBanner({ className }: GlobalNotificationBannerProps) {
+    const t = useTranslations('common.ui');
     const router = useRouter();
     const [notifications, setNotifications] = useState<Notification[]>([]);
 
@@ -221,6 +225,7 @@ export function GlobalNotificationBanner({ className }: GlobalNotificationBanner
                     notification={notification}
                     onDismiss={handleDismiss}
                     onAction={handleAction}
+                    dismissLabel={t('dismiss')}
                 />
             ))}
         </div>
