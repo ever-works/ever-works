@@ -49,11 +49,15 @@
 				"oauth"
 			],
 			"description": "GitHub integration for repository management, git operations, and GitHub Actions",
+			"author": {
+				"name": "Ever Works Team"
+			},
+			"license": "MIT",
 			"autoInstall": true,
 			"autoEnable": true,
 			"systemPlugin": true,
 			"builtIn": true,
-			"visibility": "public",
+			"visibility": "user-only",
 			"defaultForCapabilities": [
 				"git-provider"
 			],

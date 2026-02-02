@@ -531,7 +531,7 @@ export class GitHubPlugin implements IPlugin, IGitProviderPlugin, IOAuthPlugin {
 			systemPlugin: true,
 			autoInstall: true,
 			autoEnable: true,
-			visibility: 'public',
+			visibility: 'user-only', // User-only, not shown in directory plugins list
 			icon: {
 				type: 'lucide',
 				value: 'Github',

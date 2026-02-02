@@ -85,6 +85,12 @@ export class PluginSettingsSchemaPropertyDto implements PluginSettingsSchemaProp
     @ApiPropertyOptional({ description: 'Is this field write-only (never returned via API)' })
     writeOnly?: boolean;
 
+    @ApiPropertyOptional({ description: 'Is this field admin-only' })
+    adminOnly?: boolean;
+
+    @ApiPropertyOptional({ description: 'Environment variable name (env-only field)' })
+    envVar?: string;
+
     @ApiPropertyOptional({
         description: 'Setting scope: global, user, or directory',
         enum: ['global', 'user', 'directory'],
@@ -161,7 +167,7 @@ export class PluginResponseDto implements PluginResponse {
 
     @ApiProperty({
         description: 'UI visibility',
-        enum: ['public', 'hidden', 'advanced'],
+        enum: ['public', 'hidden', 'user-only'],
         default: 'public',
     })
     visibility: PluginVisibility;

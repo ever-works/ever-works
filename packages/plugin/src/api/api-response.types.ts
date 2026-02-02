@@ -33,6 +33,10 @@ export interface PluginSettingsSchemaProperty {
 	masked?: boolean;
 	/** Whether this field is write-only (from JsonSchema x-writeOnly) */
 	writeOnly?: boolean;
+	/** Whether this field is admin-only (from JsonSchema x-adminOnly) */
+	adminOnly?: boolean;
+	/** Environment variable name if field is env-only (from JsonSchema x-envVar) */
+	envVar?: string;
 	/** Setting scope: global, user, or directory (from JsonSchema x-scope) */
 	scope?: SettingScopeApi;
 	/** Category for grouping settings in UI (from JsonSchema x-category) */
@@ -75,6 +79,8 @@ export function toPluginSettingsSchemaProperty(schema: JsonSchema): PluginSettin
 		secret: schema['x-secret'],
 		masked: schema['x-masked'],
 		writeOnly: schema['x-writeOnly'],
+		adminOnly: schema['x-adminOnly'],
+		envVar: schema['x-envVar'],
 		scope: schema['x-scope'] || 'global',
 		category: schema['x-category'],
 		placeholder: schema['x-placeholder'],
@@ -129,7 +135,7 @@ export interface PluginResponse {
 	builtIn: boolean;
 	/** Whether this is a system plugin that cannot be disabled */
 	systemPlugin: boolean;
-	/** UI visibility: 'public', 'hidden', or 'advanced' */
+	/** UI visibility: 'public', 'hidden', or 'user-only' */
 	visibility: PluginVisibility;
 	/** Plugin state */
 	state: PluginState;

@@ -449,4 +449,149 @@ describe('PluginsService', () => {
             expect(userPluginRepository.save).toHaveBeenCalled();
         });
     });
+
+    describe('extractSettingsSchema filtering', () => {
+        it('should exclude x-envVar fields from settings schema', async () => {
+            const registered = createRegisteredPlugin();
+            jest.spyOn(pluginRegistryService, 'get').mockReturnValue(registered);
+            jest.spyOn(userPluginRepository, 'findOne').mockResolvedValue(null);
+
+            const result = await service.getPlugin('test-plugin', 'user-1');
+
+            expect(result.settingsSchema).toBeDefined();
+            expect(result.settingsSchema!.properties.clientId).toBeUndefined();
+            expect(result.settingsSchema!.properties.clientSecret).toBeUndefined();
+            expect(result.settingsSchema!.properties.apiBaseUrl).toBeUndefined();
+        });
+
+        it('should exclude x-writeOnly fields from settings schema', async () => {
+            const registered = createRegisteredPlugin();
+            jest.spyOn(pluginRegistryService, 'get').mockReturnValue(registered);
+            jest.spyOn(userPluginRepository, 'findOne').mockResolvedValue(null);
+
+            const result = await service.getPlugin('test-plugin', 'user-1');
+
+            expect(result.settingsSchema).toBeDefined();
+            expect(result.settingsSchema!.properties.writeOnlyField).toBeUndefined();
+        });
+
+        it('should include normal fields in settings schema', async () => {
+            const registered = createRegisteredPlugin();
+            jest.spyOn(pluginRegistryService, 'get').mockReturnValue(registered);
+            jest.spyOn(userPluginRepository, 'findOne').mockResolvedValue(null);
+
+            const result = await service.getPlugin('test-plugin', 'user-1');
+
+            expect(result.settingsSchema).toBeDefined();
+            expect(result.settingsSchema!.properties.normalSetting).toBeDefined();
+            expect(result.settingsSchema!.properties.maskedField).toBeDefined();
+        });
+
+        it('should filter required array to exclude filtered fields', async () => {
+            const schemaWithRequired: JsonSchema = {
+                type: 'object',
+                properties: {
+                    envField: { type: 'string', 'x-envVar': 'TEST_VAR' },
+                    normalField: { type: 'string' },
+                },
+                required: ['envField', 'normalField'],
+            } as unknown as JsonSchema;
+
+            const plugin = createMockPlugin(schemaWithRequired);
+            const registered = createRegisteredPlugin(plugin);
+            jest.spyOn(pluginRegistryService, 'get').mockReturnValue(registered);
+            jest.spyOn(userPluginRepository, 'findOne').mockResolvedValue(null);
+
+            const result = await service.getPlugin('test-plugin', 'user-1');
+
+            expect(result.settingsSchema).toBeDefined();
+            expect(result.settingsSchema!.required).toEqual(['normalField']);
+        });
+    });
+
+    describe('visibility filtering', () => {
+        it('should filter out user-only plugins from listDirectoryPlugins', async () => {
+            const userOnlyPlugin = createRegisteredPlugin();
+            userOnlyPlugin.manifest = {
+                ...userOnlyPlugin.manifest,
+                id: 'user-only-plugin',
+                visibility: 'user-only',
+            } as PluginManifest;
+            userOnlyPlugin.plugin = {
+                ...userOnlyPlugin.plugin,
+                id: 'user-only-plugin',
+            } as IPlugin;
+
+            const directoryPlugin = createRegisteredPlugin();
+            directoryPlugin.manifest = {
+                ...directoryPlugin.manifest,
+                id: 'directory-plugin',
+                visibility: 'public',
+            } as PluginManifest;
+            directoryPlugin.plugin = {
+                ...directoryPlugin.plugin,
+                id: 'directory-plugin',
+            } as IPlugin;
+
+            jest.spyOn(pluginRegistryService, 'getAll').mockReturnValue([
+                userOnlyPlugin,
+                directoryPlugin,
+            ]);
+            jest.spyOn(userPluginRepository, 'find').mockResolvedValue([]);
+            jest.spyOn(directoryPluginRepository, 'find').mockResolvedValue([]);
+
+            const result = await service.listDirectoryPlugins('dir-1', 'user-1');
+
+            expect(result.plugins.length).toBe(1);
+            expect(result.plugins[0].pluginId).toBe('directory-plugin');
+        });
+
+        it('should filter out hidden plugins from listDirectoryPlugins', async () => {
+            const hiddenPlugin = createRegisteredPlugin();
+            hiddenPlugin.manifest = {
+                ...hiddenPlugin.manifest,
+                id: 'hidden-plugin',
+                visibility: 'hidden',
+            } as PluginManifest;
+            hiddenPlugin.plugin = {
+                ...hiddenPlugin.plugin,
+                id: 'hidden-plugin',
+            } as IPlugin;
+
+            const publicPlugin = createRegisteredPlugin();
+            publicPlugin.manifest = {
+                ...publicPlugin.manifest,
+                id: 'public-plugin',
+                visibility: 'public',
+            } as PluginManifest;
+            publicPlugin.plugin = {
+                ...publicPlugin.plugin,
+                id: 'public-plugin',
+            } as IPlugin;
+
+            jest.spyOn(pluginRegistryService, 'getAll').mockReturnValue([
+                hiddenPlugin,
+                publicPlugin,
+            ]);
+            jest.spyOn(userPluginRepository, 'find').mockResolvedValue([]);
+            jest.spyOn(directoryPluginRepository, 'find').mockResolvedValue([]);
+
+            const result = await service.listDirectoryPlugins('dir-1', 'user-1');
+
+            expect(result.plugins.length).toBe(1);
+            expect(result.plugins[0].pluginId).toBe('public-plugin');
+        });
+
+        it('should include plugins with default visibility in listDirectoryPlugins', async () => {
+            const defaultVisibilityPlugin = createRegisteredPlugin();
+            // No visibility set - should default to 'public'
+            jest.spyOn(pluginRegistryService, 'getAll').mockReturnValue([defaultVisibilityPlugin]);
+            jest.spyOn(userPluginRepository, 'find').mockResolvedValue([]);
+            jest.spyOn(directoryPluginRepository, 'find').mockResolvedValue([]);
+
+            const result = await service.listDirectoryPlugins('dir-1', 'user-1');
+
+            expect(result.plugins.length).toBe(1);
+        });
+    });
 });

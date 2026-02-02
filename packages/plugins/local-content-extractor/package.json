@@ -48,6 +48,10 @@
 				"content-extractor"
 			],
 			"description": "System plugin for extracting web page content using axios + Readability. Provides fallback content extraction without requiring external API keys.",
+			"author": {
+				"name": "Ever Works Team"
+			},
+			"license": "MIT",
 			"autoInstall": true,
 			"autoEnable": true,
 			"systemPlugin": true,

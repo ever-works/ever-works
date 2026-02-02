@@ -46,6 +46,10 @@
 				"form-schema-provider"
 			],
 			"description": "System plugin providing the standard 15-step generation pipeline",
+			"author": {
+				"name": "Ever Works Team"
+			},
+			"license": "MIT",
 			"autoInstall": true,
 			"systemPlugin": true,
 			"builtIn": true,

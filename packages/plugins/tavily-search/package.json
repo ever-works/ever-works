@@ -45,6 +45,10 @@
 				"content-extractor"
 			],
 			"description": "Web search and content extraction using Tavily API. Supports both search queries and direct URL content extraction.",
+			"author": {
+				"name": "Ever Works Team"
+			},
+			"license": "MIT",
 			"autoInstall": true,
 			"autoEnable": true,
 			"defaultForCapabilities": [

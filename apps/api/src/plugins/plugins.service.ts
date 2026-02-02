@@ -249,9 +249,13 @@ export class PluginsService {
         userId: string,
     ): Promise<DirectoryPluginListResponseDto> {
         const allPlugins = this.pluginRegistryService.getAll();
-        const visiblePlugins = allPlugins.filter(
-            (p) => (p.manifest?.visibility ?? 'public') !== 'hidden',
-        );
+
+        // Filter: visible + applicable to directory scope
+        // 'hidden' and 'user-only' plugins are not shown in directory plugins list
+        const visiblePlugins = allPlugins.filter((p) => {
+            const visibility = p.manifest?.visibility ?? 'public';
+            return visibility !== 'hidden' && visibility !== 'user-only';
+        });
 
         const userPlugins = await this.userPluginRepository.find({
             where: { userId },
@@ -611,26 +615,28 @@ export class PluginsService {
     }
 
     /**
-     * Extract and convert settings schema.
-     * Uses the shared toPluginSettingsSchemaProperty utility from @ever-works/plugin.
+     * Extract settings schema, filtering out env-only and write-only fields.
      */
     private extractSettingsSchema(schema?: JsonSchema): PluginSettingsSchemaDto | undefined {
         if (!schema) return undefined;
 
-        // Convert properties using the shared utility function
         const properties: Record<string, PluginSettingsSchemaPropertyDto> = {};
         if (schema.properties) {
             for (const [key, prop] of Object.entries(schema.properties)) {
+                if (prop['x-envVar']) continue;
+                if (prop['x-writeOnly']) continue;
                 properties[key] = toPluginSettingsSchemaProperty(prop);
             }
         }
+
+        const filteredRequired = schema.required?.filter((r) => r in properties);
 
         return {
             type: 'object',
             title: schema.title,
             description: schema.description,
             properties,
-            required: schema.required ? [...schema.required] : undefined,
+            required: filteredRequired?.length ? filteredRequired : undefined,
         };
     }
 
