@@ -14,6 +14,7 @@ import { PluginLifecycleManagerService } from '../services/plugin-lifecycle-mana
 import { PluginSettingsService } from '../services/plugin-settings.service';
 import { PluginContextFactoryService } from '../services/plugin-context-factory.service';
 import { CustomCapabilityRegistryService } from '../services/custom-capability-registry.service';
+import { PluginBootstrapService } from '../services/plugin-bootstrap.service';
 import type { PluginsModuleOptions } from '../interfaces/plugins-module-options.interface';
 
 describe('PluginsModule', () => {
@@ -83,6 +84,11 @@ describe('PluginsModule', () => {
             const service = module.get<CustomCapabilityRegistryService>(
                 CustomCapabilityRegistryService,
             );
+            expect(service).toBeDefined();
+        });
+
+        it('should provide PluginBootstrapService', () => {
+            const service = module.get<PluginBootstrapService>(PluginBootstrapService);
             expect(service).toBeDefined();
         });
 

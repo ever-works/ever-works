@@ -5,24 +5,7 @@ import type {
     ValidationResult,
     ValidationError,
 } from '@ever-works/plugin';
-
-/**
- * Valid plugin categories
- */
-const VALID_CATEGORIES: PluginCategory[] = [
-    'git-provider',
-    'deployment',
-    'screenshot',
-    'search',
-    'content-extractor',
-    'data-source',
-    'ai-provider',
-    'pipeline',
-    'form',
-    'integration',
-    'utility',
-    'theme',
-];
+import { PLUGIN_CATEGORIES, isPluginCategory } from '@ever-works/plugin';
 
 /**
  * Plugin ID pattern: lowercase letters, numbers, and hyphens
@@ -103,12 +86,12 @@ export class PluginManifestValidatorService {
 
         // Validate category
         if (typeof m.category === 'string') {
-            if (!VALID_CATEGORIES.includes(m.category as PluginCategory)) {
+            if (!isPluginCategory(m.category)) {
                 errors.push({
                     path: 'category',
-                    message: `Invalid category. Must be one of: ${VALID_CATEGORIES.join(', ')}`,
+                    message: `Invalid category. Must be one of: ${PLUGIN_CATEGORIES.join(', ')}`,
                     actual: m.category,
-                    expected: VALID_CATEGORIES.join(' | '),
+                    expected: PLUGIN_CATEGORIES.join(' | '),
                 });
             }
         }
@@ -221,7 +204,7 @@ export class PluginManifestValidatorService {
                 });
             } else {
                 const icon = m.icon as Record<string, unknown>;
-                const validIconTypes = ['url', 'svg', 'emoji', 'lucide'];
+                const validIconTypes = ['url', 'svg', 'emoji', 'lucide', 'base64'];
                 if (typeof icon.type !== 'string' || !validIconTypes.includes(icon.type)) {
                     errors.push({
                         path: 'icon.type',

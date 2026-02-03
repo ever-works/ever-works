@@ -22,10 +22,15 @@ import { DirectoryTaxonomyService } from './directory-taxonomy.service';
 import { GeneratorFormSchemaService } from './generator-form-schema.service';
 import { SubscriptionsModule } from '@src/subscriptions';
 import { RepositoryManagementService } from './repository-management.service';
-import { PluginsModule } from '@src/plugins/plugins.module';
 import { NotificationsModule } from '@src/notifications';
 import { NotificationOperationsModule } from '@src/notification-operations';
 
+/**
+ * Directory module providing directory-related services.
+ *
+ * Note: This module relies on PluginsModule being registered globally via forRoot()
+ * at the application root level. Do not import PluginsModule directly here.
+ */
 @Module({
     imports: [
         DatabaseModule,
@@ -40,7 +45,6 @@ import { NotificationOperationsModule } from '@src/notification-operations';
         SubscriptionsModule,
         NotificationsModule,
         NotificationOperationsModule,
-        PluginsModule,
     ],
     providers: [
         DirectoryOwnershipService,

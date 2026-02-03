@@ -1,19 +1,27 @@
 /**
- * Plugin categories for organization and discovery
+ * All valid plugin categories as a readonly tuple.
+ * This is the single source of truth for plugin categories.
  */
-export type PluginCategory =
-	| 'git-provider'
-	| 'deployment'
-	| 'screenshot'
-	| 'search'
-	| 'content-extractor'
-	| 'data-source'
-	| 'ai-provider'
-	| 'pipeline'
-	| 'form'
-	| 'integration'
-	| 'utility'
-	| 'theme';
+export const PLUGIN_CATEGORIES = [
+	'git-provider',
+	'deployment',
+	'screenshot',
+	'search',
+	'content-extractor',
+	'data-source',
+	'ai-provider',
+	'pipeline',
+	'form',
+	'integration',
+	'utility',
+	'theme'
+] as const;
+
+export type PluginCategory = (typeof PLUGIN_CATEGORIES)[number];
+
+export function isPluginCategory(value: string): value is PluginCategory {
+	return PLUGIN_CATEGORIES.includes(value as PluginCategory);
+}
 
 /**
  * Icon types for plugin display

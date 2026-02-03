@@ -14,7 +14,7 @@ export default defineConfig({
 		'src/api/index.ts',
 		'src/git/index.ts'
 	],
-	format: ['esm'],
+	format: ['esm', 'cjs'],
 	dts: true,
 	clean: true,
 	sourcemap: true,

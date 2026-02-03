@@ -14,9 +14,10 @@ export const PLUGINS_MODULE_OPTIONS = Symbol('PLUGINS_MODULE_OPTIONS');
 export const DEFAULT_PLUGIN_PATHS = [
     './plugins',
     './node_modules/@ever-works',
-    // Monorepo paths for built-in plugins
+    // Monorepo paths for built-in plugins (relative to apps/api)
     './packages/plugins',
     '../plugins',
+    '../../packages/plugins',
 ];
 
 /**

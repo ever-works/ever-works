@@ -6,16 +6,15 @@ import type {
     ParallelGroup,
     StepExecutor,
     IPipelineStepPlugin,
-    IPlugin,
 } from '@ever-works/plugin';
+import { isPipelineStepPlugin } from '@ever-works/plugin';
 import {
     PluginRegistryService,
     RegisteredPlugin,
 } from '../plugins/services/plugin-registry.service';
 import { DirectoryPluginRepository } from '../plugins/repositories/directory-plugin.repository';
 import { UserPluginRepository } from '../plugins/repositories/user-plugin.repository';
-// Import the NestJS wrapper which delegates to the standalone plugin
-import { DefaultPipelinePlugin } from './default-pipeline.plugin';
+import { DefaultPipelinePlugin } from '@ever-works/default-pipeline-plugin';
 
 /**
  * Create an empty executable pipeline
@@ -31,13 +30,6 @@ function createExecutablePipeline(source: 'standard' | string = 'standard'): Exe
         injectedSteps: new Set(),
         source,
     };
-}
-
-/**
- * Type guard for pipeline step plugins
- */
-function isPipelineStepPlugin(plugin: IPlugin): plugin is IPipelineStepPlugin {
-    return plugin.capabilities.includes('pipeline-step');
 }
 
 /**

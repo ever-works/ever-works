@@ -1,13 +1,4 @@
-import {
-    Module,
-    Global,
-    DynamicModule,
-    Provider,
-    OnModuleInit,
-    OnModuleDestroy,
-    Logger,
-    Inject,
-} from '@nestjs/common';
+import { Module, Global, DynamicModule, Provider, OnModuleDestroy } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { CacheModule } from '@nestjs/cache-manager';
@@ -32,6 +23,7 @@ import { PluginLifecycleManagerService } from './services/plugin-lifecycle-manag
 import { PluginSettingsService } from './services/plugin-settings.service';
 import { PluginContextFactoryService } from './services/plugin-context-factory.service';
 import { CustomCapabilityRegistryService } from './services/custom-capability-registry.service';
+import { PluginBootstrapService } from './services/plugin-bootstrap.service';
 
 // Constants and interfaces
 import { PLUGINS_MODULE_OPTIONS, DEFAULT_PLATFORM_VERSION } from './plugins.constants';
@@ -67,6 +59,8 @@ const PROVIDERS = [
     // Context and capabilities
     PluginContextFactoryService,
     CustomCapabilityRegistryService,
+    // Bootstrap service
+    PluginBootstrapService,
 ];
 
 /**
@@ -88,24 +82,35 @@ const EXPORTS = [
     PluginManifestValidatorService,
     PluginVersionCheckerService,
     PluginClassValidatorService,
+    // Bootstrap service (for explicit initialization)
+    PluginBootstrapService,
 ];
 
 /**
  * Global module for the plugin system.
  * Provides plugin discovery, loading, lifecycle management, and settings resolution.
+ *
+ * IMPORTANT: This module does NOT auto-load plugins on initialization.
+ * You must explicitly call PluginBootstrapService.bootstrap() from your application root.
+ *
+ * Example usage in api.module.ts:
+ * ```typescript
+ * @Module({
+ *     imports: [PluginsModule.forRoot()],
+ * })
+ * export class ApiModule implements OnApplicationBootstrap {
+ *     constructor(private readonly pluginBootstrap: PluginBootstrapService) {}
+ *
+ *     async onApplicationBootstrap() {
+ *         await this.pluginBootstrap.bootstrap();
+ *     }
+ * }
+ * ```
  */
 @Global()
 @Module({})
-export class PluginsModule implements OnModuleInit, OnModuleDestroy {
-    private readonly logger = new Logger(PluginsModule.name);
-
-    constructor(
-        private readonly pluginLoader: PluginLoaderService,
-        private readonly lifecycleManager: PluginLifecycleManagerService,
-        private readonly contextFactory: PluginContextFactoryService,
-        @Inject(PLUGINS_MODULE_OPTIONS)
-        private readonly options: PluginsModuleOptions,
-    ) {}
+export class PluginsModule implements OnModuleDestroy {
+    constructor(private readonly pluginBootstrap: PluginBootstrapService) {}
 
     /**
      * Configure the module with static options
@@ -246,50 +251,10 @@ export class PluginsModule implements OnModuleInit, OnModuleDestroy {
     }
 
     /**
-     * Called when the module is initialized
-     */
-    async onModuleInit(): Promise<void> {
-        this.logger.log('Initializing plugin system...');
-
-        // Connect the context factory to the lifecycle manager
-        this.lifecycleManager.setContextFactory(this.contextFactory);
-
-        // Discover and load plugins
-        const result = await this.pluginLoader.discoverAndLoadAll();
-        this.logger.log(
-            `Plugin discovery complete: ${result.loaded} loaded, ${result.failed} failed`,
-        );
-
-        // Call onLoad for all loaded plugins
-        for (const loadResult of result.results) {
-            if (loadResult.success && loadResult.pluginId) {
-                await this.lifecycleManager.callOnLoad(loadResult.pluginId);
-            }
-        }
-
-        // Always enable system plugins (they cannot be disabled)
-        const systemResults = await this.lifecycleManager.enableSystemPlugins();
-        const systemEnabled = systemResults.filter((r) => r.success).length;
-        if (systemEnabled > 0) {
-            this.logger.log(`Auto-enabled ${systemEnabled} system plugins`);
-        }
-
-        // Auto-enable all other plugins if configured
-        if (this.options.autoEnableOnLoad) {
-            const enableResults = await this.lifecycleManager.enableAll();
-            const enabled = enableResults.filter((r) => r.success).length;
-            this.logger.log(`Auto-enabled ${enabled} plugins`);
-        }
-
-        this.logger.log('Plugin system initialized');
-    }
-
-    /**
-     * Called when the module is being destroyed
+     * Called when the module is being destroyed.
+     * Delegates to PluginBootstrapService for proper cleanup.
      */
     async onModuleDestroy(): Promise<void> {
-        this.logger.log('Shutting down plugin system...');
-        await this.lifecycleManager.shutdownAll();
-        this.logger.log('Plugin system shutdown complete');
+        await this.pluginBootstrap.shutdown();
     }
 }

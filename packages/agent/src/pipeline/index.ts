@@ -8,9 +8,10 @@
 // Type-safe generation context
 export { TypedGenerationContext, createGenerationContext } from './generation-context';
 
-// Default pipeline plugin (NestJS wrapper around standalone plugin)
-// The standalone plugin in @ever-works/default-pipeline-plugin is the single source of truth
-export { DefaultPipelinePlugin, type IBuiltInStepExecutor } from './default-pipeline.plugin';
+// Re-export IBuiltInStepExecutor type from the plugin SDK
+// The DefaultPipelinePlugin is loaded via the plugin system, not as a NestJS provider.
+// Access it via PluginRegistryService.getPluginsByCapability('pipeline-step').
+export type { IBuiltInStepExecutor } from '@ever-works/plugin';
 
 // Pipeline builder service
 export {

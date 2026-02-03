@@ -4,9 +4,9 @@ import type {
     StepExecutionOptions,
     StepProgressCallback,
     StepExecutionContext,
+    IBuiltInStepExecutor,
 } from '@ever-works/plugin';
 import type { BuiltInStepId } from '@ever-works/default-pipeline-plugin';
-import { DefaultPipelinePlugin, type IBuiltInStepExecutor } from './default-pipeline.plugin';
 import { TypedGenerationContext } from './generation-context';
 
 export interface ILegacyPipelineStep {

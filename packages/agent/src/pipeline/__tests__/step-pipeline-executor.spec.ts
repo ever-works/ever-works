@@ -14,7 +14,7 @@ jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => {});
 jest.spyOn(Logger.prototype, 'log').mockImplementation(() => {});
 jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => {});
 import { PipelineBuilderService } from '../pipeline-builder.service';
-import { DefaultPipelinePlugin } from '../default-pipeline.plugin';
+import { DefaultPipelinePlugin } from '@ever-works/default-pipeline-plugin';
 import { PluginRegistryService } from '../../plugins/services/plugin-registry.service';
 import { createGenerationContext } from '../generation-context';
 import { AiFacadeService } from '../../facades/ai.facade';

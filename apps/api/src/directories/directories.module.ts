@@ -8,6 +8,7 @@ import { AiModule } from '@packages/agent/ai';
 import { CacheEntryRepository } from '@packages/agent/cache';
 import { TriggerModule as TasksTriggerModule } from '@packages/tasks';
 import { WebsiteGeneratorModule } from '@packages/agent/website-generator';
+import { FacadesModule } from '@packages/agent/facades';
 
 // Controllers
 import { DirectoriesController } from './directories.controller';
@@ -28,6 +29,7 @@ import { WebsiteTemplateSchedulerService } from './tasks/website-template-schedu
         AiModule,
         TasksTriggerModule,
         WebsiteGeneratorModule,
+        FacadesModule,
         ScheduleModule.forRoot(),
     ],
     providers: [

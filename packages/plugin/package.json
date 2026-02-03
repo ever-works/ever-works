@@ -11,47 +11,58 @@
 	"exports": {
 		".": {
 			"types": "./dist/index.d.ts",
-			"import": "./dist/index.js"
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
 		},
 		"./contracts": {
 			"types": "./dist/contracts/index.d.ts",
-			"import": "./dist/contracts/index.js"
+			"import": "./dist/contracts/index.js",
+			"require": "./dist/contracts/index.cjs"
 		},
 		"./pipeline": {
 			"types": "./dist/pipeline/index.d.ts",
-			"import": "./dist/pipeline/index.js"
+			"import": "./dist/pipeline/index.js",
+			"require": "./dist/pipeline/index.cjs"
 		},
 		"./events": {
 			"types": "./dist/events/index.d.ts",
-			"import": "./dist/events/index.js"
+			"import": "./dist/events/index.js",
+			"require": "./dist/events/index.cjs"
 		},
 		"./settings": {
 			"types": "./dist/settings/index.d.ts",
-			"import": "./dist/settings/index.js"
+			"import": "./dist/settings/index.js",
+			"require": "./dist/settings/index.cjs"
 		},
 		"./common": {
 			"types": "./dist/common/index.d.ts",
-			"import": "./dist/common/index.js"
+			"import": "./dist/common/index.js",
+			"require": "./dist/common/index.cjs"
 		},
 		"./helpers": {
 			"types": "./dist/helpers/index.d.ts",
-			"import": "./dist/helpers/index.js"
+			"import": "./dist/helpers/index.js",
+			"require": "./dist/helpers/index.cjs"
 		},
 		"./abstract": {
 			"types": "./dist/abstract/index.d.ts",
-			"import": "./dist/abstract/index.js"
+			"import": "./dist/abstract/index.js",
+			"require": "./dist/abstract/index.cjs"
 		},
 		"./testing": {
 			"types": "./dist/testing/index.d.ts",
-			"import": "./dist/testing/index.js"
+			"import": "./dist/testing/index.js",
+			"require": "./dist/testing/index.cjs"
 		},
 		"./api": {
 			"types": "./dist/api/index.d.ts",
-			"import": "./dist/api/index.js"
+			"import": "./dist/api/index.js",
+			"require": "./dist/api/index.cjs"
 		},
 		"./git": {
 			"types": "./dist/git/index.d.ts",
-			"import": "./dist/git/index.js"
+			"import": "./dist/git/index.js",
+			"require": "./dist/git/index.cjs"
 		}
 	},
 	"files": [

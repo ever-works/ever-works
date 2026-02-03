@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, OnApplicationBootstrap } from '@nestjs/common';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
@@ -20,7 +20,10 @@ import { ScreenshotModule } from './plugins-capabilities/screenshot/screenshot.m
 import { PluginsModule } from './plugins/plugins.module';
 import { GitProviderModule } from './plugins-capabilities/git-provider/git-provider.module';
 import { OAuthModule } from './plugins-capabilities/oauth/oauth.module';
-import { PluginsModule as AgentPluginsModule } from '@packages/agent/plugins';
+import {
+    PluginsModule as AgentPluginsModule,
+    PluginBootstrapService,
+} from '@packages/agent/plugins';
 import { CacheFactory } from '@packages/agent/cache';
 
 @Module({
@@ -79,4 +82,14 @@ import { CacheFactory } from '@packages/agent/cache';
     ],
     controllers: [APIController],
 })
-export class ApiModule {}
+export class ApiModule implements OnApplicationBootstrap {
+    constructor(private readonly pluginBootstrap: PluginBootstrapService) {}
+
+    /**
+     * Called after all modules have been initialized.
+     * This is the single point where plugins are loaded.
+     */
+    async onApplicationBootstrap(): Promise<void> {
+        await this.pluginBootstrap.bootstrap();
+    }
+}

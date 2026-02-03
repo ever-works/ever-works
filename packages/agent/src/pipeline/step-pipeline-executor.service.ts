@@ -13,6 +13,7 @@ import type {
     StepMetrics,
     StepDataKey,
     IPipelineStepPlugin,
+    IDefaultPipelinePlugin,
     IPlugin,
     PipelineEventPayload,
     PipelineStepEventPayload,
@@ -43,20 +44,13 @@ import type {
     DataSourceFacadeResult,
     EnabledDataSource,
 } from '@ever-works/plugin';
+import { isDefaultPipelinePlugin, isPipelineStepPlugin } from '@ever-works/plugin';
 import { AiFacadeService } from '../facades/ai.facade';
 import { SearchFacadeService } from '../facades/search.facade';
 import { ScreenshotFacadeService } from '../facades/screenshot.facade';
 import { ContentExtractorFacadeService } from '../facades/content-extractor.facade';
 import { DataSourceFacadeService } from '../facades/data-source.facade';
-
-/**
- * Type guard for pipeline step plugins (inlined to avoid ESM import issues)
- */
-function isPipelineStepPlugin(plugin: IPlugin): plugin is IPipelineStepPlugin {
-    return plugin.capabilities.includes('pipeline-step');
-}
 import { PipelineBuilderService } from './pipeline-builder.service';
-import { DefaultPipelinePlugin } from './default-pipeline.plugin';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
 import { TypedGenerationContext, createGenerationContext } from './generation-context';
 import { ExecutablePipelineRunner } from './executable-pipeline.class';
@@ -123,7 +117,6 @@ export class StepPipelineExecutorService {
 
     constructor(
         private readonly pipelineBuilder: PipelineBuilderService,
-        private readonly defaultPlugin: DefaultPipelinePlugin,
         private readonly registry: PluginRegistryService,
         private readonly eventEmitter: EventEmitter2,
         private readonly aiFacade: AiFacadeService,
@@ -135,25 +128,20 @@ export class StepPipelineExecutorService {
     ) {}
 
     /**
-     * Get the default pipeline plugin.
-     * Prefers the NestJS-injected plugin, falls back to registry lookup.
+     * Get the default pipeline plugin from the plugin registry.
+     * The plugin is loaded via the plugin system (PluginBootstrapService.bootstrap()).
      */
-    private getDefaultPipelinePlugin(): DefaultPipelinePlugin {
-        // Primary: use the NestJS-injected plugin
-        if (this.defaultPlugin) {
-            return this.defaultPlugin;
-        }
-
-        // Fallback: get from plugin registry
+    private getDefaultPipelinePlugin(): IDefaultPipelinePlugin {
         const registered = this.registry.get('default-pipeline');
         if (registered && registered.state === 'enabled') {
-            // The registered plugin should be compatible with DefaultPipelinePlugin interface
-            return registered.plugin as unknown as DefaultPipelinePlugin;
+            if (isDefaultPipelinePlugin(registered.plugin)) {
+                return registered.plugin;
+            }
         }
 
         throw new Error(
             'Default pipeline plugin not available. ' +
-                'Ensure DefaultPipelinePlugin is provided in the module or loaded via plugin system.',
+                'Ensure the plugin system has been initialized via PluginBootstrapService.bootstrap().',
         );
     }
 

@@ -6,7 +6,7 @@ import {
     MissingDependencyError,
 } from '../pipeline-builder.service';
 import { PluginRegistryService } from '../../plugins/services/plugin-registry.service';
-import { DefaultPipelinePlugin } from '../default-pipeline.plugin';
+import { DefaultPipelinePlugin } from '@ever-works/default-pipeline-plugin';
 import type {
     IPlugin,
     PluginManifest,
@@ -297,7 +297,7 @@ describe('PipelineBuilderService', () => {
                             const depIndex = stepIndexMap.get(dep.stepId);
                             const stepIndex = stepIndexMap.get(step.id);
                             if (depIndex !== undefined && stepIndex !== undefined) {
-                                expect(depIndex).toBeLessThan(stepIndex);
+                                expect(depIndex).toBeLessThan(stepIndex as number);
                             }
                         }
                     }
