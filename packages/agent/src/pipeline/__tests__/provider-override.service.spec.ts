@@ -51,7 +51,7 @@ describe('ProviderOverrideService', () => {
             id,
             name: `Mock Provider ${id}`,
             version: '1.0.0',
-            category: 'provider' as PluginCategory,
+            category: 'utility' as PluginCategory,
             capabilities: ['sub-provider'],
             settingsSchema: { type: 'object', properties: {} },
             onLoad: jest.fn(),
@@ -85,7 +85,7 @@ describe('ProviderOverrideService', () => {
         name: `Plugin ${id}`,
         version: '1.0.0',
         description: 'Test plugin',
-        category: 'provider' as PluginCategory,
+        category: 'utility' as PluginCategory,
         capabilities: ['sub-provider'],
     });
 

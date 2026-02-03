@@ -8,6 +8,8 @@ import {
     type ValidationError,
     PLUGIN_CAPABILITIES,
     isValidPluginCapability,
+    PLUGIN_CATEGORIES,
+    isPluginCategory,
 } from '@ever-works/plugin';
 
 /**
@@ -25,6 +27,7 @@ function isIPlugin(obj: unknown): obj is IPlugin {
     if (typeof plugin.name !== 'string') return false;
     if (typeof plugin.version !== 'string') return false;
     if (typeof plugin.category !== 'string') return false;
+    if (!isPluginCategory(plugin.category)) return false;
     if (!Array.isArray(plugin.capabilities)) return false;
 
     // Check required methods
@@ -182,6 +185,16 @@ export class PluginClassValidatorService {
             this.checkRequiredProperty(p, 'name', 'string', errors);
             this.checkRequiredProperty(p, 'version', 'string', errors);
             this.checkRequiredProperty(p, 'category', 'string', errors);
+
+            // Validate category is a valid PluginCategory
+            if (typeof p.category === 'string' && !isPluginCategory(p.category)) {
+                errors.push({
+                    path: 'category',
+                    message: `Invalid category "${p.category}". Must be one of: ${PLUGIN_CATEGORIES.join(', ')}`,
+                    expected: PLUGIN_CATEGORIES.join(' | '),
+                    actual: p.category,
+                });
+            }
 
             if (!Array.isArray(p.capabilities)) {
                 errors.push({

@@ -5,6 +5,7 @@ import type { IScreenshotPlugin } from '../contracts/capabilities/screenshot.int
 import type { ISearchPlugin } from '../contracts/capabilities/search.interface.js';
 import type { IAiProviderPlugin } from '../contracts/capabilities/ai-provider.interface.js';
 import type { IPipelineStepPlugin } from '../contracts/capabilities/pipeline-step.interface.js';
+import { isPluginCategory, PLUGIN_CATEGORIES } from '../contracts/plugin-manifest.types.js';
 import { createTestHarness, type PluginTestHarness, type PluginTestResult } from './plugin-test-harness.js';
 
 /**
@@ -38,6 +39,10 @@ export async function testBasePluginContract(plugin: IPlugin): Promise<PluginTes
 	results.push(
 		await harness.test('has required category property', async () => {
 			harness.assert(typeof plugin.category === 'string', 'category must be a string');
+			harness.assert(
+				isPluginCategory(plugin.category),
+				`category must be one of: ${PLUGIN_CATEGORIES.join(', ')}`
+			);
 		})
 	);
 
