@@ -594,4 +594,189 @@ describe('PluginsService', () => {
             expect(result.plugins.length).toBe(1);
         });
     });
+
+    describe('autoEnable behavior', () => {
+        describe('toUserPluginResponse with autoEnable', () => {
+            it('should show autoEnabled plugin as installed and enabled without UserPluginEntity', async () => {
+                const autoEnabledPlugin = createRegisteredPlugin();
+                autoEnabledPlugin.manifest = {
+                    ...autoEnabledPlugin.manifest,
+                    autoEnable: true,
+                } as PluginManifest;
+
+                jest.spyOn(pluginRegistryService, 'get').mockReturnValue(autoEnabledPlugin);
+                jest.spyOn(userPluginRepository, 'findOne').mockResolvedValue(null);
+
+                const result = await service.getPlugin('test-plugin', 'user-1');
+
+                expect(result.installed).toBe(true);
+                expect(result.enabled).toBe(true);
+            });
+
+            it('should respect explicit disabled status for autoEnabled plugin', async () => {
+                const autoEnabledPlugin = createRegisteredPlugin();
+                autoEnabledPlugin.manifest = {
+                    ...autoEnabledPlugin.manifest,
+                    autoEnable: true,
+                } as PluginManifest;
+
+                jest.spyOn(pluginRegistryService, 'get').mockReturnValue(autoEnabledPlugin);
+                jest.spyOn(userPluginRepository, 'findOne').mockResolvedValue({
+                    id: '1',
+                    userId: 'user-1',
+                    pluginId: 'test-plugin',
+                    enabled: false, // Explicitly disabled
+                    settings: {},
+                    secretSettings: {},
+                    metadata: {},
+                } as any);
+
+                const result = await service.getPlugin('test-plugin', 'user-1');
+
+                expect(result.installed).toBe(true);
+                expect(result.enabled).toBe(false);
+            });
+
+            it('should show non-autoEnabled plugin as not installed without UserPluginEntity', async () => {
+                const normalPlugin = createRegisteredPlugin();
+                normalPlugin.manifest = {
+                    ...normalPlugin.manifest,
+                    autoEnable: false,
+                } as PluginManifest;
+
+                jest.spyOn(pluginRegistryService, 'get').mockReturnValue(normalPlugin);
+                jest.spyOn(userPluginRepository, 'findOne').mockResolvedValue(null);
+
+                const result = await service.getPlugin('test-plugin', 'user-1');
+
+                expect(result.installed).toBe(false);
+                expect(result.enabled).toBe(false);
+            });
+        });
+
+        describe('toDirectoryPluginResponse with autoEnable', () => {
+            it('should show autoEnabled plugin as directoryEnabled without DirectoryPluginEntity', async () => {
+                const autoEnabledPlugin = createRegisteredPlugin();
+                autoEnabledPlugin.manifest = {
+                    ...autoEnabledPlugin.manifest,
+                    autoEnable: true,
+                } as PluginManifest;
+
+                jest.spyOn(pluginRegistryService, 'getAll').mockReturnValue([autoEnabledPlugin]);
+                jest.spyOn(userPluginRepository, 'find').mockResolvedValue([]);
+                jest.spyOn(directoryPluginRepository, 'find').mockResolvedValue([]);
+
+                const result = await service.listDirectoryPlugins('dir-1', 'user-1');
+
+                expect(result.plugins[0].directoryEnabled).toBe(true);
+            });
+
+            it('should respect explicit disabled status for autoEnabled plugin at directory level', async () => {
+                const autoEnabledPlugin = createRegisteredPlugin();
+                autoEnabledPlugin.manifest = {
+                    ...autoEnabledPlugin.manifest,
+                    autoEnable: true,
+                } as PluginManifest;
+
+                jest.spyOn(pluginRegistryService, 'getAll').mockReturnValue([autoEnabledPlugin]);
+                jest.spyOn(userPluginRepository, 'find').mockResolvedValue([]);
+                jest.spyOn(directoryPluginRepository, 'find').mockResolvedValue([
+                    {
+                        id: '1',
+                        directoryId: 'dir-1',
+                        pluginId: 'test-plugin',
+                        enabled: false, // Explicitly disabled
+                        settings: {},
+                        secretSettings: {},
+                        metadata: {},
+                    } as any,
+                ]);
+
+                const result = await service.listDirectoryPlugins('dir-1', 'user-1');
+
+                expect(result.plugins[0].directoryEnabled).toBe(false);
+            });
+
+            it('should show non-autoEnabled plugin as not directoryEnabled without DirectoryPluginEntity', async () => {
+                const normalPlugin = createRegisteredPlugin();
+                normalPlugin.manifest = {
+                    ...normalPlugin.manifest,
+                    autoEnable: false,
+                } as PluginManifest;
+
+                jest.spyOn(pluginRegistryService, 'getAll').mockReturnValue([normalPlugin]);
+                jest.spyOn(userPluginRepository, 'find').mockResolvedValue([]);
+                jest.spyOn(directoryPluginRepository, 'find').mockResolvedValue([]);
+
+                const result = await service.listDirectoryPlugins('dir-1', 'user-1');
+
+                expect(result.plugins[0].directoryEnabled).toBe(false);
+            });
+        });
+
+        describe('enablePluginForDirectory with autoEnable', () => {
+            it('should allow enabling autoEnabled plugin for directory without UserPluginEntity', async () => {
+                const autoEnabledPlugin = createRegisteredPlugin();
+                autoEnabledPlugin.manifest = {
+                    ...autoEnabledPlugin.manifest,
+                    autoEnable: true,
+                } as PluginManifest;
+
+                jest.spyOn(pluginRegistryService, 'get').mockReturnValue(autoEnabledPlugin);
+                jest.spyOn(pluginRepository, 'findOne').mockResolvedValue({
+                    id: '1',
+                    pluginId: 'test-plugin',
+                } as any);
+                jest.spyOn(userPluginRepository, 'findOne').mockResolvedValue(null);
+                jest.spyOn(directoryPluginRepository, 'findOne').mockResolvedValue(null);
+
+                const result = await service.enablePluginForDirectory(
+                    'dir-1',
+                    'test-plugin',
+                    'user-1',
+                );
+
+                expect(result.directoryEnabled).toBe(true);
+                expect(directoryPluginRepository.save).toHaveBeenCalled();
+            });
+
+            it('should reject non-autoEnabled plugin without UserPluginEntity', async () => {
+                const normalPlugin = createRegisteredPlugin();
+                normalPlugin.manifest = {
+                    ...normalPlugin.manifest,
+                    autoEnable: false,
+                } as PluginManifest;
+
+                jest.spyOn(pluginRegistryService, 'get').mockReturnValue(normalPlugin);
+                jest.spyOn(userPluginRepository, 'findOne').mockResolvedValue(null);
+
+                await expect(
+                    service.enablePluginForDirectory('dir-1', 'test-plugin', 'user-1'),
+                ).rejects.toThrow(BadRequestException);
+            });
+
+            it('should reject non-autoEnabled plugin with disabled UserPluginEntity', async () => {
+                const normalPlugin = createRegisteredPlugin();
+                normalPlugin.manifest = {
+                    ...normalPlugin.manifest,
+                    autoEnable: false,
+                } as PluginManifest;
+
+                jest.spyOn(pluginRegistryService, 'get').mockReturnValue(normalPlugin);
+                jest.spyOn(userPluginRepository, 'findOne').mockResolvedValue({
+                    id: '1',
+                    userId: 'user-1',
+                    pluginId: 'test-plugin',
+                    enabled: false,
+                    settings: {},
+                    secretSettings: {},
+                    metadata: {},
+                } as any);
+
+                await expect(
+                    service.enablePluginForDirectory('dir-1', 'test-plugin', 'user-1'),
+                ).rejects.toThrow(BadRequestException);
+            });
+        });
+    });
 });

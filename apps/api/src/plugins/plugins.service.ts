@@ -317,11 +317,13 @@ export class PluginsService {
             );
         }
 
-        // Check if user has the plugin enabled
+        // Check if user has the plugin enabled (or plugin is autoEnabled)
         const userPlugin = await this.userPluginRepository.findOne({
             where: { userId, pluginId },
         });
-        if (!userPlugin || !userPlugin.enabled) {
+
+        const autoEnabled = registered.manifest?.autoEnable ?? false;
+        if (!autoEnabled && (!userPlugin || !userPlugin.enabled)) {
             throw new BadRequestException(
                 `Plugin "${pluginId}" must be enabled at user level first`,
             );
@@ -560,16 +562,21 @@ export class PluginsService {
 
     /**
      * Convert to user plugin response
+     *
+     * For plugins with autoEnable=true, they are considered installed and enabled
+     * even without a UserPluginEntity record (unless explicitly disabled).
      */
     private toUserPluginResponse(
         registered: RegisteredPlugin,
         userPlugin?: UserPluginEntity | null,
     ): UserPluginResponseDto {
         const baseResponse = this.toPluginResponse(registered);
+        const autoEnabled = registered.manifest?.autoEnable ?? false;
+
         return {
             ...baseResponse,
-            installed: !!userPlugin,
-            enabled: userPlugin?.enabled ?? false,
+            installed: !!userPlugin || autoEnabled,
+            enabled: userPlugin?.enabled ?? autoEnabled,
             settings: userPlugin
                 ? this.maskSecretSettings(userPlugin.settings, registered)
                 : undefined,
@@ -579,6 +586,9 @@ export class PluginsService {
 
     /**
      * Convert to directory plugin response
+     *
+     * For plugins with autoEnable=true, directoryEnabled defaults to true
+     * even without a DirectoryPluginEntity record (unless explicitly disabled).
      */
     private toDirectoryPluginResponse(
         registered: RegisteredPlugin,
@@ -586,9 +596,11 @@ export class PluginsService {
         directoryPlugin?: DirectoryPluginEntity | null,
     ): DirectoryPluginResponseDto {
         const userResponse = this.toUserPluginResponse(registered, userPlugin);
+        const autoEnabled = registered.manifest?.autoEnable ?? false;
+
         return {
             ...userResponse,
-            directoryEnabled: directoryPlugin?.enabled ?? false,
+            directoryEnabled: directoryPlugin?.enabled ?? autoEnabled,
             activeCapability: directoryPlugin?.activeCapability,
             directorySettings: directoryPlugin
                 ? this.maskSecretSettings(directoryPlugin.settings, registered)
