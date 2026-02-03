@@ -1186,6 +1186,158 @@ describe('PluginSettingsService', () => {
         });
     });
 
+    describe('stripMaskedPlaceholders', () => {
+        const createSchemaWithMaskedFields = (): JsonSchema =>
+            ({
+                type: 'object',
+                properties: {
+                    accessToken: {
+                        type: 'string',
+                        'x-secret': true,
+                        'x-masked': true,
+                    },
+                    apiKey: {
+                        type: 'string',
+                        'x-secret': true,
+                        'x-masked': true,
+                    },
+                    normalSetting: {
+                        type: 'string',
+                        default: 'default',
+                    },
+                },
+            }) as unknown as JsonSchema;
+
+        it('should strip masked placeholder on updateAdminSettings', async () => {
+            const schema = createSchemaWithMaskedFields();
+            const plugin = createMockPlugin(schema);
+            jest.spyOn(registry, 'get').mockReturnValue(createRegisteredPlugin(plugin));
+            jest.spyOn(pluginRepository, 'findByPluginId').mockResolvedValue({
+                id: '1',
+                pluginId: 'test-plugin',
+                settings: { normalSetting: 'old' },
+                secretSettings: { accessToken: 'real-token' },
+            } as any);
+
+            await service.updateAdminSettings('test-plugin', {
+                accessToken: '********',
+                normalSetting: 'new',
+            });
+
+            expect(pluginRepository.updateSettings).toHaveBeenCalledWith(
+                'test-plugin',
+                { normalSetting: 'new' },
+                { accessToken: 'real-token' },
+            );
+        });
+
+        it('should save actual new value when user changes masked field', async () => {
+            const schema = createSchemaWithMaskedFields();
+            const plugin = createMockPlugin(schema);
+            jest.spyOn(registry, 'get').mockReturnValue(createRegisteredPlugin(plugin));
+            jest.spyOn(pluginRepository, 'findByPluginId').mockResolvedValue({
+                id: '1',
+                pluginId: 'test-plugin',
+                settings: {},
+                secretSettings: { accessToken: 'old-token' },
+            } as any);
+
+            await service.updateAdminSettings('test-plugin', {
+                accessToken: 'new-actual-token',
+            });
+
+            expect(pluginRepository.updateSettings).toHaveBeenCalledWith(
+                'test-plugin',
+                {},
+                { accessToken: 'new-actual-token' },
+            );
+        });
+
+        it('should strip masked placeholder on updateUserSettings', async () => {
+            const schema = createSchemaWithMaskedFields();
+            const plugin = createMockPlugin(schema);
+            jest.spyOn(registry, 'get').mockReturnValue(createRegisteredPlugin(plugin));
+            jest.spyOn(pluginRepository, 'findByPluginId').mockResolvedValue({
+                id: '1',
+                pluginId: 'test-plugin',
+                settings: {},
+                secretSettings: {},
+            } as any);
+            jest.spyOn(userPluginRepository, 'findByUserAndPlugin').mockResolvedValue({
+                id: '1',
+                userId: 'user-1',
+                pluginId: 'test-plugin',
+                settings: {},
+                secretSettings: { accessToken: 'user-token' },
+            } as any);
+
+            await service.updateUserSettings('test-plugin', 'user-1', {
+                accessToken: '********',
+                normalSetting: 'updated',
+            });
+
+            expect(userPluginRepository.updateSettings).toHaveBeenCalledWith(
+                'user-1',
+                'test-plugin',
+                { normalSetting: 'updated' },
+                { accessToken: 'user-token' },
+            );
+        });
+
+        it('should strip masked placeholder on updateDirectorySettings', async () => {
+            const schema = createSchemaWithMaskedFields();
+            const plugin = createMockPlugin(schema);
+            jest.spyOn(registry, 'get').mockReturnValue(createRegisteredPlugin(plugin));
+            jest.spyOn(pluginRepository, 'findByPluginId').mockResolvedValue({
+                id: '1',
+                pluginId: 'test-plugin',
+                settings: {},
+                secretSettings: {},
+            } as any);
+            jest.spyOn(directoryPluginRepository, 'findByDirectoryAndPlugin').mockResolvedValue({
+                id: '1',
+                directoryId: 'dir-1',
+                pluginId: 'test-plugin',
+                settings: {},
+                secretSettings: { accessToken: 'dir-token' },
+            } as any);
+
+            await service.updateDirectorySettings('test-plugin', 'dir-1', {
+                accessToken: '********',
+                normalSetting: 'updated',
+            });
+
+            expect(directoryPluginRepository.updateSettings).toHaveBeenCalledWith(
+                'dir-1',
+                'test-plugin',
+                { normalSetting: 'updated' },
+                { accessToken: 'dir-token' },
+            );
+        });
+
+        it('should not strip "********" for non-masked fields', async () => {
+            const schema = createSchemaWithMaskedFields();
+            const plugin = createMockPlugin(schema);
+            jest.spyOn(registry, 'get').mockReturnValue(createRegisteredPlugin(plugin));
+            jest.spyOn(pluginRepository, 'findByPluginId').mockResolvedValue({
+                id: '1',
+                pluginId: 'test-plugin',
+                settings: { normalSetting: 'old' },
+                secretSettings: {},
+            } as any);
+
+            await service.updateAdminSettings('test-plugin', {
+                normalSetting: '********',
+            });
+
+            expect(pluginRepository.updateSettings).toHaveBeenCalledWith(
+                'test-plugin',
+                { normalSetting: '********' },
+                {},
+            );
+        });
+    });
+
     describe('x-envVar security filtering', () => {
         const createSchemaWithEnvVars = (): JsonSchema =>
             ({

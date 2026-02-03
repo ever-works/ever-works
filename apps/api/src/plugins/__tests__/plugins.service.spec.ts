@@ -595,6 +595,137 @@ describe('PluginsService', () => {
         });
     });
 
+    describe('stripMaskedPlaceholders', () => {
+        it('should strip masked placeholder from secretSettings on updateUserPluginSettings', async () => {
+            const registered = createRegisteredPlugin();
+            jest.spyOn(pluginRegistryService, 'get').mockReturnValue(registered);
+            jest.spyOn(userPluginRepository, 'findOne').mockResolvedValue({
+                id: '1',
+                userId: 'user-1',
+                pluginId: 'test-plugin',
+                enabled: true,
+                settings: { normalSetting: 'old-value' },
+                secretSettings: { maskedField: 'real-secret' },
+                metadata: {},
+            } as any);
+
+            await service.updateUserPluginSettings('test-plugin', 'user-1', undefined, {
+                maskedField: '********', // Should be stripped
+            });
+
+            expect(userPluginRepository.save).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    secretSettings: { maskedField: 'real-secret' }, // Not overwritten
+                }),
+            );
+        });
+
+        it('should save actual new value when user changes masked field', async () => {
+            const registered = createRegisteredPlugin();
+            jest.spyOn(pluginRegistryService, 'get').mockReturnValue(registered);
+            jest.spyOn(userPluginRepository, 'findOne').mockResolvedValue({
+                id: '1',
+                userId: 'user-1',
+                pluginId: 'test-plugin',
+                enabled: true,
+                settings: {},
+                secretSettings: { maskedField: 'old-secret' },
+                metadata: {},
+            } as any);
+
+            await service.updateUserPluginSettings('test-plugin', 'user-1', undefined, {
+                maskedField: 'new-actual-secret',
+            });
+
+            expect(userPluginRepository.save).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    secretSettings: { maskedField: 'new-actual-secret' },
+                }),
+            );
+        });
+
+        it('should strip masked placeholder on enablePluginForUser', async () => {
+            const registered = createRegisteredPlugin();
+            jest.spyOn(pluginRegistryService, 'get').mockReturnValue(registered);
+            jest.spyOn(pluginRepository, 'findOne').mockResolvedValue({
+                id: '1',
+                pluginId: 'test-plugin',
+            } as any);
+            jest.spyOn(userPluginRepository, 'findOne').mockResolvedValue(null);
+
+            await service.enablePluginForUser('test-plugin', 'user-1', undefined, {
+                maskedField: '********',
+            });
+
+            expect(userPluginRepository.save).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    secretSettings: {}, // maskedField was stripped
+                }),
+            );
+        });
+
+        it('should strip masked placeholder on updateDirectoryPluginSettings', async () => {
+            const registered = createRegisteredPlugin();
+            jest.spyOn(pluginRegistryService, 'get').mockReturnValue(registered);
+            jest.spyOn(userPluginRepository, 'findOne').mockResolvedValue({
+                id: '1',
+                userId: 'user-1',
+                pluginId: 'test-plugin',
+                enabled: true,
+                settings: {},
+                secretSettings: {},
+                metadata: {},
+            } as any);
+            jest.spyOn(directoryPluginRepository, 'findOne').mockResolvedValue({
+                id: '1',
+                directoryId: 'dir-1',
+                pluginId: 'test-plugin',
+                enabled: true,
+                settings: {},
+                secretSettings: { maskedField: 'original-secret' },
+                metadata: {},
+            } as any);
+
+            await service.updateDirectoryPluginSettings(
+                'dir-1',
+                'test-plugin',
+                'user-1',
+                undefined,
+                { maskedField: '********' },
+            );
+
+            expect(directoryPluginRepository.save).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    secretSettings: { maskedField: 'original-secret' },
+                }),
+            );
+        });
+
+        it('should not strip non-placeholder values for non-masked fields', async () => {
+            const registered = createRegisteredPlugin();
+            jest.spyOn(pluginRegistryService, 'get').mockReturnValue(registered);
+            jest.spyOn(userPluginRepository, 'findOne').mockResolvedValue({
+                id: '1',
+                userId: 'user-1',
+                pluginId: 'test-plugin',
+                enabled: true,
+                settings: { normalSetting: 'old' },
+                secretSettings: {},
+                metadata: {},
+            } as any);
+
+            await service.updateUserPluginSettings('test-plugin', 'user-1', {
+                normalSetting: '********', // Not a masked field, should be saved as-is
+            });
+
+            expect(userPluginRepository.save).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    settings: { normalSetting: '********' },
+                }),
+            );
+        });
+    });
+
     describe('autoEnable behavior', () => {
         describe('toUserPluginResponse with autoEnable', () => {
             it('should show autoEnabled plugin as installed and enabled without UserPluginEntity', async () => {

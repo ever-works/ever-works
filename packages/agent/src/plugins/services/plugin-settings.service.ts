@@ -15,6 +15,9 @@ import { DirectoryPluginRepository } from '../repositories/directory-plugin.repo
 import { PluginRegistryService } from './plugin-registry.service';
 import { PluginEvents, SETTING_SOURCE_PRIORITY } from '../plugins.constants';
 
+/** Placeholder for masked secrets in API responses */
+const MASKED_SECRET_PLACEHOLDER = '********';
+
 /**
  * Options for resolving settings
  */
@@ -153,16 +156,13 @@ export class PluginSettingsService {
             throw new Error(`Plugin "${pluginId}" not found`);
         }
 
-        // Extract setting definitions for scope and secret validation
-        const definitions = this.extractSettingDefinitions(registered.plugin.settingsSchema);
+        const schema = registered.plugin.settingsSchema;
+        const definitions = this.extractSettingDefinitions(schema);
 
-        // SECURITY: Filter out x-envVar fields - they must NEVER be stored in database
-        const filteredSettings = this.filterEnvVarFields(
-            settings,
-            registered.plugin.settingsSchema,
-        );
+        // Filter out x-envVar fields and masked placeholders
+        let filteredSettings = this.filterEnvVarFields(settings, schema);
+        filteredSettings = this.stripMaskedPlaceholders(filteredSettings, schema);
 
-        // Validate scope - admin can only set global or user-scoped settings
         const scopeValidation = this.validateSettingsScope(
             definitions,
             Object.keys(filteredSettings),
@@ -240,16 +240,13 @@ export class PluginSettingsService {
             throw new Error(`Plugin "${pluginId}" not found`);
         }
 
-        // Extract setting definitions for scope and secret validation
-        const definitions = this.extractSettingDefinitions(registered.plugin.settingsSchema);
+        const schema = registered.plugin.settingsSchema;
+        const definitions = this.extractSettingDefinitions(schema);
 
-        // SECURITY: Filter out x-envVar fields - they must NEVER be stored in database
-        const filteredSettings = this.filterEnvVarFields(
-            settings,
-            registered.plugin.settingsSchema,
-        );
+        // Filter out x-envVar fields and masked placeholders
+        let filteredSettings = this.filterEnvVarFields(settings, schema);
+        filteredSettings = this.stripMaskedPlaceholders(filteredSettings, schema);
 
-        // Validate scope - user can set global or user-scoped settings, not directory-only
         const scopeValidation = this.validateSettingsScope(
             definitions,
             Object.keys(filteredSettings),
@@ -342,16 +339,13 @@ export class PluginSettingsService {
             throw new Error(`Plugin "${pluginId}" not found`);
         }
 
-        // Extract setting definitions for scope and secret validation
-        const definitions = this.extractSettingDefinitions(registered.plugin.settingsSchema);
+        const schema = registered.plugin.settingsSchema;
+        const definitions = this.extractSettingDefinitions(schema);
 
-        // SECURITY: Filter out x-envVar fields - they must NEVER be stored in database
-        const filteredSettings = this.filterEnvVarFields(
-            settings,
-            registered.plugin.settingsSchema,
-        );
+        // Filter out x-envVar fields and masked placeholders
+        let filteredSettings = this.filterEnvVarFields(settings, schema);
+        filteredSettings = this.stripMaskedPlaceholders(filteredSettings, schema);
 
-        // Validate scope - directory can set any scope (most permissive level)
         const scopeValidation = this.validateSettingsScope(
             definitions,
             Object.keys(filteredSettings),
@@ -795,6 +789,27 @@ export class PluginSettingsService {
                 this.logger.warn(
                     `Rejecting x-envVar field "${key}" - must be set via environment variable`,
                 );
+                continue;
+            }
+            filtered[key] = value;
+        }
+        return filtered;
+    }
+
+    /**
+     * Strip masked placeholder values from settings based on schema x-masked fields.
+     */
+    private stripMaskedPlaceholders(
+        settings: Record<string, unknown>,
+        schema: JsonSchema,
+    ): Record<string, unknown> {
+        if (!schema.properties) return settings;
+
+        const filtered: Record<string, unknown> = {};
+        for (const [key, value] of Object.entries(settings)) {
+            const propSchema = schema.properties[key] as JsonSchema | undefined;
+            if (propSchema?.['x-masked'] && value === MASKED_SECRET_PLACEHOLDER) {
+                this.logger.debug(`Stripping masked placeholder for field "${key}"`);
                 continue;
             }
             filtered[key] = value;
