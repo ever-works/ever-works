@@ -10,7 +10,14 @@
 export { FacadesModule } from './facades.module';
 
 // Base Facade
-export { BaseFacadeService, type BaseFacadeOptions, type DefaultProviderInfo } from './base.facade';
+export {
+    BaseFacadeService,
+    FacadeError,
+    NoProviderError,
+    ProviderNotFoundError,
+    type BaseFacadeOptions,
+    type DefaultProviderInfo,
+} from './base.facade';
 
 // AI Facade
 export {
@@ -75,9 +82,6 @@ export {
     OAuthProviderNotFoundError,
     OAuthNotSupportedError,
 } from './oauth.facade';
-
-// Settings Utils
-export { getSettingTyped, getSettingWithDefault, type ExpectedSettingType } from './settings-utils';
 
 // Re-export facade types from plugin for convenience
 export type { FacadeExtractionOptions, FacadeExtractedContent } from '@ever-works/plugin';

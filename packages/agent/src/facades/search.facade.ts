@@ -9,30 +9,30 @@ import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
 import { DirectoryPluginRepository } from '../plugins/repositories/directory-plugin.repository';
-import { UserPluginRepository } from '../plugins/repositories/user-plugin.repository';
+import {
+    BaseFacadeService,
+    FacadeError,
+    NoProviderError,
+    ProviderNotFoundError,
+} from './base.facade';
 
-export class SearchFacadeError extends Error {
-    constructor(
-        message: string,
-        public readonly operation: string,
-        public readonly provider?: string,
-        public readonly cause?: Error,
-    ) {
-        super(message);
+export class SearchFacadeError extends FacadeError {
+    constructor(message: string, operation: string, provider?: string, cause?: Error) {
+        super(message, operation, provider, cause);
         this.name = 'SearchFacadeError';
     }
 }
 
-export class NoSearchProviderError extends SearchFacadeError {
+export class NoSearchProviderError extends NoProviderError {
     constructor() {
-        super('No search provider configured or available', 'getPlugin');
+        super('search');
         this.name = 'NoSearchProviderError';
     }
 }
 
-export class SearchProviderNotFoundError extends SearchFacadeError {
+export class SearchProviderNotFoundError extends ProviderNotFoundError {
     constructor(providerId: string) {
-        super(`Search provider not found: ${providerId}`, 'getPlugin', providerId);
+        super(providerId, 'Search');
         this.name = 'SearchProviderNotFoundError';
     }
 }
@@ -43,21 +43,18 @@ export interface ExtendedSearchFacadeOptions extends SearchFacadeOptions {
     providerOverride?: string;
 }
 
-/**
- * Search Facade - web search capabilities via plugin registry.
- * Uses three-level enable resolution: Directory > User > autoEnable.
- */
 @Injectable()
-export class SearchFacadeService implements ISearchFacade {
-    private readonly logger = new Logger(SearchFacadeService.name);
-    private readonly CAPABILITY = PLUGIN_CAPABILITIES.SEARCH;
+export class SearchFacadeService extends BaseFacadeService implements ISearchFacade {
+    protected readonly logger = new Logger(SearchFacadeService.name);
+    protected readonly CAPABILITY = PLUGIN_CAPABILITIES.SEARCH;
 
     constructor(
-        private readonly registry: PluginRegistryService,
-        private readonly settingsService: PluginSettingsService,
-        @Optional() private readonly directoryPluginRepository?: DirectoryPluginRepository,
-        @Optional() private readonly userPluginRepository?: UserPluginRepository,
-    ) {}
+        registry: PluginRegistryService,
+        settingsService: PluginSettingsService,
+        @Optional() directoryPluginRepository?: DirectoryPluginRepository,
+    ) {
+        super(registry, settingsService, directoryPluginRepository);
+    }
 
     async search(query: string, options?: SearchFacadeOptions): Promise<SearchFacadeResult[]> {
         const extendedOptions = options as ExtendedSearchFacadeOptions | undefined;
@@ -67,10 +64,9 @@ export class SearchFacadeService implements ISearchFacade {
             extendedOptions?.directoryId,
         );
 
-        const settings = await this.settingsService.getSettings(plugin.id, {
+        const settings = await this.getResolvedSettings(plugin.id, {
             userId: extendedOptions?.userId,
             directoryId: extendedOptions?.directoryId,
-            includeSecrets: true,
         });
 
         const response = await plugin.search({
@@ -89,12 +85,7 @@ export class SearchFacadeService implements ISearchFacade {
         }));
     }
 
-    isConfigured(): boolean {
-        const plugins = this.registry.getByCapability(this.CAPABILITY);
-        return plugins.length > 0 && plugins.some((p) => p.state === 'enabled');
-    }
-
-    getAvailableProviders(): Array<{ id: string; name: string; enabled: boolean }> {
+    override getAvailableProviders(): Array<{ id: string; name: string; enabled: boolean }> {
         const plugins = this.registry.getByCapability(this.CAPABILITY);
         return plugins.map((p) => ({
             id: p.plugin.id,
@@ -103,9 +94,7 @@ export class SearchFacadeService implements ISearchFacade {
         }));
     }
 
-    /**
-     * Resolution: override > directory default (activeCapability) > first enabled
-     */
+    // Resolution: override > directory default (activeCapability) > first enabled
     private async resolveSearchPlugin(
         providerOverride?: string,
         userId?: string,
@@ -124,99 +113,18 @@ export class SearchFacadeService implements ISearchFacade {
             throw new SearchProviderNotFoundError(providerOverride);
         }
 
-        if (directoryId && this.directoryPluginRepository) {
-            try {
-                const activePlugin = await this.directoryPluginRepository.findActiveByCapability(
-                    directoryId,
-                    this.CAPABILITY,
-                );
-                if (activePlugin) {
-                    const registered = this.registry.get(activePlugin.pluginId);
-                    if (registered && registered.state === 'enabled') {
-                        return registered.plugin as ISearchPlugin;
-                    }
-                }
-            } catch {
-                // Fall through
+        if (directoryId) {
+            const activePlugin = await this.findActivePluginForDirectory(directoryId);
+            if (activePlugin) {
+                return activePlugin.plugin as ISearchPlugin;
             }
         }
 
-        const plugins = this.registry.getByCapability(this.CAPABILITY);
-        for (const p of plugins) {
-            if (p.state !== 'enabled') continue;
-            const isEnabled = await this.isPluginEnabled(p.plugin.id, directoryId, userId);
-            if (isEnabled) return p.plugin as ISearchPlugin;
+        const enabledPlugins = await this.getEnabledPlugins(directoryId, userId);
+        if (enabledPlugins.length > 0) {
+            return enabledPlugins[0].plugin as ISearchPlugin;
         }
 
         throw new NoSearchProviderError();
-    }
-
-    /**
-     * Enable resolution: Directory (L2) > User (L1) > autoEnable
-     */
-    private async isPluginEnabled(
-        pluginId: string,
-        directoryId?: string,
-        userId?: string,
-    ): Promise<boolean> {
-        if (directoryId && this.directoryPluginRepository) {
-            try {
-                const dp = await this.directoryPluginRepository.findByDirectoryAndPlugin(
-                    directoryId,
-                    pluginId,
-                );
-                if (dp !== null) return dp.enabled;
-            } catch {
-                // Continue
-            }
-        }
-
-        if (userId && this.userPluginRepository) {
-            try {
-                const up = await this.userPluginRepository.findByUserAndPlugin(userId, pluginId);
-                if (up !== null) return up.enabled;
-            } catch {
-                // Continue
-            }
-        }
-
-        const registered = this.registry.get(pluginId);
-        return registered?.manifest?.autoEnable ?? true;
-    }
-
-    async getDefaultProvider(
-        directoryId?: string,
-        userId?: string,
-    ): Promise<{ id: string; name: string } | null> {
-        if (directoryId && this.directoryPluginRepository) {
-            try {
-                const activePlugin = await this.directoryPluginRepository.findActiveByCapability(
-                    directoryId,
-                    this.CAPABILITY,
-                );
-                if (activePlugin) {
-                    const registered = this.registry.get(activePlugin.pluginId);
-                    if (registered && registered.state === 'enabled') {
-                        return {
-                            id: registered.plugin.id,
-                            name: (registered.plugin as ISearchPlugin).providerName,
-                        };
-                    }
-                }
-            } catch {
-                // Fall through
-            }
-        }
-
-        const plugins = this.registry.getByCapability(this.CAPABILITY);
-        const enabled = plugins.find((p) => p.state === 'enabled');
-        if (enabled) {
-            return {
-                id: enabled.plugin.id,
-                name: (enabled.plugin as ISearchPlugin).providerName,
-            };
-        }
-
-        return null;
     }
 }

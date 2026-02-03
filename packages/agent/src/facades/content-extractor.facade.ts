@@ -9,30 +9,30 @@ import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
 import { DirectoryPluginRepository } from '../plugins/repositories/directory-plugin.repository';
-import { UserPluginRepository } from '../plugins/repositories/user-plugin.repository';
+import {
+    BaseFacadeService,
+    FacadeError,
+    NoProviderError,
+    ProviderNotFoundError,
+} from './base.facade';
 
-export class ContentExtractorFacadeError extends Error {
-    constructor(
-        message: string,
-        public readonly operation: string,
-        public readonly provider?: string,
-        public readonly cause?: Error,
-    ) {
-        super(message);
+export class ContentExtractorFacadeError extends FacadeError {
+    constructor(message: string, operation: string, provider?: string, cause?: Error) {
+        super(message, operation, provider, cause);
         this.name = 'ContentExtractorFacadeError';
     }
 }
 
-export class NoContentExtractorProviderError extends ContentExtractorFacadeError {
+export class NoContentExtractorProviderError extends NoProviderError {
     constructor() {
-        super('No content extractor provider configured or available', 'getPlugin');
+        super('content extractor');
         this.name = 'NoContentExtractorProviderError';
     }
 }
 
-export class ContentExtractorProviderNotFoundError extends ContentExtractorFacadeError {
+export class ContentExtractorProviderNotFoundError extends ProviderNotFoundError {
     constructor(providerId: string) {
-        super(`Content extractor provider not found: ${providerId}`, 'getPlugin', providerId);
+        super(providerId, 'Content extractor');
         this.name = 'ContentExtractorProviderNotFoundError';
     }
 }
@@ -42,22 +42,21 @@ export interface ExtendedFacadeExtractionOptions extends FacadeExtractionOptions
     directoryId?: string;
 }
 
-/**
- * Content Extractor Facade - unified content extraction from URLs.
- * Resolution: override > directory default > non-system extractors > system default.
- * Uses three-level enable resolution: Directory > User > autoEnable.
- */
 @Injectable()
-export class ContentExtractorFacadeService implements IContentExtractorFacade {
-    private readonly logger = new Logger(ContentExtractorFacadeService.name);
-    private readonly CAPABILITY = PLUGIN_CAPABILITIES.CONTENT_EXTRACTOR;
+export class ContentExtractorFacadeService
+    extends BaseFacadeService
+    implements IContentExtractorFacade
+{
+    protected readonly logger = new Logger(ContentExtractorFacadeService.name);
+    protected readonly CAPABILITY = PLUGIN_CAPABILITIES.CONTENT_EXTRACTOR;
 
     constructor(
-        private readonly registry: PluginRegistryService,
-        private readonly settingsService: PluginSettingsService,
-        @Optional() private readonly directoryPluginRepository?: DirectoryPluginRepository,
-        @Optional() private readonly userPluginRepository?: UserPluginRepository,
-    ) {}
+        registry: PluginRegistryService,
+        settingsService: PluginSettingsService,
+        @Optional() directoryPluginRepository?: DirectoryPluginRepository,
+    ) {
+        super(registry, settingsService, directoryPluginRepository);
+    }
 
     async extractContent(
         url: string,
@@ -73,10 +72,9 @@ export class ContentExtractorFacadeService implements IContentExtractorFacade {
                 extendedOptions?.directoryId,
             );
 
-            const settings = await this.settingsService.getSettings(plugin.id, {
+            const settings = await this.getResolvedSettings(plugin.id, {
                 userId: extendedOptions?.userId,
                 directoryId: extendedOptions?.directoryId,
-                includeSecrets: true,
             });
 
             const result = await plugin.extract({ url, settings });
@@ -98,12 +96,7 @@ export class ContentExtractorFacadeService implements IContentExtractorFacade {
         }
     }
 
-    isConfigured(): boolean {
-        const plugins = this.registry.getByCapability(this.CAPABILITY);
-        return plugins.length > 0 && plugins.some((p) => p.state === 'enabled');
-    }
-
-    getAvailableProviders(): Array<{ id: string; name: string; enabled: boolean }> {
+    override getAvailableProviders(): Array<{ id: string; name: string; enabled: boolean }> {
         const plugins = this.registry.getByCapability(this.CAPABILITY);
         return plugins.map((p) => ({
             id: p.plugin.id,
@@ -112,9 +105,7 @@ export class ContentExtractorFacadeService implements IContentExtractorFacade {
         }));
     }
 
-    /**
-     * Resolution: override > directory default > non-system > system default
-     */
+    // Resolution: override > directory default > non-system > system default > any enabled
     private async resolvePlugin(
         url: string,
         providerOverride?: string,
@@ -133,11 +124,9 @@ export class ContentExtractorFacadeService implements IContentExtractorFacade {
                 if (!isEnabled) throw new ContentExtractorProviderNotFoundError(providerOverride);
 
                 const plugin = registered.plugin as IContentExtractorPlugin;
-                // Check if plugin can handle this URL using optional canExtract method
                 if (typeof plugin.canExtract === 'function') {
                     try {
-                        const canHandle = await plugin.canExtract(url);
-                        if (!canHandle) {
+                        if (!(await plugin.canExtract(url))) {
                             this.logger.warn(
                                 `Override plugin ${providerOverride} cannot extract: ${url}`,
                             );
@@ -148,7 +137,6 @@ export class ContentExtractorFacadeService implements IContentExtractorFacade {
                         this.logger.warn(
                             `canExtract failed for ${providerOverride}: ${(err as Error).message}`,
                         );
-                        // Continue with the plugin if canExtract fails
                     }
                 }
                 return plugin;
@@ -157,34 +145,18 @@ export class ContentExtractorFacadeService implements IContentExtractorFacade {
         }
 
         // 2. Directory default via activeCapability
-        if (directoryId && this.directoryPluginRepository) {
-            try {
-                const activePlugin = await this.directoryPluginRepository.findActiveByCapability(
-                    directoryId,
-                    this.CAPABILITY,
-                );
-                if (activePlugin) {
-                    const registered = this.registry.get(activePlugin.pluginId);
-                    if (registered && registered.state === 'enabled') {
-                        const plugin = registered.plugin as IContentExtractorPlugin;
-                        // Check canExtract if the method exists
-                        if (typeof plugin.canExtract !== 'function') {
-                            return plugin;
-                        }
-                        try {
-                            if (await plugin.canExtract(url)) {
-                                return plugin;
-                            }
-                        } catch (err) {
-                            this.logger.warn(
-                                `canExtract failed for ${registered.plugin.id}: ${(err as Error).message}`,
-                            );
-                            // Fall through to try other plugins
-                        }
-                    }
+        if (directoryId) {
+            const activePlugin = await this.findActivePluginForDirectory(directoryId);
+            if (activePlugin) {
+                const plugin = activePlugin.plugin as IContentExtractorPlugin;
+                if (typeof plugin.canExtract !== 'function') return plugin;
+                try {
+                    if (await plugin.canExtract(url)) return plugin;
+                } catch (err) {
+                    this.logger.warn(
+                        `canExtract failed for ${activePlugin.plugin.id}: ${(err as Error).message}`,
+                    );
                 }
-            } catch {
-                // Fall through
             }
         }
 
@@ -203,11 +175,9 @@ export class ContentExtractorFacadeService implements IContentExtractorFacade {
             if (!isEnabled) continue;
 
             const plugin = registered.plugin as IContentExtractorPlugin;
-            // Check canExtract if the method exists
             if (typeof plugin.canExtract === 'function') {
                 try {
-                    const canHandle = await plugin.canExtract(url);
-                    if (!canHandle) continue;
+                    if (!(await plugin.canExtract(url))) continue;
                 } catch (err) {
                     this.logger.warn(
                         `canExtract failed for ${registered.plugin.id}: ${(err as Error).message}`,
@@ -218,22 +188,17 @@ export class ContentExtractorFacadeService implements IContentExtractorFacade {
             return plugin;
         }
 
-        // 4. System/default extractor (uses registry's default resolution)
+        // 4. System/default extractor
         const defaultExtractor = this.registry.getDefaultForCapability(this.CAPABILITY);
-
         if (defaultExtractor) {
             const plugin = defaultExtractor.plugin as IContentExtractorPlugin;
-            // Check canExtract if the method exists
             if (typeof plugin.canExtract === 'function') {
                 try {
-                    const canHandle = await plugin.canExtract(url);
-                    if (!canHandle) throw new NoContentExtractorProviderError();
+                    if (!(await plugin.canExtract(url)))
+                        throw new NoContentExtractorProviderError();
                 } catch (err) {
                     if (err instanceof NoContentExtractorProviderError) throw err;
-                    this.logger.warn(
-                        `canExtract failed for default extractor ${defaultExtractor.plugin.id}: ${(err as Error).message}`,
-                    );
-                    // Continue with the default extractor if canExtract fails
+                    this.logger.warn(`canExtract failed for default: ${(err as Error).message}`);
                 }
             }
             return plugin;
@@ -245,11 +210,9 @@ export class ContentExtractorFacadeService implements IContentExtractorFacade {
             if (!isEnabled) continue;
 
             const plugin = registered.plugin as IContentExtractorPlugin;
-            // Check canExtract if the method exists
             if (typeof plugin.canExtract === 'function') {
                 try {
-                    const canHandle = await plugin.canExtract(url);
-                    if (!canHandle) continue;
+                    if (!(await plugin.canExtract(url))) continue;
                 } catch (err) {
                     this.logger.warn(
                         `canExtract failed for ${registered.plugin.id}: ${(err as Error).message}`,
@@ -261,74 +224,5 @@ export class ContentExtractorFacadeService implements IContentExtractorFacade {
         }
 
         throw new NoContentExtractorProviderError();
-    }
-
-    /**
-     * Enable resolution: Directory (L2) > User (L1) > autoEnable
-     */
-    private async isPluginEnabled(
-        pluginId: string,
-        directoryId?: string,
-        userId?: string,
-    ): Promise<boolean> {
-        if (directoryId && this.directoryPluginRepository) {
-            try {
-                const dp = await this.directoryPluginRepository.findByDirectoryAndPlugin(
-                    directoryId,
-                    pluginId,
-                );
-                if (dp !== null) return dp.enabled;
-            } catch {
-                // Continue
-            }
-        }
-
-        if (userId && this.userPluginRepository) {
-            try {
-                const up = await this.userPluginRepository.findByUserAndPlugin(userId, pluginId);
-                if (up !== null) return up.enabled;
-            } catch {
-                // Continue
-            }
-        }
-
-        const registered = this.registry.get(pluginId);
-        return registered?.manifest?.autoEnable ?? true;
-    }
-
-    async getDefaultProvider(
-        directoryId?: string,
-        userId?: string,
-    ): Promise<{ id: string; name: string } | null> {
-        if (directoryId && this.directoryPluginRepository) {
-            try {
-                const activePlugin = await this.directoryPluginRepository.findActiveByCapability(
-                    directoryId,
-                    this.CAPABILITY,
-                );
-                if (activePlugin) {
-                    const registered = this.registry.get(activePlugin.pluginId);
-                    if (registered && registered.state === 'enabled') {
-                        return {
-                            id: registered.plugin.id,
-                            name: (registered.plugin as IContentExtractorPlugin).providerName,
-                        };
-                    }
-                }
-            } catch {
-                // Fall through
-            }
-        }
-
-        const plugins = this.registry.getByCapability(this.CAPABILITY);
-        const enabled = plugins.find((p) => p.state === 'enabled');
-        if (enabled) {
-            return {
-                id: enabled.plugin.id,
-                name: (enabled.plugin as IContentExtractorPlugin).providerName,
-            };
-        }
-
-        return null;
     }
 }

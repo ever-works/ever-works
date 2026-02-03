@@ -86,6 +86,7 @@ describe('ContentExtractorFacadeService', () => {
                         get: jest.fn(),
                         getByCapability: jest.fn().mockReturnValue([]),
                         getDefaultForCapability: jest.fn().mockReturnValue(undefined),
+                        isPluginEnabledForScope: jest.fn().mockResolvedValue(true),
                     },
                 },
                 {

@@ -2,11 +2,14 @@ import { Injectable, Logger } from '@nestjs/common';
 import { GitFacadeService, GitProviderInfo, OAuthFacadeService } from '@packages/agent/facades';
 import type { GitOrganization, GitUser, GitRepositoryWithPermissions } from '@ever-works/plugin';
 
+export type GitAuthMethod = 'oauth' | 'personal-access-token';
+
 export interface GitProviderConnectionInfo extends GitProviderInfo {
     connected: boolean;
     username?: string;
     email?: string;
     avatarUrl?: string;
+    authMethod?: GitAuthMethod;
 }
 
 @Injectable()
@@ -38,9 +41,13 @@ export class GitProviderService {
             };
         }
 
-        const hasCredentials = await this.oauthFacade.hasValidCredentials(userId, providerId);
+        // Check OAuth credentials first
+        const hasOAuthCredentials = await this.oauthFacade.hasValidCredentials(userId, providerId);
 
-        if (!hasCredentials) {
+        // Check for PAT credentials via GitFacade (which checks plugin settings)
+        const hasAnyCredentials = await this.gitFacade.hasValidCredentials({ userId, providerId });
+
+        if (!hasAnyCredentials) {
             return { ...provider, connected: false };
         }
 
@@ -52,6 +59,7 @@ export class GitProviderService {
                 username: user.login,
                 email: user.email,
                 avatarUrl: user.avatarUrl,
+                authMethod: hasOAuthCredentials ? 'oauth' : 'personal-access-token',
             };
         } catch (error) {
             this.logger.warn(`Failed to get user info for provider ${providerId}:`, error);
@@ -77,6 +85,7 @@ export class GitProviderService {
     }
 
     async hasValidCredentials(userId: string, providerId: string): Promise<boolean> {
-        return this.oauthFacade.hasValidCredentials(userId, providerId);
+        // Check both OAuth and PAT credentials via GitFacade
+        return this.gitFacade.hasValidCredentials({ userId, providerId });
     }
 }

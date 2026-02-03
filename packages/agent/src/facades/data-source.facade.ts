@@ -28,10 +28,6 @@ export class DataSourceFacadeError extends Error {
     }
 }
 
-/**
- * Data Source Facade - unified access to external data sources (Apify, etc.).
- * Uses three-level enable resolution: Directory > User > autoEnable.
- */
 @Injectable()
 export class DataSourceFacadeService implements IDataSourceFacade {
     private readonly logger = new Logger(DataSourceFacadeService.name);
@@ -179,16 +175,13 @@ export class DataSourceFacadeService implements IDataSourceFacade {
         });
     }
 
-    /**
-     * Enable resolution order: Directory (L2) > User (L1) > pluginConfig (L3) > autoEnable
-     */
     private async isPluginEnabledForDirectory(
         pluginId: string,
         directoryId?: string,
         userId?: string,
         pluginConfig?: Record<string, Record<string, unknown>>,
     ): Promise<boolean> {
-        // Level 2: DirectoryPlugin
+        // Resolution: Directory > User > pluginConfig > autoEnable
         if (directoryId && this.directoryPluginRepository) {
             try {
                 const directoryPlugin =
@@ -202,7 +195,6 @@ export class DataSourceFacadeService implements IDataSourceFacade {
             }
         }
 
-        // Level 1: UserPlugin
         if (userId && this.userPluginRepository) {
             try {
                 const userPlugin = await this.userPluginRepository.findByUserAndPlugin(
@@ -215,10 +207,8 @@ export class DataSourceFacadeService implements IDataSourceFacade {
             }
         }
 
-        // Level 3: pluginConfig
         if (pluginConfig?.[pluginId]?.enabled === true) return true;
 
-        // Fallback: autoEnable
         const registered = this.registry.get(pluginId);
         return registered?.manifest?.autoEnable ?? false;
     }
@@ -228,29 +218,14 @@ export class DataSourceFacadeService implements IDataSourceFacade {
         directoryId?: string,
         userId?: string,
     ): Promise<{ id: string; name: string } | null> {
-        if (directoryId && this.directoryPluginRepository) {
-            try {
-                const activePlugin = await this.directoryPluginRepository.findActiveByCapability(
-                    directoryId,
-                    capability,
-                );
-                if (activePlugin) {
-                    const registered = this.registry.get(activePlugin.pluginId);
-                    if (registered && registered.state === 'enabled') {
-                        return { id: registered.plugin.id, name: registered.plugin.name };
-                    }
-                }
-            } catch {
-                // Fall through
-            }
+        const registered = await this.registry.getDefaultForCapabilityScoped(
+            capability,
+            directoryId,
+            userId,
+        );
+        if (registered) {
+            return { id: registered.plugin.id, name: registered.plugin.name };
         }
-
-        const plugins = this.registry.getByCapability(capability);
-        const enabledPlugin = plugins.find((p) => p.state === 'enabled');
-        if (enabledPlugin) {
-            return { id: enabledPlugin.plugin.id, name: enabledPlugin.plugin.name };
-        }
-
         return null;
     }
 }

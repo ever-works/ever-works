@@ -12,7 +12,6 @@ import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
 import { DirectoryPluginRepository } from '../plugins/repositories/directory-plugin.repository';
-import { UserPluginRepository } from '../plugins/repositories/user-plugin.repository';
 import { BaseFacadeService, BaseFacadeOptions } from './base.facade';
 
 export class ScreenshotFacadeError extends Error {
@@ -43,14 +42,6 @@ export class ScreenshotProviderNotFoundError extends ScreenshotFacadeError {
 
 export interface ScreenshotFacadeOptions extends BaseFacadeOptions {}
 
-/**
- * Screenshot Facade - simple interface for capturing screenshots.
- *
- * Extends BaseFacadeService to inherit:
- * - Three-level enable resolution (Directory > User > Generation)
- * - Default provider resolution via activeCapability
- * - Settings resolution via 4-level hierarchy
- */
 @Injectable()
 export class ScreenshotFacadeService extends BaseFacadeService implements IScreenshotFacade {
     protected readonly logger = new Logger(ScreenshotFacadeService.name);
@@ -60,9 +51,8 @@ export class ScreenshotFacadeService extends BaseFacadeService implements IScree
         registry: PluginRegistryService,
         settingsService: PluginSettingsService,
         @Optional() directoryPluginRepository?: DirectoryPluginRepository,
-        @Optional() userPluginRepository?: UserPluginRepository,
     ) {
-        super(registry, settingsService, directoryPluginRepository, userPluginRepository);
+        super(registry, settingsService, directoryPluginRepository);
     }
 
     async capture(
@@ -141,7 +131,6 @@ export class ScreenshotFacadeService extends BaseFacadeService implements IScree
         return plugin.getScreenshotUrl(options);
     }
 
-    /** Alias for isConfigured() for interface compatibility */
     isAvailable(): boolean {
         return this.isConfigured();
     }
@@ -163,20 +152,12 @@ export class ScreenshotFacadeService extends BaseFacadeService implements IScree
         return (plugin as IScreenshotPlugin).providerName || plugin.name;
     }
 
-    /**
-     * Resolve which screenshot plugin to use.
-     *
-     * Resolution order:
-     * 1. Explicit provider override
-     * 2. Directory default (activeCapability)
-     * 3. First enabled screenshot provider that passes enable check
-     */
+    // Resolution: override > directory default > first enabled
     private async resolvePlugin(
         providerOverride?: string,
         userId?: string,
         directoryId?: string,
     ): Promise<IScreenshotPlugin> {
-        // 1. Explicit override
         if (providerOverride) {
             const registered = this.registry.get(providerOverride);
             if (
@@ -184,25 +165,17 @@ export class ScreenshotFacadeService extends BaseFacadeService implements IScree
                 registered.manifest.capabilities.includes(this.CAPABILITY) &&
                 registered.state === 'enabled'
             ) {
-                // Check if enabled for this context
                 const isEnabled = await this.isPluginEnabled(providerOverride, directoryId, userId);
-                if (isEnabled) {
-                    return registered.plugin as IScreenshotPlugin;
-                }
+                if (isEnabled) return registered.plugin as IScreenshotPlugin;
             }
             throw new ScreenshotProviderNotFoundError(providerOverride);
         }
 
-        // 2. Check for directory default via activeCapability
-        const activePlugin = directoryId
-            ? await this.findActivePluginForDirectory(directoryId)
-            : null;
-
-        if (activePlugin) {
-            return activePlugin.plugin as IScreenshotPlugin;
+        if (directoryId) {
+            const activePlugin = await this.findActivePluginForDirectory(directoryId);
+            if (activePlugin) return activePlugin.plugin as IScreenshotPlugin;
         }
 
-        // 3. Fall back to first enabled screenshot provider that passes enable check
         const enabledPlugins = await this.getEnabledPlugins(directoryId, userId);
         if (enabledPlugins.length > 0) {
             return enabledPlugins[0].plugin as IScreenshotPlugin;

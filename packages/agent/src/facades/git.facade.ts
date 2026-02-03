@@ -1,4 +1,4 @@
-import { Injectable, Optional } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import type {
     IGitProviderPlugin,
     GitRepository,
@@ -34,8 +34,7 @@ export interface FacadePushOptions {
     readonly maxRetries?: number;
 }
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
-import { DirectoryPluginRepository } from '../plugins/repositories/directory-plugin.repository';
-import { UserPluginRepository } from '../plugins/repositories/user-plugin.repository';
+import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
 import { OAuthTokenRepository } from '../database/repositories/oauth-token.repository';
 
 export class GitFacadeError extends Error {
@@ -95,8 +94,7 @@ export class GitFacadeService implements IGitFacade {
     constructor(
         private readonly registry: PluginRegistryService,
         private readonly oauthTokenRepository: OAuthTokenRepository,
-        @Optional() private readonly directoryPluginRepository?: DirectoryPluginRepository,
-        @Optional() private readonly userPluginRepository?: UserPluginRepository,
+        private readonly settingsService: PluginSettingsService,
     ) {}
 
     isConfigured(): boolean {
@@ -123,11 +121,23 @@ export class GitFacadeService implements IGitFacade {
                 options.userId,
                 options.directoryId,
             );
-            const token = await this.oauthTokenRepository.findByUserAndProvider(
+
+            // Check OAuth token first
+            const oauthToken = await this.oauthTokenRepository.findByUserAndProvider(
                 options.userId,
                 plugin.id,
             );
-            return token !== null && !this.oauthTokenRepository.isTokenExpired(token);
+            if (oauthToken && !this.oauthTokenRepository.isTokenExpired(oauthToken)) {
+                return true;
+            }
+
+            // Check plugin settings for PAT
+            const patToken = await this.getPatFromSettings(
+                plugin.id,
+                options.userId,
+                options.directoryId,
+            );
+            return !!patToken;
         } catch {
             return false;
         }
@@ -143,14 +153,18 @@ export class GitFacadeService implements IGitFacade {
                 options.userId,
                 options.directoryId,
             );
+
+            // Try OAuth token first
             const oauthToken = await this.oauthTokenRepository.findByUserAndProvider(
                 options.userId,
                 plugin.id,
             );
-            if (!oauthToken || this.oauthTokenRepository.isTokenExpired(oauthToken)) {
-                return null;
+            if (oauthToken && !this.oauthTokenRepository.isTokenExpired(oauthToken)) {
+                return oauthToken.accessToken;
             }
-            return oauthToken.accessToken;
+
+            // Try plugin settings for PAT
+            return this.getPatFromSettings(plugin.id, options.userId, options.directoryId);
         } catch {
             return null;
         }
@@ -165,24 +179,56 @@ export class GitFacadeService implements IGitFacade {
                 options.userId,
                 options.directoryId,
             );
+
+            // Try to get committer info from OAuth token first
             const oauthToken = await this.oauthTokenRepository.findByUserAndProvider(
                 options.userId,
                 plugin.id,
             );
-            if (!oauthToken) return null;
+            if (oauthToken) {
+                const username = oauthToken.metadata?.login || oauthToken.username;
+                const email = oauthToken.email;
+                if (username && email) {
+                    return { name: username, email };
+                }
+            }
 
-            const username = oauthToken.metadata?.login || oauthToken.username;
-            const email = oauthToken.email;
+            // For PAT-based auth, try to get committer info from plugin settings
+            const settings = await this.settingsService.getResolvedSettings(plugin.id, {
+                userId: options.userId,
+                directoryId: options.directoryId,
+                includeSecrets: false, // We don't need secrets, just user info
+            });
 
-            if (!username || !email) return null;
+            const gitUsername = settings.gitUsername?.value as string | undefined;
+            const gitEmail = settings.gitEmail?.value as string | undefined;
 
-            return { name: username, email };
+            if (gitUsername && gitEmail) {
+                return { name: gitUsername, email: gitEmail };
+            }
+
+            // If we have a PAT but no stored committer info, fetch from API
+            const patToken = await this.getPatFromSettings(
+                plugin.id,
+                options.userId,
+                options.directoryId,
+            );
+            if (patToken) {
+                try {
+                    const user = await plugin.getUser(patToken);
+                    if (user.login && user.email) {
+                        return { name: user.login, email: user.email };
+                    }
+                } catch {
+                    // Unable to fetch user info from API
+                }
+            }
+
+            return null;
         } catch {
             return null;
         }
     }
-
-    // User & Organization
 
     async getUser(options: GitFacadeOptions): Promise<GitUser> {
         const { plugin, token } = await this.resolvePluginAndToken(options);
@@ -193,8 +239,6 @@ export class GitFacadeService implements IGitFacade {
         const { plugin, token } = await this.resolvePluginAndToken(options);
         return plugin.getOrganizations(token);
     }
-
-    // Repository operations
 
     async getRepository(
         owner: string,
@@ -259,8 +303,6 @@ export class GitFacadeService implements IGitFacade {
         const repository = await plugin.getRepository(owner, repo, token);
         return repository !== null;
     }
-
-    // Fork & Template
 
     async forkRepository(
         owner: string,
@@ -328,8 +370,6 @@ export class GitFacadeService implements IGitFacade {
         return repository !== null;
     }
 
-    // Branch operations
-
     async listBranches(
         owner: string,
         repo: string,
@@ -386,8 +426,6 @@ export class GitFacadeService implements IGitFacade {
         }
         return null;
     }
-
-    // Content access methods (for analyzing repositories)
 
     async getFileContent(
         owner: string,
@@ -451,8 +489,6 @@ export class GitFacadeService implements IGitFacade {
         return null;
     }
 
-    // Pull Request operations
-
     async createPullRequest(
         prOptions: CreatePROptions,
         options: GitFacadeOptions,
@@ -484,8 +520,6 @@ export class GitFacadeService implements IGitFacade {
         const { plugin, token } = await this.resolvePluginAndToken(options);
         return plugin.mergePullRequest(owner, repo, prNumber, mergeOptions, token);
     }
-
-    // Local git operations
 
     async cloneOrPull(
         cloneOptions: FacadeCloneOptions,
@@ -554,8 +588,6 @@ export class GitFacadeService implements IGitFacade {
         return plugin.getStatus(dir);
     }
 
-    // URL building methods (provider-specific, synchronous)
-
     getCloneUrl(providerId: string, owner: string, repo: string): string {
         const plugin = this.getPluginSync(providerId);
         return plugin.getCloneUrl(owner, repo);
@@ -593,8 +625,6 @@ export class GitFacadeService implements IGitFacade {
         return plugin.removeLocalDir(owner, repo);
     }
 
-    // Provider resolution
-
     private async resolvePluginAndToken(
         options: GitFacadeOptions,
     ): Promise<{ plugin: IGitProviderPlugin; token: string }> {
@@ -604,30 +634,59 @@ export class GitFacadeService implements IGitFacade {
             options.directoryId,
         );
 
-        let token = options.token;
-        if (!token && options.userId) {
-            const oauthToken = await this.oauthTokenRepository.findByUserAndProvider(
-                options.userId,
-                plugin.id,
-            );
-            if (!oauthToken) {
-                throw new NoGitCredentialsError(plugin.id, options.userId);
-            }
-            if (this.oauthTokenRepository.isTokenExpired(oauthToken)) {
-                throw new NoGitCredentialsError(plugin.id, options.userId);
-            }
-            token = oauthToken.accessToken;
+        // If token provided directly, use it
+        if (options.token) {
+            return { plugin, token: options.token };
         }
 
-        if (!token) {
+        if (!options.userId) {
             throw new GitFacadeError(
-                'No token provided and no userId for OAuth lookup',
+                'No token provided and no userId for credential lookup',
                 'resolveToken',
                 plugin.id,
             );
         }
 
-        return { plugin, token };
+        // 1. Try OAuth token first (for OAuth-based plugins like GitHub)
+        const oauthToken = await this.oauthTokenRepository.findByUserAndProvider(
+            options.userId,
+            plugin.id,
+        );
+        if (oauthToken && !this.oauthTokenRepository.isTokenExpired(oauthToken)) {
+            return { plugin, token: oauthToken.accessToken };
+        }
+
+        // 2. Try plugin user settings (for PAT-based plugins like GitLab)
+        const patToken = await this.getPatFromSettings(
+            plugin.id,
+            options.userId,
+            options.directoryId,
+        );
+        if (patToken) {
+            return { plugin, token: patToken };
+        }
+
+        throw new NoGitCredentialsError(plugin.id, options.userId);
+    }
+
+    /**
+     * Get Personal Access Token from plugin settings
+     */
+    private async getPatFromSettings(
+        pluginId: string,
+        userId: string,
+        directoryId?: string,
+    ): Promise<string | null> {
+        try {
+            const settings = await this.settingsService.getResolvedSettings(pluginId, {
+                userId,
+                directoryId,
+                includeSecrets: true,
+            });
+            return (settings.accessToken?.value as string) || null;
+        } catch {
+            return null;
+        }
     }
 
     private async resolvePlugin(
@@ -645,41 +704,15 @@ export class GitFacadeService implements IGitFacade {
             registered.manifest.capabilities.includes(this.CAPABILITY) &&
             registered.state === 'enabled'
         ) {
-            const isEnabled = await this.isPluginEnabled(providerId, directoryId, userId);
+            const isEnabled = await this.registry.isPluginEnabledForScope(
+                providerId,
+                directoryId,
+                userId,
+            );
             if (isEnabled) {
                 return registered.plugin as IGitProviderPlugin;
             }
         }
         throw new GitProviderNotFoundError(providerId);
-    }
-
-    private async isPluginEnabled(
-        pluginId: string,
-        directoryId?: string,
-        userId?: string,
-    ): Promise<boolean> {
-        if (directoryId && this.directoryPluginRepository) {
-            try {
-                const dp = await this.directoryPluginRepository.findByDirectoryAndPlugin(
-                    directoryId,
-                    pluginId,
-                );
-                if (dp !== null) return dp.enabled;
-            } catch {
-                // Continue
-            }
-        }
-
-        if (userId && this.userPluginRepository) {
-            try {
-                const up = await this.userPluginRepository.findByUserAndPlugin(userId, pluginId);
-                if (up !== null) return up.enabled;
-            } catch {
-                // Continue
-            }
-        }
-
-        const registered = this.registry.get(pluginId);
-        return registered?.manifest?.autoEnable ?? true;
     }
 }

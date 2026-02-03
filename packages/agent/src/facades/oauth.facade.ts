@@ -44,12 +44,6 @@ export class OAuthNotSupportedError extends OAuthFacadeError {
     }
 }
 
-/**
- * OAuth Facade Service for managing OAuth connections across all OAuth-capable plugins.
- *
- * This facade is decoupled from git-provider, allowing ANY plugin with OAuth capability
- * to use OAuth authentication (e.g., Slack, Notion, Salesforce, GitHub, etc.).
- */
 @Injectable()
 export class OAuthFacadeService implements IOAuthFacade {
     private readonly CAPABILITY = PLUGIN_CAPABILITIES.OAUTH;
@@ -59,17 +53,11 @@ export class OAuthFacadeService implements IOAuthFacade {
         private readonly oauthTokenRepository: OAuthTokenRepository,
     ) {}
 
-    /**
-     * Check if any OAuth provider is configured and available.
-     */
     isConfigured(): boolean {
         const plugins = this.registry.getByCapability(this.CAPABILITY);
         return plugins.length > 0 && plugins.some((p) => p.state === 'enabled');
     }
 
-    /**
-     * Get list of available OAuth providers.
-     */
     getAvailableProviders(): OAuthProviderInfo[] {
         const plugins = this.registry.getByCapability(this.CAPABILITY);
         return plugins.map((p) => ({
@@ -79,17 +67,11 @@ export class OAuthFacadeService implements IOAuthFacade {
         }));
     }
 
-    /**
-     * Get the OAuth authorization URL for a provider.
-     */
     getAuthorizationUrl(providerId: string, state: string, config?: Partial<OAuthConfig>): string {
         const plugin = this.getPluginSync(providerId);
         return plugin.getAuthorizationUrl(state, config);
     }
 
-    /**
-     * Exchange an authorization code for an access token.
-     */
     async exchangeCodeForToken(
         providerId: string,
         code: string,
@@ -99,19 +81,20 @@ export class OAuthFacadeService implements IOAuthFacade {
         return plugin.exchangeCodeForToken(code, config);
     }
 
-    /**
-     * Get the authenticated user information using an access token.
-     */
     async getAuthenticatedUser(providerId: string, token: string): Promise<OAuthUser> {
         const plugin = this.getPluginSync(providerId);
         return plugin.getAuthenticatedUser(token);
     }
 
-    /**
-     * Check if a user has valid OAuth credentials for a provider.
-     */
     async hasValidCredentials(userId: string, providerId: string): Promise<boolean> {
         try {
+            const isEnabled = await this.registry.isPluginEnabledForScope(
+                providerId,
+                undefined,
+                userId,
+            );
+            if (!isEnabled) return false;
+
             const token = await this.oauthTokenRepository.findByUserAndProvider(userId, providerId);
             return token !== null && !this.oauthTokenRepository.isTokenExpired(token);
         } catch {
@@ -119,11 +102,15 @@ export class OAuthFacadeService implements IOAuthFacade {
         }
     }
 
-    /**
-     * Get the access token for a user and provider.
-     */
     async getAccessToken(userId: string, providerId: string): Promise<string | null> {
         try {
+            const isEnabled = await this.registry.isPluginEnabledForScope(
+                providerId,
+                undefined,
+                userId,
+            );
+            if (!isEnabled) return null;
+
             const oauthToken = await this.oauthTokenRepository.findByUserAndProvider(
                 userId,
                 providerId,
@@ -137,11 +124,14 @@ export class OAuthFacadeService implements IOAuthFacade {
         }
     }
 
-    /**
-     * Revoke/delete OAuth token for a user and provider.
-     */
     async revokeToken(userId: string, providerId: string): Promise<void> {
-        // Try to call provider's revokeToken if available
+        const isEnabled = await this.registry.isPluginEnabledForScope(
+            providerId,
+            undefined,
+            userId,
+        );
+        if (!isEnabled) return;
+
         try {
             const plugin = this.getPluginSync(providerId);
             const token = await this.oauthTokenRepository.findByUserAndProvider(userId, providerId);
@@ -152,15 +142,9 @@ export class OAuthFacadeService implements IOAuthFacade {
             // Continue even if remote revocation fails
         }
 
-        // Always delete from local storage
         await this.oauthTokenRepository.deleteByUserAndProvider(userId, providerId);
     }
 
-    /**
-     * Get OAuth plugin synchronously by provider ID.
-     * @throws OAuthProviderNotFoundError if provider is not found or not enabled
-     * @throws OAuthNotSupportedError if plugin doesn't have OAuth capability
-     */
     private getPluginSync(providerId: string): IOAuthPlugin {
         const plugins = this.registry.getByCapability(this.CAPABILITY);
 

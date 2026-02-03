@@ -350,7 +350,8 @@ export class PluginRegistryService {
         return result;
     }
 
-    private async isPluginEnabledForScope(
+    /** Check if plugin is enabled for scope. Resolution: Directory > User > autoEnable */
+    async isPluginEnabledForScope(
         pluginId: string,
         directoryId?: string,
         userId?: string,

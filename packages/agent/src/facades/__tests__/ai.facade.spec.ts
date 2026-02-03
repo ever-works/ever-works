@@ -95,6 +95,7 @@ describe('AiFacadeService', () => {
                     useValue: {
                         get: jest.fn(),
                         getByCapability: jest.fn().mockReturnValue([]),
+                        isPluginEnabledForScope: jest.fn().mockResolvedValue(true),
                     },
                 },
                 {

@@ -63,6 +63,7 @@ describe('OAuthFacadeService', () => {
         registry = {
             getByCapability: jest.fn().mockReturnValue([]),
             get: jest.fn(),
+            isPluginEnabledForScope: jest.fn().mockResolvedValue(true),
         } as any;
 
         oauthTokenRepository = {

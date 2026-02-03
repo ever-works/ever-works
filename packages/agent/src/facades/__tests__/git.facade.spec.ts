@@ -10,9 +10,9 @@ import {
     PluginRegistryService,
     type RegisteredPlugin,
 } from '../../plugins/services/plugin-registry.service';
-import { DirectoryPluginRepository } from '../../plugins/repositories/directory-plugin.repository';
-import { UserPluginRepository } from '../../plugins/repositories/user-plugin.repository';
+import { PluginSettingsService } from '../../plugins/services/plugin-settings.service';
 import { OAuthTokenRepository } from '../../database/repositories/oauth-token.repository';
+import type { ResolvedSettings } from '@ever-works/plugin';
 import type {
     IGitProviderPlugin,
     IOAuthPlugin,
@@ -30,8 +30,7 @@ describe('GitFacadeService', () => {
     let service: GitFacadeService;
     let registry: jest.Mocked<PluginRegistryService>;
     let oauthTokenRepository: jest.Mocked<OAuthTokenRepository>;
-    let directoryPluginRepository: jest.Mocked<DirectoryPluginRepository>;
-    let userPluginRepository: jest.Mocked<UserPluginRepository>;
+    let settingsService: jest.Mocked<PluginSettingsService>;
 
     const createMockGitPlugin = (
         id: string,
@@ -237,6 +236,23 @@ describe('GitFacadeService', () => {
             ...overrides,
         }) as any;
 
+    const createMockResolvedSetting = (
+        key: string,
+        value: unknown,
+        source: 'default' | 'env' | 'admin' | 'user' | 'directory' = 'user',
+    ) => ({
+        key,
+        value,
+        source,
+        isFallback: false,
+    });
+
+    const createMockResolvedSettings = (
+        overrides: Partial<ResolvedSettings> = {},
+    ): ResolvedSettings => ({
+        ...overrides,
+    });
+
     beforeEach(async () => {
         const module: TestingModule = await Test.createTestingModule({
             providers: [
@@ -246,6 +262,7 @@ describe('GitFacadeService', () => {
                     useValue: {
                         get: jest.fn(),
                         getByCapability: jest.fn().mockReturnValue([]),
+                        isPluginEnabledForScope: jest.fn().mockResolvedValue(true),
                     },
                 },
                 {
@@ -256,15 +273,9 @@ describe('GitFacadeService', () => {
                     },
                 },
                 {
-                    provide: DirectoryPluginRepository,
+                    provide: PluginSettingsService,
                     useValue: {
-                        findByDirectoryAndPlugin: jest.fn(),
-                    },
-                },
-                {
-                    provide: UserPluginRepository,
-                    useValue: {
-                        findByUserAndPlugin: jest.fn(),
+                        getResolvedSettings: jest.fn().mockResolvedValue({}),
                     },
                 },
             ],
@@ -273,8 +284,7 @@ describe('GitFacadeService', () => {
         service = module.get<GitFacadeService>(GitFacadeService);
         registry = module.get(PluginRegistryService);
         oauthTokenRepository = module.get(OAuthTokenRepository);
-        directoryPluginRepository = module.get(DirectoryPluginRepository);
-        userPluginRepository = module.get(UserPluginRepository);
+        settingsService = module.get(PluginSettingsService);
     });
 
     describe('isConfigured', () => {
@@ -1187,18 +1197,14 @@ describe('GitFacadeService', () => {
             expect(result.login).toBe('testuser');
         });
 
-        it('should respect directory-level enable/disable', async () => {
+        it('should respect directory-level enable/disable via registry', async () => {
             const gitPlugin = createMockGitPlugin('github', 'GitHub');
             const registered = createRegisteredPlugin(gitPlugin, {
                 capabilities: [PLUGIN_CAPABILITIES.GIT_PROVIDER],
             });
             registry.get.mockReturnValue(registered);
             registry.getByCapability.mockReturnValue([registered]);
-
-            // Directory-level disabled
-            directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue({
-                enabled: false,
-            } as any);
+            registry.isPluginEnabledForScope.mockResolvedValue(false);
 
             await expect(
                 service.getUser({
@@ -1209,20 +1215,14 @@ describe('GitFacadeService', () => {
             ).rejects.toThrow(GitProviderNotFoundError);
         });
 
-        it('should respect user-level enable/disable', async () => {
+        it('should respect user-level enable/disable via registry', async () => {
             const gitPlugin = createMockGitPlugin('github', 'GitHub');
             const registered = createRegisteredPlugin(gitPlugin, {
                 capabilities: [PLUGIN_CAPABILITIES.GIT_PROVIDER],
             });
             registry.get.mockReturnValue(registered);
             registry.getByCapability.mockReturnValue([registered]);
-
-            // No directory setting
-            directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue(null);
-            // User-level disabled
-            userPluginRepository.findByUserAndPlugin.mockResolvedValue({
-                enabled: false,
-            } as any);
+            registry.isPluginEnabledForScope.mockResolvedValue(false);
 
             await expect(
                 service.getUser({
@@ -1233,7 +1233,7 @@ describe('GitFacadeService', () => {
             ).rejects.toThrow(GitProviderNotFoundError);
         });
 
-        it('should fallback to autoEnable when no explicit setting', async () => {
+        it('should use plugin when registry returns enabled', async () => {
             const gitPlugin = createMockGitPlugin('github', 'GitHub');
             const registered = createRegisteredPlugin(gitPlugin, {
                 capabilities: [PLUGIN_CAPABILITIES.GIT_PROVIDER],
@@ -1241,10 +1241,7 @@ describe('GitFacadeService', () => {
             });
             registry.get.mockReturnValue(registered);
             registry.getByCapability.mockReturnValue([registered]);
-
-            // No directory or user settings
-            directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue(null);
-            userPluginRepository.findByUserAndPlugin.mockResolvedValue(null);
+            registry.isPluginEnabledForScope.mockResolvedValue(true);
 
             const result = await service.getUser({
                 providerId: 'github',
@@ -1299,7 +1296,7 @@ describe('GitFacadeService', () => {
             );
         });
 
-        it('should throw NoGitCredentialsError when no token found', async () => {
+        it('should throw NoGitCredentialsError when no token found and no PAT', async () => {
             const gitPlugin = createMockGitPlugin('github', 'GitHub');
             const registered = createRegisteredPlugin(gitPlugin, {
                 capabilities: [PLUGIN_CAPABILITIES.GIT_PROVIDER],
@@ -1308,6 +1305,7 @@ describe('GitFacadeService', () => {
             registry.getByCapability.mockReturnValue([registered]);
 
             oauthTokenRepository.findByUserAndProvider.mockResolvedValue(null);
+            settingsService.getResolvedSettings.mockResolvedValue(createMockResolvedSettings({}));
 
             await expect(
                 service.getUser({
@@ -1317,7 +1315,7 @@ describe('GitFacadeService', () => {
             ).rejects.toThrow(NoGitCredentialsError);
         });
 
-        it('should throw NoGitCredentialsError when token is expired', async () => {
+        it('should throw NoGitCredentialsError when token is expired and no PAT', async () => {
             const gitPlugin = createMockGitPlugin('github', 'GitHub');
             const registered = createRegisteredPlugin(gitPlugin, {
                 capabilities: [PLUGIN_CAPABILITIES.GIT_PROVIDER],
@@ -1327,6 +1325,7 @@ describe('GitFacadeService', () => {
 
             oauthTokenRepository.findByUserAndProvider.mockResolvedValue(createMockOAuthToken());
             oauthTokenRepository.isTokenExpired.mockReturnValue(true);
+            settingsService.getResolvedSettings.mockResolvedValue(createMockResolvedSettings({}));
 
             await expect(
                 service.getUser({
@@ -1349,6 +1348,227 @@ describe('GitFacadeService', () => {
                     providerId: 'github',
                 }),
             ).rejects.toThrow(GitFacadeError);
+        });
+    });
+
+    describe('PAT fallback', () => {
+        it('should use PAT from plugin settings when no OAuth token exists', async () => {
+            const gitPlugin = createMockGitPlugin('gitlab', 'GitLab', false);
+            const registered = createRegisteredPlugin(gitPlugin, {
+                capabilities: [PLUGIN_CAPABILITIES.GIT_PROVIDER],
+            });
+            registry.get.mockReturnValue(registered);
+            registry.getByCapability.mockReturnValue([registered]);
+
+            oauthTokenRepository.findByUserAndProvider.mockResolvedValue(null);
+            settingsService.getResolvedSettings.mockResolvedValue(
+                createMockResolvedSettings({
+                    accessToken: createMockResolvedSetting('accessToken', 'pat-token-123', 'user'),
+                }),
+            );
+
+            await service.getUser({
+                providerId: 'gitlab',
+                userId: 'user-123',
+            });
+
+            expect(gitPlugin.getUser).toHaveBeenCalledWith('pat-token-123');
+        });
+
+        it('should use PAT when OAuth token is expired', async () => {
+            const gitPlugin = createMockGitPlugin('gitlab', 'GitLab', false);
+            const registered = createRegisteredPlugin(gitPlugin, {
+                capabilities: [PLUGIN_CAPABILITIES.GIT_PROVIDER],
+            });
+            registry.get.mockReturnValue(registered);
+            registry.getByCapability.mockReturnValue([registered]);
+
+            oauthTokenRepository.findByUserAndProvider.mockResolvedValue(createMockOAuthToken());
+            oauthTokenRepository.isTokenExpired.mockReturnValue(true);
+            settingsService.getResolvedSettings.mockResolvedValue(
+                createMockResolvedSettings({
+                    accessToken: createMockResolvedSetting('accessToken', 'pat-token-456', 'user'),
+                }),
+            );
+
+            await service.getUser({
+                providerId: 'gitlab',
+                userId: 'user-123',
+            });
+
+            expect(gitPlugin.getUser).toHaveBeenCalledWith('pat-token-456');
+        });
+
+        it('should prefer OAuth token over PAT when both are available', async () => {
+            const gitPlugin = createMockGitPlugin('github', 'GitHub');
+            const registered = createRegisteredPlugin(gitPlugin, {
+                capabilities: [PLUGIN_CAPABILITIES.GIT_PROVIDER],
+            });
+            registry.get.mockReturnValue(registered);
+            registry.getByCapability.mockReturnValue([registered]);
+
+            const mockToken = createMockOAuthToken({ accessToken: 'oauth-token' });
+            oauthTokenRepository.findByUserAndProvider.mockResolvedValue(mockToken);
+            oauthTokenRepository.isTokenExpired.mockReturnValue(false);
+            settingsService.getResolvedSettings.mockResolvedValue(
+                createMockResolvedSettings({
+                    accessToken: createMockResolvedSetting('accessToken', 'pat-token', 'user'),
+                }),
+            );
+
+            await service.getUser({
+                providerId: 'github',
+                userId: 'user-123',
+            });
+
+            expect(gitPlugin.getUser).toHaveBeenCalledWith('oauth-token');
+        });
+
+        it('should throw NoGitCredentialsError when neither OAuth nor PAT available', async () => {
+            const gitPlugin = createMockGitPlugin('gitlab', 'GitLab', false);
+            const registered = createRegisteredPlugin(gitPlugin, {
+                capabilities: [PLUGIN_CAPABILITIES.GIT_PROVIDER],
+            });
+            registry.get.mockReturnValue(registered);
+            registry.getByCapability.mockReturnValue([registered]);
+
+            oauthTokenRepository.findByUserAndProvider.mockResolvedValue(null);
+            settingsService.getResolvedSettings.mockResolvedValue(createMockResolvedSettings({}));
+
+            await expect(
+                service.getUser({
+                    providerId: 'gitlab',
+                    userId: 'user-123',
+                }),
+            ).rejects.toThrow(NoGitCredentialsError);
+        });
+
+        it('hasValidCredentials should return true when PAT exists in settings', async () => {
+            const gitPlugin = createMockGitPlugin('gitlab', 'GitLab', false);
+            const registered = createRegisteredPlugin(gitPlugin, {
+                capabilities: [PLUGIN_CAPABILITIES.GIT_PROVIDER],
+            });
+            registry.get.mockReturnValue(registered);
+            registry.getByCapability.mockReturnValue([registered]);
+
+            oauthTokenRepository.findByUserAndProvider.mockResolvedValue(null);
+            settingsService.getResolvedSettings.mockResolvedValue(
+                createMockResolvedSettings({
+                    accessToken: createMockResolvedSetting('accessToken', 'pat-token', 'user'),
+                }),
+            );
+
+            const result = await service.hasValidCredentials({
+                providerId: 'gitlab',
+                userId: 'user-123',
+            });
+
+            expect(result).toBe(true);
+        });
+
+        it('getAccessToken should return PAT when OAuth is not available', async () => {
+            const gitPlugin = createMockGitPlugin('gitlab', 'GitLab', false);
+            const registered = createRegisteredPlugin(gitPlugin, {
+                capabilities: [PLUGIN_CAPABILITIES.GIT_PROVIDER],
+            });
+            registry.get.mockReturnValue(registered);
+            registry.getByCapability.mockReturnValue([registered]);
+
+            oauthTokenRepository.findByUserAndProvider.mockResolvedValue(null);
+            settingsService.getResolvedSettings.mockResolvedValue(
+                createMockResolvedSettings({
+                    accessToken: createMockResolvedSetting('accessToken', 'pat-token-789', 'user'),
+                }),
+            );
+
+            const result = await service.getAccessToken({
+                providerId: 'gitlab',
+                userId: 'user-123',
+            });
+
+            expect(result).toBe('pat-token-789');
+        });
+
+        it('getCommitter should return committer info from plugin settings', async () => {
+            const gitPlugin = createMockGitPlugin('gitlab', 'GitLab', false);
+            const registered = createRegisteredPlugin(gitPlugin, {
+                capabilities: [PLUGIN_CAPABILITIES.GIT_PROVIDER],
+            });
+            registry.get.mockReturnValue(registered);
+            registry.getByCapability.mockReturnValue([registered]);
+
+            oauthTokenRepository.findByUserAndProvider.mockResolvedValue(null);
+            settingsService.getResolvedSettings.mockResolvedValue(
+                createMockResolvedSettings({
+                    gitUsername: createMockResolvedSetting('gitUsername', 'gitlab-user', 'user'),
+                    gitEmail: createMockResolvedSetting('gitEmail', 'gitlab@example.com', 'user'),
+                    accessToken: createMockResolvedSetting('accessToken', 'pat-token', 'user'),
+                }),
+            );
+
+            const result = await service.getCommitter({
+                providerId: 'gitlab',
+                userId: 'user-123',
+            });
+
+            expect(result).toEqual({ name: 'gitlab-user', email: 'gitlab@example.com' });
+        });
+
+        it('getCommitter should fetch from API when PAT exists but no stored committer info', async () => {
+            const gitPlugin = createMockGitPlugin('gitlab', 'GitLab', false);
+            const registered = createRegisteredPlugin(gitPlugin, {
+                capabilities: [PLUGIN_CAPABILITIES.GIT_PROVIDER],
+            });
+            registry.get.mockReturnValue(registered);
+            registry.getByCapability.mockReturnValue([registered]);
+
+            oauthTokenRepository.findByUserAndProvider.mockResolvedValue(null);
+            settingsService.getResolvedSettings.mockResolvedValue(
+                createMockResolvedSettings({
+                    accessToken: createMockResolvedSetting('accessToken', 'pat-token', 'user'),
+                }),
+            );
+
+            const result = await service.getCommitter({
+                providerId: 'gitlab',
+                userId: 'user-123',
+            });
+
+            expect(gitPlugin.getUser).toHaveBeenCalledWith('pat-token');
+            expect(result).toEqual({ name: 'testuser', email: 'test@example.com' });
+        });
+
+        it('should handle directory-scoped PAT settings', async () => {
+            const gitPlugin = createMockGitPlugin('gitlab', 'GitLab', false);
+            const registered = createRegisteredPlugin(gitPlugin, {
+                capabilities: [PLUGIN_CAPABILITIES.GIT_PROVIDER],
+            });
+            registry.get.mockReturnValue(registered);
+            registry.getByCapability.mockReturnValue([registered]);
+
+            oauthTokenRepository.findByUserAndProvider.mockResolvedValue(null);
+            settingsService.getResolvedSettings.mockResolvedValue(
+                createMockResolvedSettings({
+                    accessToken: createMockResolvedSetting(
+                        'accessToken',
+                        'directory-pat-token',
+                        'directory',
+                    ),
+                }),
+            );
+
+            await service.getUser({
+                providerId: 'gitlab',
+                userId: 'user-123',
+                directoryId: 'dir-123',
+            });
+
+            expect(settingsService.getResolvedSettings).toHaveBeenCalledWith('gitlab', {
+                userId: 'user-123',
+                directoryId: 'dir-123',
+                includeSecrets: true,
+            });
+            expect(gitPlugin.getUser).toHaveBeenCalledWith('directory-pat-token');
         });
     });
 

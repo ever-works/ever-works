@@ -73,6 +73,8 @@ describe('DataSourceFacadeService', () => {
                     useValue: {
                         get: jest.fn(),
                         getByCapability: jest.fn().mockReturnValue([]),
+                        isPluginEnabledForScope: jest.fn().mockResolvedValue(true),
+                        getDefaultForCapabilityScoped: jest.fn().mockResolvedValue(undefined),
                     },
                 },
                 {
@@ -865,43 +867,26 @@ describe('DataSourceFacadeService', () => {
     });
 
     describe('getDefaultProvider', () => {
-        it('should return default provider from activeCapability', async () => {
+        it('should return default provider from registry scoped resolution', async () => {
             const apify = createMockDataSourcePlugin('apify-data-source', 'Apify');
             const registered = createRegisteredPlugin(apify, { capabilities: ['data-source'] });
-            registry.get.mockReturnValue(registered);
+            registry.getDefaultForCapabilityScoped.mockResolvedValue(registered);
 
-            // DirectoryPlugin has activeCapability set
-            directoryPluginRepository.findActiveByCapability.mockResolvedValue({
-                pluginId: 'apify-data-source',
-            } as any);
-
-            const result = await service.getDefaultProvider('data-source', 'dir-123');
+            const result = await service.getDefaultProvider('data-source', 'dir-123', 'user-123');
 
             expect(result).toEqual({
                 id: 'apify-data-source',
                 name: 'Apify Data Source',
             });
-        });
-
-        it('should fall back to first enabled plugin when no activeCapability', async () => {
-            const apify = createMockDataSourcePlugin('apify-data-source', 'Apify');
-            const registered = createRegisteredPlugin(apify, { capabilities: ['data-source'] });
-            registry.getByCapability.mockReturnValue([registered]);
-
-            // No activeCapability set
-            directoryPluginRepository.findActiveByCapability.mockResolvedValue(null);
-
-            const result = await service.getDefaultProvider('data-source', 'dir-123');
-
-            expect(result).toEqual({
-                id: 'apify-data-source',
-                name: 'Apify Data Source',
-            });
+            expect(registry.getDefaultForCapabilityScoped).toHaveBeenCalledWith(
+                'data-source',
+                'dir-123',
+                'user-123',
+            );
         });
 
         it('should return null when no providers exist', async () => {
-            registry.getByCapability.mockReturnValue([]);
-            directoryPluginRepository.findActiveByCapability.mockResolvedValue(null);
+            registry.getDefaultForCapabilityScoped.mockResolvedValue(undefined);
 
             const result = await service.getDefaultProvider('data-source', 'dir-123');
 

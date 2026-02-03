@@ -13,31 +13,30 @@ import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
 import { DirectoryPluginRepository } from '../plugins/repositories/directory-plugin.repository';
-import { UserPluginRepository } from '../plugins/repositories/user-plugin.repository';
-import { getSettingTyped } from './settings-utils';
+import {
+    BaseFacadeService,
+    FacadeError,
+    NoProviderError,
+    ProviderNotFoundError,
+} from './base.facade';
 
-export class AiFacadeError extends Error {
-    constructor(
-        message: string,
-        public readonly operation: string,
-        public readonly provider?: string,
-        public readonly cause?: Error,
-    ) {
-        super(message);
+export class AiFacadeError extends FacadeError {
+    constructor(message: string, operation: string, provider?: string, cause?: Error) {
+        super(message, operation, provider, cause);
         this.name = 'AiFacadeError';
     }
 }
 
-export class NoAiProviderError extends AiFacadeError {
+export class NoAiProviderError extends NoProviderError {
     constructor() {
-        super('No AI provider configured or available', 'getPlugin');
+        super('AI');
         this.name = 'NoAiProviderError';
     }
 }
 
-export class AiProviderNotFoundError extends AiFacadeError {
+export class AiProviderNotFoundError extends ProviderNotFoundError {
     constructor(providerId: string) {
-        super(`AI provider not found: ${providerId}`, 'getPlugin', providerId);
+        super(providerId, 'AI');
         this.name = 'AiProviderNotFoundError';
     }
 }
@@ -48,23 +47,19 @@ export interface AiFacadeOptions {
     providerOverride?: string;
 }
 
-/**
- * AI Facade service for pipeline steps.
- * Uses plugin registry for AI provider resolution with 4-level settings hierarchy.
- */
 @Injectable()
-export class AiFacadeService implements IAiFacade {
-    private readonly logger = new Logger(AiFacadeService.name);
-    private readonly CAPABILITY = PLUGIN_CAPABILITIES.AI_PROVIDER;
+export class AiFacadeService extends BaseFacadeService implements IAiFacade {
+    protected readonly logger = new Logger(AiFacadeService.name);
+    protected readonly CAPABILITY = PLUGIN_CAPABILITIES.AI_PROVIDER;
 
     constructor(
-        private readonly registry: PluginRegistryService,
-        private readonly settingsService: PluginSettingsService,
-        @Optional() private readonly directoryPluginRepository?: DirectoryPluginRepository,
-        @Optional() private readonly userPluginRepository?: UserPluginRepository,
-    ) {}
+        registry: PluginRegistryService,
+        settingsService: PluginSettingsService,
+        @Optional() directoryPluginRepository?: DirectoryPluginRepository,
+    ) {
+        super(registry, settingsService, directoryPluginRepository);
+    }
 
-    /** Send a prompt and get a structured JSON response. */
     async askJson<T>(
         promptTemplate: string,
         schema: z.ZodSchema<T>,
@@ -77,10 +72,9 @@ export class AiFacadeService implements IAiFacade {
             facadeOptions?.directoryId,
         );
 
-        const settings = await this.settingsService.getSettings(plugin.id, {
+        const settings = await this.getResolvedSettings(plugin.id, {
             userId: facadeOptions?.userId,
             directoryId: facadeOptions?.directoryId,
-            includeSecrets: true,
         });
 
         const model = this.resolveModel(plugin, settings, options?.routing);
@@ -104,7 +98,7 @@ export class AiFacadeService implements IAiFacade {
         let parsed: unknown;
         try {
             parsed = JSON.parse(content);
-        } catch (e) {
+        } catch {
             throw new AiFacadeError('Failed to parse AI response as JSON', 'askJson', plugin.id);
         }
 
@@ -139,28 +133,18 @@ export class AiFacadeService implements IAiFacade {
         modelId: string,
         usage?: { promptTokens: number; completionTokens: number; totalTokens: number },
     ): Promise<number | null> {
-        if (!usage) {
-            return null;
-        }
+        if (!usage) return null;
 
         try {
             const modelInfo = await plugin.getModel(modelId);
-            if (!modelInfo || !modelInfo.inputCostPer1k || !modelInfo.outputCostPer1k) {
-                return null;
-            }
+            if (!modelInfo?.inputCostPer1k || !modelInfo?.outputCostPer1k) return null;
 
             const inputCost = (usage.promptTokens * modelInfo.inputCostPer1k) / 1000;
             const outputCost = (usage.completionTokens * modelInfo.outputCostPer1k) / 1000;
-
             return inputCost + outputCost;
         } catch {
             return null;
         }
-    }
-
-    isConfigured(): boolean {
-        const plugins = this.registry.getByCapability(this.CAPABILITY);
-        return plugins.length > 0 && plugins.some((p) => p.state === 'enabled');
     }
 
     async testConnection(facadeOptions?: AiFacadeOptions): Promise<{
@@ -199,11 +183,7 @@ export class AiFacadeService implements IAiFacade {
         }
     }
 
-    getAvailableProviders(): Array<{
-        id: string;
-        name: string;
-        enabled: boolean;
-    }> {
+    override getAvailableProviders(): Array<{ id: string; name: string; enabled: boolean }> {
         const plugins = this.registry.getByCapability(this.CAPABILITY);
         return plugins.map((p) => ({
             id: p.plugin.id,
@@ -212,7 +192,7 @@ export class AiFacadeService implements IAiFacade {
         }));
     }
 
-    /** Resolve AI provider: providerOverride > directory default > user default > first enabled */
+    // Resolve AI provider: providerOverride > directory default > user default > first enabled
     private async resolvePlugin(
         providerOverride?: string,
         userId?: string,
@@ -226,9 +206,7 @@ export class AiFacadeService implements IAiFacade {
                 registered.state === 'enabled'
             ) {
                 const isEnabled = await this.isPluginEnabled(providerOverride, directoryId, userId);
-                if (isEnabled) {
-                    return registered.plugin as IAiProviderPlugin;
-                }
+                if (isEnabled) return registered.plugin as IAiProviderPlugin;
             }
             throw new AiProviderNotFoundError(providerOverride);
         }
@@ -239,9 +217,7 @@ export class AiFacadeService implements IAiFacade {
                 userId,
                 'directory',
             );
-            if (directoryProvider) {
-                return directoryProvider;
-            }
+            if (directoryProvider) return directoryProvider;
         }
 
         if (userId) {
@@ -250,51 +226,17 @@ export class AiFacadeService implements IAiFacade {
                 userId,
                 'user',
             );
-            if (userProvider) {
-                return userProvider;
-            }
+            if (userProvider) return userProvider;
         }
 
         const plugins = this.registry.getByCapability(this.CAPABILITY);
         for (const registered of plugins) {
             if (registered.state !== 'enabled') continue;
             const isEnabled = await this.isPluginEnabled(registered.plugin.id, directoryId, userId);
-            if (isEnabled) {
-                return registered.plugin as IAiProviderPlugin;
-            }
+            if (isEnabled) return registered.plugin as IAiProviderPlugin;
         }
 
         throw new NoAiProviderError();
-    }
-
-    private async isPluginEnabled(
-        pluginId: string,
-        directoryId?: string,
-        userId?: string,
-    ): Promise<boolean> {
-        if (directoryId && this.directoryPluginRepository) {
-            try {
-                const dp = await this.directoryPluginRepository.findByDirectoryAndPlugin(
-                    directoryId,
-                    pluginId,
-                );
-                if (dp !== null) return dp.enabled;
-            } catch {
-                // Continue
-            }
-        }
-
-        if (userId && this.userPluginRepository) {
-            try {
-                const up = await this.userPluginRepository.findByUserAndPlugin(userId, pluginId);
-                if (up !== null) return up.enabled;
-            } catch {
-                // Continue
-            }
-        }
-
-        const registered = this.registry.get(pluginId);
-        return registered?.manifest?.autoEnable ?? true;
     }
 
     private async getDefaultProviderFromSettings(
@@ -305,24 +247,17 @@ export class AiFacadeService implements IAiFacade {
         const aiProviders = this.registry.getByCapability(this.CAPABILITY);
         const enabledProviders = aiProviders.filter((p) => p.state === 'enabled');
 
-        if (enabledProviders.length === 0) {
-            return null;
-        }
+        if (enabledProviders.length === 0) return null;
 
+        // Check for isDefault setting on each provider
         for (const registered of enabledProviders) {
             try {
-                const settings = await this.settingsService.getSettings(registered.plugin.id, {
+                const settings = await this.getResolvedSettings(registered.plugin.id, {
                     userId,
                     directoryId,
-                    includeSecrets: false,
                 });
 
-                const isDefault = getSettingTyped<boolean>(
-                    settings,
-                    'isDefault',
-                    'boolean',
-                    this.logger,
-                );
+                const isDefault = this.getSettingTyped<boolean>(settings, 'isDefault', 'boolean');
                 if (isDefault) {
                     this.logger.debug(
                         `Using ${scope}-level default AI provider: ${registered.plugin.id}`,
@@ -334,19 +269,18 @@ export class AiFacadeService implements IAiFacade {
             }
         }
 
+        // Check for defaultAiProvider setting
         try {
             const firstProvider = enabledProviders[0];
-            const settings = await this.settingsService.getSettings(firstProvider.plugin.id, {
+            const settings = await this.getResolvedSettings(firstProvider.plugin.id, {
                 userId,
                 directoryId,
-                includeSecrets: false,
             });
 
-            const defaultProviderId = getSettingTyped<string>(
+            const defaultProviderId = this.getSettingTyped<string>(
                 settings,
                 'defaultAiProvider',
                 'string',
-                this.logger,
             );
             if (defaultProviderId) {
                 const defaultProvider = enabledProviders.find(
@@ -380,7 +314,7 @@ export class AiFacadeService implements IAiFacade {
         }
     }
 
-    /** Resolve model: modelOverride > complexity-based > defaultModel > plugin default */
+    // Resolve model: modelOverride > complexity-based > defaultModel > plugin default
     private resolveModel(
         plugin: IAiProviderPlugin,
         settings: Record<string, unknown>,
@@ -392,12 +326,11 @@ export class AiFacadeService implements IAiFacade {
         }
 
         if (routing?.complexity) {
-            const complexityModelKey = `${routing.complexity}Model`; // e.g., 'simpleModel'
-            const complexityModel = getSettingTyped<string>(
+            const complexityModelKey = `${routing.complexity}Model`;
+            const complexityModel = this.getSettingTyped<string>(
                 settings,
                 complexityModelKey,
                 'string',
-                this.logger,
             );
             if (complexityModel) {
                 this.logger.debug(
@@ -407,12 +340,7 @@ export class AiFacadeService implements IAiFacade {
             }
         }
 
-        const defaultModel = getSettingTyped<string>(
-            settings,
-            'defaultModel',
-            'string',
-            this.logger,
-        );
+        const defaultModel = this.getSettingTyped<string>(settings, 'defaultModel', 'string');
         if (defaultModel) {
             this.logger.debug(`Using default model from settings: ${defaultModel}`);
             return defaultModel;
@@ -423,9 +351,7 @@ export class AiFacadeService implements IAiFacade {
     }
 
     private renderTemplate(template: string, variables?: Record<string, string>): string {
-        if (!variables) {
-            return template;
-        }
+        if (!variables) return template;
         return template.replace(/\{(\w+)\}/g, (match, key) => {
             const value = variables[key];
             return value !== undefined ? value : match;

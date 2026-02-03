@@ -5,8 +5,34 @@ import {
 } from '../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
 import { DirectoryPluginRepository } from '../plugins/repositories/directory-plugin.repository';
-import { UserPluginRepository } from '../plugins/repositories/user-plugin.repository';
 import type { IPlugin } from '@ever-works/plugin';
+
+// Common error classes for all facades
+export class FacadeError extends Error {
+    constructor(
+        message: string,
+        public readonly operation: string,
+        public readonly provider?: string,
+        public readonly cause?: Error,
+    ) {
+        super(message);
+        this.name = 'FacadeError';
+    }
+}
+
+export class NoProviderError extends FacadeError {
+    constructor(capability: string) {
+        super(`No ${capability} provider configured or available`, 'getPlugin');
+        this.name = 'NoProviderError';
+    }
+}
+
+export class ProviderNotFoundError extends FacadeError {
+    constructor(providerId: string, capability: string) {
+        super(`${capability} provider not found: ${providerId}`, 'getPlugin', providerId);
+        this.name = 'ProviderNotFoundError';
+    }
+}
 
 export interface BaseFacadeOptions {
     userId?: string;
@@ -21,9 +47,7 @@ export interface DefaultProviderInfo {
 
 /**
  * Abstract base class for capability facades.
- *
- * Handles provider resolution, settings resolution (4-level: Directory > User > Admin > Plugin defaults),
- * and enable resolution (3-level: Directory > User > autoEnable).
+ * Handles provider resolution, settings hierarchy, and enable checks.
  */
 export abstract class BaseFacadeService {
     protected abstract readonly CAPABILITY: string;
@@ -31,9 +55,8 @@ export abstract class BaseFacadeService {
 
     constructor(
         protected readonly registry: PluginRegistryService,
-        protected readonly settingsService: PluginSettingsService,
+        protected readonly settingsService: PluginSettingsService | undefined,
         protected readonly directoryPluginRepository?: DirectoryPluginRepository,
-        protected readonly userPluginRepository?: UserPluginRepository,
     ) {}
 
     isConfigured(): boolean {
@@ -92,66 +115,22 @@ export abstract class BaseFacadeService {
         return null;
     }
 
-    /** Enable resolution: Directory > User > autoEnable */
     protected async isPluginEnabled(
         pluginId: string,
         directoryId?: string,
         userId?: string,
     ): Promise<boolean> {
-        if (directoryId && this.directoryPluginRepository) {
-            try {
-                const directoryPlugin =
-                    await this.directoryPluginRepository.findByDirectoryAndPlugin(
-                        directoryId,
-                        pluginId,
-                    );
-
-                if (directoryPlugin !== null) {
-                    return directoryPlugin.enabled;
-                }
-            } catch {
-                // Continue
-            }
-        }
-
-        if (userId && this.userPluginRepository) {
-            try {
-                const userPlugin = await this.userPluginRepository.findByUserAndPlugin(
-                    userId,
-                    pluginId,
-                );
-
-                if (userPlugin !== null) {
-                    return userPlugin.enabled;
-                }
-            } catch {
-                // Continue to autoEnable
-            }
-        }
-
-        // Check autoEnable in manifest
-        const registered = this.registry.get(pluginId);
-        if (registered?.manifest?.autoEnable) {
-            return true;
-        }
-
-        // Default to enabled if no explicit setting (registry already filtered by enabled state)
-        return true;
+        return this.registry.isPluginEnabledForScope(pluginId, directoryId, userId);
     }
 
-    /**
-     * Get resolved settings for a plugin using the 4-level hierarchy.
-     *
-     * Settings are merged from:
-     * 1. Plugin defaults (lowest priority)
-     * 2. Admin settings
-     * 3. User settings
-     * 4. Directory settings (highest priority)
-     */
+    // Get resolved settings using 4-level hierarchy: Directory > User > Admin > Plugin defaults
     protected async getResolvedSettings(
         pluginId: string,
         options?: BaseFacadeOptions,
     ): Promise<Record<string, unknown>> {
+        if (!this.settingsService) {
+            return {};
+        }
         return this.settingsService.getSettings(pluginId, {
             userId: options?.userId,
             directoryId: options?.directoryId,
@@ -159,26 +138,18 @@ export abstract class BaseFacadeService {
         });
     }
 
-    /**
-     * Get the provider/display name from a plugin.
-     * Override in subclasses if the plugin interface has a specific property for this.
-     */
+    // Get the provider/display name from a plugin
     protected getProviderName(plugin: IPlugin): string {
-        // Try common provider name properties
         const providerName = (plugin as { providerName?: string }).providerName;
-        if (providerName) {
-            return providerName;
-        }
+        if (providerName) return providerName;
 
         const sourceName = (plugin as { sourceName?: string }).sourceName;
-        if (sourceName) {
-            return sourceName;
-        }
+        if (sourceName) return sourceName;
 
         return plugin.name;
     }
 
-    /** Get a setting value with type validation. Returns undefined if missing or wrong type. */
+    // Get a setting value with type validation. Returns undefined if missing or wrong type.
     protected getSettingTyped<T>(
         settings: Record<string, unknown>,
         key: string,
@@ -202,7 +173,7 @@ export abstract class BaseFacadeService {
         return value as T;
     }
 
-    /** Get a required setting. Throws if missing or wrong type. */
+    // Get a required setting. Throws if missing or wrong type.
     protected getSettingRequired<T>(
         settings: Record<string, unknown>,
         key: string,
@@ -219,7 +190,7 @@ export abstract class BaseFacadeService {
         return value;
     }
 
-    /** Get a setting with fallback to default value. */
+    // Get a setting with fallback to default value.
     protected getSettingWithDefault<T>(
         settings: Record<string, unknown>,
         key: string,
