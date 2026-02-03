@@ -168,6 +168,19 @@ describe('PipelineOrchestratorService', () => {
         registry = module.get<PluginRegistryService>(PluginRegistryService);
         defaultPlugin = module.get<DefaultPipelinePlugin>(DefaultPipelinePlugin);
 
+        // Register the default pipeline plugin in the registry so getDefaultPipelinePlugin() can find it
+        // Note: We intentionally do NOT include 'pipeline-step' capability because the DefaultPipelinePlugin
+        // provides the built-in steps (via static getBuiltInSteps()), not by implementing getStepDefinition().
+        registry.register(defaultPlugin, {
+            id: 'default-pipeline',
+            name: 'Default Pipeline',
+            version: '1.0.0',
+            description: 'Default pipeline plugin for tests',
+            category: 'pipeline',
+            capabilities: ['default-pipeline'],
+        });
+        registry.updateState('default-pipeline', 'enabled');
+
         // Register mock executors for built-in steps
         for (const step of DefaultPipelinePlugin.getBuiltInSteps()) {
             defaultPlugin.registerStepExecutor(step.id as any, {

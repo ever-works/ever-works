@@ -134,6 +134,21 @@ describe('StepPipelineExecutorService', () => {
 
     describe('execute()', () => {
         beforeEach(() => {
+            // Register the default pipeline plugin in the registry so getDefaultPipelinePlugin() can find it
+            // Note: We intentionally do NOT include 'pipeline-step' capability because the DefaultPipelinePlugin
+            // provides the built-in steps (via static getBuiltInSteps()), not by implementing getStepDefinition().
+            // If we included 'pipeline-step', the pipeline builder would try to call getStepDefinition() on it
+            // which would cause issues.
+            registry.register(defaultPlugin, {
+                id: 'default-pipeline',
+                name: 'Default Pipeline',
+                version: '1.0.0',
+                description: 'Default pipeline plugin for tests',
+                category: 'pipeline',
+                capabilities: ['default-pipeline'],
+            });
+            registry.updateState('default-pipeline', 'enabled');
+
             // Register mock executors for all built-in steps
             for (const step of DefaultPipelinePlugin.getBuiltInSteps()) {
                 defaultPlugin.registerStepExecutor(step.id as any, {
@@ -370,6 +385,18 @@ describe('StepPipelineExecutorService', () => {
 
     describe('executeWithContext()', () => {
         it('should execute using provided context', async () => {
+            // Register the default pipeline plugin in the registry
+            // Note: We intentionally do NOT include 'pipeline-step' capability (see execute() beforeEach for details)
+            registry.register(defaultPlugin, {
+                id: 'default-pipeline',
+                name: 'Default Pipeline',
+                version: '1.0.0',
+                description: 'Default pipeline plugin for tests',
+                category: 'pipeline',
+                capabilities: ['default-pipeline'],
+            });
+            registry.updateState('default-pipeline', 'enabled');
+
             // Register mock executors
             for (const step of DefaultPipelinePlugin.getBuiltInSteps()) {
                 defaultPlugin.registerStepExecutor(step.id as any, {
