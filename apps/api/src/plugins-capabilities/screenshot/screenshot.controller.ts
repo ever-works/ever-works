@@ -1,8 +1,8 @@
 import { BadRequestException, Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { ScreenshotFacadeService } from '@packages/agent/facades';
-import { CurrentUser, JwtAuthGuard } from '../auth';
-import { AuthenticatedUser } from '../auth/types/jwt.types';
+import { CurrentUser, JwtAuthGuard } from '../../auth';
+import { AuthenticatedUser } from '../../auth/types/jwt.types';
 import { CaptureScreenshotDto, GetScreenshotUrlDto } from './dto/screenshot.dto';
 
 @ApiTags('Screenshot')

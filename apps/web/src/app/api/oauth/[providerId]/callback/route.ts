@@ -1,17 +1,10 @@
 import { redirect } from '@/i18n/navigation';
-import { gitProvidersAPI } from '@/lib/api';
+import { oauthAPI } from '@/lib/api';
 import { getOAuthStateCookie } from '@/lib/auth';
 import { ROUTES } from '@/lib/constants';
 import { getLocale } from 'next-intl/server';
 import { NextRequest } from 'next/server';
 
-/**
- * OAuth callback route for git provider connections.
- * This is separate from the auth callback route (/api/auth/[provider]/callback)
- * which handles user authentication (login/register).
- *
- * This route handles git provider OAuth connections for repository access.
- */
 export async function GET(
     request: NextRequest,
     { params }: { params: Promise<{ providerId: string }> },
@@ -31,7 +24,6 @@ export async function GET(
         });
     }
 
-    // Verify state if provided
     const storedState = await getOAuthStateCookie();
     if (state && state !== storedState) {
         return redirect({
@@ -41,19 +33,15 @@ export async function GET(
     }
 
     try {
-        // Call the backend to handle the OAuth callback
-        await gitProvidersAPI.connectCallback(providerId, code, state || undefined);
-
-        // Redirect to the return path or dashboard with success indicator
+        await oauthAPI.connectCallback(providerId, code, state || undefined);
         const href =
-            (returnPath || ROUTES.DASHBOARD_SETTINGS_GIT_PROVIDERS) +
-            '?git_provider_connected=true';
+            (returnPath || ROUTES.DASHBOARD_SETTINGS_GIT_PROVIDERS) + '?oauth_connected=true';
         return redirect({ locale, href });
     } catch (error) {
-        console.error(`Failed to connect git provider ${providerId}:`, error);
+        console.error(`Failed to connect OAuth provider ${providerId}:`, error);
         return redirect({
             locale,
-            href: ROUTES.AUTH_ERROR + '?error=git_provider_oauth_failed',
+            href: ROUTES.AUTH_ERROR + '?error=oauth_failed',
         });
     }
 }

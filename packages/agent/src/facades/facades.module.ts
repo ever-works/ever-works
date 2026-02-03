@@ -8,6 +8,7 @@ import { ScreenshotFacadeService } from './screenshot.facade';
 import { ContentExtractorFacadeService } from './content-extractor.facade';
 import { DataSourceFacadeService } from './data-source.facade';
 import { GitFacadeService } from './git.facade';
+import { OAuthFacadeService } from './oauth.facade';
 
 const FACADES = [
     AiFacadeService,
@@ -16,10 +17,11 @@ const FACADES = [
     ContentExtractorFacadeService,
     DataSourceFacadeService,
     GitFacadeService,
+    OAuthFacadeService,
 ];
 
 /**
- * Facades module providing unified access to AI, Search, and Screenshot services.
+ * Facades module providing unified access to AI, Search, Screenshot etc. services.
  *
  * These facades wrap the plugin registry and settings service to provide
  * a consistent interface for pipeline steps. Providers are resolved dynamically

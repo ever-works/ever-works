@@ -15,16 +15,15 @@ export default async function NewDirectoryPage() {
     let defaultProviderId: string | null = null;
 
     try {
-        const [providersResult, defaultResult] = await Promise.all([
-            gitProvidersAPI.list(),
-            gitProvidersAPI.getDefault(),
-        ]);
+        const providersResult = await gitProvidersAPI.list();
 
-        defaultProviderId = defaultResult.provider?.id || null;
+        // Use first enabled provider as default
+        const enabledProviders = providersResult.providers.filter((p) => p.enabled);
+        defaultProviderId = enabledProviders[0]?.id || null;
 
         // Get connection info for each provider
         providers = await Promise.all(
-            providersResult.providers.map(async (provider) => {
+            providersResult.providers.map(async (provider: GitProviderInfo) => {
                 const connectionInfo = await gitProvidersAPI
                     .checkConnection(provider.id)
                     .catch(() => null);

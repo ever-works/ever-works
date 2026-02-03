@@ -11,3 +11,4 @@ export * from './screenshot-facade.interface.js';
 export * from './content-extractor-facade.interface.js';
 export * from './data-source-facade.interface.js';
 export * from './git-facade.interface.js';
+export * from './oauth-facade.interface.js';

@@ -1,7 +1,6 @@
 import { Injectable, Optional } from '@nestjs/common';
 import type {
     IGitProviderPlugin,
-    IOAuthPlugin,
     GitRepository,
     GitUser,
     GitOrganization,
@@ -16,12 +15,9 @@ import type {
     GitRepositoryWithPermissions,
     GitCommitter,
     GitFileChange,
-    OAuthConfig,
-    OAuthToken,
-    OAuthUser,
     IGitFacade,
 } from '@ever-works/plugin';
-import { PLUGIN_CAPABILITIES, isOAuthPlugin } from '@ever-works/plugin';
+import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
 
 // Facade-specific types that don't require token (facade resolves token internally)
 export interface FacadeCloneOptions {
@@ -556,40 +552,6 @@ export class GitFacadeService implements IGitFacade {
     async getStatus(providerId: string, dir: string): Promise<GitFileChange[]> {
         const plugin = this.getPluginSync(providerId);
         return plugin.getStatus(dir);
-    }
-
-    // OAuth methods
-
-    getOAuthUrl(providerId: string, state: string, config: Partial<OAuthConfig>): string {
-        const plugin = this.getPluginSync(providerId);
-        if (!isOAuthPlugin(plugin)) {
-            throw new GitFacadeError('Plugin does not support OAuth', 'getOAuthUrl', providerId);
-        }
-        return (plugin as unknown as IOAuthPlugin).getAuthorizationUrl(state, config);
-    }
-
-    async exchangeCodeForToken(
-        providerId: string,
-        code: string,
-        config: Partial<OAuthConfig>,
-    ): Promise<OAuthToken> {
-        const plugin = this.getPluginSync(providerId);
-        if (!isOAuthPlugin(plugin)) {
-            throw new GitFacadeError(
-                'Plugin does not support OAuth',
-                'exchangeCodeForToken',
-                providerId,
-            );
-        }
-        return (plugin as unknown as IOAuthPlugin).exchangeCodeForToken(code, config);
-    }
-
-    async getOAuthUser(providerId: string, token: string): Promise<OAuthUser> {
-        const plugin = this.getPluginSync(providerId);
-        if (!isOAuthPlugin(plugin)) {
-            throw new GitFacadeError('Plugin does not support OAuth', 'getOAuthUser', providerId);
-        }
-        return (plugin as unknown as IOAuthPlugin).getAuthenticatedUser(token);
     }
 
     // URL building methods (provider-specific, synchronous)

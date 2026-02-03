@@ -10,4 +10,5 @@ export * from './deploy';
 export * from './members';
 export * from './plugins';
 export * from './git-providers';
+export * from './oauth';
 export * from './types';

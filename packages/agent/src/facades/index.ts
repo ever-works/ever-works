@@ -67,6 +67,15 @@ export {
     type FacadePushOptions,
 } from './git.facade';
 
+// OAuth Facade
+export {
+    OAuthFacadeService,
+    OAuthFacadeError,
+    NoOAuthProviderError,
+    OAuthProviderNotFoundError,
+    OAuthNotSupportedError,
+} from './oauth.facade';
+
 // Settings Utils
 export { getSettingTyped, getSettingWithDefault, type ExpectedSettingType } from './settings-utils';
 

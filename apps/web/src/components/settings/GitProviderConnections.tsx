@@ -1,7 +1,7 @@
 'use client';
 
 import { useTransition } from 'react';
-import { connectGitProvider, disconnectGitProvider } from '@/app/actions/dashboard/oauth';
+import { connectOAuthProvider, disconnectOAuthProvider } from '@/app/actions/dashboard/oauth';
 import { toast } from 'sonner';
 import { ROUTES } from '@/lib/constants';
 import { useTranslations } from 'next-intl';
@@ -224,7 +224,7 @@ function GitProviderCard({
 
     const handleConnect = () => {
         startTransition(async () => {
-            const result = await connectGitProvider(
+            const result = await connectOAuthProvider(
                 provider.id,
                 ROUTES.DASHBOARD_SETTINGS_GIT_PROVIDERS,
             );
@@ -239,7 +239,7 @@ function GitProviderCard({
 
     const handleReconnect = () => {
         startTransition(async () => {
-            const result = await connectGitProvider(
+            const result = await connectOAuthProvider(
                 provider.id,
                 ROUTES.DASHBOARD_SETTINGS_GIT_PROVIDERS,
                 true,
@@ -259,7 +259,7 @@ function GitProviderCard({
         }
 
         startTransition(async () => {
-            const result = await disconnectGitProvider(provider.id);
+            const result = await disconnectOAuthProvider(provider.id);
 
             if (result.success) {
                 toast.success(`${provider.name} disconnected`);

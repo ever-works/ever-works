@@ -104,8 +104,8 @@ export const ROUTES = {
     API_AUTH_RESET_PASSWORD: '/api/auth/reset-password',
     API_AI_CONVERSATIONS_ASK_STREAM: '/api/ai-conversations/ask/stream',
     API_AI_CONVERSATIONS_MESSAGE_STREAM: '/api/ai-conversations/:sessionId/stream',
-    // Git provider routes (separate from auth)
-    API_GIT_PROVIDER_CALLBACK: '/api/git-providers/:providerId/callback',
+    // OAuth routes (provider-agnostic)
+    API_OAUTH_CALLBACK: '/api/oauth/:providerId/callback',
 } as const;
 
 export const routeWithParams = (route: string, params: Record<string, string>) => {

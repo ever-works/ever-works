@@ -2,7 +2,7 @@
 
 import { useTransition } from 'react';
 import { cn } from '@/lib/utils/cn';
-import { connectGitProvider } from '@/app/actions/dashboard/oauth';
+import { connectOAuthProvider } from '@/app/actions/dashboard/oauth';
 import { toast } from 'sonner';
 import { ROUTES } from '@/lib/constants';
 import { useTranslations } from 'next-intl';
@@ -27,7 +27,10 @@ export function GitProviderConnectionAlert({
         }
 
         startTransition(async () => {
-            const result = await connectGitProvider(provider.id, ROUTES.DASHBOARD_DIRECTORIES_NEW);
+            const result = await connectOAuthProvider(
+                provider.id,
+                ROUTES.DASHBOARD_DIRECTORIES_NEW,
+            );
 
             if (result.success && result.url) {
                 window.location.href = result.url;

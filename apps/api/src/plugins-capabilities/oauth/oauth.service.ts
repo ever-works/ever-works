@@ -1,56 +1,38 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { randomBytes } from 'crypto';
-import { GitFacadeService, GitProviderInfo } from '@packages/agent/facades';
+import { OAuthFacadeService } from '@packages/agent/facades';
 import { OAuthTokenRepository } from '@packages/agent/database';
 import { PluginSettingsService } from '@packages/agent/plugins';
-import type {
-    GitOrganization,
-    GitUser,
-    GitRepositoryWithPermissions,
-    OAuthConfig,
-} from '@ever-works/plugin';
+import type { OAuthConfig, OAuthProviderInfo } from '@ever-works/plugin';
 
-export interface GitProviderConnectionInfo extends GitProviderInfo {
+export interface OAuthConnectionInfo extends OAuthProviderInfo {
     connected: boolean;
     username?: string;
     email?: string;
     avatarUrl?: string;
 }
 
-/**
- * Service providing git provider operations through the plugin system.
- * Acts as an abstraction layer between the API and the GitFacade.
- */
 @Injectable()
-export class GitProviderService {
-    private readonly logger = new Logger(GitProviderService.name);
+export class OAuthService {
+    private readonly logger = new Logger(OAuthService.name);
     private stateStore = new Map<string, { userId: string; expires: Date }>();
 
     constructor(
-        private readonly gitFacade: GitFacadeService,
+        private readonly oauthFacade: OAuthFacadeService,
         private readonly oauthTokenRepository: OAuthTokenRepository,
         private readonly pluginSettingsService: PluginSettingsService,
     ) {}
 
-    /**
-     * Check if any git provider is configured and available
-     */
     isConfigured(): boolean {
-        return this.gitFacade.isConfigured();
+        return this.oauthFacade.isConfigured();
     }
 
-    /**
-     * Get list of available git providers
-     */
-    getAvailableProviders(): GitProviderInfo[] {
-        return this.gitFacade.getAvailableProviders();
+    getAvailableProviders(): OAuthProviderInfo[] {
+        return this.oauthFacade.getAvailableProviders();
     }
 
-    /**
-     * Check connection status for a specific provider
-     */
-    async checkConnection(userId: string, providerId: string): Promise<GitProviderConnectionInfo> {
-        const provider = this.gitFacade.getAvailableProviders().find((p) => p.id === providerId);
+    async checkConnection(userId: string, providerId: string): Promise<OAuthConnectionInfo> {
+        const provider = this.oauthFacade.getAvailableProviders().find((p) => p.id === providerId);
 
         if (!provider) {
             return {
@@ -61,90 +43,43 @@ export class GitProviderService {
             };
         }
 
-        const hasCredentials = await this.gitFacade.hasValidCredentials({
-            userId,
-            providerId: provider.id,
-        });
+        const hasCredentials = await this.oauthFacade.hasValidCredentials(userId, providerId);
 
         if (!hasCredentials) {
-            return {
-                ...provider,
-                connected: false,
-            };
+            return { ...provider, connected: false };
         }
 
         try {
-            const user = await this.gitFacade.getUser({
-                userId,
-                providerId: provider.id,
-            });
+            const token = await this.oauthFacade.getAccessToken(userId, providerId);
+            if (!token) {
+                return { ...provider, connected: false };
+            }
 
+            const user = await this.oauthFacade.getAuthenticatedUser(providerId, token);
             return {
                 ...provider,
                 connected: true,
-                username: user.login,
+                username: user.username,
                 email: user.email,
                 avatarUrl: user.avatarUrl,
             };
         } catch (error) {
-            this.logger.warn(`Failed to get user info for provider ${provider.id}:`, error);
-            return {
-                ...provider,
-                connected: false,
-            };
+            this.logger.warn(`Failed to get user info for provider ${providerId}:`, error);
+            return { ...provider, connected: false };
         }
     }
 
-    /**
-     * Get user information from the git provider
-     */
-    async getUser(userId: string, providerId: string): Promise<GitUser> {
-        return this.gitFacade.getUser({
-            userId,
-            providerId,
-        });
+    async getUser(userId: string, providerId: string) {
+        const token = await this.oauthFacade.getAccessToken(userId, providerId);
+        if (!token) {
+            throw new BadRequestException(`No valid token for provider ${providerId}`);
+        }
+        return this.oauthFacade.getAuthenticatedUser(providerId, token);
     }
 
-    /**
-     * Get organizations accessible by the user
-     */
-    async getOrganizations(userId: string, providerId: string): Promise<GitOrganization[]> {
-        return this.gitFacade.getOrganizations({
-            userId,
-            providerId,
-        });
-    }
-
-    /**
-     * Get repositories accessible by the user
-     */
-    async getRepositories(
-        userId: string,
-        providerId: string,
-        page?: number,
-        perPage?: number,
-    ): Promise<GitRepositoryWithPermissions[]> {
-        return this.gitFacade.listRepositories(
-            {
-                userId,
-                providerId,
-            },
-            page,
-            perPage,
-        );
-    }
-
-    /**
-     * Check if user has valid credentials for a provider
-     */
     async hasValidCredentials(userId: string, providerId: string): Promise<boolean> {
-        return this.gitFacade.hasValidCredentials({
-            userId,
-            providerId,
-        });
+        return this.oauthFacade.hasValidCredentials(userId, providerId);
     }
-
-    // OAuth methods
 
     async getOAuthUrl(
         userId: string,
@@ -155,10 +90,8 @@ export class GitProviderService {
         const finalState = state || this.generateState(userId);
         this.storeState(finalState, userId);
 
-        // Get OAuth config from plugin settings and environment
         const config = await this.getOAuthConfig(providerId, redirectUri);
-
-        const url = this.gitFacade.getOAuthUrl(providerId, finalState, config);
+        const url = this.oauthFacade.getAuthorizationUrl(providerId, finalState, config);
         return { url, state: finalState };
     }
 
@@ -167,29 +100,21 @@ export class GitProviderService {
         providerId: string,
         code: string,
         state?: string,
-    ): Promise<GitProviderConnectionInfo> {
-        // Verify state if provided
+    ): Promise<OAuthConnectionInfo> {
         if (state && !this.verifyState(state, userId)) {
             throw new BadRequestException('Invalid state parameter');
         }
 
-        // Get OAuth config
         const config = await this.getOAuthConfig(providerId);
+        const token = await this.oauthFacade.exchangeCodeForToken(providerId, code, config);
+        const user = await this.oauthFacade.getAuthenticatedUser(providerId, token.accessToken);
 
-        // Exchange code for token via the plugin
-        const token = await this.gitFacade.exchangeCodeForToken(providerId, code, config);
-
-        // Get user info via the plugin
-        const user = await this.gitFacade.getOAuthUser(providerId, token.accessToken);
-
-        // Calculate expiration time if provided
         let expiresAt: Date | undefined;
         if (token.expiresIn) {
             expiresAt = new Date();
             expiresAt.setSeconds(expiresAt.getSeconds() + token.expiresIn);
         }
 
-        // Store token in database
         await this.oauthTokenRepository.upsert({
             userId,
             provider: providerId,
@@ -207,7 +132,7 @@ export class GitProviderService {
             },
         });
 
-        const providerInfo = this.gitFacade
+        const providerInfo = this.oauthFacade
             .getAvailableProviders()
             .find((p) => p.id === providerId);
 
@@ -223,7 +148,7 @@ export class GitProviderService {
     }
 
     async disconnectProvider(userId: string, providerId: string): Promise<void> {
-        await this.oauthTokenRepository.deleteByUserAndProvider(userId, providerId);
+        await this.oauthFacade.revokeToken(userId, providerId);
     }
 
     private async getOAuthConfig(
@@ -266,11 +191,9 @@ export class GitProviderService {
 
     verifyState(state: string, userId: string): boolean {
         const stored = this.stateStore.get(state);
-
         if (!stored || stored.userId !== userId || new Date() > stored.expires) {
             return false;
         }
-
         this.stateStore.delete(state);
         return true;
     }

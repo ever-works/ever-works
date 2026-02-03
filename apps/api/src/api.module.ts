@@ -16,9 +16,10 @@ import { TriggerInternalModule } from './trigger/trigger-internal.module';
 import { TwentyCrmModule } from './integrations';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { NotificationsModule } from './notifications/notifications.module';
-import { ScreenshotModule } from './screenshot/screenshot.module';
+import { ScreenshotModule } from './plugins-capabilities/screenshot/screenshot.module';
 import { PluginsModule } from './plugins/plugins.module';
-import { GitProviderModule } from './git-provider/git-provider.module';
+import { GitProviderModule } from './plugins-capabilities/git-provider/git-provider.module';
+import { OAuthModule } from './plugins-capabilities/oauth/oauth.module';
 import { PluginsModule as AgentPluginsModule } from '@packages/agent/plugins';
 import { CacheFactory } from '@packages/agent/cache';
 
@@ -52,6 +53,7 @@ import { CacheFactory } from '@packages/agent/cache';
         AgentPluginsModule.forRoot(),
         PluginsModule,
         GitProviderModule,
+        OAuthModule,
     ],
     providers: [
         {
