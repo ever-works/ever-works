@@ -322,6 +322,77 @@ describe('StepPipelineExecutorService', () => {
                 }),
             );
         });
+
+        it('should execute parallel steps concurrently', async () => {
+            // Setup: Create a pipeline with 1 start step and 2 parallel steps
+            // We use the pipelineBuilder mock behavior to return our custom pipeline structure
+            // effectively bypassing the plugin registry for this specific test to control the graph exactly.
+
+            const startStep = {
+                id: 'start',
+                name: 'Start',
+                run: jest.fn().mockResolvedValue(undefined),
+            };
+            const parallel1 = {
+                id: 'p1',
+                name: 'Parallel 1',
+                run: jest
+                    .fn()
+                    .mockImplementation(() => new Promise((resolve) => setTimeout(resolve, 50))),
+            };
+            const parallel2 = {
+                id: 'p2',
+                name: 'Parallel 2',
+                run: jest
+                    .fn()
+                    .mockImplementation(() => new Promise((resolve) => setTimeout(resolve, 50))),
+            };
+
+            // Mock the build method to return our manual parallel structure
+            jest.spyOn(pipelineBuilder, 'build').mockResolvedValue({
+                steps: [
+                    { id: 'start', name: 'Start', position: { type: 'first' } },
+                    { id: 'p1', name: 'Parallel 1', position: { type: 'after', stepId: 'start' } },
+                    { id: 'p2', name: 'Parallel 2', position: { type: 'after', stepId: 'start' } },
+                ],
+                groups: [
+                    { id: 'g1', stepIds: ['start'], allRequired: true },
+                    { id: 'g2', stepIds: ['p1', 'p2'], allRequired: true }, // Parallel group
+                ],
+                executorMap: new Map([
+                    ['start', { type: 'builtin', serviceId: 'start' }],
+                    ['p1', { type: 'builtin', serviceId: 'p1' }],
+                    ['p2', { type: 'builtin', serviceId: 'p2' }],
+                ]),
+                replacedSteps: new Map(),
+                disabledSteps: new Set(),
+                injectedSteps: new Set(),
+                source: 'test',
+            } as any);
+
+            // Register executors for these custom steps (using defaultPlugin as a container)
+            // In a real scenario these would be looked up via the map, here we reuse the default plugin's registry
+            // but we need to patch the getDefaultPipelinePlugin private method or ensures it uses the registry
+            // The service uses getDefaultPipelinePlugin() which looks up 'default-pipeline'
+            // We can add our custom steps to the default plugin mock
+            defaultPlugin.registerStepExecutor('start' as any, startStep);
+            defaultPlugin.registerStepExecutor('p1' as any, parallel1);
+            defaultPlugin.registerStepExecutor('p2' as any, parallel2);
+
+            const startTime = Date.now();
+            await service.execute(mockDirectory, mockRequest, mockExisting);
+            const duration = Date.now() - startTime;
+
+            // Verification
+            // Both parallel steps take 50ms.
+            // If sequential: 50 + 50 = 100ms (+ overhead)
+            // If parallel: max(50, 50) = 50ms (+ overhead)
+            // We expect the total duration to be closer to 50ms than 100ms
+            // Using a slightly loose check to account for test overhead
+            expect(duration).toBeLessThan(90);
+            expect(parallel1.run).toHaveBeenCalled();
+            expect(parallel2.run).toHaveBeenCalled();
+        });
     });
 
     describe('skip steps when data already provided', () => {

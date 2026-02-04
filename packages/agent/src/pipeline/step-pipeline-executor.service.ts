@@ -381,127 +381,55 @@ export class StepPipelineExecutorService {
         let currentStepIndex = 0;
 
         try {
-            // 4. Execute steps in order
-            for (const step of pipeline.steps) {
+            // 4. Execute groups in order (Task 3.19)
+            // We iterate over groups to allow parallel execution of steps within a group
+            for (const group of pipeline.groups) {
                 // Check for cancellation
                 if (options?.signal?.aborted) {
-                    this.logger.log(`Pipeline cancelled at step ${currentStepIndex}`);
+                    this.logger.log(`Pipeline cancelled before group ${group.id}`);
                     runner.cancelExecution();
                     this.emitPipelineEvent(PipelineEvents.CANCELLED, {
                         directoryId: directory.id,
                     });
-                    return this.createCancelledResult(context, runner, startTime, step.id);
+                    // Determine which step would have been next
+                    const nextStep = group.stepIds[0];
+                    return this.createCancelledResult(context, runner, startTime, nextStep);
                 }
 
-                // Check if step should be skipped via options
-                if (options?.skipSteps?.includes(step.id)) {
-                    this.logger.debug(`Skipping step "${step.id}" (in skipSteps)`);
-                    runner.markStepSkipped(step.id, 'skipped by options');
-                    this.emitStepSkipped(step, currentStepIndex, pipeline.steps.length);
-                    currentStepIndex++;
-                    continue;
-                }
+                // Get steps for this group
+                const groupSteps = group.stepIds
+                    .map((id) => pipeline.steps.find((s) => s.id === id))
+                    .filter((s): s is PipelineStepDefinition => s !== undefined);
 
-                // Check if onlySteps is specified and this step is not in it
-                if (options?.onlySteps && !options.onlySteps.includes(step.id)) {
-                    this.logger.debug(`Skipping step "${step.id}" (not in onlySteps)`);
-                    runner.markStepSkipped(step.id, 'not in onlySteps');
-                    currentStepIndex++;
-                    continue;
-                }
+                if (groupSteps.length === 0) continue;
 
-                // Check if step can be skipped (data already provided)
-                if (await this.canSkipStep(step, context)) {
-                    this.logger.debug(`Skipping step "${step.id}" (data already provided)`);
-                    runner.markStepSkipped(step.id, 'data already provided');
-                    this.emitStepSkipped(step, currentStepIndex, pipeline.steps.length);
-                    currentStepIndex++;
-                    continue;
-                }
-
-                // Emit step:started event (Task 3.19)
-                runner.startStep(step.id);
-                this.emitStepEvent(
-                    PipelineEvents.STEP_STARTED,
-                    step,
-                    currentStepIndex,
-                    pipeline.steps.length,
+                // Execute steps in the group (parallel or sequential)
+                // Use Promise.all to run all steps in the group concurrently
+                const stepPromises = groupSteps.map((step) =>
+                    this.processStep(
+                        step,
+                        pipeline,
+                        runner,
+                        context,
+                        currentStepIndex + groupSteps.indexOf(step),
+                        pipeline.steps.length,
+                        options,
+                        onProgress,
+                    ),
                 );
 
-                // Report progress
-                if (onProgress) {
-                    onProgress({
-                        percent: Math.round((currentStepIndex / pipeline.steps.length) * 100),
-                        currentStepIndex,
-                        totalSteps: pipeline.steps.length,
-                        currentStepName: step.name,
-                        message: `Executing: ${step.name}`,
-                    });
+                // Wait for all steps in the group to complete
+                await Promise.all(stepPromises);
+
+                // Increment index
+                currentStepIndex += groupSteps.length;
+                lastCompletedStepIndex = currentStepIndex - 1;
+
+                // Check if shouldStop is set (from any step in the group)
+                if (context.shouldStop) {
+                    this.logger.log(`Pipeline stopped by a step in group ${group.id}`);
+                    break;
                 }
-
-                const stepStartTime = Date.now();
-
-                try {
-                    // Execute the step
-                    const executor = pipeline.executorMap.get(step.id);
-                    if (!executor) {
-                        throw new Error(`No executor found for step "${step.id}"`);
-                    }
-
-                    await this.executeStep(step, executor, context, options);
-
-                    // Record metrics
-                    const metrics = this.createStepMetrics(step, stepStartTime, true);
-                    context.recordStepMetrics(step.id, metrics);
-                    runner.markStepComplete(step.id, metrics);
-
-                    // Save checkpoint
-                    await this.saveCheckpoint(
-                        directory,
-                        context,
-                        currentStepIndex,
-                        step.name,
-                        runner.getState().completedSteps,
-                    );
-
-                    // Emit step:completed event (Task 3.19)
-                    this.emitStepCompleted(
-                        step,
-                        currentStepIndex,
-                        pipeline.steps.length,
-                        metrics.duration ?? 0,
-                    );
-
-                    lastCompletedStepIndex = currentStepIndex;
-
-                    // Check if shouldStop is set
-                    if (context.shouldStop) {
-                        this.logger.log(`Pipeline stopped by step "${step.id}"`);
-                        break;
-                    }
-                } catch (error) {
-                    const err = error as Error;
-                    const metrics = this.createStepMetrics(step, stepStartTime, false, err.message);
-                    context.recordStepMetrics(step.id, metrics);
-                    runner.markStepFailed(step.id, err);
-
-                    // Emit step:failed event (Task 3.19)
-                    this.emitStepFailed(
-                        step,
-                        currentStepIndex,
-                        pipeline.steps.length,
-                        err,
-                        step.optional ?? false,
-                    );
-
-                    if (!options?.continueOnError && !step.optional) {
-                        throw err;
-                    }
-
-                    this.logger.warn(`Step "${step.id}" failed but continuing: ${err.message}`);
-                }
-
-                currentStepIndex++;
             }
 
             // 6. Complete execution
@@ -529,6 +457,9 @@ export class StepPipelineExecutorService {
         } catch (error) {
             runner.completeExecution();
 
+            // We can't easily know exactly which step failed in the main catch block
+            // because of parallel execution, but the individual processStep catches errors.
+            // If we got here, it means a non-optional step failed and re-threw the error.
             const failedStep = pipeline.steps[currentStepIndex]?.id;
 
             // Emit pipeline:failed event (Task 3.19)
@@ -539,11 +470,106 @@ export class StepPipelineExecutorService {
                 lastCompletedStepIndex + 1,
             );
 
-            this.logger.error(
-                `Pipeline failed at step "${failedStep}": ${(error as Error).message}`,
-            );
+            this.logger.error(`Pipeline failed: ${(error as Error).message}`);
 
             return this.createFailedResult(context, runner, startTime, error as Error, failedStep);
+        }
+    }
+
+    /**
+     * Process a single step with error handling, metrics, and events
+     */
+    private async processStep(
+        step: PipelineStepDefinition,
+        pipeline: any, // Typed as ExecutablePipeline but avoiding circular import in private method signature if strictly typed
+        runner: ExecutablePipelineRunner,
+        context: TypedGenerationContext,
+        stepIndex: number,
+        totalSteps: number,
+        options?: PipelineExecutionOptions,
+        onProgress?: PipelineProgressCallback,
+    ): Promise<void> {
+        const directory = context.directory;
+
+        // Check if step should be skipped via options
+        if (options?.skipSteps?.includes(step.id)) {
+            this.logger.debug(`Skipping step "${step.id}" (in skipSteps)`);
+            runner.markStepSkipped(step.id, 'skipped by options');
+            this.emitStepSkipped(step, stepIndex, totalSteps);
+            return;
+        }
+
+        // Check if onlySteps is specified and this step is not in it
+        if (options?.onlySteps && !options.onlySteps.includes(step.id)) {
+            this.logger.debug(`Skipping step "${step.id}" (not in onlySteps)`);
+            runner.markStepSkipped(step.id, 'not in onlySteps');
+            return;
+        }
+
+        // Check if step can be skipped (data already provided)
+        if (await this.canSkipStep(step, context)) {
+            this.logger.debug(`Skipping step "${step.id}" (data already provided)`);
+            runner.markStepSkipped(step.id, 'data already provided');
+            this.emitStepSkipped(step, stepIndex, totalSteps);
+            return;
+        }
+
+        // Emit step:started event (Task 3.19)
+        runner.startStep(step.id);
+        this.emitStepEvent(PipelineEvents.STEP_STARTED, step, stepIndex, totalSteps);
+
+        // Report progress
+        if (onProgress) {
+            onProgress({
+                percent: Math.round((stepIndex / totalSteps) * 100),
+                currentStepIndex: stepIndex,
+                totalSteps: totalSteps,
+                currentStepName: step.name,
+                message: `Executing: ${step.name}`,
+            });
+        }
+
+        const stepStartTime = Date.now();
+
+        try {
+            // Execute the step
+            const executor = pipeline.executorMap.get(step.id);
+            if (!executor) {
+                throw new Error(`No executor found for step "${step.id}"`);
+            }
+
+            await this.executeStep(step, executor, context, options);
+
+            // Record metrics
+            const metrics = this.createStepMetrics(step, stepStartTime, true);
+            context.recordStepMetrics(step.id, metrics);
+            runner.markStepComplete(step.id, metrics);
+
+            // Save checkpoint
+            await this.saveCheckpoint(
+                directory,
+                context,
+                stepIndex,
+                step.name,
+                runner.getState().completedSteps,
+            );
+
+            // Emit step:completed event (Task 3.19)
+            this.emitStepCompleted(step, stepIndex, totalSteps, metrics.duration ?? 0);
+        } catch (error) {
+            const err = error as Error;
+            const metrics = this.createStepMetrics(step, stepStartTime, false, err.message);
+            context.recordStepMetrics(step.id, metrics);
+            runner.markStepFailed(step.id, err);
+
+            // Emit step:failed event (Task 3.19)
+            this.emitStepFailed(step, stepIndex, totalSteps, err, step.optional ?? false);
+
+            if (!options?.continueOnError && !step.optional) {
+                throw err;
+            }
+
+            this.logger.warn(`Step "${step.id}" failed but continuing: ${err.message}`);
         }
     }
 

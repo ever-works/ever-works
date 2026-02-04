@@ -334,6 +334,37 @@ describe('PipelineBuilderService', () => {
             });
 
             await expect(service.build()).rejects.toThrow(CircularDependencyError);
+            await expect(service.build()).rejects.toThrow(/step-a -> step-b -> step-a/);
+        });
+    });
+
+    describe('validation', () => {
+        it('should detect duplicate step IDs and throw', async () => {
+            const stepA: PipelineStepDefinition = {
+                id: 'duplicate-step',
+                name: 'Step A',
+                position: { type: 'first' },
+            };
+
+            const stepB: PipelineStepDefinition = {
+                id: 'duplicate-step', // Duplicate ID
+                name: 'Step B',
+                position: { type: 'last' },
+            };
+
+            const pluginA = createMockPipelinePlugin('plugin-a', stepA);
+            const pluginB = createMockPipelinePlugin('plugin-b', stepB);
+
+            registry.register(pluginA as unknown as IPlugin, createMockManifest('plugin-a'), {
+                state: 'enabled',
+            });
+            registry.register(pluginB as unknown as IPlugin, createMockManifest('plugin-b'), {
+                state: 'enabled',
+            });
+
+            await expect(service.build()).rejects.toThrow(
+                'Duplicate step ID detected: "duplicate-step"',
+            );
         });
     });
 
@@ -347,6 +378,68 @@ describe('PipelineBuilderService', () => {
             // The built-in pipeline has some parallelizable steps
             // (e.g., content-retrieval, items-extraction, image-capture are marked parallelizable)
             expect(pipeline.groups.length).toBeGreaterThan(0);
+        });
+
+        it('should correctly group independent steps (A -> [B, C] -> D)', async () => {
+            // Mock the built-in steps to create a specific dependency graph
+            // A -> B
+            // A -> C
+            // B, C -> D
+            // B and C are parallelizable
+            const mockSteps: PipelineStepDefinition[] = [
+                {
+                    id: 'step-a',
+                    name: 'Step A',
+                    position: { type: 'first' },
+                    parallelizable: false,
+                },
+                {
+                    id: 'step-b',
+                    name: 'Step B',
+                    position: { type: 'after', stepId: 'step-a' },
+                    dependencies: [{ stepId: 'step-a', required: true }],
+                    parallelizable: true,
+                },
+                {
+                    id: 'step-c',
+                    name: 'Step C',
+                    position: { type: 'after', stepId: 'step-a' },
+                    dependencies: [{ stepId: 'step-a', required: true }],
+                    parallelizable: true,
+                },
+                {
+                    id: 'step-d',
+                    name: 'Step D',
+                    position: { type: 'last' },
+                    dependencies: [
+                        { stepId: 'step-b', required: true },
+                        { stepId: 'step-c', required: true },
+                    ],
+                    parallelizable: false,
+                },
+            ];
+
+            jest.spyOn(DefaultPipelinePlugin, 'getBuiltInSteps').mockReturnValue(mockSteps as any);
+
+            const pipeline = await service.build();
+
+            // We expect 3 groups: [A], [B, C], [D]
+            expect(pipeline.groups).toHaveLength(3);
+
+            // Group 1: Step A
+            expect(pipeline.groups[0].stepIds).toHaveLength(1);
+            expect(pipeline.groups[0].stepIds).toContain('step-a');
+
+            // Group 2: Step B and C (Parallel)
+            expect(pipeline.groups[1].stepIds).toHaveLength(2);
+            expect(pipeline.groups[1].stepIds).toContain('step-b');
+            expect(pipeline.groups[1].stepIds).toContain('step-c');
+
+            // Group 3: Step D
+            expect(pipeline.groups[2].stepIds).toHaveLength(1);
+            expect(pipeline.groups[2].stepIds).toContain('step-d');
+
+            jest.restoreAllMocks();
         });
 
         it('should set maxConcurrent for parallel groups', async () => {

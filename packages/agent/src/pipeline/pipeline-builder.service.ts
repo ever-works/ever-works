@@ -150,6 +150,9 @@ export class PipelineBuilderService {
         // 5d. Apply prepend/append (Task 3.8)
         steps = this.applyPrependAppend(steps, buildContext.prependSteps, buildContext.appendSteps);
 
+        // 5e. Check for duplicate step IDs (Fix #2)
+        this.checkForDuplicateStepIds(steps);
+
         // 6. Topological sort to respect dependencies
         const orderedSteps = this.topologicalSort(steps);
 
@@ -194,6 +197,21 @@ export class PipelineBuilderService {
         );
 
         return pipeline;
+    }
+
+    /**
+     * Check for duplicate step IDs
+     */
+    private checkForDuplicateStepIds(steps: PipelineStepDefinition[]): void {
+        const ids = new Set<string>();
+        for (const step of steps) {
+            if (ids.has(step.id)) {
+                throw new Error(
+                    `Duplicate step ID detected: "${step.id}". Step IDs must be unique.`,
+                );
+            }
+            ids.add(step.id);
+        }
     }
 
     /**
@@ -529,14 +547,62 @@ export class PipelineBuilderService {
 
         // Check for cycles
         if (sorted.length !== steps.length) {
-            const remaining = steps.filter((s) => !visited.has(s.id)).map((s) => s.id);
+            const remainingSteps = steps.filter((s) => !visited.has(s.id));
+            const cycle = this.findCycle(remainingSteps, graph);
+            const cycleMessage =
+                cycle.length > 0 ? cycle.join(' -> ') : remainingSteps.map((s) => s.id).join(', ');
+
             throw new CircularDependencyError(
-                remaining,
-                `Circular dependency detected among steps: ${remaining.join(', ')}`,
+                remainingSteps.map((s) => s.id),
+                `Circular dependency detected among steps: ${cycleMessage}`,
             );
         }
 
         return sorted;
+    }
+
+    /**
+     * Find a cycle in the dependency graph for better error reporting
+     */
+    private findCycle(nodes: PipelineStepDefinition[], graph: Map<string, Set<string>>): string[] {
+        const visited = new Set<string>();
+        const recursionStack = new Set<string>();
+        const cycle: string[] = [];
+
+        const dfs = (nodeId: string): boolean => {
+            visited.add(nodeId);
+            recursionStack.add(nodeId);
+
+            const dependents = graph.get(nodeId) || new Set();
+            for (const dependent of dependents) {
+                // Only consider nodes involved in the remaining set
+                if (!nodes.some((n) => n.id === dependent)) continue;
+
+                if (!visited.has(dependent)) {
+                    if (dfs(dependent)) {
+                        cycle.push(nodeId);
+                        return true;
+                    }
+                } else if (recursionStack.has(dependent)) {
+                    cycle.push(dependent);
+                    cycle.push(nodeId);
+                    return true;
+                }
+            }
+
+            recursionStack.delete(nodeId);
+            return false;
+        };
+
+        for (const node of nodes) {
+            if (!visited.has(node.id)) {
+                if (dfs(node.id)) {
+                    return cycle.reverse();
+                }
+            }
+        }
+
+        return [];
     }
 
     /**
@@ -548,6 +614,7 @@ export class PipelineBuilderService {
         const completedSteps = new Set<string>();
         let currentGroup: string[] = [];
         let groupIndex = 0;
+        const DEFAULT_CONCURRENCY = 4;
 
         for (const step of steps) {
             // Check if all dependencies are complete
@@ -558,7 +625,14 @@ export class PipelineBuilderService {
             if (!dependenciesComplete) {
                 // Flush current group and start new one
                 if (currentGroup.length > 0) {
-                    groups.push(this.createParallelGroup(groupIndex++, currentGroup, steps));
+                    groups.push(
+                        this.createParallelGroup(
+                            groupIndex++,
+                            currentGroup,
+                            steps,
+                            DEFAULT_CONCURRENCY,
+                        ),
+                    );
                     currentGroup.forEach((id) => completedSteps.add(id));
                     currentGroup = [];
                 }
@@ -570,18 +644,29 @@ export class PipelineBuilderService {
             } else {
                 // Non-parallelizable step - flush and add as single-step group
                 if (currentGroup.length > 0) {
-                    groups.push(this.createParallelGroup(groupIndex++, currentGroup, steps));
+                    groups.push(
+                        this.createParallelGroup(
+                            groupIndex++,
+                            currentGroup,
+                            steps,
+                            DEFAULT_CONCURRENCY,
+                        ),
+                    );
                     currentGroup.forEach((id) => completedSteps.add(id));
                     currentGroup = [];
                 }
-                groups.push(this.createParallelGroup(groupIndex++, [step.id], steps));
+                groups.push(
+                    this.createParallelGroup(groupIndex++, [step.id], steps, DEFAULT_CONCURRENCY),
+                );
                 completedSteps.add(step.id);
             }
         }
 
         // Flush remaining
         if (currentGroup.length > 0) {
-            groups.push(this.createParallelGroup(groupIndex++, currentGroup, steps));
+            groups.push(
+                this.createParallelGroup(groupIndex++, currentGroup, steps, DEFAULT_CONCURRENCY),
+            );
         }
 
         return groups;
@@ -594,6 +679,7 @@ export class PipelineBuilderService {
         index: number,
         stepIds: string[],
         steps: PipelineStepDefinition[],
+        concurrencyLimit: number,
     ): ParallelGroup {
         const groupSteps = steps.filter((s) => stepIds.includes(s.id));
         const allRequired = groupSteps.every((s) => !s.optional);
@@ -602,7 +688,8 @@ export class PipelineBuilderService {
             id: `group-${index}`,
             stepIds,
             allRequired,
-            maxConcurrent: stepIds.length > 1 ? Math.min(stepIds.length, 4) : undefined,
+            maxConcurrent:
+                stepIds.length > 1 ? Math.min(stepIds.length, concurrencyLimit) : undefined,
         };
     }
 
