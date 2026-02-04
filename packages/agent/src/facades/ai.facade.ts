@@ -192,7 +192,7 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
         }));
     }
 
-    // Resolve AI provider: providerOverride > directory default > user default > first enabled
+    // Resolve AI provider: providerOverride > directory active > first enabled
     private async resolvePlugin(
         providerOverride?: string,
         userId?: string,
@@ -211,93 +211,21 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
             throw new AiProviderNotFoundError(providerOverride);
         }
 
+        // Check for directory's explicitly configured active provider
         if (directoryId) {
-            const directoryProvider = await this.getDefaultProviderFromSettings(
-                directoryId,
-                userId,
-                'directory',
-            );
-            if (directoryProvider) return directoryProvider;
+            const activePlugin = await this.findActivePluginForDirectory(directoryId);
+            if (activePlugin) {
+                return activePlugin.plugin as IAiProviderPlugin;
+            }
         }
 
-        if (userId) {
-            const userProvider = await this.getDefaultProviderFromSettings(
-                undefined,
-                userId,
-                'user',
-            );
-            if (userProvider) return userProvider;
-        }
-
-        const plugins = this.registry.getByCapability(this.CAPABILITY);
-        for (const registered of plugins) {
-            if (registered.state !== 'enabled') continue;
-            const isEnabled = await this.isPluginEnabled(registered.plugin.id, directoryId, userId);
-            if (isEnabled) return registered.plugin as IAiProviderPlugin;
+        // Fall back to first enabled provider
+        const enabledPlugins = await this.getEnabledPlugins(directoryId, userId);
+        if (enabledPlugins.length > 0) {
+            return enabledPlugins[0].plugin as IAiProviderPlugin;
         }
 
         throw new NoAiProviderError();
-    }
-
-    private async getDefaultProviderFromSettings(
-        directoryId?: string,
-        userId?: string,
-        scope?: 'directory' | 'user',
-    ): Promise<IAiProviderPlugin | null> {
-        const aiProviders = this.registry.getByCapability(this.CAPABILITY);
-        const enabledProviders = aiProviders.filter((p) => p.state === 'enabled');
-
-        if (enabledProviders.length === 0) return null;
-
-        // Check for isDefault setting on each provider
-        for (const registered of enabledProviders) {
-            try {
-                const settings = await this.getResolvedSettings(registered.plugin.id, {
-                    userId,
-                    directoryId,
-                });
-
-                const isDefault = this.getSettingTyped<boolean>(settings, 'isDefault', 'boolean');
-                if (isDefault) {
-                    this.logger.debug(
-                        `Using ${scope}-level default AI provider: ${registered.plugin.id}`,
-                    );
-                    return registered.plugin as IAiProviderPlugin;
-                }
-            } catch {
-                // Continue
-            }
-        }
-
-        // Check for defaultAiProvider setting
-        try {
-            const firstProvider = enabledProviders[0];
-            const settings = await this.getResolvedSettings(firstProvider.plugin.id, {
-                userId,
-                directoryId,
-            });
-
-            const defaultProviderId = this.getSettingTyped<string>(
-                settings,
-                'defaultAiProvider',
-                'string',
-            );
-            if (defaultProviderId) {
-                const defaultProvider = enabledProviders.find(
-                    (p) => p.plugin.id === defaultProviderId,
-                );
-                if (defaultProvider) {
-                    this.logger.debug(
-                        `Using ${scope}-level defaultAiProvider setting: ${defaultProviderId}`,
-                    );
-                    return defaultProvider.plugin as IAiProviderPlugin;
-                }
-            }
-        } catch {
-            // Continue
-        }
-
-        return null;
     }
 
     async getAvailableModels(facadeOptions?: AiFacadeOptions): Promise<readonly AiModel[]> {

@@ -554,4 +554,206 @@ describe('PluginLoaderService', () => {
             expect(discovered).toEqual([]);
         });
     });
+
+    describe('topological sort', () => {
+        it('should load plugins in dependency order', async () => {
+            const pluginA = createMockPlugin('plugin-a');
+            const pluginB = createMockPlugin('plugin-b');
+            const pluginC = createMockPlugin('plugin-c');
+            const mockRegister = jest.fn().mockReturnValue({});
+
+            // C depends on B, B depends on A
+            const module = await Test.createTestingModule({
+                providers: [
+                    PluginLoaderService,
+                    {
+                        provide: PLUGINS_MODULE_OPTIONS,
+                        useValue: {
+                            pluginPaths: [],
+                            builtInPlugins: [
+                                {
+                                    plugin: pluginC,
+                                    manifest: {
+                                        ...createMockManifest('plugin-c'),
+                                        dependencies: { 'plugin-b': '^1.0.0' },
+                                    },
+                                },
+                                {
+                                    plugin: pluginB,
+                                    manifest: {
+                                        ...createMockManifest('plugin-b'),
+                                        dependencies: { 'plugin-a': '^1.0.0' },
+                                    },
+                                },
+                                { plugin: pluginA, manifest: createMockManifest('plugin-a') },
+                            ],
+                            platformVersion: '1.0.0',
+                        },
+                    },
+                    {
+                        provide: PluginRegistryService,
+                        useValue: {
+                            has: jest.fn().mockReturnValue(false),
+                            register: mockRegister,
+                            getVersionsMap: jest.fn().mockReturnValue(new Map()),
+                        },
+                    },
+                    {
+                        provide: PluginManifestValidatorService,
+                        useValue: {
+                            validate: jest.fn().mockReturnValue({ valid: true }),
+                        },
+                    },
+                    {
+                        provide: PluginVersionCheckerService,
+                        useValue: { check: jest.fn().mockReturnValue({ valid: true }) },
+                    },
+                    {
+                        provide: PluginClassValidatorService,
+                        useValue: { validate: jest.fn().mockReturnValue({ valid: true }) },
+                    },
+                    {
+                        provide: PluginRepository,
+                        useValue: { upsert: jest.fn().mockResolvedValue({}) },
+                    },
+                ],
+            }).compile();
+
+            const testService = module.get<PluginLoaderService>(PluginLoaderService);
+            const results = await testService.discoverAndLoadAll();
+
+            expect(results.loaded).toBe(3);
+            // Verify they loaded in correct order: A, then B, then C
+            const registerCalls = mockRegister.mock.calls;
+            expect(registerCalls[0][0].id).toBe('plugin-a');
+            expect(registerCalls[1][0].id).toBe('plugin-b');
+            expect(registerCalls[2][0].id).toBe('plugin-c');
+        });
+
+        it('should detect circular dependencies', async () => {
+            const pluginA = createMockPlugin('plugin-a');
+            const pluginB = createMockPlugin('plugin-b');
+
+            // A depends on B, B depends on A (circular)
+            const module = await Test.createTestingModule({
+                providers: [
+                    PluginLoaderService,
+                    {
+                        provide: PLUGINS_MODULE_OPTIONS,
+                        useValue: {
+                            pluginPaths: [],
+                            builtInPlugins: [
+                                {
+                                    plugin: pluginA,
+                                    manifest: {
+                                        ...createMockManifest('plugin-a'),
+                                        dependencies: { 'plugin-b': '^1.0.0' },
+                                    },
+                                },
+                                {
+                                    plugin: pluginB,
+                                    manifest: {
+                                        ...createMockManifest('plugin-b'),
+                                        dependencies: { 'plugin-a': '^1.0.0' },
+                                    },
+                                },
+                            ],
+                            platformVersion: '1.0.0',
+                        },
+                    },
+                    {
+                        provide: PluginRegistryService,
+                        useValue: {
+                            has: jest.fn().mockReturnValue(false),
+                            register: jest.fn().mockReturnValue({}),
+                            getVersionsMap: jest.fn().mockReturnValue(new Map()),
+                        },
+                    },
+                    {
+                        provide: PluginManifestValidatorService,
+                        useValue: {
+                            validate: jest.fn().mockReturnValue({ valid: true }),
+                        },
+                    },
+                    {
+                        provide: PluginVersionCheckerService,
+                        useValue: { check: jest.fn().mockReturnValue({ valid: true }) },
+                    },
+                    {
+                        provide: PluginClassValidatorService,
+                        useValue: { validate: jest.fn().mockReturnValue({ valid: true }) },
+                    },
+                    {
+                        provide: PluginRepository,
+                        useValue: { upsert: jest.fn().mockResolvedValue({}) },
+                    },
+                ],
+            }).compile();
+
+            const testService = module.get<PluginLoaderService>(PluginLoaderService);
+
+            await expect(testService.discoverAndLoadAll()).rejects.toThrow(
+                'Circular dependency detected',
+            );
+        });
+
+        it('should fail when dependency is missing', async () => {
+            const pluginA = createMockPlugin('plugin-a');
+
+            // A depends on non-existent plugin
+            const module = await Test.createTestingModule({
+                providers: [
+                    PluginLoaderService,
+                    {
+                        provide: PLUGINS_MODULE_OPTIONS,
+                        useValue: {
+                            pluginPaths: [],
+                            builtInPlugins: [
+                                {
+                                    plugin: pluginA,
+                                    manifest: {
+                                        ...createMockManifest('plugin-a'),
+                                        dependencies: { 'missing-plugin': '^1.0.0' },
+                                    },
+                                },
+                            ],
+                            platformVersion: '1.0.0',
+                        },
+                    },
+                    {
+                        provide: PluginRegistryService,
+                        useValue: {
+                            has: jest.fn().mockReturnValue(false),
+                            register: jest.fn().mockReturnValue({}),
+                            getVersionsMap: jest.fn().mockReturnValue(new Map()),
+                        },
+                    },
+                    {
+                        provide: PluginManifestValidatorService,
+                        useValue: {
+                            validate: jest.fn().mockReturnValue({ valid: true }),
+                        },
+                    },
+                    {
+                        provide: PluginVersionCheckerService,
+                        useValue: { check: jest.fn().mockReturnValue({ valid: true }) },
+                    },
+                    {
+                        provide: PluginClassValidatorService,
+                        useValue: { validate: jest.fn().mockReturnValue({ valid: true }) },
+                    },
+                    {
+                        provide: PluginRepository,
+                        useValue: { upsert: jest.fn().mockResolvedValue({}) },
+                    },
+                ],
+            }).compile();
+
+            const testService = module.get<PluginLoaderService>(PluginLoaderService);
+
+            await expect(testService.discoverAndLoadAll()).rejects.toThrow(
+                'depends on unknown plugin',
+            );
+        });
+    });
 });

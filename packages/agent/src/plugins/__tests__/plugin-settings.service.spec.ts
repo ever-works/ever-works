@@ -1606,4 +1606,54 @@ describe('PluginSettingsService', () => {
             });
         });
     });
+
+    describe('configurationMode enforcement', () => {
+        it('should reject user settings for admin-only plugins', async () => {
+            const adminOnlyPlugin = createMockPlugin();
+            (adminOnlyPlugin as any).configurationMode = 'admin-only';
+            jest.spyOn(registry, 'get').mockReturnValue(createRegisteredPlugin(adminOnlyPlugin));
+
+            await expect(
+                service.updateUserSettings('test-plugin', 'user-1', { theme: 'dark' }),
+            ).rejects.toThrow('admin-only and cannot be configured by users');
+        });
+
+        it('should reject directory settings for admin-only plugins', async () => {
+            const adminOnlyPlugin = createMockPlugin();
+            (adminOnlyPlugin as any).configurationMode = 'admin-only';
+            jest.spyOn(registry, 'get').mockReturnValue(createRegisteredPlugin(adminOnlyPlugin));
+
+            await expect(
+                service.updateDirectorySettings('test-plugin', 'dir-1', { maxItems: 25 }),
+            ).rejects.toThrow('admin-only and cannot be configured at directory level');
+        });
+
+        it('should ignore user/directory settings when resolving admin-only plugin settings', async () => {
+            const adminOnlyPlugin = createMockPlugin();
+            (adminOnlyPlugin as any).configurationMode = 'admin-only';
+            jest.spyOn(registry, 'get').mockReturnValue(createRegisteredPlugin(adminOnlyPlugin));
+            jest.spyOn(pluginRepository, 'findByPluginId').mockResolvedValue({
+                id: '1',
+                pluginId: 'test-plugin',
+                settings: { enabled: false },
+                secretSettings: {},
+            } as any);
+            jest.spyOn(userPluginRepository, 'findByUserAndPlugin').mockResolvedValue({
+                id: '1',
+                userId: 'user-1',
+                pluginId: 'test-plugin',
+                settings: { enabled: true },
+                secretSettings: {},
+            } as any);
+
+            const result = await service.getResolvedSettings('test-plugin', {
+                userId: 'user-1',
+                directoryId: 'dir-1',
+            });
+
+            // Should use admin settings, not user settings
+            expect(result.enabled.value).toBe(false);
+            expect(result.enabled.source).toBe('admin');
+        });
+    });
 });

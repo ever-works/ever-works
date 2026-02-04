@@ -11,6 +11,7 @@ import {
     type RegisteredPlugin,
 } from '../../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../../plugins/services/plugin-settings.service';
+import { DirectoryPluginRepository } from '../../plugins/repositories/directory-plugin.repository';
 import type {
     IAiProviderPlugin,
     PluginManifest,
@@ -324,10 +325,10 @@ describe('AiFacadeService', () => {
         });
     });
 
-    describe('provider resolution with settings', () => {
+    describe('provider resolution with active directory provider', () => {
         const testSchema = z.object({ name: z.string() });
 
-        it('should use directory-level default provider when set', async () => {
+        it('should use directory active provider when set', async () => {
             const openaiPlugin = createMockAiPlugin('openai-provider', 'OpenAI');
             const anthropicPlugin = createMockAiPlugin('anthropic-provider', 'Anthropic');
 
@@ -339,28 +340,53 @@ describe('AiFacadeService', () => {
             });
 
             registry.getByCapability.mockReturnValue([openaiRegistered, anthropicRegistered]);
+            registry.get.mockReturnValue(anthropicRegistered);
 
-            // anthropic-provider is set as default for this directory
-            settingsService.getSettings.mockImplementation(async (pluginId) => {
-                if (pluginId === 'anthropic-provider') {
-                    return { isDefault: true };
-                }
-                return {};
-            });
+            // Import DirectoryPluginRepository to mock it
+            const {
+                DirectoryPluginRepository,
+            } = require('../../plugins/repositories/directory-plugin.repository');
+            const mockDirRepo = {
+                findActiveByCapability: jest.fn().mockResolvedValue({
+                    pluginId: 'anthropic-provider',
+                    capability: 'ai-provider',
+                }),
+            };
 
-            await service.askJson(
+            // Recreate service with mocked directory repository
+            const module: TestingModule = await Test.createTestingModule({
+                providers: [
+                    AiFacadeService,
+                    {
+                        provide: PluginRegistryService,
+                        useValue: registry,
+                    },
+                    {
+                        provide: PluginSettingsService,
+                        useValue: settingsService,
+                    },
+                    {
+                        provide: DirectoryPluginRepository,
+                        useValue: mockDirRepo,
+                    },
+                ],
+            }).compile();
+
+            const serviceWithDirRepo = module.get<AiFacadeService>(AiFacadeService);
+
+            await serviceWithDirRepo.askJson(
                 'Test',
                 testSchema,
                 {},
                 { directoryId: 'dir-123', userId: 'user-456' },
             );
 
-            // Anthropic should be used because it has isDefault: true at directory level
+            // Anthropic should be used because it's the active provider for the directory
             expect(anthropicPlugin.createChatCompletion).toHaveBeenCalled();
             expect(openaiPlugin.createChatCompletion).not.toHaveBeenCalled();
         });
 
-        it('should use user-level default provider when directory has no default', async () => {
+        it('should fall back to first enabled provider when no directory active provider', async () => {
             const openaiPlugin = createMockAiPlugin('openai-provider', 'OpenAI');
             const anthropicPlugin = createMockAiPlugin('anthropic-provider', 'Anthropic');
 
@@ -372,43 +398,6 @@ describe('AiFacadeService', () => {
             });
 
             registry.getByCapability.mockReturnValue([openaiRegistered, anthropicRegistered]);
-
-            let callCount = 0;
-            // No default at directory level, but anthropic is default at user level
-            settingsService.getSettings.mockImplementation(async (pluginId, options) => {
-                callCount++;
-                // First calls with directoryId return no default
-                if (options?.directoryId) {
-                    return {};
-                }
-                // User-level calls: anthropic is default
-                if (pluginId === 'anthropic-provider' && options?.userId && !options?.directoryId) {
-                    return { isDefault: true };
-                }
-                return {};
-            });
-
-            await service.askJson('Test', testSchema, {}, { userId: 'user-456' });
-
-            // Anthropic should be used because it has isDefault: true at user level
-            expect(anthropicPlugin.createChatCompletion).toHaveBeenCalled();
-            expect(openaiPlugin.createChatCompletion).not.toHaveBeenCalled();
-        });
-
-        it('should fall back to first enabled provider when no defaults set', async () => {
-            const openaiPlugin = createMockAiPlugin('openai-provider', 'OpenAI');
-            const anthropicPlugin = createMockAiPlugin('anthropic-provider', 'Anthropic');
-
-            const openaiRegistered = createRegisteredPlugin(openaiPlugin, {
-                capabilities: ['ai-provider'],
-            });
-            const anthropicRegistered = createRegisteredPlugin(anthropicPlugin, {
-                capabilities: ['ai-provider'],
-            });
-
-            registry.getByCapability.mockReturnValue([openaiRegistered, anthropicRegistered]);
-
-            // No defaults set
             settingsService.getSettings.mockResolvedValue({});
 
             await service.askJson(
@@ -418,11 +407,11 @@ describe('AiFacadeService', () => {
                 { directoryId: 'dir-123', userId: 'user-456' },
             );
 
-            // First provider (OpenAI) should be used
+            // First provider (OpenAI) should be used when no active provider set
             expect(openaiPlugin.createChatCompletion).toHaveBeenCalled();
         });
 
-        it('should use defaultAiProvider setting when specified', async () => {
+        it('should use provider override when specified', async () => {
             const openaiPlugin = createMockAiPlugin('openai-provider', 'OpenAI');
             const anthropicPlugin = createMockAiPlugin('anthropic-provider', 'Anthropic');
 
@@ -434,20 +423,16 @@ describe('AiFacadeService', () => {
             });
 
             registry.getByCapability.mockReturnValue([openaiRegistered, anthropicRegistered]);
-
-            // defaultAiProvider setting points to anthropic
-            settingsService.getSettings.mockResolvedValue({
-                defaultAiProvider: 'anthropic-provider',
-            });
+            registry.get.mockReturnValue(anthropicRegistered);
 
             await service.askJson(
                 'Test',
                 testSchema,
-                {},
+                { routing: { providerOverride: 'anthropic-provider' } },
                 { directoryId: 'dir-123', userId: 'user-456' },
             );
 
-            // Anthropic should be used because defaultAiProvider is set
+            // Anthropic should be used because of provider override
             expect(anthropicPlugin.createChatCompletion).toHaveBeenCalled();
             expect(openaiPlugin.createChatCompletion).not.toHaveBeenCalled();
         });

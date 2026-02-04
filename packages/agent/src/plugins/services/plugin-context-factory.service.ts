@@ -34,6 +34,7 @@ export class PluginContextFactoryService {
     private readonly platformVersion: string;
     private readonly environment: 'development' | 'production' | 'test';
     private readonly features: ReadonlySet<string>;
+    private injectedServices: Partial<PluginServices> = {};
 
     constructor(
         @Inject(PLUGINS_MODULE_OPTIONS)
@@ -48,6 +49,17 @@ export class PluginContextFactoryService {
         this.platformVersion = options.platformVersion || DEFAULT_PLATFORM_VERSION;
         this.environment = options.environment || 'development';
         this.features = new Set(options.features || []);
+    }
+
+    /**
+     * Inject platform services into plugin context.
+     * Call this during module initialization to provide access to UserService, DirectoryService, etc.
+     */
+    injectServices(services: Partial<PluginServices>): void {
+        this.injectedServices = { ...this.injectedServices, ...services };
+        this.logger.debug(
+            `Injected ${Object.keys(services).length} service(s) into plugin context`,
+        );
     }
 
     /**
@@ -281,24 +293,14 @@ export class PluginContextFactoryService {
 
     /**
      * Create PluginServices for a plugin.
-     *
-     * Note: scopeOptions contains userId/directoryId that are used for settings
-     * resolution in getSettings/getResolvedSettings methods. The service refs
-     * (directory, user) require actual service implementations to be injected
-     * by the consuming module if plugins need to access directory/user data.
-     *
-     * For settings resolution, the scope context is passed via scopeOptions and
-     * used in buildSettingsOptions() when getSettings() is called.
      */
     private createServices(_scopeOptions?: {
         userId?: string;
         directoryId?: string;
     }): PluginServices {
-        // Service refs need actual implementations - can be populated by consuming module
-        // if plugins need access to directory/user data beyond settings
         return {
-            directory: undefined,
-            user: undefined,
+            directory: this.injectedServices.directory,
+            user: this.injectedServices.user,
         };
     }
 

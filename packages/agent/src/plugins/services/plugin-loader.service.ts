@@ -49,6 +49,18 @@ export interface LoadResult {
 }
 
 /**
+ * Dependency node for topological sorting
+ */
+interface DependencyNode {
+    id: string;
+    plugin: DiscoveredPlugin | PluginModule;
+    builtIn: boolean;
+    dependencies: string[];
+    visited: boolean;
+    visiting: boolean;
+}
+
+/**
  * Service for discovering and loading plugins.
  * Scans file system paths and loads plugin modules.
  */
@@ -437,7 +449,7 @@ export class PluginLoaderService {
     }
 
     /**
-     * Discover and load all plugins
+     * Discover and load all plugins with dependency resolution
      */
     async discoverAndLoadAll(): Promise<{
         discovered: number;
@@ -450,22 +462,48 @@ export class PluginLoaderService {
         let loaded = 0;
         let failed = 0;
 
-        // Load built-in plugins first
-        if (this.options.autoLoadBuiltIn !== false) {
-            const builtInResults = await this.loadAllBuiltIn();
-            for (const result of builtInResults) {
-                results.push(result);
-                if (result.success) {
-                    loaded++;
-                } else {
-                    failed++;
-                }
+        // Build unified list of all plugins (built-in + discovered)
+        const allPlugins: Array<{
+            id: string;
+            plugin: DiscoveredPlugin | PluginModule;
+            builtIn: boolean;
+        }> = [];
+
+        // Add built-in plugins
+        if (this.options.builtInPlugins) {
+            for (const pluginModule of this.options.builtInPlugins) {
+                const plugin =
+                    typeof pluginModule.plugin === 'function'
+                        ? new (pluginModule.plugin as new () => IPlugin)()
+                        : pluginModule.plugin;
+                allPlugins.push({
+                    id: plugin.id,
+                    plugin: pluginModule,
+                    builtIn: true,
+                });
             }
         }
 
-        // Load discovered plugins
-        for (const plugin of discovered) {
-            const result = await this.load(plugin);
+        // Add discovered plugins
+        for (const discoveredPlugin of discovered) {
+            allPlugins.push({
+                id: discoveredPlugin.manifest.id,
+                plugin: discoveredPlugin,
+                builtIn: false,
+            });
+        }
+
+        // Build dependency graph and perform topological sort
+        const sortedPlugins = this.topologicalSort(allPlugins);
+
+        // Load plugins in dependency order
+        for (const pluginInfo of sortedPlugins) {
+            let result: LoadResult;
+            if (pluginInfo.builtIn) {
+                result = await this.loadBuiltIn(pluginInfo.plugin as PluginModule);
+            } else {
+                result = await this.load(pluginInfo.plugin as DiscoveredPlugin);
+            }
             results.push(result);
             if (result.success) {
                 loaded++;
@@ -475,7 +513,7 @@ export class PluginLoaderService {
         }
 
         this.logger.log(
-            `Plugin loading complete: ${loaded} loaded, ${failed} failed out of ${discovered.length + (this.options.builtInPlugins?.length || 0)} total`,
+            `Plugin loading complete: ${loaded} loaded, ${failed} failed out of ${allPlugins.length} total`,
         );
 
         return {
@@ -484,6 +522,87 @@ export class PluginLoaderService {
             failed,
             results,
         };
+    }
+
+    /**
+     * Perform topological sort on plugins based on dependencies
+     */
+    private topologicalSort(
+        plugins: Array<{ id: string; plugin: DiscoveredPlugin | PluginModule; builtIn: boolean }>,
+    ): Array<{ id: string; plugin: DiscoveredPlugin | PluginModule; builtIn: boolean }> {
+        const nodes = new Map<string, DependencyNode>();
+
+        // Build nodes
+        for (const plugin of plugins) {
+            const dependencies = this.extractDependencies(plugin.plugin, plugin.builtIn);
+            nodes.set(plugin.id, {
+                id: plugin.id,
+                plugin: plugin.plugin,
+                builtIn: plugin.builtIn,
+                dependencies,
+                visited: false,
+                visiting: false,
+            });
+        }
+
+        const sorted: Array<{
+            id: string;
+            plugin: DiscoveredPlugin | PluginModule;
+            builtIn: boolean;
+        }> = [];
+        const visited = new Set<string>();
+
+        // DFS with cycle detection
+        const visit = (nodeId: string, stack: string[] = []): void => {
+            const node = nodes.get(nodeId);
+            if (!node || visited.has(nodeId)) return;
+
+            if (stack.includes(nodeId)) {
+                const cycle = stack.slice(stack.indexOf(nodeId)).concat(nodeId);
+                throw new Error(`Circular dependency detected: ${cycle.join(' -> ')}`);
+            }
+
+            stack.push(nodeId);
+
+            // Visit dependencies first
+            for (const depId of node.dependencies) {
+                if (!nodes.has(depId)) {
+                    throw new Error(`Plugin "${nodeId}" depends on unknown plugin "${depId}"`);
+                }
+                visit(depId, stack);
+            }
+
+            stack.pop();
+            visited.add(nodeId);
+            sorted.push({
+                id: node.id,
+                plugin: node.plugin,
+                builtIn: node.builtIn,
+            });
+        };
+
+        // Visit all nodes
+        for (const [id] of nodes) {
+            visit(id);
+        }
+
+        return sorted;
+    }
+
+    /**
+     * Extract dependencies from a plugin manifest
+     */
+    private extractDependencies(
+        plugin: DiscoveredPlugin | PluginModule,
+        builtIn: boolean,
+    ): string[] {
+        if (builtIn) {
+            const manifest = (plugin as PluginModule).manifest;
+            return manifest?.dependencies ? Object.keys(manifest.dependencies) : [];
+        } else {
+            const manifest = (plugin as DiscoveredPlugin).manifest;
+            return manifest.dependencies ? Object.keys(manifest.dependencies) : [];
+        }
     }
 
     /**

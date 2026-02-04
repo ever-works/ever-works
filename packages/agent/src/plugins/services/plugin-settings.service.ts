@@ -79,32 +79,40 @@ export class PluginSettingsService {
 
         const plugin = registered.plugin;
         const settingsSchema = plugin.settingsSchema;
+        const configMode = this.getConfigurationMode(plugin);
+
+        // Enforce configurationMode: admin-only plugins ignore user/directory settings
+        const effectiveOptions = this.applyConfigurationMode(options, configMode);
 
         // Get settings from each level
         const adminEntity = await this.pluginRepository.findByPluginId(pluginId);
         const adminSettings = adminEntity?.settings || {};
-        const adminSecrets = options?.includeSecrets ? adminEntity?.secretSettings || {} : {};
+        const adminSecrets = effectiveOptions?.includeSecrets
+            ? adminEntity?.secretSettings || {}
+            : {};
 
         let userSettings: Record<string, unknown> = {};
         let userSecrets: Record<string, unknown> = {};
-        if (options?.userId) {
+        if (effectiveOptions?.userId && configMode !== 'admin-only') {
             const userEntity = await this.userPluginRepository.findByUserAndPlugin(
-                options.userId,
+                effectiveOptions.userId,
                 pluginId,
             );
             userSettings = userEntity?.settings || {};
-            userSecrets = options?.includeSecrets ? userEntity?.secretSettings || {} : {};
+            userSecrets = effectiveOptions?.includeSecrets ? userEntity?.secretSettings || {} : {};
         }
 
         let directorySettings: Record<string, unknown> = {};
         let directorySecrets: Record<string, unknown> = {};
-        if (options?.directoryId) {
+        if (effectiveOptions?.directoryId && configMode !== 'admin-only') {
             const dirEntity = await this.directoryPluginRepository.findByDirectoryAndPlugin(
-                options.directoryId,
+                effectiveOptions.directoryId,
                 pluginId,
             );
             directorySettings = dirEntity?.settings || {};
-            directorySecrets = options?.includeSecrets ? dirEntity?.secretSettings || {} : {};
+            directorySecrets = effectiveOptions?.includeSecrets
+                ? dirEntity?.secretSettings || {}
+                : {};
         }
 
         // Resolve each setting
@@ -119,11 +127,37 @@ export class PluginSettingsService {
                     user: { ...userSettings, ...userSecrets },
                     admin: { ...adminSettings, ...adminSecrets },
                 },
-                options,
+                effectiveOptions,
             );
         }
 
         return resolved;
+    }
+
+    /**
+     * Get configuration mode from plugin
+     */
+    private getConfigurationMode(plugin: { configurationMode?: string }): string {
+        return plugin.configurationMode || 'hybrid';
+    }
+
+    /**
+     * Apply configurationMode restrictions to settings options
+     */
+    private applyConfigurationMode(
+        options: SettingsResolutionOptions | undefined,
+        configMode: string,
+    ): SettingsResolutionOptions | undefined {
+        if (configMode === 'admin-only') {
+            // Admin-only: ignore user/directory settings
+            return {
+                ...options,
+                userId: undefined,
+                directoryId: undefined,
+                includeSecrets: false, // Never include secrets for non-admin reads
+            };
+        }
+        return options;
     }
 
     /**
@@ -240,6 +274,12 @@ export class PluginSettingsService {
             throw new Error(`Plugin "${pluginId}" not found`);
         }
 
+        // Enforce configurationMode
+        const configMode = this.getConfigurationMode(registered.plugin);
+        if (configMode === 'admin-only') {
+            throw new Error(`Plugin "${pluginId}" is admin-only and cannot be configured by users`);
+        }
+
         const schema = registered.plugin.settingsSchema;
         const definitions = this.extractSettingDefinitions(schema);
 
@@ -337,6 +377,14 @@ export class PluginSettingsService {
         const registered = this.registry.get(pluginId);
         if (!registered) {
             throw new Error(`Plugin "${pluginId}" not found`);
+        }
+
+        // Enforce configurationMode
+        const configMode = this.getConfigurationMode(registered.plugin);
+        if (configMode === 'admin-only') {
+            throw new Error(
+                `Plugin "${pluginId}" is admin-only and cannot be configured at directory level`,
+            );
         }
 
         const schema = registered.plugin.settingsSchema;

@@ -597,6 +597,45 @@ describe('PluginContextFactoryService', () => {
             expect(context.services.directory).toBeUndefined();
             expect(context.services.user).toBeUndefined();
         });
+
+        it('should inject services via injectServices', () => {
+            const mockDirectoryService = { getDirectory: jest.fn() };
+            const mockUserService = { getUser: jest.fn() };
+
+            service.injectServices({
+                directory: mockDirectoryService as any,
+                user: mockUserService as any,
+            });
+
+            const context = service.createContext('test-plugin');
+
+            expect(context.services.directory).toBe(mockDirectoryService);
+            expect(context.services.user).toBe(mockUserService);
+        });
+
+        it('should merge services when injecting multiple times', () => {
+            const mockDirectoryService = { getDirectory: jest.fn() };
+            const mockUserService = { getUser: jest.fn() };
+
+            service.injectServices({ directory: mockDirectoryService as any });
+            service.injectServices({ user: mockUserService as any });
+
+            const context = service.createContext('test-plugin');
+
+            expect(context.services.directory).toBe(mockDirectoryService);
+            expect(context.services.user).toBe(mockUserService);
+        });
+
+        it('should allow partial service injection', () => {
+            const mockDirectoryService = { getDirectory: jest.fn() };
+
+            service.injectServices({ directory: mockDirectoryService as any });
+
+            const context = service.createContext('test-plugin');
+
+            expect(context.services.directory).toBe(mockDirectoryService);
+            expect(context.services.user).toBeUndefined();
+        });
     });
 
     describe('default options', () => {
