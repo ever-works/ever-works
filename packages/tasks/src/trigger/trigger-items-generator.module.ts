@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { GitModule } from '@packages/agent/git';
+import { FacadesModule } from '@packages/agent/facades';
 import { TriggerAiModule } from './trigger-ai.module';
 
 /**
@@ -7,7 +7,7 @@ import { TriggerAiModule } from './trigger-ai.module';
  * Step services have been moved to plugins (default-pipeline-plugin).
  */
 @Module({
-    imports: [TriggerAiModule, GitModule],
+    imports: [TriggerAiModule, FacadesModule],
     providers: [],
     exports: [],
 })

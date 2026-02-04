@@ -1,7 +1,6 @@
 import { Module, Global, DynamicModule, Provider, OnModuleDestroy } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { EventEmitterModule } from '@nestjs/event-emitter';
-import { CacheModule } from '@nestjs/cache-manager';
 
 // Entities
 import { PluginEntity } from './entities/plugin.entity';
@@ -118,11 +117,7 @@ export class PluginsModule implements OnModuleDestroy {
     static forRoot(options: PluginsModuleOptions = {}): DynamicModule {
         return {
             module: PluginsModule,
-            imports: [
-                TypeOrmModule.forFeature(PLUGIN_ENTITIES),
-                EventEmitterModule.forRoot(),
-                CacheModule.register(),
-            ],
+            imports: [TypeOrmModule.forFeature(PLUGIN_ENTITIES), EventEmitterModule.forRoot()],
             providers: [
                 {
                     provide: PLUGINS_MODULE_OPTIONS,
@@ -155,7 +150,6 @@ export class PluginsModule implements OnModuleDestroy {
                 ...(options.imports || []),
                 TypeOrmModule.forFeature(PLUGIN_ENTITIES),
                 EventEmitterModule.forRoot(),
-                CacheModule.register(),
             ],
             providers: [...asyncProviders, ...PROVIDERS],
             exports: [...EXPORTS, PLUGINS_MODULE_OPTIONS],

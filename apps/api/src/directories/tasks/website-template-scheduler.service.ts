@@ -3,7 +3,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { config } from '@packages/agent/config';
 import { DirectoryRepository } from '@packages/agent/database';
 import { Directory } from '@packages/agent/entities';
-import { WebsiteUpdateService } from '@packages/agent/website-generator';
+import { WebsiteUpdateService } from '@packages/agent/generators';
 
 @Injectable()
 export class WebsiteTemplateSchedulerService {

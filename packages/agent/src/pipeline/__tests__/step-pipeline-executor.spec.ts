@@ -16,7 +16,8 @@ jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => {});
 import { PipelineBuilderService } from '../pipeline-builder.service';
 import { DefaultPipelinePlugin } from '@ever-works/default-pipeline-plugin';
 import { PluginRegistryService } from '../../plugins/services/plugin-registry.service';
-import { createGenerationContext } from '../generation-context';
+import { createGenerationContext, TypedGenerationContext } from '../generation-context';
+import * as superjson from 'superjson';
 import { AiFacadeService } from '../../facades/ai.facade';
 import { SearchFacadeService } from '../../facades/search.facade';
 import { ScreenshotFacadeService } from '../../facades/screenshot.facade';
@@ -235,14 +236,48 @@ describe('StepPipelineExecutorService', () => {
         it('should save checkpoint after each step', async () => {
             await service.execute(mockDirectory, mockRequest, mockExisting);
 
+            // Verify checkpoint was saved as serialized string
             expect(cacheManager.set).toHaveBeenCalledWith(
                 `pipeline-checkpoint-${mockDirectory.id}`,
-                expect.objectContaining({
-                    stepIndex: 0,
-                    stepName: 'Prompt Comparison',
-                }),
+                expect.any(String),
                 expect.any(Number),
             );
+
+            // Parse and verify content
+            const serialized = cacheManager.set.mock.calls[0][1];
+            const checkpoint = superjson.parse<CheckpointData>(serialized);
+            expect(checkpoint.stepIndex).toBe(0);
+            expect(checkpoint.stepName).toBe('Prompt Comparison');
+        });
+
+        it('should convert Sets and Maps to arrays when saving checkpoint', async () => {
+            // Add some data to Sets and Maps
+            defaultPlugin.registerStepExecutor('prompt-comparison' as any, {
+                name: 'Prompt Comparison',
+                run: jest.fn().mockImplementation((ctx) => {
+                    ctx.processedSourceUrls.add('https://example.com');
+                    ctx.contentCache.set('url1', 'content1');
+                    ctx.contentCache.set('url2', 'content2');
+                    ctx.shouldStop = true;
+                    return Promise.resolve(ctx);
+                }),
+            });
+
+            await service.execute(mockDirectory, mockRequest, mockExisting);
+
+            // Verify that checkpoint was serialized with superjson
+            const serializedCheckpoint = cacheManager.set.mock.calls[0][1];
+            expect(typeof serializedCheckpoint).toBe('string');
+
+            // Parse and verify Sets and Maps were preserved
+            const savedCheckpoint = superjson.parse<CheckpointData>(serializedCheckpoint);
+            expect(savedCheckpoint.context.processedSourceUrls instanceof Set).toBe(true);
+            expect(savedCheckpoint.context.processedSourceUrls.has('https://example.com')).toBe(
+                true,
+            );
+            expect(savedCheckpoint.context.contentCache instanceof Map).toBe(true);
+            expect(savedCheckpoint.context.contentCache.get('url1')).toBe('content1');
+            expect(savedCheckpoint.context.contentCache.get('url2')).toBe('content2');
         });
 
         it('should track per-step metrics', async () => {
@@ -353,13 +388,18 @@ describe('StepPipelineExecutorService', () => {
                     featuredItemHints: [],
                 },
                 completedSteps: ['prompt-comparison', 'prompt-processing'],
+                schemaVersion: 1,
             };
 
-            cacheManager.get.mockResolvedValue(mockCheckpoint);
+            // Serialize with superjson as the real implementation does
+            cacheManager.get.mockResolvedValue(superjson.stringify(mockCheckpoint));
 
             const checkpoint = await service.loadCheckpoint(mockDirectory.id);
 
-            expect(checkpoint).toEqual(mockCheckpoint);
+            expect(checkpoint).not.toBeNull();
+            expect(checkpoint!.stepIndex).toBe(mockCheckpoint.stepIndex);
+            expect(checkpoint!.stepName).toBe(mockCheckpoint.stepName);
+            expect(checkpoint!.schemaVersion).toBe(mockCheckpoint.schemaVersion);
         });
     });
 
@@ -380,6 +420,184 @@ describe('StepPipelineExecutorService', () => {
             const result = await service.resumeFromCheckpoint(mockDirectory.id);
 
             expect(result).toBeNull();
+        });
+
+        it('should reject checkpoints with incompatible schema version', async () => {
+            const oldCheckpoint = {
+                stepIndex: 5,
+                stepName: 'Web Search',
+                timestamp: new Date().toISOString(),
+                context: {},
+                completedSteps: [],
+                schemaVersion: 999, // Future/incompatible version
+            };
+
+            // Serialize with superjson as the real implementation does
+            cacheManager.get.mockResolvedValue(superjson.stringify(oldCheckpoint));
+
+            const result = await service.resumeFromCheckpoint(mockDirectory.id);
+
+            expect(result).toBeNull();
+            expect(cacheManager.del).toHaveBeenCalledWith(
+                `pipeline-checkpoint-${mockDirectory.id}`,
+            );
+        });
+
+        it('should properly restore Sets and Maps from checkpoint', async () => {
+            registry.register(defaultPlugin, {
+                id: 'default-pipeline',
+                name: 'Default Pipeline',
+                version: '1.0.0',
+                description: 'Default pipeline plugin for tests',
+                category: 'pipeline',
+                capabilities: ['default-pipeline'],
+            });
+            registry.updateState('default-pipeline', 'enabled');
+
+            const mockCheckpoint: CheckpointData = {
+                stepIndex: 0,
+                stepName: 'Prompt Comparison',
+                timestamp: new Date().toISOString(),
+                context: {
+                    directory: mockDirectory,
+                    request: mockRequest,
+                    existing: mockExisting,
+                    extractedUrls: ['https://example.com'],
+                    searchQueries: ['test query'],
+                    webPages: [],
+                    // Use real Set and Map - superjson handles serialization
+                    processedSourceUrls: new Set(['https://processed.com', 'https://url2.com']),
+                    contentCache: new Map([
+                        ['url1', 'content1'],
+                        ['url2', 'content2'],
+                    ]),
+                    initialAiItems: [],
+                    extractedWebItems: [],
+                    aggregatedItems: [],
+                    finalItems: [],
+                    finalCategories: [],
+                    finalTags: [],
+                    finalBrands: [],
+                    metrics: {
+                        startTime: Date.now(),
+                        itemsProcessed: 10,
+                        urlsExtracted: 5,
+                        pagesRetrieved: 3,
+                        itemsExtracted: 8,
+                        itemsAfterDedup: 7,
+                        steps: {},
+                    },
+                    allInitialCategories: ['cat1'],
+                    allPriorityCategories: ['cat2'],
+                    featuredItemHints: ['hint1'],
+                    subject: 'Test Subject',
+                },
+                completedSteps: [],
+                schemaVersion: 1,
+            };
+
+            // Serialize with superjson as the real implementation does
+            cacheManager.get.mockResolvedValue(superjson.stringify(mockCheckpoint));
+
+            let capturedContext: TypedGenerationContext | null = null;
+
+            // Register all built-in step executors
+            for (const step of DefaultPipelinePlugin.getBuiltInSteps()) {
+                defaultPlugin.registerStepExecutor(step.id as any, {
+                    name: step.name,
+                    run: jest.fn().mockImplementation((ctx) => {
+                        if (step.id === 'prompt-comparison') {
+                            capturedContext = ctx;
+                        }
+                        ctx.shouldStop = true;
+                        return Promise.resolve(ctx);
+                    }),
+                });
+            }
+
+            await service.resumeFromCheckpoint(mockDirectory.id);
+
+            expect(capturedContext).not.toBeNull();
+            // Verify Sets were restored correctly
+            expect(capturedContext!.processedSourceUrls instanceof Set).toBe(true);
+            expect(capturedContext!.processedSourceUrls.has('https://processed.com')).toBe(true);
+            expect(capturedContext!.processedSourceUrls.has('https://url2.com')).toBe(true);
+            expect(capturedContext!.processedSourceUrls.size).toBe(2);
+            // Verify Maps were restored correctly
+            expect(capturedContext!.contentCache instanceof Map).toBe(true);
+            expect(capturedContext!.contentCache.get('url1')).toBe('content1');
+            expect(capturedContext!.contentCache.get('url2')).toBe('content2');
+            expect(capturedContext!.contentCache.size).toBe(2);
+        });
+
+        it('should handle empty Sets and Maps in checkpoint', async () => {
+            registry.register(defaultPlugin, {
+                id: 'default-pipeline',
+                name: 'Default Pipeline',
+                version: '1.0.0',
+                description: 'Default pipeline plugin for tests',
+                category: 'pipeline',
+                capabilities: ['default-pipeline'],
+            });
+            registry.updateState('default-pipeline', 'enabled');
+
+            const mockCheckpoint: CheckpointData = {
+                stepIndex: 1,
+                stepName: 'Prompt Comparison',
+                timestamp: new Date().toISOString(),
+                context: {
+                    directory: mockDirectory,
+                    request: mockRequest,
+                    existing: mockExisting,
+                    extractedUrls: [],
+                    searchQueries: [],
+                    webPages: [],
+                    processedSourceUrls: new Set(),
+                    contentCache: new Map(),
+                    initialAiItems: [],
+                    extractedWebItems: [],
+                    aggregatedItems: [],
+                    finalItems: [],
+                    finalCategories: [],
+                    finalTags: [],
+                    finalBrands: [],
+                    metrics: {
+                        startTime: Date.now(),
+                        itemsProcessed: 0,
+                        urlsExtracted: 0,
+                        pagesRetrieved: 0,
+                        itemsExtracted: 0,
+                        itemsAfterDedup: 0,
+                        steps: {},
+                    },
+                    allInitialCategories: [],
+                    allPriorityCategories: [],
+                    featuredItemHints: [],
+                },
+                completedSteps: [],
+                schemaVersion: 1,
+            };
+
+            // Serialize with superjson as the real implementation does
+            cacheManager.get.mockResolvedValue(superjson.stringify(mockCheckpoint));
+
+            let capturedContext: TypedGenerationContext | null = null;
+            defaultPlugin.registerStepExecutor('prompt-comparison', {
+                name: 'Prompt Comparison',
+                run: jest.fn().mockImplementation((ctx) => {
+                    capturedContext = ctx;
+                    ctx.shouldStop = true;
+                    return Promise.resolve(ctx);
+                }),
+            });
+
+            await service.resumeFromCheckpoint(mockDirectory.id);
+
+            expect(capturedContext).not.toBeNull();
+            expect(capturedContext!.processedSourceUrls instanceof Set).toBe(true);
+            expect(capturedContext!.processedSourceUrls.size).toBe(0);
+            expect(capturedContext!.contentCache instanceof Map).toBe(true);
+            expect(capturedContext!.contentCache.size).toBe(0);
         });
     });
 

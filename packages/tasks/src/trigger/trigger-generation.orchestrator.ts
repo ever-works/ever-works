@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
-import { DataGeneratorService } from '@packages/agent/data-generator';
-import { MarkdownGeneratorService } from '@packages/agent/markdown-generator';
-import { WebsiteGeneratorService } from '@packages/agent/website-generator';
+import { DataGeneratorService } from '@packages/agent/generators';
+import { MarkdownGeneratorService } from '@packages/agent/generators';
+import { WebsiteGeneratorService } from '@packages/agent/generators';
 import { Directory, User, GenerateStatusType } from '@packages/agent/entities';
 import { CreateItemsGeneratorDto } from '@packages/agent/items-generator';
 import { DIRECTORY_OPERATIONS } from '@packages/agent/directory-operations';

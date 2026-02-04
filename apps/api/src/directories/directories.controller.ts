@@ -70,7 +70,7 @@ import {
     GetUserRepositoriesDto,
     GetUserRepositoriesResponseDto,
 } from '@packages/agent/dto';
-import { UpdateWebsiteRepositoryResponseDto } from '@packages/agent/website-generator';
+import { UpdateWebsiteRepositoryResponseDto } from '@packages/agent/generators';
 import { AuthService, CurrentUser, JwtAuthGuard } from '../auth';
 import { AuthenticatedUser } from '@src/auth/types/jwt.types';
 import { GenerateDirectoryDetailDto } from './dto/generate-detail.dto';

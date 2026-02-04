@@ -30,6 +30,8 @@ describe('PluginsModule', () => {
                         entities: PLUGIN_ENTITIES,
                         synchronize: true,
                     }),
+                    EventEmitterModule.forRoot(),
+                    CacheModule.register({ isGlobal: true }),
                     PluginsModule.forRoot({
                         platformVersion: '1.0.0',
                         autoLoadBuiltIn: false,
@@ -119,6 +121,8 @@ describe('PluginsModule', () => {
                         entities: PLUGIN_ENTITIES,
                         synchronize: true,
                     }),
+                    EventEmitterModule.forRoot(),
+                    CacheModule.register({ isGlobal: true }),
                     PluginsModule.forRootAsync({
                         useFactory: () => ({
                             platformVersion: '2.0.0',
@@ -144,6 +148,8 @@ describe('PluginsModule', () => {
                         entities: PLUGIN_ENTITIES,
                         synchronize: true,
                     }),
+                    EventEmitterModule.forRoot(),
+                    CacheModule.register({ isGlobal: true }),
                     PluginsModule.forRootAsync({
                         useFactory: async () => {
                             await new Promise((resolve) => setTimeout(resolve, 10));
@@ -174,6 +180,8 @@ describe('PluginsModule', () => {
                         entities: PLUGIN_ENTITIES,
                         synchronize: true,
                     }),
+                    EventEmitterModule.forRoot(),
+                    CacheModule.register({ isGlobal: true }),
                     PluginsModule.forRoot({
                         autoLoadBuiltIn: false, // Prevent actual loading during test
                     }),

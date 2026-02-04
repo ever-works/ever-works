@@ -7,7 +7,7 @@ import { AuthModule } from '@src/auth';
 import { AiModule } from '@packages/agent/ai';
 import { CacheEntryRepository } from '@packages/agent/cache';
 import { TriggerModule as TasksTriggerModule } from '@packages/tasks';
-import { WebsiteGeneratorModule } from '@packages/agent/website-generator';
+import { WebsiteGeneratorModule } from '@packages/agent/generators';
 import { FacadesModule } from '@packages/agent/facades';
 
 // Controllers

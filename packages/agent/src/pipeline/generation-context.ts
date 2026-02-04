@@ -370,6 +370,13 @@ export class TypedGenerationContext implements MutableGenerationContext {
     }
 
     /**
+     * Clear the content cache to free memory
+     */
+    clearContentCache(): void {
+        this.contentCache.clear();
+    }
+
+    /**
      * Create a TypedGenerationContext from a MutableGenerationContext
      */
     static fromMutableContext(ctx: MutableGenerationContext): TypedGenerationContext {
@@ -396,6 +403,45 @@ export class TypedGenerationContext implements MutableGenerationContext {
         typed.subject = ctx.subject;
         typed.advancedPrompts = ctx.advancedPrompts;
         typed.shouldStop = ctx.shouldStop;
+
+        return typed;
+    }
+
+    /**
+     * Create a TypedGenerationContext from a GenerationContextSnapshot
+     */
+    static fromSnapshot(snapshot: GenerationContextSnapshot): TypedGenerationContext {
+        const typed = new TypedGenerationContext(
+            snapshot.directory,
+            snapshot.request,
+            snapshot.existing,
+        );
+
+        typed.extractedUrls = [...snapshot.extractedUrls];
+        typed.searchQueries = [...snapshot.searchQueries];
+        typed.webPages = [...snapshot.webPages];
+        typed.processedSourceUrls = new Set(snapshot.processedSourceUrls);
+        typed.contentCache = new Map(snapshot.contentCache);
+        typed.initialAiItems = [
+            ...snapshot.initialAiItems,
+        ] as MutableGenerationContext['initialAiItems'];
+        typed.extractedWebItems = [
+            ...snapshot.extractedWebItems,
+        ] as MutableGenerationContext['extractedWebItems'];
+        typed.aggregatedItems = [
+            ...snapshot.aggregatedItems,
+        ] as MutableGenerationContext['aggregatedItems'];
+        typed.finalItems = [...snapshot.finalItems] as MutableGenerationContext['finalItems'];
+        typed.finalCategories = [...snapshot.finalCategories];
+        typed.finalTags = [...snapshot.finalTags];
+        typed.finalBrands = [...snapshot.finalBrands];
+        typed.domainAnalysis = snapshot.domainAnalysis;
+        typed.allInitialCategories = [...snapshot.allInitialCategories];
+        typed.allPriorityCategories = [...snapshot.allPriorityCategories];
+        typed.featuredItemHints = [...snapshot.featuredItemHints];
+        typed.subject = snapshot.subject;
+        typed.advancedPrompts = snapshot.advancedPrompts;
+        typed.shouldStop = snapshot.shouldStop;
 
         return typed;
     }

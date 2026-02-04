@@ -9,9 +9,9 @@
             "types": "./dist/ai/index.d.ts",
             "default": "./dist/ai/index.js"
         },
-        "./data-generator": {
-            "types": "./dist/data-generator/index.d.ts",
-            "default": "./dist/data-generator/index.js"
+        "./generators": {
+            "types": "./dist/generators/index.d.ts",
+            "default": "./dist/generators/index.js"
         },
         "./database": {
             "types": "./dist/database/index.d.ts",
@@ -48,14 +48,6 @@
         "./events": {
             "types": "./dist/events/index.d.ts",
             "default": "./dist/events/index.js"
-        },
-        "./markdown-generator": {
-            "types": "./dist/markdown-generator/index.d.ts",
-            "default": "./dist/markdown-generator/index.js"
-        },
-        "./website-generator": {
-            "types": "./dist/website-generator/index.d.ts",
-            "default": "./dist/website-generator/index.js"
         },
         "./services": {
             "types": "./dist/services/index.d.ts",
@@ -184,6 +176,7 @@
         "isomorphic-git": "^1.36.1",
         "p-map": "^7.0.4",
         "semver": "^7.7.3",
+        "superjson": "^1.13.3",
         "typeorm": "^0.3.28",
         "yaml": "^2.8.2",
         "zod": "^3.25.76"

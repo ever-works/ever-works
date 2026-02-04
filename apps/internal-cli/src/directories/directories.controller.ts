@@ -31,7 +31,7 @@ import {
     DirectoryOwnershipService,
     DirectoryQueryService,
 } from '@packages/agent/services';
-import { UpdateWebsiteRepositoryResponseDto } from '@packages/agent/website-generator';
+import { UpdateWebsiteRepositoryResponseDto } from '@packages/agent/generators';
 
 @Controller('api')
 export class DirectoriesController {

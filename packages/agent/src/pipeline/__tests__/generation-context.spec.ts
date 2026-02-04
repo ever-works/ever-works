@@ -242,4 +242,24 @@ describe('TypedGenerationContext', () => {
             expect(ctx.existing).toBe(mockExisting);
         });
     });
+
+    describe('clearContentCache', () => {
+        it('should clear all content from cache', () => {
+            context.contentCache.set('url1', 'content1');
+            context.contentCache.set('url2', 'content2');
+            expect(context.contentCache.size).toBe(2);
+
+            context.clearContentCache();
+
+            expect(context.contentCache.size).toBe(0);
+        });
+
+        it('should handle clearing empty cache', () => {
+            expect(context.contentCache.size).toBe(0);
+
+            context.clearContentCache();
+
+            expect(context.contentCache.size).toBe(0);
+        });
+    });
 });

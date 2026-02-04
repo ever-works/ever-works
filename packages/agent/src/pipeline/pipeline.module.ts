@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 import { EventEmitterModule } from '@nestjs/event-emitter';
-import { CacheModule } from '@nestjs/cache-manager';
 
 import { FacadesModule } from '../facades/facades.module';
 
@@ -49,7 +48,7 @@ const EXPORTS = [
  * Access it via PluginRegistryService.getPluginsByCapability('pipeline-step').
  */
 @Module({
-    imports: [FacadesModule, EventEmitterModule.forRoot(), CacheModule.register()],
+    imports: [FacadesModule, EventEmitterModule.forRoot()],
     providers: PROVIDERS,
     exports: EXPORTS,
 })

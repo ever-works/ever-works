@@ -2,6 +2,7 @@ import { Injectable, Logger, Inject, Optional } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
+import * as superjson from 'superjson';
 import type {
     DirectoryReference,
     GenerationRequest,
@@ -43,6 +44,13 @@ import type {
     DataSourceFacadeOptions,
     DataSourceFacadeResult,
     EnabledDataSource,
+    ItemData,
+    Category,
+    Tag,
+    Brand,
+    DomainAnalysis,
+    WebPageData,
+    AdvancedPromptsContext,
 } from '@ever-works/plugin';
 import { isDefaultPipelinePlugin, isPipelineStepPlugin } from '@ever-works/plugin';
 import { AiFacadeService } from '../facades/ai.facade';
@@ -73,9 +81,33 @@ export interface CheckpointData {
 }
 
 /**
+ * Checkpoint data structure for pipeline recovery
+ */
+export interface CheckpointData {
+    /** Index of the last completed step */
+    stepIndex: number;
+    /** Name of the last completed step */
+    stepName: string;
+    /** When the checkpoint was created */
+    timestamp: string;
+    /** Serializable context snapshot */
+    context: GenerationContextSnapshot;
+    /** Steps that have been completed */
+    completedSteps: string[];
+    /** Schema version for validation */
+    schemaVersion: number;
+}
+
+/**
  * Checkpoint TTL in milliseconds (24 hours)
  */
 const CHECKPOINT_TTL_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Current checkpoint schema version
+ * Increment when checkpoint structure changes to invalidate old checkpoints
+ */
+const CURRENT_CHECKPOINT_VERSION = 1;
 
 /**
  * Context for binding facades to a specific directory/user.
@@ -319,7 +351,17 @@ export class StepPipelineExecutorService {
         options?: PipelineExecutionOptions,
         onProgress?: PipelineProgressCallback,
     ): Promise<PipelineResult> {
+        const context = createGenerationContext(directory, request, existing);
+        return this.executeWithContext(context, options, onProgress);
+    }
+
+    private async executePipeline(
+        context: TypedGenerationContext,
+        options?: PipelineExecutionOptions,
+        onProgress?: PipelineProgressCallback,
+    ): Promise<PipelineResult> {
         const startTime = Date.now();
+        const directory = context.directory;
 
         this.logger.log(`Starting step-based pipeline execution for directory: ${directory.id}`);
 
@@ -327,22 +369,19 @@ export class StepPipelineExecutorService {
         const pipeline = await this.pipelineBuilder.build(directory.id, directory.user?.id);
         const runner = new ExecutablePipelineRunner(pipeline, this.eventEmitter);
 
-        // 2. Create the generation context
-        const context = createGenerationContext(directory, request, existing);
-
-        // 3. Emit pipeline:started event (Task 3.19)
+        // 2. Emit pipeline:started event (Task 3.19)
         this.emitPipelineEvent(PipelineEvents.STARTED, {
             directoryId: directory.id,
         });
 
-        // 4. Start execution tracking
+        // 3. Start execution tracking
         runner.startExecution();
 
         let lastCompletedStepIndex = -1;
         let currentStepIndex = 0;
 
         try {
-            // 5. Execute steps in order
+            // 4. Execute steps in order
             for (const step of pipeline.steps) {
                 // Check for cancellation
                 if (options?.signal?.aborted) {
@@ -516,13 +555,7 @@ export class StepPipelineExecutorService {
         options?: PipelineExecutionOptions,
         onProgress?: PipelineProgressCallback,
     ): Promise<PipelineResult> {
-        return this.execute(
-            context.directory,
-            context.request,
-            context.existing,
-            options,
-            onProgress,
-        );
+        return this.executePipeline(context, options, onProgress);
     }
 
     /**
@@ -546,37 +579,7 @@ export class StepPipelineExecutorService {
             `Resuming pipeline from checkpoint at step ${checkpoint.stepIndex}: ${checkpoint.stepName}`,
         );
 
-        // Reconstruct context from checkpoint
-        const context = new TypedGenerationContext(
-            checkpoint.context.directory,
-            checkpoint.context.request,
-            checkpoint.context.existing,
-        );
-
-        // Copy checkpoint data to context
-        // Note: We need to convert readonly types to mutable types when restoring
-        context.extractedUrls = [...checkpoint.context.extractedUrls];
-        context.searchQueries = [...checkpoint.context.searchQueries];
-        context.webPages = checkpoint.context.webPages.map((wp) => ({ ...wp }));
-        context.processedSourceUrls = new Set(checkpoint.context.processedSourceUrls);
-        context.contentCache = new Map(checkpoint.context.contentCache);
-
-        // Convert readonly ItemData to MutableItemData using JSON serialization
-        // This is safe for checkpoint restore since we need deep clones anyway
-        context.initialAiItems = JSON.parse(JSON.stringify(checkpoint.context.initialAiItems));
-        context.extractedWebItems = JSON.parse(
-            JSON.stringify(checkpoint.context.extractedWebItems),
-        );
-        context.aggregatedItems = JSON.parse(JSON.stringify(checkpoint.context.aggregatedItems));
-        context.finalItems = JSON.parse(JSON.stringify(checkpoint.context.finalItems));
-        context.finalCategories = checkpoint.context.finalCategories.map((c) => ({ ...c }));
-        context.finalTags = checkpoint.context.finalTags.map((t) => ({ ...t }));
-        context.finalBrands = checkpoint.context.finalBrands.map((b) => ({ ...b }));
-        context.domainAnalysis = checkpoint.context.domainAnalysis;
-        context.allInitialCategories = [...checkpoint.context.allInitialCategories];
-        context.allPriorityCategories = [...checkpoint.context.allPriorityCategories];
-        context.featuredItemHints = [...checkpoint.context.featuredItemHints];
-        context.subject = checkpoint.context.subject;
+        const context = TypedGenerationContext.fromSnapshot(checkpoint.context);
 
         // Execute with completed steps to skip
         const resumeOptions: PipelineExecutionOptions = {
@@ -694,16 +697,22 @@ export class StepPipelineExecutorService {
         }
 
         const checkpointKey = `pipeline-checkpoint-${directory.id}`;
+        const snapshot = context.toSnapshot();
+
         const checkpointData: CheckpointData = {
             stepIndex,
             stepName,
             timestamp: new Date().toISOString(),
-            context: context.toSnapshot(),
+            context: snapshot,
             completedSteps: [...completedSteps],
+            schemaVersion: CURRENT_CHECKPOINT_VERSION,
         };
 
+        // Serialize with superjson to handle Sets, Maps, Dates, etc.
+        const serialized = superjson.stringify(checkpointData);
+
         try {
-            await this.cacheManager.set(checkpointKey, checkpointData, CHECKPOINT_TTL_MS);
+            await this.cacheManager.set(checkpointKey, serialized, CHECKPOINT_TTL_MS);
             this.logger.debug(`Saved checkpoint at step ${stepIndex}: ${stepName}`);
         } catch (error) {
             this.logger.warn(`Failed to save checkpoint: ${(error as Error).message}`);
@@ -720,8 +729,28 @@ export class StepPipelineExecutorService {
 
         const checkpointKey = `pipeline-checkpoint-${directoryId}`;
         try {
-            const data = await this.cacheManager.get<CheckpointData>(checkpointKey);
-            return data ?? null;
+            const serialized = await this.cacheManager.get<string>(checkpointKey);
+
+            if (!serialized) {
+                return null;
+            }
+
+            // Deserialize with superjson to restore Sets, Maps, Dates, etc.
+            const data = superjson.parse<CheckpointData>(serialized);
+
+            // Validate schema version
+            const schemaVersion = data.schemaVersion ?? 0;
+            if (schemaVersion !== CURRENT_CHECKPOINT_VERSION) {
+                this.logger.warn(
+                    `Checkpoint schema version mismatch for directory ${directoryId}: ` +
+                        `expected ${CURRENT_CHECKPOINT_VERSION}, got ${schemaVersion}. ` +
+                        `Clearing incompatible checkpoint.`,
+                );
+                await this.cacheManager.del(checkpointKey);
+                return null;
+            }
+
+            return data;
         } catch {
             return null;
         }
