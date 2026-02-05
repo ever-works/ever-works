@@ -46,10 +46,6 @@ export class User {
     @Column({ nullable: true })
     emailVerificationExpires: Date;
 
-    // Tokens and API keys
-    @Column({ nullable: true })
-    vercelToken: string;
-
     // User status
     @Column({ default: true })
     isActive: boolean;

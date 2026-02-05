@@ -74,9 +74,7 @@ export type {
 
 export type {
     // From settings.ts
-    UpdateVercelTokenDto,
     NotificationPreferencesDto,
-    VercelTokenStatus,
     NotificationPreferencesResponse,
 } from './settings';
 

@@ -15,9 +15,4 @@ export class UpdateProfileDto {
     @IsUrl()
     @IsOptional()
     avatar?: string;
-
-    @ApiPropertyOptional({ description: 'Vercel API token for deployments' })
-    @IsString()
-    @IsOptional()
-    vercelToken?: string;
 }

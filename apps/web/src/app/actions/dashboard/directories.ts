@@ -55,6 +55,7 @@ const getCreateDirectorySchema = async () => {
             .transform((val) => val?.trim()),
         organization: z.boolean(),
         repoProvider: z.string().optional(),
+        deployProvider: z.string().optional(),
         readmeConfig: readmeConfigSchema.optional(),
     });
 
@@ -138,6 +139,8 @@ export async function createDirectory(data: CreateDirectoryDto) {
         validation.data.organization = organization;
         validation.data.owner = owner;
         validation.data.repoProvider = providerId;
+        // Set default deploy provider to vercel if not specified
+        validation.data.deployProvider = data.deployProvider || 'vercel';
 
         console.log('Creating directory:', validation.data);
 
@@ -164,6 +167,7 @@ interface AIDirectoryOptions {
     organization?: boolean;
     owner?: string;
     repoProvider?: string;
+    deployProvider?: string;
 }
 
 export async function createDirectoryWithAI(request: AIDirectoryOptions) {
@@ -237,6 +241,7 @@ export async function createDirectoryWithAI(request: AIDirectoryOptions) {
             organization,
             owner,
             repoProvider: providerId,
+            deployProvider: request.deployProvider || 'vercel',
         };
 
         // Validate the generated directory data
@@ -504,6 +509,7 @@ interface ImportDirectoryRequest {
     createMissingRepos?: boolean;
     sync?: boolean;
     repoProvider?: string;
+    deployProvider?: string;
 }
 
 export async function importDirectory(data: ImportDirectoryRequest) {

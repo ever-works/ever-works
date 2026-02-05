@@ -460,7 +460,6 @@ export class AuthService {
         await this.userRepository.update(userId, {
             ...(isNotNull(updateData.username) && { username: updateData.username }),
             ...(isNotNull(updateData.avatar) && { avatar: updateData.avatar }),
-            ...(isNotNull(updateData.vercelToken) && { vercelToken: updateData.vercelToken }),
         });
 
         // Return updated profile

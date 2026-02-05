@@ -1044,6 +1044,17 @@
                 "updateReadme": "Update README",
                 "updateSuccess": "Settings updated successfully",
                 "updateFailed": "Failed to update settings",
+                "deployProvider": {
+                    "title": "Deploy Provider",
+                    "description": "Select where to deploy your directory website",
+                    "configure": "Configure",
+                    "ready": "Ready to deploy",
+                    "notConfigured": "Not configured",
+                    "deployed": "Deployed",
+                    "viewSite": "View site",
+                    "updateSuccess": "Deploy provider updated successfully",
+                    "updateFailed": "Failed to update deploy provider"
+                },
                 "visibilityUpdateFailed": "Failed to update repository visibility",
                 "visibilityWarningTitle": "Make Repository Private?",
                 "visibilityWarningDescription": "You are about to make {name} private.",
@@ -1184,34 +1195,33 @@
             },
             "deploy": {
                 "noTokenAlert": {
-                    "title": "Vercel Token Required",
-                    "description": "To deploy your directory to Vercel, you need to configure your Vercel API token in your account settings.",
-                    "configureButton": "Go to API Tokens Settings",
-                    "getTokenButton": "Get Vercel Token",
+                    "title": "Deployment Token Required",
+                    "description": "To deploy your directory, you need to configure your deployment provider in Plugin Settings.",
+                    "configureButton": "Configure in Plugin Settings",
+                    "getTokenButton": "Get API Token",
                     "howTo": {
-                        "title": "How to configure your Vercel token:",
-                        "step1": "Click 'Get Vercel Token' to open the Vercel dashboard",
+                        "title": "How to configure deployment:",
+                        "step1": "Click 'Get API Token' to open your provider dashboard",
                         "step2": "Create a new token with deployment permissions",
-                        "step3": "Copy the generated token",
-                        "step4": "Go to API Tokens Settings and paste your token in the Vercel section"
+                        "step3": "Copy the generated token"
                     }
                 },
                 "sharedNoTokenAlert": {
                     "title": "Deployment Not Available",
-                    "description": "The directory owner has not configured a Vercel token for deployment. Please contact the directory owner to set up deployment.",
-                    "hint": "As a collaborator, you can trigger deployments once the owner configures their Vercel integration."
+                    "description": "The directory owner has not configured deployment. Please contact the directory owner to set up deployment.",
+                    "hint": "As a collaborator, you can trigger deployments once the owner configures their deployment provider."
                 },
                 "form": {
                     "deployToVercel": {
-                        "title": "Deploy to Vercel",
-                        "description": "Deploy your directory website repository on Vercel.",
+                        "title": "Deploy Website",
+                        "description": "Deploy your directory website repository.",
                         "deployButton": "Deploy Now",
                         "deployingButton": "Deploying...",
                         "deployingStateButton": "Deploying ({state})...",
                         "successMessage": "Your website has been successfully deployed!",
                         "teamSelection": {
-                            "title": "Select Vercel Team",
-                            "description": "Choose the Vercel team to deploy this directory to.",
+                            "title": "Select Team",
+                            "description": "Choose the team to deploy this directory to.",
                             "label": "Team",
                             "placeholder": "Select a team",
                             "confirmButton": "Deploy to team",
@@ -1228,7 +1238,7 @@
                     "messages": {
                         "deploySuccess": "Deployment started successfully",
                         "deployPending": "Deployment is queued and will start shortly",
-                        "deployFailed": "Failed to deploy to Vercel",
+                        "deployFailed": "Failed to deploy",
                         "deployError": "An error occurred during deployment",
                         "updateSuccess": "Repository updated successfully",
                         "updateFailed": "Failed to update repository",
@@ -1273,7 +1283,16 @@
             "subtitle": "Choose how you'd like to create your directory",
             "backToOptions": "Back to options",
             "sidebar": {
-                "selectedProvider": "Selected Provider"
+                "selectedProvider": "Git Provider",
+                "selectedDeployProvider": "Deploy Provider"
+            },
+            "deployProvider": {
+                "title": "Deploy Provider",
+                "description": "Select where to deploy your directory website",
+                "noProviders": "No deploy providers available",
+                "notConfigured": "Not configured",
+                "configured": "Ready to deploy",
+                "configureLink": "Configure"
             },
             "organizationSelector": {
                 "label": "Repository Owner",
@@ -1555,28 +1574,28 @@
         "apiTokens": {
             "title": "API & Tokens",
             "subtitle": "Manage your API keys and third-party integrations",
-            "vercel": {
-                "title": "Vercel Integration",
-                "subtitle": "Connect your Vercel account to deploy directories as websites",
+            "deployment": {
+                "title": "Deployment Integration",
+                "subtitle": "Configure deployment providers in Plugin Settings",
                 "connected": "Connected",
                 "notConnected": "Not Connected",
-                "connectedMessage": "Your Vercel account is connected. You can now deploy directories to Vercel.",
-                "disconnect": "Disconnect Vercel",
+                "connectedMessage": "Your deployment provider is configured. You can now deploy directories.",
+                "disconnect": "Disconnect",
                 "disconnecting": "Removing...",
-                "apiTokenLabel": "Vercel API Token",
-                "placeholder": "vc_...",
+                "apiTokenLabel": "API Token",
+                "placeholder": "Enter your API token",
                 "showToken": "Show",
                 "hideToken": "Hide",
-                "getTokenHelp": "You can get your API token from",
-                "vercelDashboard": "Vercel Dashboard",
+                "getTokenHelp": "You can get your API token from your provider dashboard",
+                "providerDashboard": "Provider Dashboard",
                 "save": "Save Token",
                 "saving": "Saving...",
                 "messages": {
-                    "tokenRequired": "Please enter a valid Vercel token",
-                    "saveSuccess": "Vercel token saved successfully",
-                    "saveFailed": "Failed to save Vercel token",
-                    "removeSuccess": "Vercel token removed successfully",
-                    "removeFailed": "Failed to remove Vercel token",
+                    "tokenRequired": "Please enter a valid token",
+                    "saveSuccess": "Token saved successfully",
+                    "saveFailed": "Failed to save token",
+                    "removeSuccess": "Token removed successfully",
+                    "removeFailed": "Failed to remove token",
                     "unexpectedError": "An unexpected error occurred"
                 }
             },
@@ -1892,15 +1911,15 @@
                 "updateSuccess": "Password updated successfully",
                 "notAuthenticated": "Not authenticated"
             },
-            "vercel": {
+            "deployment": {
                 "notAuthenticated": "Not authenticated",
                 "tokenRequired": "Token is required",
-                "invalidFormat": "Invalid Vercel token format",
-                "saveFailed": "Failed to save Vercel token",
-                "saveSuccess": "Vercel token saved successfully",
-                "validationFailed": "The provided Vercel token is invalid. Please double-check and try again.",
-                "removeFailed": "Failed to remove Vercel token",
-                "removeSuccess": "Vercel token removed successfully"
+                "invalidFormat": "Invalid token format",
+                "saveFailed": "Failed to save deployment token",
+                "saveSuccess": "Deployment token saved successfully",
+                "validationFailed": "The provided token is invalid. Please double-check and try again.",
+                "removeFailed": "Failed to remove deployment token",
+                "removeSuccess": "Deployment token removed successfully"
             },
             "github": {
                 "notAuthenticated": "Not authenticated",
@@ -1919,7 +1938,7 @@
             }
         },
         "deploy": {
-            "deployVercelFailed": "Failed to deploy to Vercel",
+            "deployFailed": "Failed to deploy",
             "updateRepositoryFailed": "Failed to update repository",
             "updateSettingsFailed": "Failed to update website template settings"
         }

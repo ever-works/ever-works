@@ -7,15 +7,13 @@ export class BatchDeployItemDto {
     @IsString()
     directoryId: string;
 
-    @ApiPropertyOptional({
-        description: 'Vercel team scope for this directory (overrides default)',
-    })
+    @ApiPropertyOptional({ description: 'Team scope for this directory (overrides default)' })
     @IsOptional()
     @IsString()
-    vercelTeamScope?: string;
+    teamScope?: string;
 }
 
-export class BatchDeployVercelDto {
+export class BatchDeployDto {
     @ApiProperty({
         description: 'List of directories to deploy',
         type: [BatchDeployItemDto],
@@ -27,15 +25,10 @@ export class BatchDeployVercelDto {
     @ArrayMinSize(1)
     directories: BatchDeployItemDto[];
 
-    @ApiPropertyOptional({ description: 'Vercel API token (uses account token if not provided)' })
+    @ApiPropertyOptional({ description: 'Default team scope for all directories' })
     @IsOptional()
     @IsString()
-    VERCEL_TOKEN?: string;
-
-    @ApiPropertyOptional({ description: 'Default Vercel team scope for all directories' })
-    @IsOptional()
-    @IsString()
-    vercelTeamScope?: string;
+    teamScope?: string;
 }
 
 export interface BatchDeployResult {

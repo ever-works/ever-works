@@ -84,14 +84,33 @@ export interface IDeploymentPlugin extends IPlugin {
 	getDeploymentStatus(deploymentId: string, token: string): Promise<DeploymentResult>;
 
 	/**
-	 * Cancel a deployment
+	 * Validate API token
 	 */
-	cancelDeployment?(deploymentId: string, token: string): Promise<void>;
+	validateToken?(token: string): Promise<boolean>;
 
 	/**
-	 * List deployments for a project
+	 * Get teams/organizations for the authenticated user
 	 */
-	listDeployments?(projectId: string, token: string, limit?: number): Promise<DeploymentResult[]>;
+	getTeams?(token: string): Promise<Array<{ id: string; slug: string; name: string | null }>>;
+
+	/**
+	 * Lookup existing deployment for a project
+	 */
+	lookupExistingDeployment?(
+		projectName: string,
+		token: string,
+		teamScope?: string
+	): Promise<{
+		found: boolean;
+		website?: string;
+		deploymentState?: string;
+		projectId?: string;
+	}>;
+
+	/**
+	 * Get authenticated user info
+	 */
+	getAuthenticatedUser?(token: string): Promise<{ username: string; email?: string } | null>;
 
 	/**
 	 * Get project information
@@ -102,31 +121,6 @@ export interface IDeploymentPlugin extends IPlugin {
 	 * List all projects
 	 */
 	listProjects?(token: string): Promise<DeploymentProject[]>;
-
-	/**
-	 * Create a new project
-	 */
-	createProject?(name: string, token: string, options?: Record<string, unknown>): Promise<DeploymentProject>;
-
-	/**
-	 * Delete a project
-	 */
-	deleteProject?(projectId: string, token: string): Promise<void>;
-
-	/**
-	 * Add a custom domain to a project
-	 */
-	addDomain?(projectId: string, domain: string, token: string): Promise<void>;
-
-	/**
-	 * Remove a custom domain from a project
-	 */
-	removeDomain?(projectId: string, domain: string, token: string): Promise<void>;
-
-	/**
-	 * Validate API token
-	 */
-	validateToken?(token: string): Promise<boolean>;
 }
 
 /**

@@ -1,8 +1,25 @@
 import 'server-only';
-import { serverMutation } from './server-api';
+import { serverFetch, serverMutation } from './server-api';
 import { APIResponse } from './types';
 
-export type ValidateVercelTokenDto = APIResponse<{
+export interface DeployProvider {
+    id: string;
+    name: string;
+    enabled: boolean;
+}
+
+export type DeployProvidersResponseDto = APIResponse<{
+    providers: DeployProvider[];
+}>;
+
+export type ProviderConfiguredResponseDto = APIResponse<{
+    configured: boolean;
+    available: boolean;
+    enabled?: boolean;
+    message?: string;
+}>;
+
+export type ValidateDeployTokenDto = APIResponse<{
     valid: boolean;
     userInfo: any;
 }>;
@@ -14,24 +31,20 @@ export type DeployWebsiteResponseDto = APIResponse<{
     message: string;
 }>;
 
-export type VercelTeam = {
+export type DeploymentTeam = {
     id: string;
-
     slug: string;
-
     name: string | null;
-
     saml?: any;
-
     createdAt: number;
 };
 
-export type VercelTeamResponse = APIResponse<{
-    teams: VercelTeam[];
+export type DeploymentTeamResponse = APIResponse<{
+    teams: DeploymentTeam[];
 }>;
 
-export interface DeployWebsiteVercelDto {
-    vercelTeamScope?: string;
+export interface DeployWebsiteDto {
+    teamScope?: string;
 }
 
 export type LookupDeploymentResponseDto = APIResponse<{
@@ -49,40 +62,62 @@ export type DeploymentCapabilityResponseDto = APIResponse<{
 }>;
 
 export const deployAPI = {
-    // Deploy to Vercel
-    deployToVercel: async (directoryId: string, data: DeployWebsiteVercelDto) => {
+    // Get available deployment providers
+    getProviders: async () => {
+        return serverFetch<DeployProvidersResponseDto>('/deploy/providers');
+    },
+
+    // Check if a provider is configured for the current user
+    isProviderConfigured: async (providerId: string) => {
+        return serverFetch<ProviderConfiguredResponseDto>(
+            `/deploy/providers/${providerId}/configured`,
+        );
+    },
+
+    // Deploy directory to its configured provider
+    deploy: async (directoryId: string, data: DeployWebsiteDto) => {
         return serverMutation<DeployWebsiteResponseDto>({
-            endpoint: `/deploy/directories/${directoryId}/vercel`,
-            data,
+            endpoint: `/deploy/directories/${directoryId}`,
+            data: { teamScope: data.teamScope },
             method: 'POST',
             wrapInData: false,
         });
     },
 
-    // validate vercel token
-    validateVercelToken: (vercelToken: string) => {
-        return serverMutation<ValidateVercelTokenDto>({
-            endpoint: '/deploy/vercel/validate-token',
-            data: { token: vercelToken },
+    // Validate deployment token
+    validateToken: (token: string) => {
+        return serverMutation<ValidateDeployTokenDto>({
+            endpoint: '/deploy/validate-token',
+            data: { token },
             method: 'POST',
             wrapInData: false,
         });
     },
 
-    // get vercel teams of the passed token
-    getVercelTeams() {
-        return serverMutation<VercelTeamResponse>({
-            endpoint: '/deploy/vercel/teams',
+    // Get deployment teams (requires directory context for token)
+    getDeploymentTeams() {
+        return serverMutation<DeploymentTeamResponse>({
+            endpoint: '/deploy/teams',
             data: {},
             method: 'POST',
             wrapInData: false,
         });
     },
 
-    lookupExistingDeployment(directoryId: string, data?: DeployWebsiteVercelDto) {
+    // Get teams for a specific directory
+    getTeamsForDirectory(directoryId: string) {
+        return serverMutation<DeploymentTeamResponse>({
+            endpoint: `/deploy/directories/${directoryId}/teams`,
+            data: {},
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    lookupExistingDeployment(directoryId: string, data?: DeployWebsiteDto) {
         return serverMutation<LookupDeploymentResponseDto>({
-            endpoint: `/deploy/directories/${directoryId}/vercel/lookup`,
-            data: data || {},
+            endpoint: `/deploy/directories/${directoryId}/lookup`,
+            data: data ? { teamScope: data.teamScope } : {},
             method: 'POST',
             wrapInData: false,
         });
@@ -90,11 +125,10 @@ export const deployAPI = {
 
     /**
      * Check if deployment is possible for a directory.
-     * For shared directories, checks the owner's Vercel token.
      */
     checkDeploymentCapability(directoryId: string) {
         return serverMutation<DeploymentCapabilityResponseDto>({
-            endpoint: `/deploy/directories/${directoryId}/vercel/check`,
+            endpoint: `/deploy/directories/${directoryId}/check`,
             data: {},
             method: 'POST',
             wrapInData: false,

@@ -78,7 +78,7 @@ async function bootstrap() {
         .addTag('Health', 'API health check endpoints')
         .addTag('Auth', 'Authentication and authorization endpoints')
         .addTag('Directories', 'Directory management endpoints')
-        .addTag('Deploy', 'Deployment endpoints for Vercel and other providers')
+        .addTag('Deploy', 'Deployment endpoints')
         .addTag('AI Conversation', 'AI-powered conversation and content generation')
         .addTag('Screenshot', 'Screenshot capture and smart image preview')
         .addTag('Subscriptions', 'Subscription and billing management')

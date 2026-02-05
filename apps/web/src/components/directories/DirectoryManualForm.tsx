@@ -19,9 +19,14 @@ import { ChevronDown, Plus } from 'lucide-react';
 interface DirectoryManualFormProps {
     user: AuthUser;
     repoProvider?: string;
+    deployProvider?: string;
 }
 
-export function DirectoryManualForm({ user, repoProvider }: DirectoryManualFormProps) {
+export function DirectoryManualForm({
+    user,
+    repoProvider,
+    deployProvider,
+}: DirectoryManualFormProps) {
     const [showAdvanced, setShowAdvanced] = useState(false);
     const [isPending, startTransition] = useTransition();
     const router = useRouter();
@@ -60,7 +65,7 @@ export function DirectoryManualForm({ user, repoProvider }: DirectoryManualFormP
         }
 
         startTransition(async () => {
-            const result = await createDirectory({ ...formData, repoProvider });
+            const result = await createDirectory({ ...formData, repoProvider, deployProvider });
 
             if (result.success) {
                 toast.success(result.message || t('success.created'));

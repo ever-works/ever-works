@@ -204,8 +204,7 @@ export class SetSubCommand extends CommandRunner {
             AI_DEFAULT_PROVIDER:
                 'This sets your primary AI provider. Make sure the corresponding API key is configured.',
             GH_APIKEY: 'Used for GitHub API access. Get from: https://github.com/settings/tokens',
-            VERCEL_TOKEN:
-                'Used for Vercel deployments. Get from: https://vercel.com/account/tokens',
+            DEPLOY_TOKEN: 'Used for deployments. Get from your deployment provider dashboard.',
             PLUGIN_TAVILY_API_KEY:
                 'Used for enhanced search and content extraction. Get from: https://tavily.com',
         };
@@ -214,11 +213,10 @@ export class SetSubCommand extends CommandRunner {
             console.log(chalk.blue('ℹ ') + chalk.gray(keyInfo[key]));
         }
 
-        // Suggest testing after setting important keys
         const testableKeys = [
             'AI_DEFAULT_PROVIDER',
             'GH_APIKEY',
-            'VERCEL_TOKEN',
+            'DEPLOY_TOKEN',
             'PLUGIN_TAVILY_API_KEY',
         ];
         if (testableKeys.includes(key)) {

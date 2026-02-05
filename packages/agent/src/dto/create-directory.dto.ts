@@ -112,6 +112,15 @@ export class CreateDirectoryDto {
     repoProvider: RepoProvider = RepoProvider.GITHUB;
 
     @ApiPropertyOptional({
+        description: 'Deploy provider (e.g., vercel)',
+        example: 'vercel',
+    })
+    @IsString()
+    @IsOptional()
+    @Transform(({ value }) => (typeof value === 'string' ? value.trim().toLowerCase() : value))
+    deployProvider?: string;
+
+    @ApiPropertyOptional({
         description: 'Custom README configuration',
         type: MarkdownReadmeConfigDto,
     })

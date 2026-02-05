@@ -43,6 +43,7 @@ export interface CreateDirectoryDto {
     owner?: string;
     organization: boolean;
     repoProvider?: string;
+    deployProvider?: string;
     readmeConfig?: MarkdownReadmeConfig;
 }
 
@@ -51,6 +52,7 @@ export interface UpdateDirectoryDto {
     description?: string;
     owner?: string;
     organization?: boolean;
+    deployProvider?: string;
     readmeConfig?: MarkdownReadmeConfig;
     websiteTemplateAutoUpdate?: boolean;
     websiteTemplateUseBeta?: boolean;
@@ -116,6 +118,7 @@ export interface Directory {
     website?: string;
     organization: boolean;
     repoProvider: string;
+    deployProvider?: string;
     readmeConfig?: MarkdownReadmeConfig;
     generateStatus?: GenerateStatus;
     createdAt: string;
@@ -336,6 +339,7 @@ export interface ImportDirectoryDto {
     createMissingRepos?: boolean;
     sync?: boolean;
     repoProvider: string;
+    deployProvider?: string;
 }
 
 export interface ImportDirectoryResponseDto {

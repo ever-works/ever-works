@@ -8,6 +8,7 @@ import { DirectoryManualForm } from '@/components/directories/DirectoryManualFor
 import { DirectoryImportForm } from '@/components/directories/DirectoryImportForm';
 import { GitProviderConnectionAlert } from './git-provider-connection-alert';
 import { GitProviderSelector } from './git-provider-selector';
+import { DeployProviderSelector, type DeployProvider } from './deploy-provider-selector';
 import { useTranslations } from 'next-intl';
 import type { ProviderWithConnection } from './page';
 
@@ -15,16 +16,23 @@ interface NewDirectoryClientProps {
     user: AuthUser;
     providers: ProviderWithConnection[];
     defaultProviderId: string | null;
+    deployProviders: DeployProvider[];
+    defaultDeployProviderId: string | null;
 }
 
 export default function NewDirectoryClient({
     user,
     providers,
     defaultProviderId,
+    deployProviders,
+    defaultDeployProviderId,
 }: NewDirectoryClientProps) {
     const [creationMode, setCreationMode] = useState<'ai' | 'manual' | 'import' | null>(null);
     const [selectedProviderId, setSelectedProviderId] = useState<string | null>(
         defaultProviderId || providers[0]?.provider.id || null,
+    );
+    const [selectedDeployProviderId, setSelectedDeployProviderId] = useState<string | null>(
+        defaultDeployProviderId || 'vercel',
     );
     const t = useTranslations('dashboard.directoryCreation');
 
@@ -56,6 +64,17 @@ export default function NewDirectoryClient({
                             providers={providers}
                             selectedProviderId={selectedProviderId}
                             onSelect={setSelectedProviderId}
+                        />
+                    </div>
+                )}
+
+                {/* Deploy Provider Selector */}
+                {deployProviders.length > 0 && (
+                    <div className="mb-8">
+                        <DeployProviderSelector
+                            providers={deployProviders}
+                            selectedProviderId={selectedDeployProviderId}
+                            onSelect={setSelectedDeployProviderId}
                         />
                     </div>
                 )}
@@ -272,18 +291,23 @@ export default function NewDirectoryClient({
                 </div>
 
                 {creationMode === 'ai' && (
-                    <DirectoryAICreator repoProvider={selectedProviderId || undefined} />
+                    <DirectoryAICreator
+                        repoProvider={selectedProviderId || undefined}
+                        deployProvider={selectedDeployProviderId || undefined}
+                    />
                 )}
                 {creationMode === 'manual' && (
                     <DirectoryManualForm
                         user={user}
                         repoProvider={selectedProviderId || undefined}
+                        deployProvider={selectedDeployProviderId || undefined}
                     />
                 )}
                 {creationMode === 'import' && (
                     <DirectoryImportForm
                         user={user}
                         repoProvider={selectedProviderId || undefined}
+                        deployProvider={selectedDeployProviderId || undefined}
                     />
                 )}
             </div>
@@ -292,20 +316,35 @@ export default function NewDirectoryClient({
             <aside className="w-80 shrink-0">
                 <div
                     className={cn(
-                        'sticky top-8 p-6 rounded-lg',
+                        'sticky top-8 p-6 rounded-lg space-y-6',
                         'bg-card dark:bg-card-dark',
                         'border border-card-border dark:border-card-border-dark',
                     )}
                 >
-                    <h3 className="font-medium text-text dark:text-text-dark mb-4">
-                        {t('sidebar.selectedProvider')}
-                    </h3>
-                    <GitProviderSelector
-                        providers={providers}
-                        selectedProviderId={selectedProviderId}
-                        onSelect={setSelectedProviderId}
-                        compact
-                    />
+                    <div>
+                        <h3 className="font-medium text-text dark:text-text-dark mb-4">
+                            {t('sidebar.selectedProvider')}
+                        </h3>
+                        <GitProviderSelector
+                            providers={providers}
+                            selectedProviderId={selectedProviderId}
+                            onSelect={setSelectedProviderId}
+                            compact
+                        />
+                    </div>
+                    {deployProviders.length > 0 && (
+                        <div>
+                            <h3 className="font-medium text-text dark:text-text-dark mb-4">
+                                {t('sidebar.selectedDeployProvider')}
+                            </h3>
+                            <DeployProviderSelector
+                                providers={deployProviders}
+                                selectedProviderId={selectedDeployProviderId}
+                                onSelect={setSelectedDeployProviderId}
+                                compact
+                            />
+                        </div>
+                    )}
                 </div>
             </aside>
         </div>

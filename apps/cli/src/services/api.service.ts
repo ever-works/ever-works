@@ -97,9 +97,9 @@ export interface RemoveItemDto {
 }
 
 export interface DeployDto {
-    VERCEL_TOKEN?: string;
+    DEPLOY_TOKEN?: string;
     GITHUB_TOKEN?: string;
-    vercelTeamScope?: string;
+    teamScope?: string;
 }
 
 export interface DeleteDirectoryDto {
@@ -141,14 +141,14 @@ export interface DeployWebsiteResponse {
     deployment_url?: string;
 }
 
-export interface VercelTeam {
+export interface DeploymentTeam {
     id: string;
     slug: string;
     name: string | null;
     createdAt: number;
 }
 
-export interface VercelTeamResponse extends ApiResponse<{ teams: VercelTeam[] }> {}
+export interface DeploymentTeamResponse extends ApiResponse<{ teams: DeploymentTeam[] }> {}
 
 export interface ConnectionInfo {
     provider: string;
@@ -262,14 +262,14 @@ export class ApiService {
 
     async deployWebsite(directoryId: string, data: DeployDto = {}) {
         const response = await this.httpClient.post<ApiResponse<DeployWebsiteResponse>>(
-            `/deploy/directories/${directoryId}/vercel`,
+            `/deploy/directories/${directoryId}`,
             data,
         );
         return response.data;
     }
 
-    async getVercelTeams() {
-        const response = await this.httpClient.post<VercelTeamResponse>('/deploy/vercel/teams', {});
+    async getDeploymentTeams() {
+        const response = await this.httpClient.post<DeploymentTeamResponse>('/deploy/teams', {});
         return response.data;
     }
 

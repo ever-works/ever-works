@@ -100,8 +100,8 @@ export class SetupSubCommand extends CommandRunner {
             const deploymentConfig =
                 await this.deploymentPrompt.promptDeploymentConfig(existingConfig);
 
-            if (deploymentConfig.provider === 'vercel' && deploymentConfig.vercelToken) {
-                config.VERCEL_TOKEN = deploymentConfig.vercelToken;
+            if (deploymentConfig.provider === 'vercel' && deploymentConfig.token) {
+                config.DEPLOY_TOKEN = deploymentConfig.token;
             }
 
             // 3. AI Provider Configuration

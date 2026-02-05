@@ -4,7 +4,6 @@ import { ItemsGeneratorModule } from '../items-generator/items-generator.module'
 import { FacadesModule } from '../facades/facades.module';
 import { MarkdownGeneratorModule } from '../generators/markdown-generator/markdown-generator.module';
 import { WebsiteGeneratorModule } from '../generators/website-generator/website-generator.module';
-import { DeployModule } from '../deploy/deploy.module';
 import { DatabaseModule } from '../database/database.module';
 import { AiModule } from '../ai/ai.module';
 import { ImportModule } from '../import/import.module';
@@ -39,7 +38,6 @@ import { NotificationOperationsModule } from '@src/notification-operations';
         FacadesModule,
         MarkdownGeneratorModule,
         WebsiteGeneratorModule,
-        DeployModule,
         AiModule,
         ImportModule,
         SubscriptionsModule,

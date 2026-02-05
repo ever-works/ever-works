@@ -35,6 +35,7 @@ import type { AnalyzeForLinkingResponseDto } from '@/lib/api/directory';
 interface DirectoryImportFormProps {
     user: AuthUser;
     repoProvider?: string;
+    deployProvider?: string;
 }
 
 type ImportStep = 'source' | 'analyzing' | 'choose_mode' | 'configure' | 'importing';
@@ -59,7 +60,11 @@ interface AnalysisResult {
     error?: string;
 }
 
-export function DirectoryImportForm({ user, repoProvider }: DirectoryImportFormProps) {
+export function DirectoryImportForm({
+    user,
+    repoProvider,
+    deployProvider,
+}: DirectoryImportFormProps) {
     const [step, setStep] = useState<ImportStep>('source');
     const [sourceMethod, setSourceMethod] = useState<SourceMethod>('url');
     const [sourceUrl, setSourceUrl] = useState('');
@@ -169,6 +174,7 @@ export function DirectoryImportForm({ user, repoProvider }: DirectoryImportFormP
                 owner: organization ? owner : undefined,
                 createMissingRepos,
                 repoProvider,
+                deployProvider,
             });
 
             if (result.success) {
@@ -208,6 +214,7 @@ export function DirectoryImportForm({ user, repoProvider }: DirectoryImportFormP
                 owner: organization ? owner : undefined,
                 sync,
                 repoProvider,
+                deployProvider,
             });
 
             if (result.success) {

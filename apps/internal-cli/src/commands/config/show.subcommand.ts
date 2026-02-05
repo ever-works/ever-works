@@ -46,8 +46,8 @@ export class ShowSubCommand extends CommandRunner {
             });
 
             this.displaySection('Deployment', {
-                'Vercel Token': config.VERCEL_TOKEN
-                    ? maskSecret(config.VERCEL_TOKEN)
+                'Deploy Token': config.DEPLOY_TOKEN
+                    ? maskSecret(config.DEPLOY_TOKEN)
                     : 'Not configured',
             });
 

@@ -3,7 +3,7 @@ import { BasePromptService } from '@packages/cli-shared';
 
 export interface DeploymentConfig {
     provider: 'vercel' | 'ignore';
-    vercelToken?: string;
+    token?: string;
 }
 
 @Injectable()
@@ -12,9 +12,8 @@ export class DeploymentPromptService extends BasePromptService {
         this.displaySectionHeader('Deployment Provider Configuration');
         this.displayInfo('Configure your deployment provider (you can add more providers later)');
 
-        // Determine default provider based on existing config
         let defaultProvider: 'vercel' | 'ignore' = 'ignore';
-        if (existingConfig?.VERCEL_TOKEN) {
+        if (existingConfig?.DEPLOY_TOKEN) {
             defaultProvider = 'vercel';
         }
 
@@ -27,29 +26,26 @@ export class DeploymentPromptService extends BasePromptService {
             defaultProvider,
         );
 
-        let vercelToken: string | undefined;
+        let token: string | undefined;
 
         if (provider === 'vercel') {
-            this.displayInfo(
-                'You can get your Vercel token from: https://vercel.com/account/tokens',
-            );
+            this.displayInfo('You can get your token from: https://vercel.com/account/tokens');
 
             while (true) {
                 try {
-                    vercelToken = await this.promptPassword('Enter your Vercel token:');
-                    vercelToken = vercelToken?.trim();
+                    token = await this.promptPassword('Enter your deployment token:');
+                    token = token?.trim();
 
-                    const validation = this.validateApiKeyWithProvider(vercelToken, 'Vercel');
+                    const validation = this.validateApiKeyWithProvider(token, 'deployment');
                     if (validation !== true) {
                         this.displayError(validation as string);
                         continue;
                     }
 
-                    // Test the Vercel token
-                    this.displayInfo('Testing Vercel token...');
-                    const isValid = await this.testVercelToken(vercelToken);
+                    this.displayInfo('Testing deployment token...');
+                    const isValid = await this.testDeployToken(token);
                     if (!isValid) {
-                        this.displayError('Vercel token validation failed');
+                        this.displayError('Token validation failed');
                         this.displayInfo(
                             'This could be due to network issues or API endpoint changes',
                         );
@@ -60,21 +56,20 @@ export class DeploymentPromptService extends BasePromptService {
                                 value: 'continue',
                             },
                             { name: 'Re-enter the token', value: 'retry' },
-                            { name: 'Skip Vercel configuration', value: 'skip' },
+                            { name: 'Skip deployment configuration', value: 'skip' },
                         ]);
 
                         if (action === 'skip') {
-                            return { provider: 'ignore', vercelToken: undefined };
+                            return { provider: 'ignore', token: undefined };
                         } else if (action === 'retry') {
                             continue;
                         }
-                        // If 'continue', we proceed with the token
                     }
 
-                    this.displaySuccess('Vercel token validated successfully');
+                    this.displaySuccess('Deployment token validated successfully');
                     break;
                 } catch (error) {
-                    this.displayError('Failed to validate Vercel token. Please try again.');
+                    this.displayError('Failed to validate token. Please try again.');
                 }
             }
         }
@@ -87,13 +82,12 @@ export class DeploymentPromptService extends BasePromptService {
 
         return {
             provider,
-            vercelToken,
+            token,
         };
     }
 
-    private async testVercelToken(token: string): Promise<boolean> {
+    private async testDeployToken(token: string): Promise<boolean> {
         try {
-            // Test with the Vercel user endpoint
             const response = await fetch('https://api.vercel.com/v2/user', {
                 headers: {
                     Authorization: `Bearer ${token}`,
@@ -104,27 +98,14 @@ export class DeploymentPromptService extends BasePromptService {
                 return true;
             }
 
-            // Log the error for debugging
-            const errorText = await response.text();
-            console.error(`Vercel API error (${response.status}):`, errorText);
-
-            // Try alternative endpoint - projects list (simpler endpoint)
             const projectsResponse = await fetch('https://api.vercel.com/v9/projects', {
                 headers: {
                     Authorization: `Bearer ${token}`,
                 },
             });
 
-            if (projectsResponse.ok) {
-                return true;
-            }
-
-            const projectsError = await projectsResponse.text();
-            console.error(`Vercel projects API error (${projectsResponse.status}):`, projectsError);
-
-            return false;
+            return projectsResponse.ok;
         } catch (error) {
-            console.error('Vercel token test network error:', error);
             return false;
         }
     }

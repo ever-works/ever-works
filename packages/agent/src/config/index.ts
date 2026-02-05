@@ -293,10 +293,10 @@ export const config = {
         },
     },
 
-    // Vercel configuration
-    vercel: {
+    // Deployment configuration
+    deploy: {
         getToken() {
-            return process.env.VERCEL_TOKEN;
+            return process.env.DEPLOY_TOKEN;
         },
     },
 

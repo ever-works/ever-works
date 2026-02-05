@@ -16,6 +16,7 @@ export interface DirectoryInputData {
     description: string;
     owner?: string;
     readmeConfig?: MarkdownReadmeConfigDto;
+    cancelled?: boolean;
 }
 
 export interface SlugConflictResolution {

@@ -8,6 +8,7 @@ import { ContentExtractorFacadeService } from './content-extractor.facade';
 import { DataSourceFacadeService } from './data-source.facade';
 import { GitFacadeService } from './git.facade';
 import { OAuthFacadeService } from './oauth.facade';
+import { DeployFacadeService } from './deploy.facade';
 
 const FACADES = [
     AiFacadeService,
@@ -17,6 +18,7 @@ const FACADES = [
     DataSourceFacadeService,
     GitFacadeService,
     OAuthFacadeService,
+    DeployFacadeService,
 ];
 
 /**

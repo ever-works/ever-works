@@ -77,6 +77,11 @@ export class ImportDirectoryDto {
     @IsString()
     @IsNotEmpty({ message: 'Git provider is required' })
     repoProvider: string;
+
+    @IsOptional()
+    @IsString()
+    @Transform(({ value }) => (typeof value === 'string' ? value.trim().toLowerCase() : value))
+    deployProvider?: string;
 }
 
 export class ImportDirectoryResponseDto {

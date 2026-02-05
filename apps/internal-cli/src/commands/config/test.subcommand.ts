@@ -43,7 +43,7 @@ export class TestSubCommand extends CommandRunner {
                 allTestsPassed = false;
             }
 
-            // Test other services (GitHub, Vercel, etc.)
+            // Test other services (GitHub, Deployment, etc.)
             const serviceTestResults = await this.testOtherServices(config);
             if (!serviceTestResults) {
                 allTestsPassed = false;
@@ -142,10 +142,10 @@ export class TestSubCommand extends CommandRunner {
             }
         }
 
-        // Test Vercel API
-        if (config.VERCEL_TOKEN) {
-            const vercelResult = await this.testVercelApi(config.VERCEL_TOKEN);
-            if (!vercelResult) {
+        // Test Deployment API
+        if (config.DEPLOY_TOKEN) {
+            const deployResult = await this.testDeployApi(config.DEPLOY_TOKEN);
+            if (!deployResult) {
                 allPassed = false;
             }
         }
@@ -187,8 +187,8 @@ export class TestSubCommand extends CommandRunner {
         }
     }
 
-    private async testVercelApi(token: string): Promise<boolean> {
-        const spinner = ora('Testing Vercel API...').start();
+    private async testDeployApi(token: string): Promise<boolean> {
+        const spinner = ora('Testing Deploy API...').start();
 
         try {
             const response = await fetch('https://api.vercel.com/v2/user', {
@@ -200,15 +200,15 @@ export class TestSubCommand extends CommandRunner {
             if (response.ok) {
                 const user = await response.json();
                 spinner.succeed(
-                    `Vercel API: ${chalk.green('✓ Connected')} (User: ${user.user.username})`,
+                    `Deploy API: ${chalk.green('✓ Connected')} (User: ${user.user.username})`,
                 );
                 return true;
             } else {
-                spinner.fail(`Vercel API: ${chalk.red('✗ Failed')} (Status: ${response.status})`);
+                spinner.fail(`Deploy API: ${chalk.red('✗ Failed')} (Status: ${response.status})`);
                 return false;
             }
         } catch (error) {
-            spinner.fail(`Vercel API: ${chalk.red('✗ Failed')}`);
+            spinner.fail(`Deploy API: ${chalk.red('✗ Failed')}`);
             console.log(chalk.red(`  Error: ${error.message}`));
             return false;
         }

@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import type { VercelTeam } from '@/lib/api';
 import {
     Dialog,
     DialogClose,
@@ -16,21 +15,29 @@ import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 
-interface VercelTeamSelectionDialogProps {
+export interface DeployTeam {
+    id: string;
+    slug: string;
+    name: string | null;
+}
+
+interface TeamSelectionDialogProps {
     open: boolean;
-    teams: VercelTeam[];
+    teams: DeployTeam[];
     isSubmitting?: boolean;
+    providerName?: string;
     onConfirm: (teamScope: string) => void;
     onCancel: () => void;
 }
 
-export function VercelTeamSelectionDialog({
+export function TeamSelectionDialog({
     open,
     teams,
     isSubmitting = false,
+    providerName = 'Vercel',
     onConfirm,
     onCancel,
-}: VercelTeamSelectionDialogProps) {
+}: TeamSelectionDialogProps) {
     const t = useTranslations('dashboard.directoryDetail.deploy');
     const [selectedTeamScope, setSelectedTeamScope] = useState<string>('');
 

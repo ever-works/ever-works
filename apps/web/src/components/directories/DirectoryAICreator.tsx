@@ -15,9 +15,10 @@ import { ChevronDown, Lightbulb, Check } from 'lucide-react';
 
 interface DirectoryAICreatorProps {
     repoProvider?: string;
+    deployProvider?: string;
 }
 
-export function DirectoryAICreator({ repoProvider }: DirectoryAICreatorProps) {
+export function DirectoryAICreator({ repoProvider, deployProvider }: DirectoryAICreatorProps) {
     const [prompt, setPrompt] = useState('');
     const [directoryName, setDirectoryName] = useState('');
     const [organization, setOrganization] = useState(false);
@@ -45,6 +46,7 @@ export function DirectoryAICreator({ repoProvider }: DirectoryAICreatorProps) {
                 organization,
                 owner: organization ? owner : undefined,
                 repoProvider,
+                deployProvider,
             });
 
             if (result.success) {

@@ -8,7 +8,7 @@ import { DataGeneratorModule } from '@packages/agent/generators';
 import { ItemsGeneratorModule } from '@packages/agent/items-generator';
 import { MarkdownGeneratorModule } from '@packages/agent/generators';
 import { WebsiteGeneratorModule } from '@packages/agent/generators';
-import { DeployModule } from '@packages/agent/deploy';
+import { FacadesModule } from '@packages/agent/facades';
 import { ConfigModule } from './config/config.module';
 
 // Commands
@@ -31,7 +31,7 @@ import { CacheFactory } from '@packages/agent/cache';
         ItemsGeneratorModule,
         MarkdownGeneratorModule,
         WebsiteGeneratorModule,
-        DeployModule,
+        FacadesModule,
         DirectoryModule,
     ],
     providers: [

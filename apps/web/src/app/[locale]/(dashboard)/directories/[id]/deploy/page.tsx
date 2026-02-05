@@ -2,7 +2,7 @@ import { deployAPI, Directory, directoryAPI } from '@/lib/api';
 import { notFound, redirect } from 'next/navigation';
 import { ROUTES } from '@/lib/constants';
 import { DeployForm } from '@/components/directories/detail/deploy/DeployForm';
-import { VercelTokenAlert } from '@/components/directories/detail/deploy/VercelTokenAlert';
+import { DeployTokenAlert } from '@/components/directories/detail/deploy/DeployTokenAlert';
 import { SharedDirectoryNoTokenAlert } from '@/components/directories/detail/deploy/SharedDirectoryNoTokenAlert';
 import { GenerateStatusType } from '@/lib/api/enums';
 import { canDeploy } from '@/lib/permissions';
@@ -46,10 +46,11 @@ export default async function DeployPage({ params }: DeployPageParams) {
             return <SharedDirectoryNoTokenAlert />;
         }
         // For owned directories, show the regular token configuration alert
-        return <VercelTokenAlert />;
+        // Pass the directory's deploy provider if set, default to 'vercel'
+        return <DeployTokenAlert providerId={directory.deployProvider || 'vercel'} />;
     }
 
-    // Hydrate existing deployment from Vercel if we don't have the URL stored yet
+    // Hydrate existing deployment if we don't have the URL stored yet
     if (!directory.website) {
         const lookup = await deployAPI.lookupExistingDeployment(id).catch(() => null);
 

@@ -15,7 +15,7 @@ export interface EverWorksConfig {
     GIT_EMAIL: string;
 
     // Deployment Providers
-    VERCEL_TOKEN?: string;
+    DEPLOY_TOKEN?: string;
 
     // AI Configuration
     AI_DEFAULT_PROVIDER: string;

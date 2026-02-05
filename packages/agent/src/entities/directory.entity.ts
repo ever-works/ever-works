@@ -51,6 +51,9 @@ export class Directory {
     repoProvider: string; // 'github', 'gitlab', etc.
 
     @Column({ nullable: true })
+    deployProvider?: string; // 'vercel', 'netlify', etc.
+
+    @Column({ nullable: true })
     website: string;
 
     @Column({ nullable: true })

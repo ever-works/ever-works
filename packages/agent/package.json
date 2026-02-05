@@ -17,10 +17,6 @@
             "types": "./dist/database/index.d.ts",
             "default": "./dist/database/index.js"
         },
-        "./deploy": {
-            "types": "./dist/deploy/index.d.ts",
-            "default": "./dist/deploy/index.js"
-        },
         "./dto": {
             "types": "./dist/dto/index.d.ts",
             "default": "./dist/dto/index.js"
@@ -164,7 +160,6 @@
         "@nestjs/swagger": "^11.2.5",
         "@nestjs/typeorm": "^11.0.0",
         "@types/fs-extra": "^11.0.4",
-        "@vercel/sdk": "^1.18.5",
         "axios": "^1.13.2",
         "bullmq": "^5.66.4",
         "cache-manager": "^7.2.7",

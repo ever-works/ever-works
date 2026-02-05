@@ -1,14 +1,14 @@
 'use client';
 
 import { useEffect, useRef, useState, useTransition } from 'react';
-import type { Directory, VercelTeam } from '@/lib/api';
+import type { Directory } from '@/lib/api';
 import { cn } from '@/lib/utils/cn';
 import { toast } from 'sonner';
 import { useTranslations } from 'next-intl';
 import { Link, useRouter } from '@/i18n/navigation';
 import {
-    deployToVercel,
-    getVercelTeams,
+    deploy,
+    getDeploymentTeams,
     lookupExistingDeployment,
     updateWebsiteRepository,
     updateWebsiteTemplateSettings,
@@ -18,7 +18,7 @@ import { useDirectoryDetail } from '../DirectoryDetailContext';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { pageIntervalRefresh } from '@/lib/utils';
-import { VercelTeamSelectionDialog } from './VercelTeamSelectionDialog';
+import { TeamSelectionDialog, type DeployTeam } from './TeamSelectionDialog';
 import { DeployConfigDialog, type DeployConfigData } from './DeployConfigDialog';
 import { updateWebsiteSettings } from '@/app/actions/dashboard/directories';
 import { formatDistanceToNow } from 'date-fns';
@@ -34,10 +34,10 @@ export function DeployForm({ directory, isDeploying }: DeployFormProps) {
     const router = useRouter();
     const [isConfigDialogOpen, setIsConfigDialogOpen] = useState(false);
     const [isTeamDialogOpen, setIsTeamDialogOpen] = useState(false);
-    const [vercelTeams, setVercelTeams] = useState<VercelTeam[]>([]);
+    const [deployTeams, setDeployTeams] = useState<DeployTeam[]>([]);
     const [pendingTeamScope, setPendingTeamScope] = useState<string | undefined>();
 
-    const hasVercelTeams = vercelTeams.length > 0;
+    const hasDeployTeams = deployTeams.length > 0;
     const setHasCheckedExisting = useRef(false);
 
     useEffect(() => {
@@ -48,10 +48,12 @@ export function DeployForm({ directory, isDeploying }: DeployFormProps) {
     }, [isDeploying, router]);
 
     useEffect(() => {
-        getVercelTeams().then((res) => {
-            setVercelTeams(res.teams || []);
+        // Fetch teams using the directory-specific endpoint
+        // This uses the user's plugin settings token
+        getDeploymentTeams(directory.id).then((res) => {
+            setDeployTeams(res.teams || []);
         });
-    }, []);
+    }, [directory.id]);
 
     useEffect(() => {
         if (directory.website || setHasCheckedExisting.current) {
@@ -70,7 +72,7 @@ export function DeployForm({ directory, isDeploying }: DeployFormProps) {
     const runDeploy = (teamScope?: string) => {
         startTransition(async () => {
             try {
-                const result = await deployToVercel(directory.id, teamScope);
+                const result = await deploy(directory.id, teamScope);
 
                 if (result.success && result.data) {
                     if (result.data.status === 'pending') {
@@ -131,7 +133,7 @@ export function DeployForm({ directory, isDeploying }: DeployFormProps) {
     };
 
     const proceedToDeploy = () => {
-        if (hasVercelTeams) {
+        if (hasDeployTeams) {
             setIsTeamDialogOpen(true);
         } else {
             runDeploy();
@@ -153,15 +155,15 @@ export function DeployForm({ directory, isDeploying }: DeployFormProps) {
                 onCancel={() => setIsConfigDialogOpen(false)}
             />
 
-            <VercelTeamSelectionDialog
+            <TeamSelectionDialog
                 open={isTeamDialogOpen}
-                teams={vercelTeams}
+                teams={deployTeams}
                 isSubmitting={isPending || isDeploying}
                 onConfirm={handleConfirmDeploy}
                 onCancel={() => setIsTeamDialogOpen(false)}
             />
 
-            {/* Deploy to Vercel Section */}
+            {/* Deploy Section */}
             <div className="rounded-lg bg-surface dark:bg-surface-dark border border-border dark:border-border-dark p-6">
                 <div className="flex items-start gap-4">
                     <div

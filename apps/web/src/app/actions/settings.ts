@@ -7,7 +7,6 @@ import { revalidatePath } from 'next/cache';
 import { ROUTES } from '@/lib/constants';
 import { getTranslations } from 'next-intl/server';
 import { VALIDATION_RULES } from './validation';
-import { deployAPI } from '@/lib/api/deploy';
 
 // Note: Validation schemas are now created inside each function with translations
 
@@ -91,75 +90,6 @@ export async function updatePassword(data: { currentPassword: string; newPasswor
         return {
             success: false,
             error: error?.message || t('updateFailed'),
-        };
-    }
-}
-
-// API Token Actions
-export async function updateVercelToken(token: string) {
-    const t = await getTranslations('actions.settings.vercel');
-
-    // Validation schema with translations
-    const vercelTokenSchema = z.object({
-        token: z
-            .string()
-            .min(1, t('tokenRequired'))
-            .regex(/^[A-Za-z0-9]+$/, t('invalidFormat')),
-    });
-
-    try {
-        const user = await getAuthFromCookie();
-        if (!user) {
-            return { success: false, error: t('notAuthenticated') };
-        }
-
-        // Validate input
-        const validation = vercelTokenSchema.safeParse({ token });
-        if (!validation.success) {
-            return {
-                success: false,
-                error: validation.error.errors[0].message,
-            };
-        }
-
-        const validationResponse = await deployAPI.validateVercelToken(validation.data.token);
-
-        if (validationResponse.status !== 'success' || !validationResponse.valid) {
-            return {
-                success: false,
-                error: t('validationFailed'),
-            };
-        }
-
-        await authAPI.updateProfile({ vercelToken: validation.data.token });
-        revalidatePath(ROUTES.DASHBOARD_SETTINGS_API_TOKENS);
-
-        return { success: true, message: t('saveSuccess') };
-    } catch (error: any) {
-        return {
-            success: false,
-            error: error?.message || t('saveFailed'),
-        };
-    }
-}
-
-export async function removeVercelToken() {
-    const t = await getTranslations('actions.settings.vercel');
-
-    try {
-        const user = await getAuthFromCookie();
-        if (!user) {
-            return { success: false, error: t('notAuthenticated') };
-        }
-
-        await authAPI.updateProfile({ vercelToken: '' });
-        revalidatePath(ROUTES.DASHBOARD_SETTINGS_API_TOKENS);
-
-        return { success: true, message: t('removeSuccess') };
-    } catch (error: any) {
-        return {
-            success: false,
-            error: error?.message || t('removeFailed'),
         };
     }
 }

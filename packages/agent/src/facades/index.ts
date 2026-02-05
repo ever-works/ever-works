@@ -83,6 +83,16 @@ export {
     OAuthNotSupportedError,
 } from './oauth.facade';
 
+// Deploy Facade
+export {
+    DeployFacadeService,
+    DeployFacadeError,
+    NoDeployProviderError,
+    DeployProviderNotFoundError,
+    NoDeployCredentialsError,
+    type DeployFacadeFullOptions,
+} from './deploy.facade';
+
 // Re-export facade types from plugin for convenience
 export type { FacadeExtractionOptions, FacadeExtractedContent } from '@ever-works/plugin';
 export type {

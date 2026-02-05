@@ -1,6 +1,7 @@
 import { getAuthFromCookie } from '@/lib/auth';
-import { gitProvidersAPI, GitProviderConnectionInfo, GitProviderInfo } from '@/lib/api';
+import { gitProvidersAPI, deployAPI, GitProviderConnectionInfo, GitProviderInfo } from '@/lib/api';
 import NewDirectoryClient from './new-directory-client';
+import type { DeployProvider } from './deploy-provider-selector';
 
 export interface ProviderWithConnection {
     provider: GitProviderInfo;
@@ -13,6 +14,10 @@ export default async function NewDirectoryPage() {
     // Get all available git providers and their connection status
     let providers: ProviderWithConnection[] = [];
     let defaultProviderId: string | null = null;
+
+    // Get all available deploy providers
+    let deployProviders: DeployProvider[] = [];
+    let defaultDeployProviderId: string | null = 'vercel'; // Default to vercel
 
     try {
         const providersResult = await gitProvidersAPI.list();
@@ -34,11 +39,29 @@ export default async function NewDirectoryPage() {
         console.error('Failed to fetch git providers:', error);
     }
 
+    // Fetch deploy providers
+    try {
+        const deployProvidersResult = await deployAPI.getProviders();
+        if (deployProvidersResult.providers) {
+            deployProviders = deployProvidersResult.providers;
+            // Use first enabled provider as default, or vercel if available
+            const vercelProvider = deployProviders.find((p) => p.id === 'vercel');
+            const firstEnabled = deployProviders.find((p) => p.enabled);
+            defaultDeployProviderId = vercelProvider?.id || firstEnabled?.id || null;
+        }
+    } catch (error) {
+        console.error('Failed to fetch deploy providers:', error);
+        // Provide a fallback with vercel as default
+        deployProviders = [{ id: 'vercel', name: 'Vercel', enabled: true }];
+    }
+
     return (
         <NewDirectoryClient
             user={user!}
             providers={providers}
             defaultProviderId={defaultProviderId}
+            deployProviders={deployProviders}
+            defaultDeployProviderId={defaultDeployProviderId}
         />
     );
 }

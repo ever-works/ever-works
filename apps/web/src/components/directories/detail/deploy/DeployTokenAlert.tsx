@@ -4,10 +4,41 @@ import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
-import { AlertTriangle, Plus, ExternalLink } from 'lucide-react';
+import { AlertTriangle, ExternalLink, Settings } from 'lucide-react';
 
-export function VercelTokenAlert() {
+interface DeployTokenAlertProps {
+    /** The deployment provider ID (e.g., 'vercel', 'netlify') */
+    providerId?: string;
+    /** Display name of the provider */
+    providerName?: string;
+}
+
+const PROVIDER_CONFIGS: Record<
+    string,
+    { name: string; tokenUrl: string; tokenDescription: string }
+> = {
+    vercel: {
+        name: 'Vercel',
+        tokenUrl: 'https://vercel.com/account/tokens',
+        tokenDescription: 'API token',
+    },
+    netlify: {
+        name: 'Netlify',
+        tokenUrl: 'https://app.netlify.com/user/applications#personal-access-tokens',
+        tokenDescription: 'personal access token',
+    },
+};
+
+export function DeployTokenAlert({ providerId = 'vercel', providerName }: DeployTokenAlertProps) {
     const t = useTranslations('dashboard.directoryDetail.deploy');
+
+    const config = PROVIDER_CONFIGS[providerId] || {
+        name: providerName || providerId,
+        tokenUrl: '',
+        tokenDescription: 'API token',
+    };
+
+    const displayName = providerName || config.name;
 
     return (
         <div className="max-w-full mx-auto">
@@ -34,32 +65,34 @@ export function VercelTokenAlert() {
                         <p className="text-text-secondary dark:text-text-secondary-dark mb-4">
                             {t('noTokenAlert.description')}
                         </p>
-                        <div className="flex gap-3">
+                        <div className="flex flex-wrap gap-3">
                             <Link
-                                href={ROUTES.DASHBOARD_SETTINGS_API_TOKENS}
+                                href={ROUTES.DASHBOARD_PLUGIN_DETAIL(providerId)}
                                 className={cn(
                                     'inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors',
                                     'bg-primary dark:bg-primary-dark text-white',
                                     'hover:bg-primary/90 dark:hover:bg-primary-dark/90',
                                 )}
                             >
-                                <Plus className="w-4 h-4" />
+                                <Settings className="w-4 h-4" />
                                 {t('noTokenAlert.configureButton')}
                             </Link>
-                            <a
-                                href="https://vercel.com/account/tokens"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className={cn(
-                                    'inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors',
-                                    'bg-surface-secondary dark:bg-surface-secondary-dark',
-                                    'text-text dark:text-text-dark',
-                                    'hover:bg-surface-hover dark:hover:bg-surface-hover-dark',
-                                )}
-                            >
-                                <ExternalLink className="w-4 h-4" />
-                                {t('noTokenAlert.getTokenButton')}
-                            </a>
+                            {config.tokenUrl && (
+                                <a
+                                    href={config.tokenUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className={cn(
+                                        'inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors',
+                                        'bg-surface-secondary dark:bg-surface-secondary-dark',
+                                        'text-text dark:text-text-dark',
+                                        'hover:bg-surface-hover dark:hover:bg-surface-hover-dark',
+                                    )}
+                                >
+                                    <ExternalLink className="w-4 h-4" />
+                                    {t('noTokenAlert.getTokenButton')}
+                                </a>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -80,11 +113,14 @@ export function VercelTokenAlert() {
                     </li>
                     <li className="flex gap-2">
                         <span className="font-medium">3.</span>
-                        <span>{t('noTokenAlert.howTo.step3')}</span>
+                        <span>
+                            Configure your {displayName} {config.tokenDescription} in Plugin
+                            Settings &gt; {displayName}
+                        </span>
                     </li>
                     <li className="flex gap-2">
                         <span className="font-medium">4.</span>
-                        <span>{t('noTokenAlert.howTo.step4')}</span>
+                        <span>Return here to deploy your directory</span>
                     </li>
                 </ol>
             </div>
