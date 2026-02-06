@@ -37,6 +37,7 @@ export class GroqPlugin extends BaseAiProvider {
 			apiKey: {
 				type: 'string',
 				title: 'Groq API Key',
+				description: 'Connects to Groq for fast AI content generation and chat',
 				'x-secret': true,
 				'x-masked': true,
 				'x-writeOnly': true,
@@ -44,35 +45,47 @@ export class GroqPlugin extends BaseAiProvider {
 			},
 			defaultModel: {
 				type: 'string',
+				title: 'Default Model',
+				description: 'Used for all AI tasks unless a tier-specific model is set',
 				default: 'meta-llama/llama-4-scout-17b-16e-instruct',
 				'x-widget': 'model-select',
 				'x-scope': 'user'
 			},
 			simpleModel: {
 				type: 'string',
+				title: 'Simple Tasks Model',
+				description: 'Handles tags, short descriptions, and quick classifications',
 				default: 'llama-3.1-8b-instant',
 				'x-widget': 'model-select',
 				'x-scope': 'user'
 			},
 			mediumModel: {
 				type: 'string',
+				title: 'Standard Tasks Model',
+				description: 'Handles listings, summaries, and content reformatting',
 				default: 'meta-llama/llama-4-scout-17b-16e-instruct',
 				'x-widget': 'model-select',
 				'x-scope': 'user'
 			},
 			complexModel: {
 				type: 'string',
+				title: 'Complex Tasks Model',
+				description: 'Handles full page generation and multi-step analysis',
 				default: 'llama-3.3-70b-versatile',
 				'x-widget': 'model-select',
 				'x-scope': 'user'
 			},
 			baseUrl: {
 				type: 'string',
+				title: 'Base URL',
+				description: 'Custom API endpoint for proxies or compatible services',
 				default: 'https://api.groq.com/openai/v1',
 				'x-hidden': true
 			},
 			temperature: {
 				type: 'number',
+				title: 'Temperature',
+				description: 'Lower values give consistent output, higher values add variety',
 				default: 0.7,
 				minimum: 0,
 				maximum: 2,
@@ -80,6 +93,8 @@ export class GroqPlugin extends BaseAiProvider {
 			},
 			maxTokens: {
 				type: 'number',
+				title: 'Max Tokens',
+				description: 'Limits the length of each AI-generated response',
 				default: 4096,
 				'x-hidden': true
 			}

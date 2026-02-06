@@ -51,25 +51,27 @@ export default async function PluginCategoryPage({ params }: PageProps) {
 
     const categoryLabel = getCategoryLabel(category);
 
+    const isSinglePlugin = pluginsWithOAuth.length === 1;
+
     return (
-        <div className="space-y-8">
+        <div className="space-y-6">
             <div>
-                <h2 className="text-xl font-semibold text-text dark:text-text-dark">
+                <h2 className="text-lg font-semibold text-text dark:text-text-dark">
                     {categoryLabel}
                 </h2>
-                <p className="text-text-muted dark:text-text-muted-dark mt-1">
+                <p className="text-sm text-text-muted dark:text-text-muted-dark mt-1">
                     {t('plugins.configure')} {categoryLabel.toLowerCase()}
                 </p>
             </div>
 
-            <div className="space-y-8">
+            <div className="space-y-3">
                 {pluginsWithOAuth.map(({ plugin, oauthConnection }) => (
-                    <div
+                    <PluginSettingsInline
                         key={plugin.pluginId}
-                        className="p-6 rounded-xl bg-card dark:bg-card-dark border border-card-border dark:border-card-border-dark"
-                    >
-                        <PluginSettingsInline plugin={plugin} oauthConnection={oauthConnection} />
-                    </div>
+                        plugin={plugin}
+                        oauthConnection={oauthConnection}
+                        defaultExpanded={isSinglePlugin}
+                    />
                 ))}
             </div>
         </div>

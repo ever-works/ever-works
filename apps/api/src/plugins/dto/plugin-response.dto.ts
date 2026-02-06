@@ -109,6 +109,12 @@ export class PluginSettingsSchemaPropertyDto implements PluginSettingsSchemaProp
 
     @ApiPropertyOptional({ description: 'Enum values', type: [String] })
     enum?: readonly unknown[];
+
+    @ApiPropertyOptional({ description: 'UI widget type hint (e.g., model-select)' })
+    widget?: string;
+
+    @ApiPropertyOptional({ description: 'Whether field should be hidden from settings UI' })
+    hidden?: boolean;
 }
 
 /**

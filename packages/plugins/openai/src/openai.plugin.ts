@@ -37,6 +37,7 @@ export class OpenAiPlugin extends BaseAiProvider {
 			apiKey: {
 				type: 'string',
 				title: 'OpenAI API Key',
+				description: 'Connects to OpenAI for content generation and chat',
 				'x-secret': true,
 				'x-masked': true,
 				'x-writeOnly': true,
@@ -45,6 +46,7 @@ export class OpenAiPlugin extends BaseAiProvider {
 			defaultModel: {
 				type: 'string',
 				title: 'Default Model',
+				description: 'Used for all AI tasks unless a tier-specific model is set',
 				default: 'gpt-5-nano',
 				'x-widget': 'model-select',
 				'x-scope': 'user'
@@ -52,6 +54,7 @@ export class OpenAiPlugin extends BaseAiProvider {
 			simpleModel: {
 				type: 'string',
 				title: 'Simple Tasks Model',
+				description: 'Handles tags, short descriptions, and quick classifications',
 				default: 'gpt-5-nano',
 				'x-widget': 'model-select',
 				'x-scope': 'user'
@@ -59,6 +62,7 @@ export class OpenAiPlugin extends BaseAiProvider {
 			mediumModel: {
 				type: 'string',
 				title: 'Standard Tasks Model',
+				description: 'Handles listings, summaries, and content reformatting',
 				default: 'gpt-4o-mini',
 				'x-widget': 'model-select',
 				'x-scope': 'user'
@@ -66,12 +70,15 @@ export class OpenAiPlugin extends BaseAiProvider {
 			complexModel: {
 				type: 'string',
 				title: 'Complex Tasks Model',
+				description: 'Handles full page generation and multi-step analysis',
 				default: 'gpt-4o',
 				'x-widget': 'model-select',
 				'x-scope': 'user'
 			},
 			temperature: {
 				type: 'number',
+				title: 'Temperature',
+				description: 'Lower values give consistent output, higher values add variety',
 				default: 0.7,
 				minimum: 0,
 				maximum: 2,
@@ -79,6 +86,8 @@ export class OpenAiPlugin extends BaseAiProvider {
 			},
 			maxTokens: {
 				type: 'number',
+				title: 'Max Tokens',
+				description: 'Limits the length of each AI-generated response',
 				default: 4096,
 				'x-hidden': true
 			}

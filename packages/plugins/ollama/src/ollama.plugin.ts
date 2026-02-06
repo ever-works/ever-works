@@ -38,30 +38,38 @@ export class OllamaPlugin extends BaseAiProvider {
 			apiKey: {
 				type: 'string',
 				title: 'API Key',
-				description: 'Optional - Ollama typically does not require authentication',
+				description: 'Usually not needed; only for secured Ollama instances',
 				default: 'ollama',
 				'x-scope': 'user'
 			},
 			defaultModel: {
 				type: 'string',
+				title: 'Default Model',
+				description: 'Used for all AI tasks unless a tier-specific model is set',
 				default: 'llama3.3',
 				'x-widget': 'model-select',
 				'x-scope': 'user'
 			},
 			simpleModel: {
 				type: 'string',
+				title: 'Simple Tasks Model',
+				description: 'Handles tags, short descriptions, and quick classifications',
 				default: 'llama3.2',
 				'x-widget': 'model-select',
 				'x-scope': 'user'
 			},
 			mediumModel: {
 				type: 'string',
+				title: 'Standard Tasks Model',
+				description: 'Handles listings, summaries, and content reformatting',
 				default: 'llama3.3',
 				'x-widget': 'model-select',
 				'x-scope': 'user'
 			},
 			complexModel: {
 				type: 'string',
+				title: 'Complex Tasks Model',
+				description: 'Handles full page generation and multi-step analysis',
 				default: 'llama3.3',
 				'x-widget': 'model-select',
 				'x-scope': 'user'
@@ -69,11 +77,14 @@ export class OllamaPlugin extends BaseAiProvider {
 			baseUrl: {
 				type: 'string',
 				title: 'Ollama Server URL',
+				description: 'Address of your Ollama instance (default: localhost:11434)',
 				default: 'http://localhost:11434/v1',
 				'x-hidden': true
 			},
 			temperature: {
 				type: 'number',
+				title: 'Temperature',
+				description: 'Lower values give consistent output, higher values add variety',
 				default: 0.7,
 				minimum: 0,
 				maximum: 2,
@@ -81,6 +92,8 @@ export class OllamaPlugin extends BaseAiProvider {
 			},
 			maxTokens: {
 				type: 'number',
+				title: 'Max Tokens',
+				description: 'Limits the length of each AI-generated response',
 				default: 4096,
 				'x-hidden': true
 			}

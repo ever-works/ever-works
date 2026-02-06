@@ -230,6 +230,75 @@ describe('PluginLoaderService', () => {
             expect(result.error).toContain('Plugin validation failed');
         });
 
+        it('should merge runtime manifest from getManifest() into discovered manifest', async () => {
+            const manifest = createMockManifest();
+            const plugin = {
+                ...createMockPlugin(),
+                getManifest: jest.fn().mockReturnValue({
+                    ...manifest,
+                    readme: '## Plugin Readme',
+                    icon: { type: 'svg', value: '<svg/>' },
+                }),
+            };
+
+            (service as any).loadPluginModule = jest.fn().mockResolvedValue(plugin);
+
+            const discovered = {
+                path: '/path/to/plugin',
+                packageJson: {},
+                manifest,
+                builtIn: false,
+            };
+
+            const result = await service.load(discovered);
+
+            expect(result.success).toBe(true);
+            // The manifest passed to register should have package.json fields (spread last)
+            // but also include readme from getManifest() (runtime manifest fills gaps)
+            expect(registry.register).toHaveBeenCalledWith(
+                plugin,
+                expect.objectContaining({
+                    id: 'test-plugin',
+                    readme: '## Plugin Readme',
+                }),
+                expect.any(Object),
+            );
+        });
+
+        it('should give package.json manifest priority over runtime manifest', async () => {
+            const manifest = { ...createMockManifest(), description: 'From package.json' };
+            const plugin = {
+                ...createMockPlugin(),
+                getManifest: jest.fn().mockReturnValue({
+                    ...createMockManifest(),
+                    description: 'From getManifest',
+                    readme: '## Readme',
+                }),
+            };
+
+            (service as any).loadPluginModule = jest.fn().mockResolvedValue(plugin);
+
+            const discovered = {
+                path: '/path/to/plugin',
+                packageJson: {},
+                manifest,
+                builtIn: false,
+            };
+
+            const result = await service.load(discovered);
+
+            expect(result.success).toBe(true);
+            // package.json manifest spread last, so its description wins
+            expect(registry.register).toHaveBeenCalledWith(
+                plugin,
+                expect.objectContaining({
+                    description: 'From package.json',
+                    readme: '## Readme',
+                }),
+                expect.any(Object),
+            );
+        });
+
         it('should include warnings from version checker and class validator', async () => {
             const plugin = createMockPlugin();
             const manifest = createMockManifest();

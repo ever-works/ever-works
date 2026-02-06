@@ -46,6 +46,7 @@ export class OpenRouterPlugin extends BaseAiProvider {
 			apiKey: {
 				type: 'string',
 				title: 'OpenRouter API Key',
+				description: 'Connects to OpenRouter to access models from multiple providers',
 				'x-secret': true,
 				'x-masked': true,
 				'x-writeOnly': true,
@@ -55,6 +56,7 @@ export class OpenRouterPlugin extends BaseAiProvider {
 			defaultModel: {
 				type: 'string',
 				title: 'Default Model',
+				description: 'Used for all AI tasks unless a tier-specific model is set',
 				default: 'openai/gpt-5-nano',
 				'x-widget': 'model-select',
 				'x-scope': 'user',
@@ -63,7 +65,7 @@ export class OpenRouterPlugin extends BaseAiProvider {
 			simpleModel: {
 				type: 'string',
 				title: 'Simple Tasks Model',
-				description: 'Economy model for simple tasks',
+				description: 'Handles tags, short descriptions, and quick classifications',
 				default: 'openai/gpt-5-nano',
 				'x-widget': 'model-select',
 				'x-scope': 'user',
@@ -72,7 +74,7 @@ export class OpenRouterPlugin extends BaseAiProvider {
 			mediumModel: {
 				type: 'string',
 				title: 'Standard Tasks Model',
-				description: 'Balanced model for standard tasks',
+				description: 'Handles listings, summaries, and content reformatting',
 				default: 'moonshotai/kimi-k2.5',
 				'x-widget': 'model-select',
 				'x-scope': 'user',
@@ -81,7 +83,7 @@ export class OpenRouterPlugin extends BaseAiProvider {
 			complexModel: {
 				type: 'string',
 				title: 'Complex Tasks Model',
-				description: 'Premium model for complex tasks',
+				description: 'Handles full page generation and multi-step analysis',
 				default: 'moonshotai/kimi-k2.5',
 				'x-widget': 'model-select',
 				'x-scope': 'user',
@@ -90,6 +92,7 @@ export class OpenRouterPlugin extends BaseAiProvider {
 			baseUrl: {
 				type: 'string',
 				title: 'Base URL',
+				description: 'Custom API endpoint for proxies or compatible services',
 				default: 'https://openrouter.ai/api/v1',
 				'x-envVar': 'PLUGIN_OPENROUTER_BASE_URL',
 				'x-hidden': true
@@ -97,6 +100,7 @@ export class OpenRouterPlugin extends BaseAiProvider {
 			temperature: {
 				type: 'number',
 				title: 'Temperature',
+				description: 'Lower values give consistent output, higher values add variety',
 				default: 0.7,
 				minimum: 0,
 				maximum: 2,
@@ -105,6 +109,7 @@ export class OpenRouterPlugin extends BaseAiProvider {
 			maxTokens: {
 				type: 'number',
 				title: 'Max Tokens',
+				description: 'Limits the length of each AI-generated response',
 				default: 4096,
 				'x-hidden': true
 			}

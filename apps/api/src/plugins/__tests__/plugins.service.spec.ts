@@ -386,6 +386,126 @@ describe('PluginsService', () => {
         });
     });
 
+    describe('listPlugins', () => {
+        it('should filter by category when category param is provided', async () => {
+            const aiPlugin = createRegisteredPlugin();
+            aiPlugin.plugin = { ...aiPlugin.plugin, id: 'openai' } as IPlugin;
+            aiPlugin.manifest = {
+                ...aiPlugin.manifest,
+                id: 'openai',
+                category: 'ai-provider',
+            } as PluginManifest;
+
+            const gitPlugin = createRegisteredPlugin();
+            gitPlugin.plugin = { ...gitPlugin.plugin, id: 'github' } as IPlugin;
+            gitPlugin.manifest = {
+                ...gitPlugin.manifest,
+                id: 'github',
+                category: 'git-provider',
+            } as PluginManifest;
+
+            jest.spyOn(pluginRegistryService, 'getAll').mockReturnValue([aiPlugin, gitPlugin]);
+            jest.spyOn(userPluginRepository, 'find').mockResolvedValue([
+                {
+                    id: '1',
+                    userId: 'user-1',
+                    pluginId: 'openai',
+                    enabled: true,
+                    settings: {},
+                    secretSettings: {},
+                    metadata: {},
+                } as any,
+                {
+                    id: '2',
+                    userId: 'user-1',
+                    pluginId: 'github',
+                    enabled: true,
+                    settings: {},
+                    secretSettings: {},
+                    metadata: {},
+                } as any,
+            ]);
+
+            const result = await service.listPlugins('user-1', 'ai-provider');
+
+            expect(result.plugins).toHaveLength(1);
+            expect(result.plugins[0].pluginId).toBe('openai');
+        });
+
+        it('should only return enabled plugins when category is provided', async () => {
+            const enabledPlugin = createRegisteredPlugin();
+            enabledPlugin.plugin = { ...enabledPlugin.plugin, id: 'openai' } as IPlugin;
+            enabledPlugin.manifest = {
+                ...enabledPlugin.manifest,
+                id: 'openai',
+                category: 'ai-provider',
+            } as PluginManifest;
+
+            const disabledPlugin = createRegisteredPlugin();
+            disabledPlugin.plugin = { ...disabledPlugin.plugin, id: 'anthropic' } as IPlugin;
+            disabledPlugin.manifest = {
+                ...disabledPlugin.manifest,
+                id: 'anthropic',
+                category: 'ai-provider',
+            } as PluginManifest;
+
+            jest.spyOn(pluginRegistryService, 'getAll').mockReturnValue([
+                enabledPlugin,
+                disabledPlugin,
+            ]);
+            jest.spyOn(userPluginRepository, 'find').mockResolvedValue([
+                {
+                    id: '1',
+                    userId: 'user-1',
+                    pluginId: 'openai',
+                    enabled: true,
+                    settings: {},
+                    secretSettings: {},
+                    metadata: {},
+                } as any,
+                {
+                    id: '2',
+                    userId: 'user-1',
+                    pluginId: 'anthropic',
+                    enabled: false,
+                    settings: {},
+                    secretSettings: {},
+                    metadata: {},
+                } as any,
+            ]);
+
+            const result = await service.listPlugins('user-1', 'ai-provider');
+
+            expect(result.plugins).toHaveLength(1);
+            expect(result.plugins[0].pluginId).toBe('openai');
+        });
+
+        it('should return all visible plugins when no category is provided', async () => {
+            const aiPlugin = createRegisteredPlugin();
+            aiPlugin.plugin = { ...aiPlugin.plugin, id: 'openai' } as IPlugin;
+            aiPlugin.manifest = {
+                ...aiPlugin.manifest,
+                id: 'openai',
+                category: 'ai-provider',
+            } as PluginManifest;
+
+            const gitPlugin = createRegisteredPlugin();
+            gitPlugin.plugin = { ...gitPlugin.plugin, id: 'github' } as IPlugin;
+            gitPlugin.manifest = {
+                ...gitPlugin.manifest,
+                id: 'github',
+                category: 'git-provider',
+            } as PluginManifest;
+
+            jest.spyOn(pluginRegistryService, 'getAll').mockReturnValue([aiPlugin, gitPlugin]);
+            jest.spyOn(userPluginRepository, 'find').mockResolvedValue([]);
+
+            const result = await service.listPlugins('user-1');
+
+            expect(result.plugins).toHaveLength(2);
+        });
+    });
+
     describe('getPlugin', () => {
         it('should throw NotFoundException for non-existent plugin', async () => {
             jest.spyOn(pluginRegistryService, 'get').mockReturnValue(undefined);
@@ -1098,6 +1218,107 @@ describe('PluginsService', () => {
 
             expect(result.categories).toHaveLength(1);
             expect(result.categories[0].plugins[0].pluginId).toBe('hybrid');
+        });
+
+        it('should include admin-only plugins with oauth capability in settings menu', async () => {
+            const oauthPlugin: RegisteredPlugin = {
+                plugin: {
+                    id: 'github',
+                    name: 'GitHub',
+                    version: '1.0.0',
+                    category: 'git-provider',
+                    capabilities: ['git-provider', 'oauth'],
+                    settingsSchema: {
+                        type: 'object',
+                        properties: {
+                            clientId: {
+                                type: 'string',
+                                'x-envVar': 'PLUGIN_GITHUB_CLIENT_ID',
+                                'x-adminOnly': true,
+                            },
+                        },
+                    },
+                    configurationMode: 'admin-only',
+                    onLoad: jest.fn().mockResolvedValue(undefined),
+                    onEnable: jest.fn().mockResolvedValue(undefined),
+                    onDisable: jest.fn().mockResolvedValue(undefined),
+                    onUnload: jest.fn().mockResolvedValue(undefined),
+                    validateSettings: jest.fn().mockResolvedValue({ valid: true }),
+                } as unknown as IPlugin,
+                manifest: {
+                    id: 'github',
+                    name: 'GitHub',
+                    version: '1.0.0',
+                    description: 'GitHub integration',
+                    category: 'git-provider',
+                    capabilities: ['git-provider', 'oauth'],
+                    visibility: 'user-only',
+                    autoEnable: true,
+                    systemPlugin: true,
+                } as PluginManifest,
+                state: 'loaded',
+                builtIn: true,
+                registeredAt: Date.now(),
+                stateHistory: [],
+            };
+
+            jest.spyOn(pluginRegistryService, 'getAll').mockReturnValue([oauthPlugin]);
+            jest.spyOn(userPluginRepository, 'find').mockResolvedValue([]);
+
+            const result = await service.getPluginsForSettingsMenu('user-1');
+
+            expect(result.categories).toHaveLength(1);
+            expect(result.categories[0].category).toBe('git-provider');
+            expect(result.categories[0].plugins[0].pluginId).toBe('github');
+        });
+
+        it('should not include admin-only plugins without oauth capability', async () => {
+            const adminOnlyNoOAuth: RegisteredPlugin = {
+                plugin: {
+                    id: 'internal-tool',
+                    name: 'Internal Tool',
+                    version: '1.0.0',
+                    category: 'utility',
+                    capabilities: ['utility'],
+                    settingsSchema: {
+                        type: 'object',
+                        properties: {
+                            secret: {
+                                type: 'string',
+                                'x-envVar': 'INTERNAL_SECRET',
+                                'x-adminOnly': true,
+                            },
+                        },
+                    },
+                    configurationMode: 'admin-only',
+                    onLoad: jest.fn().mockResolvedValue(undefined),
+                    onEnable: jest.fn().mockResolvedValue(undefined),
+                    onDisable: jest.fn().mockResolvedValue(undefined),
+                    onUnload: jest.fn().mockResolvedValue(undefined),
+                    validateSettings: jest.fn().mockResolvedValue({ valid: true }),
+                } as unknown as IPlugin,
+                manifest: {
+                    id: 'internal-tool',
+                    name: 'Internal Tool',
+                    version: '1.0.0',
+                    description: 'Internal tool',
+                    category: 'utility',
+                    capabilities: ['utility'],
+                    visibility: 'public',
+                    autoEnable: true,
+                } as PluginManifest,
+                state: 'loaded',
+                builtIn: true,
+                registeredAt: Date.now(),
+                stateHistory: [],
+            };
+
+            jest.spyOn(pluginRegistryService, 'getAll').mockReturnValue([adminOnlyNoOAuth]);
+            jest.spyOn(userPluginRepository, 'find').mockResolvedValue([]);
+
+            const result = await service.getPluginsForSettingsMenu('user-1');
+
+            expect(result.categories).toHaveLength(0);
         });
 
         it('should filter out plugins with only env-var settings', async () => {

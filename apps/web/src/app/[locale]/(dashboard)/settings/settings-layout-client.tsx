@@ -68,10 +68,6 @@ export function SettingsLayoutClient({ children, settingsMenu }: SettingsLayoutC
         return pathname.startsWith(categoryPath);
     };
 
-    const isPluginActive = (category: string, pluginId: string) => {
-        return pathname === `${baseSettingsPath}/plugins/${category}/${pluginId}`;
-    };
-
     const toggleCategory = (category: string) => {
         setExpandedCategories((prev) => {
             const next = new Set(prev);
@@ -124,14 +120,14 @@ export function SettingsLayoutClient({ children, settingsMenu }: SettingsLayoutC
 
         // For categories with a single plugin, link directly to plugin settings
         if (singlePlugin) {
-            const pluginHref = `${baseSettingsPath}/plugins/${category.category}/${singlePlugin.pluginId}`;
+            const pluginHref = `${baseSettingsPath}/plugins/${category.category}`;
             return (
                 <Link
                     key={category.category}
                     href={pluginHref}
                     className={cn(
                         'w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors',
-                        isPluginActive(category.category, singlePlugin.pluginId)
+                        isCategoryActive(category)
                             ? 'bg-surface-secondary dark:bg-surface-secondary-dark text-text dark:text-text-dark font-medium'
                             : 'text-text-muted dark:text-text-muted-dark hover:bg-surface dark:hover:bg-surface-dark hover:text-text dark:hover:text-text-dark',
                     )}
@@ -172,14 +168,14 @@ export function SettingsLayoutClient({ children, settingsMenu }: SettingsLayoutC
                 {isExpanded && (
                     <div className="ml-4 pl-4 border-l border-border dark:border-border-dark mt-1 space-y-1">
                         {category.plugins.map((plugin) => {
-                            const pluginHref = `${baseSettingsPath}/plugins/${category.category}/${plugin.pluginId}`;
+                            const pluginHref = `${baseSettingsPath}/plugins/${category.category}`;
                             return (
                                 <Link
                                     key={plugin.pluginId}
                                     href={pluginHref}
                                     className={cn(
                                         'w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors text-sm',
-                                        isPluginActive(category.category, plugin.pluginId)
+                                        isCategoryActive(category)
                                             ? 'bg-surface-secondary dark:bg-surface-secondary-dark text-text dark:text-text-dark font-medium'
                                             : 'text-text-muted dark:text-text-muted-dark hover:bg-surface dark:hover:bg-surface-dark hover:text-text dark:hover:text-text-dark',
                                     )}
@@ -238,7 +234,7 @@ export function SettingsLayoutClient({ children, settingsMenu }: SettingsLayoutC
                 </div>
 
                 {/* Content Area */}
-                <div className="flex-1 bg-surface dark:bg-surface-dark rounded-lg border border-border dark:border-border-dark">
+                <div className="flex-1 rounded-lg border border-border dark:border-border-dark">
                     <div className="p-6">{children}</div>
                 </div>
             </div>

@@ -53,11 +53,6 @@ describe('GroqPlugin', () => {
 			expect(props).toHaveProperty('complexModel');
 		});
 
-		it('should not have embeddingModel setting', () => {
-			const props = plugin.settingsSchema.properties!;
-			expect(props).not.toHaveProperty('embeddingModel');
-		});
-
 		it('should have baseUrl setting', () => {
 			const props = plugin.settingsSchema.properties!;
 			expect(props).toHaveProperty('baseUrl');
@@ -71,6 +66,21 @@ describe('GroqPlugin', () => {
 			expect(props).toHaveProperty('maxTokens');
 			expect((props.temperature as any).type).toBe('number');
 			expect((props.maxTokens as any).type).toBe('number');
+		});
+
+		it('should have description on all settings fields', () => {
+			const props = plugin.settingsSchema.properties!;
+			for (const [key, prop] of Object.entries(props)) {
+				expect((prop as any).description, `${key} should have a description`).toBeDefined();
+				expect((prop as any).description, `${key} description should not be empty`).not.toBe('');
+			}
+		});
+
+		it('should have title on all settings fields', () => {
+			const props = plugin.settingsSchema.properties!;
+			for (const [key, prop] of Object.entries(props)) {
+				expect((prop as any).title, `${key} should have a title`).toBeDefined();
+			}
 		});
 	});
 

@@ -178,7 +178,7 @@ export class PluginLoaderService {
      * Load a discovered plugin
      */
     async load(discovered: DiscoveredPlugin): Promise<LoadResult> {
-        const { manifest, path: pluginPath } = discovered;
+        let { manifest, path: pluginPath } = discovered;
         const warnings: string[] = [];
 
         try {
@@ -217,6 +217,12 @@ export class PluginLoaderService {
                     pluginId: manifest.id,
                     error: 'Failed to load plugin module',
                 };
+            }
+
+            // Merge runtime manifest from plugin class (provides readme, icon overrides, etc.)
+            if (typeof plugin.getManifest === 'function') {
+                const runtimeManifest = plugin.getManifest();
+                manifest = { ...runtimeManifest, ...manifest };
             }
 
             // Validate the plugin class

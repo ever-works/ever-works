@@ -61,11 +61,16 @@ export class PluginsService {
     /**
      * List all available plugins with user-specific status
      */
-    async listPlugins(userId: string): Promise<PluginListResponseDto> {
+    async listPlugins(userId: string, category?: string): Promise<PluginListResponseDto> {
         const allPlugins = this.pluginRegistryService.getAll();
         const visiblePlugins = allPlugins.filter(
             (p) => (p.manifest?.visibility ?? 'public') !== 'hidden',
         );
+
+        // Filter by category if provided
+        let filteredPlugins = category
+            ? visiblePlugins.filter((p) => p.manifest.category === category)
+            : visiblePlugins;
 
         // Get user's plugin installations
         const userPlugins = await this.userPluginRepository.find({
@@ -74,8 +79,17 @@ export class PluginsService {
 
         const userPluginMap = new Map(userPlugins.map((up) => [up.pluginId, up]));
 
+        // When filtering by category (settings page), only show enabled plugins
+        if (category) {
+            filteredPlugins = filteredPlugins.filter((registered) => {
+                const userPlugin = userPluginMap.get(registered.plugin.id);
+                const autoEnabled = registered.manifest?.autoEnable ?? false;
+                return userPlugin?.enabled ?? autoEnabled;
+            });
+        }
+
         // Map to response DTOs
-        const plugins: UserPluginResponseDto[] = visiblePlugins.map((registered) => {
+        const plugins: UserPluginResponseDto[] = filteredPlugins.map((registered) => {
             const userPlugin = userPluginMap.get(registered.plugin.id);
             return this.toUserPluginResponse(registered, userPlugin);
         });
@@ -110,8 +124,10 @@ export class PluginsService {
             const visibility = registered.manifest?.visibility ?? 'public';
             if (visibility === 'hidden') return false;
 
+            const hasOAuth = registered.plugin.capabilities?.includes('oauth') ?? false;
+
             const configMode = registered.plugin.configurationMode || 'hybrid';
-            if (configMode === 'admin-only') return false;
+            if (configMode === 'admin-only' && !hasOAuth) return false;
 
             const userPlugin = userPluginMap.get(registered.plugin.id);
             const autoEnabled = registered.manifest?.autoEnable ?? false;
@@ -120,10 +136,10 @@ export class PluginsService {
 
             // Check if plugin has user-configurable settings
             const schema = registered.plugin.settingsSchema;
-            if (!schema?.properties) return false;
+            if (!schema?.properties && !hasOAuth) return false;
 
             // Check if there are any non-admin-only, non-env-only settings
-            const hasUserSettings = Object.values(schema.properties).some((prop) => {
+            const hasUserSettings = Object.values(schema?.properties || {}).some((prop) => {
                 if (prop['x-envVar']) return false;
                 if (prop['x-adminOnly']) return false;
                 if (prop['x-hidden']) return false;
@@ -131,7 +147,7 @@ export class PluginsService {
                 return scope === 'global' || scope === 'user';
             });
 
-            return hasUserSettings;
+            return hasUserSettings || hasOAuth;
         });
 
         // Group by category
@@ -781,13 +797,9 @@ export class PluginsService {
     private toPluginResponse(registered: RegisteredPlugin): PluginResponseDto {
         const manifest = registered.manifest;
         return {
+            ...manifest,
             id: registered.plugin.id,
             pluginId: registered.plugin.id,
-            name: registered.manifest.name,
-            version: registered.manifest.version,
-            description: manifest.description,
-            readme: manifest.readme,
-            category: manifest.category,
             capabilities: [...manifest.capabilities],
             configurationMode: registered.plugin.configurationMode || 'hybrid',
             builtIn: registered.builtIn,
@@ -796,8 +808,6 @@ export class PluginsService {
             state: registered.state,
             icon: this.extractIcon(manifest),
             settingsSchema: this.extractSettingsSchema(registered.plugin.settingsSchema),
-            author: manifest.author,
-            homepage: manifest.homepage,
             autoEnable: manifest.autoEnable ?? false,
         };
     }
@@ -859,13 +869,7 @@ export class PluginsService {
         const icon = manifest.icon;
         if (!icon) return undefined;
 
-        return {
-            type: icon.type,
-            value: icon.value,
-            darkValue: icon.darkValue,
-            backgroundColor: icon.backgroundColor,
-            color: icon.color,
-        };
+        return { ...icon };
     }
 
     /**

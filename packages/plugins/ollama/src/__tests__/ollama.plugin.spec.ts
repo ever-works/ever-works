@@ -48,7 +48,6 @@ describe('OllamaPlugin', () => {
 			expect(props).toHaveProperty('simpleModel');
 			expect(props).toHaveProperty('mediumModel');
 			expect(props).toHaveProperty('complexModel');
-			expect(props).toHaveProperty('embeddingModel');
 		});
 
 		it('should have baseUrl setting with localhost default', () => {
@@ -65,6 +64,21 @@ describe('OllamaPlugin', () => {
 			expect(props).toHaveProperty('maxTokens');
 			expect((props.temperature as any).type).toBe('number');
 			expect((props.maxTokens as any).type).toBe('number');
+		});
+
+		it('should have description on all settings fields', () => {
+			const props = plugin.settingsSchema.properties!;
+			for (const [key, prop] of Object.entries(props)) {
+				expect((prop as any).description, `${key} should have a description`).toBeDefined();
+				expect((prop as any).description, `${key} description should not be empty`).not.toBe('');
+			}
+		});
+
+		it('should have title on all settings fields', () => {
+			const props = plugin.settingsSchema.properties!;
+			for (const [key, prop] of Object.entries(props)) {
+				expect((prop as any).title, `${key} should have a title`).toBeDefined();
+			}
 		});
 	});
 

@@ -37,6 +37,7 @@ export class GooglePlugin extends BaseAiProvider {
 			apiKey: {
 				type: 'string',
 				title: 'Google AI API Key',
+				description: 'Connects to Google Gemini for content generation and chat',
 				'x-secret': true,
 				'x-masked': true,
 				'x-writeOnly': true,
@@ -45,24 +46,31 @@ export class GooglePlugin extends BaseAiProvider {
 			defaultModel: {
 				type: 'string',
 				title: 'Default Model',
+				description: 'Used for all AI tasks unless a tier-specific model is set',
 				default: 'gemini-2.5-flash',
 				'x-widget': 'model-select',
 				'x-scope': 'user'
 			},
 			simpleModel: {
 				type: 'string',
+				title: 'Simple Tasks Model',
+				description: 'Handles tags, short descriptions, and quick classifications',
 				default: 'gemini-2.0-flash',
 				'x-widget': 'model-select',
 				'x-scope': 'user'
 			},
 			mediumModel: {
 				type: 'string',
+				title: 'Standard Tasks Model',
+				description: 'Handles listings, summaries, and content reformatting',
 				default: 'gemini-2.5-flash',
 				'x-widget': 'model-select',
 				'x-scope': 'user'
 			},
 			complexModel: {
 				type: 'string',
+				title: 'Complex Tasks Model',
+				description: 'Handles full page generation and multi-step analysis',
 				default: 'gemini-2.5-pro',
 				'x-widget': 'model-select',
 				'x-scope': 'user'
@@ -70,11 +78,14 @@ export class GooglePlugin extends BaseAiProvider {
 			baseUrl: {
 				type: 'string',
 				title: 'Base URL',
+				description: 'Custom API endpoint for proxies or compatible services',
 				default: 'https://generativelanguage.googleapis.com/v1beta/openai/',
 				'x-hidden': true
 			},
 			temperature: {
 				type: 'number',
+				title: 'Temperature',
+				description: 'Lower values give consistent output, higher values add variety',
 				default: 0.7,
 				minimum: 0,
 				maximum: 2,
@@ -82,6 +93,8 @@ export class GooglePlugin extends BaseAiProvider {
 			},
 			maxTokens: {
 				type: 'number',
+				title: 'Max Tokens',
+				description: 'Limits the length of each AI-generated response',
 				default: 4096,
 				'x-hidden': true
 			}

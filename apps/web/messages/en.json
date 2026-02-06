@@ -1782,6 +1782,7 @@
             "docs": "Docs",
             "author": "Author",
             "documentation": "Documentation",
+            "about": "About",
             "backToPlugins": "Back to Plugins",
             "filters": {
                 "all": "All",

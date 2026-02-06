@@ -4,21 +4,35 @@ import { useState, useTransition, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { UserPlugin, PluginSettingsSchemaProperty } from '@/lib/api/plugins';
+import type { OAuthConnectionInfo } from '@/lib/api/oauth';
 import { cn } from '@/lib/utils/cn';
 import { Button } from '@/components/ui/button';
-import { Power, PowerOff, Save, ArrowLeft, ExternalLink, Check, AlertCircle } from 'lucide-react';
+import {
+    Power,
+    PowerOff,
+    Save,
+    ArrowLeft,
+    ExternalLink,
+    Check,
+    AlertCircle,
+    BookOpen,
+    Settings,
+} from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { enablePlugin, disablePlugin, updatePluginSettings } from '@/app/actions/plugins';
 import { PluginIcon } from './PluginIcon';
 import { PluginSettingsField } from './PluginSettingsField';
+import { PluginReadme } from './PluginReadme';
+import { PluginOAuthConnection } from '@/components/settings/PluginOAuthConnection';
 import { getCategoryLabel, getCapabilityLabel } from '@/lib/utils/plugin-category-icons';
 
 interface PluginSettingsProps {
     plugin: UserPlugin;
+    oauthConnection?: OAuthConnectionInfo | null;
 }
 
-export function PluginSettings({ plugin }: PluginSettingsProps) {
+export function PluginSettings({ plugin, oauthConnection }: PluginSettingsProps) {
     const t = useTranslations('dashboard.plugins');
     const router = useRouter();
     const [isPending, startTransition] = useTransition();
@@ -144,109 +158,146 @@ export function PluginSettings({ plugin }: PluginSettingsProps) {
             {/* Back link */}
             <Link
                 href={ROUTES.DASHBOARD_PLUGINS}
-                className="inline-flex items-center gap-1 text-sm text-text-muted dark:text-text-muted-dark hover:text-text dark:hover:text-text-dark"
+                className="inline-flex items-center gap-1.5 text-sm text-text-muted dark:text-text-muted-dark hover:text-text dark:hover:text-text-dark transition-colors"
             >
                 <ArrowLeft className="w-4 h-4" />
                 {t('backToPlugins')}
             </Link>
 
             {/* Plugin Header */}
-            <div className="bg-surface dark:bg-surface-dark rounded-lg border border-border dark:border-border-dark p-6">
-                <div className="flex items-start gap-4">
-                    <PluginIcon icon={plugin.icon} name={plugin.name} size={64} />
+            <div className="bg-surface dark:bg-surface-dark rounded-xl border border-border dark:border-border-dark overflow-hidden">
+                <div className="p-6">
+                    <div className="flex items-start gap-4">
+                        <PluginIcon
+                            icon={plugin.icon}
+                            name={plugin.name}
+                            size={56}
+                            className="rounded-xl shrink-0"
+                        />
 
-                    <div className="flex-1">
-                        <div className="flex items-center gap-3">
-                            <h2 className="text-xl font-semibold text-text dark:text-text-dark">
-                                {plugin.name}
-                            </h2>
-                            <span className="text-sm text-text-muted dark:text-text-muted-dark">
-                                v{plugin.version}
-                            </span>
-                            {plugin.builtIn && (
-                                <span className="shrink-0 text-xs px-2 py-0.5 rounded bg-surface-tertiary dark:bg-surface-tertiary-dark text-text-muted dark:text-text-muted-dark">
-                                    {t('builtIn')}
-                                </span>
-                            )}
-                        </div>
+                        <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-4">
+                                <div>
+                                    <div className="flex items-center gap-2.5 flex-wrap">
+                                        <h1 className="text-xl font-semibold text-text dark:text-text-dark">
+                                            {plugin.name}
+                                        </h1>
+                                        <span className="text-xs font-mono text-text-muted dark:text-text-muted-dark bg-surface-secondary dark:bg-surface-secondary-dark px-1.5 py-0.5 rounded">
+                                            v{plugin.version}
+                                        </span>
+                                        {plugin.systemPlugin && (
+                                            <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                                                {t('system')}
+                                            </span>
+                                        )}
+                                        {plugin.builtIn && !plugin.systemPlugin && (
+                                            <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-surface-tertiary dark:bg-surface-tertiary-dark text-text-muted dark:text-text-muted-dark">
+                                                {t('builtIn')}
+                                            </span>
+                                        )}
+                                    </div>
 
-                        {plugin.description && (
-                            <p className="text-text-secondary dark:text-text-secondary-dark mt-2">
-                                {plugin.description}
-                            </p>
-                        )}
+                                    {plugin.description && (
+                                        <p className="text-sm text-text-secondary dark:text-text-secondary-dark mt-2 leading-relaxed">
+                                            {plugin.description}
+                                        </p>
+                                    )}
+                                </div>
 
-                        <div className="flex flex-wrap gap-2 mt-3">
-                            <span className="text-xs px-2 py-1 rounded-full bg-surface-secondary dark:bg-surface-secondary-dark text-text-secondary dark:text-text-secondary-dark">
-                                {getCategoryLabel(plugin.category)}
-                            </span>
-                            {plugin.capabilities.filter((cap) => cap !== plugin.category).map((cap) => (
-                                <span
-                                    key={cap}
-                                    className="text-xs px-2 py-1 rounded-full bg-surface-tertiary dark:bg-surface-tertiary-dark text-text-muted dark:text-text-muted-dark"
-                                >
-                                    {getCapabilityLabel(cap)}
-                                </span>
-                            ))}
-                        </div>
-
-                        {(plugin.author || plugin.homepage) && (
-                            <div className="flex items-center gap-4 mt-4 text-sm text-text-muted dark:text-text-muted-dark">
-                                {plugin.author && (
-                                    <span>
-                                        {t('author')}: {plugin.author.name}
-                                    </span>
-                                )}
-                                {plugin.homepage && (
-                                    <a
-                                        href={plugin.homepage}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="inline-flex items-center gap-1 hover:text-primary"
+                                {!plugin.systemPlugin && (
+                                    <Button
+                                        variant={plugin.enabled ? 'ghost' : 'primary'}
+                                        onClick={handleToggle}
+                                        disabled={isPending}
+                                        loading={isPending}
+                                        className={cn(
+                                            'shrink-0',
+                                            plugin.enabled &&
+                                                'text-danger hover:text-danger hover:bg-danger/10',
+                                        )}
                                     >
-                                        <ExternalLink className="w-4 h-4" />
-                                        {t('documentation')}
-                                    </a>
+                                        {plugin.enabled ? (
+                                            <>
+                                                <PowerOff className="w-4 h-4 mr-2" />
+                                                {t('disable')}
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Power className="w-4 h-4 mr-2" />
+                                                {t('enable')}
+                                            </>
+                                        )}
+                                    </Button>
                                 )}
                             </div>
-                        )}
-                    </div>
 
-                    {!plugin.systemPlugin && (
-                        <Button
-                            variant={plugin.enabled ? 'ghost' : 'primary'}
-                            onClick={handleToggle}
-                            disabled={isPending}
-                            loading={isPending}
-                            className={cn(
-                                plugin.enabled &&
-                                    'text-danger hover:text-danger hover:bg-danger/10',
-                            )}
-                        >
-                            {plugin.enabled ? (
-                                <>
-                                    <PowerOff className="w-4 h-4 mr-2" />
-                                    {t('disable')}
-                                </>
-                            ) : (
-                                <>
-                                    <Power className="w-4 h-4 mr-2" />
-                                    {t('enable')}
-                                </>
-                            )}
-                        </Button>
-                    )}
+                            {/* Capability badges */}
+                            <div className="flex flex-wrap gap-1.5 mt-3">
+                                {plugin.capabilities
+                                    .filter((cap) => cap !== plugin.category)
+                                    .map((cap) => (
+                                        <span
+                                            key={cap}
+                                            className="text-xs px-2 py-0.5 rounded-full bg-surface-secondary dark:bg-surface-secondary-dark text-text-secondary dark:text-text-secondary-dark"
+                                        >
+                                            {getCapabilityLabel(cap)}
+                                        </span>
+                                    ))}
+                            </div>
+                        </div>
+                    </div>
                 </div>
+
+                {/* Metadata footer */}
+                {(plugin.author || plugin.homepage) && (
+                    <div className="px-6 py-3 border-t border-border dark:border-border-dark bg-surface-secondary/30 dark:bg-surface-secondary-dark/30">
+                        <div className="flex items-center gap-4 text-xs text-text-muted dark:text-text-muted-dark">
+                            {plugin.author && (
+                                <span>
+                                    {t('author')}: {plugin.author.name}
+                                </span>
+                            )}
+                            {plugin.author && plugin.homepage && (
+                                <span className="text-border dark:text-border-dark">|</span>
+                            )}
+                            {plugin.homepage && (
+                                <a
+                                    href={plugin.homepage}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1 hover:text-primary transition-colors"
+                                >
+                                    <ExternalLink className="w-3.5 h-3.5" />
+                                    {t('documentation')}
+                                </a>
+                            )}
+                            <span className="text-border dark:text-border-dark">|</span>
+                            <span>{getCategoryLabel(plugin.category)}</span>
+                        </div>
+                    </div>
+                )}
             </div>
+
+            {/* OAuth Connection Section */}
+            {plugin.capabilities.includes('oauth') && oauthConnection !== undefined && (
+                <PluginOAuthConnection
+                    pluginId={plugin.pluginId}
+                    pluginName={plugin.name}
+                    connection={oauthConnection}
+                />
+            )}
 
             {/* Settings Form */}
             {hasSettings ? (
-                <div className="bg-surface dark:bg-surface-dark rounded-lg border border-border dark:border-border-dark p-6">
-                    <h3 className="text-lg font-medium text-text dark:text-text-dark mb-4">
-                        {t('settingsTitle')}
-                    </h3>
+                <div className="bg-surface dark:bg-surface-dark rounded-xl border border-border dark:border-border-dark">
+                    <div className="flex items-center gap-2 px-6 py-3 border-b border-border dark:border-border-dark">
+                        <Settings className="w-4 h-4 text-text-muted dark:text-text-muted-dark" />
+                        <h2 className="text-sm font-medium text-text dark:text-text-dark">
+                            {t('settingsTitle')}
+                        </h2>
+                    </div>
 
-                    <div className="space-y-4">
+                    <div className="p-6 space-y-4">
                         {Object.entries(userScopeProperties).map(([key, propSchema]) => (
                             <PluginSettingsField
                                 key={key}
@@ -263,13 +314,13 @@ export function PluginSettings({ plugin }: PluginSettingsProps) {
                     </div>
 
                     {validationError && (
-                        <div className="mt-4 p-3 rounded-lg bg-danger/10 border border-danger/20 flex items-start gap-2">
+                        <div className="mx-6 mb-4 p-3 rounded-lg bg-danger/10 border border-danger/20 flex items-start gap-2">
                             <AlertCircle className="w-5 h-5 text-danger flex-shrink-0 mt-0.5" />
                             <p className="text-sm text-danger">{validationError}</p>
                         </div>
                     )}
 
-                    <div className="flex items-center gap-3 mt-6 pt-4 border-t border-border dark:border-border-dark">
+                    <div className="flex items-center gap-3 px-6 py-4 border-t border-border dark:border-border-dark">
                         <Button
                             variant="primary"
                             onClick={handleSave}
@@ -288,9 +339,20 @@ export function PluginSettings({ plugin }: PluginSettingsProps) {
                         )}
                     </div>
                 </div>
-            ) : (
-                <div className="bg-surface dark:bg-surface-dark rounded-lg border border-border dark:border-border-dark p-6 text-center">
-                    <p className="text-text-muted dark:text-text-muted-dark">{t('noSettings')}</p>
+            ) : null}
+
+            {/* Readme Section */}
+            {plugin.readme && (
+                <div className="bg-surface dark:bg-surface-dark rounded-xl border border-border dark:border-border-dark">
+                    <div className="flex items-center gap-2 px-6 py-3 border-b border-border dark:border-border-dark">
+                        <BookOpen className="w-4 h-4 text-text-muted dark:text-text-muted-dark" />
+                        <h2 className="text-sm font-medium text-text dark:text-text-dark">
+                            {t('about')}
+                        </h2>
+                    </div>
+                    <div className="p-6">
+                        <PluginReadme content={plugin.readme} />
+                    </div>
                 </div>
             )}
         </div>

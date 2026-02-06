@@ -60,7 +60,7 @@ describe('OpenRouterPlugin', () => {
 			expect(schema).toBeDefined();
 			expect(schema.type).toBe('string');
 			expect(schema.title).toBe('Simple Tasks Model');
-			expect(schema.description).toBe('Economy model for simple tasks');
+			expect(schema.description).toBe('Handles tags, short descriptions, and quick classifications');
 			expect(schema.default).toBe('openai/gpt-5-nano');
 		});
 
@@ -69,7 +69,7 @@ describe('OpenRouterPlugin', () => {
 			expect(schema).toBeDefined();
 			expect(schema.type).toBe('string');
 			expect(schema.title).toBe('Standard Tasks Model');
-			expect(schema.description).toBe('Balanced model for standard tasks');
+			expect(schema.description).toBe('Handles listings, summaries, and content reformatting');
 			expect(schema.default).toBe('moonshotai/kimi-k2.5');
 		});
 
@@ -78,7 +78,7 @@ describe('OpenRouterPlugin', () => {
 			expect(schema).toBeDefined();
 			expect(schema.type).toBe('string');
 			expect(schema.title).toBe('Complex Tasks Model');
-			expect(schema.description).toBe('Premium model for complex tasks');
+			expect(schema.description).toBe('Handles full page generation and multi-step analysis');
 			expect(schema.default).toBe('moonshotai/kimi-k2.5');
 		});
 
@@ -88,15 +88,6 @@ describe('OpenRouterPlugin', () => {
 			expect(schema.type).toBe('string');
 			expect(schema.default).toBe('https://openrouter.ai/api/v1');
 			expect(schema['x-envVar']).toBe('PLUGIN_OPENROUTER_BASE_URL');
-		});
-
-		it('should have embeddingModel field', () => {
-			const schema = plugin.settingsSchema.properties?.embeddingModel as any;
-			expect(schema).toBeDefined();
-			expect(schema.type).toBe('string');
-			expect(schema.default).toBe('openai/text-embedding-3-small');
-			expect(schema['x-widget']).toBe('model-select');
-			expect(schema['x-scope']).toBe('user');
 		});
 
 		it('should have temperature field with constraints', () => {
@@ -123,9 +114,23 @@ describe('OpenRouterPlugin', () => {
 			expect(properties).toHaveProperty('mediumModel');
 			expect(properties).toHaveProperty('complexModel');
 			expect(properties).toHaveProperty('baseUrl');
-			expect(properties).toHaveProperty('embeddingModel');
 			expect(properties).toHaveProperty('temperature');
 			expect(properties).toHaveProperty('maxTokens');
+		});
+
+		it('should have description on all settings fields', () => {
+			const props = plugin.settingsSchema.properties!;
+			for (const [key, prop] of Object.entries(props)) {
+				expect((prop as any).description, `${key} should have a description`).toBeDefined();
+				expect((prop as any).description, `${key} description should not be empty`).not.toBe('');
+			}
+		});
+
+		it('should have title on all settings fields', () => {
+			const props = plugin.settingsSchema.properties!;
+			for (const [key, prop] of Object.entries(props)) {
+				expect((prop as any).title, `${key} should have a title`).toBeDefined();
+			}
 		});
 	});
 

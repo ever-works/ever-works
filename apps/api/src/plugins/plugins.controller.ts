@@ -6,6 +6,7 @@ import {
     Delete,
     Param,
     Body,
+    Query,
     UseGuards,
     HttpCode,
     HttpStatus,
@@ -49,8 +50,11 @@ export class PluginsController {
         description: 'Get all available plugins with user-specific installation status',
     })
     @ApiResponse({ status: 200, description: 'List of plugins', type: PluginListResponseDto })
-    async listPlugins(@CurrentUser() auth: AuthenticatedUser): Promise<PluginListResponseDto> {
-        return this.pluginsService.listPlugins(auth.userId);
+    async listPlugins(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Query('category') category?: string,
+    ): Promise<PluginListResponseDto> {
+        return this.pluginsService.listPlugins(auth.userId, category);
     }
 
     @Get('plugins/settings-menu')

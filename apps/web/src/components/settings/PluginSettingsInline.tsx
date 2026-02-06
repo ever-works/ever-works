@@ -1,28 +1,32 @@
 'use client';
 
-import { useState, useTransition, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { UserPlugin, PluginSettingsSchemaProperty } from '@/lib/api/plugins';
 import { OAuthConnectionInfo } from '@/lib/api/oauth';
-import { cn } from '@/lib/utils/cn';
 import { Button } from '@/components/ui/button';
-import { Power, PowerOff, Save, ExternalLink, Check, AlertCircle } from 'lucide-react';
-import { updatePluginSettings, enablePlugin, disablePlugin } from '@/app/actions/plugins';
+import { CollapsibleCard } from '@/components/ui/collapsible-card';
+import { Save, Check, AlertCircle } from 'lucide-react';
+import { updatePluginSettings } from '@/app/actions/plugins';
 import { PluginIcon } from '@/components/plugins/PluginIcon';
 import { PluginSettingsField } from '@/components/plugins/PluginSettingsField';
 import { PluginOAuthConnection } from '@/components/settings/PluginOAuthConnection';
-import { getCategoryLabel, getCapabilityLabel } from '@/lib/utils/plugin-category-icons';
+import { getCapabilityLabel } from '@/lib/utils/plugin-category-icons';
 
 interface PluginSettingsInlineProps {
     plugin: UserPlugin;
     oauthConnection?: OAuthConnectionInfo | null;
+    defaultExpanded?: boolean;
 }
 
-export function PluginSettingsInline({ plugin, oauthConnection }: PluginSettingsInlineProps) {
+export function PluginSettingsInline({
+    plugin,
+    oauthConnection,
+    defaultExpanded = false,
+}: PluginSettingsInlineProps) {
     const t = useTranslations('dashboard.plugins');
     const router = useRouter();
-    const [isPending, startTransition] = useTransition();
     const [isSaving, setIsSaving] = useState(false);
     const [settings, setSettings] = useState<Record<string, unknown>>(plugin.settings || {});
     const [secretSettings, setSecretSettings] = useState<Record<string, unknown>>({});
@@ -49,6 +53,7 @@ export function PluginSettingsInline({ plugin, oauthConnection }: PluginSettings
     }, [schema]);
 
     const hasSettings = Object.keys(userScopeProperties).length > 0;
+    const hasOAuth = plugin.capabilities.includes('oauth') && oauthConnection !== undefined;
 
     // Get required fields for user scope (global and user scoped)
     const requiredFields = useMemo(() => {
@@ -78,21 +83,6 @@ export function PluginSettingsInline({ plugin, oauthConnection }: PluginSettings
         }
         return missingFields;
     }, [requiredFields, settings, secretSettings, schema]);
-
-    const handleToggle = async () => {
-        startTransition(async () => {
-            try {
-                if (plugin.enabled) {
-                    await disablePlugin(plugin.pluginId);
-                } else {
-                    await enablePlugin(plugin.pluginId);
-                }
-                router.refresh();
-            } catch (error) {
-                console.error('Failed to toggle plugin:', error);
-            }
-        });
-    };
 
     const handleFieldChange = (key: string, value: unknown, isSecret: boolean) => {
         if (isSecret) {
@@ -140,160 +130,115 @@ export function PluginSettingsInline({ plugin, oauthConnection }: PluginSettings
         }
     };
 
-    return (
-        <div className="space-y-6">
-            {/* Plugin Header */}
-            <div className="flex items-start gap-4">
-                <PluginIcon icon={plugin.icon} name={plugin.name} size={56} />
-
-                <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-3">
-                        <h2 className="text-xl font-semibold text-text dark:text-text-dark">
-                            {plugin.name}
-                        </h2>
-                        <span className="text-sm text-text-muted dark:text-text-muted-dark">
-                            v{plugin.version}
+    const headerContent = (
+        <div className="flex items-center gap-3 min-w-0">
+            <PluginIcon
+                icon={plugin.icon}
+                name={plugin.name}
+                size={36}
+                className="shrink-0 rounded-lg"
+            />
+            <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-semibold text-text dark:text-text-dark">
+                        {plugin.name}
+                    </span>
+                    <span className="text-xs text-text-muted dark:text-text-muted-dark">
+                        v{plugin.version}
+                    </span>
+                    {plugin.enabled && (
+                        <span className="inline-flex items-center gap-1 text-xs text-success">
+                            <span className="w-1.5 h-1.5 rounded-full bg-success" />
+                            {t('enabled')}
                         </span>
-                        {plugin.builtIn && (
-                            <span className="text-xs px-2 py-0.5 rounded bg-surface-tertiary dark:bg-surface-tertiary-dark text-text-muted dark:text-text-muted-dark">
-                                {t('builtIn')}
-                            </span>
-                        )}
-                    </div>
-
-                    {plugin.description && (
-                        <p className="text-sm text-text-secondary dark:text-text-secondary-dark mt-1 line-clamp-2">
-                            {plugin.description}
-                        </p>
                     )}
-
-                    <div className="flex flex-wrap items-center gap-2 mt-2">
-                        <span className="shrink-0 text-xs px-2 py-1 rounded-full bg-surface-secondary dark:bg-surface-secondary-dark text-text-secondary dark:text-text-secondary-dark">
-                            {getCategoryLabel(plugin.category)}
-                        </span>
-                        {plugin.capabilities
-                            .filter((cap) => cap !== plugin.category)
-                            .slice(0, 3)
-                            .map((cap) => (
-                                <span
-                                    key={cap}
-                                    className="shrink-0 text-xs px-2 py-1 rounded-full bg-surface-tertiary dark:bg-surface-tertiary-dark text-text-muted dark:text-text-muted-dark"
-                                >
-                                    {getCapabilityLabel(cap)}
-                                </span>
-                            ))}
-
-                        {(plugin.author || plugin.homepage) && (
-                            <div className="flex items-center gap-3 ml-auto text-xs text-text-muted dark:text-text-muted-dark">
-                                {plugin.author && <span>{plugin.author.name}</span>}
-                                {plugin.homepage && (
-                                    <a
-                                        href={plugin.homepage}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="inline-flex items-center gap-1 hover:text-primary"
-                                    >
-                                        <ExternalLink className="w-3 h-3" />
-                                        Docs
-                                    </a>
-                                )}
-                            </div>
-                        )}
-                    </div>
+                    {plugin.capabilities
+                        .filter((cap) => cap !== plugin.category)
+                        .slice(0, 2)
+                        .map((cap) => (
+                            <span
+                                key={cap}
+                                className="text-xs px-1.5 py-0.5 rounded bg-surface-secondary dark:bg-surface-secondary-dark text-text-muted dark:text-text-muted-dark"
+                            >
+                                {getCapabilityLabel(cap)}
+                            </span>
+                        ))}
                 </div>
-
-                {!plugin.systemPlugin && (
-                    <Button
-                        variant={plugin.enabled ? 'ghost' : 'primary'}
-                        size="sm"
-                        onClick={handleToggle}
-                        disabled={isPending}
-                        loading={isPending}
-                        className={cn(
-                            plugin.enabled && 'text-danger hover:text-danger hover:bg-danger/10',
-                        )}
-                    >
-                        {plugin.enabled ? (
-                            <>
-                                <PowerOff className="w-4 h-4 mr-1.5" />
-                                {t('disable')}
-                            </>
-                        ) : (
-                            <>
-                                <Power className="w-4 h-4 mr-1.5" />
-                                {t('enable')}
-                            </>
-                        )}
-                    </Button>
+                {plugin.description && (
+                    <p className="text-xs text-text-muted dark:text-text-muted-dark mt-0.5 line-clamp-1">
+                        {plugin.description}
+                    </p>
                 )}
             </div>
-
-            {/* Divider */}
-            <hr className="border-border dark:border-border-dark" />
-
-            {/* OAuth Connection Section */}
-            {plugin.capabilities.includes('oauth') && oauthConnection !== undefined && (
-                <PluginOAuthConnection
-                    pluginId={plugin.pluginId}
-                    pluginName={plugin.name}
-                    connection={oauthConnection}
-                />
-            )}
-
-            {/* Settings Form */}
-            {hasSettings ? (
-                <div className="space-y-6">
-                    <h3 className="text-lg font-medium text-text dark:text-text-dark">
-                        {t('settingsTitle')}
-                    </h3>
-
-                    <div className="space-y-4">
-                        {Object.entries(userScopeProperties).map(([key, propSchema]) => (
-                            <PluginSettingsField
-                                key={key}
-                                name={key}
-                                schema={propSchema}
-                                value={settings[key]}
-                                required={schema?.required?.includes(key)}
-                                onChange={(value) =>
-                                    handleFieldChange(key, value, propSchema.secret || false)
-                                }
-                                pluginId={plugin.pluginId}
-                            />
-                        ))}
-                    </div>
-
-                    {validationError && (
-                        <div className="p-3 rounded-lg bg-danger/10 border border-danger/20 flex items-start gap-2">
-                            <AlertCircle className="w-5 h-5 text-danger flex-shrink-0 mt-0.5" />
-                            <p className="text-sm text-danger">{validationError}</p>
-                        </div>
-                    )}
-
-                    <div className="flex items-center gap-3 pt-4 border-t border-border dark:border-border-dark">
-                        <Button
-                            variant="primary"
-                            onClick={handleSave}
-                            disabled={!hasChanges || isSaving}
-                            loading={isSaving}
-                        >
-                            <Save className="w-4 h-4 mr-2" />
-                            {t('saveSettings')}
-                        </Button>
-
-                        {saveSuccess && (
-                            <span className="inline-flex items-center gap-1 text-sm text-success">
-                                <Check className="w-4 h-4" />
-                                {t('settingsSaved')}
-                            </span>
-                        )}
-                    </div>
-                </div>
-            ) : (
-                <div className="py-8 text-center">
-                    <p className="text-text-muted dark:text-text-muted-dark">{t('noSettings')}</p>
-                </div>
-            )}
         </div>
+    );
+
+    return (
+        <CollapsibleCard header={headerContent} defaultExpanded={defaultExpanded}>
+            <div className="p-5 space-y-5">
+                {/* OAuth Connection Section */}
+                {hasOAuth && (
+                    <PluginOAuthConnection
+                        pluginId={plugin.pluginId}
+                        pluginName={plugin.name}
+                        connection={oauthConnection!}
+                    />
+                )}
+
+                {/* Settings Form */}
+                {hasSettings ? (
+                    <div className="space-y-4">
+                        <div className="space-y-3">
+                            {Object.entries(userScopeProperties).map(([key, propSchema]) => (
+                                <PluginSettingsField
+                                    key={key}
+                                    name={key}
+                                    schema={propSchema}
+                                    value={settings[key]}
+                                    required={schema?.required?.includes(key)}
+                                    onChange={(value) =>
+                                        handleFieldChange(key, value, propSchema.secret || false)
+                                    }
+                                    pluginId={plugin.pluginId}
+                                />
+                            ))}
+                        </div>
+
+                        {validationError && (
+                            <div className="p-3 rounded-lg bg-danger/10 border border-danger/20 flex items-start gap-2">
+                                <AlertCircle className="w-4 h-4 text-danger flex-shrink-0 mt-0.5" />
+                                <p className="text-sm text-danger">{validationError}</p>
+                            </div>
+                        )}
+
+                        <div className="flex items-center gap-3 pt-3 border-t border-border dark:border-border-dark">
+                            <Button
+                                variant="primary"
+                                size="sm"
+                                onClick={handleSave}
+                                disabled={!hasChanges || isSaving}
+                                loading={isSaving}
+                            >
+                                <Save className="w-3.5 h-3.5 mr-1.5" />
+                                {t('saveSettings')}
+                            </Button>
+
+                            {saveSuccess && (
+                                <span className="inline-flex items-center gap-1 text-sm text-success">
+                                    <Check className="w-4 h-4" />
+                                    {t('settingsSaved')}
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                ) : !hasOAuth ? (
+                    <div className="py-4 text-center">
+                        <p className="text-sm text-text-muted dark:text-text-muted-dark">
+                            {t('noSettings')}
+                        </p>
+                    </div>
+                ) : null}
+            </div>
+        </CollapsibleCard>
     );
 }

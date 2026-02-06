@@ -78,7 +78,7 @@ export function PluginIcon({ icon, name, size = 32, className }: PluginIconProps
                         style={{
                             ...containerStyle,
                             backgroundColor: icon.backgroundColor,
-                            color: icon.color,
+                            color: icon.color || (icon.backgroundColor ? '#ffffff' : undefined),
                         }}
                     >
                         <LucideIcon className="w-1/2 h-1/2" />
