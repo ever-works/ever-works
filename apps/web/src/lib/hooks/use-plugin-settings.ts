@@ -19,6 +19,9 @@ interface UsePluginSettingsOptions {
     }) => Promise<void>;
 }
 
+/** Stable empty object to avoid re-renders when initialSettings is undefined */
+const EMPTY_SETTINGS: Record<string, unknown> = {};
+
 interface UsePluginSettingsReturn {
     settings: Record<string, unknown>;
     secretSettings: Record<string, unknown>;
@@ -41,13 +44,27 @@ export function usePluginSettings({
 }: UsePluginSettingsOptions): UsePluginSettingsReturn {
     const t = useTranslations('dashboard.plugins');
     const router = useRouter();
-    const [settings, setSettings] = useState<Record<string, unknown>>(initialSettings);
+    // Use stable empty object when initialSettings has no keys, so ref comparison works
+    const stableInitial =
+        initialSettings && Object.keys(initialSettings).length > 0
+            ? initialSettings
+            : EMPTY_SETTINGS;
+    const [settings, setSettings] = useState<Record<string, unknown>>(stableInitial);
     const [secretSettings, setSecretSettings] = useState<Record<string, unknown>>({});
     const [hasChanges, setHasChanges] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [saveSuccess, setSaveSuccess] = useState(false);
     const [validationError, setValidationError] = useState<string | null>(null);
     const successTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const prevInitialRef = useRef(stableInitial);
+
+    // Sync settings state when server data changes (e.g. after router.refresh())
+    if (stableInitial !== prevInitialRef.current) {
+        prevInitialRef.current = stableInitial;
+        setSettings(stableInitial);
+        setSecretSettings({});
+        setHasChanges(false);
+    }
 
     // Cleanup success timer on unmount
     useEffect(() => {
@@ -146,7 +163,10 @@ export function usePluginSettings({
 
     const getFieldValue = useCallback(
         (key: string, propSchema: PluginSettingsSchemaProperty): unknown => {
-            return propSchema.secret ? secretSettings[key] : settings[key];
+            if (propSchema.secret) {
+                return key in secretSettings ? secretSettings[key] : settings[key];
+            }
+            return settings[key];
         },
         [settings, secretSettings],
     );

@@ -118,7 +118,6 @@ export function PluginSettingsField({
                     type={getInputType()}
                     value={String(value ?? schema.default ?? '')}
                     onChange={(e) => onChange(e.target.value || undefined)}
-                    placeholder={schema.default !== undefined ? String(schema.default) : undefined}
                     className={cn(
                         'w-full px-3 py-2 rounded-lg border border-border dark:border-border-dark',
                         'bg-surface-secondary dark:bg-surface-secondary-dark',

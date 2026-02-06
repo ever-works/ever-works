@@ -35,9 +35,6 @@ import {
 } from './dto';
 import { SettingsSchemaValidatorService, type SettingsScope } from './services';
 
-/** Placeholder for masked secrets in API responses */
-const MASKED_SECRET_PLACEHOLDER = '********';
-
 @Injectable()
 export class PluginsService {
     private readonly logger = new Logger(PluginsService.name);
@@ -288,17 +285,15 @@ export class PluginsService {
             this.enforceConfigurationMode(registered, 'user');
         }
 
-        // Strip masked placeholders to prevent saving literal "********"
         const schema = registered.plugin.settingsSchema;
-        const filteredSettings = this.stripMaskedPlaceholders(settings, schema);
-        const filteredSecretSettings = this.stripMaskedPlaceholders(secretSettings, schema);
 
-        // Validate settings against schema if provided
-        if (filteredSettings) {
-            this.validateSettingsOrThrow(filteredSettings, schema, 'user');
-        }
-        if (filteredSecretSettings) {
-            this.validateSettingsOrThrow(filteredSecretSettings, schema, 'user');
+        // Validate combined settings+secretSettings together against schema
+        if (settings || secretSettings) {
+            const allSettings = {
+                ...(settings || {}),
+                ...(secretSettings || {}),
+            };
+            this.validateSettingsOrThrow(allSettings, schema, 'user');
         }
 
         // Get the plugin entity from database
@@ -317,13 +312,13 @@ export class PluginsService {
         if (userPlugin) {
             // Update existing record
             userPlugin.enabled = true;
-            if (filteredSettings) {
-                userPlugin.settings = { ...userPlugin.settings, ...filteredSettings };
+            if (settings) {
+                userPlugin.settings = { ...userPlugin.settings, ...settings };
             }
-            if (filteredSecretSettings) {
+            if (secretSettings) {
                 userPlugin.secretSettings = {
                     ...userPlugin.secretSettings,
-                    ...filteredSecretSettings,
+                    ...secretSettings,
                 };
             }
         } else {
@@ -333,8 +328,8 @@ export class PluginsService {
                 pluginId,
                 pluginEntityId: pluginEntity.id,
                 enabled: true,
-                settings: filteredSettings || {},
-                secretSettings: filteredSecretSettings || {},
+                settings: settings || {},
+                secretSettings: secretSettings || {},
                 metadata: {},
             });
         }
@@ -423,33 +418,27 @@ export class PluginsService {
             });
         }
 
-        // Strip masked placeholders to prevent saving literal "********"
         const schema = registered.plugin.settingsSchema;
-        const filteredSettings = this.stripMaskedPlaceholders(settings, schema);
-        const filteredSecretSettings = this.stripMaskedPlaceholders(secretSettings, schema);
 
-        // Validate settings against schema if provided
-        if (filteredSettings) {
-            // Validate merged settings to ensure all required fields are present
-            const mergedSettings = { ...userPlugin.settings, ...filteredSettings };
-            this.validateSettingsOrThrow(mergedSettings, schema, 'user');
-        }
-        if (filteredSecretSettings) {
-            const mergedSecretSettings = {
+        // Validate combined settings+secretSettings together against schema
+        if (settings || secretSettings) {
+            const allSettings = {
+                ...userPlugin.settings,
                 ...userPlugin.secretSettings,
-                ...filteredSecretSettings,
+                ...(settings || {}),
+                ...(secretSettings || {}),
             };
-            this.validateSettingsOrThrow(mergedSecretSettings, schema, 'user');
+            this.validateSettingsOrThrow(allSettings, schema, 'user');
         }
 
         // Merge settings
-        if (filteredSettings) {
-            userPlugin.settings = { ...userPlugin.settings, ...filteredSettings };
+        if (settings) {
+            userPlugin.settings = { ...userPlugin.settings, ...settings };
         }
-        if (filteredSecretSettings) {
+        if (secretSettings) {
             userPlugin.secretSettings = {
                 ...userPlugin.secretSettings,
-                ...filteredSecretSettings,
+                ...secretSettings,
             };
         }
         if (metadata) {
@@ -538,13 +527,11 @@ export class PluginsService {
             this.enforceConfigurationMode(registered, 'directory');
         }
 
-        // Strip masked placeholders to prevent saving literal "********"
         const schema = registered.plugin.settingsSchema;
-        const filteredSettings = this.stripMaskedPlaceholders(options?.settings, schema);
 
         // Validate settings against schema if provided
-        if (filteredSettings) {
-            this.validateSettingsOrThrow(filteredSettings, schema, 'directory');
+        if (options?.settings) {
+            this.validateSettingsOrThrow(options.settings, schema, 'directory');
         }
 
         // Check if user has the plugin enabled (or plugin is autoEnabled)
@@ -575,8 +562,8 @@ export class PluginsService {
         if (directoryPlugin) {
             // Update existing record
             directoryPlugin.enabled = true;
-            if (filteredSettings) {
-                directoryPlugin.settings = { ...directoryPlugin.settings, ...filteredSettings };
+            if (options?.settings) {
+                directoryPlugin.settings = { ...directoryPlugin.settings, ...options.settings };
             }
             if (options?.activeCapability) {
                 directoryPlugin.activeCapability = options.activeCapability;
@@ -591,7 +578,7 @@ export class PluginsService {
                 pluginId,
                 pluginEntityId: pluginEntity.id,
                 enabled: true,
-                settings: filteredSettings || {},
+                settings: options?.settings || {},
                 secretSettings: {},
                 metadata: {},
                 activeCapability: options?.activeCapability,
@@ -677,33 +664,27 @@ export class PluginsService {
             );
         }
 
-        // Strip masked placeholders to prevent saving literal "********"
         const schema = registered.plugin.settingsSchema;
-        const filteredSettings = this.stripMaskedPlaceholders(settings, schema);
-        const filteredSecretSettings = this.stripMaskedPlaceholders(secretSettings, schema);
 
-        // Validate settings against schema if provided
-        if (filteredSettings) {
-            // Validate merged settings to ensure all required fields are present
-            const mergedSettings = { ...directoryPlugin.settings, ...filteredSettings };
-            this.validateSettingsOrThrow(mergedSettings, schema, 'directory');
-        }
-        if (filteredSecretSettings) {
-            const mergedSecretSettings = {
+        // Validate combined settings+secretSettings together against schema
+        if (settings || secretSettings) {
+            const allSettings = {
+                ...directoryPlugin.settings,
                 ...directoryPlugin.secretSettings,
-                ...filteredSecretSettings,
+                ...(settings || {}),
+                ...(secretSettings || {}),
             };
-            this.validateSettingsOrThrow(mergedSecretSettings, schema, 'directory');
+            this.validateSettingsOrThrow(allSettings, schema, 'directory');
         }
 
         // Merge settings
-        if (filteredSettings) {
-            directoryPlugin.settings = { ...directoryPlugin.settings, ...filteredSettings };
+        if (settings) {
+            directoryPlugin.settings = { ...directoryPlugin.settings, ...settings };
         }
-        if (filteredSecretSettings) {
+        if (secretSettings) {
             directoryPlugin.secretSettings = {
                 ...directoryPlugin.secretSettings,
-                ...filteredSecretSettings,
+                ...secretSettings,
             };
         }
         if (metadata) {
@@ -848,7 +829,7 @@ export class PluginsService {
             installed: !!userPlugin || autoEnabled,
             enabled: userPlugin?.enabled ?? autoEnabled,
             settings: userPlugin
-                ? this.maskSecretSettings(userPlugin.settings, registered)
+                ? { ...userPlugin.settings, ...userPlugin.secretSettings }
                 : undefined,
             userPluginId: userPlugin?.id,
         };
@@ -873,7 +854,7 @@ export class PluginsService {
             directoryEnabled: directoryPlugin?.enabled ?? autoEnabled,
             activeCapability: directoryPlugin?.activeCapability,
             directorySettings: directoryPlugin
-                ? this.maskSecretSettings(directoryPlugin.settings, registered)
+                ? { ...directoryPlugin.settings, ...directoryPlugin.secretSettings }
                 : undefined,
             directoryPluginId: directoryPlugin?.id,
             priority: directoryPlugin?.priority,
@@ -917,34 +898,6 @@ export class PluginsService {
     }
 
     /**
-     * Mask secret settings based on schema.
-     * Uses JsonSchema type for type-safe property access.
-     *
-     * SECURITY: This method filters out sensitive fields:
-     * - x-secret: Secret fields are never returned to the client
-     */
-    private maskSecretSettings(
-        settings: Record<string, unknown>,
-        registered: RegisteredPlugin,
-    ): Record<string, unknown> {
-        const schema = registered.plugin.settingsSchema;
-        if (!schema?.properties) return settings;
-
-        const masked: Record<string, unknown> = {};
-        for (const [key, value] of Object.entries(settings)) {
-            const propSchema: JsonSchema | undefined = schema.properties[key];
-
-            // SECURITY: x-secret fields are never returned to the client
-            if (propSchema?.['x-secret']) {
-                continue;
-            }
-
-            masked[key] = value;
-        }
-        return masked;
-    }
-
-    /**
      * Validate settings against a plugin's JSON schema.
      * Throws BadRequestException if validation fails.
      */
@@ -977,35 +930,5 @@ export class PluginsService {
                 `Plugin "${registered.plugin.id}" is admin-only and cannot be configured at ${scope} level`,
             );
         }
-    }
-
-    /**
-     * Strip masked placeholder values from x-secret fields to prevent saving "********" literally.
-     */
-    private stripMaskedPlaceholders(
-        settings: Record<string, unknown> | undefined,
-        schema: JsonSchema | undefined,
-    ): Record<string, unknown> | undefined {
-        if (!settings) return undefined;
-
-        const secretFields = new Set<string>();
-        if (schema?.properties) {
-            for (const [key, propSchema] of Object.entries(schema.properties)) {
-                if (propSchema['x-secret']) {
-                    secretFields.add(key);
-                }
-            }
-        }
-
-        const filtered: Record<string, unknown> = {};
-        for (const [key, value] of Object.entries(settings)) {
-            if (secretFields.has(key) && value === MASKED_SECRET_PLACEHOLDER) {
-                this.logger.debug(`Stripping masked placeholder for "${key}"`);
-                continue;
-            }
-            filtered[key] = value;
-        }
-
-        return Object.keys(filtered).length > 0 ? filtered : undefined;
     }
 }
