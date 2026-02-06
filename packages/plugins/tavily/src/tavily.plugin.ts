@@ -39,7 +39,7 @@ export class TavilySearchPlugin implements IPlugin, ISearchPlugin, IContentExtra
 	// IPlugin Properties
 	// ============================================================================
 
-	readonly id = 'tavily-search';
+	readonly id = 'tavily';
 	readonly name = 'Tavily Search';
 	readonly version = '1.0.0';
 	readonly category: PluginCategory = 'search';

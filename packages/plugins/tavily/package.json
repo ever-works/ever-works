@@ -1,5 +1,5 @@
 {
-	"name": "@ever-works/tavily-search-plugin",
+	"name": "@ever-works/tavily-plugin",
 	"version": "1.0.0",
 	"description": "Tavily Search Plugin - Web search and content extraction using Tavily API",
 	"private": true,
@@ -36,7 +36,7 @@
 	},
 	"everworks": {
 		"plugin": {
-			"id": "tavily-search",
+			"id": "tavily",
 			"name": "Tavily Search",
 			"version": "1.0.0",
 			"category": "search",

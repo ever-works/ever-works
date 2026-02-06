@@ -72,19 +72,19 @@ describe('PluginRegistryService - Default Resolution', () => {
         describe('Basic Resolution', () => {
             it('should resolve plugin with explicit defaultForCapabilities', () => {
                 registerAndEnable({
-                    id: 'tavily-search',
+                    id: 'tavily',
                     capabilities: ['search', 'content-extractor'],
                     defaultForCapabilities: ['search'],
                 });
 
                 const result = service.getDefaultForCapability('search');
 
-                expect(result?.plugin.id).toBe('tavily-search');
+                expect(result?.plugin.id).toBe('tavily');
             });
 
             it('should NOT resolve plugin for capability not in defaultForCapabilities', () => {
                 registerAndEnable({
-                    id: 'tavily-search',
+                    id: 'tavily',
                     capabilities: ['search', 'content-extractor'],
                     defaultForCapabilities: ['search'],
                 });
@@ -122,18 +122,18 @@ describe('PluginRegistryService - Default Resolution', () => {
 
             it('should allow plugin to be default for subset of capabilities', () => {
                 registerAndEnable({
-                    id: 'tavily-search',
+                    id: 'tavily',
                     capabilities: ['search', 'content-extractor'],
                     defaultForCapabilities: ['search'],
                 });
 
-                expect(service.getDefaultForCapability('search')?.plugin.id).toBe('tavily-search');
+                expect(service.getDefaultForCapability('search')?.plugin.id).toBe('tavily');
                 expect(service.getDefaultForCapability('content-extractor')).toBeUndefined();
             });
 
             it('should resolve different defaults for different capabilities', () => {
                 registerAndEnable({
-                    id: 'tavily-search',
+                    id: 'tavily',
                     capabilities: ['search', 'content-extractor'],
                     defaultForCapabilities: ['search'],
                 });
@@ -144,7 +144,7 @@ describe('PluginRegistryService - Default Resolution', () => {
                     defaultForCapabilities: ['content-extractor'],
                 });
 
-                expect(service.getDefaultForCapability('search')?.plugin.id).toBe('tavily-search');
+                expect(service.getDefaultForCapability('search')?.plugin.id).toBe('tavily');
                 expect(service.getDefaultForCapability('content-extractor')?.plugin.id).toBe(
                     'local-content-extractor',
                 );

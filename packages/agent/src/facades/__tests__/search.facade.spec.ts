@@ -85,7 +85,7 @@ describe('SearchFacadeService', () => {
 
     describe('isConfigured', () => {
         it('should return true when search plugin is enabled', () => {
-            const searchPlugin = createMockSearchPlugin('tavily-search', 'Tavily');
+            const searchPlugin = createMockSearchPlugin('tavily', 'Tavily');
             const registered = createRegisteredPlugin(searchPlugin, {
                 capabilities: ['search'],
             });
@@ -101,7 +101,7 @@ describe('SearchFacadeService', () => {
         });
 
         it('should return false when search plugin is not enabled', () => {
-            const searchPlugin = createMockSearchPlugin('tavily-search', 'Tavily');
+            const searchPlugin = createMockSearchPlugin('tavily', 'Tavily');
             const registered = createRegisteredPlugin(
                 searchPlugin,
                 { capabilities: ['search'] },
@@ -115,7 +115,7 @@ describe('SearchFacadeService', () => {
 
     describe('getAvailableProviders', () => {
         it('should return list of available search providers', () => {
-            const tavily = createMockSearchPlugin('tavily-search', 'Tavily');
+            const tavily = createMockSearchPlugin('tavily', 'Tavily');
             const exa = createMockSearchPlugin('exa-search', 'Exa');
 
             const tavilyRegistered = createRegisteredPlugin(tavily, {
@@ -133,7 +133,7 @@ describe('SearchFacadeService', () => {
 
             expect(providers).toHaveLength(2);
             expect(providers[0]).toEqual({
-                id: 'tavily-search',
+                id: 'tavily',
                 name: 'Tavily',
                 enabled: true,
             });

@@ -191,7 +191,7 @@ Create `packages/plugins/` with all built-in plugins as full packages.
 - [ ] **4.4** Create Vercel plugin package (IDeploymentPlugin)
 - [ ] **4.5** Create Netlify plugin package (IDeploymentPlugin)
 - [ ] **4.6** Create ScreenshotOne plugin package (IScreenshotPlugin)
-- [x] **4.7** Create Tavily plugin package (ISearchPlugin + IContentExtractorPlugin) _(implemented: `packages/plugins/tavily-search/`)_
+- [x] **4.7** Create Tavily plugin package (ISearchPlugin + IContentExtractorPlugin) _(implemented: `packages/plugins/tavily/`)_
 - [ ] **4.8** Create Exa.ai plugin package (IFullPipelinePlugin + ISearchPlugin)
 - [ ] **4.9** Create OpenAI plugin package (IAiProviderPlugin)
 - [ ] **4.10** Create Anthropic plugin package (IAiProviderPlugin)
@@ -516,7 +516,7 @@ Once GitFacade and DeployFacade exist:
 | Plugin            | Package                   | Capabilities                            | Status      |
 | ----------------- | ------------------------- | --------------------------------------- | ----------- |
 | Default Pipeline  | `default-pipeline`        | `pipeline-step`, `form-schema-provider` | ✅ System   |
-| Tavily Search     | `tavily-search`           | `search`, `content-extractor`           | ✅ Complete |
+| Tavily Search     | `tavily`           | `search`, `content-extractor`           | ✅ Complete |
 | Local Extractor   | `local-content-extractor` | `content-extractor`                     | ✅ Default  |
 | Notion Extractor  | `notion-extractor`        | `content-extractor`                     | ✅ Complete |
 | Apify Data Source | `apify-data-source`       | `data-source`, `form-schema-provider`   | ✅ Complete |

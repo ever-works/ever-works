@@ -237,7 +237,7 @@ Plugins can declare which capabilities they should be the default provider for u
 // In plugin's getManifest()
 getManifest(): PluginManifest {
     return {
-        id: 'tavily-search',
+        id: 'tavily',
         capabilities: ['search', 'content-extractor'],
         defaultForCapabilities: ['search'], // Only default for search, not content-extractor
         // ...
