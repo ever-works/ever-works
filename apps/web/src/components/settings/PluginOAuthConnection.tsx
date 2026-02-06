@@ -10,6 +10,7 @@ import { OAuthConnectionInfo } from '@/lib/api/oauth';
 import Image from 'next/image';
 import { Check, Link as LinkIcon, Unlink, RefreshCw, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { usePathname } from '@/i18n/navigation';
 
 interface PluginOAuthConnectionProps {
     pluginId: string;
@@ -26,15 +27,14 @@ export function PluginOAuthConnection({
 }: PluginOAuthConnectionProps) {
     const [isPending, startTransition] = useTransition();
     const t = useTranslations('dashboard.plugins.oauth');
+    const pathname = usePathname();
 
     const isConnected = connection?.connected ?? false;
     const username = connection?.username;
     const avatarUrl = connection?.avatarUrl;
     const email = connection?.email;
 
-    const getReturnPath = () =>
-        returnPath ||
-        (typeof window !== 'undefined' ? window.location.pathname : ROUTES.DASHBOARD_SETTINGS);
+    const getReturnPath = () => returnPath || pathname || ROUTES.DASHBOARD_SETTINGS;
 
     const handleConnect = () => {
         startTransition(async () => {

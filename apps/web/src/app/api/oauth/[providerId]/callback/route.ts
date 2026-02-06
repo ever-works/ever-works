@@ -32,17 +32,17 @@ export async function GET(
         });
     }
 
+    // Build redirect href — redirect() must be called outside try/catch because
+    // next-intl's redirect() throws a NEXT_REDIRECT control flow exception internally.
+    let href: string;
     try {
         await oauthAPI.connectCallback(providerId, code, state || undefined);
-        // If returnPath is provided, use it; otherwise redirect to plugin category settings page
         const defaultPath = ROUTES.DASHBOARD_SETTINGS_PLUGIN_CATEGORY('git-provider');
-        const href = (returnPath || defaultPath) + '?oauth_connected=true';
-        return redirect({ locale, href });
+        href = (returnPath || defaultPath) + '?oauth_connected=true';
     } catch (error) {
         console.error(`Failed to connect OAuth provider ${providerId}:`, error);
-        return redirect({
-            locale,
-            href: ROUTES.AUTH_ERROR + '?error=oauth_failed',
-        });
+        href = ROUTES.AUTH_ERROR + '?error=oauth_failed';
     }
+
+    return redirect({ locale, href });
 }

@@ -5,6 +5,7 @@ import { connectOAuthProvider, disconnectOAuthProvider } from '@/app/actions/das
 import { toast } from 'sonner';
 import { ROUTES } from '@/lib/constants';
 import { useTranslations } from 'next-intl';
+import { usePathname } from '@/i18n/navigation';
 import {
     GitProviderInfo,
     GitProviderConnectionInfo,
@@ -40,7 +41,7 @@ interface GitProviderConnectionsProps {
         avatar?: string;
     };
     providers: ProviderWithConnection[];
-    /** OAuth return path after connect/reconnect. Defaults to current page via window.location.pathname */
+    /** OAuth return path after connect/reconnect. Defaults to current page via usePathname() */
     returnPath?: string;
 }
 
@@ -223,6 +224,7 @@ function GitProviderCard({
     const [isPending, startTransition] = useTransition();
     const t = useTranslations('dashboard.gitProvider.settings');
     const tSelector = useTranslations('dashboard.gitProvider.selector');
+    const pathname = usePathname();
 
     const isConnected = connectionInfo?.connected ?? false;
     const username = connectionInfo?.username;
@@ -231,10 +233,8 @@ function GitProviderCard({
     const ProviderIcon = getProviderIcon(provider.id);
     const brandColors = getProviderBrandColors(provider.id);
 
-    // Use provided returnPath or fall back to current page
-    const getReturnPath = () =>
-        returnPath ||
-        (typeof window !== 'undefined' ? window.location.pathname : ROUTES.DASHBOARD_SETTINGS);
+    // Use provided returnPath or fall back to current page (locale-free via usePathname)
+    const getReturnPath = () => returnPath || pathname || ROUTES.DASHBOARD_SETTINGS;
 
     const handleConnect = () => {
         startTransition(async () => {
