@@ -1,0 +1,66 @@
+{
+	"name": "@ever-works/exa-plugin",
+	"version": "1.0.0",
+	"description": "Exa Plugin - Neural and keyword search using the Exa API",
+	"private": true,
+	"main": "./dist/index.js",
+	"module": "./dist/index.mjs",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.mjs",
+			"require": "./dist/index.js"
+		}
+	},
+	"scripts": {
+		"build": "tsup",
+		"dev": "tsup --watch",
+		"type-check": "tsc --noEmit",
+		"clean": "rm -rf dist",
+		"test": "vitest run --passWithNoTests",
+		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage"
+	},
+	"peerDependencies": {
+		"@ever-works/plugin": "workspace:*"
+	},
+	"dependencies": {},
+	"devDependencies": {
+		"@ever-works/plugin": "workspace:*",
+		"tsup": "^8.4.0",
+		"typescript": "^5.7.3",
+		"vitest": "^3.0.0"
+	},
+	"everworks": {
+		"plugin": {
+			"id": "exa",
+			"name": "Exa",
+			"version": "1.0.0",
+			"category": "search",
+			"capabilities": [
+				"search"
+			],
+			"description": "AI-native search using the Exa API. Supports neural, keyword, and auto search modes with optional category filtering.",
+			"author": {
+				"name": "Ever Works Team"
+			},
+			"license": "MIT",
+			"autoEnable": false,
+			"systemPlugin": false,
+			"builtIn": true,
+			"envVars": [
+				{
+					"name": "PLUGIN_EXA_API_KEY",
+					"required": false,
+					"secret": true,
+					"description": "Exa API key (optional - can be set via admin/user settings)"
+				}
+			],
+			"icon": {
+				"type": "svg",
+				"value": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 79 100\" fill=\"#1F40ED\"><path d=\"M39.5 0L0 23v54l39.5 23L79 77V23L39.5 0zM39.5 12.5L67 28v44L39.5 87.5 12 72V28l27.5-15.5z\"/><path d=\"M39.5 32L24 41v18l15.5 9L55 59V41L39.5 32z\"/></svg>"
+			}
+		}
+	}
+}

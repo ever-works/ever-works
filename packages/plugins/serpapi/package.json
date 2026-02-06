@@ -1,0 +1,66 @@
+{
+	"name": "@ever-works/serpapi-plugin",
+	"version": "1.0.0",
+	"description": "SerpAPI Plugin - Web search using SerpAPI (Google, Bing, Yahoo, and more)",
+	"private": true,
+	"main": "./dist/index.js",
+	"module": "./dist/index.mjs",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.mjs",
+			"require": "./dist/index.js"
+		}
+	},
+	"scripts": {
+		"build": "tsup",
+		"dev": "tsup --watch",
+		"type-check": "tsc --noEmit",
+		"clean": "rm -rf dist",
+		"test": "vitest run --passWithNoTests",
+		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage"
+	},
+	"peerDependencies": {
+		"@ever-works/plugin": "workspace:*"
+	},
+	"dependencies": {},
+	"devDependencies": {
+		"@ever-works/plugin": "workspace:*",
+		"tsup": "^8.4.0",
+		"typescript": "^5.7.3",
+		"vitest": "^3.0.0"
+	},
+	"everworks": {
+		"plugin": {
+			"id": "serpapi",
+			"name": "SerpAPI",
+			"version": "1.0.0",
+			"category": "search",
+			"capabilities": [
+				"search"
+			],
+			"description": "Web search using SerpAPI with support for Google, Bing, Yahoo, DuckDuckGo, Baidu, and Yandex engines.",
+			"author": {
+				"name": "Ever Works Team"
+			},
+			"license": "MIT",
+			"autoEnable": false,
+			"systemPlugin": false,
+			"builtIn": true,
+			"envVars": [
+				{
+					"name": "PLUGIN_SERPAPI_API_KEY",
+					"required": false,
+					"secret": true,
+					"description": "SerpAPI API key (optional - can be set via admin/user settings)"
+				}
+			],
+			"icon": {
+				"type": "svg",
+				"value": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"11\" cy=\"11\" r=\"8\"/><line x1=\"21\" y1=\"21\" x2=\"16.65\" y2=\"16.65\"/><line x1=\"8\" y1=\"11\" x2=\"14\" y2=\"11\"/></svg>"
+			}
+		}
+	}
+}
