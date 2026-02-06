@@ -51,7 +51,6 @@
 			},
 			"license": "MIT",
 			"builtIn": true,
-			"autoInstall": true,
 			"autoEnable": true,
 			"icon": {
 				"type": "svg",

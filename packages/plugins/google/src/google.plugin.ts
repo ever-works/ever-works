@@ -73,12 +73,6 @@ export class GooglePlugin extends BaseAiProvider {
 				default: 'https://generativelanguage.googleapis.com/v1beta/openai/',
 				'x-hidden': true
 			},
-			embeddingModel: {
-				type: 'string',
-				default: 'text-embedding-004',
-				'x-widget': 'model-select',
-				'x-scope': 'user'
-			},
 			temperature: {
 				type: 'number',
 				default: 0.7,
@@ -105,8 +99,7 @@ export class GooglePlugin extends BaseAiProvider {
 			baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/',
 			temperature: 0.7,
 			maxTokens: 4096,
-			providerType: 'google',
-			embeddingModel: 'text-embedding-004'
+			providerType: 'google'
 		});
 		context.logger.log('Google Gemini Plugin loaded');
 	}
@@ -132,7 +125,6 @@ export class GooglePlugin extends BaseAiProvider {
 		if (settings.baseUrl) config.baseURL = settings.baseUrl as string;
 		if (settings.temperature !== undefined) config.temperature = settings.temperature as number;
 		if (settings.maxTokens !== undefined) config.maxTokens = settings.maxTokens as number;
-		if (settings.embeddingModel) config.embeddingModel = settings.embeddingModel as string;
 		return config;
 	}
 
@@ -223,7 +215,6 @@ export class GooglePlugin extends BaseAiProvider {
 			author: { name: 'Ever Works Team' },
 			license: 'MIT',
 			builtIn: true,
-			autoInstall: false,
 			autoEnable: false,
 			visibility: 'public',
 			readme: [

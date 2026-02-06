@@ -72,12 +72,6 @@ export class OllamaPlugin extends BaseAiProvider {
 				default: 'http://localhost:11434/v1',
 				'x-hidden': true
 			},
-			embeddingModel: {
-				type: 'string',
-				default: 'nomic-embed-text',
-				'x-widget': 'model-select',
-				'x-scope': 'user'
-			},
 			temperature: {
 				type: 'number',
 				default: 0.7,
@@ -104,8 +98,7 @@ export class OllamaPlugin extends BaseAiProvider {
 			baseURL: 'http://localhost:11434/v1',
 			temperature: 0.7,
 			maxTokens: 4096,
-			providerType: 'ollama',
-			embeddingModel: 'nomic-embed-text'
+			providerType: 'ollama'
 		});
 		context.logger.log('Ollama Plugin loaded');
 	}
@@ -131,7 +124,6 @@ export class OllamaPlugin extends BaseAiProvider {
 		if (settings.baseUrl) config.baseURL = settings.baseUrl as string;
 		if (settings.temperature !== undefined) config.temperature = settings.temperature as number;
 		if (settings.maxTokens !== undefined) config.maxTokens = settings.maxTokens as number;
-		if (settings.embeddingModel) config.embeddingModel = settings.embeddingModel as string;
 		return config;
 	}
 
@@ -213,7 +205,6 @@ export class OllamaPlugin extends BaseAiProvider {
 			author: { name: 'Ever Works Team' },
 			license: 'MIT',
 			builtIn: true,
-			autoInstall: false,
 			autoEnable: false,
 			visibility: 'public',
 			readme: [

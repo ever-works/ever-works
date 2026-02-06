@@ -24,34 +24,24 @@ export class UserRepository {
     async findByUsername(username: string): Promise<User | null> {
         return await this.repository.findOne({
             where: { username },
-            relations: ['oauthTokens'],
         });
     }
 
     async findByEmail(email: string): Promise<User | null> {
         return await this.repository.findOne({
             where: { email },
-            relations: ['oauthTokens'],
         });
     }
 
     async findById(id: string): Promise<User | null> {
         return await this.repository.findOne({
             where: { id },
-            relations: ['oauthTokens'],
         });
     }
 
     async update(id: string, userData: Partial<User>): Promise<User> {
         await this.repository.update(id, userData);
         return await this.findById(id);
-    }
-
-    async findByIdWithTokens(id: string): Promise<User | null> {
-        return await this.repository.findOne({
-            where: { id },
-            relations: ['oauthTokens'],
-        });
     }
 
     async createOrGetLocalUser(): Promise<User> {

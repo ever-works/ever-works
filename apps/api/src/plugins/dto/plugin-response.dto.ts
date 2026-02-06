@@ -189,6 +189,9 @@ export class PluginResponseDto implements PluginResponse {
 
     @ApiPropertyOptional({ description: 'Plugin homepage URL' })
     homepage?: string;
+
+    @ApiPropertyOptional({ description: 'Whether plugin is auto-enabled' })
+    autoEnable?: boolean;
 }
 
 /**

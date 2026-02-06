@@ -397,7 +397,6 @@ describe('ScreenshotOnePlugin', () => {
 			expect(manifest.capabilities).toContain('screenshot');
 			expect(manifest.builtIn).toBe(false);
 			expect(manifest.systemPlugin).toBe(false);
-			expect(manifest.autoInstall).toBe(false);
 		});
 
 		it('should have icon configuration', () => {

@@ -7,6 +7,7 @@ import { DirectoryPlugin } from '@/lib/api/plugins';
 import { cn } from '@/lib/utils/cn';
 import { setActiveCapability } from '@/app/actions/plugins';
 import { PluginIcon } from '@/components/plugins/PluginIcon';
+import { getCapabilityLabel } from '@/lib/utils/plugin-category-icons';
 
 interface CapabilitySelectorProps {
     directoryId: string;
@@ -14,20 +15,6 @@ interface CapabilitySelectorProps {
     plugins: DirectoryPlugin[];
     activePluginId?: string;
 }
-
-const capabilityLabels: Record<string, string> = {
-    git: 'Git Provider',
-    deployment: 'Deployment',
-    screenshot: 'Screenshot',
-    search: 'Search',
-    content: 'Content Extraction',
-    'data-source': 'Data Source',
-    ai: 'AI Provider',
-    pipeline: 'Pipeline',
-    'ai-text': 'AI Text Generation',
-    'ai-image': 'AI Image Generation',
-    'ai-embedding': 'AI Embeddings',
-};
 
 export function CapabilitySelector({
     directoryId,
@@ -60,7 +47,7 @@ export function CapabilitySelector({
         <div className="flex items-center gap-3 py-2">
             <div className="w-32 shrink-0">
                 <span className="text-sm font-medium text-text dark:text-text-dark">
-                    {capabilityLabels[capability] || capability}
+                    {getCapabilityLabel(capability)}
                 </span>
             </div>
 

@@ -48,7 +48,6 @@
 				"name": "Ever Works Team"
 			},
 			"license": "MIT",
-			"autoInstall": true,
 			"autoEnable": true,
 			"systemPlugin": false,
 			"builtIn": true,

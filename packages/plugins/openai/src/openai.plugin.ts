@@ -70,13 +70,6 @@ export class OpenAiPlugin extends BaseAiProvider {
 				'x-widget': 'model-select',
 				'x-scope': 'user'
 			},
-			embeddingModel: {
-				type: 'string',
-				title: 'Embedding Model',
-				default: 'text-embedding-3-small',
-				'x-widget': 'model-select',
-				'x-scope': 'user'
-			},
 			temperature: {
 				type: 'number',
 				default: 0.7,
@@ -102,8 +95,7 @@ export class OpenAiPlugin extends BaseAiProvider {
 			model: 'gpt-5-nano',
 			temperature: 0.7,
 			maxTokens: 4096,
-			providerType: 'openai',
-			embeddingModel: 'text-embedding-3-small'
+			providerType: 'openai'
 		});
 		context.logger.log('OpenAI Plugin loaded');
 	}
@@ -128,7 +120,6 @@ export class OpenAiPlugin extends BaseAiProvider {
 		if (settings.defaultModel) config.model = settings.defaultModel as string;
 		if (settings.temperature !== undefined) config.temperature = settings.temperature as number;
 		if (settings.maxTokens !== undefined) config.maxTokens = settings.maxTokens as number;
-		if (settings.embeddingModel) config.embeddingModel = settings.embeddingModel as string;
 		return config;
 	}
 
@@ -219,7 +210,6 @@ export class OpenAiPlugin extends BaseAiProvider {
 			author: { name: 'Ever Works Team' },
 			license: 'MIT',
 			builtIn: true,
-			autoInstall: false,
 			autoEnable: false,
 			visibility: 'public',
 			readme: [

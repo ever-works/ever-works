@@ -85,6 +85,13 @@ export async function updateDirectoryPluginSettings(
 }
 
 /**
+ * List available models for an AI provider plugin
+ */
+export async function fetchModels(pluginId: string) {
+    return pluginsAPI.listModels(pluginId);
+}
+
+/**
  * Set active capability for a directory plugin
  */
 export async function setActiveCapability(

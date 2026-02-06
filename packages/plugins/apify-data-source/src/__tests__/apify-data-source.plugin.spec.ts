@@ -216,7 +216,6 @@ describe('ApifyDataSourcePlugin', () => {
 			expect(manifest.id).toBe('apify-data-source');
 			expect(manifest.name).toBe('Apify Data Source');
 			expect(manifest.systemPlugin).toBe(false);
-			expect(manifest.autoInstall).toBe(false);
 			expect(manifest.capabilities).toContain('data-source');
 			expect(manifest.capabilities).toContain('form-schema-provider');
 		});

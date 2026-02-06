@@ -339,6 +339,12 @@ export class PluginsService {
             throw new NotFoundException(`Plugin "${pluginId}" not found`);
         }
 
+        if (registered.manifest.systemPlugin) {
+            throw new BadRequestException(
+                `Plugin "${pluginId}" is a system plugin and cannot be disabled`,
+            );
+        }
+
         const userPlugin = await this.userPluginRepository.findOne({
             where: { userId, pluginId },
         });
@@ -578,6 +584,12 @@ export class PluginsService {
             throw new NotFoundException(`Plugin "${pluginId}" not found`);
         }
 
+        if (registered.manifest.systemPlugin) {
+            throw new BadRequestException(
+                `Plugin "${pluginId}" is a system plugin and cannot be disabled`,
+            );
+        }
+
         const userPlugin = await this.userPluginRepository.findOne({
             where: { userId, pluginId },
         });
@@ -786,6 +798,7 @@ export class PluginsService {
             settingsSchema: this.extractSettingsSchema(registered.plugin.settingsSchema),
             author: manifest.author,
             homepage: manifest.homepage,
+            autoEnable: manifest.autoEnable ?? false,
         };
     }
 
@@ -856,7 +869,7 @@ export class PluginsService {
     }
 
     /**
-     * Extract settings schema, filtering out env-only and write-only fields.
+     * Extract settings schema, filtering out env-only and hidden fields.
      */
     private extractSettingsSchema(schema?: JsonSchema): PluginSettingsSchemaDto | undefined {
         if (!schema) return undefined;

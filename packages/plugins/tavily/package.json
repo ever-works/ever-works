@@ -49,7 +49,6 @@
 				"name": "Ever Works Team"
 			},
 			"license": "MIT",
-			"autoInstall": true,
 			"autoEnable": true,
 			"defaultForCapabilities": [
 				"search"

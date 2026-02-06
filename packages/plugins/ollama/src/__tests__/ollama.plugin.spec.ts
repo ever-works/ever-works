@@ -112,7 +112,6 @@ describe('OllamaPlugin', () => {
 			expect(manifest.id).toBe('ollama');
 			expect(manifest.name).toBe('Ollama');
 			expect(manifest.builtIn).toBe(true);
-			expect(manifest.autoInstall).toBe(false);
 			expect(manifest.autoEnable).toBe(false);
 			expect(manifest.visibility).toBe('public');
 			expect(manifest.icon).toBeDefined();

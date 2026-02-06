@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { cn } from '@/lib/utils/cn';
 import { ChevronDown, Search, Loader2 } from 'lucide-react';
+import { fetchModels } from '@/app/actions/plugins';
 
 interface AiModel {
     id: string;
@@ -42,25 +43,18 @@ export function PluginModelSelect({
     useEffect(() => {
         if (!pluginId) return;
 
-        const fetchModels = async () => {
-            setLoading(true);
-            setError(null);
-            try {
-                const response = await fetch(`/api/plugins/${pluginId}/models`);
-                if (response.ok) {
-                    const data = await response.json();
-                    setModels(Array.isArray(data) ? data : []);
-                } else {
-                    setError('Failed to load models');
-                }
-            } catch {
+        setLoading(true);
+        setError(null);
+        fetchModels(pluginId)
+            .then((data) => {
+                setModels(Array.isArray(data) ? data : []);
+            })
+            .catch(() => {
                 setError('Failed to load models');
-            } finally {
+            })
+            .finally(() => {
                 setLoading(false);
-            }
-        };
-
-        fetchModels();
+            });
     }, [pluginId]);
 
     const filteredModels = useMemo(() => {

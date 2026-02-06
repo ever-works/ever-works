@@ -32,7 +32,6 @@ describe('VercelPlugin', () => {
 			expect(manifest.name).toBe('Vercel');
 			expect(manifest.description).toBe('Deploy directories to Vercel');
 			expect(manifest.builtIn).toBe(true);
-			expect(manifest.autoInstall).toBe(true);
 			expect(manifest.autoEnable).toBe(true);
 			expect(manifest.visibility).toBe('public');
 			expect(manifest.defaultForCapabilities).toContain('deployment');

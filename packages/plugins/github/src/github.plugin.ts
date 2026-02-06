@@ -82,7 +82,7 @@ export class GitHubPlugin implements IPlugin, IGitProviderPlugin, IOAuthPlugin {
 				title: 'API Base URL',
 				description: 'GitHub API base URL (for GitHub Enterprise)',
 				default: 'https://api.github.com',
-				'x-envVar': 'PLUGIN_GITHUB_API_URL',
+				'x-hidden': true,
 				'x-scope': 'global'
 			}
 		}
@@ -529,7 +529,6 @@ export class GitHubPlugin implements IPlugin, IGitProviderPlugin, IOAuthPlugin {
 			license: 'MIT',
 			builtIn: true,
 			systemPlugin: true,
-			autoInstall: true,
 			autoEnable: true,
 			visibility: 'user-only', // User-only, not shown in directory plugins list
 			readme: [

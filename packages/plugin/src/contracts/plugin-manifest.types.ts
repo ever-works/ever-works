@@ -150,8 +150,6 @@ export interface PluginManifest {
 	readonly builtIn?: boolean;
 	/** Whether this is a system plugin that cannot be disabled by users */
 	readonly systemPlugin?: boolean;
-	/** Whether plugin should be auto-installed on first load */
-	readonly autoInstall?: boolean;
 	/** Whether plugin should be auto-enabled for all directories when installed */
 	readonly autoEnable?: boolean;
 	/** UI visibility: 'public' (default), 'hidden', or 'user-only' */

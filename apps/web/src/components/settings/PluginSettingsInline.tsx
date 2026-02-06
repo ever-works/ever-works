@@ -12,6 +12,7 @@ import { updatePluginSettings, enablePlugin, disablePlugin } from '@/app/actions
 import { PluginIcon } from '@/components/plugins/PluginIcon';
 import { PluginSettingsField } from '@/components/plugins/PluginSettingsField';
 import { PluginOAuthConnection } from '@/components/settings/PluginOAuthConnection';
+import { getCategoryLabel, getCapabilityLabel } from '@/lib/utils/plugin-category-icons';
 
 interface PluginSettingsInlineProps {
     plugin: UserPlugin;
@@ -139,17 +140,6 @@ export function PluginSettingsInline({ plugin, oauthConnection }: PluginSettings
         }
     };
 
-    const categoryLabels: Record<string, string> = {
-        git: t('categories.git'),
-        deployment: t('categories.deployment'),
-        screenshot: t('categories.screenshot'),
-        search: t('categories.search'),
-        content: t('categories.content'),
-        'data-source': t('categories.dataSource'),
-        ai: t('categories.ai'),
-        pipeline: t('categories.pipeline'),
-    };
-
     return (
         <div className="space-y-6">
             {/* Plugin Header */}
@@ -178,17 +168,20 @@ export function PluginSettingsInline({ plugin, oauthConnection }: PluginSettings
                     )}
 
                     <div className="flex flex-wrap items-center gap-2 mt-2">
-                        <span className="text-xs px-2 py-1 rounded-full bg-surface-secondary dark:bg-surface-secondary-dark text-text-secondary dark:text-text-secondary-dark">
-                            {categoryLabels[plugin.category] || plugin.category}
+                        <span className="shrink-0 text-xs px-2 py-1 rounded-full bg-surface-secondary dark:bg-surface-secondary-dark text-text-secondary dark:text-text-secondary-dark">
+                            {getCategoryLabel(plugin.category)}
                         </span>
-                        {plugin.capabilities.slice(0, 3).map((cap) => (
-                            <span
-                                key={cap}
-                                className="text-xs px-2 py-1 rounded-full bg-surface-tertiary dark:bg-surface-tertiary-dark text-text-muted dark:text-text-muted-dark"
-                            >
-                                {cap}
-                            </span>
-                        ))}
+                        {plugin.capabilities
+                            .filter((cap) => cap !== plugin.category)
+                            .slice(0, 3)
+                            .map((cap) => (
+                                <span
+                                    key={cap}
+                                    className="shrink-0 text-xs px-2 py-1 rounded-full bg-surface-tertiary dark:bg-surface-tertiary-dark text-text-muted dark:text-text-muted-dark"
+                                >
+                                    {getCapabilityLabel(cap)}
+                                </span>
+                            ))}
 
                         {(plugin.author || plugin.homepage) && (
                             <div className="flex items-center gap-3 ml-auto text-xs text-text-muted dark:text-text-muted-dark">
@@ -209,28 +202,30 @@ export function PluginSettingsInline({ plugin, oauthConnection }: PluginSettings
                     </div>
                 </div>
 
-                <Button
-                    variant={plugin.enabled ? 'ghost' : 'primary'}
-                    size="sm"
-                    onClick={handleToggle}
-                    disabled={isPending}
-                    loading={isPending}
-                    className={cn(
-                        plugin.enabled && 'text-danger hover:text-danger hover:bg-danger/10',
-                    )}
-                >
-                    {plugin.enabled ? (
-                        <>
-                            <PowerOff className="w-4 h-4 mr-1.5" />
-                            {t('disable')}
-                        </>
-                    ) : (
-                        <>
-                            <Power className="w-4 h-4 mr-1.5" />
-                            {t('enable')}
-                        </>
-                    )}
-                </Button>
+                {!plugin.systemPlugin && (
+                    <Button
+                        variant={plugin.enabled ? 'ghost' : 'primary'}
+                        size="sm"
+                        onClick={handleToggle}
+                        disabled={isPending}
+                        loading={isPending}
+                        className={cn(
+                            plugin.enabled && 'text-danger hover:text-danger hover:bg-danger/10',
+                        )}
+                    >
+                        {plugin.enabled ? (
+                            <>
+                                <PowerOff className="w-4 h-4 mr-1.5" />
+                                {t('disable')}
+                            </>
+                        ) : (
+                            <>
+                                <Power className="w-4 h-4 mr-1.5" />
+                                {t('enable')}
+                            </>
+                        )}
+                    </Button>
+                )}
             </div>
 
             {/* Divider */}

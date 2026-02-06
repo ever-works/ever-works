@@ -148,7 +148,6 @@ describe('NotionExtractorPlugin', () => {
 			expect(manifest.id).toBe('notion-extractor');
 			expect(manifest.name).toBe('Notion Page Extractor');
 			expect(manifest.systemPlugin).toBe(false);
-			expect(manifest.autoInstall).toBe(false);
 			expect(manifest.capabilities).toContain('content-extractor');
 		});
 	});

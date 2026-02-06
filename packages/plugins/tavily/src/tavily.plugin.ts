@@ -364,7 +364,6 @@ export class TavilySearchPlugin implements IPlugin, ISearchPlugin, IContentExtra
 			license: 'MIT',
 			builtIn: true,
 			systemPlugin: false,
-			autoInstall: true,
 			autoEnable: true,
 			defaultForCapabilities: ['search'],
 			readme: [

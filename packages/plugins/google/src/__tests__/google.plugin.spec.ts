@@ -114,7 +114,6 @@ describe('GooglePlugin', () => {
 			expect(manifest.id).toBe('google');
 			expect(manifest.name).toBe('Google Gemini');
 			expect(manifest.builtIn).toBe(true);
-			expect(manifest.autoInstall).toBe(false);
 			expect(manifest.autoEnable).toBe(false);
 			expect(manifest.visibility).toBe('public');
 			expect(manifest.icon).toBeDefined();

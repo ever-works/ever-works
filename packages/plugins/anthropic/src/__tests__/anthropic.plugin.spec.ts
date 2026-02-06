@@ -113,7 +113,6 @@ describe('AnthropicPlugin', () => {
 			expect(manifest.id).toBe('anthropic');
 			expect(manifest.name).toBe('Anthropic');
 			expect(manifest.builtIn).toBe(true);
-			expect(manifest.autoInstall).toBe(false);
 			expect(manifest.autoEnable).toBe(false);
 			expect(manifest.visibility).toBe('public');
 			expect(manifest.icon).toBeDefined();

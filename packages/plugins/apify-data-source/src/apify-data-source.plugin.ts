@@ -436,7 +436,6 @@ export class ApifyDataSourcePlugin implements IPlugin, IDataSourcePlugin, IFormS
 			license: 'MIT',
 			builtIn: false,
 			systemPlugin: false,
-			autoInstall: false,
 			readme: [
 				'## What does the Apify plugin do?',
 				'',

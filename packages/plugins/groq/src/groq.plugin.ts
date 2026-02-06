@@ -210,7 +210,6 @@ export class GroqPlugin extends BaseAiProvider {
 			author: { name: 'Ever Works Team' },
 			license: 'MIT',
 			builtIn: true,
-			autoInstall: false,
 			autoEnable: false,
 			visibility: 'public',
 			readme: [

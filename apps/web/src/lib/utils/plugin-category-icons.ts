@@ -83,6 +83,36 @@ export function getCategoryLabel(category: string): string {
 }
 
 /**
+ * Mapping of plugin capabilities to human-readable labels
+ */
+export const CAPABILITY_LABELS: Record<string, string> = {
+    'ai-provider': 'AI Provider',
+    search: 'Search',
+    screenshot: 'Screenshot',
+    'content-extractor': 'Content Extractor',
+    'data-source': 'Data Source',
+    deployment: 'Deployment',
+    'git-provider': 'Git',
+    'oauth-provider': 'OAuth',
+    pipeline: 'Pipeline',
+    form: 'Form',
+};
+
+/**
+ * Get the human-readable label for a plugin capability
+ * Formats unknown capabilities by splitting on hyphens and capitalizing
+ */
+export function getCapabilityLabel(capability: string): string {
+    return (
+        CAPABILITY_LABELS[capability] ??
+        capability
+            .split('-')
+            .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+            .join(' ')
+    );
+}
+
+/**
  * Get all available plugin categories
  * Re-exports from @ever-works/plugin for convenience
  */

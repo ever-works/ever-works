@@ -12,6 +12,7 @@ import { ROUTES } from '@/lib/constants';
 import { enablePlugin, disablePlugin, updatePluginSettings } from '@/app/actions/plugins';
 import { PluginIcon } from './PluginIcon';
 import { PluginSettingsField } from './PluginSettingsField';
+import { getCategoryLabel, getCapabilityLabel } from '@/lib/utils/plugin-category-icons';
 
 interface PluginSettingsProps {
     plugin: UserPlugin;
@@ -138,17 +139,6 @@ export function PluginSettings({ plugin }: PluginSettingsProps) {
         }
     };
 
-    const categoryLabels: Record<string, string> = {
-        git: t('categories.git'),
-        deployment: t('categories.deployment'),
-        screenshot: t('categories.screenshot'),
-        search: t('categories.search'),
-        content: t('categories.content'),
-        'data-source': t('categories.dataSource'),
-        ai: t('categories.ai'),
-        pipeline: t('categories.pipeline'),
-    };
-
     return (
         <div className="space-y-6">
             {/* Back link */}
@@ -174,7 +164,7 @@ export function PluginSettings({ plugin }: PluginSettingsProps) {
                                 v{plugin.version}
                             </span>
                             {plugin.builtIn && (
-                                <span className="text-xs px-2 py-0.5 rounded bg-surface-tertiary dark:bg-surface-tertiary-dark text-text-muted dark:text-text-muted-dark">
+                                <span className="shrink-0 text-xs px-2 py-0.5 rounded bg-surface-tertiary dark:bg-surface-tertiary-dark text-text-muted dark:text-text-muted-dark">
                                     {t('builtIn')}
                                 </span>
                             )}
@@ -188,14 +178,14 @@ export function PluginSettings({ plugin }: PluginSettingsProps) {
 
                         <div className="flex flex-wrap gap-2 mt-3">
                             <span className="text-xs px-2 py-1 rounded-full bg-surface-secondary dark:bg-surface-secondary-dark text-text-secondary dark:text-text-secondary-dark">
-                                {categoryLabels[plugin.category] || plugin.category}
+                                {getCategoryLabel(plugin.category)}
                             </span>
                             {plugin.capabilities.map((cap) => (
                                 <span
                                     key={cap}
                                     className="text-xs px-2 py-1 rounded-full bg-surface-tertiary dark:bg-surface-tertiary-dark text-text-muted dark:text-text-muted-dark"
                                 >
-                                    {cap}
+                                    {getCapabilityLabel(cap)}
                                 </span>
                             ))}
                         </div>
@@ -222,27 +212,30 @@ export function PluginSettings({ plugin }: PluginSettingsProps) {
                         )}
                     </div>
 
-                    <Button
-                        variant={plugin.enabled ? 'ghost' : 'primary'}
-                        onClick={handleToggle}
-                        disabled={isPending}
-                        loading={isPending}
-                        className={cn(
-                            plugin.enabled && 'text-danger hover:text-danger hover:bg-danger/10',
-                        )}
-                    >
-                        {plugin.enabled ? (
-                            <>
-                                <PowerOff className="w-4 h-4 mr-2" />
-                                {t('disable')}
-                            </>
-                        ) : (
-                            <>
-                                <Power className="w-4 h-4 mr-2" />
-                                {t('enable')}
-                            </>
-                        )}
-                    </Button>
+                    {!plugin.systemPlugin && (
+                        <Button
+                            variant={plugin.enabled ? 'ghost' : 'primary'}
+                            onClick={handleToggle}
+                            disabled={isPending}
+                            loading={isPending}
+                            className={cn(
+                                plugin.enabled &&
+                                    'text-danger hover:text-danger hover:bg-danger/10',
+                            )}
+                        >
+                            {plugin.enabled ? (
+                                <>
+                                    <PowerOff className="w-4 h-4 mr-2" />
+                                    {t('disable')}
+                                </>
+                            ) : (
+                                <>
+                                    <Power className="w-4 h-4 mr-2" />
+                                    {t('enable')}
+                                </>
+                            )}
+                        </Button>
+                    )}
                 </div>
             </div>
 

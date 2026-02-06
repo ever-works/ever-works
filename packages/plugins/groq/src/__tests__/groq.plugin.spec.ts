@@ -118,7 +118,6 @@ describe('GroqPlugin', () => {
 			expect(manifest.id).toBe('groq');
 			expect(manifest.name).toBe('Groq');
 			expect(manifest.builtIn).toBe(true);
-			expect(manifest.autoInstall).toBe(false);
 			expect(manifest.autoEnable).toBe(false);
 			expect(manifest.visibility).toBe('public');
 			expect(manifest.icon).toBeDefined();

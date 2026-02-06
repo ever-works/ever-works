@@ -8,7 +8,9 @@ module.exports = {
             'ts-jest',
             {
                 diagnostics: {
-                    ignoreCodes: [151002],
+                    // 151002: ts-jest specific warning
+                    // 2307: cross-package @src path alias not resolved by TS (handled by moduleNameMapper)
+                    ignoreCodes: [151002, 2307],
                 },
             },
         ],
@@ -17,6 +19,7 @@ module.exports = {
     coverageDirectory: '../coverage',
     testEnvironment: 'node',
     moduleNameMapper: {
+        '^@src/generators/(.*)$': '<rootDir>/../../../packages/agent/src/generators/$1/index.ts',
         '^@src/(.*)$': '<rootDir>/$1',
         // Map workspace packages to their source TypeScript files for testing
         '^@ever-works/plugin$': '<rootDir>/../../../packages/plugin/src/index.ts',

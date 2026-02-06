@@ -94,13 +94,6 @@ export class OpenRouterPlugin extends BaseAiProvider {
 				'x-envVar': 'PLUGIN_OPENROUTER_BASE_URL',
 				'x-hidden': true
 			},
-			embeddingModel: {
-				type: 'string',
-				title: 'Embedding Model',
-				default: 'openai/text-embedding-3-small',
-				'x-widget': 'model-select',
-				'x-scope': 'user'
-			},
 			temperature: {
 				type: 'number',
 				title: 'Temperature',
@@ -132,8 +125,7 @@ export class OpenRouterPlugin extends BaseAiProvider {
 			baseURL: 'https://openrouter.ai/api/v1',
 			temperature: 0.7,
 			maxTokens: 4096,
-			providerType: 'openrouter',
-			embeddingModel: 'openai/text-embedding-3-small'
+			providerType: 'openrouter'
 		});
 
 		context.logger.log('OpenRouter Plugin loaded');
@@ -259,7 +251,6 @@ export class OpenRouterPlugin extends BaseAiProvider {
 			license: 'MIT',
 			builtIn: true,
 			systemPlugin: false,
-			autoInstall: true,
 			autoEnable: true,
 			visibility: 'public',
 			defaultForCapabilities: ['ai-provider'],

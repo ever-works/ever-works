@@ -32,11 +32,11 @@ export function PluginIcon({ icon, name, size = 32, className }: PluginIconProps
         case 'svg':
             return (
                 <div
-                    className={containerClass}
+                    className={cn(containerClass, 'p-1.5 [&>svg]:w-full [&>svg]:h-full')}
                     style={{
                         ...containerStyle,
                         backgroundColor: icon.backgroundColor,
-                        color: icon.color,
+                        color: icon.color || (icon.backgroundColor ? '#ffffff' : undefined),
                     }}
                     dangerouslySetInnerHTML={{ __html: icon.value }}
                 />

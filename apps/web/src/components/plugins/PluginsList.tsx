@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import { UserPlugin, PluginCategory } from '@/lib/api/plugins';
 import { PluginCard } from './PluginCard';
 import { cn } from '@/lib/utils/cn';
+import { getCategoryLabel } from '@/lib/utils/plugin-category-icons';
 
 interface PluginsListProps {
     plugins: UserPlugin[];
@@ -41,17 +42,6 @@ export function PluginsList({ plugins, categories = [], capabilities = [] }: Plu
         {} as Record<string, UserPlugin[]>,
     );
 
-    const categoryLabels: Record<string, string> = {
-        git: t('categories.git'),
-        deployment: t('categories.deployment'),
-        screenshot: t('categories.screenshot'),
-        search: t('categories.search'),
-        content: t('categories.content'),
-        'data-source': t('categories.dataSource'),
-        ai: t('categories.ai'),
-        pipeline: t('categories.pipeline'),
-    };
-
     return (
         <div className="space-y-6">
             {/* Filters */}
@@ -79,7 +69,7 @@ export function PluginsList({ plugins, categories = [], capabilities = [] }: Plu
                                     : 'bg-surface-secondary dark:bg-surface-secondary-dark text-text-secondary dark:text-text-secondary-dark hover:bg-surface-tertiary dark:hover:bg-surface-tertiary-dark',
                             )}
                         >
-                            {categoryLabels[category] || category}
+                            {getCategoryLabel(category)}
                         </button>
                     ))}
                 </div>
@@ -113,7 +103,7 @@ export function PluginsList({ plugins, categories = [], capabilities = [] }: Plu
                     {Object.entries(pluginsByCategory).map(([category, categoryPlugins]) => (
                         <div key={category}>
                             <h2 className="text-lg font-semibold text-text dark:text-text-dark mb-4">
-                                {categoryLabels[category] || category}
+                                {getCategoryLabel(category)}
                             </h2>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                 {categoryPlugins.map((plugin) => (

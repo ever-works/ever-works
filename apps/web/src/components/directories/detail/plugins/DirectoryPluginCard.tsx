@@ -14,6 +14,7 @@ import {
 } from '@/app/actions/plugins';
 import { PluginIcon } from '@/components/plugins/PluginIcon';
 import { PluginSettingsField } from '@/components/plugins/PluginSettingsField';
+import { getCategoryLabel, getCapabilityLabel } from '@/lib/utils/plugin-category-icons';
 
 interface DirectoryPluginCardProps {
     directoryId: string;
@@ -152,17 +153,6 @@ export function DirectoryPluginCard({ directoryId, plugin }: DirectoryPluginCard
         }
     };
 
-    const categoryLabels: Record<string, string> = {
-        git: t('categories.git'),
-        deployment: t('categories.deployment'),
-        screenshot: t('categories.screenshot'),
-        search: t('categories.search'),
-        content: t('categories.content'),
-        'data-source': t('categories.dataSource'),
-        ai: t('categories.ai'),
-        pipeline: t('categories.pipeline'),
-    };
-
     return (
         <div
             className={cn(
@@ -191,33 +181,41 @@ export function DirectoryPluginCard({ directoryId, plugin }: DirectoryPluginCard
                     </p>
                 </div>
 
-                <Button
-                    variant={isEnabled ? 'ghost' : 'primary'}
-                    size="sm"
-                    onClick={handleToggle}
-                    disabled={isPending || (!canEnable && !isEnabled)}
-                    loading={isPending}
-                    className={cn(isEnabled && 'text-danger hover:text-danger hover:bg-danger/10')}
-                    title={
-                        !canEnable && !isEnabled
-                            ? t('enableAtUserLevelFirst')
-                            : isEnabled
-                              ? t('disableForDirectory')
-                              : t('enableForDirectory')
-                    }
-                >
-                    {isEnabled ? (
-                        <>
-                            <PowerOff className="w-4 h-4" />
-                            <span className="sr-only md:not-sr-only md:ml-1">{t('disable')}</span>
-                        </>
-                    ) : (
-                        <>
-                            <Power className="w-4 h-4" />
-                            <span className="sr-only md:not-sr-only md:ml-1">{t('enable')}</span>
-                        </>
-                    )}
-                </Button>
+                {!plugin.systemPlugin && (
+                    <Button
+                        variant={isEnabled ? 'ghost' : 'primary'}
+                        size="sm"
+                        onClick={handleToggle}
+                        disabled={isPending || (!canEnable && !isEnabled)}
+                        loading={isPending}
+                        className={cn(
+                            isEnabled && 'text-danger hover:text-danger hover:bg-danger/10',
+                        )}
+                        title={
+                            !canEnable && !isEnabled
+                                ? t('enableAtUserLevelFirst')
+                                : isEnabled
+                                  ? t('disableForDirectory')
+                                  : t('enableForDirectory')
+                        }
+                    >
+                        {isEnabled ? (
+                            <>
+                                <PowerOff className="w-4 h-4" />
+                                <span className="sr-only md:not-sr-only md:ml-1">
+                                    {t('disable')}
+                                </span>
+                            </>
+                        ) : (
+                            <>
+                                <Power className="w-4 h-4" />
+                                <span className="sr-only md:not-sr-only md:ml-1">
+                                    {t('enable')}
+                                </span>
+                            </>
+                        )}
+                    </Button>
+                )}
             </div>
 
             {!canEnable && !isEnabled && (
@@ -232,25 +230,28 @@ export function DirectoryPluginCard({ directoryId, plugin }: DirectoryPluginCard
 
             <div className="flex flex-wrap gap-1.5 mt-3">
                 <span className="text-xs px-2 py-0.5 rounded-full bg-surface-secondary dark:bg-surface-secondary-dark text-text-secondary dark:text-text-secondary-dark">
-                    {categoryLabels[plugin.category] || plugin.category}
+                    {getCategoryLabel(plugin.category)}
                 </span>
-                {plugin.capabilities.slice(0, 2).map((cap) => (
-                    <span
-                        key={cap}
-                        className={cn(
-                            'text-xs px-2 py-0.5 rounded-full',
-                            plugin.activeCapability === cap
-                                ? 'bg-primary/20 text-primary'
-                                : 'bg-surface-tertiary dark:bg-surface-tertiary-dark text-text-muted dark:text-text-muted-dark',
-                        )}
-                    >
-                        {cap}
-                        {plugin.activeCapability === cap && ' ✓'}
-                    </span>
-                ))}
-                {plugin.capabilities.length > 2 && (
+                {plugin.capabilities
+                    .filter((cap) => cap !== plugin.category)
+                    .slice(0, 2)
+                    .map((cap) => (
+                        <span
+                            key={cap}
+                            className={cn(
+                                'text-xs px-2 py-0.5 rounded-full',
+                                plugin.activeCapability === cap
+                                    ? 'bg-primary/20 text-primary'
+                                    : 'bg-surface-tertiary dark:bg-surface-tertiary-dark text-text-muted dark:text-text-muted-dark',
+                            )}
+                        >
+                            {getCapabilityLabel(cap)}
+                            {plugin.activeCapability === cap && ' ✓'}
+                        </span>
+                    ))}
+                {plugin.capabilities.filter((cap) => cap !== plugin.category).length > 2 && (
                     <span className="text-xs px-2 py-0.5 rounded-full bg-surface-tertiary dark:bg-surface-tertiary-dark text-text-muted dark:text-text-muted-dark">
-                        +{plugin.capabilities.length - 2}
+                        +{plugin.capabilities.filter((cap) => cap !== plugin.category).length - 2}
                     </span>
                 )}
             </div>

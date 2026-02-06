@@ -202,10 +202,9 @@ describe('OpenRouterPlugin', () => {
 			expect(manifest.capabilities).toContain('ai-provider');
 		});
 
-		it('should have builtIn, autoInstall, and autoEnable flags', () => {
+		it('should have builtIn and autoEnable flags', () => {
 			const manifest = plugin.getManifest();
 			expect(manifest.builtIn).toBe(true);
-			expect(manifest.autoInstall).toBe(true);
 			expect(manifest.autoEnable).toBe(true);
 		});
 

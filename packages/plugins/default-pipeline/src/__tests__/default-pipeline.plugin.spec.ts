@@ -481,7 +481,6 @@ describe('DefaultPipelinePlugin', () => {
 			expect(manifest.capabilities).toContain('form-schema-provider');
 			expect(manifest.builtIn).toBe(true);
 			expect(manifest.systemPlugin).toBe(true);
-			expect(manifest.autoInstall).toBe(true);
 		});
 	});
 });

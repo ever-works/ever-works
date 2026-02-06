@@ -155,6 +155,8 @@ export interface PluginResponse {
 	author?: PluginAuthor;
 	/** Plugin homepage URL */
 	homepage?: string;
+	/** Whether plugin is auto-enabled */
+	autoEnable?: boolean;
 }
 
 /**

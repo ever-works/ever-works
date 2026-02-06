@@ -505,7 +505,6 @@ export class ScreenshotOnePlugin implements IPlugin, IScreenshotPlugin {
 			license: 'MIT',
 			builtIn: false,
 			systemPlugin: false,
-			autoInstall: false,
 			readme: [
 				'## What does ScreenshotOne do?',
 				'',

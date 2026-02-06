@@ -346,7 +346,6 @@ export class NotionExtractorPlugin implements IPlugin, IContentExtractorPlugin {
 			license: 'MIT',
 			builtIn: false,
 			systemPlugin: false,
-			autoInstall: false,
 			readme: [
 				'## What does the Notion Extractor do?',
 				'',

@@ -508,7 +508,6 @@ export class LocalContentExtractorPlugin implements IPlugin, IContentExtractorPl
 			license: 'MIT',
 			builtIn: true,
 			systemPlugin: true,
-			autoInstall: true,
 			autoEnable: true,
 			visibility: 'hidden',
 			defaultForCapabilities: ['content-extractor']

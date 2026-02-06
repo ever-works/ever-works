@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Settings, Power, PowerOff, ExternalLink } from 'lucide-react';
 import { enablePlugin, disablePlugin } from '@/app/actions/plugins';
 import { PluginIcon } from './PluginIcon';
+import { getCategoryLabel, getCapabilityLabel } from '@/lib/utils/plugin-category-icons';
 
 interface PluginCardProps {
     plugin: UserPlugin;
@@ -41,17 +42,6 @@ export function PluginCard({ plugin }: PluginCardProps) {
         });
     };
 
-    const categoryLabels: Record<string, string> = {
-        git: t('categories.git'),
-        deployment: t('categories.deployment'),
-        screenshot: t('categories.screenshot'),
-        search: t('categories.search'),
-        content: t('categories.content'),
-        'data-source': t('categories.dataSource'),
-        ai: t('categories.ai'),
-        pipeline: t('categories.pipeline'),
-    };
-
     return (
         <div
             className={cn(
@@ -69,12 +59,12 @@ export function PluginCard({ plugin }: PluginCardProps) {
                             {plugin.name}
                         </h3>
                         {plugin.systemPlugin && (
-                            <span className="text-xs px-1.5 py-0.5 rounded bg-primary/10 text-primary">
+                            <span className="shrink-0 text-xs px-1.5 py-0.5 rounded bg-primary/10 text-primary">
                                 {t('system')}
                             </span>
                         )}
                         {plugin.builtIn && !plugin.systemPlugin && (
-                            <span className="text-xs px-1.5 py-0.5 rounded bg-surface-tertiary dark:bg-surface-tertiary-dark text-text-muted dark:text-text-muted-dark">
+                            <span className="shrink-0 text-xs px-1.5 py-0.5 rounded bg-surface-tertiary dark:bg-surface-tertiary-dark text-text-muted dark:text-text-muted-dark">
                                 {t('builtIn')}
                             </span>
                         )}
@@ -122,19 +112,22 @@ export function PluginCard({ plugin }: PluginCardProps) {
 
             <div className="flex flex-wrap gap-1.5 mt-3">
                 <span className="text-xs px-2 py-0.5 rounded-full bg-surface-secondary dark:bg-surface-secondary-dark text-text-secondary dark:text-text-secondary-dark">
-                    {categoryLabels[plugin.category] || plugin.category}
+                    {getCategoryLabel(plugin.category)}
                 </span>
-                {plugin.capabilities.slice(0, 2).map((cap) => (
-                    <span
-                        key={cap}
-                        className="text-xs px-2 py-0.5 rounded-full bg-surface-tertiary dark:bg-surface-tertiary-dark text-text-muted dark:text-text-muted-dark"
-                    >
-                        {cap}
-                    </span>
-                ))}
-                {plugin.capabilities.length > 2 && (
+                {plugin.capabilities
+                    .filter((cap) => cap !== plugin.category)
+                    .slice(0, 2)
+                    .map((cap) => (
+                        <span
+                            key={cap}
+                            className="text-xs px-2 py-0.5 rounded-full bg-surface-tertiary dark:bg-surface-tertiary-dark text-text-muted dark:text-text-muted-dark"
+                        >
+                            {getCapabilityLabel(cap)}
+                        </span>
+                    ))}
+                {plugin.capabilities.filter((cap) => cap !== plugin.category).length > 2 && (
                     <span className="text-xs px-2 py-0.5 rounded-full bg-surface-tertiary dark:bg-surface-tertiary-dark text-text-muted dark:text-text-muted-dark">
-                        +{plugin.capabilities.length - 2}
+                        +{plugin.capabilities.filter((cap) => cap !== plugin.category).length - 2}
                     </span>
                 )}
             </div>

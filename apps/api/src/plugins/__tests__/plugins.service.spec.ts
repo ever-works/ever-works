@@ -13,6 +13,13 @@ import type { RegisteredPlugin } from '@packages/agent/plugins';
 import type { IPlugin, PluginManifest, JsonSchema } from '@ever-works/plugin';
 import { SettingsSchemaValidatorService } from '../services';
 
+// Mock the facades module to avoid transitive cross-package @src path resolution issues
+jest.mock('@packages/agent/facades', () => ({
+    AiFacadeService: class AiFacadeService {},
+}));
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { AiFacadeService } = require('@packages/agent/facades');
+
 // Silence Logger output during tests
 jest.spyOn(Logger.prototype, 'error').mockImplementation(() => {});
 jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => {});
@@ -146,6 +153,12 @@ describe('PluginsService', () => {
                     provide: SettingsSchemaValidatorService,
                     useValue: {
                         validate: jest.fn().mockReturnValue({ valid: true, errors: [] }),
+                    },
+                },
+                {
+                    provide: AiFacadeService,
+                    useValue: {
+                        getAvailableModels: jest.fn().mockResolvedValue([]),
                     },
                 },
             ],
@@ -448,6 +461,129 @@ describe('PluginsService', () => {
             expect(result.enabled).toBe(false);
             expect(userPluginRepository.save).toHaveBeenCalled();
         });
+
+        it('should throw BadRequestException when disabling a systemPlugin', async () => {
+            const systemPlugin = createRegisteredPlugin();
+            systemPlugin.manifest = {
+                ...systemPlugin.manifest,
+                systemPlugin: true,
+            } as PluginManifest;
+
+            jest.spyOn(pluginRegistryService, 'get').mockReturnValue(systemPlugin);
+
+            await expect(service.disablePluginForUser('test-plugin', 'user-1')).rejects.toThrow(
+                BadRequestException,
+            );
+        });
+
+        it('should allow disabling an autoEnable plugin', async () => {
+            const autoEnablePlugin = createRegisteredPlugin();
+            autoEnablePlugin.manifest = {
+                ...autoEnablePlugin.manifest,
+                autoEnable: true,
+            } as PluginManifest;
+
+            jest.spyOn(pluginRegistryService, 'get').mockReturnValue(autoEnablePlugin);
+            jest.spyOn(userPluginRepository, 'findOne').mockResolvedValue({
+                id: '1',
+                userId: 'user-1',
+                pluginId: 'test-plugin',
+                enabled: true,
+                settings: {},
+                secretSettings: {},
+                metadata: {},
+            } as any);
+
+            const result = await service.disablePluginForUser('test-plugin', 'user-1');
+
+            expect(result.enabled).toBe(false);
+            expect(userPluginRepository.save).toHaveBeenCalled();
+        });
+    });
+
+    describe('disablePluginForDirectory', () => {
+        it('should throw BadRequestException when disabling a systemPlugin at directory level', async () => {
+            const systemPlugin = createRegisteredPlugin();
+            systemPlugin.manifest = {
+                ...systemPlugin.manifest,
+                systemPlugin: true,
+            } as PluginManifest;
+
+            jest.spyOn(pluginRegistryService, 'get').mockReturnValue(systemPlugin);
+
+            await expect(
+                service.disablePluginForDirectory('dir-1', 'test-plugin', 'user-1'),
+            ).rejects.toThrow(BadRequestException);
+        });
+
+        it('should allow disabling an autoEnable plugin at directory level', async () => {
+            const autoEnablePlugin = createRegisteredPlugin();
+            autoEnablePlugin.manifest = {
+                ...autoEnablePlugin.manifest,
+                autoEnable: true,
+            } as PluginManifest;
+
+            jest.spyOn(pluginRegistryService, 'get').mockReturnValue(autoEnablePlugin);
+            jest.spyOn(userPluginRepository, 'findOne').mockResolvedValue({
+                id: '1',
+                userId: 'user-1',
+                pluginId: 'test-plugin',
+                enabled: true,
+                settings: {},
+                secretSettings: {},
+                metadata: {},
+            } as any);
+            jest.spyOn(directoryPluginRepository, 'findOne').mockResolvedValue({
+                id: '1',
+                directoryId: 'dir-1',
+                pluginId: 'test-plugin',
+                enabled: true,
+                settings: {},
+                secretSettings: {},
+                metadata: {},
+            } as any);
+
+            const result = await service.disablePluginForDirectory(
+                'dir-1',
+                'test-plugin',
+                'user-1',
+            );
+
+            expect(result.directoryEnabled).toBe(false);
+            expect(directoryPluginRepository.save).toHaveBeenCalled();
+        });
+
+        it('should successfully disable a normal plugin for directory', async () => {
+            const registered = createRegisteredPlugin();
+            jest.spyOn(pluginRegistryService, 'get').mockReturnValue(registered);
+            jest.spyOn(userPluginRepository, 'findOne').mockResolvedValue({
+                id: '1',
+                userId: 'user-1',
+                pluginId: 'test-plugin',
+                enabled: true,
+                settings: {},
+                secretSettings: {},
+                metadata: {},
+            } as any);
+            jest.spyOn(directoryPluginRepository, 'findOne').mockResolvedValue({
+                id: '1',
+                directoryId: 'dir-1',
+                pluginId: 'test-plugin',
+                enabled: true,
+                settings: {},
+                secretSettings: {},
+                metadata: {},
+            } as any);
+
+            const result = await service.disablePluginForDirectory(
+                'dir-1',
+                'test-plugin',
+                'user-1',
+            );
+
+            expect(result.directoryEnabled).toBe(false);
+            expect(directoryPluginRepository.save).toHaveBeenCalled();
+        });
     });
 
     describe('extractSettingsSchema filtering', () => {
@@ -464,7 +600,7 @@ describe('PluginsService', () => {
             expect(result.settingsSchema!.properties.apiBaseUrl).toBeUndefined();
         });
 
-        it('should exclude x-writeOnly fields from settings schema', async () => {
+        it('should include x-writeOnly fields in settings schema', async () => {
             const registered = createRegisteredPlugin();
             jest.spyOn(pluginRegistryService, 'get').mockReturnValue(registered);
             jest.spyOn(userPluginRepository, 'findOne').mockResolvedValue(null);
@@ -472,7 +608,7 @@ describe('PluginsService', () => {
             const result = await service.getPlugin('test-plugin', 'user-1');
 
             expect(result.settingsSchema).toBeDefined();
-            expect(result.settingsSchema!.properties.writeOnlyField).toBeUndefined();
+            expect(result.settingsSchema!.properties.writeOnlyField).toBeDefined();
         });
 
         it('should include normal fields in settings schema', async () => {
