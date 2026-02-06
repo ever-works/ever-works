@@ -251,10 +251,24 @@
             "tabs": {
                 "profile": "Profile",
                 "security": "Security",
-                "apiTokens": "API & Tokens",
                 "gitProviders": "Git Providers",
-                "notifications": "Notifications",
                 "dangerZone": "Danger Zone"
+            },
+            "pluginCategories": {
+                "ai-provider": "AI Providers",
+                "deployment": "Deployment",
+                "search": "Search",
+                "screenshot": "Screenshots",
+                "content-extractor": "Content Extractors",
+                "data-source": "Data Sources",
+                "git-provider": "Git Providers",
+                "pipeline": "Pipeline"
+            },
+            "plugins": {
+                "configure": "Configure",
+                "noPluginsInCategory": "No plugins in this category",
+                "requiredSettingsMissing": "Required settings not configured",
+                "backToCategory": "Back to {category}"
             },
             "profile": {
                 "title": "Profile Settings",

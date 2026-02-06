@@ -204,3 +204,39 @@ export interface DirectoryPluginListResponse {
 	/** Capability providers mapping */
 	capabilityProviders?: Record<string, string>;
 }
+
+/**
+ * Plugin information for settings menu
+ */
+export interface SettingsMenuPlugin {
+	/** Plugin unique identifier */
+	pluginId: string;
+	/** Plugin display name */
+	name: string;
+	/** Plugin icon */
+	icon?: PluginIcon;
+	/** Whether plugin is enabled */
+	enabled: boolean;
+	/** Whether plugin has required settings that are not configured */
+	hasRequiredSettings: boolean;
+}
+
+/**
+ * Category grouping for settings menu
+ */
+export interface SettingsMenuCategory {
+	/** Category identifier */
+	category: PluginCategory;
+	/** Category display label */
+	label: string;
+	/** Plugins in this category */
+	plugins: SettingsMenuPlugin[];
+}
+
+/**
+ * Response for settings menu endpoint
+ */
+export interface SettingsMenuResponse {
+	/** Categories with plugins */
+	categories: SettingsMenuCategory[];
+}

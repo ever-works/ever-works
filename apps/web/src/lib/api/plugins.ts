@@ -6,6 +6,9 @@ import type {
     DirectoryPluginResponse,
     PluginListResponse as IPluginListResponse,
     DirectoryPluginListResponse as IDirectoryPluginListResponse,
+    SettingsMenuResponse as ISettingsMenuResponse,
+    SettingsMenuCategory as ISettingsMenuCategory,
+    SettingsMenuPlugin as ISettingsMenuPlugin,
 } from '@ever-works/plugin/api';
 
 // Re-export types from @ever-works/plugin/api for consistency
@@ -26,6 +29,9 @@ export type UserPlugin = UserPluginResponse;
 export type DirectoryPlugin = DirectoryPluginResponse;
 export type PluginListResponse = IPluginListResponse;
 export type DirectoryPluginListResponse = IDirectoryPluginListResponse;
+export type SettingsMenuResponse = ISettingsMenuResponse;
+export type SettingsMenuCategory = ISettingsMenuCategory;
+export type SettingsMenuPlugin = ISettingsMenuPlugin;
 
 // ============================================
 // API Client
@@ -48,6 +54,14 @@ export const pluginsAPI = {
      */
     get: async (pluginId: string): Promise<UserPlugin> => {
         return serverFetch<UserPlugin>(`/plugins/${pluginId}`);
+    },
+
+    /**
+     * Get plugins grouped by category for settings menu
+     * Only returns plugins with user-configurable settings
+     */
+    listForSettingsMenu: async (): Promise<SettingsMenuResponse> => {
+        return serverFetch<SettingsMenuResponse>('/plugins/settings-menu');
     },
 
     // ============================================

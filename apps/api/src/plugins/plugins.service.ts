@@ -22,6 +22,9 @@ import {
     PluginIconDto,
     PluginSettingsSchemaDto,
     PluginSettingsSchemaPropertyDto,
+    SettingsMenuResponseDto,
+    SettingsMenuCategoryDto,
+    SettingsMenuPluginDto,
 } from './dto';
 import { SettingsSchemaValidatorService, type SettingsScope } from './services';
 
@@ -75,6 +78,151 @@ export class PluginsService {
             categories: this.pluginRegistryService.getAvailableCategories(),
             capabilities: this.pluginRegistryService.getAvailableCapabilities(),
         };
+    }
+
+    /**
+     * Get plugins for settings menu, grouped by category
+     * Returns only plugins that have user-configurable settings
+     */
+    async getPluginsForSettingsMenu(userId: string): Promise<SettingsMenuResponseDto> {
+        const allPlugins = this.pluginRegistryService.getAll();
+
+        // Get user's plugin installations
+        const userPlugins = await this.userPluginRepository.find({
+            where: { userId },
+        });
+        const userPluginMap = new Map(userPlugins.map((up) => [up.pluginId, up]));
+
+        // Filter to plugins that:
+        // 1. Are visible (not hidden)
+        // 2. Are installed and enabled by the user
+        // 3. Have user-configurable settings (configurationMode !== 'admin-only')
+        // 4. Have settings schema with properties
+        const configurablePlugins = allPlugins.filter((registered) => {
+            const visibility = registered.manifest?.visibility ?? 'public';
+            if (visibility === 'hidden') return false;
+
+            const configMode = registered.plugin.configurationMode || 'hybrid';
+            if (configMode === 'admin-only') return false;
+
+            const userPlugin = userPluginMap.get(registered.plugin.id);
+            const autoEnabled = registered.manifest?.autoEnable ?? false;
+            const isEnabled = userPlugin?.enabled ?? autoEnabled;
+            if (!isEnabled) return false;
+
+            // Check if plugin has user-configurable settings
+            const schema = registered.plugin.settingsSchema;
+            if (!schema?.properties) return false;
+
+            // Check if there are any non-admin-only, non-env-only settings
+            const hasUserSettings = Object.values(schema.properties).some((prop) => {
+                if (prop['x-envVar']) return false;
+                if (prop['x-adminOnly']) return false;
+                const scope = prop['x-scope'] || 'global';
+                return scope === 'global' || scope === 'user';
+            });
+
+            return hasUserSettings;
+        });
+
+        // Group by category
+        const categoryMap = new Map<string, SettingsMenuPluginDto[]>();
+
+        for (const registered of configurablePlugins) {
+            const category = registered.manifest.category;
+            const userPlugin = userPluginMap.get(registered.plugin.id);
+
+            // Check if plugin has required settings that are not configured
+            const hasRequiredSettings = this.checkHasUnconfiguredRequiredSettings(
+                registered.plugin.settingsSchema,
+                userPlugin?.settings || {},
+            );
+
+            const pluginDto: SettingsMenuPluginDto = {
+                pluginId: registered.plugin.id,
+                name: registered.manifest.name,
+                icon: this.extractIcon(registered.manifest),
+                enabled: userPlugin?.enabled ?? registered.manifest?.autoEnable ?? false,
+                hasRequiredSettings,
+            };
+
+            const existing = categoryMap.get(category) || [];
+            existing.push(pluginDto);
+            categoryMap.set(category, existing);
+        }
+
+        // Convert to array of categories (only non-empty)
+        const categories: SettingsMenuCategoryDto[] = [];
+        for (const [category, plugins] of categoryMap.entries()) {
+            if (plugins.length > 0) {
+                categories.push({
+                    category: category as any,
+                    label: this.getCategoryLabel(category),
+                    plugins,
+                });
+            }
+        }
+
+        // Sort categories by label
+        categories.sort((a, b) => a.label.localeCompare(b.label));
+
+        return { categories };
+    }
+
+    /**
+     * Check if plugin has required settings that are not configured
+     */
+    private checkHasUnconfiguredRequiredSettings(
+        schema: JsonSchema | undefined,
+        settings: Record<string, unknown>,
+    ): boolean {
+        if (!schema?.required || !schema.properties) return false;
+
+        for (const field of schema.required) {
+            const propSchema = schema.properties[field];
+            if (!propSchema) continue;
+
+            // Skip env-only and admin-only fields
+            if (propSchema['x-envVar']) continue;
+            if (propSchema['x-adminOnly']) continue;
+
+            const scope = propSchema['x-scope'] || 'global';
+            if (scope !== 'global' && scope !== 'user') continue;
+
+            const value = settings[field];
+            if (value === undefined || value === null || value === '') {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Get human-readable category label
+     */
+    private getCategoryLabel(category: string): string {
+        const labels: Record<string, string> = {
+            'ai-provider': 'AI Providers',
+            deployment: 'Deployment',
+            search: 'Search',
+            screenshot: 'Screenshots',
+            'content-extractor': 'Content Extractors',
+            'data-source': 'Data Sources',
+            'git-provider': 'Git Providers',
+            pipeline: 'Pipeline',
+        };
+        return labels[category] || this.formatCategoryLabel(category);
+    }
+
+    /**
+     * Format unknown category to human-readable label
+     */
+    private formatCategoryLabel(category: string): string {
+        return category
+            .split('-')
+            .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(' ');
     }
 
     /**

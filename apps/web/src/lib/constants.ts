@@ -81,10 +81,11 @@ export const ROUTES = {
     DASHBOARD_SETTINGS: '/settings',
     DASHBOARD_SETTINGS_PROFILE: '/settings',
     DASHBOARD_SETTINGS_SECURITY: '/settings/security',
-    DASHBOARD_SETTINGS_API_TOKENS: '/settings/api-tokens',
-    DASHBOARD_SETTINGS_GIT_PROVIDERS: '/settings/git-providers',
-    DASHBOARD_SETTINGS_NOTIFICATIONS: '/settings/notifications',
     DASHBOARD_SETTINGS_DANGER_ZONE: '/settings/danger',
+    // Dynamic plugin settings routes
+    DASHBOARD_SETTINGS_PLUGIN_CATEGORY: (category: string) => `/settings/plugins/${category}`,
+    DASHBOARD_SETTINGS_PLUGIN: (category: string, pluginId: string) =>
+        `/settings/plugins/${category}/${pluginId}`,
     // Profile
     DASHBOARD_PROFILE: '/profile',
     DASHBOARD_ANALYTICS: '/analytics',

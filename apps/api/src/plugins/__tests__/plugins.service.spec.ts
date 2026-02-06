@@ -726,6 +726,443 @@ describe('PluginsService', () => {
         });
     });
 
+    describe('getPluginsForSettingsMenu', () => {
+        const createPluginWithSettings = (
+            id: string,
+            category: string,
+            configMode: string = 'hybrid',
+            visibility: string = 'public',
+            autoEnable: boolean = false,
+            settingsSchema?: JsonSchema,
+        ): RegisteredPlugin => {
+            const defaultSchema: JsonSchema = {
+                type: 'object',
+                properties: {
+                    apiKey: { type: 'string', 'x-scope': 'user' },
+                },
+                required: ['apiKey'],
+            } as unknown as JsonSchema;
+
+            const plugin = {
+                id,
+                name: `${id} Plugin`,
+                version: '1.0.0',
+                category,
+                capabilities: ['test'],
+                settingsSchema: settingsSchema || defaultSchema,
+                configurationMode: configMode,
+                onLoad: jest.fn().mockResolvedValue(undefined),
+                onEnable: jest.fn().mockResolvedValue(undefined),
+                onDisable: jest.fn().mockResolvedValue(undefined),
+                onUnload: jest.fn().mockResolvedValue(undefined),
+                validateSettings: jest.fn().mockResolvedValue({ valid: true }),
+            } as unknown as IPlugin;
+
+            return {
+                plugin,
+                manifest: {
+                    id,
+                    name: `${id} Plugin`,
+                    version: '1.0.0',
+                    description: 'Test plugin',
+                    category,
+                    capabilities: ['test'],
+                    visibility,
+                    autoEnable,
+                } as PluginManifest,
+                state: 'loaded',
+                builtIn: false,
+                registeredAt: Date.now(),
+                stateHistory: [],
+            };
+        };
+
+        it('should return empty categories when no plugins have settings', async () => {
+            const pluginWithoutSettings = createPluginWithSettings(
+                'no-settings',
+                'utility',
+                'hybrid',
+                'public',
+                false,
+                { type: 'object' } as JsonSchema, // No properties
+            );
+
+            jest.spyOn(pluginRegistryService, 'getAll').mockReturnValue([pluginWithoutSettings]);
+            jest.spyOn(userPluginRepository, 'find').mockResolvedValue([
+                {
+                    id: '1',
+                    userId: 'user-1',
+                    pluginId: 'no-settings',
+                    enabled: true,
+                    settings: {},
+                    secretSettings: {},
+                    metadata: {},
+                } as any,
+            ]);
+
+            const result = await service.getPluginsForSettingsMenu('user-1');
+
+            expect(result.categories).toHaveLength(0);
+        });
+
+        it('should return only enabled plugins with user-configurable settings', async () => {
+            const enabledPlugin = createPluginWithSettings('enabled-plugin', 'ai-provider');
+            const disabledPlugin = createPluginWithSettings('disabled-plugin', 'deployment');
+
+            jest.spyOn(pluginRegistryService, 'getAll').mockReturnValue([
+                enabledPlugin,
+                disabledPlugin,
+            ]);
+            jest.spyOn(userPluginRepository, 'find').mockResolvedValue([
+                {
+                    id: '1',
+                    userId: 'user-1',
+                    pluginId: 'enabled-plugin',
+                    enabled: true,
+                    settings: {},
+                    secretSettings: {},
+                    metadata: {},
+                } as any,
+                {
+                    id: '2',
+                    userId: 'user-1',
+                    pluginId: 'disabled-plugin',
+                    enabled: false,
+                    settings: {},
+                    secretSettings: {},
+                    metadata: {},
+                } as any,
+            ]);
+
+            const result = await service.getPluginsForSettingsMenu('user-1');
+
+            expect(result.categories).toHaveLength(1);
+            expect(result.categories[0].category).toBe('ai-provider');
+            expect(result.categories[0].plugins).toHaveLength(1);
+            expect(result.categories[0].plugins[0].pluginId).toBe('enabled-plugin');
+        });
+
+        it('should group plugins by category', async () => {
+            const aiPlugin1 = createPluginWithSettings('openai', 'ai-provider');
+            const aiPlugin2 = createPluginWithSettings('anthropic', 'ai-provider');
+            const deployPlugin = createPluginWithSettings('vercel', 'deployment');
+
+            jest.spyOn(pluginRegistryService, 'getAll').mockReturnValue([
+                aiPlugin1,
+                aiPlugin2,
+                deployPlugin,
+            ]);
+            jest.spyOn(userPluginRepository, 'find').mockResolvedValue([
+                {
+                    id: '1',
+                    userId: 'user-1',
+                    pluginId: 'openai',
+                    enabled: true,
+                    settings: {},
+                    secretSettings: {},
+                    metadata: {},
+                } as any,
+                {
+                    id: '2',
+                    userId: 'user-1',
+                    pluginId: 'anthropic',
+                    enabled: true,
+                    settings: {},
+                    secretSettings: {},
+                    metadata: {},
+                } as any,
+                {
+                    id: '3',
+                    userId: 'user-1',
+                    pluginId: 'vercel',
+                    enabled: true,
+                    settings: {},
+                    secretSettings: {},
+                    metadata: {},
+                } as any,
+            ]);
+
+            const result = await service.getPluginsForSettingsMenu('user-1');
+
+            expect(result.categories).toHaveLength(2);
+            const aiCategory = result.categories.find((c) => c.category === 'ai-provider');
+            const deployCategory = result.categories.find((c) => c.category === 'deployment');
+
+            expect(aiCategory).toBeDefined();
+            expect(aiCategory!.plugins).toHaveLength(2);
+            expect(deployCategory).toBeDefined();
+            expect(deployCategory!.plugins).toHaveLength(1);
+        });
+
+        it('should filter out hidden plugins', async () => {
+            const publicPlugin = createPluginWithSettings('public', 'utility', 'hybrid', 'public');
+            const hiddenPlugin = createPluginWithSettings('hidden', 'utility', 'hybrid', 'hidden');
+
+            jest.spyOn(pluginRegistryService, 'getAll').mockReturnValue([
+                publicPlugin,
+                hiddenPlugin,
+            ]);
+            jest.spyOn(userPluginRepository, 'find').mockResolvedValue([
+                {
+                    id: '1',
+                    userId: 'user-1',
+                    pluginId: 'public',
+                    enabled: true,
+                    settings: {},
+                    secretSettings: {},
+                    metadata: {},
+                } as any,
+                {
+                    id: '2',
+                    userId: 'user-1',
+                    pluginId: 'hidden',
+                    enabled: true,
+                    settings: {},
+                    secretSettings: {},
+                    metadata: {},
+                } as any,
+            ]);
+
+            const result = await service.getPluginsForSettingsMenu('user-1');
+
+            expect(result.categories).toHaveLength(1);
+            expect(result.categories[0].plugins[0].pluginId).toBe('public');
+        });
+
+        it('should filter out admin-only configuration mode plugins', async () => {
+            const hybridPlugin = createPluginWithSettings('hybrid', 'utility', 'hybrid');
+            const adminOnlyPlugin = createPluginWithSettings('admin-only', 'utility', 'admin-only');
+
+            jest.spyOn(pluginRegistryService, 'getAll').mockReturnValue([
+                hybridPlugin,
+                adminOnlyPlugin,
+            ]);
+            jest.spyOn(userPluginRepository, 'find').mockResolvedValue([
+                {
+                    id: '1',
+                    userId: 'user-1',
+                    pluginId: 'hybrid',
+                    enabled: true,
+                    settings: {},
+                    secretSettings: {},
+                    metadata: {},
+                } as any,
+                {
+                    id: '2',
+                    userId: 'user-1',
+                    pluginId: 'admin-only',
+                    enabled: true,
+                    settings: {},
+                    secretSettings: {},
+                    metadata: {},
+                } as any,
+            ]);
+
+            const result = await service.getPluginsForSettingsMenu('user-1');
+
+            expect(result.categories).toHaveLength(1);
+            expect(result.categories[0].plugins[0].pluginId).toBe('hybrid');
+        });
+
+        it('should filter out plugins with only env-var settings', async () => {
+            const normalPlugin = createPluginWithSettings('normal', 'utility');
+            const envOnlyPlugin = createPluginWithSettings(
+                'env-only',
+                'utility',
+                'hybrid',
+                'public',
+                false,
+                {
+                    type: 'object',
+                    properties: {
+                        apiKey: { type: 'string', 'x-envVar': 'API_KEY' },
+                    },
+                } as unknown as JsonSchema,
+            );
+
+            jest.spyOn(pluginRegistryService, 'getAll').mockReturnValue([
+                normalPlugin,
+                envOnlyPlugin,
+            ]);
+            jest.spyOn(userPluginRepository, 'find').mockResolvedValue([
+                {
+                    id: '1',
+                    userId: 'user-1',
+                    pluginId: 'normal',
+                    enabled: true,
+                    settings: {},
+                    secretSettings: {},
+                    metadata: {},
+                } as any,
+                {
+                    id: '2',
+                    userId: 'user-1',
+                    pluginId: 'env-only',
+                    enabled: true,
+                    settings: {},
+                    secretSettings: {},
+                    metadata: {},
+                } as any,
+            ]);
+
+            const result = await service.getPluginsForSettingsMenu('user-1');
+
+            expect(result.categories).toHaveLength(1);
+            expect(result.categories[0].plugins[0].pluginId).toBe('normal');
+        });
+
+        it('should identify plugins with unconfigured required settings', async () => {
+            const configuredPlugin = createPluginWithSettings('configured', 'ai-provider');
+            const unconfiguredPlugin = createPluginWithSettings('unconfigured', 'ai-provider');
+
+            jest.spyOn(pluginRegistryService, 'getAll').mockReturnValue([
+                configuredPlugin,
+                unconfiguredPlugin,
+            ]);
+            jest.spyOn(userPluginRepository, 'find').mockResolvedValue([
+                {
+                    id: '1',
+                    userId: 'user-1',
+                    pluginId: 'configured',
+                    enabled: true,
+                    settings: { apiKey: 'configured-key' },
+                    secretSettings: {},
+                    metadata: {},
+                } as any,
+                {
+                    id: '2',
+                    userId: 'user-1',
+                    pluginId: 'unconfigured',
+                    enabled: true,
+                    settings: {}, // Missing required apiKey
+                    secretSettings: {},
+                    metadata: {},
+                } as any,
+            ]);
+
+            const result = await service.getPluginsForSettingsMenu('user-1');
+
+            const category = result.categories.find((c) => c.category === 'ai-provider');
+            expect(category).toBeDefined();
+
+            const configured = category!.plugins.find((p) => p.pluginId === 'configured');
+            const unconfigured = category!.plugins.find((p) => p.pluginId === 'unconfigured');
+
+            expect(configured!.hasRequiredSettings).toBe(false);
+            expect(unconfigured!.hasRequiredSettings).toBe(true);
+        });
+
+        it('should include autoEnabled plugins even without UserPluginEntity', async () => {
+            const autoEnabledPlugin = createPluginWithSettings(
+                'auto-enabled',
+                'ai-provider',
+                'hybrid',
+                'public',
+                true,
+            );
+
+            jest.spyOn(pluginRegistryService, 'getAll').mockReturnValue([autoEnabledPlugin]);
+            jest.spyOn(userPluginRepository, 'find').mockResolvedValue([]);
+
+            const result = await service.getPluginsForSettingsMenu('user-1');
+
+            expect(result.categories).toHaveLength(1);
+            expect(result.categories[0].plugins[0].pluginId).toBe('auto-enabled');
+            expect(result.categories[0].plugins[0].enabled).toBe(true);
+        });
+
+        it('should format unknown category labels correctly', async () => {
+            const unknownCategoryPlugin = createPluginWithSettings('plugin', 'my-custom-category');
+
+            jest.spyOn(pluginRegistryService, 'getAll').mockReturnValue([unknownCategoryPlugin]);
+            jest.spyOn(userPluginRepository, 'find').mockResolvedValue([
+                {
+                    id: '1',
+                    userId: 'user-1',
+                    pluginId: 'plugin',
+                    enabled: true,
+                    settings: {},
+                    secretSettings: {},
+                    metadata: {},
+                } as any,
+            ]);
+
+            const result = await service.getPluginsForSettingsMenu('user-1');
+
+            expect(result.categories).toHaveLength(1);
+            expect(result.categories[0].label).toBe('My Custom Category');
+        });
+
+        it('should use predefined labels for known categories', async () => {
+            const aiPlugin = createPluginWithSettings('openai', 'ai-provider');
+
+            jest.spyOn(pluginRegistryService, 'getAll').mockReturnValue([aiPlugin]);
+            jest.spyOn(userPluginRepository, 'find').mockResolvedValue([
+                {
+                    id: '1',
+                    userId: 'user-1',
+                    pluginId: 'openai',
+                    enabled: true,
+                    settings: {},
+                    secretSettings: {},
+                    metadata: {},
+                } as any,
+            ]);
+
+            const result = await service.getPluginsForSettingsMenu('user-1');
+
+            expect(result.categories[0].label).toBe('AI Providers');
+        });
+
+        it('should sort categories alphabetically by label', async () => {
+            const searchPlugin = createPluginWithSettings('tavily', 'search');
+            const aiPlugin = createPluginWithSettings('openai', 'ai-provider');
+            const deployPlugin = createPluginWithSettings('vercel', 'deployment');
+
+            jest.spyOn(pluginRegistryService, 'getAll').mockReturnValue([
+                searchPlugin,
+                aiPlugin,
+                deployPlugin,
+            ]);
+            jest.spyOn(userPluginRepository, 'find').mockResolvedValue([
+                {
+                    id: '1',
+                    userId: 'user-1',
+                    pluginId: 'tavily',
+                    enabled: true,
+                    settings: {},
+                    secretSettings: {},
+                    metadata: {},
+                } as any,
+                {
+                    id: '2',
+                    userId: 'user-1',
+                    pluginId: 'openai',
+                    enabled: true,
+                    settings: {},
+                    secretSettings: {},
+                    metadata: {},
+                } as any,
+                {
+                    id: '3',
+                    userId: 'user-1',
+                    pluginId: 'vercel',
+                    enabled: true,
+                    settings: {},
+                    secretSettings: {},
+                    metadata: {},
+                } as any,
+            ]);
+
+            const result = await service.getPluginsForSettingsMenu('user-1');
+
+            expect(result.categories).toHaveLength(3);
+            expect(result.categories[0].label).toBe('AI Providers');
+            expect(result.categories[1].label).toBe('Deployment');
+            expect(result.categories[2].label).toBe('Search');
+        });
+    });
+
     describe('autoEnable behavior', () => {
         describe('toUserPluginResponse with autoEnable', () => {
             it('should show autoEnabled plugin as installed and enabled without UserPluginEntity', async () => {

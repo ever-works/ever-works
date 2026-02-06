@@ -6,10 +6,12 @@ import { Button } from '@/components/ui/button';
 import { updatePassword } from '@/app/actions/settings';
 import { toast } from 'sonner';
 import { useTranslations } from 'next-intl';
+import { Lock } from 'lucide-react';
 
 interface SecuritySettingsProps {
     user: {
         id: string;
+        username: string;
         email: string;
     };
 }
@@ -23,23 +25,26 @@ export function SecuritySettings({ user }: SecuritySettingsProps) {
     const t = useTranslations('dashboard.settings.security');
 
     const handleUpdatePassword = () => {
-        // Validation
+        // Validate all fields are filled
         if (!currentPassword || !newPassword || !confirmPassword) {
             toast.error(t('changePassword.messages.fillAllFields'));
             return;
         }
 
+        // Validate min length
         if (newPassword.length < 8) {
             toast.error(t('changePassword.messages.minLength'));
             return;
         }
 
+        // Validate passwords match
         if (newPassword !== confirmPassword) {
             toast.error(t('changePassword.messages.mismatch'));
             return;
         }
 
-        if (currentPassword === newPassword) {
+        // Validate new password is different from current
+        if (newPassword === currentPassword) {
             toast.error(t('changePassword.messages.sameAsCurrent'));
             return;
         }
@@ -53,7 +58,7 @@ export function SecuritySettings({ user }: SecuritySettingsProps) {
 
                 if (result.success) {
                     toast.success(t('changePassword.messages.success'));
-                    // Clear form
+                    // Clear the form
                     setCurrentPassword('');
                     setNewPassword('');
                     setConfirmPassword('');
@@ -67,91 +72,75 @@ export function SecuritySettings({ user }: SecuritySettingsProps) {
     };
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-8">
             <div>
-                <h2 className="text-xl font-semibold text-text dark:text-text-dark mb-4">
+                <h2 className="text-xl font-semibold text-text dark:text-text-dark mb-2">
                     {t('title')}
                 </h2>
                 <p className="text-text-muted dark:text-text-muted-dark text-sm">{t('subtitle')}</p>
             </div>
 
-            {/* Password Change Section */}
+            {/* Change Password Section */}
             <div className="space-y-4">
-                <h3 className="text-lg font-medium text-text dark:text-text-dark">
-                    {t('changePassword.title')}
-                </h3>
-
-                <Input
-                    label={t('changePassword.currentPassword')}
-                    type={showPasswords ? 'text' : 'password'}
-                    value={currentPassword}
-                    onChange={(e) => setCurrentPassword(e.target.value)}
-                    placeholder={t('changePassword.placeholders.current')}
-                />
-
-                <Input
-                    label={t('changePassword.newPassword')}
-                    type={showPasswords ? 'text' : 'password'}
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder={t('changePassword.placeholders.new')}
-                />
-
-                <Input
-                    label={t('changePassword.confirmPassword')}
-                    type={showPasswords ? 'text' : 'password'}
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder={t('changePassword.placeholders.confirm')}
-                />
-
                 <div className="flex items-center gap-2">
-                    <input
-                        type="checkbox"
-                        id="show-passwords"
-                        checked={showPasswords}
-                        onChange={(e) => setShowPasswords(e.target.checked)}
-                        className="w-4 h-4"
-                    />
-                    <label
-                        htmlFor="show-passwords"
-                        className="text-sm text-text-muted dark:text-text-muted-dark"
-                    >
+                    <Lock className="w-5 h-5 text-text-muted dark:text-text-muted-dark" />
+                    <h3 className="text-lg font-medium text-text dark:text-text-dark">
+                        {t('changePassword.title')}
+                    </h3>
+                </div>
+
+                <div className="space-y-4 pl-7">
+                    {/* Current Password */}
+                    <div className="relative">
+                        <Input
+                            label={t('changePassword.currentPassword')}
+                            type={showPasswords ? 'text' : 'password'}
+                            value={currentPassword}
+                            onChange={(e) => setCurrentPassword(e.target.value)}
+                            placeholder={t('changePassword.placeholders.current')}
+                        />
+                    </div>
+
+                    {/* New Password */}
+                    <div className="relative">
+                        <Input
+                            label={t('changePassword.newPassword')}
+                            type={showPasswords ? 'text' : 'password'}
+                            value={newPassword}
+                            onChange={(e) => setNewPassword(e.target.value)}
+                            placeholder={t('changePassword.placeholders.new')}
+                        />
+                    </div>
+
+                    {/* Confirm Password */}
+                    <div className="relative">
+                        <Input
+                            label={t('changePassword.confirmPassword')}
+                            type={showPasswords ? 'text' : 'password'}
+                            value={confirmPassword}
+                            onChange={(e) => setConfirmPassword(e.target.value)}
+                            placeholder={t('changePassword.placeholders.confirm')}
+                        />
+                    </div>
+
+                    {/* Show Passwords Toggle */}
+                    <label className="flex items-center gap-2 text-sm text-text-muted dark:text-text-muted-dark cursor-pointer">
+                        <input
+                            type="checkbox"
+                            checked={showPasswords}
+                            onChange={(e) => setShowPasswords(e.target.checked)}
+                            className="rounded border-border dark:border-border-dark"
+                        />
                         {t('changePassword.showPasswords')}
                     </label>
+
+                    {/* Update Button */}
+                    <div className="flex justify-end">
+                        <Button onClick={handleUpdatePassword} loading={isPending}>
+                            {t('changePassword.actions.update')}
+                        </Button>
+                    </div>
                 </div>
-
-                <div className="flex justify-end">
-                    <Button onClick={handleUpdatePassword} loading={isPending}>
-                        {t('changePassword.actions.update')}
-                    </Button>
-                </div>
-            </div>
-
-            {/* Two-Factor Authentication */}
-            <div className="pt-6 border-t border-border dark:border-border-dark">
-                <h3 className="text-lg font-medium text-text dark:text-text-dark mb-2">
-                    {t('twoFactor.title')}
-                </h3>
-                <p className="text-sm text-text-muted dark:text-text-muted-dark mb-4">
-                    {t('twoFactor.subtitle')}
-                </p>
-                <Button variant="secondary" disabled>
-                    {t('twoFactor.action')}
-                </Button>
-            </div>
-
-            {/* Active Sessions */}
-            <div className="pt-6 border-t border-border dark:border-border-dark">
-                <h3 className="text-lg font-medium text-text dark:text-text-dark mb-2">
-                    {t('sessions.title')}
-                </h3>
-                <p className="text-sm text-text-muted dark:text-text-muted-dark mb-4">
-                    {t('sessions.subtitle')}
-                </p>
-                <Button variant="secondary" disabled>
-                    {t('sessions.action')}
-                </Button>
             </div>
         </div>
     );

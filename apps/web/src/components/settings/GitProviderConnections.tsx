@@ -40,6 +40,8 @@ interface GitProviderConnectionsProps {
         avatar?: string;
     };
     providers: ProviderWithConnection[];
+    /** OAuth return path after connect/reconnect. Defaults to current page via window.location.pathname */
+    returnPath?: string;
 }
 
 function getProviderIcon(providerId: string) {
@@ -112,7 +114,11 @@ function getProviderBrandColors(providerId: string) {
     }
 }
 
-export function GitProviderConnections({ user, providers }: GitProviderConnectionsProps) {
+export function GitProviderConnections({
+    user,
+    providers,
+    returnPath,
+}: GitProviderConnectionsProps) {
     const t = useTranslations('dashboard.gitProvider.settings');
 
     const connectedCount = providers.filter((p) => p.connectionInfo?.connected).length;
@@ -172,6 +178,7 @@ export function GitProviderConnections({ user, providers }: GitProviderConnectio
                         connectionInfo={connectionInfo}
                         organizations={organizations}
                         userAvatar={user.avatar}
+                        returnPath={returnPath}
                     />
                 ))}
             </div>
@@ -203,6 +210,7 @@ interface GitProviderCardProps {
     connectionInfo: GitProviderConnectionInfo | null;
     organizations: GitOrganization[];
     userAvatar?: string;
+    returnPath?: string;
 }
 
 function GitProviderCard({
@@ -210,6 +218,7 @@ function GitProviderCard({
     connectionInfo,
     organizations,
     userAvatar,
+    returnPath,
 }: GitProviderCardProps) {
     const [isPending, startTransition] = useTransition();
     const t = useTranslations('dashboard.gitProvider.settings');
@@ -222,12 +231,14 @@ function GitProviderCard({
     const ProviderIcon = getProviderIcon(provider.id);
     const brandColors = getProviderBrandColors(provider.id);
 
+    // Use provided returnPath or fall back to current page
+    const getReturnPath = () =>
+        returnPath ||
+        (typeof window !== 'undefined' ? window.location.pathname : ROUTES.DASHBOARD_SETTINGS);
+
     const handleConnect = () => {
         startTransition(async () => {
-            const result = await connectOAuthProvider(
-                provider.id,
-                ROUTES.DASHBOARD_SETTINGS_GIT_PROVIDERS,
-            );
+            const result = await connectOAuthProvider(provider.id, getReturnPath());
 
             if (result.success && result.url) {
                 window.location.href = result.url;
@@ -239,11 +250,7 @@ function GitProviderCard({
 
     const handleReconnect = () => {
         startTransition(async () => {
-            const result = await connectOAuthProvider(
-                provider.id,
-                ROUTES.DASHBOARD_SETTINGS_GIT_PROVIDERS,
-                true,
-            );
+            const result = await connectOAuthProvider(provider.id, getReturnPath(), true);
 
             if (result.success && result.url) {
                 window.location.href = result.url;

@@ -24,6 +24,7 @@ import {
     UpdateDirectoryPluginSettingsDto,
     EnableDirectoryPluginDto,
     SetActiveCapabilityDto,
+    SettingsMenuResponseDto,
 } from './dto';
 
 @ApiTags('Plugins')
@@ -46,6 +47,24 @@ export class PluginsController {
     @ApiResponse({ status: 200, description: 'List of plugins', type: PluginListResponseDto })
     async listPlugins(@CurrentUser() auth: AuthenticatedUser): Promise<PluginListResponseDto> {
         return this.pluginsService.listPlugins(auth.userId);
+    }
+
+    @Get('plugins/settings-menu')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Get plugins for settings menu',
+        description:
+            'Get user-installed plugins grouped by category for settings navigation. Only returns plugins with user-configurable settings.',
+    })
+    @ApiResponse({
+        status: 200,
+        description: 'Settings menu categories',
+        type: SettingsMenuResponseDto,
+    })
+    async getPluginsForSettingsMenu(
+        @CurrentUser() auth: AuthenticatedUser,
+    ): Promise<SettingsMenuResponseDto> {
+        return this.pluginsService.getPluginsForSettingsMenu(auth.userId);
     }
 
     @Get('plugins/:pluginId')
