@@ -250,8 +250,7 @@ export class GroqPlugin extends BaseAiProvider {
 			].join('\n'),
 			icon: {
 				type: 'svg',
-				value: '<svg viewBox="0 0 33 33" fill="currentColor"><path d="M16.5 0C7.387 0 0 7.387 0 16.5S7.387 33 16.5 33 33 25.613 33 16.5 25.613 0 16.5 0zm7.5 22.5-4.5-4.5L15 22.5 7.5 15l4.5-4.5L16.5 15 21 10.5l4.5 4.5-1.5 1.5z"/></svg>',
-				backgroundColor: '#F55036'
+				value: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" width="33" height="33" viewBox="0 0 33 33"><g clip-path="url(#a)"><path fill="#F43E01" d="M.54.39h32v32h-32z"/><path fill="#fff" d="m18.445 4.406-9.468 13.74 7.341.665-1.69 9.578 9.469-13.74-7.342-.664 1.69-9.579Z"/></g><defs><clipPath id="a"><path fill="#fff" d="M.54.39h32v32h-32z"/></clipPath></defs></svg>`
 			}
 		};
 	}

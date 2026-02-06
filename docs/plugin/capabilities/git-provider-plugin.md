@@ -90,8 +90,7 @@ export class GitLabPATPlugin implements IPlugin, IGitProviderPlugin {
 				title: 'Personal Access Token',
 				description: 'GitLab PAT with api and read_repository scopes',
 				'x-secret': true,
-				'x-scope': 'user', // User-level setting
-				'x-masked': true
+				'x-scope': 'user'
 			},
 			gitUsername: {
 				type: 'string',
@@ -246,7 +245,6 @@ export class MyGitProviderPlugin implements IPlugin, IGitProviderPlugin, IOAuthP
 				title: 'Client ID',
 				description: 'OAuth App Client ID',
 				'x-envVar': 'PLUGIN_MY_PROVIDER_CLIENT_ID',
-				'x-writeOnly': true,
 				'x-adminOnly': true,
 				'x-scope': 'global'
 			},
@@ -255,8 +253,6 @@ export class MyGitProviderPlugin implements IPlugin, IGitProviderPlugin, IOAuthP
 				title: 'Client Secret',
 				description: 'OAuth App Client Secret',
 				'x-secret': true,
-				'x-masked': true,
-				'x-writeOnly': true,
 				'x-envVar': 'PLUGIN_MY_PROVIDER_CLIENT_SECRET',
 				'x-adminOnly': true,
 				'x-scope': 'global'
@@ -769,15 +765,14 @@ export { MyGitProviderPlugin, default } from './my-git-provider.plugin.js';
 
 ### Schema Extensions (x- properties)
 
-| Property            | Type                                    | Description                        |
-| ------------------- | --------------------------------------- | ---------------------------------- |
-| `x-secret`          | boolean                                 | Value is encrypted in database     |
-| `x-masked`          | boolean                                 | Value shown as `****` in UI        |
-| `x-writeOnly`       | boolean                                 | Value cannot be read back          |
-| `x-envVar`          | string                                  | Read from environment variable     |
-| `x-adminOnly`       | boolean                                 | Only admin can modify              |
-| `x-scope`           | `'global'` \| `'user'` \| `'directory'` | Where setting can be configured    |
-| `x-requiresRestart` | boolean                                 | Plugin restart needed after change |
+| Property     | Type                                    | Description                                                        |
+| ------------ | --------------------------------------- | ------------------------------------------------------------------ |
+| `x-secret`   | boolean                                 | Secret field: value never returned via API, rendered as password input |
+| `x-envVar`   | string                                  | Environment variable name used as fallback                         |
+| `x-scope`    | `'global'` \| `'user'` \| `'directory'` | Setting access level                                               |
+| `x-widget`   | string                                  | UI widget hint (e.g., `'model-select'`)                            |
+| `x-hidden`   | boolean                                 | Hide field from all UI                                             |
+| `x-adminOnly`| boolean                                 | Only visible to admins                                             |
 
 ### Scope Hierarchy
 
@@ -803,7 +798,6 @@ readonly settingsSchema: JsonSchema = {
             title: 'Personal Access Token',
             description: 'Create at: https://gitlab.com/-/profile/personal_access_tokens',
             'x-secret': true,
-            'x-masked': true,
             'x-scope': 'user', // User enters their own token
         },
         // Optional: for git commit author info

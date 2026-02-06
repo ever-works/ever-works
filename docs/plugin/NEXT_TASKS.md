@@ -103,7 +103,7 @@ The plugin system has made significant progress. All key blockers have been reso
 
 ```typescript
 {
-    apiToken: { type: 'string', 'x-secret': true, 'x-masked': true, 'x-writeOnly': true },
+    apiToken: { type: 'string', 'x-secret': true },
     defaultTeamScope: { type: 'string' }
 }
 ```

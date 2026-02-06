@@ -594,7 +594,18 @@ interface ExecutablePipeline {
 
 ## Settings & Configuration
 
-### JsonSchema with Security Markers
+### JsonSchema Extension Fields
+
+The plugin system uses `x-*` extension fields on JSON Schema properties to control behavior:
+
+| Field | Type | Purpose |
+|-------|------|---------|
+| `x-secret` | `boolean` | Secret field: value is never returned via API, rendered as password input in UI |
+| `x-envVar` | `string` | Environment variable name used as fallback (value not stored in DB when env var is set) |
+| `x-scope` | `'global' \| 'user' \| 'directory'` | Setting access level |
+| `x-widget` | `string` | UI widget hint (e.g., `'model-select'`) |
+| `x-hidden` | `boolean` | Hide field from all UI (still usable internally) |
+| `x-adminOnly` | `boolean` | Only visible to admins, stripped from user-facing schema |
 
 ```typescript
 const settingsSchema: JsonSchema = {
@@ -603,21 +614,21 @@ const settingsSchema: JsonSchema = {
 		apiKey: {
 			type: 'string',
 			title: 'API Key',
-			'x-secret': true, // Encrypted at rest
-			'x-masked': true, // Shows as ******** in UI
-			'x-writeOnly': true // Never returned via API
+			'x-secret': true, // Never returned via API; rendered as password input
+			'x-scope': 'user'
 		},
-		endpoint: {
+		defaultModel: {
 			type: 'string',
-			title: 'API Endpoint',
-			default: 'https://api.example.com'
+			title: 'Default Model',
+			default: 'gpt-4o',
+			'x-widget': 'model-select',
+			'x-scope': 'user'
 		},
-		timeout: {
-			type: 'number',
-			title: 'Timeout (ms)',
-			default: 30000,
-			minimum: 1000,
-			maximum: 120000
+		baseUrl: {
+			type: 'string',
+			title: 'API Base URL',
+			default: 'https://api.example.com',
+			'x-hidden': true // Available but not shown in settings UI
 		}
 	},
 	required: ['apiKey']
@@ -804,14 +815,33 @@ function validateMySettings(settings: PluginSettings): ValidationResult {
 
 ### Icon Helpers
 
+Plugin icons **must** be defined in the `getManifest()` method of your plugin class, not in `package.json`. The `getManifest()` icon is the single source of truth rendered in the UI.
+
+```typescript
+import { svgIcon } from '@ever-works/plugin';
+
+// In your plugin class:
+getManifest(): PluginManifest {
+	return {
+		// ...other manifest fields
+		icon: {
+			type: 'svg',
+			value: '<svg>...</svg>',
+			backgroundColor: '#000000'
+		}
+	};
+}
+```
+
+Available icon factory helpers:
+
 ```typescript
 import { lucideIcon, svgIcon, urlIcon, base64Icon } from '@ever-works/plugin';
 
-// Create plugin icons
-const icon1 = lucideIcon('github', '#333'); // Lucide icon
-const icon2 = svgIcon('<svg>...</svg>'); // Raw SVG
-const icon3 = urlIcon('https://example.com/icon.png');
-const icon4 = base64Icon('data:image/png;base64,...');
+lucideIcon('github', '#333');                   // Lucide icon name + background color
+svgIcon('<svg>...</svg>');                       // Raw SVG string
+urlIcon('https://example.com/icon.png');         // External image URL
+base64Icon('data:image/png;base64,...');          // Base64-encoded image
 ```
 
 ### Type Guards

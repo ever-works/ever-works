@@ -29,6 +29,13 @@ export function PluginsList({ plugins, categories = [], capabilities = [] }: Plu
         return true;
     });
 
+    // Sort: enabled/installed plugins first, then alphabetically by name
+    const sortPlugins = (a: UserPlugin, b: UserPlugin) => {
+        if (a.enabled !== b.enabled) return a.enabled ? -1 : 1;
+        if (a.installed !== b.installed) return a.installed ? -1 : 1;
+        return a.name.localeCompare(b.name);
+    };
+
     // Group plugins by category for display
     const pluginsByCategory = filteredPlugins.reduce(
         (acc, plugin) => {
@@ -41,6 +48,11 @@ export function PluginsList({ plugins, categories = [], capabilities = [] }: Plu
         },
         {} as Record<string, UserPlugin[]>,
     );
+
+    // Sort plugins within each category
+    for (const plugins of Object.values(pluginsByCategory)) {
+        plugins.sort(sortPlugins);
+    }
 
     return (
         <div className="space-y-6">
@@ -93,7 +105,7 @@ export function PluginsList({ plugins, categories = [], capabilities = [] }: Plu
             ) : selectedCategory ? (
                 // Show flat grid when filtering by category
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {filteredPlugins.map((plugin) => (
+                    {[...filteredPlugins].sort(sortPlugins).map((plugin) => (
                         <PluginCard key={plugin.pluginId} plugin={plugin} />
                     ))}
                 </div>

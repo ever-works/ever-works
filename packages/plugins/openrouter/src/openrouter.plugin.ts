@@ -282,7 +282,7 @@ export class OpenRouterPlugin extends BaseAiProvider {
 			].join('\n'),
 			icon: {
 				type: 'svg',
-				value: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.22.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>',
+				value: `<svg width="100%" height="100%" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" class="size-4" fill="currentColor" stroke="currentColor" aria-label="Logo"><g clip-path="url(#clip0_205_3)"><path d="M3 248.945C18 248.945 76 236 106 219C136 202 136 202 198 158C276.497 102.293 332 120.945 423 120.945" stroke-width="90"></path><path d="M511 121.5L357.25 210.268L357.25 32.7324L511 121.5Z"></path><path d="M0 249C15 249 73 261.945 103 278.945C133 295.945 133 295.945 195 339.945C273.497 395.652 329 377 420 377" stroke-width="90"></path><path d="M508 376.445L354.25 287.678L354.25 465.213L508 376.445Z"></path></g><title style="display:none">OpenRouter</title><defs><clipPath id="clip0_205_3"><rect width="512" height="512" fill="white"></rect></clipPath></defs></svg>`,
 				backgroundColor: '#94A3B8'
 			}
 		};

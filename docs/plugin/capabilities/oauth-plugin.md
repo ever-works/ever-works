@@ -185,7 +185,6 @@ export class GoogleOAuthPlugin implements IPlugin, IOAuthPlugin {
 				title: 'Client ID',
 				description: 'Google OAuth 2.0 Client ID from Google Cloud Console',
 				'x-envVar': 'PLUGIN_GOOGLE_CLIENT_ID',
-				'x-writeOnly': true,
 				'x-adminOnly': true,
 				'x-scope': 'global'
 			},
@@ -194,8 +193,6 @@ export class GoogleOAuthPlugin implements IPlugin, IOAuthPlugin {
 				title: 'Client Secret',
 				description: 'Google OAuth 2.0 Client Secret',
 				'x-secret': true,
-				'x-masked': true,
-				'x-writeOnly': true,
 				'x-envVar': 'PLUGIN_GOOGLE_CLIENT_SECRET',
 				'x-adminOnly': true,
 				'x-scope': 'global'
