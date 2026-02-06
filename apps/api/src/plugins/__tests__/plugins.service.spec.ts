@@ -1482,6 +1482,74 @@ describe('PluginsService', () => {
         });
     });
 
+    describe('updateUserPluginSettings', () => {
+        it('should auto-create user plugin record for autoEnabled plugin without prior record', async () => {
+            const autoEnabledPlugin = createRegisteredPlugin();
+            autoEnabledPlugin.manifest = {
+                ...autoEnabledPlugin.manifest,
+                autoEnable: true,
+            } as PluginManifest;
+
+            jest.spyOn(pluginRegistryService, 'get').mockReturnValue(autoEnabledPlugin);
+            jest.spyOn(userPluginRepository, 'findOne').mockResolvedValue(null);
+            jest.spyOn(pluginRepository, 'findOne').mockResolvedValue({
+                id: '1',
+                pluginId: 'test-plugin',
+            } as any);
+
+            const result = await service.updateUserPluginSettings('test-plugin', 'user-1', {
+                normalSetting: 'my-value',
+            });
+
+            expect(userPluginRepository.create).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    userId: 'user-1',
+                    pluginId: 'test-plugin',
+                    pluginEntityId: '1',
+                    enabled: true,
+                }),
+            );
+            expect(userPluginRepository.save).toHaveBeenCalled();
+            expect(result.installed).toBe(true);
+            expect(result.enabled).toBe(true);
+        });
+
+        it('should throw for non-autoEnabled plugin without prior record', async () => {
+            const normalPlugin = createRegisteredPlugin();
+            normalPlugin.manifest = {
+                ...normalPlugin.manifest,
+                autoEnable: false,
+            } as PluginManifest;
+
+            jest.spyOn(pluginRegistryService, 'get').mockReturnValue(normalPlugin);
+            jest.spyOn(userPluginRepository, 'findOne').mockResolvedValue(null);
+
+            await expect(
+                service.updateUserPluginSettings('test-plugin', 'user-1', {
+                    normalSetting: 'value',
+                }),
+            ).rejects.toThrow(BadRequestException);
+        });
+
+        it('should throw NotFoundException when plugin entity not found for autoEnabled plugin', async () => {
+            const autoEnabledPlugin = createRegisteredPlugin();
+            autoEnabledPlugin.manifest = {
+                ...autoEnabledPlugin.manifest,
+                autoEnable: true,
+            } as PluginManifest;
+
+            jest.spyOn(pluginRegistryService, 'get').mockReturnValue(autoEnabledPlugin);
+            jest.spyOn(userPluginRepository, 'findOne').mockResolvedValue(null);
+            jest.spyOn(pluginRepository, 'findOne').mockResolvedValue(null);
+
+            await expect(
+                service.updateUserPluginSettings('test-plugin', 'user-1', {
+                    normalSetting: 'value',
+                }),
+            ).rejects.toThrow(NotFoundException);
+        });
+    });
+
     describe('autoEnable behavior', () => {
         describe('toUserPluginResponse with autoEnable', () => {
             it('should show autoEnabled plugin as installed and enabled without UserPluginEntity', async () => {

@@ -765,14 +765,14 @@ export { MyGitProviderPlugin, default } from './my-git-provider.plugin.js';
 
 ### Schema Extensions (x- properties)
 
-| Property     | Type                                    | Description                                                        |
-| ------------ | --------------------------------------- | ------------------------------------------------------------------ |
-| `x-secret`   | boolean                                 | Secret field: value never returned via API, rendered as password input |
-| `x-envVar`   | string                                  | Environment variable name used as fallback                         |
-| `x-scope`    | `'global'` \| `'user'` \| `'directory'` | Setting access level                                               |
-| `x-widget`   | string                                  | UI widget hint (e.g., `'model-select'`)                            |
-| `x-hidden`   | boolean                                 | Hide field from all UI                                             |
-| `x-adminOnly`| boolean                                 | Only visible to admins                                             |
+| Property      | Type                                    | Description                                                            |
+| ------------- | --------------------------------------- | ---------------------------------------------------------------------- |
+| `x-secret`    | boolean                                 | Secret field: value never returned via API, rendered as password input |
+| `x-envVar`    | string                                  | Environment variable name used as fallback                             |
+| `x-scope`     | `'global'` \| `'user'` \| `'directory'` | Setting access level                                                   |
+| `x-widget`    | string                                  | UI widget hint (e.g., `'model-select'`)                                |
+| `x-hidden`    | boolean                                 | Hide field from all UI                                                 |
+| `x-adminOnly` | boolean                                 | Only visible to admins                                                 |
 
 ### Scope Hierarchy
 

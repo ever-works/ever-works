@@ -394,14 +394,33 @@ export class PluginsService {
             this.enforceConfigurationMode(registered, 'user');
         }
 
-        const userPlugin = await this.userPluginRepository.findOne({
+        let userPlugin = await this.userPluginRepository.findOne({
             where: { userId, pluginId },
         });
 
         if (!userPlugin) {
-            throw new BadRequestException(
-                `Plugin "${pluginId}" is not installed for this user. Enable it first.`,
-            );
+            const autoEnabled = registered.manifest?.autoEnable ?? false;
+            if (!autoEnabled) {
+                throw new BadRequestException(
+                    `Plugin "${pluginId}" is not installed for this user. Enable it first.`,
+                );
+            }
+            // Auto-create user plugin record for autoEnabled plugins
+            const pluginEntity = await this.pluginRepository.findOne({
+                where: { pluginId },
+            });
+            if (!pluginEntity) {
+                throw new NotFoundException(`Plugin entity "${pluginId}" not found in database`);
+            }
+            userPlugin = this.userPluginRepository.create({
+                userId,
+                pluginId,
+                pluginEntityId: pluginEntity.id,
+                enabled: true,
+                settings: {},
+                secretSettings: {},
+                metadata: {},
+            });
         }
 
         // Strip masked placeholders to prevent saving literal "********"

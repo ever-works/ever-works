@@ -598,14 +598,14 @@ interface ExecutablePipeline {
 
 The plugin system uses `x-*` extension fields on JSON Schema properties to control behavior:
 
-| Field | Type | Purpose |
-|-------|------|---------|
-| `x-secret` | `boolean` | Secret field: value is never returned via API, rendered as password input in UI |
-| `x-envVar` | `string` | Environment variable name used as fallback (value not stored in DB when env var is set) |
-| `x-scope` | `'global' \| 'user' \| 'directory'` | Setting access level |
-| `x-widget` | `string` | UI widget hint (e.g., `'model-select'`) |
-| `x-hidden` | `boolean` | Hide field from all UI (still usable internally) |
-| `x-adminOnly` | `boolean` | Only visible to admins, stripped from user-facing schema |
+| Field         | Type                                | Purpose                                                                                 |
+| ------------- | ----------------------------------- | --------------------------------------------------------------------------------------- |
+| `x-secret`    | `boolean`                           | Secret field: value is never returned via API, rendered as password input in UI         |
+| `x-envVar`    | `string`                            | Environment variable name used as fallback (value not stored in DB when env var is set) |
+| `x-scope`     | `'global' \| 'user' \| 'directory'` | Setting access level                                                                    |
+| `x-widget`    | `string`                            | UI widget hint (e.g., `'model-select'`)                                                 |
+| `x-hidden`    | `boolean`                           | Hide field from all UI (still usable internally)                                        |
+| `x-adminOnly` | `boolean`                           | Only visible to admins, stripped from user-facing schema                                |
 
 ```typescript
 const settingsSchema: JsonSchema = {
@@ -838,10 +838,10 @@ Available icon factory helpers:
 ```typescript
 import { lucideIcon, svgIcon, urlIcon, base64Icon } from '@ever-works/plugin';
 
-lucideIcon('github', '#333');                   // Lucide icon name + background color
-svgIcon('<svg>...</svg>');                       // Raw SVG string
-urlIcon('https://example.com/icon.png');         // External image URL
-base64Icon('data:image/png;base64,...');          // Base64-encoded image
+lucideIcon('github', '#333'); // Lucide icon name + background color
+svgIcon('<svg>...</svg>'); // Raw SVG string
+urlIcon('https://example.com/icon.png'); // External image URL
+base64Icon('data:image/png;base64,...'); // Base64-encoded image
 ```
 
 ### Type Guards

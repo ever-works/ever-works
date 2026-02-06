@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useTransition, useMemo, useCallback } from 'react';
+import { useState, useTransition, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { DirectoryPlugin, PluginSettingsSchemaProperty } from '@/lib/api/plugins';
+import { DirectoryPlugin } from '@/lib/api/plugins';
 import { cn } from '@/lib/utils/cn';
 import { Button } from '@/components/ui/button';
 import { Power, PowerOff, Settings, Save, Check, AlertCircle } from 'lucide-react';
@@ -15,6 +15,7 @@ import {
 import { PluginIcon } from '@/components/plugins/PluginIcon';
 import { PluginSettingsField } from '@/components/plugins/PluginSettingsField';
 import { getCategoryLabel, getCapabilityLabel } from '@/lib/utils/plugin-category-icons';
+import { usePluginSettings } from '@/lib/hooks/use-plugin-settings';
 
 interface DirectoryPluginCardProps {
     directoryId: string;
@@ -26,64 +27,37 @@ export function DirectoryPluginCard({ directoryId, plugin }: DirectoryPluginCard
     const router = useRouter();
     const [isPending, startTransition] = useTransition();
     const [showSettings, setShowSettings] = useState(false);
-    const [settings, setSettings] = useState<Record<string, unknown>>(
-        plugin.directorySettings || {},
-    );
-    const [secretSettings, setSecretSettings] = useState<Record<string, unknown>>({});
-    const [hasChanges, setHasChanges] = useState(false);
-    const [isSaving, setIsSaving] = useState(false);
-    const [saveSuccess, setSaveSuccess] = useState(false);
-    const [validationError, setValidationError] = useState<string | null>(null);
-
-    const schema = plugin.settingsSchema;
 
     // Plugin must be enabled at user level to be enabled at directory level
     const canEnable = plugin.installed && plugin.enabled;
     const isEnabled = plugin.directoryEnabled;
 
-    // Filter properties to show only 'global' or 'directory' scoped settings
-    const directoryScopeProperties = useMemo(() => {
-        if (!schema?.properties) return {};
-        return Object.fromEntries(
-            Object.entries(schema.properties).filter(([_, propSchema]) => {
-                const prop = propSchema as PluginSettingsSchemaProperty;
-                const scope = prop.scope || 'global';
-                // Show global and directory-scoped settings in directory settings
-                return scope === 'global' || scope === 'directory';
-            }),
-        );
-    }, [schema]);
+    const onSave = useCallback(
+        async (data: {
+            settings?: Record<string, unknown>;
+            secretSettings?: Record<string, unknown>;
+        }) => {
+            await updateDirectoryPluginSettings(directoryId, plugin.pluginId, data);
+        },
+        [directoryId, plugin.pluginId],
+    );
 
-    const hasDirectorySettings = Object.keys(directoryScopeProperties).length > 0;
-
-    // Get required fields for directory scope
-    const requiredFields = useMemo(() => {
-        if (!schema?.required || !schema.properties) return [];
-        return schema.required.filter((field) => {
-            const propSchema = schema.properties?.[field] as
-                | PluginSettingsSchemaProperty
-                | undefined;
-            if (!propSchema) return false;
-            const scope = propSchema.scope || 'global';
-            return scope === 'global' || scope === 'directory';
-        });
-    }, [schema]);
-
-    // Validate required fields before saving
-    const validateRequiredFields = useCallback((): string[] => {
-        const missingFields: string[] = [];
-        for (const field of requiredFields) {
-            const value = settings[field] ?? secretSettings[field];
-            if (value === undefined || value === null || value === '') {
-                const propSchema = schema?.properties?.[field] as
-                    | PluginSettingsSchemaProperty
-                    | undefined;
-                const label = propSchema?.title || field;
-                missingFields.push(label);
-            }
-        }
-        return missingFields;
-    }, [requiredFields, settings, secretSettings, schema]);
+    const {
+        hasChanges,
+        isSaving,
+        saveSuccess,
+        validationError,
+        visibleProperties,
+        hasSettings: hasDirectorySettings,
+        handleFieldChange,
+        handleSave,
+        getFieldValue,
+    } = usePluginSettings({
+        schema: plugin.settingsSchema,
+        initialSettings: plugin.directorySettings || {},
+        scopes: ['global', 'directory'],
+        onSave,
+    });
 
     const handleToggle = async () => {
         if (!canEnable && !isEnabled) {
@@ -102,52 +76,6 @@ export function DirectoryPluginCard({ directoryId, plugin }: DirectoryPluginCard
                 console.error('Failed to toggle directory plugin:', error);
             }
         });
-    };
-
-    const handleFieldChange = (key: string, value: unknown, isSecret: boolean) => {
-        if (isSecret) {
-            setSecretSettings((prev) => ({ ...prev, [key]: value }));
-        } else {
-            setSettings((prev) => ({ ...prev, [key]: value }));
-        }
-        setHasChanges(true);
-        setSaveSuccess(false);
-        setValidationError(null);
-    };
-
-    const handleSaveSettings = async () => {
-        // Validate required fields before saving
-        const missingFields = validateRequiredFields();
-        if (missingFields.length > 0) {
-            setValidationError(t('missingRequiredFields', { fields: missingFields.join(', ') }));
-            return;
-        }
-
-        setIsSaving(true);
-        setValidationError(null);
-        try {
-            await updateDirectoryPluginSettings(directoryId, plugin.pluginId, {
-                settings: Object.keys(settings).length > 0 ? settings : undefined,
-                secretSettings: Object.keys(secretSettings).length > 0 ? secretSettings : undefined,
-            });
-            setHasChanges(false);
-            setSaveSuccess(true);
-            router.refresh();
-            // Clear success message after 3 seconds
-            setTimeout(() => setSaveSuccess(false), 3000);
-        } catch (error) {
-            console.error('Failed to save directory settings:', error);
-            // Extract error message from response if available
-            const errorMessage =
-                error instanceof Error
-                    ? error.message
-                    : typeof error === 'object' && error !== null && 'message' in error
-                      ? String((error as { message: unknown }).message)
-                      : t('saveError');
-            setValidationError(errorMessage);
-        } finally {
-            setIsSaving(false);
-        }
     };
 
     return (
@@ -265,16 +193,17 @@ export function DirectoryPluginCard({ directoryId, plugin }: DirectoryPluginCard
 
                     {showSettings && (
                         <div className="mt-3 space-y-3">
-                            {Object.entries(directoryScopeProperties).map(([key, propSchema]) => (
+                            {Object.entries(visibleProperties).map(([key, propSchema]) => (
                                 <PluginSettingsField
                                     key={key}
                                     name={key}
                                     schema={propSchema}
-                                    value={settings[key]}
-                                    required={schema?.required?.includes(key)}
+                                    value={getFieldValue(key, propSchema)}
+                                    required={plugin.settingsSchema?.required?.includes(key)}
                                     onChange={(value) =>
                                         handleFieldChange(key, value, propSchema.secret || false)
                                     }
+                                    pluginId={plugin.pluginId}
                                 />
                             ))}
                             {validationError && (
@@ -286,7 +215,7 @@ export function DirectoryPluginCard({ directoryId, plugin }: DirectoryPluginCard
                             <div className="flex items-center gap-2 pt-2">
                                 <Button
                                     size="sm"
-                                    onClick={handleSaveSettings}
+                                    onClick={handleSave}
                                     disabled={!hasChanges || isSaving}
                                     loading={isSaving}
                                 >
