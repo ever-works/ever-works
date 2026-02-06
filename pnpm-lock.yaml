@@ -1118,6 +1118,28 @@ importers:
         specifier: ^3.0.0
         version: 3.2.4(@types/debug@4.1.12)(@types/node@25.0.3)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.44.1)(yaml@2.8.2)
 
+  packages/plugins/urlbox:
+    dependencies:
+      urlbox:
+        specifier: ^2.2.0
+        version: 2.2.0
+    devDependencies:
+      '@ever-works/plugin':
+        specifier: workspace:*
+        version: link:../../plugin
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.3
+      tsup:
+        specifier: ^8.4.0
+        version: 8.5.1(@swc/core@1.15.8(@swc/helpers@0.5.18))(jiti@2.6.1)(postcss@8.5.6)(typescript@5.9.3)(yaml@2.8.2)
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.4(@types/debug@4.1.12)(@types/node@22.19.3)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.44.1)(yaml@2.8.2)
+
   packages/plugins/vercel:
     dependencies:
       '@vercel/sdk':
@@ -9312,6 +9334,9 @@ packages:
 
   uri-js@4.4.1:
     resolution: {integrity: sha512-7rKUyy33Q1yc98pQ1DAmLtwX109F7TIfWlW1Ydo8Wl1ii1SeHieeh0HHfPeL2fMXK6z0s8ecKs9frCuLJvndBg==}
+
+  urlbox@2.2.0:
+    resolution: {integrity: sha512-emCQgYvmclNVwxTX0Bg7ATOp6CPz8VFLbcubYnlw0PObQzAt+nfh9J8ODd+D7LBOeYjlj/hS407UeOypYpbrRQ==}
 
   use-intl@4.6.1:
     resolution: {integrity: sha512-mUIj6QvJZ7Rk33mLDxRziz1YiBBAnIji8YW4TXXMdYHtaPEbVucrXD3iKQGAqJhbVn0VnjrEtIKYO1B18mfSJw==}
@@ -19040,6 +19065,10 @@ snapshots:
   uri-js@4.4.1:
     dependencies:
       punycode: 2.3.1
+
+  urlbox@2.2.0:
+    dependencies:
+      qs: 6.14.1
 
   use-intl@4.6.1(react@19.2.3):
     dependencies:
