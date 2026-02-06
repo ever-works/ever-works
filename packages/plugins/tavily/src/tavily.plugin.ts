@@ -20,7 +20,7 @@ import type {
 import { tavily, TavilyClient } from '@tavily/core';
 
 /**
- * Tavily Search Plugin
+ * Tavily Plugin
  *
  * Provides web search and content extraction capabilities using the Tavily API.
  * Implements both ISearchPlugin and IContentExtractorPlugin interfaces.
@@ -40,7 +40,7 @@ export class TavilySearchPlugin implements IPlugin, ISearchPlugin, IContentExtra
 	// ============================================================================
 
 	readonly id = 'tavily';
-	readonly name = 'Tavily Search';
+	readonly name = 'Tavily';
 	readonly version = '1.0.0';
 	readonly category: PluginCategory = 'search';
 	readonly capabilities: readonly string[] = ['search', 'content-extractor'];
@@ -146,9 +146,7 @@ export class TavilySearchPlugin implements IPlugin, ISearchPlugin, IContentExtra
 				duration: Date.now() - startTime
 			};
 		} catch (error) {
-			this.context?.logger.error(
-				`Tavily search failed: ${error instanceof Error ? error.message : String(error)}`
-			);
+			this.context?.logger.error(`Tavily failed: ${error instanceof Error ? error.message : String(error)}`);
 			throw error;
 		}
 	}
@@ -291,15 +289,15 @@ export class TavilySearchPlugin implements IPlugin, ISearchPlugin, IContentExtra
 
 	async onLoad(context: PluginContext): Promise<void> {
 		this.context = context;
-		context.logger.log('Tavily Search Plugin loaded');
+		context.logger.log('Tavily Plugin loaded');
 	}
 
 	async onEnable(context: PluginContext): Promise<void> {
-		context.logger.log('Tavily Search Plugin enabled');
+		context.logger.log('Tavily Plugin enabled');
 	}
 
 	async onDisable(context: PluginContext): Promise<void> {
-		context.logger.log('Tavily Search Plugin disabled');
+		context.logger.log('Tavily Plugin disabled');
 		this.client = undefined;
 	}
 
@@ -349,7 +347,7 @@ export class TavilySearchPlugin implements IPlugin, ISearchPlugin, IContentExtra
 		// The facade will pass settings when making actual calls
 		return {
 			status: 'healthy',
-			message: 'Tavily Search plugin is ready (API key required for operations)',
+			message: 'Tavily plugin is ready (API key required for operations)',
 			checkedAt: Date.now()
 		};
 	}

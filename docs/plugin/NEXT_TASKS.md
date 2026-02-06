@@ -347,7 +347,7 @@ export class MyFacadeService extends BaseFacadeService implements IMyFacade {
 | GitFacade                    | `packages/agent/src/facades/git.facade.ts`                             |
 | DeployFacade                 | `packages/agent/src/facades/deploy.facade.ts`                          |
 | BaseFacadeService            | `packages/agent/src/facades/base.facade.ts`                            |
-| Example plugin (Tavily)      | `packages/plugins/tavily/src/tavily.plugin.ts`           |
+| Example plugin (Tavily)      | `packages/plugins/tavily/src/tavily.plugin.ts`                         |
 | Example facade (AI)          | `packages/agent/src/facades/ai.facade.ts`                              |
 | Plugin entities              | `packages/agent/src/plugins/entities/`                                 |
 | User entity                  | `packages/agent/src/entities/user.entity.ts`                           |

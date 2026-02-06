@@ -516,7 +516,7 @@ Once GitFacade and DeployFacade exist:
 | Plugin            | Package                   | Capabilities                            | Status      |
 | ----------------- | ------------------------- | --------------------------------------- | ----------- |
 | Default Pipeline  | `default-pipeline`        | `pipeline-step`, `form-schema-provider` | ✅ System   |
-| Tavily Search     | `tavily`           | `search`, `content-extractor`           | ✅ Complete |
+| Tavily            | `tavily`                  | `search`, `content-extractor`           | ✅ Complete |
 | Local Extractor   | `local-content-extractor` | `content-extractor`                     | ✅ Default  |
 | Notion Extractor  | `notion-extractor`        | `content-extractor`                     | ✅ Complete |
 | Apify Data Source | `apify-data-source`       | `data-source`, `form-schema-provider`   | ✅ Complete |

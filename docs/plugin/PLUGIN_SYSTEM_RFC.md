@@ -3046,7 +3046,7 @@ class DirectoryPlugin {
 | `screenshotone` | screenshot | `IScreenshotPlugin`                        | ScreenshotOne API               |
 | `openai`        | ai         | `IAiProviderPlugin`                        | OpenAI GPT models               |
 | `anthropic`     | ai         | `IAiProviderPlugin`                        | Anthropic Claude models         |
-| `tavily`        | search     | `ISearchPlugin`, `IContentExtractorPlugin` | Tavily search API               |
+| `tavily`        | search     | `ISearchPlugin`, `IContentExtractorPlugin` | Tavily API                      |
 | `exa`           | pipeline   | `IFullPipelinePlugin`, `ISearchPlugin`     | Exa.ai full pipeline            |
 
 ---
