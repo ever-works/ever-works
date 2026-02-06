@@ -5,5 +5,5 @@ import { nextApiResponseStreaming } from '@/lib/utils/next-api';
 export async function POST(request: NextRequest) {
     const body = await request.json();
 
-    return nextApiResponseStreaming(() => aiConversationAPI.streamAsk(body));
+    return nextApiResponseStreaming(() => aiConversationAPI.streamChat(body));
 }

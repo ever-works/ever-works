@@ -48,7 +48,7 @@
 			"backgroundColor": "#8E75B2"
 		},
 		"builtIn": true,
-		"autoInstall": true,
-		"autoEnable": true
+		"autoInstall": false,
+		"autoEnable": false
 	}
 }

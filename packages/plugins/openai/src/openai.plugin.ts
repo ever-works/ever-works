@@ -13,8 +13,7 @@ import type {
 	EmbeddingOptions,
 	EmbeddingResponse,
 	AiModel,
-	AiModelCapabilities,
-	AiProviderType
+	AiModelCapabilities
 } from '@ever-works/plugin';
 
 /**
@@ -27,7 +26,7 @@ export class OpenAiPlugin extends BaseAiProvider {
 	readonly id = 'openai';
 	readonly name = 'OpenAI';
 	readonly version = '1.0.0';
-	readonly providerType: AiProviderType = 'openai';
+	readonly providerType = 'openai';
 	readonly providerName = 'OpenAI';
 
 	readonly configurationMode: 'admin-only' | 'user-required' | 'hybrid' = 'user-required';
@@ -220,8 +219,8 @@ export class OpenAiPlugin extends BaseAiProvider {
 			author: { name: 'Ever Works Team' },
 			license: 'MIT',
 			builtIn: true,
-			autoInstall: true,
-			autoEnable: true,
+			autoInstall: false,
+			autoEnable: false,
 			visibility: 'public',
 			icon: {
 				type: 'svg',

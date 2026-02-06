@@ -1,7 +1,6 @@
 import { BaseAiProvider } from '@ever-works/plugin/abstract';
 import { AiOperations } from '@ever-works/plugin/ai';
 import type {
-	AiProviderType,
 	AiModel,
 	AiModelCapabilities,
 	ChatCompletionOptions,
@@ -35,7 +34,7 @@ export class OpenRouterPlugin extends BaseAiProvider {
 	readonly name = 'OpenRouter';
 	readonly version = '1.0.0';
 
-	readonly providerType: AiProviderType = 'openrouter';
+	readonly providerType = 'openrouter';
 	readonly providerName = 'OpenRouter';
 
 	readonly configurationMode: ConfigurationMode = 'hybrid';
@@ -50,14 +49,15 @@ export class OpenRouterPlugin extends BaseAiProvider {
 				'x-masked': true,
 				'x-writeOnly': true,
 				'x-scope': 'user',
-				'x-envVar': 'OPENROUTER_API_KEY'
+				'x-envVar': 'PLUGIN_OPENROUTER_API_KEY'
 			},
 			defaultModel: {
 				type: 'string',
 				title: 'Default Model',
 				default: 'openai/gpt-4.1-nano',
 				'x-widget': 'model-select',
-				'x-scope': 'user'
+				'x-scope': 'user',
+				'x-envVar': 'PLUGIN_OPENROUTER_DEFAULT_MODEL'
 			},
 			simpleModel: {
 				type: 'string',
@@ -65,7 +65,8 @@ export class OpenRouterPlugin extends BaseAiProvider {
 				description: 'Economy model for simple tasks',
 				default: 'openai/gpt-4.1-nano',
 				'x-widget': 'model-select',
-				'x-scope': 'user'
+				'x-scope': 'user',
+				'x-envVar': 'PLUGIN_OPENROUTER_SIMPLE_MODEL'
 			},
 			mediumModel: {
 				type: 'string',
@@ -73,7 +74,8 @@ export class OpenRouterPlugin extends BaseAiProvider {
 				description: 'Balanced model for standard tasks',
 				default: 'openai/gpt-4o-mini',
 				'x-widget': 'model-select',
-				'x-scope': 'user'
+				'x-scope': 'user',
+				'x-envVar': 'PLUGIN_OPENROUTER_MEDIUM_MODEL'
 			},
 			complexModel: {
 				type: 'string',
@@ -81,13 +83,14 @@ export class OpenRouterPlugin extends BaseAiProvider {
 				description: 'Premium model for complex tasks',
 				default: 'anthropic/claude-sonnet-4.5',
 				'x-widget': 'model-select',
-				'x-scope': 'user'
+				'x-scope': 'user',
+				'x-envVar': 'PLUGIN_OPENROUTER_COMPLEX_MODEL'
 			},
 			baseUrl: {
 				type: 'string',
 				title: 'Base URL',
 				default: 'https://openrouter.ai/api/v1',
-				'x-envVar': 'OPENROUTER_BASE_URL',
+				'x-envVar': 'PLUGIN_OPENROUTER_BASE_URL',
 				'x-hidden': true
 			},
 			embeddingModel: {

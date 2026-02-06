@@ -90,23 +90,19 @@ spec:
             - name: GOOGLE_CALLBACK_URL
               value: https://app.ever.works/api/auth/google/callback
 
-            # AI Configuration
-            - name: AI_DEFAULT_PROVIDER
-              value: "$AI_DEFAULT_PROVIDER"
-
-            # OpenAI
-            - name: OPENAI_MODEL
-              value: "$OPENAI_MODEL"
-            - name: OPENAI_API_KEY
-              value: "$OPENAI_API_KEY"
-
-            # OpenRouter
-            - name: OPENROUTER_MODEL
-              value: "$OPENROUTER_MODEL"
-            - name: OPENROUTER_API_KEY
-              value: "$OPENROUTER_API_KEY"
-
             # Plugins
+            - name: PLUGIN_OPENROUTER_API_KEY
+              value: "$PLUGIN_OPENROUTER_API_KEY"
+            - name: PLUGIN_OPENROUTER_BASE_URL
+              value: "$PLUGIN_OPENROUTER_BASE_URL"
+            - name: PLUGIN_OPENROUTER_DEFAULT_MODEL
+              value: "$PLUGIN_OPENROUTER_DEFAULT_MODEL"
+            - name: PLUGIN_OPENROUTER_SIMPLE_MODEL
+              value: "$PLUGIN_OPENROUTER_SIMPLE_MODEL"
+            - name: PLUGIN_OPENROUTER_MEDIUM_MODEL
+              value: "$PLUGIN_OPENROUTER_MEDIUM_MODEL"
+            - name: PLUGIN_OPENROUTER_COMPLEX_MODEL
+              value: "$PLUGIN_OPENROUTER_COMPLEX_MODEL"
             - name: PLUGIN_GITHUB_CLIENT_ID
               value: "$PLUGIN_GITHUB_CLIENT_ID"
             - name: PLUGIN_GITHUB_CLIENT_SECRET

@@ -80,12 +80,9 @@ export type {
 
 export type {
     // From ai-conversation.ts
-    StartConversationDto,
-    SendMessageDto,
-    ConversationStartResponse,
-    ConversationHistoryResponse,
-    ConversationSummary,
-    ConversationMessage,
+    ChatMessage as ConversationMessage,
+    ChatMessageRole,
+    ChatStreamRequestDto,
     StreamChunk,
 } from './ai-conversation';
 

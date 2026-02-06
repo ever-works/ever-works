@@ -107,8 +107,8 @@ describe('OpenAiPlugin', () => {
 			expect(manifest.id).toBe('openai');
 			expect(manifest.name).toBe('OpenAI');
 			expect(manifest.builtIn).toBe(true);
-			expect(manifest.autoInstall).toBe(true);
-			expect(manifest.autoEnable).toBe(true);
+			expect(manifest.autoInstall).toBe(false);
+			expect(manifest.autoEnable).toBe(false);
 			expect(manifest.visibility).toBe('public');
 			expect(manifest.icon).toBeDefined();
 			expect(manifest.icon?.type).toBe('svg');

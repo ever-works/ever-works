@@ -13,8 +13,7 @@ import type {
 	EmbeddingOptions,
 	EmbeddingResponse,
 	AiModel,
-	AiModelCapabilities,
-	AiProviderType
+	AiModelCapabilities
 } from '@ever-works/plugin';
 
 /**
@@ -27,7 +26,7 @@ export class AnthropicPlugin extends BaseAiProvider {
 	readonly id = 'anthropic';
 	readonly name = 'Anthropic';
 	readonly version = '1.0.0';
-	readonly providerType: AiProviderType = 'anthropic';
+	readonly providerType = 'anthropic';
 	readonly providerName = 'Anthropic';
 
 	readonly configurationMode: 'admin-only' | 'user-required' | 'hybrid' = 'user-required';
@@ -211,8 +210,8 @@ export class AnthropicPlugin extends BaseAiProvider {
 			author: { name: 'Ever Works Team' },
 			license: 'MIT',
 			builtIn: true,
-			autoInstall: true,
-			autoEnable: true,
+			autoInstall: false,
+			autoEnable: false,
 			visibility: 'public',
 			icon: {
 				type: 'svg',

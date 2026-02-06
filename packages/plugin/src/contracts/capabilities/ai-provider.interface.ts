@@ -2,18 +2,11 @@ import type { IPlugin } from '../plugin.interface.js';
 import type { PluginSettings } from '../../settings/settings.types.js';
 
 /**
- * AI provider types
+ * AI provider type identifier.
+ * Any string is valid — new providers can be added as plugins
+ * without modifying this type.
  */
-export type AiProviderType =
-	| 'openai'
-	| 'anthropic'
-	| 'google'
-	| 'groq'
-	| 'openrouter'
-	| 'ollama'
-	| 'mistral'
-	| 'cohere'
-	| 'custom';
+export type AiProviderType = string;
 
 /**
  * AI model capabilities

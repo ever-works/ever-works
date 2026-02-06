@@ -20,6 +20,7 @@ import { PluginsModule } from './plugins/plugins.module';
 import { GitProviderModule } from './plugins-capabilities/git-provider/git-provider.module';
 import { OAuthModule } from './plugins-capabilities/oauth/oauth.module';
 import { DeployModule } from './plugins-capabilities/deploy/deploy.module';
+import { AiConversationModule } from './ai-conversation/ai-conversation.module';
 import {
     PluginsModule as AgentPluginsModule,
     PluginBootstrapService,
@@ -57,6 +58,7 @@ import { CacheFactory } from '@packages/agent/cache';
         GitProviderModule,
         OAuthModule,
         DeployModule,
+        AiConversationModule,
     ],
     providers: [
         {

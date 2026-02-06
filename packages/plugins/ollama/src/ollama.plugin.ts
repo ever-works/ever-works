@@ -13,8 +13,7 @@ import type {
 	EmbeddingOptions,
 	EmbeddingResponse,
 	AiModel,
-	AiModelCapabilities,
-	AiProviderType
+	AiModelCapabilities
 } from '@ever-works/plugin';
 
 /**
@@ -28,7 +27,7 @@ export class OllamaPlugin extends BaseAiProvider {
 	readonly id = 'ollama';
 	readonly name = 'Ollama';
 	readonly version = '1.0.0';
-	readonly providerType: AiProviderType = 'ollama';
+	readonly providerType = 'ollama';
 	readonly providerName = 'Ollama';
 
 	readonly configurationMode: 'admin-only' | 'user-required' | 'hybrid' = 'user-required';
@@ -214,8 +213,8 @@ export class OllamaPlugin extends BaseAiProvider {
 			author: { name: 'Ever Works Team' },
 			license: 'MIT',
 			builtIn: true,
-			autoInstall: true,
-			autoEnable: true,
+			autoInstall: false,
+			autoEnable: false,
 			visibility: 'public',
 			icon: {
 				type: 'svg',

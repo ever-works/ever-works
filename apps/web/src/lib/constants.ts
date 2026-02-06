@@ -101,8 +101,7 @@ export const ROUTES = {
     API_AUTH_CALLBACK: '/api/auth/:provider/callback',
     API_AUTH_VERIFY_EMAIL: '/api/auth/verify-email',
     API_AUTH_RESET_PASSWORD: '/api/auth/reset-password',
-    API_AI_CONVERSATIONS_ASK_STREAM: '/api/ai-conversations/ask/stream',
-    API_AI_CONVERSATIONS_MESSAGE_STREAM: '/api/ai-conversations/:sessionId/stream',
+    API_AI_CONVERSATIONS_CHAT_STREAM: '/api/ai-conversations/chat/stream',
     // OAuth routes (provider-agnostic)
     API_OAUTH_CALLBACK: '/api/oauth/:providerId/callback',
 } as const;

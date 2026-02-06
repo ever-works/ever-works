@@ -13,8 +13,7 @@ import type {
 	EmbeddingOptions,
 	EmbeddingResponse,
 	AiModel,
-	AiModelCapabilities,
-	AiProviderType
+	AiModelCapabilities
 } from '@ever-works/plugin';
 
 /**
@@ -27,7 +26,7 @@ export class GooglePlugin extends BaseAiProvider {
 	readonly id = 'google';
 	readonly name = 'Google Gemini';
 	readonly version = '1.0.0';
-	readonly providerType: AiProviderType = 'google';
+	readonly providerType = 'google';
 	readonly providerName = 'Google Gemini';
 
 	readonly configurationMode: 'admin-only' | 'user-required' | 'hybrid' = 'user-required';
@@ -224,8 +223,8 @@ export class GooglePlugin extends BaseAiProvider {
 			author: { name: 'Ever Works Team' },
 			license: 'MIT',
 			builtIn: true,
-			autoInstall: true,
-			autoEnable: true,
+			autoInstall: false,
+			autoEnable: false,
 			visibility: 'public',
 			icon: {
 				type: 'svg',

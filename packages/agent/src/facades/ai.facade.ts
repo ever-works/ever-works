@@ -6,6 +6,8 @@ import type {
     AskJsonResponse,
     IAiProviderPlugin,
     ChatCompletionOptions,
+    ChatCompletionResponse,
+    ChatCompletionChunk,
     AiRoutingOptions,
     AiModel,
 } from '@ever-works/plugin';
@@ -145,6 +147,65 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
         } catch {
             return null;
         }
+    }
+
+    async createChatCompletion(
+        options: ChatCompletionOptions,
+        facadeOptions?: AiFacadeOptions,
+    ): Promise<ChatCompletionResponse> {
+        const plugin = await this.resolvePlugin(
+            facadeOptions?.providerOverride,
+            facadeOptions?.userId,
+            facadeOptions?.directoryId,
+        );
+
+        const settings = await this.getResolvedSettings(plugin.id, {
+            userId: facadeOptions?.userId,
+            directoryId: facadeOptions?.directoryId,
+        });
+
+        const model = this.resolveModel(plugin, settings, options as unknown as AiRoutingOptions);
+        const mergedOptions: ChatCompletionOptions = {
+            ...options,
+            model: options.model ?? model,
+            settings,
+        };
+
+        return plugin.createChatCompletion(mergedOptions);
+    }
+
+    async *createStreamingChatCompletion(
+        options: ChatCompletionOptions,
+        facadeOptions?: AiFacadeOptions,
+    ): AsyncGenerator<ChatCompletionChunk> {
+        const plugin = await this.resolvePlugin(
+            facadeOptions?.providerOverride,
+            facadeOptions?.userId,
+            facadeOptions?.directoryId,
+        );
+
+        const settings = await this.getResolvedSettings(plugin.id, {
+            userId: facadeOptions?.userId,
+            directoryId: facadeOptions?.directoryId,
+        });
+
+        const model = this.resolveModel(plugin, settings, options as unknown as AiRoutingOptions);
+        const mergedOptions: ChatCompletionOptions = {
+            ...options,
+            model: options.model ?? model,
+            stream: true,
+            settings,
+        };
+
+        if (!plugin.createStreamingChatCompletion) {
+            throw new AiFacadeError(
+                `Provider ${plugin.id} does not support streaming`,
+                'createStreamingChatCompletion',
+                plugin.id,
+            );
+        }
+
+        yield* plugin.createStreamingChatCompletion(mergedOptions);
     }
 
     async testConnection(facadeOptions?: AiFacadeOptions): Promise<{

@@ -42,7 +42,7 @@ describe('OpenRouterPlugin', () => {
 			expect(apiKeySchema['x-masked']).toBe(true);
 			expect(apiKeySchema['x-writeOnly']).toBe(true);
 			expect(apiKeySchema['x-scope']).toBe('user');
-			expect(apiKeySchema['x-envVar']).toBe('OPENROUTER_API_KEY');
+			expect(apiKeySchema['x-envVar']).toBe('PLUGIN_OPENROUTER_API_KEY');
 		});
 
 		it('should have defaultModel field', () => {
@@ -87,7 +87,7 @@ describe('OpenRouterPlugin', () => {
 			expect(schema).toBeDefined();
 			expect(schema.type).toBe('string');
 			expect(schema.default).toBe('https://openrouter.ai/api/v1');
-			expect(schema['x-envVar']).toBe('OPENROUTER_BASE_URL');
+			expect(schema['x-envVar']).toBe('PLUGIN_OPENROUTER_BASE_URL');
 		});
 
 		it('should have embeddingModel field', () => {
