@@ -63,6 +63,11 @@
 			"types": "./dist/git/index.d.ts",
 			"import": "./dist/git/index.js",
 			"require": "./dist/git/index.cjs"
+		},
+		"./ai": {
+			"types": "./dist/ai/index.d.ts",
+			"import": "./dist/ai/index.js",
+			"require": "./dist/ai/index.cjs"
 		}
 	},
 	"files": [
@@ -76,15 +81,25 @@
 	},
 	"devDependencies": {
 		"@types/node": "^22.19.3",
+		"@langchain/openai": "^0.6.17",
+		"@langchain/core": "^0.3.80",
 		"isomorphic-git": "^1.36.3",
 		"tsup": "^8.0.0",
 		"typescript": "^5.9.3"
 	},
 	"peerDependencies": {
-		"isomorphic-git": "^1.27.0"
+		"isomorphic-git": "^1.27.0",
+		"@langchain/openai": "^0.6.17",
+		"@langchain/core": "^0.3.80"
 	},
 	"peerDependenciesMeta": {
 		"isomorphic-git": {
+			"optional": true
+		},
+		"@langchain/openai": {
+			"optional": true
+		},
+		"@langchain/core": {
 			"optional": true
 		}
 	},

@@ -1,4 +1,4 @@
-import { TokenUsage } from '../ai';
+import type { AiFacadeTokenUsage as TokenUsage } from '@ever-works/plugin';
 
 export type MetricsAccumulator = {
     total_tokens_used?: number;

@@ -155,6 +155,8 @@ export interface JsonSchema {
 	readonly 'x-writeOnly'?: boolean;
 	/** Whether field is admin-only (not visible to regular users) */
 	readonly 'x-adminOnly'?: boolean;
+	/** Whether field should be hidden from the settings UI entirely */
+	readonly 'x-hidden'?: boolean;
 }
 
 /**

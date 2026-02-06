@@ -1,0 +1,54 @@
+{
+	"name": "@ever-works/google-plugin",
+	"version": "1.0.0",
+	"description": "Google Gemini AI provider plugin for Ever Works platform",
+	"private": false,
+	"license": "MIT",
+	"type": "module",
+	"main": "./dist/index.js",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		}
+	},
+	"files": [
+		"dist"
+	],
+	"scripts": {
+		"build": "tsup",
+		"dev": "tsup --watch",
+		"clean": "rm -rf dist",
+		"type-check": "tsc --noEmit",
+		"test": "vitest run",
+		"test:watch": "vitest"
+	},
+	"dependencies": {
+		"@ever-works/plugin": "workspace:*",
+		"@langchain/openai": "^0.6.17",
+		"@langchain/core": "^0.3.80"
+	},
+	"devDependencies": {
+		"tsup": "^8.0.0",
+		"typescript": "^5.9.3",
+		"vitest": "^3.2.1"
+	},
+	"ever-works-plugin": {
+		"id": "google",
+		"category": "ai-provider",
+		"capabilities": [
+			"ai-provider"
+		],
+		"icon": {
+			"type": "svg",
+			"value": "<svg viewBox=\"0 0 24 24\" fill=\"none\"><path d=\"M12 3 4 7.5v9L12 21l8-4.5v-9L12 3z\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linejoin=\"round\"/><path d=\"m4 7.5 8 4.5m0 0 8-4.5M12 12v9\" stroke=\"currentColor\" stroke-width=\"1.5\"/></svg>",
+			"backgroundColor": "#8E75B2"
+		},
+		"builtIn": true,
+		"autoInstall": true,
+		"autoEnable": true
+	}
+}

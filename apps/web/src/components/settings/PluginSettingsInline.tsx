@@ -263,6 +263,7 @@ export function PluginSettingsInline({ plugin, oauthConnection }: PluginSettings
                                 onChange={(value) =>
                                     handleFieldChange(key, value, propSchema.secret || false)
                                 }
+                                pluginId={plugin.pluginId}
                             />
                         ))}
                     </div>

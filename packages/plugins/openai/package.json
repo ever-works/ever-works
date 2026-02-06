@@ -1,0 +1,54 @@
+{
+	"name": "@ever-works/openai-plugin",
+	"version": "1.0.0",
+	"description": "OpenAI AI provider plugin for Ever Works platform",
+	"private": false,
+	"license": "MIT",
+	"type": "module",
+	"main": "./dist/index.js",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		}
+	},
+	"files": [
+		"dist"
+	],
+	"scripts": {
+		"build": "tsup",
+		"dev": "tsup --watch",
+		"clean": "rm -rf dist",
+		"type-check": "tsc --noEmit",
+		"test": "vitest run",
+		"test:watch": "vitest"
+	},
+	"dependencies": {
+		"@ever-works/plugin": "workspace:*",
+		"@langchain/openai": "^0.6.17",
+		"@langchain/core": "^0.3.80"
+	},
+	"devDependencies": {
+		"tsup": "^8.0.0",
+		"typescript": "^5.9.3",
+		"vitest": "^3.2.1"
+	},
+	"ever-works-plugin": {
+		"id": "openai",
+		"category": "ai-provider",
+		"capabilities": [
+			"ai-provider"
+		],
+		"icon": {
+			"type": "svg",
+			"value": "<svg viewBox=\"0 0 16 16\" fill=\"currentColor\"><path d=\"M13.78 6.34c.19-.95.02-1.93-.47-2.76A3.67 3.67 0 0 0 9.38 1.7a3.59 3.59 0 0 0-2.7-1.2A3.67 3.67 0 0 0 3.2 3.54c-.98.17-1.84.72-2.4 1.53A3.67 3.67 0 0 0 1.26 9.6c-.18.95-.02 1.93.47 2.76a3.67 3.67 0 0 0 3.93 1.88 3.59 3.59 0 0 0 2.7 1.2 3.67 3.67 0 0 0 3.48-3.04c.98-.17 1.84-.72 2.4-1.53a3.67 3.67 0 0 0-.46-4.53zM8.36 14.1a2.74 2.74 0 0 1-1.76-.64l.09-.05 2.92-1.68c.15-.09.24-.25.24-.42V7.28l1.23.71s.02.01.02.03v3.41c0 1.47-1.23 2.67-2.74 2.67zm-5.9-2.45a2.68 2.68 0 0 1-.32-1.82l.09.05 2.92 1.69c.15.09.33.09.48 0l3.56-2.06v1.42s0 .03-.02.04l-2.95 1.7a2.76 2.76 0 0 1-3.76-1.02zm-.77-6.2A2.7 2.7 0 0 1 3.1 4.1v.1l-.01 3.37c0 .17.09.34.24.42l3.56 2.06-1.24.71-.02-.01-2.95-1.7a2.68 2.68 0 0 1-.99-3.61zm10.14 2.36L8.27 5.75l1.23-.71s.02-.01.03 0l2.95 1.7a2.68 2.68 0 0 1 .42 4.42v-3.47c0-.18-.1-.34-.25-.43l.18.1zm1.23-1.84-.09-.05-2.92-1.69a.47.47 0 0 0-.48 0L6.01 6.29V4.87l.02-.04 2.95-1.7a2.76 2.76 0 0 1 4.08 2.84zM5.37 8.72 4.14 8s0-.03.01-.04V4.55c0-1.48 1.24-2.68 2.75-2.68.56 0 1.1.17 1.56.48l-.09.05-2.92 1.68a.48.48 0 0 0-.24.43l.16 4.21zm.67-1.48L8 6.14l1.96 1.13v2.26L8 10.66l-1.96-1.13V7.24z\"/></svg>",
+			"backgroundColor": "#000000"
+		},
+		"builtIn": true,
+		"autoInstall": true,
+		"autoEnable": true
+	}
+}

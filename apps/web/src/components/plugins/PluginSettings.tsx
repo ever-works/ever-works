@@ -38,8 +38,8 @@ export function PluginSettings({ plugin }: PluginSettingsProps) {
             Object.entries(schema.properties).filter(([_, propSchema]) => {
                 const prop = propSchema as PluginSettingsSchemaProperty;
                 const scope = prop.scope || 'global';
-                // Filter out writeOnly fields
-                if (prop.writeOnly) return false;
+                // Filter out hidden fields (writeOnly fields are shown - they're secret inputs)
+                if (prop.hidden) return false;
                 // Show global and user-scoped settings in user settings page
                 return scope === 'global' || scope === 'user';
             }),
@@ -264,6 +264,7 @@ export function PluginSettings({ plugin }: PluginSettingsProps) {
                                 onChange={(value) =>
                                     handleFieldChange(key, value, propSchema.secret || false)
                                 }
+                                pluginId={plugin.pluginId}
                             />
                         ))}
                     </div>

@@ -1,4 +1,4 @@
-import { AiProviderType } from '@src/ai';
+import type { AiProviderType } from '@ever-works/plugin';
 import { DatabaseType } from '@src/database';
 
 type AppType = 'cli' | 'api';

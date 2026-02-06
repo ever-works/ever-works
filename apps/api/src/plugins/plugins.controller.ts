@@ -67,6 +67,23 @@ export class PluginsController {
         return this.pluginsService.getPluginsForSettingsMenu(auth.userId);
     }
 
+    @Get('plugins/:pluginId/models')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'List available models for an AI provider plugin',
+        description:
+            'Fetch models from the AI provider. Requires plugin to be enabled with valid credentials.',
+    })
+    @ApiParam({ name: 'pluginId', description: 'Plugin ID' })
+    @ApiResponse({ status: 200, description: 'List of available models' })
+    @ApiResponse({ status: 404, description: 'Plugin not found' })
+    async listPluginModels(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('pluginId') pluginId: string,
+    ): Promise<any[]> {
+        return this.pluginsService.listPluginModels(pluginId, auth.userId);
+    }
+
     @Get('plugins/:pluginId')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({

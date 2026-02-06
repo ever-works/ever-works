@@ -1,5 +1,22 @@
 import { Injectable } from '@nestjs/common';
-import { AiProviderInfo } from '@packages/agent/ai';
+
+interface AiProviderDefaults {
+    model: string;
+    temperature: number;
+    maxTokens: number;
+    baseUrl?: string;
+}
+
+interface AiProviderInfo {
+    name: string;
+    displayName: string;
+    description: string;
+    defaults: AiProviderDefaults;
+    requiresApiKey: boolean;
+    models: string[];
+    websiteUrl: string;
+    docsUrl: string;
+}
 
 @Injectable()
 export class AiProviderRegistryService {

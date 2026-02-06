@@ -118,6 +118,7 @@ export class PluginsService {
             const hasUserSettings = Object.values(schema.properties).some((prop) => {
                 if (prop['x-envVar']) return false;
                 if (prop['x-adminOnly']) return false;
+                if (prop['x-hidden']) return false;
                 const scope = prop['x-scope'] || 'global';
                 return scope === 'global' || scope === 'user';
             });
@@ -698,6 +699,35 @@ export class PluginsService {
     }
 
     // ============================================
+    // Plugin Model Operations
+    // ============================================
+
+    /**
+     * List available models for an AI provider plugin.
+     * Returns an empty array if the plugin does not support listing models.
+     */
+    async listPluginModels(pluginId: string, userId: string): Promise<any[]> {
+        const registered = this.pluginRegistryService.get(pluginId);
+        if (!registered) {
+            throw new NotFoundException(`Plugin "${pluginId}" not found`);
+        }
+
+        const plugin = registered.plugin as any;
+        if (typeof plugin.listModels !== 'function') {
+            return [];
+        }
+
+        try {
+            return await plugin.listModels();
+        } catch (error) {
+            this.logger.warn(
+                `Failed to list models for plugin ${pluginId}: ${(error as Error).message}`,
+            );
+            return [];
+        }
+    }
+
+    // ============================================
     // Helper Methods
     // ============================================
 
@@ -802,7 +832,7 @@ export class PluginsService {
         if (schema.properties) {
             for (const [key, prop] of Object.entries(schema.properties)) {
                 if (prop['x-envVar']) continue;
-                if (prop['x-writeOnly']) continue;
+                if (prop['x-hidden']) continue;
                 properties[key] = toPluginSettingsSchemaProperty(prop);
             }
         }

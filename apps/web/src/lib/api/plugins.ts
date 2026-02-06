@@ -73,6 +73,17 @@ export const pluginsAPI = {
         return response.plugins;
     },
 
+    /**
+     * List available models for an AI provider plugin
+     */
+    listModels: async (pluginId: string): Promise<any[]> => {
+        try {
+            return await serverFetch<any[]>(`/plugins/${pluginId}/models`);
+        } catch {
+            return [];
+        }
+    },
+
     // ============================================
     // User Plugin Management
     // ============================================

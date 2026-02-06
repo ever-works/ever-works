@@ -12,7 +12,8 @@ export default defineConfig({
 		'src/abstract/index.ts',
 		'src/testing/index.ts',
 		'src/api/index.ts',
-		'src/git/index.ts'
+		'src/git/index.ts',
+		'src/ai/index.ts'
 	],
 	format: ['esm', 'cjs'],
 	dts: true,

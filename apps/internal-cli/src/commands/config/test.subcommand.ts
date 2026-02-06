@@ -3,8 +3,8 @@ import { Logger } from '@nestjs/common';
 import chalk from 'chalk';
 import ora from 'ora';
 import { ConfigService } from '../../config/config.service';
-import { AiService } from '@packages/agent/ai';
-import { config as agentConfig } from '@packages/agent/config';
+import { AiFacadeService } from '@packages/agent/facades';
+
 import { COMMAND } from '../../config';
 
 @SubCommand({
@@ -16,7 +16,7 @@ export class TestSubCommand extends CommandRunner {
 
     constructor(
         private readonly configService: ConfigService,
-        private readonly aiService: AiService,
+        private readonly aiFacade: AiFacadeService,
     ) {
         super();
     }
@@ -68,65 +68,30 @@ export class TestSubCommand extends CommandRunner {
         }
     }
 
-    private async testAiProviders(config: any): Promise<boolean> {
+    private async testAiProviders(_config: any): Promise<boolean> {
         console.log(chalk.blue.bold('Testing AI Providers\n'));
 
-        const providers = this.getConfiguredAiProviders(config);
-        if (providers.length === 0) {
-            console.log(chalk.yellow('⚠ No AI providers configured'));
+        const spinner = ora('Testing AI provider via plugin system...').start();
+
+        try {
+            const result = await this.aiFacade.testConnection();
+
+            if (result.success) {
+                spinner.succeed(
+                    `${result.provider}: ${chalk.green('✓ Connected')} (${result.responseTime}ms)`,
+                );
+            } else {
+                spinner.fail(`${result.provider}: ${chalk.red('✗ Failed')}`);
+                console.log(chalk.red(`  Error: ${result.error}`));
+                return false;
+            }
+
+            return true;
+        } catch (error) {
+            spinner.fail(`AI provider: ${chalk.red('✗ Failed')}`);
+            console.log(chalk.red(`  Error: ${error.message}`));
             return false;
         }
-
-        let allPassed = true;
-
-        for (const provider of providers) {
-            const spinner = ora(`Testing ${provider} provider...`).start();
-
-            const lowerProvider = provider.toLowerCase();
-            const upperProvider = provider.toUpperCase();
-
-            try {
-                const providerConfig = agentConfig.ai[lowerProvider];
-
-                const result = await this.aiService.testProvider({
-                    type: provider as any,
-
-                    apiKey: config[`${upperProvider}_API_KEY`],
-
-                    modelName:
-                        config[`${upperProvider}_MODEL`] ||
-                        providerConfig?.getModel?.() ||
-                        this.getDefaultModel(provider),
-
-                    temperature:
-                        parseFloat(config[`${upperProvider}_TEMPERATURE`] || '0.7') ||
-                        providerConfig?.getTemperature?.(),
-
-                    maxTokens:
-                        parseInt(config[`${upperProvider}_MAX_TOKENS`] || '4096') ||
-                        providerConfig?.getMaxTokens?.(),
-
-                    baseURL: config[`${upperProvider}_BASE_URL`] || providerConfig?.getBaseUrl?.(),
-                });
-
-                if (result.success) {
-                    spinner.succeed(
-                        `${provider}: ${chalk.green('✓ Connected')} (${result.responseTime}ms)`,
-                    );
-                    console.log(chalk.gray(`  Response: ${result.response}`));
-                } else {
-                    spinner.fail(`${provider}: ${chalk.red('✗ Failed')}`);
-                    console.log(chalk.red(`  Error: ${result.error}`));
-                    allPassed = false;
-                }
-            } catch (error) {
-                spinner.fail(`${provider}: ${chalk.red('✗ Failed')}`);
-                console.log(chalk.red(`  Error: ${error.message}`));
-                allPassed = false;
-            }
-        }
-
-        return allPassed;
     }
 
     private async testOtherServices(config: any): Promise<boolean> {
@@ -242,44 +207,5 @@ export class TestSubCommand extends CommandRunner {
             console.log(chalk.red(`  Error: ${error.message}`));
             return false;
         }
-    }
-
-    private getConfiguredAiProviders(config: any): string[] {
-        const providers: string[] = [];
-        const providerKeys = [
-            'openai',
-            'google',
-            'anthropic',
-            'openrouter',
-            'ollama',
-            'groq',
-            'custom',
-        ];
-
-        for (const provider of providerKeys) {
-            const upperProvider = provider.toUpperCase();
-            if (
-                config[`${upperProvider}_API_KEY`] ||
-                ((provider === 'ollama' || provider === 'custom') &&
-                    config[`${upperProvider}_BASE_URL`])
-            ) {
-                providers.push(provider);
-            }
-        }
-
-        return providers;
-    }
-
-    private getDefaultModel(provider: string): string {
-        const defaults: Record<string, string> = {
-            openai: 'gpt-4o',
-            google: 'gemini-2.5-flash',
-            anthropic: 'claude-3-5-sonnet-20241022',
-            openrouter: 'openai/gpt-4o',
-            ollama: 'llama2',
-            groq: 'openai/gpt-oss-120b',
-            custom: 'default',
-        };
-        return defaults[provider] || 'default';
     }
 }

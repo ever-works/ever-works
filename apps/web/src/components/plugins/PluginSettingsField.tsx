@@ -4,6 +4,7 @@ import { PluginSettingsSchemaProperty } from '@/lib/api/plugins';
 import { cn } from '@/lib/utils/cn';
 import { Eye, EyeOff } from 'lucide-react';
 import { useState } from 'react';
+import { PluginModelSelect } from './PluginModelSelect';
 
 interface PluginSettingsFieldProps {
     name: string;
@@ -11,6 +12,7 @@ interface PluginSettingsFieldProps {
     value: unknown;
     required?: boolean;
     onChange: (value: unknown) => void;
+    pluginId?: string;
 }
 
 export function PluginSettingsField({
@@ -19,6 +21,7 @@ export function PluginSettingsField({
     value,
     required,
     onChange,
+    pluginId,
 }: PluginSettingsFieldProps) {
     const [showSecret, setShowSecret] = useState(false);
 
@@ -94,6 +97,17 @@ export function PluginSettingsField({
                         'focus:outline-none focus:ring-2 focus:ring-primary/50',
                     )}
                     placeholder={schema.default !== undefined ? String(schema.default) : undefined}
+                />
+            );
+        }
+
+        // Model select widget
+        if (schema.widget === 'model-select' && pluginId) {
+            return (
+                <PluginModelSelect
+                    pluginId={pluginId}
+                    value={String(value ?? schema.default ?? '')}
+                    onChange={(val) => onChange(val || undefined)}
                 />
             );
         }

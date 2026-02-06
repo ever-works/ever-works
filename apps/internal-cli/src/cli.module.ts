@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { DatabaseConfigurations, DatabaseInitService } from '@packages/agent/database';
-import { AiModule } from '@packages/agent/ai';
 import { DirectoryModule } from '@packages/agent/services';
 import { DatabaseModule } from '@packages/agent/database';
 import { DataGeneratorModule } from '@packages/agent/generators';
@@ -25,7 +24,6 @@ import { CacheFactory } from '@packages/agent/cache';
         DatabaseConfigurations.cli(),
         EventEmitterModule.forRoot(),
         ConfigModule,
-        AiModule,
         DatabaseModule,
         DataGeneratorModule,
         ItemsGeneratorModule,

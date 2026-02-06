@@ -1,8 +1,12 @@
 import { Module } from '@nestjs/common';
-import { AiService } from '@packages/agent/ai';
+import { FacadesModule } from '@packages/agent/facades';
 
+/**
+ * TriggerAiModule - now delegates to FacadesModule.
+ * AI operations use AiFacadeService from the plugin system.
+ */
 @Module({
-    providers: [AiService],
-    exports: [AiService],
+    imports: [FacadesModule],
+    exports: [FacadesModule],
 })
 export class TriggerAiModule {}

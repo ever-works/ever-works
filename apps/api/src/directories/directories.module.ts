@@ -3,7 +3,6 @@ import { Module } from '@nestjs/common';
 import { DirectoryModule } from '@packages/agent/services';
 import { DatabaseModule } from '@packages/agent/database';
 import { AuthModule } from '@src/auth';
-import { AiModule } from '@packages/agent/ai';
 import { CacheEntryRepository } from '@packages/agent/cache';
 import { TriggerModule as TasksTriggerModule } from '@packages/tasks';
 import { WebsiteGeneratorModule } from '@packages/agent/generators';
@@ -22,7 +21,6 @@ import { WebsiteTemplateSchedulerService } from './tasks/website-template-schedu
         DirectoryModule,
         DatabaseModule,
         AuthModule,
-        AiModule,
         TasksTriggerModule,
         WebsiteGeneratorModule,
         FacadesModule,

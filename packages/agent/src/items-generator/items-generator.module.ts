@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 import { ItemSubmissionService } from './item-submission.service';
-import { AiModule } from '../ai';
 import { DatabaseModule } from '../database/database.module';
 import { FacadesModule } from '../facades/facades.module';
 import { PipelineModule } from '../pipeline/pipeline.module';
@@ -12,7 +11,7 @@ import { PipelineModule } from '../pipeline/pipeline.module';
  * This module only provides the ItemSubmissionService for single-item operations.
  */
 @Module({
-    imports: [AiModule, DatabaseModule, FacadesModule, PipelineModule],
+    imports: [DatabaseModule, FacadesModule, PipelineModule],
     providers: [ItemSubmissionService],
     exports: [ItemSubmissionService],
 })

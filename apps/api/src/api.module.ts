@@ -11,7 +11,6 @@ import { MailModule } from './mail/mail.module';
 import { LoggingInterceptor } from './logging.interceptor';
 import { MonitoringModule, SentryInterceptor, PostHogInterceptor } from '@packages/monitoring';
 import { APIController } from './api.controller';
-import { AiConversationModule } from './ai-conversation/ai-conversation.module';
 import { TriggerInternalModule } from './trigger/trigger-internal.module';
 import { TwentyCrmModule } from './integrations';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
@@ -47,7 +46,6 @@ import { CacheFactory } from '@packages/agent/cache';
             },
         }),
         AuthModule,
-        AiConversationModule,
         DirectoriesModule,
         MailModule,
         TriggerInternalModule,

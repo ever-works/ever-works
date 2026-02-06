@@ -1,14 +1,29 @@
 import { Injectable } from '@nestjs/common';
 import { AiProviderRegistryService } from '../ai-providers/ai-provider-registry.service';
-import { AiProviderConfiguration, ConfiguredAiProvider, AiService } from '@packages/agent/ai';
+import { AiFacadeService } from '@packages/agent/facades';
 import ora from 'ora';
 import { BasePromptService } from '@packages/cli-shared';
+
+interface AiProviderConfiguration {
+    defaultProvider: string;
+    fallbackProviders: string[];
+    providers: ConfiguredAiProvider[];
+}
+
+interface ConfiguredAiProvider {
+    name: string;
+    apiKey: string;
+    model: string;
+    temperature: number;
+    maxTokens: number;
+    baseUrl?: string;
+}
 
 @Injectable()
 export class AiProviderPromptService extends BasePromptService {
     constructor(
         private readonly aiProviderRegistry: AiProviderRegistryService,
-        private readonly aiService: AiService,
+        private readonly aiFacade: AiFacadeService,
     ) {
         super();
     }
@@ -438,13 +453,8 @@ export class AiProviderPromptService extends BasePromptService {
         const spinner = ora(`Testing ${config.name} provider...`).start();
 
         try {
-            const result = await this.aiService.testProvider({
-                type: config.name as any,
-                apiKey: config.apiKey,
-                modelName: config.model,
-                temperature: config.temperature,
-                maxTokens: config.maxTokens,
-                baseURL: config.baseUrl,
+            const result = await this.aiFacade.testConnection({
+                providerOverride: config.name,
             });
 
             if (result.success) {

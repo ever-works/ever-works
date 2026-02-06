@@ -47,6 +47,10 @@ export interface PluginSettingsSchemaProperty {
 	requiresRestart?: boolean;
 	/** Enumerated allowed values */
 	enum?: readonly unknown[];
+	/** UI widget type hint (e.g., 'model-select') */
+	widget?: string;
+	/** Whether field should be hidden from the settings UI (from JsonSchema x-hidden) */
+	hidden?: boolean;
 }
 
 /**
@@ -85,7 +89,9 @@ export function toPluginSettingsSchemaProperty(schema: JsonSchema): PluginSettin
 		category: schema['x-category'],
 		placeholder: schema['x-placeholder'],
 		requiresRestart: schema['x-requiresRestart'],
-		enum: schema.enum
+		enum: schema.enum,
+		widget: schema['x-widget'],
+		hidden: schema['x-hidden']
 	};
 }
 

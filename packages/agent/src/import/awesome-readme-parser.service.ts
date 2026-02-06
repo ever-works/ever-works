@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { z } from 'zod';
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
-import { AiService, TaskComplexity } from '@src/ai';
+import { AiFacadeService } from '../facades/ai.facade';
 import type { Category, ItemData, Tag } from '@ever-works/contracts';
 import { slugifyText } from '@src/utils/text.utils';
 import { accumulateMetrics, MetricsAccumulator } from '@src/utils/metrics.util';
@@ -124,7 +124,7 @@ export class AwesomeReadmeParserService {
     private textSplitter: RecursiveCharacterTextSplitter;
     private categoryTextSplitter: RecursiveCharacterTextSplitter;
 
-    constructor(private readonly aiService: AiService) {
+    constructor(private readonly aiFacade: AiFacadeService) {
         this.textSplitter = new RecursiveCharacterTextSplitter({
             chunkSize: this.MAX_CHUNK_SIZE,
             chunkOverlap: this.CHUNK_OVERLAP,
@@ -283,14 +283,14 @@ export class AwesomeReadmeParserService {
         this.logger.log(`[Import] AI call: extracting categories from chunk...`);
         const startTime = Date.now();
 
-        const { result, usage, cost } = await this.aiService.askJson(
+        const { result, usage, cost } = await this.aiFacade.askJson(
             CATEGORY_EXTRACTION_PROMPT,
             extractedCategoriesSchema,
             {
                 variables: { content },
                 temperature: 0.1,
                 routing: {
-                    complexity: TaskComplexity.MEDIUM,
+                    complexity: 'medium',
                     taskId: 'awesome-category-extraction',
                 },
             },
@@ -413,14 +413,14 @@ export class AwesomeReadmeParserService {
                 );
                 const startTime = Date.now();
                 try {
-                    const { result, usage, cost } = await this.aiService.askJson(
+                    const { result, usage, cost } = await this.aiFacade.askJson(
                         ITEM_EXTRACTION_PROMPT,
                         extractedItemsSchema,
                         {
                             variables: { categoryName, categoryId, sectionContent: chunks[i] },
                             temperature: 0.1,
                             routing: {
-                                complexity: TaskComplexity.MEDIUM,
+                                complexity: 'medium',
                                 taskId: 'awesome-item-extraction-chunk',
                             },
                         },
@@ -452,14 +452,14 @@ export class AwesomeReadmeParserService {
             this.logger.log(`[Import] AI call: extracting items from "${categoryName}"...`);
             const startTime = Date.now();
 
-            const { result, usage, cost } = await this.aiService.askJson(
+            const { result, usage, cost } = await this.aiFacade.askJson(
                 ITEM_EXTRACTION_PROMPT,
                 extractedItemsSchema,
                 {
                     variables: { categoryName, categoryId, sectionContent },
                     temperature: 0.1,
                     routing: {
-                        complexity: TaskComplexity.MEDIUM,
+                        complexity: 'medium',
                         taskId: 'awesome-item-extraction',
                     },
                 },

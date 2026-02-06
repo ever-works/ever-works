@@ -5,10 +5,6 @@
     "private": true,
     "license": "UNLICENSED",
     "exports": {
-        "./ai": {
-            "types": "./dist/ai/index.d.ts",
-            "default": "./dist/ai/index.js"
-        },
         "./generators": {
             "types": "./dist/generators/index.d.ts",
             "default": "./dist/generators/index.js"
