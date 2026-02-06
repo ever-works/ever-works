@@ -150,6 +150,9 @@ export class PluginResponseDto implements PluginResponse {
     @ApiPropertyOptional({ description: 'Plugin description' })
     description?: string;
 
+    @ApiPropertyOptional({ description: 'Plugin readme in markdown format' })
+    readme?: string;
+
     @ApiProperty({ description: 'Plugin category' })
     category: PluginCategory;
 

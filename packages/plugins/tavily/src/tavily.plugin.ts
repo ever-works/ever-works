@@ -357,7 +357,7 @@ export class TavilySearchPlugin implements IPlugin, ISearchPlugin, IContentExtra
 			id: this.id,
 			name: this.name,
 			version: this.version,
-			description: 'Web search and content extraction using Tavily API',
+			description: 'Search the web and extract content from websites to build your directory',
 			category: this.category,
 			capabilities: [...this.capabilities],
 			author: { name: 'Ever Works Team' },
@@ -366,7 +366,30 @@ export class TavilySearchPlugin implements IPlugin, ISearchPlugin, IContentExtra
 			systemPlugin: false,
 			autoInstall: true,
 			autoEnable: true,
-			defaultForCapabilities: ['search']
+			defaultForCapabilities: ['search'],
+			readme: [
+				'## What does Tavily do?',
+				'',
+				'Tavily is a search and content extraction service designed for AI applications. It searches the web for relevant results and extracts clean, structured content from web pages, providing the source material that Ever Works uses to generate accurate directory items.',
+				'',
+				'## Why use it?',
+				'',
+				'- **AI-optimized search** — returns results formatted for AI processing, not just links',
+				'- **Content extraction** — pulls clean text from web pages, removing ads and navigation elements',
+				'- **Configurable depth** — choose basic search for speed or advanced search for thoroughness',
+				'- **Domain filtering** — include or exclude specific websites from search results',
+				'',
+				'## How it works in Ever Works',
+				'',
+				'During directory generation, the search facade uses Tavily to find information about each item, discover relevant source URLs, and extract content from web pages. This powers automatic descriptions, source URL resolution, and content enrichment across the generation pipeline.',
+				'',
+				'## Getting started',
+				'',
+				'1. Create an account at [tavily.com](https://tavily.com)',
+				'2. Copy your API key from the Tavily dashboard',
+				'3. Enter the key in the **API Key** field below',
+				'4. Tavily will be used automatically during directory generation'
+			].join('\n')
 		};
 	}
 }

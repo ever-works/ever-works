@@ -131,6 +131,8 @@ export interface PluginResponse {
 	version: string;
 	/** Plugin description */
 	description?: string;
+	/** Plugin readme (markdown) */
+	readme?: string;
 	/** Plugin category */
 	category: PluginCategory;
 	/** Plugin capabilities */

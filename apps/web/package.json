@@ -26,6 +26,8 @@
         "path-to-regexp": "^8.3.0",
         "react": "19.2.3",
         "react-dom": "19.2.3",
+        "react-markdown": "^10.1.0",
+        "remark-gfm": "^4.0.1",
         "sonner": "^2.0.7",
         "tailwind-merge": "^3.4.0",
         "zod": "^3.25.76"
@@ -33,6 +35,7 @@
     "devDependencies": {
         "@eslint/eslintrc": "^3.3.3",
         "@tailwindcss/postcss": "^4.1.18",
+        "@tailwindcss/typography": "^0.5.19",
         "@types/node": "^20.19.27",
         "@types/react": "^19.2.7",
         "@types/react-dom": "^19.2.3",

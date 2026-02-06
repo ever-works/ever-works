@@ -774,6 +774,7 @@ export class PluginsService {
             name: registered.manifest.name,
             version: registered.manifest.version,
             description: manifest.description,
+            readme: manifest.readme,
             category: manifest.category,
             capabilities: [...manifest.capabilities],
             configurationMode: registered.plugin.configurationMode || 'hybrid',

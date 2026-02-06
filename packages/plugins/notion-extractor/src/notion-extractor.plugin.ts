@@ -339,15 +339,37 @@ export class NotionExtractorPlugin implements IPlugin, IContentExtractorPlugin {
 			id: this.id,
 			name: this.name,
 			version: this.version,
-			description:
-				'Extract content from Notion pages. Supports public pages via Splitbee and private pages via Notion API.',
+			description: 'Extract content from Notion pages to use as source material for your directory',
 			category: this.category,
 			capabilities: [...this.capabilities],
 			author: { name: 'Ever Works Team' },
 			license: 'MIT',
 			builtIn: false,
 			systemPlugin: false,
-			autoInstall: false
+			autoInstall: false,
+			readme: [
+				'## What does the Notion Extractor do?',
+				'',
+				'This plugin extracts content from Notion pages and converts it to clean markdown for use as source material during directory generation. It supports both public and private Notion pages.',
+				'',
+				'## Why use it?',
+				'',
+				'- **Leverage existing content** — use Notion pages as source material without manual copy-pasting',
+				'- **Public and private pages** — extracts published pages out of the box and private pages with an API key',
+				'- **Clean markdown output** — preserves headings, formatting, and document structure',
+				'- **No API key required for public pages** — public pages are extracted via the Splitbee API at no cost',
+				'',
+				'## How it works in Ever Works',
+				'',
+				'When a source URL points to a Notion page (notion.so or notion.site), the content extractor facade delegates to this plugin instead of the default extractor. It retrieves the page content as structured markdown, which the AI then uses to generate directory items during the pipeline.',
+				'',
+				'## Getting started',
+				'',
+				'1. Enable the Notion Extractor plugin on this page',
+				'2. For public pages, no additional configuration is required',
+				'3. For private pages, create a Notion integration at [notion.so/my-integrations](https://www.notion.so/my-integrations) and enter the API key in the settings below',
+				'4. Add Notion page URLs as source material when generating your directory'
+			].join('\n')
 		};
 	}
 

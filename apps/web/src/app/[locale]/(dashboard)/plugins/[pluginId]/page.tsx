@@ -1,5 +1,6 @@
 import { pluginsAPI } from '@/lib/api/plugins';
 import { PluginSettings } from '@/components/plugins/PluginSettings';
+import { PluginReadme } from '@/components/plugins/PluginReadme';
 import { getTranslations } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 
@@ -24,6 +25,12 @@ export default async function PluginDetailPage({ params }: PluginDetailPageProps
                         {plugin.description || t('noDescription')}
                     </p>
                 </div>
+
+                {plugin.readme && (
+                    <div className="mb-8 rounded-xl border border-border dark:border-border-dark bg-card dark:bg-card-dark p-6">
+                        <PluginReadme content={plugin.readme} />
+                    </div>
+                )}
 
                 <PluginSettings plugin={plugin} />
             </div>
