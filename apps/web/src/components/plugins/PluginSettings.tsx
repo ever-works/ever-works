@@ -180,7 +180,7 @@ export function PluginSettings({ plugin }: PluginSettingsProps) {
                             <span className="text-xs px-2 py-1 rounded-full bg-surface-secondary dark:bg-surface-secondary-dark text-text-secondary dark:text-text-secondary-dark">
                                 {getCategoryLabel(plugin.category)}
                             </span>
-                            {plugin.capabilities.map((cap) => (
+                            {plugin.capabilities.filter((cap) => cap !== plugin.category).map((cap) => (
                                 <span
                                     key={cap}
                                     className="text-xs px-2 py-1 rounded-full bg-surface-tertiary dark:bg-surface-tertiary-dark text-text-muted dark:text-text-muted-dark"

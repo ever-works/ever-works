@@ -303,28 +303,16 @@ export class PluginManifestValidatorService {
 
         const plugin = everworks.plugin as Record<string, unknown>;
 
-        // Merge with top-level package.json fields
+        // Spread all plugin fields, then apply fallbacks from top-level package.json
         return {
-            id: plugin.id as string,
+            ...plugin,
             name: (plugin.name as string) || (packageJson.name as string),
             version: (plugin.version as string) || (packageJson.version as string),
             description: (plugin.description as string) || (packageJson.description as string),
-            category: plugin.category as PluginCategory,
-            capabilities: (plugin.capabilities as readonly string[]) || [],
-            icon: plugin.icon as PluginManifest['icon'],
-            author: plugin.author as PluginManifest['author'],
-            repository: plugin.repository as PluginManifest['repository'],
             homepage: (plugin.homepage as string) || (packageJson.homepage as string),
             license: (plugin.license as string) || (packageJson.license as string),
-            keywords: plugin.keywords as readonly string[],
-            minPlatformVersion: plugin.minPlatformVersion as string,
-            maxPlatformVersion: plugin.maxPlatformVersion as string,
-            dependencies: plugin.dependencies as Record<string, string>,
-            builtIn: plugin.builtIn as boolean,
-            deprecated: plugin.deprecated as boolean,
-            deprecationMessage: plugin.deprecationMessage as string,
-            readme: plugin.readme as string,
-        };
+            capabilities: (plugin.capabilities as readonly string[]) || [],
+        } as unknown as PluginManifest;
     }
 
     /**
