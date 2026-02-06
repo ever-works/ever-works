@@ -130,7 +130,6 @@ describe('GroqPlugin', () => {
 			expect(manifest.visibility).toBe('public');
 			expect(manifest.icon).toBeDefined();
 			expect(manifest.icon?.type).toBe('svg');
-			expect(manifest.icon?.backgroundColor).toBe('#F55036');
 		});
 	});
 

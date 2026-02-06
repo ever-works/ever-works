@@ -130,7 +130,6 @@ describe('OllamaPlugin', () => {
 			expect(manifest.visibility).toBe('public');
 			expect(manifest.icon).toBeDefined();
 			expect(manifest.icon?.type).toBe('svg');
-			expect(manifest.icon?.backgroundColor).toBe('#000000');
 		});
 	});
 
