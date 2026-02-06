@@ -115,7 +115,13 @@ const CURRENT_CHECKPOINT_VERSION = 1;
  */
 interface FacadeBindingContext {
     readonly directoryId: string;
-    readonly userId?: string;
+    readonly userId: string;
+    readonly providerOverrides?: {
+        readonly ai?: string;
+        readonly search?: string;
+        readonly screenshot?: string;
+        readonly contentExtractor?: string;
+    };
 }
 
 /**
@@ -194,17 +200,20 @@ export class StepPipelineExecutorService {
                 facade.askJson(promptTemplate, schema as any, options, {
                     directoryId: ctx.directoryId,
                     userId: ctx.userId,
+                    providerOverride: ctx.providerOverrides?.ai,
                 }),
             isConfigured: () => facade.isConfigured(),
             testConnection: () =>
                 facade.testConnection({
                     directoryId: ctx.directoryId,
                     userId: ctx.userId,
+                    providerOverride: ctx.providerOverrides?.ai,
                 }),
             getAvailableModels: () =>
                 facade.getAvailableModels({
                     directoryId: ctx.directoryId,
                     userId: ctx.userId,
+                    providerOverride: ctx.providerOverrides?.ai,
                 }),
         };
     }
@@ -220,6 +229,7 @@ export class StepPipelineExecutorService {
                     ...options,
                     userId: ctx.userId,
                     directoryId: ctx.directoryId,
+                    providerOverride: ctx.providerOverrides?.search,
                 } as SearchFacadeOptions),
             isConfigured: () => facade.isConfigured(),
         };
@@ -235,16 +245,19 @@ export class StepPipelineExecutorService {
                 facade.capture(options, {
                     directoryId: ctx.directoryId,
                     userId: ctx.userId,
+                    providerOverride: ctx.providerOverrides?.screenshot,
                 }),
             getSmartImage: (options: SmartImageOptions): Promise<SmartImageResult> =>
                 facade.getSmartImage(options, {
                     directoryId: ctx.directoryId,
                     userId: ctx.userId,
+                    providerOverride: ctx.providerOverrides?.screenshot,
                 }),
             getScreenshotUrl: (options: ScreenshotCaptureOptions): Promise<string | null> =>
                 facade.getScreenshotUrl(options, {
                     directoryId: ctx.directoryId,
                     userId: ctx.userId,
+                    providerOverride: ctx.providerOverrides?.screenshot,
                 }),
             isAvailable: () => facade.isAvailable(),
         };
@@ -264,6 +277,7 @@ export class StepPipelineExecutorService {
                     ...options,
                     userId: ctx.userId,
                     directoryId: ctx.directoryId,
+                    providerOverride: ctx.providerOverrides?.contentExtractor,
                 } as FacadeExtractionOptions),
             isConfigured: () => facade.isConfigured(),
         };
@@ -300,6 +314,7 @@ export class StepPipelineExecutorService {
      */
     private createStepExecutionContext(
         directory: DirectoryReference,
+        providerOverrides?: GenerationRequest['providers'],
         signal?: AbortSignal,
     ): StepExecutionContext {
         const stepLogger: StepLogger = {
@@ -315,10 +330,17 @@ export class StepPipelineExecutorService {
                 this.logger.verbose?.(`[${directory.slug}] ${msg}`, ...args),
         };
 
-        // Create binding context with directory info
+        // Create binding context with directory info and optional provider overrides
+        if (!directory.user?.id) {
+            throw new Error(
+                'User context is required for pipeline execution. ' +
+                    'Ensure DirectoryReference includes a user with an id.',
+            );
+        }
         const facadeContext: FacadeBindingContext = {
             directoryId: directory.id,
-            userId: directory.user?.id,
+            userId: directory.user.id,
+            providerOverrides,
         };
 
         return {
@@ -644,7 +666,12 @@ export class StepPipelineExecutorService {
         options?: PipelineExecutionOptions,
     ): Promise<void> {
         // Create execution context with facades for step executors
-        const execContext = this.createStepExecutionContext(context.directory, options?.signal);
+        // Pass provider overrides from the generation request so user-selected providers are used
+        const execContext = this.createStepExecutionContext(
+            context.directory,
+            context.request.providers,
+            options?.signal,
+        );
 
         if (executor.type === 'builtin') {
             // Execute via DefaultPipelinePlugin

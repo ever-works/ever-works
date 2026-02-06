@@ -918,6 +918,16 @@ export class DataGeneratorService {
             // All plugin-specific configuration passes through as-is
             // The pipeline plugin applies its own defaults via getDefaultValues()
             config: dto.pluginConfig || {},
+            // Provider overrides from the generator form (e.g., user selected "openai" for AI)
+            providers: dto.providers
+                ? {
+                      ai: dto.providers.ai,
+                      search: dto.providers.search,
+                      screenshot: dto.providers.screenshot,
+                      contentExtractor: dto.providers.contentExtractor,
+                      pipeline: dto.providers.pipeline,
+                  }
+                : undefined,
         };
 
         // Convert existing data to ExistingItems (plugin type)

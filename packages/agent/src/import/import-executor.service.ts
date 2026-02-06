@@ -156,7 +156,10 @@ export class ImportExecutorService {
             }
 
             this.logger.log(`Parsing README from ${sourceUrl}`);
-            const parsedData = await this.awesomeReadmeParser.parseReadme(readme.content);
+            const parsedData = await this.awesomeReadmeParser.parseReadme(readme.content, {
+                userId: user.id,
+                directoryId: directory.id,
+            });
 
             this.logger.log(
                 `Parsed ${parsedData.items.length} items, ${parsedData.categories.length} categories`,

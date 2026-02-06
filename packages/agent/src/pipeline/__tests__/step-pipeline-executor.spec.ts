@@ -43,6 +43,7 @@ describe('StepPipelineExecutorService', () => {
         id: 'dir-123',
         name: 'Test Directory',
         slug: 'test-directory',
+        user: { id: 'user-123' },
     };
 
     const mockRequest: GenerationRequest = {
@@ -86,6 +87,11 @@ describe('StepPipelineExecutorService', () => {
                     useValue: {
                         generateText: jest.fn().mockResolvedValue(''),
                         generateStructuredOutput: jest.fn().mockResolvedValue({}),
+                        askJson: jest
+                            .fn()
+                            .mockResolvedValue({ result: {}, usage: null, cost: null }),
+                        testConnection: jest.fn().mockResolvedValue(true),
+                        getAvailableModels: jest.fn().mockResolvedValue([]),
                         isConfigured: jest.fn().mockReturnValue(true),
                     },
                 },
@@ -101,6 +107,9 @@ describe('StepPipelineExecutorService', () => {
                     provide: ScreenshotFacadeService,
                     useValue: {
                         capture: jest.fn().mockResolvedValue(null),
+                        getSmartImage: jest.fn().mockResolvedValue(null),
+                        getScreenshotUrl: jest.fn().mockResolvedValue(null),
+                        isAvailable: jest.fn().mockReturnValue(true),
                         isConfigured: jest.fn().mockReturnValue(true),
                     },
                 },
@@ -392,6 +401,148 @@ describe('StepPipelineExecutorService', () => {
             expect(duration).toBeLessThan(90);
             expect(parallel1.run).toHaveBeenCalled();
             expect(parallel2.run).toHaveBeenCalled();
+        });
+    });
+
+    describe('provider overrides', () => {
+        beforeEach(() => {
+            registry.register(defaultPlugin, {
+                id: 'default-pipeline',
+                name: 'Default Pipeline',
+                version: '1.0.0',
+                description: 'Default pipeline plugin for tests',
+                category: 'pipeline',
+                capabilities: ['default-pipeline'],
+            });
+            registry.updateState('default-pipeline', 'enabled');
+        });
+
+        it('should pass provider overrides from request to bound AI facade', async () => {
+            const aiFacadeMock = {
+                askJson: jest.fn().mockResolvedValue({ result: {}, usage: null, cost: null }),
+                isConfigured: jest.fn().mockReturnValue(true),
+                testConnection: jest.fn().mockResolvedValue(true),
+                getAvailableModels: jest.fn().mockResolvedValue([]),
+            };
+
+            // Override the aiFacade on the service to spy on calls
+            (service as any).aiFacade = aiFacadeMock;
+
+            const requestWithProviders: GenerationRequest = {
+                prompt: 'Generate test items',
+                config: {},
+                providers: {
+                    ai: 'openai',
+                    search: 'tavily',
+                    screenshot: 'screenshotone',
+                    contentExtractor: 'jina',
+                },
+            };
+
+            // Register a step executor that uses the AI facade
+            defaultPlugin.registerStepExecutor('prompt-comparison' as any, {
+                name: 'Prompt Comparison',
+                run: jest.fn().mockImplementation(async (ctx, execContext) => {
+                    // Use the AI facade to trigger the bound call
+                    await execContext.aiFacade.askJson('test prompt', {}, {});
+                    ctx.shouldStop = true;
+                    return ctx;
+                }),
+            });
+
+            // Register remaining step executors
+            for (const step of DefaultPipelinePlugin.getBuiltInSteps()) {
+                if (step.id !== 'prompt-comparison') {
+                    defaultPlugin.registerStepExecutor(step.id as any, {
+                        name: step.name,
+                        run: jest.fn().mockResolvedValue(undefined),
+                    });
+                }
+            }
+
+            await service.execute(mockDirectory, requestWithProviders, mockExisting);
+
+            // Verify the AI facade was called with providerOverride
+            expect(aiFacadeMock.askJson).toHaveBeenCalledWith(
+                'test prompt',
+                expect.anything(),
+                expect.anything(),
+                expect.objectContaining({
+                    directoryId: 'dir-123',
+                    userId: 'user-123',
+                    providerOverride: 'openai',
+                }),
+            );
+        });
+
+        it('should not include providerOverride when request has no providers', async () => {
+            const aiFacadeMock = {
+                askJson: jest.fn().mockResolvedValue({ result: {}, usage: null, cost: null }),
+                isConfigured: jest.fn().mockReturnValue(true),
+                testConnection: jest.fn().mockResolvedValue(true),
+                getAvailableModels: jest.fn().mockResolvedValue([]),
+            };
+
+            (service as any).aiFacade = aiFacadeMock;
+
+            defaultPlugin.registerStepExecutor('prompt-comparison' as any, {
+                name: 'Prompt Comparison',
+                run: jest.fn().mockImplementation(async (ctx, execContext) => {
+                    await execContext.aiFacade.askJson('test prompt', {}, {});
+                    ctx.shouldStop = true;
+                    return ctx;
+                }),
+            });
+
+            for (const step of DefaultPipelinePlugin.getBuiltInSteps()) {
+                if (step.id !== 'prompt-comparison') {
+                    defaultPlugin.registerStepExecutor(step.id as any, {
+                        name: step.name,
+                        run: jest.fn().mockResolvedValue(undefined),
+                    });
+                }
+            }
+
+            await service.execute(mockDirectory, mockRequest, mockExisting);
+
+            // Verify the AI facade was called without providerOverride
+            expect(aiFacadeMock.askJson).toHaveBeenCalledWith(
+                'test prompt',
+                expect.anything(),
+                expect.anything(),
+                expect.objectContaining({
+                    directoryId: 'dir-123',
+                    userId: 'user-123',
+                    providerOverride: undefined,
+                }),
+            );
+        });
+
+        it('should throw when directory has no user context', async () => {
+            const directoryWithoutUser: DirectoryReference = {
+                id: 'dir-no-user',
+                name: 'No User Dir',
+                slug: 'no-user-dir',
+            };
+
+            defaultPlugin.registerStepExecutor('prompt-comparison' as any, {
+                name: 'Prompt Comparison',
+                run: jest.fn().mockResolvedValue(undefined),
+            });
+
+            for (const step of DefaultPipelinePlugin.getBuiltInSteps()) {
+                if (step.id !== 'prompt-comparison') {
+                    defaultPlugin.registerStepExecutor(step.id as any, {
+                        name: step.name,
+                        run: jest.fn().mockResolvedValue(undefined),
+                    });
+                }
+            }
+
+            const result = await service.execute(directoryWithoutUser, mockRequest, mockExisting);
+
+            expect(result.success).toBe(false);
+            expect(result.error).toBeDefined();
         });
     });
 

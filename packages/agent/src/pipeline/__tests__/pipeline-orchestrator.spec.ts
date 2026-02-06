@@ -38,6 +38,7 @@ describe('PipelineOrchestratorService', () => {
         id: 'dir-123',
         name: 'Test Directory',
         slug: 'test-directory',
+        user: { id: 'user-123' },
     };
 
     const mockRequest: GenerationRequest = {

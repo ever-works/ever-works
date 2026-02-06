@@ -79,6 +79,18 @@ export interface GenerationRequest {
 	 * any field names - plugins are fully responsible for their own config.
 	 */
 	readonly config?: Record<string, unknown>;
+
+	/**
+	 * Provider overrides selected by the user in the generator form.
+	 * When set, these override the default/directory-level provider for each facade.
+	 */
+	readonly providers?: {
+		readonly ai?: string;
+		readonly search?: string;
+		readonly screenshot?: string;
+		readonly contentExtractor?: string;
+		readonly pipeline?: string;
+	};
 }
 
 /**

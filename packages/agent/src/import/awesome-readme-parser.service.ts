@@ -138,7 +138,10 @@ export class AwesomeReadmeParserService {
         });
     }
 
-    async parseReadme(content: string): Promise<ParsedAwesomeData> {
+    async parseReadme(
+        content: string,
+        facadeOptions?: { userId: string; directoryId: string },
+    ): Promise<ParsedAwesomeData> {
         const parseErrors: string[] = [];
         const metrics: MetricsAccumulator = {
             total_tokens_used: 0,
@@ -151,7 +154,7 @@ export class AwesomeReadmeParserService {
 
         let categories: Category[];
         try {
-            categories = await this.extractCategories(content, metrics);
+            categories = await this.extractCategories(content, metrics, facadeOptions);
             this.logger.log(`[Import] Step 1/3 complete: Found ${categories.length} categories`);
         } catch (error) {
             this.logger.error('[Import] Category extraction failed, using fallback', error);
@@ -176,6 +179,7 @@ export class AwesomeReadmeParserService {
                     section.categoryName,
                     section.categoryId,
                     metrics,
+                    facadeOptions,
                 );
                 allItems.push(...items);
                 this.logger.log(
@@ -228,10 +232,15 @@ export class AwesomeReadmeParserService {
     private async extractCategories(
         content: string,
         metrics: MetricsAccumulator,
+        facadeOptions?: { userId: string; directoryId: string },
     ): Promise<Category[]> {
         if (content.length <= this.CATEGORY_CHUNK_SIZE) {
             this.logger.log(`[Import] Content fits in single chunk, extracting categories...`);
-            const categories = await this.extractCategoriesFromChunk(content, metrics);
+            const categories = await this.extractCategoriesFromChunk(
+                content,
+                metrics,
+                facadeOptions,
+            );
             this.logger.log(`[Import] Extracted ${categories.length} categories from single chunk`);
             return categories;
         }
@@ -249,7 +258,11 @@ export class AwesomeReadmeParserService {
                 `[Import] Processing category chunk ${i + 1}/${chunks.length} (${chunks[i].length} chars)...`,
             );
             try {
-                const chunkCategories = await this.extractCategoriesFromChunk(chunks[i], metrics);
+                const chunkCategories = await this.extractCategoriesFromChunk(
+                    chunks[i],
+                    metrics,
+                    facadeOptions,
+                );
                 let newCount = 0;
                 for (const cat of chunkCategories) {
                     if (!seenIds.has(cat.id)) {
@@ -279,6 +292,7 @@ export class AwesomeReadmeParserService {
     private async extractCategoriesFromChunk(
         content: string,
         metrics: MetricsAccumulator,
+        facadeOptions?: { userId: string; directoryId: string },
     ): Promise<Category[]> {
         this.logger.log(`[Import] AI call: extracting categories from chunk...`);
         const startTime = Date.now();
@@ -294,6 +308,7 @@ export class AwesomeReadmeParserService {
                     taskId: 'awesome-category-extraction',
                 },
             },
+            facadeOptions,
         );
 
         const duration = Date.now() - startTime;
@@ -398,6 +413,7 @@ export class AwesomeReadmeParserService {
         categoryName: string,
         categoryId: string,
         metrics: MetricsAccumulator,
+        facadeOptions?: { userId: string; directoryId: string },
     ): Promise<ItemData[]> {
         const extractedItems: ItemData[] = [];
 
@@ -424,6 +440,7 @@ export class AwesomeReadmeParserService {
                                 taskId: 'awesome-item-extraction-chunk',
                             },
                         },
+                        facadeOptions,
                     );
 
                     const duration = Date.now() - startTime;
@@ -463,6 +480,7 @@ export class AwesomeReadmeParserService {
                         taskId: 'awesome-item-extraction',
                     },
                 },
+                facadeOptions,
             );
 
             const duration = Date.now() - startTime;
