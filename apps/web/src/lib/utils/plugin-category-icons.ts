@@ -8,43 +8,63 @@ import {
     GitBranch,
     Workflow,
     Plug,
+    FormInput,
+    Puzzle,
+    Wrench,
+    Palette,
     type LucideIcon,
 } from 'lucide-react';
+import { PluginCategory, PLUGIN_CATEGORIES } from '@ever-works/plugin';
 
 /**
  * Mapping of plugin categories to Lucide icons
+ * Uses PluginCategory type from @ever-works/plugin for type safety
  */
-export const CATEGORY_ICONS: Record<string, LucideIcon> = {
-    'ai-provider': Brain,
+export const CATEGORY_ICONS: Record<PluginCategory, LucideIcon> = {
+    'git-provider': GitBranch,
     deployment: Rocket,
-    search: Search,
     screenshot: Camera,
+    search: Search,
     'content-extractor': FileText,
     'data-source': Database,
-    'git-provider': GitBranch,
+    'ai-provider': Brain,
     pipeline: Workflow,
+    form: FormInput,
+    integration: Puzzle,
+    utility: Wrench,
+    theme: Palette,
 };
 
 /**
  * Mapping of plugin categories to human-readable labels
+ * Uses PluginCategory type from @ever-works/plugin for type safety
  */
-export const CATEGORY_LABELS: Record<string, string> = {
-    'ai-provider': 'AI Providers',
+export const CATEGORY_LABELS: Record<PluginCategory, string> = {
+    'git-provider': 'Git Providers',
     deployment: 'Deployment',
-    search: 'Search',
     screenshot: 'Screenshots',
+    search: 'Search',
     'content-extractor': 'Content Extractors',
     'data-source': 'Data Sources',
-    'git-provider': 'Git Providers',
+    'ai-provider': 'AI Providers',
     pipeline: 'Pipeline',
+    form: 'Forms',
+    integration: 'Integrations',
+    utility: 'Utilities',
+    theme: 'Themes',
 };
+
+// Type-safe assertion that all categories are covered
+// This will cause a compile error if a category is missing
+const _assertAllCategoriesHaveIcons: Record<PluginCategory, LucideIcon> = CATEGORY_ICONS;
+const _assertAllCategoriesHaveLabels: Record<PluginCategory, string> = CATEGORY_LABELS;
 
 /**
  * Get the icon component for a plugin category
  * Returns a default Plug icon for unknown categories
  */
 export function getCategoryIcon(category: string): LucideIcon {
-    return CATEGORY_ICONS[category] || Plug;
+    return CATEGORY_ICONS[category as PluginCategory] || Plug;
 }
 
 /**
@@ -52,8 +72,8 @@ export function getCategoryIcon(category: string): LucideIcon {
  * Formats unknown categories by splitting on hyphens and capitalizing
  */
 export function getCategoryLabel(category: string): string {
-    if (CATEGORY_LABELS[category]) {
-        return CATEGORY_LABELS[category];
+    if (CATEGORY_LABELS[category as PluginCategory]) {
+        return CATEGORY_LABELS[category as PluginCategory];
     }
     // Format unknown category: split by hyphen and capitalize each word
     return category
@@ -61,3 +81,9 @@ export function getCategoryLabel(category: string): string {
         .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
         .join(' ');
 }
+
+/**
+ * Get all available plugin categories
+ * Re-exports from @ever-works/plugin for convenience
+ */
+export { PLUGIN_CATEGORIES };

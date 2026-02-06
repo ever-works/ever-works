@@ -34,8 +34,8 @@ export async function GET(
 
     try {
         await oauthAPI.connectCallback(providerId, code, state || undefined);
-        // If returnPath is provided, use it; otherwise redirect to plugin settings page
-        const defaultPath = ROUTES.DASHBOARD_SETTINGS_PLUGIN('git-provider', providerId);
+        // If returnPath is provided, use it; otherwise redirect to plugin category settings page
+        const defaultPath = ROUTES.DASHBOARD_SETTINGS_PLUGIN_CATEGORY('git-provider');
         const href = (returnPath || defaultPath) + '?oauth_connected=true';
         return redirect({ locale, href });
     } catch (error) {

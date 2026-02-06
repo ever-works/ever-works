@@ -64,6 +64,15 @@ export const pluginsAPI = {
         return serverFetch<SettingsMenuResponse>('/plugins/settings-menu');
     },
 
+    /**
+     * List all plugins for a specific category with full details
+     * @param category - The plugin category to filter by
+     */
+    listByCategory: async (category: string): Promise<UserPlugin[]> => {
+        const response = await serverFetch<PluginListResponse>(`/plugins?category=${category}`);
+        return response.plugins;
+    },
+
     // ============================================
     // User Plugin Management
     // ============================================

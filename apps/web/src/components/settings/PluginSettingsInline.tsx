@@ -4,18 +4,21 @@ import { useState, useTransition, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { UserPlugin, PluginSettingsSchemaProperty } from '@/lib/api/plugins';
+import { OAuthConnectionInfo } from '@/lib/api/oauth';
 import { cn } from '@/lib/utils/cn';
 import { Button } from '@/components/ui/button';
 import { Power, PowerOff, Save, ExternalLink, Check, AlertCircle } from 'lucide-react';
 import { updatePluginSettings, enablePlugin, disablePlugin } from '@/app/actions/plugins';
 import { PluginIcon } from '@/components/plugins/PluginIcon';
 import { PluginSettingsField } from '@/components/plugins/PluginSettingsField';
+import { PluginOAuthConnection } from '@/components/settings/PluginOAuthConnection';
 
 interface PluginSettingsInlineProps {
     plugin: UserPlugin;
+    oauthConnection?: OAuthConnectionInfo | null;
 }
 
-export function PluginSettingsInline({ plugin }: PluginSettingsInlineProps) {
+export function PluginSettingsInline({ plugin, oauthConnection }: PluginSettingsInlineProps) {
     const t = useTranslations('dashboard.plugins');
     const router = useRouter();
     const [isPending, startTransition] = useTransition();
@@ -232,6 +235,15 @@ export function PluginSettingsInline({ plugin }: PluginSettingsInlineProps) {
 
             {/* Divider */}
             <hr className="border-border dark:border-border-dark" />
+
+            {/* OAuth Connection Section */}
+            {plugin.capabilities.includes('oauth') && oauthConnection !== undefined && (
+                <PluginOAuthConnection
+                    pluginId={plugin.pluginId}
+                    pluginName={plugin.name}
+                    connection={oauthConnection}
+                />
+            )}
 
             {/* Settings Form */}
             {hasSettings ? (

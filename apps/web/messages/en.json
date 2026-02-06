@@ -1764,7 +1764,23 @@
                 "pipeline": "Pipeline"
             },
             "missingRequiredFields": "Missing required fields: {fields}",
-            "saveError": "Failed to save settings. Please try again."
+            "saveError": "Failed to save settings. Please try again.",
+            "oauth": {
+                "title": "Account Connection",
+                "connected": "Connected",
+                "notConnected": "Not connected",
+                "connect": "Connect",
+                "disconnect": "Disconnect",
+                "reconnect": "Reconnect",
+                "connecting": "Connecting...",
+                "reconnecting": "Reconnecting...",
+                "connectDescription": "Connect your {plugin} account to enable full functionality",
+                "confirmDisconnect": "Are you sure you want to disconnect {plugin}?",
+                "disconnected": "{plugin} disconnected successfully",
+                "connectError": "Failed to connect. Please try again.",
+                "reconnectError": "Failed to reconnect. Please try again.",
+                "disconnectError": "Failed to disconnect. Please try again."
+            }
         },
         "directoryPlugins": {
             "title": "Directory Plugins",
