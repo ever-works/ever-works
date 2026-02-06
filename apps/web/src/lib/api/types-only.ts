@@ -102,7 +102,7 @@ export type {
     // From git-providers.ts (API response types)
     GitProviderInfo,
     GitProviderConnectionInfo,
-} from './git-providers';
+} from './plugins-capabilities/git-providers';
 
 // Re-export plugin types for client components
 export type { GitUser, GitOrganization, GitRepositoryWithPermissions } from '@ever-works/plugin';

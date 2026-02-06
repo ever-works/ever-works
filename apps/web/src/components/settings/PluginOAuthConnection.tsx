@@ -6,7 +6,7 @@ import { connectOAuthProvider, disconnectOAuthProvider } from '@/app/actions/das
 import { toast } from 'sonner';
 import { ROUTES } from '@/lib/constants';
 import { cn } from '@/lib/utils/cn';
-import { OAuthConnectionInfo } from '@/lib/api/oauth';
+import { OAuthConnectionInfo } from '@/lib/api/plugins-capabilities/oauth';
 import Image from 'next/image';
 import { Check, Link as LinkIcon, Unlink, RefreshCw, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';

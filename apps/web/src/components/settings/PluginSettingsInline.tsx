@@ -3,7 +3,7 @@
 import { useCallback } from 'react';
 import { useTranslations } from 'next-intl';
 import { UserPlugin } from '@/lib/api/plugins';
-import { OAuthConnectionInfo } from '@/lib/api/oauth';
+import { OAuthConnectionInfo } from '@/lib/api/plugins-capabilities/oauth';
 import { Button } from '@/components/ui/button';
 import { CollapsibleCard } from '@/components/ui/collapsible-card';
 import { Save, Check, AlertCircle } from 'lucide-react';

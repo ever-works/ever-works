@@ -81,17 +81,28 @@ export class OAuthService {
         return this.oauthFacade.hasValidCredentials(userId, providerId);
     }
 
-    async getOAuthUrl(
-        userId: string,
-        providerId: string,
-        redirectUri: string,
-        state?: string,
-    ): Promise<{ url: string; state: string }> {
+    async getOAuthUrl({
+        userId,
+        providerId,
+        redirectUri,
+        state,
+        forceConsent,
+    }: {
+        userId: string;
+        providerId: string;
+        redirectUri: string;
+        state?: string;
+        forceConsent?: boolean;
+    }): Promise<{ url: string; state: string }> {
         const finalState = state || this.generateState(userId);
         this.storeState(finalState, userId);
 
         const config = await this.getOAuthConfig(providerId, redirectUri);
-        const url = this.oauthFacade.getAuthorizationUrl(providerId, finalState, config);
+        const url = this.oauthFacade.getAuthorizationUrl(providerId, finalState, {
+            ...config,
+            forceConsent,
+        });
+
         return { url, state: finalState };
     }
 

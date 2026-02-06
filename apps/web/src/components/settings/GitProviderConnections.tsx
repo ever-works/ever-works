@@ -10,7 +10,7 @@ import {
     GitProviderInfo,
     GitProviderConnectionInfo,
     GitOrganization,
-} from '@/lib/api/git-providers';
+} from '@/lib/api/plugins-capabilities/git-providers';
 import Link from 'next/link';
 import Image from 'next/image';
 import { cn } from '@/lib/utils/cn';

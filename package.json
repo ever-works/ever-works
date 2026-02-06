@@ -18,6 +18,7 @@
 	"private": true,
 	"scripts": {
 		"dev": "turbo dev",
+		"dev:apps": "turbo dev --filter=./apps/*",
 		"dev:api": "turbo dev --filter=ever-works-api",
 		"dev:web": "turbo dev --filter=ever-works-web",
 		"dev:trigger": "turbo dev:trigger --filter=@packages/tasks",

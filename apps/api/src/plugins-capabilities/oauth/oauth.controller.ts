@@ -57,14 +57,16 @@ export class OAuthController {
         @Param('providerId') providerId: string,
         @Query('callbackUrl') callbackUrl?: string,
         @Query('state') state?: string,
+        @Query('forceConsent') forceConsent?: string,
     ) {
         try {
-            return await this.oauthService.getOAuthUrl(
-                req.user.userId,
+            return await this.oauthService.getOAuthUrl({
+                userId: req.user.userId,
+                redirectUri: callbackUrl || '',
+                forceConsent: forceConsent === 'true',
                 providerId,
-                callbackUrl || '',
                 state,
-            );
+            });
         } catch (error) {
             throw new BadRequestException(
                 error instanceof Error ? error.message : 'Failed to get OAuth URL',
@@ -72,7 +74,7 @@ export class OAuthController {
         }
     }
 
-    @Get(':providerId/callback')
+    @Get(':providerId/callback/plugins')
     @ApiOperation({ summary: 'OAuth callback handler' })
     @ApiParam({ name: 'providerId', description: 'OAuth provider ID' })
     @ApiQuery({ name: 'code', required: true })

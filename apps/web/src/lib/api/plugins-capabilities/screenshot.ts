@@ -1,5 +1,5 @@
 import 'server-only';
-import { serverFetch, serverMutation } from './server-api';
+import { serverFetch, serverMutation } from '../server-api';
 
 export interface CheckAvailabilityResponse {
     status: 'success' | 'error';

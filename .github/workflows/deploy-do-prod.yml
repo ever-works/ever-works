@@ -63,12 +63,12 @@ jobs:
           # GitHub Auth
           GH_CLIENT_ID: ${{ secrets.GH_CLIENT_ID }}
           GH_CLIENT_SECRET: ${{ secrets.GH_CLIENT_SECRET }}
-          GH_CALLBACK_URL: https://app.ever.works/api/auth/github/callback
+          GH_CALLBACK_URL: https://app.ever.works/api/oauth/github/callback
 
           # Google Auth
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
-          GOOGLE_CALLBACK_URL: https://app.ever.works/api/auth/google/callback
+          GOOGLE_CALLBACK_URL: https://app.ever.works/api/oauth/google/callback
 
           # Plugins
           PLUGIN_OPENROUTER_API_KEY: ${{ secrets.PLUGIN_OPENROUTER_API_KEY }}

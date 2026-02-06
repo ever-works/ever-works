@@ -1,5 +1,5 @@
 import 'server-only';
-import { serverFetch } from './server-api';
+import { serverFetch } from '../server-api';
 import type { GitUser, GitOrganization, GitRepositoryWithPermissions } from '@ever-works/plugin';
 
 export type { GitUser, GitOrganization, GitRepositoryWithPermissions };

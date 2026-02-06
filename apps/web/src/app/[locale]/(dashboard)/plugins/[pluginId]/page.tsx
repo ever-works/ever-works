@@ -1,5 +1,5 @@
 import { pluginsAPI } from '@/lib/api/plugins';
-import { oauthAPI, OAuthConnectionInfo } from '@/lib/api/oauth';
+import { oauthAPI, OAuthConnectionInfo } from '@/lib/api/plugins-capabilities/oauth';
 import { PluginSettings } from '@/components/plugins/PluginSettings';
 import { notFound } from 'next/navigation';
 

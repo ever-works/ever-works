@@ -150,7 +150,7 @@ export const authAPI = {
         if (callbackUrl) params.append('callbackUrl', callbackUrl);
         if (state) params.append('state', state);
         const query = params.toString() ? `?${params.toString()}` : '';
-        return serverFetch<OAuthUrlResponse>(`/auth/github/url${query}`);
+        return serverFetch<OAuthUrlResponse>(`/oauth/github/url${query}`);
     },
 
     getGoogleAuthUrl: async (callbackUrl?: string, state?: string) => {
@@ -158,21 +158,21 @@ export const authAPI = {
         if (callbackUrl) params.append('callbackUrl', callbackUrl);
         if (state) params.append('state', state);
         const query = params.toString() ? `?${params.toString()}` : '';
-        return serverFetch<OAuthUrlResponse>(`/auth/google/url${query}`);
+        return serverFetch<OAuthUrlResponse>(`/oauth/google/url${query}`);
     },
 
     connectGoogleCallback: async (code: string, state?: string) => {
         const params = new URLSearchParams({ code });
         if (state) params.append('state', state);
 
-        return serverFetch<AuthResponse>(`/auth/google/callback?${params.toString()}`);
+        return serverFetch<AuthResponse>(`/oauth/google/callback?${params.toString()}`);
     },
 
     connectGitHubCallback: async (code: string, state?: string) => {
         const params = new URLSearchParams({ code });
         if (state) params.append('state', state);
 
-        return serverFetch<AuthResponse>(`/auth/github/callback?${params.toString()}`);
+        return serverFetch<AuthResponse>(`/oauth/github/callback?${params.toString()}`);
     },
 
     // Email Verification

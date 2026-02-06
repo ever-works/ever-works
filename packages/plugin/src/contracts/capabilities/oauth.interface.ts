@@ -5,6 +5,7 @@ export interface OAuthConfig {
 	readonly clientSecret: string;
 	readonly redirectUri: string;
 	readonly scopes: readonly string[];
+	readonly forceConsent?: boolean;
 }
 
 export interface OAuthToken {

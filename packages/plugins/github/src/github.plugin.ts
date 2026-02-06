@@ -399,6 +399,7 @@ export class GitHubPlugin implements IPlugin, IGitProviderPlugin, IOAuthPlugin {
 		const clientId = config?.clientId;
 		const redirectUri = config?.redirectUri;
 		const scopes = config?.scopes || DEFAULT_SCOPES;
+		const forceConsent = config?.forceConsent || false;
 
 		if (!clientId) {
 			throw new Error('GitHub OAuth client ID not configured');
@@ -408,6 +409,7 @@ export class GitHubPlugin implements IPlugin, IGitProviderPlugin, IOAuthPlugin {
 			client_id: clientId,
 			redirect_uri: redirectUri || '',
 			scope: scopes.join(' '),
+			...(forceConsent && { prompt: 'consent' }),
 			state
 		});
 

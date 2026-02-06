@@ -1,5 +1,5 @@
 import { pluginsAPI } from '@/lib/api/plugins';
-import { oauthAPI, OAuthConnectionInfo } from '@/lib/api/oauth';
+import { oauthAPI, OAuthConnectionInfo } from '@/lib/api/plugins-capabilities/oauth';
 import { notFound } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 import { getCategoryLabel } from '@/lib/utils/plugin-category-icons';

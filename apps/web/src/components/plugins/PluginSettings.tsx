@@ -4,7 +4,7 @@ import { useTransition, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { UserPlugin } from '@/lib/api/plugins';
-import type { OAuthConnectionInfo } from '@/lib/api/oauth';
+import type { OAuthConnectionInfo } from '@/lib/api/plugins-capabilities/oauth';
 import { cn } from '@/lib/utils/cn';
 import { Button } from '@/components/ui/button';
 import {

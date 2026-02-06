@@ -59,8 +59,8 @@ export async function connectOAuthProvider(
             params.append('returnPath', returnPath);
         }
 
-        const callbackPath = routeWithParams(ROUTES.API_OAUTH_CALLBACK, { providerId });
         const queryString = params.toString();
+        const callbackPath = routeWithParams(ROUTES.API_OAUTH_PLUGINS_CALLBACK, { providerId });
         const callbackUrl = withAppUrl(callbackPath) + (queryString ? `?${queryString}` : '');
 
         const response = await oauthAPI.getConnectUrl(providerId, callbackUrl, state, forceConsent);

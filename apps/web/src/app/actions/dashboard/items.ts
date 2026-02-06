@@ -1,7 +1,7 @@
 'use server';
 
 import { itemsGeneratorAPI, SubmitItemDto, UpdateItemDto } from '@/lib/api';
-import { screenshotAPI } from '@/lib/api/screenshot';
+import { screenshotAPI } from '@/lib/api';
 import { getAuthFromCookie } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { ROUTES } from '@/lib/constants';

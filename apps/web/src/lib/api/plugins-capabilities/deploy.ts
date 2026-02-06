@@ -1,6 +1,6 @@
 import 'server-only';
-import { serverFetch, serverMutation } from './server-api';
-import { APIResponse } from './types';
+import { serverFetch, serverMutation } from '../server-api';
+import { APIResponse } from '../types';
 
 export interface DeployProvider {
     id: string;

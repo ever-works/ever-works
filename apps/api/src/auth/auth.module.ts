@@ -7,6 +7,7 @@ import { LocalStrategy } from './strategies/local.strategy';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { AuthService } from './services/auth.service';
 import { AuthController } from './controllers/auth.controller';
+import { OAuthController } from './controllers/oauth.controller';
 import { GithubAuthStrategy } from './strategies/github.strategy';
 import { GoogleAuthStrategy } from './strategies/google.strategy';
 import { TokenCleanupService } from './tasks/token-cleanup.service';
@@ -44,7 +45,7 @@ import { jwtConstants } from '../config/constants';
         TokenCleanupService,
         OAuthUrlService,
     ],
-    controllers: [AuthController],
+    controllers: [OAuthController, AuthController],
     exports: [AuthService],
 })
 export class AuthModule {}

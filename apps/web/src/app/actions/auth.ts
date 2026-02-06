@@ -172,7 +172,7 @@ export async function connectProvider(provider: OAuthProvider) {
         const state = generateHexToken(16);
         await setOAuthStateCookie(state);
 
-        const callbackUrl = routeWithParams(ROUTES.API_AUTH_CALLBACK, { provider });
+        const callbackUrl = routeWithParams(ROUTES.API_OAUTH_CALLBACK, { provider });
 
         switch (provider) {
             case OAuthProvider.GITHUB: {

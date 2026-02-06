@@ -75,7 +75,7 @@ spec:
             - name: GH_CLIENT_SECRET
               value: "$GH_CLIENT_SECRET"
             - name: GH_CALLBACK_URL
-              value: https://appstage.ever.works/api/auth/github/callback
+              value: https://appstage.ever.works/api/oauth/github/callback
 
             # Google Auth
             - name: GOOGLE_CLIENT_ID
@@ -83,7 +83,7 @@ spec:
             - name: GOOGLE_CLIENT_SECRET
               value: "$GOOGLE_CLIENT_SECRET"
             - name: GOOGLE_CALLBACK_URL
-              value: https://appstage.ever.works/api/auth/google/callback
+              value: https://appstage.ever.works/api/oauth/google/callback
 
             # Plugins
             - name: PLUGIN_OPENROUTER_API_KEY

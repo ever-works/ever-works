@@ -1,5 +1,5 @@
 import 'server-only';
-import { serverFetch } from './server-api';
+import { serverFetch } from '../server-api';
 import type { OAuthUser } from '@ever-works/plugin';
 
 export type { OAuthUser };
@@ -51,7 +51,7 @@ export const oauthAPI = {
         const params = new URLSearchParams({ code });
         if (state) params.append('state', state);
         return serverFetch<OAuthConnectionInfo>(
-            `/oauth/${providerId}/callback?${params.toString()}`,
+            `/oauth/${providerId}/callback/plugins?${params.toString()}`,
         );
     },
 
