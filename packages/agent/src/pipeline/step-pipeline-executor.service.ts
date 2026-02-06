@@ -225,12 +225,11 @@ export class StepPipelineExecutorService {
         const facade = this.searchFacade;
         return {
             search: (query: string, options?: SearchFacadeOptions): Promise<SearchFacadeResult[]> =>
-                facade.search(query, {
-                    ...options,
+                facade.search(query, options, {
                     userId: ctx.userId,
                     directoryId: ctx.directoryId,
                     providerOverride: ctx.providerOverrides?.search,
-                } as SearchFacadeOptions),
+                }),
             isConfigured: () => facade.isConfigured(),
         };
     }
@@ -273,12 +272,11 @@ export class StepPipelineExecutorService {
                 url: string,
                 options?: FacadeExtractionOptions,
             ): Promise<FacadeExtractedContent | null> =>
-                facade.extractContent(url, {
-                    ...options,
+                facade.extractContent(url, options, {
                     userId: ctx.userId,
                     directoryId: ctx.directoryId,
                     providerOverride: ctx.providerOverrides?.contentExtractor,
-                } as FacadeExtractionOptions),
+                }),
             isConfigured: () => facade.isConfigured(),
         };
     }

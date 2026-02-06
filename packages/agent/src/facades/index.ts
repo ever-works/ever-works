@@ -34,7 +34,6 @@ export {
     SearchFacadeError,
     NoSearchProviderError,
     SearchProviderNotFoundError,
-    type ExtendedSearchFacadeOptions,
 } from './search.facade';
 
 // Re-export SearchFacadeOptions from plugin for convenience
@@ -55,7 +54,6 @@ export {
     ContentExtractorFacadeError,
     NoContentExtractorProviderError,
     ContentExtractorProviderNotFoundError,
-    type ExtendedFacadeExtractionOptions,
 } from './content-extractor.facade';
 
 // Data Source Facade

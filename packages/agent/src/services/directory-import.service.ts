@@ -652,7 +652,10 @@ export class DirectoryImportService {
                 };
             }
 
-            const parsedData = await this.awesomeReadmeParser.parseReadme(readme.content);
+            const parsedData = await this.awesomeReadmeParser.parseReadme(readme.content, {
+                userId: user.id,
+                directoryId: directory.id,
+            });
 
             const syncResult = await this.dataGenerator.updateWithImportedData(
                 directory,

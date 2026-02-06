@@ -1,4 +1,10 @@
-import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
+import {
+    Injectable,
+    NotFoundException,
+    BadRequestException,
+    ForbiddenException,
+    Logger,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
@@ -13,6 +19,7 @@ import {
     type PluginManifest,
     toPluginSettingsSchemaProperty,
 } from '@ever-works/plugin';
+import { AiFacadeService } from '@packages/agent/facades';
 import {
     PluginResponseDto,
     UserPluginResponseDto,
@@ -44,6 +51,7 @@ export class PluginsService {
         private readonly directoryPluginRepository: Repository<DirectoryPluginEntity>,
         private readonly pluginRegistryService: PluginRegistryService,
         private readonly settingsValidator: SettingsSchemaValidatorService,
+        private readonly aiFacade: AiFacadeService,
     ) {}
 
     // ============================================
@@ -260,6 +268,11 @@ export class PluginsService {
             throw new NotFoundException(`Plugin "${pluginId}" not found`);
         }
 
+        // Enforce configurationMode — admin-only plugins cannot have user settings
+        if (settings || secretSettings) {
+            this.enforceConfigurationMode(registered, 'user');
+        }
+
         // Strip masked placeholders to prevent saving literal "********"
         const schema = registered.plugin.settingsSchema;
         const filteredSettings = this.stripMaskedPlaceholders(settings, schema);
@@ -353,6 +366,11 @@ export class PluginsService {
         const registered = this.pluginRegistryService.get(pluginId);
         if (!registered) {
             throw new NotFoundException(`Plugin "${pluginId}" not found`);
+        }
+
+        // Enforce configurationMode — admin-only plugins cannot have user settings
+        if (settings || secretSettings) {
+            this.enforceConfigurationMode(registered, 'user');
         }
 
         const userPlugin = await this.userPluginRepository.findOne({
@@ -475,6 +493,11 @@ export class PluginsService {
             throw new NotFoundException(`Plugin "${pluginId}" not found`);
         }
 
+        // Enforce configurationMode — admin-only plugins cannot have directory settings
+        if (options?.settings) {
+            this.enforceConfigurationMode(registered, 'directory');
+        }
+
         // Strip masked placeholders to prevent saving literal "********"
         const schema = registered.plugin.settingsSchema;
         const filteredSettings = this.stripMaskedPlaceholders(options?.settings, schema);
@@ -587,6 +610,11 @@ export class PluginsService {
         const registered = this.pluginRegistryService.get(pluginId);
         if (!registered) {
             throw new NotFoundException(`Plugin "${pluginId}" not found`);
+        }
+
+        // Enforce configurationMode — admin-only plugins cannot have directory settings
+        if (settings || secretSettings) {
+            this.enforceConfigurationMode(registered, 'directory');
         }
 
         const userPlugin = await this.userPluginRepository.findOne({
@@ -704,9 +732,10 @@ export class PluginsService {
 
     /**
      * List available models for an AI provider plugin.
+     * Uses the AI facade to resolve user-scoped credentials before listing models.
      * Returns an empty array if the plugin does not support listing models.
      */
-    async listPluginModels(pluginId: string, userId: string): Promise<any[]> {
+    async listPluginModels(pluginId: string, userId: string): Promise<readonly any[]> {
         const registered = this.pluginRegistryService.get(pluginId);
         if (!registered) {
             throw new NotFoundException(`Plugin "${pluginId}" not found`);
@@ -718,7 +747,10 @@ export class PluginsService {
         }
 
         try {
-            return await plugin.listModels();
+            return await this.aiFacade.getAvailableModels({
+                providerOverride: pluginId,
+                userId,
+            });
         } catch (error) {
             this.logger.warn(
                 `Failed to list models for plugin ${pluginId}: ${(error as Error).message}`,
@@ -904,6 +936,23 @@ export class PluginsService {
                 message: 'Invalid plugin settings',
                 errors: result.errors,
             });
+        }
+    }
+
+    /**
+     * Enforce configurationMode restrictions.
+     * Throws ForbiddenException if the plugin is admin-only and the caller is trying
+     * to modify settings at user or directory scope.
+     */
+    private enforceConfigurationMode(
+        registered: RegisteredPlugin,
+        scope: 'user' | 'directory',
+    ): void {
+        const configMode = registered.plugin.configurationMode || 'hybrid';
+        if (configMode === 'admin-only') {
+            throw new ForbiddenException(
+                `Plugin "${registered.plugin.id}" is admin-only and cannot be configured at ${scope} level`,
+            );
         }
     }
 

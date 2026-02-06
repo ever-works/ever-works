@@ -11,6 +11,7 @@ import { PluginSettingsService } from '../plugins/services/plugin-settings.servi
 import { DirectoryPluginRepository } from '../plugins/repositories/directory-plugin.repository';
 import {
     BaseFacadeService,
+    BaseFacadeOptions,
     FacadeError,
     NoProviderError,
     ProviderNotFoundError,
@@ -37,11 +38,6 @@ export class ContentExtractorProviderNotFoundError extends ProviderNotFoundError
     }
 }
 
-export interface ExtendedFacadeExtractionOptions extends FacadeExtractionOptions {
-    userId?: string;
-    directoryId?: string;
-}
-
 @Injectable()
 export class ContentExtractorFacadeService
     extends BaseFacadeService
@@ -61,20 +57,19 @@ export class ContentExtractorFacadeService
     async extractContent(
         url: string,
         options?: FacadeExtractionOptions,
+        facadeOptions?: BaseFacadeOptions,
     ): Promise<FacadeExtractedContent | null> {
         try {
-            const extendedOptions = options as ExtendedFacadeExtractionOptions | undefined;
-
             const plugin = await this.resolvePlugin(
                 url,
-                extendedOptions?.providerOverride,
-                extendedOptions?.userId,
-                extendedOptions?.directoryId,
+                facadeOptions?.providerOverride,
+                facadeOptions?.userId,
+                facadeOptions?.directoryId,
             );
 
             const settings = await this.getResolvedSettings(plugin.id, {
-                userId: extendedOptions?.userId,
-                directoryId: extendedOptions?.directoryId,
+                userId: facadeOptions?.userId,
+                directoryId: facadeOptions?.directoryId,
             });
 
             const result = await plugin.extract({ url, settings });

@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { PluginEntity, UserPluginEntity, DirectoryPluginEntity } from '@packages/agent/plugins';
+import { FacadesModule } from '@packages/agent/facades';
+import { DirectoryModule } from '@packages/agent/services';
 import { AuthModule } from '../auth';
 
 import { PluginsController } from './plugins.controller';
@@ -15,6 +17,8 @@ import { SettingsSchemaValidatorService } from './services';
 @Module({
     imports: [
         TypeOrmModule.forFeature([PluginEntity, UserPluginEntity, DirectoryPluginEntity]),
+        FacadesModule,
+        DirectoryModule,
         AuthModule,
     ],
     controllers: [PluginsController],

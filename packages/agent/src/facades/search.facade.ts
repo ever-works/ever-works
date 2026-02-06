@@ -11,6 +11,7 @@ import { PluginSettingsService } from '../plugins/services/plugin-settings.servi
 import { DirectoryPluginRepository } from '../plugins/repositories/directory-plugin.repository';
 import {
     BaseFacadeService,
+    BaseFacadeOptions,
     FacadeError,
     NoProviderError,
     ProviderNotFoundError,
@@ -37,12 +38,6 @@ export class SearchProviderNotFoundError extends ProviderNotFoundError {
     }
 }
 
-export interface ExtendedSearchFacadeOptions extends SearchFacadeOptions {
-    userId?: string;
-    directoryId?: string;
-    providerOverride?: string;
-}
-
 @Injectable()
 export class SearchFacadeService extends BaseFacadeService implements ISearchFacade {
     protected readonly logger = new Logger(SearchFacadeService.name);
@@ -56,17 +51,20 @@ export class SearchFacadeService extends BaseFacadeService implements ISearchFac
         super(registry, settingsService, directoryPluginRepository);
     }
 
-    async search(query: string, options?: SearchFacadeOptions): Promise<SearchFacadeResult[]> {
-        const extendedOptions = options as ExtendedSearchFacadeOptions | undefined;
+    async search(
+        query: string,
+        options?: SearchFacadeOptions,
+        facadeOptions?: BaseFacadeOptions,
+    ): Promise<SearchFacadeResult[]> {
         const plugin = await this.resolveSearchPlugin(
-            extendedOptions?.providerOverride,
-            extendedOptions?.userId,
-            extendedOptions?.directoryId,
+            facadeOptions?.providerOverride,
+            facadeOptions?.userId,
+            facadeOptions?.directoryId,
         );
 
         const settings = await this.getResolvedSettings(plugin.id, {
-            userId: extendedOptions?.userId,
-            directoryId: extendedOptions?.directoryId,
+            userId: facadeOptions?.userId,
+            directoryId: facadeOptions?.directoryId,
         });
 
         const response = await plugin.search({

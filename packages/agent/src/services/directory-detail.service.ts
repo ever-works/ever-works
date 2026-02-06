@@ -78,6 +78,7 @@ export class DirectoryDetailService {
                     variables: { name, prompt },
                     routing: { complexity: 'simple' },
                 },
+                { userId: user.id },
             );
 
             // Generate unique slug

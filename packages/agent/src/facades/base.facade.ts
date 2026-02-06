@@ -91,10 +91,18 @@ export abstract class BaseFacadeService {
                 if (activePlugin) {
                     const registered = this.registry.get(activePlugin.pluginId);
                     if (registered && registered.state === 'enabled') {
-                        return {
-                            id: registered.plugin.id,
-                            name: this.getProviderName(registered.plugin),
-                        };
+                        // Verify plugin is enabled for this scope (directory + user)
+                        const isEnabled = await this.isPluginEnabled(
+                            activePlugin.pluginId,
+                            directoryId,
+                            userId,
+                        );
+                        if (isEnabled) {
+                            return {
+                                id: registered.plugin.id,
+                                name: this.getProviderName(registered.plugin),
+                            };
+                        }
                     }
                 }
             } catch {

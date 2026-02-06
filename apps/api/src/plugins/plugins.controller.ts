@@ -13,6 +13,7 @@ import {
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { JwtAuthGuard, CurrentUser } from '../auth';
 import { AuthenticatedUser } from '@src/auth/types/jwt.types';
+import { DirectoryOwnershipService } from '@packages/agent/services';
 import { PluginsService } from './plugins.service';
 import {
     PluginListResponseDto,
@@ -32,7 +33,10 @@ import {
 @Controller('api')
 @UseGuards(JwtAuthGuard)
 export class PluginsController {
-    constructor(private readonly pluginsService: PluginsService) {}
+    constructor(
+        private readonly pluginsService: PluginsService,
+        private readonly ownershipService: DirectoryOwnershipService,
+    ) {}
 
     // ============================================
     // Plugin Listing
@@ -80,7 +84,7 @@ export class PluginsController {
     async listPluginModels(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('pluginId') pluginId: string,
-    ): Promise<any[]> {
+    ): Promise<readonly any[]> {
         return this.pluginsService.listPluginModels(pluginId, auth.userId);
     }
 
@@ -186,6 +190,7 @@ export class PluginsController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('directoryId') directoryId: string,
     ): Promise<DirectoryPluginListResponseDto> {
+        await this.ownershipService.ensureCanView(directoryId, auth.userId);
         return this.pluginsService.listDirectoryPlugins(directoryId, auth.userId);
     }
 
@@ -210,6 +215,7 @@ export class PluginsController {
         @Param('pluginId') pluginId: string,
         @Body() dto: EnableDirectoryPluginDto,
     ): Promise<DirectoryPluginResponseDto> {
+        await this.ownershipService.ensureCanEdit(directoryId, auth.userId);
         return this.pluginsService.enablePluginForDirectory(directoryId, pluginId, auth.userId, {
             settings: dto.settings,
             activeCapability: dto.activeCapability,
@@ -235,6 +241,7 @@ export class PluginsController {
         @Param('directoryId') directoryId: string,
         @Param('pluginId') pluginId: string,
     ): Promise<DirectoryPluginResponseDto> {
+        await this.ownershipService.ensureCanEdit(directoryId, auth.userId);
         return this.pluginsService.disablePluginForDirectory(directoryId, pluginId, auth.userId);
     }
 
@@ -258,6 +265,7 @@ export class PluginsController {
         @Param('pluginId') pluginId: string,
         @Body() dto: UpdateDirectoryPluginSettingsDto,
     ): Promise<DirectoryPluginResponseDto> {
+        await this.ownershipService.ensureCanEdit(directoryId, auth.userId);
         return this.pluginsService.updateDirectoryPluginSettings(
             directoryId,
             pluginId,
@@ -288,6 +296,7 @@ export class PluginsController {
         @Param('pluginId') pluginId: string,
         @Body() dto: SetActiveCapabilityDto,
     ): Promise<DirectoryPluginResponseDto> {
+        await this.ownershipService.ensureCanEdit(directoryId, auth.userId);
         return this.pluginsService.setActiveCapability(
             directoryId,
             pluginId,

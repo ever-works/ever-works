@@ -153,7 +153,7 @@ describe('ContentExtractorFacadeService', () => {
             });
             registry.get.mockReturnValue(registered);
 
-            const result = await service.extractContent('https://notion.so/page', {
+            const result = await service.extractContent('https://notion.so/page', undefined, {
                 providerOverride: 'notion-extractor',
             });
 
@@ -171,7 +171,7 @@ describe('ContentExtractorFacadeService', () => {
             });
             registry.get.mockReturnValue(registered);
 
-            const result = await service.extractContent('https://github.com/repo', {
+            const result = await service.extractContent('https://github.com/repo', undefined, {
                 providerOverride: 'notion-extractor',
             });
 
@@ -181,7 +181,7 @@ describe('ContentExtractorFacadeService', () => {
         it('should throw error for non-existent provider override', async () => {
             registry.get.mockReturnValue(undefined);
 
-            const result = await service.extractContent('https://example.com', {
+            const result = await service.extractContent('https://example.com', undefined, {
                 providerOverride: 'non-existent',
             });
 
