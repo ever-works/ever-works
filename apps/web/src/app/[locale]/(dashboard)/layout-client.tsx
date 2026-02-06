@@ -1,12 +1,14 @@
 'use client';
 
 import { AuthUser } from '@/lib/auth';
-import { Suspense, useState } from 'react';
+import { Suspense, useState, useCallback } from 'react';
 import DashboardToasts from './toasts';
 import { DashboardSidebar } from '@/components/dashboard/DashboardSidebar';
 import { DashboardHeader } from '@/components/dashboard/DashboardHeader';
 import { GlobalNotificationBanner } from '@/components/dashboard/GlobalNotificationBanner';
 import { Footer } from '@/components/footer';
+import { HelpDrawer } from '@/components/dashboard/HelpDrawer';
+import { useKeyboardShortcuts } from '@/lib/hooks/use-keyboard-shortcuts';
 
 interface DashboardLayoutClientProps {
     user: AuthUser;
@@ -15,6 +17,14 @@ interface DashboardLayoutClientProps {
 
 export function DashboardLayoutClient({ user, children }: DashboardLayoutClientProps) {
     const [sidebarOpen, setSidebarOpen] = useState(true);
+    const [helpOpen, setHelpOpen] = useState(false);
+
+    const openHelp = useCallback(() => setHelpOpen(true), []);
+    const closeHelp = useCallback(() => setHelpOpen(false), []);
+
+    // Register global keyboard shortcuts
+    useKeyboardShortcuts({ onOpenHelp: openHelp });
+
     return (
         <>
             <Suspense fallback={null}>
@@ -41,6 +51,7 @@ export function DashboardLayoutClient({ user, children }: DashboardLayoutClientP
                         user={user}
                         onMenuClick={() => setSidebarOpen(!sidebarOpen)}
                         isSidebarOpen={sidebarOpen}
+                        onHelpClick={openHelp}
                     />
 
                     <GlobalNotificationBanner />
@@ -59,6 +70,8 @@ export function DashboardLayoutClient({ user, children }: DashboardLayoutClientP
                     {/* Footer */}
                 </div>
             </div>
+
+            <HelpDrawer open={helpOpen} onClose={closeHelp} />
         </>
     );
 }

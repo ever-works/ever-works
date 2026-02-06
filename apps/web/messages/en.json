@@ -220,6 +220,31 @@
             "notifications": {
                 "title": "Notifications",
                 "empty": "No new notifications"
+            },
+            "help": {
+                "title": "Help & Resources",
+                "subtitle": "Quick tips and useful links to help you get started",
+                "quickTips": {
+                    "title": "Quick Tips",
+                    "tip1": "Create your first directory by clicking the 'Create Directory' button on the dashboard.",
+                    "tip2": "Use the AI generator to automatically populate your directory with relevant items.",
+                    "tip3": "Connect your GitHub account to sync and deploy your directories as repositories."
+                },
+                "shortcuts": {
+                    "title": "Keyboard Shortcuts",
+                    "search": "Search directories",
+                    "newDirectory": "Create new directory",
+                    "help": "Open help",
+                    "hint": "Use Cmd on Mac or Ctrl on Windows/Linux"
+                },
+                "links": {
+                    "title": "Resources",
+                    "github": "GitHub Repository",
+                    "issues": "Report an Issue",
+                    "docs": "Documentation",
+                    "comingSoon": "Coming soon"
+                },
+                "version": "Ever Works v{version}"
             }
         },
         "directories": {
@@ -1497,6 +1522,11 @@
                     "weeksAgo": "{weeks} weeks ago",
                     "repositoriesLoaded": "repositories loaded",
                     "moreAvailable": "more available",
+                    "ownerLabel": "Repository Owner",
+                    "personalAccount": "Personal Account",
+                    "organizations": "Organizations",
+                    "showingPersonalRepos": "Showing your personal repositories",
+                    "showingOrgRepos": "Showing repositories for {org}",
                     "errors": {
                         "fetchFailed": "Failed to load repositories"
                     }
@@ -1531,6 +1561,7 @@
                     "linking": "Linking...",
                     "linkRepos": "Link repositories"
                 },
+                "detectionFailed": "We could not automatically detect the format. Please select how to import this repository.",
                 "errors": {
                     "urlRequired": "Please enter a GitHub repository URL",
                     "unsupportedFormat": "This repository format is not supported. Please use a Data Repository or Awesome List format.",
@@ -1814,7 +1845,11 @@
                 "pipeline": "Pipeline"
             },
             "missingRequiredFields": "Missing required fields: {fields}",
-            "saveError": "Failed to save settings. Please try again."
+            "saveError": "Failed to save settings. Please try again.",
+            "sendButton": "Send",
+            "errors": {
+                "unableToSend": "Unable to send message."
+            }
         }
     },
     "layout": {
@@ -1995,6 +2030,21 @@
             "username": {
                 "minLength": "Username must contain at least {length} characters"
             }
+        }
+    },
+    "common": {
+        "ui": {
+            "close": "Close",
+            "dismiss": "Dismiss"
+        },
+        "theme": {
+            "toggle": "Toggle theme",
+            "switchToLight": "Switch to light mode",
+            "switchToDark": "Switch to dark mode"
+        },
+        "visibility": {
+            "private": "Private",
+            "public": "Public"
         }
     }
 }

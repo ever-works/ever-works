@@ -631,6 +631,8 @@ export class DirectoriesController {
         @Query('page') page?: string,
         @Query('perPage') perPage?: string,
         @Query('search') search?: string,
+        @Query('owner') owner?: string,
+        @Query('type') type?: 'user' | 'org',
     ): Promise<GetUserRepositoriesResponseDto> {
         const user = await this.authService.getUser(auth.userId);
 
@@ -639,6 +641,8 @@ export class DirectoriesController {
             page: page ? parseInt(page, 10) : undefined,
             perPage: perPage ? parseInt(perPage, 10) : undefined,
             search: search || undefined,
+            owner: owner || undefined,
+            type: type || undefined,
         };
 
         return this.directoryImportService.getUserRepositories(dto, user);
