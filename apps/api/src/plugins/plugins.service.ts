@@ -902,9 +902,7 @@ export class PluginsService {
      * Uses JsonSchema type for type-safe property access.
      *
      * SECURITY: This method filters out sensitive fields:
-     * - x-envVar: Must come from environment only, never return to client
-     * - x-writeOnly: Write-only fields excluded from responses
-     * - x-masked: Values replaced with asterisks
+     * - x-secret: Secret fields are never returned to the client
      */
     private maskSecretSettings(
         settings: Record<string, unknown>,
@@ -915,25 +913,14 @@ export class PluginsService {
 
         const masked: Record<string, unknown> = {};
         for (const [key, value] of Object.entries(settings)) {
-            // propSchema is already typed as JsonSchema from the schema.properties definition
             const propSchema: JsonSchema | undefined = schema.properties[key];
 
-            // SECURITY: x-envVar fields must NEVER be returned (must come from env only)
-            if (propSchema?.['x-envVar']) {
+            // SECURITY: x-secret fields are never returned to the client
+            if (propSchema?.['x-secret']) {
                 continue;
             }
 
-            // Don't include write-only fields
-            if (propSchema?.['x-writeOnly']) {
-                continue;
-            }
-
-            // Mask the value
-            if (propSchema?.['x-masked'] && value) {
-                masked[key] = '********';
-            } else {
-                masked[key] = value;
-            }
+            masked[key] = value;
         }
         return masked;
     }
@@ -974,7 +961,7 @@ export class PluginsService {
     }
 
     /**
-     * Strip masked placeholder values from x-masked fields to prevent saving "********" literally.
+     * Strip masked placeholder values from x-secret fields to prevent saving "********" literally.
      */
     private stripMaskedPlaceholders(
         settings: Record<string, unknown> | undefined,
@@ -982,18 +969,18 @@ export class PluginsService {
     ): Record<string, unknown> | undefined {
         if (!settings) return undefined;
 
-        const maskedFields = new Set<string>();
+        const secretFields = new Set<string>();
         if (schema?.properties) {
             for (const [key, propSchema] of Object.entries(schema.properties)) {
-                if (propSchema['x-masked']) {
-                    maskedFields.add(key);
+                if (propSchema['x-secret']) {
+                    secretFields.add(key);
                 }
             }
         }
 
         const filtered: Record<string, unknown> = {};
         for (const [key, value] of Object.entries(settings)) {
-            if (maskedFields.has(key) && value === MASKED_SECRET_PLACEHOLDER) {
+            if (secretFields.has(key) && value === MASKED_SECRET_PLACEHOLDER) {
                 this.logger.debug(`Stripping masked placeholder for "${key}"`);
                 continue;
             }

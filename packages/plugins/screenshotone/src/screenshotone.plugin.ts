@@ -76,10 +76,8 @@ export class ScreenshotOnePlugin implements IPlugin, IScreenshotPlugin {
 				type: 'string',
 				title: 'Access Key',
 				description: 'Your ScreenshotOne access key. Get one at https://screenshotone.com',
-				// Security markers - encrypt and mask in UI
+				// Security marker - encrypt and never return via API
 				'x-secret': true,
-				'x-masked': true,
-				'x-writeOnly': true,
 				// Environment variable fallback
 				'x-envVar': 'PLUGIN_SCREENSHOTONE_ACCESS_KEY',
 				// Scope - can be set at any level
@@ -89,10 +87,8 @@ export class ScreenshotOnePlugin implements IPlugin, IScreenshotPlugin {
 				type: 'string',
 				title: 'Secret Key',
 				description: 'Your ScreenshotOne secret key for signed URLs (recommended for security)',
-				// Security markers - encrypt and mask in UI
+				// Security marker - encrypt and never return via API
 				'x-secret': true,
-				'x-masked': true,
-				'x-writeOnly': true,
 				// Environment variable fallback
 				'x-envVar': 'PLUGIN_SCREENSHOTONE_SECRET_KEY',
 				// Scope - can be set at any level

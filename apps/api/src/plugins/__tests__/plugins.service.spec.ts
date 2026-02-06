@@ -40,14 +40,11 @@ describe('PluginsService', () => {
                 clientId: {
                     type: 'string',
                     'x-envVar': 'TEST_CLIENT_ID',
-                    'x-writeOnly': true,
                 },
                 clientSecret: {
                     type: 'string',
                     'x-envVar': 'TEST_CLIENT_SECRET',
                     'x-secret': true,
-                    'x-masked': true,
-                    'x-writeOnly': true,
                 },
                 apiBaseUrl: {
                     type: 'string',
@@ -58,13 +55,9 @@ describe('PluginsService', () => {
                     type: 'string',
                     default: 'default-value',
                 },
-                maskedField: {
+                secretField: {
                     type: 'string',
-                    'x-masked': true,
-                },
-                writeOnlyField: {
-                    type: 'string',
-                    'x-writeOnly': true,
+                    'x-secret': true,
                 },
             },
         }) as unknown as JsonSchema;
@@ -176,8 +169,8 @@ describe('PluginsService', () => {
     });
 
     describe('maskSecretSettings security', () => {
-        describe('x-envVar filtering', () => {
-            it('should exclude x-envVar fields from user plugin response', async () => {
+        describe('x-secret filtering', () => {
+            it('should exclude x-secret fields from user plugin response', async () => {
                 const registered = createRegisteredPlugin();
                 jest.spyOn(pluginRegistryService, 'get').mockReturnValue(registered);
                 jest.spyOn(userPluginRepository, 'findOne').mockResolvedValue({
@@ -186,8 +179,7 @@ describe('PluginsService', () => {
                     pluginId: 'test-plugin',
                     enabled: true,
                     settings: {
-                        clientId: 'should-not-appear',
-                        apiBaseUrl: 'also-should-not-appear',
+                        secretField: 'should-not-appear',
                         normalSetting: 'should-appear',
                     },
                     secretSettings: {},
@@ -196,15 +188,14 @@ describe('PluginsService', () => {
 
                 const result = await service.getPlugin('test-plugin', 'user-1');
 
-                // x-envVar fields should NOT be in the response
                 expect(result.settings).toBeDefined();
-                expect(result.settings!.clientId).toBeUndefined();
-                expect(result.settings!.apiBaseUrl).toBeUndefined();
+                // x-secret fields should NOT be in the response
+                expect(result.settings!.secretField).toBeUndefined();
                 // Normal fields should appear
                 expect(result.settings!.normalSetting).toBe('should-appear');
             });
 
-            it('should exclude x-envVar fields from directory plugin response', async () => {
+            it('should exclude x-secret fields from directory plugin response', async () => {
                 const registered = createRegisteredPlugin();
                 jest.spyOn(pluginRegistryService, 'get').mockReturnValue(registered);
                 jest.spyOn(pluginRegistryService, 'getAll').mockReturnValue([registered]);
@@ -228,7 +219,7 @@ describe('PluginsService', () => {
                         pluginId: 'test-plugin',
                         enabled: true,
                         settings: {
-                            clientId: 'should-not-appear',
+                            secretField: 'should-not-appear',
                             normalSetting: 'should-appear',
                         },
                         secretSettings: {},
@@ -240,15 +231,14 @@ describe('PluginsService', () => {
 
                 const plugin = result.plugins.find((p) => p.pluginId === 'test-plugin');
                 expect(plugin).toBeDefined();
-                // x-envVar fields should NOT be in directory settings
                 expect(plugin!.directorySettings).toBeDefined();
-                expect(plugin!.directorySettings!.clientId).toBeUndefined();
+                expect(plugin!.directorySettings!.secretField).toBeUndefined();
                 expect(plugin!.directorySettings!.normalSetting).toBe('should-appear');
             });
         });
 
-        describe('x-writeOnly filtering', () => {
-            it('should exclude x-writeOnly fields from response', async () => {
+        describe('non-secret x-envVar fields pass through', () => {
+            it('should include non-secret x-envVar fields in response', async () => {
                 const registered = createRegisteredPlugin();
                 jest.spyOn(pluginRegistryService, 'get').mockReturnValue(registered);
                 jest.spyOn(userPluginRepository, 'findOne').mockResolvedValue({
@@ -257,7 +247,8 @@ describe('PluginsService', () => {
                     pluginId: 'test-plugin',
                     enabled: true,
                     settings: {
-                        writeOnlyField: 'should-not-appear',
+                        clientId: 'my-client-id',
+                        apiBaseUrl: 'https://custom.api.com',
                         normalSetting: 'should-appear',
                     },
                     secretSettings: {},
@@ -267,61 +258,15 @@ describe('PluginsService', () => {
                 const result = await service.getPlugin('test-plugin', 'user-1');
 
                 expect(result.settings).toBeDefined();
-                expect(result.settings!.writeOnlyField).toBeUndefined();
+                // Non-secret x-envVar fields SHOULD appear (bug fix: no longer stripped)
+                expect(result.settings!.clientId).toBe('my-client-id');
+                expect(result.settings!.apiBaseUrl).toBe('https://custom.api.com');
                 expect(result.settings!.normalSetting).toBe('should-appear');
             });
         });
 
-        describe('x-masked handling', () => {
-            it('should mask x-masked fields with asterisks', async () => {
-                const registered = createRegisteredPlugin();
-                jest.spyOn(pluginRegistryService, 'get').mockReturnValue(registered);
-                jest.spyOn(userPluginRepository, 'findOne').mockResolvedValue({
-                    id: '1',
-                    userId: 'user-1',
-                    pluginId: 'test-plugin',
-                    enabled: true,
-                    settings: {
-                        maskedField: 'secret-value',
-                        normalSetting: 'normal-value',
-                    },
-                    secretSettings: {},
-                    metadata: {},
-                } as any);
-
-                const result = await service.getPlugin('test-plugin', 'user-1');
-
-                expect(result.settings).toBeDefined();
-                expect(result.settings!.maskedField).toBe('********');
-                expect(result.settings!.normalSetting).toBe('normal-value');
-            });
-
-            it('should not mask null or undefined x-masked fields', async () => {
-                const registered = createRegisteredPlugin();
-                jest.spyOn(pluginRegistryService, 'get').mockReturnValue(registered);
-                jest.spyOn(userPluginRepository, 'findOne').mockResolvedValue({
-                    id: '1',
-                    userId: 'user-1',
-                    pluginId: 'test-plugin',
-                    enabled: true,
-                    settings: {
-                        maskedField: null,
-                        normalSetting: 'normal-value',
-                    },
-                    secretSettings: {},
-                    metadata: {},
-                } as any);
-
-                const result = await service.getPlugin('test-plugin', 'user-1');
-
-                expect(result.settings).toBeDefined();
-                // null/undefined values should pass through as-is, not be masked
-                expect(result.settings!.maskedField).toBeNull();
-            });
-        });
-
         describe('combined filtering', () => {
-            it('should correctly filter x-envVar, x-writeOnly, and mask x-masked in single response', async () => {
+            it('should exclude x-secret fields and pass through everything else', async () => {
                 const registered = createRegisteredPlugin();
                 jest.spyOn(pluginRegistryService, 'get').mockReturnValue(registered);
                 jest.spyOn(userPluginRepository, 'findOne').mockResolvedValue({
@@ -331,11 +276,10 @@ describe('PluginsService', () => {
                     enabled: true,
                     settings: {
                         clientId: 'env-var-field',
-                        clientSecret: 'env-var-and-masked',
-                        apiBaseUrl: 'env-var-field-2',
+                        clientSecret: 'secret-env-var',
+                        apiBaseUrl: 'https://custom.api.com',
                         normalSetting: 'normal',
-                        maskedField: 'will-be-masked',
-                        writeOnlyField: 'write-only',
+                        secretField: 'secret-value',
                     },
                     secretSettings: {},
                     metadata: {},
@@ -344,15 +288,12 @@ describe('PluginsService', () => {
                 const result = await service.getPlugin('test-plugin', 'user-1');
 
                 expect(result.settings).toBeDefined();
-                // x-envVar fields excluded
-                expect(result.settings!.clientId).toBeUndefined();
+                // x-secret fields excluded (clientSecret, secretField)
                 expect(result.settings!.clientSecret).toBeUndefined();
-                expect(result.settings!.apiBaseUrl).toBeUndefined();
-                // x-writeOnly excluded
-                expect(result.settings!.writeOnlyField).toBeUndefined();
-                // x-masked is masked
-                expect(result.settings!.maskedField).toBe('********');
-                // normal field passes through
+                expect(result.settings!.secretField).toBeUndefined();
+                // Non-secret fields pass through (including x-envVar fields)
+                expect(result.settings!.clientId).toBe('env-var-field');
+                expect(result.settings!.apiBaseUrl).toBe('https://custom.api.com');
                 expect(result.settings!.normalSetting).toBe('normal');
             });
         });
@@ -742,7 +683,7 @@ describe('PluginsService', () => {
             expect(result.settingsSchema!.properties.userField).toBeDefined();
         });
 
-        it('should include x-writeOnly fields in settings schema', async () => {
+        it('should include x-secret fields in settings schema (field visible, value excluded)', async () => {
             const registered = createRegisteredPlugin();
             jest.spyOn(pluginRegistryService, 'get').mockReturnValue(registered);
             jest.spyOn(userPluginRepository, 'findOne').mockResolvedValue(null);
@@ -750,7 +691,7 @@ describe('PluginsService', () => {
             const result = await service.getPlugin('test-plugin', 'user-1');
 
             expect(result.settingsSchema).toBeDefined();
-            expect(result.settingsSchema!.properties.writeOnlyField).toBeDefined();
+            expect(result.settingsSchema!.properties.secretField).toBeDefined();
         });
 
         it('should include normal fields in settings schema', async () => {
@@ -762,7 +703,6 @@ describe('PluginsService', () => {
 
             expect(result.settingsSchema).toBeDefined();
             expect(result.settingsSchema!.properties.normalSetting).toBeDefined();
-            expect(result.settingsSchema!.properties.maskedField).toBeDefined();
         });
 
         it('should filter required array to exclude filtered fields', async () => {
@@ -883,22 +823,22 @@ describe('PluginsService', () => {
                 pluginId: 'test-plugin',
                 enabled: true,
                 settings: { normalSetting: 'old-value' },
-                secretSettings: { maskedField: 'real-secret' },
+                secretSettings: { secretField: 'real-secret' },
                 metadata: {},
             } as any);
 
             await service.updateUserPluginSettings('test-plugin', 'user-1', undefined, {
-                maskedField: '********', // Should be stripped
+                secretField: '********', // Should be stripped
             });
 
             expect(userPluginRepository.save).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    secretSettings: { maskedField: 'real-secret' }, // Not overwritten
+                    secretSettings: { secretField: 'real-secret' }, // Not overwritten
                 }),
             );
         });
 
-        it('should save actual new value when user changes masked field', async () => {
+        it('should save actual new value when user changes secret field', async () => {
             const registered = createRegisteredPlugin();
             jest.spyOn(pluginRegistryService, 'get').mockReturnValue(registered);
             jest.spyOn(userPluginRepository, 'findOne').mockResolvedValue({
@@ -907,17 +847,17 @@ describe('PluginsService', () => {
                 pluginId: 'test-plugin',
                 enabled: true,
                 settings: {},
-                secretSettings: { maskedField: 'old-secret' },
+                secretSettings: { secretField: 'old-secret' },
                 metadata: {},
             } as any);
 
             await service.updateUserPluginSettings('test-plugin', 'user-1', undefined, {
-                maskedField: 'new-actual-secret',
+                secretField: 'new-actual-secret',
             });
 
             expect(userPluginRepository.save).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    secretSettings: { maskedField: 'new-actual-secret' },
+                    secretSettings: { secretField: 'new-actual-secret' },
                 }),
             );
         });
@@ -932,12 +872,12 @@ describe('PluginsService', () => {
             jest.spyOn(userPluginRepository, 'findOne').mockResolvedValue(null);
 
             await service.enablePluginForUser('test-plugin', 'user-1', undefined, {
-                maskedField: '********',
+                secretField: '********',
             });
 
             expect(userPluginRepository.save).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    secretSettings: {}, // maskedField was stripped
+                    secretSettings: {}, // secretField placeholder was stripped
                 }),
             );
         });
@@ -960,7 +900,7 @@ describe('PluginsService', () => {
                 pluginId: 'test-plugin',
                 enabled: true,
                 settings: {},
-                secretSettings: { maskedField: 'original-secret' },
+                secretSettings: { secretField: 'original-secret' },
                 metadata: {},
             } as any);
 
@@ -969,17 +909,17 @@ describe('PluginsService', () => {
                 'test-plugin',
                 'user-1',
                 undefined,
-                { maskedField: '********' },
+                { secretField: '********' },
             );
 
             expect(directoryPluginRepository.save).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    secretSettings: { maskedField: 'original-secret' },
+                    secretSettings: { secretField: 'original-secret' },
                 }),
             );
         });
 
-        it('should not strip non-placeholder values for non-masked fields', async () => {
+        it('should not strip non-placeholder values for non-secret fields', async () => {
             const registered = createRegisteredPlugin();
             jest.spyOn(pluginRegistryService, 'get').mockReturnValue(registered);
             jest.spyOn(userPluginRepository, 'findOne').mockResolvedValue({
@@ -993,7 +933,7 @@ describe('PluginsService', () => {
             } as any);
 
             await service.updateUserPluginSettings('test-plugin', 'user-1', {
-                normalSetting: '********', // Not a masked field, should be saved as-is
+                normalSetting: '********', // Not a secret field, should be saved as-is
             });
 
             expect(userPluginRepository.save).toHaveBeenCalledWith(

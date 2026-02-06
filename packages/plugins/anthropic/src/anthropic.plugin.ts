@@ -39,8 +39,6 @@ export class AnthropicPlugin extends BaseAiProvider {
 				title: 'Anthropic API Key',
 				description: 'Connects to Anthropic for content generation and chat',
 				'x-secret': true,
-				'x-masked': true,
-				'x-writeOnly': true,
 				'x-scope': 'user'
 			},
 			defaultModel: {

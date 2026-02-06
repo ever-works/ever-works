@@ -51,7 +51,6 @@ describe('VercelPlugin', () => {
 			expect(apiTokenSchema).toBeDefined();
 			expect(apiTokenSchema['x-secret']).toBe(true);
 			expect(apiTokenSchema['x-scope']).toBe('user');
-			expect(apiTokenSchema['x-writeOnly']).toBe(true);
 		});
 
 		it('should have optional defaultTeamScope field', () => {
@@ -139,7 +138,7 @@ describe('VercelPlugin', () => {
 
 	describe('deployment methods', () => {
 		it('should return pending result from deploy', async () => {
-			const result = await plugin.deploy({ projectName: 'test-project', teamScope: 'team-1' }, 'token');
+			const result = await plugin.deploy({ projectName: 'test-project', teamScope: 'team-1' } as any, 'token');
 			expect(result.status).toBe('pending');
 			expect(result.id).toBeDefined();
 			expect(result.createdAt).toBeDefined();

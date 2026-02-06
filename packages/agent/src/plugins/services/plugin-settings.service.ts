@@ -673,12 +673,7 @@ export class PluginSettingsService {
             const prop = propSchema as JsonSchema & {
                 'x-envVar'?: string;
                 'x-secret'?: boolean;
-                'x-masked'?: boolean;
-                'x-writeOnly'?: boolean;
                 'x-scope'?: SettingScope;
-                'x-category'?: string;
-                'x-placeholder'?: string;
-                'x-requiresRestart'?: boolean;
             };
 
             definitions.push({
@@ -687,11 +682,6 @@ export class PluginSettingsService {
                 scope: prop['x-scope'] || 'global',
                 envVar: prop['x-envVar'],
                 secret: prop['x-secret'] || false,
-                masked: prop['x-masked'] || false,
-                writeOnly: prop['x-writeOnly'] || false,
-                category: prop['x-category'],
-                placeholder: prop['x-placeholder'],
-                requiresRestart: prop['x-requiresRestart'] || false,
                 defaultValue: prop.default,
             });
         }
@@ -747,16 +737,11 @@ export class PluginSettingsService {
     /**
      * Check if any of the changed settings require a plugin restart
      */
-    private checkRequiresRestart(definitions: SettingDefinition[], changedKeys: string[]): boolean {
-        const defMap = new Map(definitions.map((d) => [d.key, d]));
-
-        for (const key of changedKeys) {
-            const def = defMap.get(key);
-            if (def?.requiresRestart) {
-                return true;
-            }
-        }
-
+    private checkRequiresRestart(
+        _definitions: SettingDefinition[],
+        _changedKeys: string[],
+    ): boolean {
+        // No plugins currently use x-requiresRestart; always returns false.
         return false;
     }
 
@@ -845,7 +830,7 @@ export class PluginSettingsService {
     }
 
     /**
-     * Strip masked placeholder values from settings based on schema x-masked fields.
+     * Strip masked placeholder values from settings based on schema x-secret fields.
      */
     private stripMaskedPlaceholders(
         settings: Record<string, unknown>,
@@ -856,7 +841,7 @@ export class PluginSettingsService {
         const filtered: Record<string, unknown> = {};
         for (const [key, value] of Object.entries(settings)) {
             const propSchema = schema.properties[key] as JsonSchema | undefined;
-            if (propSchema?.['x-masked'] && value === MASKED_SECRET_PLACEHOLDER) {
+            if (propSchema?.['x-secret'] && value === MASKED_SECRET_PLACEHOLDER) {
                 this.logger.debug(`Stripping masked placeholder for field "${key}"`);
                 continue;
             }

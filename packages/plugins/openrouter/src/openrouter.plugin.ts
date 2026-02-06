@@ -48,8 +48,6 @@ export class OpenRouterPlugin extends BaseAiProvider {
 				title: 'OpenRouter API Key',
 				description: 'Connects to OpenRouter to access models from multiple providers',
 				'x-secret': true,
-				'x-masked': true,
-				'x-writeOnly': true,
 				'x-scope': 'user',
 				'x-envVar': 'PLUGIN_OPENROUTER_API_KEY'
 			},

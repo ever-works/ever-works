@@ -62,7 +62,6 @@ export class GitHubPlugin implements IPlugin, IGitProviderPlugin, IOAuthPlugin {
 				title: 'Client ID',
 				description: 'GitHub OAuth App Client ID',
 				'x-envVar': 'PLUGIN_GITHUB_CLIENT_ID',
-				'x-writeOnly': true,
 				'x-adminOnly': true,
 				'x-scope': 'global'
 			},
@@ -71,8 +70,6 @@ export class GitHubPlugin implements IPlugin, IGitProviderPlugin, IOAuthPlugin {
 				title: 'Client Secret',
 				description: 'GitHub OAuth App Client Secret',
 				'x-secret': true,
-				'x-masked': true,
-				'x-writeOnly': true,
 				'x-envVar': 'PLUGIN_GITHUB_CLIENT_SECRET',
 				'x-adminOnly': true,
 				'x-scope': 'global'

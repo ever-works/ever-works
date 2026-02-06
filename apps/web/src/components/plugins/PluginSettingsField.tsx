@@ -27,8 +27,7 @@ export function PluginSettingsField({
 
     const label = schema.title || name;
     const description = schema.description;
-    const isSecret = schema.secret || schema.masked;
-    const isMasked = schema.masked && value === '********';
+    const isSecret = schema.secret;
 
     // Determine input type
     const getInputType = () => {
@@ -117,15 +116,9 @@ export function PluginSettingsField({
             <div className="relative">
                 <input
                     type={getInputType()}
-                    value={isMasked ? '' : String(value ?? schema.default ?? '')}
+                    value={String(value ?? schema.default ?? '')}
                     onChange={(e) => onChange(e.target.value || undefined)}
-                    placeholder={
-                        isMasked
-                            ? '••••••••'
-                            : schema.default !== undefined
-                              ? String(schema.default)
-                              : undefined
-                    }
+                    placeholder={schema.default !== undefined ? String(schema.default) : undefined}
                     className={cn(
                         'w-full px-3 py-2 rounded-lg border border-border dark:border-border-dark',
                         'bg-surface-secondary dark:bg-surface-secondary-dark',

@@ -27,24 +27,14 @@ export interface PluginSettingsSchemaProperty {
 	description?: string;
 	/** Default value */
 	default?: unknown;
-	/** Whether this is a secret field (from JsonSchema x-secret) */
+	/** Whether this is a secret field: never returned in API responses, rendered as password input (from JsonSchema x-secret) */
 	secret?: boolean;
-	/** Whether this field should be masked in UI (from JsonSchema x-masked) */
-	masked?: boolean;
-	/** Whether this field is write-only (from JsonSchema x-writeOnly) */
-	writeOnly?: boolean;
 	/** Whether this field is admin-only (from JsonSchema x-adminOnly) */
 	adminOnly?: boolean;
 	/** Environment variable name if field is env-only (from JsonSchema x-envVar) */
 	envVar?: string;
 	/** Setting scope: global, user, or directory (from JsonSchema x-scope) */
 	scope?: SettingScopeApi;
-	/** Category for grouping settings in UI (from JsonSchema x-category) */
-	category?: string;
-	/** Placeholder text for input fields (from JsonSchema x-placeholder) */
-	placeholder?: string;
-	/** Whether changes require plugin restart (from JsonSchema x-requiresRestart) */
-	requiresRestart?: boolean;
 	/** Enumerated allowed values */
 	enum?: readonly unknown[];
 	/** UI widget type hint (e.g., 'model-select') */
@@ -81,14 +71,9 @@ export function toPluginSettingsSchemaProperty(schema: JsonSchema): PluginSettin
 		description: schema.description,
 		default: schema.default,
 		secret: schema['x-secret'],
-		masked: schema['x-masked'],
-		writeOnly: schema['x-writeOnly'],
 		adminOnly: schema['x-adminOnly'],
 		envVar: schema['x-envVar'],
 		scope: schema['x-scope'] || 'global',
-		category: schema['x-category'],
-		placeholder: schema['x-placeholder'],
-		requiresRestart: schema['x-requiresRestart'],
 		enum: schema.enum,
 		widget: schema['x-widget'],
 		hidden: schema['x-hidden']

@@ -98,15 +98,11 @@ describe('ScreenshotOnePlugin', () => {
 		it('should mark accessKey as secret', () => {
 			const properties = plugin.settingsSchema.properties as Record<string, any>;
 			expect(properties.accessKey['x-secret']).toBe(true);
-			expect(properties.accessKey['x-masked']).toBe(true);
-			expect(properties.accessKey['x-writeOnly']).toBe(true);
 		});
 
 		it('should mark secretKey as secret', () => {
 			const properties = plugin.settingsSchema.properties as Record<string, any>;
 			expect(properties.secretKey['x-secret']).toBe(true);
-			expect(properties.secretKey['x-masked']).toBe(true);
-			expect(properties.secretKey['x-writeOnly']).toBe(true);
 		});
 
 		it('should have environment variable fallbacks', () => {

@@ -39,8 +39,6 @@ export class GroqPlugin extends BaseAiProvider {
 				title: 'Groq API Key',
 				description: 'Connects to Groq for fast AI content generation and chat',
 				'x-secret': true,
-				'x-masked': true,
-				'x-writeOnly': true,
 				'x-scope': 'user'
 			},
 			defaultModel: {

@@ -63,10 +63,8 @@ export class TavilySearchPlugin implements IPlugin, ISearchPlugin, IContentExtra
 				type: 'string',
 				title: 'API Key',
 				description: 'Your Tavily API key. Get one at https://tavily.com',
-				// Security markers - encrypt and mask in UI
+				// Security marker - encrypt and never return via API
 				'x-secret': true,
-				'x-masked': true,
-				'x-writeOnly': true,
 				// Environment variable fallback
 				'x-envVar': 'PLUGIN_TAVILY_API_KEY',
 				// Scope - can be set at any level

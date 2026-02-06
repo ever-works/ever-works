@@ -129,30 +129,14 @@ export interface JsonSchema {
 	// UI extensions (for form generation)
 	/** UI widget type hint */
 	readonly 'x-widget'?: string;
-	/** UI display order */
-	readonly 'x-order'?: number;
-	/** UI group/section */
-	readonly 'x-group'?: string;
-	/** UI visibility condition */
-	readonly 'x-visible-if'?: Record<string, unknown>;
-	/** Whether field is secret (e.g., API keys) */
+	/** Whether field is secret: never returned in API responses, rendered as password input */
 	readonly 'x-secret'?: boolean;
-	/** Placeholder text */
-	readonly 'x-placeholder'?: string;
 
 	// Plugin settings extensions
 	/** Environment variable fallback (checked when no other setting is found) */
 	readonly 'x-envVar'?: string;
 	/** Setting scope: global, user, or directory */
 	readonly 'x-scope'?: 'global' | 'user' | 'directory';
-	/** Category for grouping settings in UI */
-	readonly 'x-category'?: string;
-	/** Whether changes require plugin restart */
-	readonly 'x-requiresRestart'?: boolean;
-	/** Whether field should be masked in UI (for secrets) */
-	readonly 'x-masked'?: boolean;
-	/** Whether field should be write-only (not readable after set) */
-	readonly 'x-writeOnly'?: boolean;
 	/** Whether field is admin-only (not visible to regular users) */
 	readonly 'x-adminOnly'?: boolean;
 	/** Whether field should be hidden from the settings UI entirely */

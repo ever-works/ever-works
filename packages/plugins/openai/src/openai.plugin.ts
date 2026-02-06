@@ -39,8 +39,6 @@ export class OpenAiPlugin extends BaseAiProvider {
 				title: 'OpenAI API Key',
 				description: 'Connects to OpenAI for content generation and chat',
 				'x-secret': true,
-				'x-masked': true,
-				'x-writeOnly': true,
 				'x-scope': 'user'
 			},
 			defaultModel: {

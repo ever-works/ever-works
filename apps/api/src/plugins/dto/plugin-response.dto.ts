@@ -76,14 +76,10 @@ export class PluginSettingsSchemaPropertyDto implements PluginSettingsSchemaProp
     @ApiPropertyOptional({ description: 'Default value' })
     default?: unknown;
 
-    @ApiPropertyOptional({ description: 'Is this a secret field' })
+    @ApiPropertyOptional({
+        description: 'Is this a secret field (never returned in API responses)',
+    })
     secret?: boolean;
-
-    @ApiPropertyOptional({ description: 'Should this field be masked in UI' })
-    masked?: boolean;
-
-    @ApiPropertyOptional({ description: 'Is this field write-only (never returned via API)' })
-    writeOnly?: boolean;
 
     @ApiPropertyOptional({ description: 'Is this field admin-only' })
     adminOnly?: boolean;
@@ -97,15 +93,6 @@ export class PluginSettingsSchemaPropertyDto implements PluginSettingsSchemaProp
         default: 'global',
     })
     scope?: SettingScopeApi;
-
-    @ApiPropertyOptional({ description: 'Category for grouping settings in UI' })
-    category?: string;
-
-    @ApiPropertyOptional({ description: 'Placeholder text for input fields' })
-    placeholder?: string;
-
-    @ApiPropertyOptional({ description: 'Whether changes require plugin restart' })
-    requiresRestart?: boolean;
 
     @ApiPropertyOptional({ description: 'Enum values', type: [String] })
     enum?: readonly unknown[];

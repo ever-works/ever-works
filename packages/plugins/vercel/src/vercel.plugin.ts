@@ -37,8 +37,6 @@ export class VercelPlugin implements IPlugin, IDeploymentPlugin {
 				title: 'Vercel API Token',
 				description: 'Your personal Vercel API token. Get one from https://vercel.com/account/tokens',
 				'x-secret': true,
-				'x-masked': true,
-				'x-writeOnly': true,
 				'x-scope': 'user'
 				// Note: NO 'x-envVar' - this is user-required mode
 			},

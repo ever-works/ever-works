@@ -40,8 +40,6 @@ describe('AnthropicPlugin', () => {
 			expect(apiKeySchema).toBeDefined();
 			expect(apiKeySchema.type).toBe('string');
 			expect(apiKeySchema['x-secret']).toBe(true);
-			expect(apiKeySchema['x-masked']).toBe(true);
-			expect(apiKeySchema['x-writeOnly']).toBe(true);
 			expect(apiKeySchema['x-scope']).toBe('user');
 		});
 

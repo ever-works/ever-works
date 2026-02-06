@@ -39,8 +39,6 @@ describe('OpenRouterPlugin', () => {
 			const apiKeySchema = plugin.settingsSchema.properties?.apiKey as any;
 			expect(apiKeySchema).toBeDefined();
 			expect(apiKeySchema['x-secret']).toBe(true);
-			expect(apiKeySchema['x-masked']).toBe(true);
-			expect(apiKeySchema['x-writeOnly']).toBe(true);
 			expect(apiKeySchema['x-scope']).toBe('user');
 			expect(apiKeySchema['x-envVar']).toBe('PLUGIN_OPENROUTER_API_KEY');
 		});

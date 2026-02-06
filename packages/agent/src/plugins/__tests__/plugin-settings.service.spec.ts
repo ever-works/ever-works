@@ -961,42 +961,7 @@ describe('PluginSettingsService', () => {
     });
 
     describe('requiresRestart handling', () => {
-        it('should include requiresRestart in event when setting has x-requiresRestart', async () => {
-            const schema: JsonSchema = {
-                type: 'object',
-                properties: {
-                    port: {
-                        type: 'number',
-                        default: 3000,
-                        'x-requiresRestart': true,
-                    },
-                    debug: {
-                        type: 'boolean',
-                        default: false,
-                    },
-                },
-            } as unknown as JsonSchema;
-
-            const plugin = createMockPlugin(schema);
-            jest.spyOn(registry, 'get').mockReturnValue(createRegisteredPlugin(plugin));
-            jest.spyOn(pluginRepository, 'findByPluginId').mockResolvedValue({
-                id: '1',
-                pluginId: 'test-plugin',
-                settings: {},
-                secretSettings: {},
-            } as any);
-
-            await service.updateAdminSettings('test-plugin', { port: 8080 });
-
-            expect(eventEmitter.emit).toHaveBeenCalledWith(
-                PluginEvents.SETTINGS_CHANGED,
-                expect.objectContaining({
-                    requiresRestart: true,
-                }),
-            );
-        });
-
-        it('should not set requiresRestart when setting does not have x-requiresRestart', async () => {
+        it('should always emit requiresRestart as false (no plugins use x-requiresRestart)', async () => {
             const schema: JsonSchema = {
                 type: 'object',
                 properties: {
@@ -1187,19 +1152,17 @@ describe('PluginSettingsService', () => {
     });
 
     describe('stripMaskedPlaceholders', () => {
-        const createSchemaWithMaskedFields = (): JsonSchema =>
+        const createSchemaWithSecretFields = (): JsonSchema =>
             ({
                 type: 'object',
                 properties: {
                     accessToken: {
                         type: 'string',
                         'x-secret': true,
-                        'x-masked': true,
                     },
                     apiKey: {
                         type: 'string',
                         'x-secret': true,
-                        'x-masked': true,
                     },
                     normalSetting: {
                         type: 'string',
@@ -1209,7 +1172,7 @@ describe('PluginSettingsService', () => {
             }) as unknown as JsonSchema;
 
         it('should strip masked placeholder on updateAdminSettings', async () => {
-            const schema = createSchemaWithMaskedFields();
+            const schema = createSchemaWithSecretFields();
             const plugin = createMockPlugin(schema);
             jest.spyOn(registry, 'get').mockReturnValue(createRegisteredPlugin(plugin));
             jest.spyOn(pluginRepository, 'findByPluginId').mockResolvedValue({
@@ -1231,8 +1194,8 @@ describe('PluginSettingsService', () => {
             );
         });
 
-        it('should save actual new value when user changes masked field', async () => {
-            const schema = createSchemaWithMaskedFields();
+        it('should save actual new value when user changes secret field', async () => {
+            const schema = createSchemaWithSecretFields();
             const plugin = createMockPlugin(schema);
             jest.spyOn(registry, 'get').mockReturnValue(createRegisteredPlugin(plugin));
             jest.spyOn(pluginRepository, 'findByPluginId').mockResolvedValue({
@@ -1254,7 +1217,7 @@ describe('PluginSettingsService', () => {
         });
 
         it('should strip masked placeholder on updateUserSettings', async () => {
-            const schema = createSchemaWithMaskedFields();
+            const schema = createSchemaWithSecretFields();
             const plugin = createMockPlugin(schema);
             jest.spyOn(registry, 'get').mockReturnValue(createRegisteredPlugin(plugin));
             jest.spyOn(pluginRepository, 'findByPluginId').mockResolvedValue({
@@ -1285,7 +1248,7 @@ describe('PluginSettingsService', () => {
         });
 
         it('should strip masked placeholder on updateDirectorySettings', async () => {
-            const schema = createSchemaWithMaskedFields();
+            const schema = createSchemaWithSecretFields();
             const plugin = createMockPlugin(schema);
             jest.spyOn(registry, 'get').mockReturnValue(createRegisteredPlugin(plugin));
             jest.spyOn(pluginRepository, 'findByPluginId').mockResolvedValue({
@@ -1315,8 +1278,8 @@ describe('PluginSettingsService', () => {
             );
         });
 
-        it('should not strip "********" for non-masked fields', async () => {
-            const schema = createSchemaWithMaskedFields();
+        it('should not strip "********" for non-secret fields', async () => {
+            const schema = createSchemaWithSecretFields();
             const plugin = createMockPlugin(schema);
             jest.spyOn(registry, 'get').mockReturnValue(createRegisteredPlugin(plugin));
             jest.spyOn(pluginRepository, 'findByPluginId').mockResolvedValue({
