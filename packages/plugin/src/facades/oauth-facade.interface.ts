@@ -1,4 +1,4 @@
-import type { OAuthConfig, OAuthToken, OAuthUser } from '../../contracts/capabilities/oauth.interface.js';
+import type { OAuthConfig, OAuthToken, OAuthUser } from '../contracts/capabilities/oauth.interface.js';
 
 /**
  * Information about an available OAuth provider.

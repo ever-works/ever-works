@@ -1,8 +1,8 @@
-import type { IAiFacade } from './facades/ai-facade.interface.js';
-import type { ISearchFacade } from './facades/search-facade.interface.js';
-import type { IScreenshotFacade } from './facades/screenshot-facade.interface.js';
-import type { IContentExtractorFacade } from './facades/content-extractor-facade.interface.js';
-import type { IDataSourceFacade } from './facades/data-source-facade.interface.js';
+import type { IAiFacade } from '../facades/ai-facade.interface.js';
+import type { ISearchFacade } from '../facades/search-facade.interface.js';
+import type { IScreenshotFacade } from '../facades/screenshot-facade.interface.js';
+import type { IContentExtractorFacade } from '../facades/content-extractor-facade.interface.js';
+import type { IDataSourceFacade } from '../facades/data-source-facade.interface.js';
 import type { DirectoryReference, UserReference } from './generation-context.interface.js';
 
 /**

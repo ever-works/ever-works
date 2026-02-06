@@ -5,4 +5,3 @@ export * from './parallel-group.types.js';
 export * from './executable-pipeline.types.js';
 export * from './step-execution-context.interface.js';
 export * from './built-in-step-executor.interface.js';
-export * from './facades/index.js';

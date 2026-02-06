@@ -1,5 +1,5 @@
 import type { MutableItemData, Category, Tag, Brand } from '@ever-works/contracts';
-import type { DataSourceFilterContext } from '../../contracts/capabilities/data-source.interface.js';
+import type { DataSourceFilterContext } from '../contracts/capabilities/data-source.interface.js';
 
 export interface DataSourceFacadeOptions {
 	/** User ID for settings resolution */

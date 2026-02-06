@@ -1758,7 +1758,10 @@
             "newChat": "New chat",
             "loadingConversation": "Loading conversation…",
             "inputPlaceholder": "Describe the directory you want to create...",
-            "sendButton": "Send"
+            "sendButton": "Send",
+            "errors": {
+                "unableToSend": "Unable to send message"
+            }
         },
         "plugins": {
             "title": "Plugins",

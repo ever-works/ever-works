@@ -1,4 +1,4 @@
-import type { AiModel } from '../../contracts/capabilities/ai-provider.interface.js';
+import type { AiModel } from '../contracts/capabilities/ai-provider.interface.js';
 import type { FacadeOptions } from './facade-options.interface.js';
 
 /**

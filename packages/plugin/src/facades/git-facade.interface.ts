@@ -1,4 +1,4 @@
-import type { GitCommitter, GitFileChange } from '../../contracts/capabilities/git-provider.interface.js';
+import type { GitCommitter, GitFileChange } from '../contracts/capabilities/git-provider.interface.js';
 
 /**
  * Options for cloning or pulling a repository.

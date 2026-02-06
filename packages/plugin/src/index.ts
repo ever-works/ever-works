@@ -13,6 +13,9 @@ export * from './contracts/index.js';
 // Pipeline types and utilities
 export * from './pipeline/index.js';
 
+// Facade interfaces
+export * from './facades/index.js';
+
 // Event types
 export * from './events/index.js';
 
