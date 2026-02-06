@@ -167,14 +167,14 @@ export async function logout() {
 // OAuth
 // =================
 
-export async function connectProvider(provider: OAuthProvider) {
+export async function connectProvider(providerId: OAuthProvider) {
     try {
         const state = generateHexToken(16);
         await setOAuthStateCookie(state);
 
-        const callbackUrl = routeWithParams(ROUTES.API_OAUTH_CALLBACK, { provider });
+        const callbackUrl = routeWithParams(ROUTES.API_OAUTH_CALLBACK, { providerId });
 
-        switch (provider) {
+        switch (providerId) {
             case OAuthProvider.GITHUB: {
                 const { url } = await authAPI.getGitHubAuthUrl(withAppUrl(callbackUrl), state);
                 return {
