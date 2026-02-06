@@ -255,7 +255,7 @@ export class OpenRouterPlugin extends BaseAiProvider {
 			author: { name: 'Ever Works Team' },
 			license: 'MIT',
 			builtIn: true,
-			systemPlugin: false,
+			systemPlugin: true,
 			autoEnable: true,
 			visibility: 'public',
 			defaultForCapabilities: ['ai-provider'],

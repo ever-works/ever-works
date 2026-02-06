@@ -46,7 +46,6 @@ export function PluginSettings({ plugin, oauthConnection }: PluginSettingsProps)
     const schema = plugin.settingsSchema;
 
     // Filter properties to show only 'global' or 'user' scoped settings
-    // Also filter out writeOnly fields which cannot be displayed after being set
     const userScopeProperties = useMemo(() => {
         if (!schema?.properties) return {};
         return Object.fromEntries(

@@ -42,15 +42,12 @@ export function DirectoryPluginCard({ directoryId, plugin }: DirectoryPluginCard
     const isEnabled = plugin.directoryEnabled;
 
     // Filter properties to show only 'global' or 'directory' scoped settings
-    // Also filter out writeOnly fields which cannot be displayed after being set
     const directoryScopeProperties = useMemo(() => {
         if (!schema?.properties) return {};
         return Object.fromEntries(
             Object.entries(schema.properties).filter(([_, propSchema]) => {
                 const prop = propSchema as PluginSettingsSchemaProperty;
                 const scope = prop.scope || 'global';
-                // Filter out writeOnly fields
-                if (prop.writeOnly) return false;
                 // Show global and directory-scoped settings in directory settings
                 return scope === 'global' || scope === 'directory';
             }),

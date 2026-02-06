@@ -707,7 +707,7 @@ describe('PluginsService', () => {
     });
 
     describe('extractSettingsSchema filtering', () => {
-        it('should exclude x-envVar fields from settings schema', async () => {
+        it('should include x-envVar fields in settings schema (user can override)', async () => {
             const registered = createRegisteredPlugin();
             jest.spyOn(pluginRegistryService, 'get').mockReturnValue(registered);
             jest.spyOn(userPluginRepository, 'findOne').mockResolvedValue(null);
@@ -715,9 +715,31 @@ describe('PluginsService', () => {
             const result = await service.getPlugin('test-plugin', 'user-1');
 
             expect(result.settingsSchema).toBeDefined();
-            expect(result.settingsSchema!.properties.clientId).toBeUndefined();
-            expect(result.settingsSchema!.properties.clientSecret).toBeUndefined();
-            expect(result.settingsSchema!.properties.apiBaseUrl).toBeUndefined();
+            // x-envVar fields should now be included (users can override env values)
+            expect(result.settingsSchema!.properties.clientId).toBeDefined();
+            expect(result.settingsSchema!.properties.clientSecret).toBeDefined();
+            expect(result.settingsSchema!.properties.apiBaseUrl).toBeDefined();
+        });
+
+        it('should exclude x-adminOnly fields from settings schema', async () => {
+            const adminOnlySchema: JsonSchema = {
+                type: 'object',
+                properties: {
+                    adminField: { type: 'string', 'x-adminOnly': true },
+                    userField: { type: 'string' },
+                },
+            } as unknown as JsonSchema;
+
+            const plugin = createMockPlugin(adminOnlySchema);
+            const registered = createRegisteredPlugin(plugin);
+            jest.spyOn(pluginRegistryService, 'get').mockReturnValue(registered);
+            jest.spyOn(userPluginRepository, 'findOne').mockResolvedValue(null);
+
+            const result = await service.getPlugin('test-plugin', 'user-1');
+
+            expect(result.settingsSchema).toBeDefined();
+            expect(result.settingsSchema!.properties.adminField).toBeUndefined();
+            expect(result.settingsSchema!.properties.userField).toBeDefined();
         });
 
         it('should include x-writeOnly fields in settings schema', async () => {
@@ -747,10 +769,10 @@ describe('PluginsService', () => {
             const schemaWithRequired: JsonSchema = {
                 type: 'object',
                 properties: {
-                    envField: { type: 'string', 'x-envVar': 'TEST_VAR' },
+                    hiddenField: { type: 'string', 'x-hidden': true },
                     normalField: { type: 'string' },
                 },
-                required: ['envField', 'normalField'],
+                required: ['hiddenField', 'normalField'],
             } as unknown as JsonSchema;
 
             const plugin = createMockPlugin(schemaWithRequired);
@@ -1321,10 +1343,10 @@ describe('PluginsService', () => {
             expect(result.categories).toHaveLength(0);
         });
 
-        it('should filter out plugins with only env-var settings', async () => {
+        it('should filter out plugins with only hidden or admin-only settings', async () => {
             const normalPlugin = createPluginWithSettings('normal', 'utility');
-            const envOnlyPlugin = createPluginWithSettings(
-                'env-only',
+            const hiddenOnlyPlugin = createPluginWithSettings(
+                'hidden-only',
                 'utility',
                 'hybrid',
                 'public',
@@ -1332,14 +1354,14 @@ describe('PluginsService', () => {
                 {
                     type: 'object',
                     properties: {
-                        apiKey: { type: 'string', 'x-envVar': 'API_KEY' },
+                        secret: { type: 'string', 'x-hidden': true },
                     },
                 } as unknown as JsonSchema,
             );
 
             jest.spyOn(pluginRegistryService, 'getAll').mockReturnValue([
                 normalPlugin,
-                envOnlyPlugin,
+                hiddenOnlyPlugin,
             ]);
             jest.spyOn(userPluginRepository, 'find').mockResolvedValue([
                 {
@@ -1354,7 +1376,7 @@ describe('PluginsService', () => {
                 {
                     id: '2',
                     userId: 'user-1',
-                    pluginId: 'env-only',
+                    pluginId: 'hidden-only',
                     enabled: true,
                     settings: {},
                     secretSettings: {},

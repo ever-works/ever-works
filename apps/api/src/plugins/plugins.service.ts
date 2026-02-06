@@ -138,9 +138,8 @@ export class PluginsService {
             const schema = registered.plugin.settingsSchema;
             if (!schema?.properties && !hasOAuth) return false;
 
-            // Check if there are any non-admin-only, non-env-only settings
+            // Check if there are any non-admin-only settings visible to users
             const hasUserSettings = Object.values(schema?.properties || {}).some((prop) => {
-                if (prop['x-envVar']) return false;
                 if (prop['x-adminOnly']) return false;
                 if (prop['x-hidden']) return false;
                 const scope = prop['x-scope'] || 'global';
@@ -881,8 +880,8 @@ export class PluginsService {
         const properties: Record<string, PluginSettingsSchemaPropertyDto> = {};
         if (schema.properties) {
             for (const [key, prop] of Object.entries(schema.properties)) {
-                if (prop['x-envVar']) continue;
                 if (prop['x-hidden']) continue;
+                if (prop['x-adminOnly']) continue;
                 properties[key] = toPluginSettingsSchemaProperty(prop);
             }
         }

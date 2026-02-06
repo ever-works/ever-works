@@ -37,15 +37,12 @@ export function PluginSettingsInline({
     const schema = plugin.settingsSchema;
 
     // Filter properties to show only 'global' or 'user' scoped settings
-    // Also filter out writeOnly fields which cannot be displayed after being set
     const userScopeProperties = useMemo(() => {
         if (!schema?.properties) return {};
         return Object.fromEntries(
             Object.entries(schema.properties).filter(([_, propSchema]) => {
                 const prop = propSchema as PluginSettingsSchemaProperty;
                 const scope = prop.scope || 'global';
-                // Filter out writeOnly fields
-                if (prop.writeOnly) return false;
                 // Show global and user-scoped settings in user settings page
                 return scope === 'global' || scope === 'user';
             }),
