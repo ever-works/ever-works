@@ -20,7 +20,6 @@ export interface EverWorksConfig {
     // AI Plugin Configurations
     PLUGIN_OPENROUTER_API_KEY?: string;
     PLUGIN_OPENROUTER_DEFAULT_MODEL?: string;
-    PLUGIN_OPENROUTER_BASE_URL?: string;
 
     PLUGIN_OPENAI_API_KEY?: string;
     PLUGIN_OPENAI_DEFAULT_MODEL?: string;

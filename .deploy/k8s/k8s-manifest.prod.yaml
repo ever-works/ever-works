@@ -93,8 +93,6 @@ spec:
             # Plugins
             - name: PLUGIN_OPENROUTER_API_KEY
               value: "$PLUGIN_OPENROUTER_API_KEY"
-            - name: PLUGIN_OPENROUTER_BASE_URL
-              value: "$PLUGIN_OPENROUTER_BASE_URL"
             - name: PLUGIN_OPENROUTER_DEFAULT_MODEL
               value: "$PLUGIN_OPENROUTER_DEFAULT_MODEL"
             - name: PLUGIN_OPENROUTER_SIMPLE_MODEL
