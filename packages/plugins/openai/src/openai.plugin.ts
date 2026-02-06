@@ -45,14 +45,14 @@ export class OpenAiPlugin extends BaseAiProvider {
 			defaultModel: {
 				type: 'string',
 				title: 'Default Model',
-				default: 'gpt-4.1-nano',
+				default: 'gpt-5-nano',
 				'x-widget': 'model-select',
 				'x-scope': 'user'
 			},
 			simpleModel: {
 				type: 'string',
 				title: 'Simple Tasks Model',
-				default: 'gpt-4.1-nano',
+				default: 'gpt-5-nano',
 				'x-widget': 'model-select',
 				'x-scope': 'user'
 			},
@@ -99,7 +99,7 @@ export class OpenAiPlugin extends BaseAiProvider {
 		await super.onLoad(context);
 		this.aiOps = new AiOperations({
 			apiKey: '',
-			model: 'gpt-4.1-nano',
+			model: 'gpt-5-nano',
 			temperature: 0.7,
 			maxTokens: 4096,
 			providerType: 'openai',
@@ -181,7 +181,7 @@ export class OpenAiPlugin extends BaseAiProvider {
 	}
 
 	protected getDefaultModelId(): string {
-		return 'gpt-4.1-nano';
+		return 'gpt-5-nano';
 	}
 
 	async validateSettings(settings: PluginSettings): Promise<ValidationResult> {

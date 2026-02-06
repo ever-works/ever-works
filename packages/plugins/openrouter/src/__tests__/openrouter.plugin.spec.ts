@@ -50,7 +50,7 @@ describe('OpenRouterPlugin', () => {
 			expect(schema).toBeDefined();
 			expect(schema.type).toBe('string');
 			expect(schema.title).toBe('Default Model');
-			expect(schema.default).toBe('openai/gpt-4.1-nano');
+			expect(schema.default).toBe('openai/gpt-5-nano');
 			expect(schema['x-widget']).toBe('model-select');
 			expect(schema['x-scope']).toBe('user');
 		});
@@ -61,7 +61,7 @@ describe('OpenRouterPlugin', () => {
 			expect(schema.type).toBe('string');
 			expect(schema.title).toBe('Simple Tasks Model');
 			expect(schema.description).toBe('Economy model for simple tasks');
-			expect(schema.default).toBe('openai/gpt-4.1-nano');
+			expect(schema.default).toBe('openai/gpt-5-nano');
 		});
 
 		it('should have mediumModel field', () => {
@@ -70,7 +70,7 @@ describe('OpenRouterPlugin', () => {
 			expect(schema.type).toBe('string');
 			expect(schema.title).toBe('Standard Tasks Model');
 			expect(schema.description).toBe('Balanced model for standard tasks');
-			expect(schema.default).toBe('openai/gpt-4o-mini');
+			expect(schema.default).toBe('moonshotai/kimi-k2.5');
 		});
 
 		it('should have complexModel field', () => {
@@ -79,7 +79,7 @@ describe('OpenRouterPlugin', () => {
 			expect(schema.type).toBe('string');
 			expect(schema.title).toBe('Complex Tasks Model');
 			expect(schema.description).toBe('Premium model for complex tasks');
-			expect(schema.default).toBe('anthropic/claude-sonnet-4.5');
+			expect(schema.default).toBe('moonshotai/kimi-k2.5');
 		});
 
 		it('should have baseUrl field with default', () => {
@@ -250,7 +250,7 @@ describe('OpenRouterPlugin', () => {
 		it('should accept valid settings with optional fields', async () => {
 			const result = await plugin.validateSettings({
 				apiKey: 'sk-or-valid-key',
-				defaultModel: 'anthropic/claude-sonnet-4.5',
+				defaultModel: 'moonshotai/kimi-k2.5',
 				temperature: 0.5,
 				maxTokens: 8192
 			});

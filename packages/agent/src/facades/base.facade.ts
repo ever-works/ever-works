@@ -5,7 +5,7 @@ import {
 } from '../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
 import { DirectoryPluginRepository } from '../plugins/repositories/directory-plugin.repository';
-import type { IPlugin } from '@ever-works/plugin';
+import type { IPlugin, FacadeOptions } from '@ever-works/plugin';
 
 // Common error classes for all facades
 export class FacadeError extends Error {
@@ -32,12 +32,6 @@ export class ProviderNotFoundError extends FacadeError {
         super(`${capability} provider not found: ${providerId}`, 'getPlugin', providerId);
         this.name = 'ProviderNotFoundError';
     }
-}
-
-export interface BaseFacadeOptions {
-    userId?: string;
-    directoryId?: string;
-    providerOverride?: string;
 }
 
 export interface DefaultProviderInfo {
@@ -133,7 +127,7 @@ export abstract class BaseFacadeService {
     // Get resolved settings using 4-level hierarchy: Directory > User > Admin > Plugin defaults
     protected async getResolvedSettings(
         pluginId: string,
-        options?: BaseFacadeOptions,
+        options?: FacadeOptions,
     ): Promise<Record<string, unknown>> {
         if (!this.settingsService) {
             return {};

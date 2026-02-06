@@ -6,6 +6,15 @@ The plugin system supports a 4-level settings hierarchy (`directory > user > adm
 
 This document describes the issues found and the fixes applied.
 
+## Design Decision: Required userId
+
+`userId` is **required** in `BaseFacadeOptions` (and all derived types like `AiFacadeOptions`, `ScreenshotFacadeOptions`). This means:
+
+- All facade method calls (except CLI `testConnection`) must include `userId`
+- The TypeScript compiler will catch any caller that forgets to pass scope
+- `AiFacadeTestOptions` (with optional `userId`) exists for CLI-only use (`testConnection`)
+- Facade service classes no longer `implements` the plugin interfaces (`IAiFacade`, `ISearchFacade`, etc.) since the concrete services have richer signatures; the plugin interfaces are satisfied by the pipeline-bound facades instead
+
 ## Issues Fixed
 
 ### Issue 1 (CRITICAL): AwesomeReadmeParserService — scope not threaded
@@ -75,9 +84,9 @@ This document describes the issues found and the fixes applied.
 
 ### Issue 6 (LOW): ContentExtractorFacade type-safety gap
 
-**Problem:** `extractContent(url, options?)` accepted `FacadeExtractionOptions` which doesn't include `userId`/`directoryId`. Internally cast to `ExtendedFacadeExtractionOptions`. The compiler wouldn't flag missing scope for future direct callers.
+**Problem:** `extractContent(url, options?)` accepted `FacadeExtractionOptions` which doesn't include `userId`/`directoryId`. The compiler wouldn't flag missing scope for future direct callers.
 
-**Fix:** Added explicit `facadeOptions?: BaseFacadeOptions` as 3rd parameter (matching ScreenshotFacade pattern). Updated pipeline binding to use new parameter. Legacy `ExtendedFacadeExtractionOptions` casting still works for backward compatibility.
+**Fix:** Added explicit `facadeOptions: BaseFacadeOptions` as required 3rd parameter. Updated pipeline binding to use new parameter. Removed legacy `ExtendedFacadeExtractionOptions` type and casting. Removed `implements IContentExtractorFacade` since the concrete service now has a richer signature.
 
 **Files modified:**
 
@@ -88,7 +97,7 @@ This document describes the issues found and the fixes applied.
 
 **Problem:** Same pattern as Issue 6 — scope passed through extended options casting.
 
-**Fix:** Added explicit `facadeOptions?: BaseFacadeOptions` as 3rd parameter. Updated pipeline binding.
+**Fix:** Added explicit `facadeOptions: BaseFacadeOptions` as required 3rd parameter. Updated pipeline binding. Removed legacy `ExtendedSearchFacadeOptions` type and casting. Removed `implements ISearchFacade`.
 
 **Files modified:**
 
@@ -107,8 +116,9 @@ This document describes the issues found and the fixes applied.
 
 ## Verification
 
-1. `pnpm type-check` — no type errors from signature changes
-2. `pnpm test` in `packages/agent` and `apps/api` — no regressions
-3. Manual: Import an awesome readme with user-specific AI key — verify user's key is used
-4. Manual: Attempt directory plugin endpoint as non-owner — should get 403
-5. Manual: Configure user-specific API key — list models — should use user key
+1. `pnpm build` — 24/24 tasks successful, 0 type errors
+2. `pnpm test` in `packages/agent` — 26 suites, 722 tests passing
+3. Plugin tests — all passing (openai: 16, openrouter: 29, screenshotone: 35, vercel: 33, default-pipeline: 277)
+4. Manual: Import an awesome readme with user-specific AI key — verify user's key is used
+5. Manual: Attempt directory plugin endpoint as non-owner — should get 403
+6. Manual: Configure user-specific API key — list models — should use user key

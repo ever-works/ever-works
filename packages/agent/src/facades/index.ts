@@ -15,9 +15,11 @@ export {
     FacadeError,
     NoProviderError,
     ProviderNotFoundError,
-    type BaseFacadeOptions,
     type DefaultProviderInfo,
 } from './base.facade';
+
+// Re-export FacadeOptions from plugin for convenience
+export type { FacadeOptions } from '@ever-works/plugin';
 
 // AI Facade
 export {
@@ -25,7 +27,6 @@ export {
     AiFacadeError,
     NoAiProviderError,
     AiProviderNotFoundError,
-    type AiFacadeOptions,
 } from './ai.facade';
 
 // Search Facade
@@ -45,7 +46,6 @@ export {
     ScreenshotFacadeError,
     NoScreenshotProviderError,
     ScreenshotProviderNotFoundError,
-    type ScreenshotFacadeOptions,
 } from './screenshot.facade';
 
 // Content Extractor Facade

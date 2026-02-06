@@ -454,6 +454,7 @@ export class AiProviderPromptService extends BasePromptService {
 
         try {
             const result = await this.aiFacade.testConnection({
+                userId: 'system',
                 providerOverride: config.name,
             });
 

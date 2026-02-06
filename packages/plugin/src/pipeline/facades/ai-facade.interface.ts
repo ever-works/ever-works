@@ -1,4 +1,5 @@
 import type { AiModel } from '../../contracts/capabilities/ai-provider.interface.js';
+import type { FacadeOptions } from './facade-options.interface.js';
 
 /**
  * Task complexity levels for AI model routing.
@@ -100,7 +101,12 @@ export interface IAiFacade {
 	 * );
 	 * ```
 	 */
-	askJson<T>(promptTemplate: string, schema: SchemaType<T>, options?: AskJsonOptions): Promise<AskJsonResponse<T>>;
+	askJson<T>(
+		promptTemplate: string,
+		schema: SchemaType<T>,
+		options?: AskJsonOptions,
+		facadeOptions?: FacadeOptions
+	): Promise<AskJsonResponse<T>>;
 
 	/**
 	 * Check if AI service is configured and available.
@@ -111,7 +117,7 @@ export interface IAiFacade {
 	 * Test the AI provider connection.
 	 * Returns health check result with success status and response time.
 	 */
-	testConnection(): Promise<{
+	testConnection(facadeOptions?: FacadeOptions): Promise<{
 		success: boolean;
 		provider: string;
 		model: string;
@@ -125,5 +131,5 @@ export interface IAiFacade {
 	 *
 	 * @returns List of available models with their capabilities
 	 */
-	getAvailableModels(): Promise<readonly AiModel[]>;
+	getAvailableModels(facadeOptions?: FacadeOptions): Promise<readonly AiModel[]>;
 }

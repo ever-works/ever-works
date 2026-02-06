@@ -1,3 +1,5 @@
+import type { FacadeOptions } from './facade-options.interface.js';
+
 export interface FacadeExtractedContent {
 	readonly url: string;
 	readonly rawContent: string;
@@ -32,7 +34,11 @@ export interface IContentExtractorFacade {
 	 * });
 	 * ```
 	 */
-	extractContent(url: string, options?: FacadeExtractionOptions): Promise<FacadeExtractedContent | null>;
+	extractContent(
+		url: string,
+		options?: FacadeExtractionOptions,
+		facadeOptions?: FacadeOptions
+	): Promise<FacadeExtractedContent | null>;
 
 	isConfigured(): boolean;
 }

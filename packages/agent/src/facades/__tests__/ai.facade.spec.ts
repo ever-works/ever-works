@@ -24,6 +24,8 @@ describe('AiFacadeService', () => {
     let registry: jest.Mocked<PluginRegistryService>;
     let settingsService: jest.Mocked<PluginSettingsService>;
 
+    const defaultFacadeOptions = { userId: 'test-user' };
+
     const mockCapabilities: AiModelCapabilities = {
         supportsStructuredOutput: true,
         supportsStreaming: true,
@@ -193,9 +195,12 @@ describe('AiFacadeService', () => {
             });
             registry.getByCapability.mockReturnValue([registered]);
 
-            const result = await service.askJson('Extract name: {text}', testSchema, {
-                variables: { text: 'Hello John' },
-            });
+            const result = await service.askJson(
+                'Extract name: {text}',
+                testSchema,
+                { variables: { text: 'Hello John' } },
+                defaultFacadeOptions,
+            );
 
             expect(result.result).toEqual({ name: 'test' });
             expect(result.provider).toBe('openai-provider');
@@ -206,18 +211,21 @@ describe('AiFacadeService', () => {
         it('should throw NoAiProviderError when no provider is configured', async () => {
             registry.getByCapability.mockReturnValue([]);
 
-            await expect(service.askJson('Test prompt', testSchema)).rejects.toThrow(
-                NoAiProviderError,
-            );
+            await expect(
+                service.askJson('Test prompt', testSchema, undefined, defaultFacadeOptions),
+            ).rejects.toThrow(NoAiProviderError);
         });
 
         it('should throw AiProviderNotFoundError for invalid provider override', async () => {
             registry.get.mockReturnValue(undefined);
 
             await expect(
-                service.askJson('Test prompt', testSchema, {
-                    routing: { providerOverride: 'non-existent' },
-                }),
+                service.askJson(
+                    'Test prompt',
+                    testSchema,
+                    { routing: { providerOverride: 'non-existent' } },
+                    defaultFacadeOptions,
+                ),
             ).rejects.toThrow(AiProviderNotFoundError);
         });
 
@@ -235,9 +243,12 @@ describe('AiFacadeService', () => {
             registry.getByCapability.mockReturnValue([openaiRegistered, anthropicRegistered]);
             registry.get.mockReturnValue(anthropicRegistered);
 
-            await service.askJson('Test', testSchema, {
-                routing: { providerOverride: 'anthropic-provider' },
-            });
+            await service.askJson(
+                'Test',
+                testSchema,
+                { routing: { providerOverride: 'anthropic-provider' } },
+                defaultFacadeOptions,
+            );
 
             expect(anthropic.createChatCompletion).toHaveBeenCalled();
             expect(openai.createChatCompletion).not.toHaveBeenCalled();
@@ -255,7 +266,9 @@ describe('AiFacadeService', () => {
             });
             registry.getByCapability.mockReturnValue([registered]);
 
-            await expect(service.askJson('Test', testSchema)).rejects.toThrow(AiFacadeError);
+            await expect(
+                service.askJson('Test', testSchema, undefined, defaultFacadeOptions),
+            ).rejects.toThrow(AiFacadeError);
         });
 
         it('should throw AiFacadeError when response does not match schema', async () => {
@@ -270,7 +283,9 @@ describe('AiFacadeService', () => {
             });
             registry.getByCapability.mockReturnValue([registered]);
 
-            await expect(service.askJson('Test', testSchema)).rejects.toThrow(AiFacadeError);
+            await expect(
+                service.askJson('Test', testSchema, undefined, defaultFacadeOptions),
+            ).rejects.toThrow(AiFacadeError);
         });
 
         it('should return usage information when available', async () => {
@@ -280,7 +295,12 @@ describe('AiFacadeService', () => {
             });
             registry.getByCapability.mockReturnValue([registered]);
 
-            const result = await service.askJson('Test', testSchema);
+            const result = await service.askJson(
+                'Test',
+                testSchema,
+                undefined,
+                defaultFacadeOptions,
+            );
 
             expect(result.usage).toEqual({
                 inputTokens: 10,
@@ -305,7 +325,12 @@ describe('AiFacadeService', () => {
             });
             registry.getByCapability.mockReturnValue([registered]);
 
-            const result = await service.askJson('Test', testSchema);
+            const result = await service.askJson(
+                'Test',
+                testSchema,
+                undefined,
+                defaultFacadeOptions,
+            );
 
             // Cost = (10 * 0.03 / 1000) + (5 * 0.06 / 1000) = 0.0003 + 0.0003 = 0.0006
             expect(result.cost).toBeCloseTo(0.0006, 6);
@@ -319,7 +344,12 @@ describe('AiFacadeService', () => {
             });
             registry.getByCapability.mockReturnValue([registered]);
 
-            const result = await service.askJson('Test', testSchema);
+            const result = await service.askJson(
+                'Test',
+                testSchema,
+                undefined,
+                defaultFacadeOptions,
+            );
 
             expect(result.cost).toBeNull();
         });
@@ -488,9 +518,12 @@ describe('AiFacadeService', () => {
             });
             registry.getByCapability.mockReturnValue([registered]);
 
-            await service.askJson('Test', testSchema, {
-                routing: { modelOverride: 'gpt-4-turbo' },
-            });
+            await service.askJson(
+                'Test',
+                testSchema,
+                { routing: { modelOverride: 'gpt-4-turbo' } },
+                defaultFacadeOptions,
+            );
 
             expect(aiPlugin.createChatCompletion).toHaveBeenCalledWith(
                 expect.objectContaining({ model: 'gpt-4-turbo' }),
@@ -511,9 +544,12 @@ describe('AiFacadeService', () => {
                 complexModel: 'gpt-4-turbo',
             });
 
-            await service.askJson('Test', testSchema, {
-                routing: { complexity: 'simple' },
-            });
+            await service.askJson(
+                'Test',
+                testSchema,
+                { routing: { complexity: 'simple' } },
+                defaultFacadeOptions,
+            );
 
             expect(aiPlugin.createChatCompletion).toHaveBeenCalledWith(
                 expect.objectContaining({ model: 'gpt-3.5-turbo' }),
@@ -533,9 +569,12 @@ describe('AiFacadeService', () => {
                 complexModel: 'gpt-4-turbo',
             });
 
-            await service.askJson('Test', testSchema, {
-                routing: { complexity: 'medium' },
-            });
+            await service.askJson(
+                'Test',
+                testSchema,
+                { routing: { complexity: 'medium' } },
+                defaultFacadeOptions,
+            );
 
             expect(aiPlugin.createChatCompletion).toHaveBeenCalledWith(
                 expect.objectContaining({ model: 'gpt-4' }),
@@ -555,9 +594,12 @@ describe('AiFacadeService', () => {
                 complexModel: 'gpt-4-turbo',
             });
 
-            await service.askJson('Test', testSchema, {
-                routing: { complexity: 'complex' },
-            });
+            await service.askJson(
+                'Test',
+                testSchema,
+                { routing: { complexity: 'complex' } },
+                defaultFacadeOptions,
+            );
 
             expect(aiPlugin.createChatCompletion).toHaveBeenCalledWith(
                 expect.objectContaining({ model: 'gpt-4-turbo' }),
@@ -575,7 +617,7 @@ describe('AiFacadeService', () => {
                 defaultModel: 'gpt-4',
             });
 
-            await service.askJson('Test', testSchema);
+            await service.askJson('Test', testSchema, undefined, defaultFacadeOptions);
 
             expect(aiPlugin.createChatCompletion).toHaveBeenCalledWith(
                 expect.objectContaining({ model: 'gpt-4' }),
@@ -590,9 +632,12 @@ describe('AiFacadeService', () => {
             registry.getByCapability.mockReturnValue([registered]);
             settingsService.getSettings.mockResolvedValue({});
 
-            await service.askJson('Test', testSchema, {
-                routing: { complexity: 'medium' },
-            });
+            await service.askJson(
+                'Test',
+                testSchema,
+                { routing: { complexity: 'medium' } },
+                defaultFacadeOptions,
+            );
 
             // Model should be undefined, plugin uses its default
             expect(aiPlugin.createChatCompletion).toHaveBeenCalledWith(
@@ -611,9 +656,12 @@ describe('AiFacadeService', () => {
                 simpleModel: 'gpt-3.5-turbo',
             });
 
-            await service.askJson('Test', testSchema, {
-                routing: { complexity: 'simple', modelOverride: 'gpt-4o' },
-            });
+            await service.askJson(
+                'Test',
+                testSchema,
+                { routing: { complexity: 'simple', modelOverride: 'gpt-4o' } },
+                defaultFacadeOptions,
+            );
 
             // modelOverride should win over complexity
             expect(aiPlugin.createChatCompletion).toHaveBeenCalledWith(
@@ -633,9 +681,12 @@ describe('AiFacadeService', () => {
                 // Note: no simpleModel defined
             });
 
-            await service.askJson('Test', testSchema, {
-                routing: { complexity: 'simple' },
-            });
+            await service.askJson(
+                'Test',
+                testSchema,
+                { routing: { complexity: 'simple' } },
+                defaultFacadeOptions,
+            );
 
             // Falls through to defaultModel
             expect(aiPlugin.createChatCompletion).toHaveBeenCalledWith(
@@ -658,7 +709,7 @@ describe('AiFacadeService', () => {
             });
             registry.getByCapability.mockReturnValue([registered]);
 
-            const models = await service.getAvailableModels();
+            const models = await service.getAvailableModels(defaultFacadeOptions);
 
             expect(models).toHaveLength(3);
             expect(models[0].id).toBe('gpt-3.5-turbo');
@@ -669,7 +720,7 @@ describe('AiFacadeService', () => {
         it('should return empty array when no provider exists', async () => {
             registry.getByCapability.mockReturnValue([]);
 
-            const models = await service.getAvailableModels();
+            const models = await service.getAvailableModels(defaultFacadeOptions);
 
             expect(models).toHaveLength(0);
         });
@@ -683,7 +734,7 @@ describe('AiFacadeService', () => {
             });
             registry.getByCapability.mockReturnValue([registered]);
 
-            const models = await service.getAvailableModels();
+            const models = await service.getAvailableModels(defaultFacadeOptions);
 
             expect(models).toHaveLength(0);
         });

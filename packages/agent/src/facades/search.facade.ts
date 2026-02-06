@@ -1,9 +1,10 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import type {
-    ISearchFacade,
     SearchFacadeResult,
     SearchFacadeOptions,
     ISearchPlugin,
+    ISearchFacade,
+    FacadeOptions,
 } from '@ever-works/plugin';
 import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
@@ -11,7 +12,6 @@ import { PluginSettingsService } from '../plugins/services/plugin-settings.servi
 import { DirectoryPluginRepository } from '../plugins/repositories/directory-plugin.repository';
 import {
     BaseFacadeService,
-    BaseFacadeOptions,
     FacadeError,
     NoProviderError,
     ProviderNotFoundError,
@@ -53,8 +53,8 @@ export class SearchFacadeService extends BaseFacadeService implements ISearchFac
 
     async search(
         query: string,
-        options?: SearchFacadeOptions,
-        facadeOptions?: BaseFacadeOptions,
+        options: SearchFacadeOptions | undefined,
+        facadeOptions?: FacadeOptions,
     ): Promise<SearchFacadeResult[]> {
         const plugin = await this.resolveSearchPlugin(
             facadeOptions?.providerOverride,

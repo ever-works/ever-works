@@ -1,7 +1,6 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import { z } from 'zod';
 import type {
-    IAiFacade,
     AskJsonOptions,
     AskJsonResponse,
     IAiProviderPlugin,
@@ -10,6 +9,8 @@ import type {
     ChatCompletionChunk,
     AiRoutingOptions,
     AiModel,
+    IAiFacade,
+    FacadeOptions,
 } from '@ever-works/plugin';
 import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
@@ -43,12 +44,6 @@ export class AiProviderNotFoundError extends ProviderNotFoundError {
     }
 }
 
-export interface AiFacadeOptions {
-    userId?: string;
-    directoryId?: string;
-    providerOverride?: string;
-}
-
 @Injectable()
 export class AiFacadeService extends BaseFacadeService implements IAiFacade {
     protected readonly logger = new Logger(AiFacadeService.name);
@@ -65,8 +60,8 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
     async askJson<T>(
         promptTemplate: string,
         schema: z.ZodSchema<T>,
-        options?: AskJsonOptions,
-        facadeOptions?: AiFacadeOptions,
+        options: AskJsonOptions | undefined,
+        facadeOptions?: FacadeOptions,
     ): Promise<AskJsonResponse<T>> {
         const plugin = await this.resolvePlugin(
             options?.routing?.providerOverride,
@@ -151,7 +146,7 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
 
     async createChatCompletion(
         options: ChatCompletionOptions,
-        facadeOptions?: AiFacadeOptions,
+        facadeOptions?: FacadeOptions,
     ): Promise<ChatCompletionResponse> {
         const plugin = await this.resolvePlugin(
             facadeOptions?.providerOverride,
@@ -176,7 +171,7 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
 
     async *createStreamingChatCompletion(
         options: ChatCompletionOptions,
-        facadeOptions?: AiFacadeOptions,
+        facadeOptions?: FacadeOptions,
     ): AsyncGenerator<ChatCompletionChunk> {
         const plugin = await this.resolvePlugin(
             facadeOptions?.providerOverride,
@@ -208,7 +203,7 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
         yield* plugin.createStreamingChatCompletion(mergedOptions);
     }
 
-    async testConnection(facadeOptions?: AiFacadeOptions): Promise<{
+    async testConnection(facadeOptions?: FacadeOptions): Promise<{
         success: boolean;
         provider: string;
         model: string;
@@ -289,7 +284,7 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
         throw new NoAiProviderError();
     }
 
-    async getAvailableModels(facadeOptions?: AiFacadeOptions): Promise<readonly AiModel[]> {
+    async getAvailableModels(facadeOptions?: FacadeOptions): Promise<readonly AiModel[]> {
         try {
             const plugin = await this.resolvePlugin(
                 facadeOptions?.providerOverride,

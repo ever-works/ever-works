@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { z } from 'zod';
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
 import { AiFacadeService } from '../facades/ai.facade';
+import type { FacadeOptions } from '@ever-works/plugin';
 import type { Category, ItemData, Tag } from '@ever-works/contracts';
 import { slugifyText } from '@src/utils/text.utils';
 import { accumulateMetrics, MetricsAccumulator } from '@src/utils/metrics.util';
@@ -138,10 +139,7 @@ export class AwesomeReadmeParserService {
         });
     }
 
-    async parseReadme(
-        content: string,
-        facadeOptions?: { userId: string; directoryId: string },
-    ): Promise<ParsedAwesomeData> {
+    async parseReadme(content: string, facadeOptions: FacadeOptions): Promise<ParsedAwesomeData> {
         const parseErrors: string[] = [];
         const metrics: MetricsAccumulator = {
             total_tokens_used: 0,
@@ -232,7 +230,7 @@ export class AwesomeReadmeParserService {
     private async extractCategories(
         content: string,
         metrics: MetricsAccumulator,
-        facadeOptions?: { userId: string; directoryId: string },
+        facadeOptions: FacadeOptions,
     ): Promise<Category[]> {
         if (content.length <= this.CATEGORY_CHUNK_SIZE) {
             this.logger.log(`[Import] Content fits in single chunk, extracting categories...`);
@@ -292,7 +290,7 @@ export class AwesomeReadmeParserService {
     private async extractCategoriesFromChunk(
         content: string,
         metrics: MetricsAccumulator,
-        facadeOptions?: { userId: string; directoryId: string },
+        facadeOptions: FacadeOptions,
     ): Promise<Category[]> {
         this.logger.log(`[Import] AI call: extracting categories from chunk...`);
         const startTime = Date.now();
@@ -413,7 +411,7 @@ export class AwesomeReadmeParserService {
         categoryName: string,
         categoryId: string,
         metrics: MetricsAccumulator,
-        facadeOptions?: { userId: string; directoryId: string },
+        facadeOptions: FacadeOptions,
     ): Promise<ItemData[]> {
         const extractedItems: ItemData[] = [];
 

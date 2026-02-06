@@ -1,3 +1,5 @@
+import type { FacadeOptions } from './facade-options.interface.js';
+
 export interface SearchFacadeResult {
 	readonly title: string;
 	readonly url: string;
@@ -26,7 +28,7 @@ export interface ISearchFacade {
 	 * });
 	 * ```
 	 */
-	search(query: string, options?: SearchFacadeOptions): Promise<SearchFacadeResult[]>;
+	search(query: string, options?: SearchFacadeOptions, facadeOptions?: FacadeOptions): Promise<SearchFacadeResult[]>;
 
 	isConfigured(): boolean;
 }

@@ -20,6 +20,8 @@ describe('ContentExtractorFacadeService', () => {
     let registry: jest.Mocked<PluginRegistryService>;
     let settingsService: jest.Mocked<PluginSettingsService>;
 
+    const defaultFacadeOptions = { userId: 'test-user' };
+
     const createMockExtractorPlugin = (
         id: string,
         providerName: string,
@@ -154,6 +156,7 @@ describe('ContentExtractorFacadeService', () => {
             registry.get.mockReturnValue(registered);
 
             const result = await service.extractContent('https://notion.so/page', undefined, {
+                userId: 'test-user',
                 providerOverride: 'notion-extractor',
             });
 
@@ -172,6 +175,7 @@ describe('ContentExtractorFacadeService', () => {
             registry.get.mockReturnValue(registered);
 
             const result = await service.extractContent('https://github.com/repo', undefined, {
+                userId: 'test-user',
                 providerOverride: 'notion-extractor',
             });
 
@@ -182,6 +186,7 @@ describe('ContentExtractorFacadeService', () => {
             registry.get.mockReturnValue(undefined);
 
             const result = await service.extractContent('https://example.com', undefined, {
+                userId: 'test-user',
                 providerOverride: 'non-existent',
             });
 
@@ -207,7 +212,7 @@ describe('ContentExtractorFacadeService', () => {
 
             registry.getByCapability.mockReturnValue([localRegistered, notionRegistered]);
 
-            await service.extractContent('https://notion.so/page');
+            await service.extractContent('https://notion.so/page', undefined, defaultFacadeOptions);
 
             expect(notionExtractor.extract).toHaveBeenCalled();
             expect(localExtractor.extract).not.toHaveBeenCalled();
@@ -235,7 +240,7 @@ describe('ContentExtractorFacadeService', () => {
             registry.getByCapability.mockReturnValue([notionRegistered, localRegistered]);
             registry.getDefaultForCapability.mockReturnValue(localRegistered);
 
-            await service.extractContent('https://example.com');
+            await service.extractContent('https://example.com', undefined, defaultFacadeOptions);
 
             expect(notionExtractor.canExtract).toHaveBeenCalled();
             expect(localExtractor.extract).toHaveBeenCalled();
@@ -244,7 +249,11 @@ describe('ContentExtractorFacadeService', () => {
         it('should return null when no extractor can handle the URL', async () => {
             registry.getByCapability.mockReturnValue([]);
 
-            const result = await service.extractContent('https://example.com');
+            const result = await service.extractContent(
+                'https://example.com',
+                undefined,
+                defaultFacadeOptions,
+            );
 
             expect(result).toBeNull();
         });
@@ -268,7 +277,7 @@ describe('ContentExtractorFacadeService', () => {
 
             registry.getByCapability.mockReturnValue([githubRegistered, notionRegistered]);
 
-            await service.extractContent('https://notion.so/page');
+            await service.extractContent('https://notion.so/page', undefined, defaultFacadeOptions);
 
             expect(githubExtractor.canExtract).toHaveBeenCalled();
             expect(githubExtractor.extract).not.toHaveBeenCalled();

@@ -1,18 +1,19 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import type {
-    IScreenshotFacade,
     ScreenshotCaptureOptions,
     ScreenshotCaptureResult,
     SmartImageOptions,
     SmartImageResult,
     IScreenshotPlugin,
     IPlugin,
+    IScreenshotFacade,
+    FacadeOptions,
 } from '@ever-works/plugin';
 import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
 import { DirectoryPluginRepository } from '../plugins/repositories/directory-plugin.repository';
-import { BaseFacadeService, BaseFacadeOptions } from './base.facade';
+import { BaseFacadeService } from './base.facade';
 
 export class ScreenshotFacadeError extends Error {
     constructor(
@@ -40,8 +41,6 @@ export class ScreenshotProviderNotFoundError extends ScreenshotFacadeError {
     }
 }
 
-export interface ScreenshotFacadeOptions extends BaseFacadeOptions {}
-
 @Injectable()
 export class ScreenshotFacadeService extends BaseFacadeService implements IScreenshotFacade {
     protected readonly logger = new Logger(ScreenshotFacadeService.name);
@@ -57,7 +56,7 @@ export class ScreenshotFacadeService extends BaseFacadeService implements IScree
 
     async capture(
         options: ScreenshotCaptureOptions,
-        facadeOptions?: ScreenshotFacadeOptions,
+        facadeOptions?: FacadeOptions,
     ): Promise<ScreenshotCaptureResult> {
         const plugin = await this.resolvePlugin(
             facadeOptions?.providerOverride,
@@ -93,7 +92,7 @@ export class ScreenshotFacadeService extends BaseFacadeService implements IScree
 
     async getSmartImage(
         options: SmartImageOptions,
-        facadeOptions?: ScreenshotFacadeOptions,
+        facadeOptions?: FacadeOptions,
     ): Promise<SmartImageResult> {
         const result = await this.capture(
             {
@@ -116,7 +115,7 @@ export class ScreenshotFacadeService extends BaseFacadeService implements IScree
 
     async getScreenshotUrl(
         options: ScreenshotCaptureOptions,
-        facadeOptions?: ScreenshotFacadeOptions,
+        facadeOptions?: FacadeOptions,
     ): Promise<string | null> {
         const plugin = await this.resolvePlugin(
             facadeOptions?.providerOverride,

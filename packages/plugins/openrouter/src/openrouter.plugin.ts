@@ -55,7 +55,7 @@ export class OpenRouterPlugin extends BaseAiProvider {
 			defaultModel: {
 				type: 'string',
 				title: 'Default Model',
-				default: 'openai/gpt-4.1-nano',
+				default: 'openai/gpt-5-nano',
 				'x-widget': 'model-select',
 				'x-scope': 'user',
 				'x-envVar': 'PLUGIN_OPENROUTER_DEFAULT_MODEL'
@@ -64,7 +64,7 @@ export class OpenRouterPlugin extends BaseAiProvider {
 				type: 'string',
 				title: 'Simple Tasks Model',
 				description: 'Economy model for simple tasks',
-				default: 'openai/gpt-4.1-nano',
+				default: 'openai/gpt-5-nano',
 				'x-widget': 'model-select',
 				'x-scope': 'user',
 				'x-envVar': 'PLUGIN_OPENROUTER_SIMPLE_MODEL'
@@ -73,7 +73,7 @@ export class OpenRouterPlugin extends BaseAiProvider {
 				type: 'string',
 				title: 'Standard Tasks Model',
 				description: 'Balanced model for standard tasks',
-				default: 'openai/gpt-4o-mini',
+				default: 'moonshotai/kimi-k2.5',
 				'x-widget': 'model-select',
 				'x-scope': 'user',
 				'x-envVar': 'PLUGIN_OPENROUTER_MEDIUM_MODEL'
@@ -82,7 +82,7 @@ export class OpenRouterPlugin extends BaseAiProvider {
 				type: 'string',
 				title: 'Complex Tasks Model',
 				description: 'Premium model for complex tasks',
-				default: 'anthropic/claude-sonnet-4.5',
+				default: 'moonshotai/kimi-k2.5',
 				'x-widget': 'model-select',
 				'x-scope': 'user',
 				'x-envVar': 'PLUGIN_OPENROUTER_COMPLEX_MODEL'
@@ -128,7 +128,7 @@ export class OpenRouterPlugin extends BaseAiProvider {
 
 		this.aiOps = new AiOperations({
 			apiKey: '',
-			model: 'openai/gpt-4.1-nano',
+			model: 'openai/gpt-5-nano',
 			baseURL: 'https://openrouter.ai/api/v1',
 			temperature: 0.7,
 			maxTokens: 4096,
@@ -157,7 +157,7 @@ export class OpenRouterPlugin extends BaseAiProvider {
 	// BaseAiProvider abstract implementations
 
 	protected getDefaultModelId(): string {
-		return 'openai/gpt-4.1-nano';
+		return 'openai/gpt-5-nano';
 	}
 
 	async createChatCompletion(options: ChatCompletionOptions): Promise<ChatCompletionResponse> {

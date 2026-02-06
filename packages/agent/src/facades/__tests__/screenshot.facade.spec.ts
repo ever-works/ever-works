@@ -20,6 +20,8 @@ describe('ScreenshotFacadeService', () => {
     let registry: jest.Mocked<PluginRegistryService>;
     let settingsService: jest.Mocked<PluginSettingsService>;
 
+    const defaultFacadeOptions = { userId: 'test-user' };
+
     const createMockScreenshotPlugin = (id: string, providerName: string): IScreenshotPlugin => ({
         id,
         name: `${providerName} Plugin`,
@@ -171,7 +173,10 @@ describe('ScreenshotFacadeService', () => {
             });
             registry.getByCapability.mockReturnValue([registered]);
 
-            const result = await service.capture({ url: 'https://example.com' });
+            const result = await service.capture(
+                { url: 'https://example.com' },
+                defaultFacadeOptions,
+            );
 
             expect(result.success).toBe(true);
             expect(result.imageUrl).toBe('https://screenshots.example.com/abc123.png');
@@ -183,9 +188,9 @@ describe('ScreenshotFacadeService', () => {
         it('should throw NoScreenshotProviderError when no provider is configured', async () => {
             registry.getByCapability.mockReturnValue([]);
 
-            await expect(service.capture({ url: 'https://example.com' })).rejects.toThrow(
-                NoScreenshotProviderError,
-            );
+            await expect(
+                service.capture({ url: 'https://example.com' }, defaultFacadeOptions),
+            ).rejects.toThrow(NoScreenshotProviderError);
         });
 
         it('should throw ScreenshotProviderNotFoundError for invalid provider override', async () => {
@@ -194,7 +199,7 @@ describe('ScreenshotFacadeService', () => {
             await expect(
                 service.capture(
                     { url: 'https://example.com' },
-                    { providerOverride: 'non-existent' },
+                    { userId: 'test-user', providerOverride: 'non-existent' },
                 ),
             ).rejects.toThrow(ScreenshotProviderNotFoundError);
         });
@@ -218,7 +223,7 @@ describe('ScreenshotFacadeService', () => {
 
             await service.capture(
                 { url: 'https://example.com' },
-                { providerOverride: 'browserless' },
+                { userId: 'test-user', providerOverride: 'browserless' },
             );
 
             expect(browserless.capture).toHaveBeenCalled();
@@ -232,19 +237,22 @@ describe('ScreenshotFacadeService', () => {
             });
             registry.getByCapability.mockReturnValue([registered]);
 
-            await service.capture({
-                url: 'https://example.com',
-                viewportWidth: 1920,
-                viewportHeight: 1080,
-                format: 'jpg',
-                fullPage: true,
-                delay: 500,
-                blockAds: true,
-                blockTrackers: true,
-                blockCookieBanners: true,
-                cache: true,
-                cacheTtl: 3600,
-            });
+            await service.capture(
+                {
+                    url: 'https://example.com',
+                    viewportWidth: 1920,
+                    viewportHeight: 1080,
+                    format: 'jpg',
+                    fullPage: true,
+                    delay: 500,
+                    blockAds: true,
+                    blockTrackers: true,
+                    blockCookieBanners: true,
+                    cache: true,
+                    cacheTtl: 3600,
+                },
+                defaultFacadeOptions,
+            );
 
             expect(screenshotPlugin.capture).toHaveBeenCalledWith(
                 expect.objectContaining({
@@ -275,7 +283,10 @@ describe('ScreenshotFacadeService', () => {
             });
             registry.getByCapability.mockReturnValue([registered]);
 
-            const result = await service.capture({ url: 'https://example.com' });
+            const result = await service.capture(
+                { url: 'https://example.com' },
+                defaultFacadeOptions,
+            );
 
             expect(result.success).toBe(false);
             expect(result.error).toBe('Failed to capture screenshot');
@@ -290,7 +301,10 @@ describe('ScreenshotFacadeService', () => {
             });
             registry.getByCapability.mockReturnValue([registered]);
 
-            const result = await service.getSmartImage({ url: 'https://example.com' });
+            const result = await service.getSmartImage(
+                { url: 'https://example.com' },
+                defaultFacadeOptions,
+            );
 
             expect(result.primaryImage).toBe('https://cache.example.com/abc123.png');
             expect(result.source).toBe('screenshot');
@@ -303,7 +317,7 @@ describe('ScreenshotFacadeService', () => {
             });
             registry.getByCapability.mockReturnValue([registered]);
 
-            await service.getSmartImage({ url: 'https://example.com' });
+            await service.getSmartImage({ url: 'https://example.com' }, defaultFacadeOptions);
 
             expect(screenshotPlugin.capture).toHaveBeenCalledWith(
                 expect.objectContaining({
@@ -320,9 +334,9 @@ describe('ScreenshotFacadeService', () => {
         it('should throw NoScreenshotProviderError when no provider exists', async () => {
             registry.getByCapability.mockReturnValue([]);
 
-            await expect(service.getSmartImage({ url: 'https://example.com' })).rejects.toThrow(
-                NoScreenshotProviderError,
-            );
+            await expect(
+                service.getSmartImage({ url: 'https://example.com' }, defaultFacadeOptions),
+            ).rejects.toThrow(NoScreenshotProviderError);
         });
     });
 
@@ -334,7 +348,10 @@ describe('ScreenshotFacadeService', () => {
             });
             registry.getByCapability.mockReturnValue([registered]);
 
-            const url = await service.getScreenshotUrl({ url: 'https://example.com' });
+            const url = await service.getScreenshotUrl(
+                { url: 'https://example.com' },
+                defaultFacadeOptions,
+            );
 
             expect(url).toBe('https://api.example.com/screenshot?url=');
         });
@@ -348,7 +365,10 @@ describe('ScreenshotFacadeService', () => {
             });
             registry.getByCapability.mockReturnValue([registered]);
 
-            const url = await service.getScreenshotUrl({ url: 'https://example.com' });
+            const url = await service.getScreenshotUrl(
+                { url: 'https://example.com' },
+                defaultFacadeOptions,
+            );
 
             expect(url).toBeNull();
         });

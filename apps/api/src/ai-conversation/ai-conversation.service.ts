@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { AiFacadeService, type AiFacadeOptions } from '@packages/agent/facades';
+import { AiFacadeService, type FacadeOptions } from '@packages/agent/facades';
 import type { ChatMessage, ChatCompletionChunk } from '@ever-works/plugin';
 
 export interface ChatRequestDto {
@@ -22,7 +22,7 @@ export class AiConversationService {
 
     async *streamChat(
         dto: ChatRequestDto,
-        facadeOptions?: AiFacadeOptions,
+        facadeOptions?: FacadeOptions,
     ): AsyncGenerator<StreamChunk> {
         try {
             const stream = this.aiFacade.createStreamingChatCompletion(

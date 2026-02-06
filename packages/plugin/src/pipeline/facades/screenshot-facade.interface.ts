@@ -1,3 +1,5 @@
+import type { FacadeOptions } from './facade-options.interface.js';
+
 export interface ScreenshotCaptureOptions {
 	/** URL to capture */
 	readonly url: string;
@@ -79,7 +81,7 @@ export interface IScreenshotFacade {
 	 * }
 	 * ```
 	 */
-	capture(options: ScreenshotCaptureOptions): Promise<ScreenshotCaptureResult>;
+	capture(options: ScreenshotCaptureOptions, facadeOptions?: FacadeOptions): Promise<ScreenshotCaptureResult>;
 
 	/**
 	 * Get a smart image for a URL based on domain type.
@@ -92,7 +94,7 @@ export interface IScreenshotFacade {
 	 * @param options - Smart image options
 	 * @returns Smart image result with primary image URL
 	 */
-	getSmartImage(options: SmartImageOptions): Promise<SmartImageResult>;
+	getSmartImage(options: SmartImageOptions, facadeOptions?: FacadeOptions): Promise<SmartImageResult>;
 
 	/**
 	 * Get a pre-signed screenshot URL without actually capturing.
@@ -100,7 +102,7 @@ export interface IScreenshotFacade {
 	 * @param options - Screenshot options
 	 * @returns Pre-signed URL or null if not available
 	 */
-	getScreenshotUrl(options: ScreenshotCaptureOptions): Promise<string | null>;
+	getScreenshotUrl(options: ScreenshotCaptureOptions, facadeOptions?: FacadeOptions): Promise<string | null>;
 
 	/**
 	 * Check if screenshot service is available.

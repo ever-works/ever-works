@@ -1,9 +1,10 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import type {
-    IContentExtractorFacade,
     IContentExtractorPlugin,
     FacadeExtractedContent,
     FacadeExtractionOptions,
+    IContentExtractorFacade,
+    FacadeOptions,
 } from '@ever-works/plugin';
 import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
@@ -11,7 +12,6 @@ import { PluginSettingsService } from '../plugins/services/plugin-settings.servi
 import { DirectoryPluginRepository } from '../plugins/repositories/directory-plugin.repository';
 import {
     BaseFacadeService,
-    BaseFacadeOptions,
     FacadeError,
     NoProviderError,
     ProviderNotFoundError,
@@ -56,8 +56,8 @@ export class ContentExtractorFacadeService
 
     async extractContent(
         url: string,
-        options?: FacadeExtractionOptions,
-        facadeOptions?: BaseFacadeOptions,
+        options: FacadeExtractionOptions | undefined,
+        facadeOptions?: FacadeOptions,
     ): Promise<FacadeExtractedContent | null> {
         try {
             const plugin = await this.resolvePlugin(
