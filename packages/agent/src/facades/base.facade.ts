@@ -102,13 +102,12 @@ export abstract class BaseFacadeService {
             }
         }
 
-        const plugins = this.registry.getByCapability(this.CAPABILITY);
-        const enabledPlugin = plugins.find((p) => p.state === 'enabled');
+        const enabledPlugins = await this.getEnabledPlugins(directoryId, userId);
 
-        if (enabledPlugin) {
+        if (enabledPlugins.length > 0) {
             return {
-                id: enabledPlugin.plugin.id,
-                name: this.getProviderName(enabledPlugin.plugin),
+                id: enabledPlugins[0].plugin.id,
+                name: this.getProviderName(enabledPlugins[0].plugin),
             };
         }
 
@@ -242,6 +241,13 @@ export abstract class BaseFacadeService {
                 result.push(p);
             }
         }
+
+        // Sort: plugins with defaultForCapabilities matching this.CAPABILITY come first
+        result.sort((a, b) => {
+            const aDefault = a.manifest.defaultForCapabilities?.includes(this.CAPABILITY) ? 0 : 1;
+            const bDefault = b.manifest.defaultForCapabilities?.includes(this.CAPABILITY) ? 0 : 1;
+            return aDefault - bDefault;
+        });
 
         return result;
     }

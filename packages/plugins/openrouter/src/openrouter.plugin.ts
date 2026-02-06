@@ -5,6 +5,7 @@ import type {
 	AiModelCapabilities,
 	ChatCompletionOptions,
 	ChatCompletionResponse,
+	ChatCompletionChunk,
 	EmbeddingOptions,
 	EmbeddingResponse
 } from '@ever-works/plugin';
@@ -166,6 +167,15 @@ export class OpenRouterPlugin extends BaseAiProvider {
 
 		const config = this.resolveConfig(options);
 		return this.aiOps.createChatCompletion(options, config);
+	}
+
+	async *createStreamingChatCompletion(options: ChatCompletionOptions): AsyncIterable<ChatCompletionChunk> {
+		if (!this.aiOps) {
+			throw new Error('OpenRouter plugin not loaded');
+		}
+
+		const config = this.resolveConfig(options);
+		yield* this.aiOps.createStreamingChatCompletion(options, config);
 	}
 
 	async createEmbedding(options: EmbeddingOptions): Promise<EmbeddingResponse> {

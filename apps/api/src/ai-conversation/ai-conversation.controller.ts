@@ -1,26 +1,29 @@
-import { Controller, Post, Body, Req, Res, HttpCode } from '@nestjs/common';
-import { Request, Response } from 'express';
+import { Controller, Post, Body, Res, HttpCode } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { Response } from 'express';
 import { AiConversationService, ChatRequestDto } from './ai-conversation.service';
+import { CurrentUser } from '../auth/decorators/user.decorator';
+import { AuthenticatedUser } from '../auth/types/jwt.types';
 
-@Controller('ai-conversations')
+@ApiTags('AI Conversations')
+@ApiBearerAuth('JWT-auth')
+@Controller('api/ai-conversations')
 export class AiConversationController {
     constructor(private readonly aiConversationService: AiConversationService) {}
 
     @Post('chat/stream')
     @HttpCode(200)
     async chatStream(
+        @CurrentUser() auth: AuthenticatedUser,
         @Body() body: ChatRequestDto,
-        @Req() req: Request,
         @Res() res: Response,
     ): Promise<void> {
         res.setHeader('Content-Type', 'application/x-ndjson');
         res.setHeader('Cache-Control', 'no-cache');
         res.setHeader('X-Accel-Buffering', 'no');
 
-        const userId = (req as any).user?.id;
-
         const stream = this.aiConversationService.streamChat(body, {
-            userId,
+            userId: auth.userId,
         });
 
         for await (const chunk of stream) {

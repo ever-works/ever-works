@@ -253,7 +253,7 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
         }));
     }
 
-    // Resolve AI provider: providerOverride > directory active > first enabled
+    // Resolve AI provider: providerOverride > directory active > defaultForCapabilities > first enabled
     private async resolvePlugin(
         providerOverride?: string,
         userId?: string,
@@ -280,7 +280,7 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
             }
         }
 
-        // Fall back to first enabled provider
+        // Fall back to first enabled provider (base sorts by defaultForCapabilities)
         const enabledPlugins = await this.getEnabledPlugins(directoryId, userId);
         if (enabledPlugins.length > 0) {
             return enabledPlugins[0].plugin as IAiProviderPlugin;

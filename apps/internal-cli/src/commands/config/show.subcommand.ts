@@ -51,16 +51,11 @@ export class ShowSubCommand extends CommandRunner {
                     : 'Not configured',
             });
 
-            this.displaySection('AI Configuration', {
-                'Default Provider': config.AI_DEFAULT_PROVIDER,
-                'Fallback Providers': config.AI_FALLBACK_PROVIDERS || 'None',
-            });
-
-            // Display configured AI providers
+            // Display configured AI providers (plugins)
             const aiProviders = this.getConfiguredAiProviders(config);
             if (aiProviders.length > 0) {
                 this.displaySection(
-                    'AI Providers',
+                    'AI Providers (Plugins)',
                     aiProviders.reduce(
                         (acc, provider) => {
                             acc[provider] = 'Configured ✓';
@@ -104,20 +99,12 @@ export class ShowSubCommand extends CommandRunner {
 
     private getConfiguredAiProviders(config: any): string[] {
         const providers: string[] = [];
-        const providerKeys = [
-            'OPENAI',
-            'GOOGLE',
-            'ANTHROPIC',
-            'OPENROUTER',
-            'OLLAMA',
-            'GROQ',
-            'CUSTOM',
-        ];
+        const providerKeys = ['OPENROUTER', 'OPENAI', 'GOOGLE', 'ANTHROPIC', 'GROQ', 'OLLAMA'];
 
         for (const provider of providerKeys) {
             if (
-                config[`${provider}_API_KEY`] ||
-                (provider === 'OLLAMA' && config[`${provider}_BASE_URL`])
+                config[`PLUGIN_${provider}_API_KEY`] ||
+                (provider === 'OLLAMA' && config[`PLUGIN_${provider}_BASE_URL`])
             ) {
                 providers.push(provider.toLowerCase());
             }
