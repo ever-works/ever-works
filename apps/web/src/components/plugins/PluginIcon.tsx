@@ -1,9 +1,31 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { PluginsApiIcon } from '@/lib/api/plugins';
 import { cn } from '@/lib/utils/cn';
 import { Plug } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
+
+/**
+ * Observes the `dark` class on `<html>` so the component re-renders
+ * in real time when the user toggles the theme.
+ */
+function useIsDark(): boolean {
+    const [isDark, setIsDark] = useState(false);
+
+    useEffect(() => {
+        const root = document.documentElement;
+        setIsDark(root.classList.contains('dark'));
+
+        const observer = new MutationObserver(() => {
+            setIsDark(root.classList.contains('dark'));
+        });
+        observer.observe(root, { attributes: true, attributeFilter: ['class'] });
+        return () => observer.disconnect();
+    }, []);
+
+    return isDark;
+}
 
 interface PluginIconProps {
     icon?: PluginsApiIcon;
@@ -13,7 +35,11 @@ interface PluginIconProps {
 }
 
 export function PluginIcon({ icon, name, size = 32, className }: PluginIconProps) {
+    const isDark = useIsDark();
     const containerStyle = { width: size, height: size };
+
+    // Use dark variant when available and in dark mode
+    const iconValue = icon && isDark && icon.darkValue ? icon.darkValue : icon?.value;
     const containerClass = cn(
         'flex items-center justify-center rounded-lg bg-surface-secondary dark:bg-surface-secondary-dark',
         className,
@@ -38,7 +64,7 @@ export function PluginIcon({ icon, name, size = 32, className }: PluginIconProps
                         backgroundColor: icon.backgroundColor,
                         color: icon.color || (icon.backgroundColor ? '#ffffff' : undefined),
                     }}
-                    dangerouslySetInnerHTML={{ __html: icon.value }}
+                    dangerouslySetInnerHTML={{ __html: iconValue! }}
                 />
             );
 
@@ -48,14 +74,14 @@ export function PluginIcon({ icon, name, size = 32, className }: PluginIconProps
                     className={cn(containerClass, 'overflow-hidden')}
                     style={{ ...containerStyle, backgroundColor: icon.backgroundColor }}
                 >
-                    <img src={icon.value} alt={name} className="w-full h-full object-contain" />
+                    <img src={iconValue!} alt={name} className="w-full h-full object-contain" />
                 </div>
             );
 
         case 'base64':
-            const dataUrl = icon.value.startsWith('data:')
-                ? icon.value
-                : `data:image/png;base64,${icon.value}`;
+            const dataUrl = iconValue!.startsWith('data:')
+                ? iconValue!
+                : `data:image/png;base64,${iconValue!}`;
             return (
                 <div
                     className={cn(containerClass, 'overflow-hidden')}
@@ -67,7 +93,7 @@ export function PluginIcon({ icon, name, size = 32, className }: PluginIconProps
 
         case 'lucide':
             // Get the Lucide icon component by name
-            const iconName = icon.value.charAt(0).toUpperCase() + icon.value.slice(1);
+            const iconName = iconValue!.charAt(0).toUpperCase() + iconValue!.slice(1);
             const LucideIcon = (LucideIcons as unknown as Record<string, React.ComponentType<any>>)[
                 iconName
             ];
@@ -98,7 +124,7 @@ export function PluginIcon({ icon, name, size = 32, className }: PluginIconProps
                     className={containerClass}
                     style={{ ...containerStyle, backgroundColor: icon.backgroundColor }}
                 >
-                    <span style={{ fontSize: size * 0.5 }}>{icon.value}</span>
+                    <span style={{ fontSize: size * 0.5 }}>{iconValue}</span>
                 </div>
             );
 
