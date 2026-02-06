@@ -56,11 +56,7 @@
 					"secret": true,
 					"description": "Brave Search API key (optional - can be set via admin/user settings)"
 				}
-			],
-			"icon": {
-				"type": "svg",
-				"value": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\"><path d=\"M20.44 7.11l-.56-1.63 1.05-1.68a.56.56 0 00-.08-.69L18.72 1a.56.56 0 00-.55-.14L16 1.52l-1.35-.8A13.85 13.85 0 0012 0a13.85 13.85 0 00-2.65.72L8 1.52l-2.17-.66A.56.56 0 005.28 1L3.15 3.11a.56.56 0 00-.08.69L4.12 5.48l-.56 1.63a14.9 14.9 0 00-.64 2.87L2 12.71a.56.56 0 00.14.55L4 15.32l.37 2.2a14 14 0 001.15 3.32l1.76 2.28a.56.56 0 00.6.2l2.14-.68 2 .65a.56.56 0 00.34 0l2-.65 2.14.68a.56.56 0 00.6-.2l1.76-2.28a14 14 0 001.15-3.32l.37-2.2L22 13.26a.56.56 0 00.14-.55l-.92-2.73a14.9 14.9 0 00-.78-2.87z\" fill=\"url(#brave-grad)\"/><defs><linearGradient id=\"brave-grad\" x1=\"12\" y1=\"0\" x2=\"12\" y2=\"24\" gradientUnits=\"userSpaceOnUse\"><stop stop-color=\"#FF5500\"/><stop offset=\"0.41\" stop-color=\"#FF5500\"/><stop offset=\"1\" stop-color=\"#FF2000\"/></linearGradient></defs></svg>"
-			}
+			]
 		}
 	}
 }

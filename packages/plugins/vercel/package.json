@@ -54,12 +54,7 @@
 			"visibility": "public",
 			"defaultForCapabilities": [
 				"deployment"
-			],
-			"icon": {
-				"type": "lucide",
-				"value": "Triangle",
-				"backgroundColor": "#000000"
-			}
+			]
 		}
 	}
 }

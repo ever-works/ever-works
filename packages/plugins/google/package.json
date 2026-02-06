@@ -51,12 +51,7 @@
 			},
 			"license": "MIT",
 			"builtIn": true,
-			"autoEnable": false,
-			"icon": {
-				"type": "svg",
-				"value": "<svg viewBox=\"0 0 24 24\" fill=\"none\"><path d=\"M12 3 4 7.5v9L12 21l8-4.5v-9L12 3z\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linejoin=\"round\"/><path d=\"m4 7.5 8 4.5m0 0 8-4.5M12 12v9\" stroke=\"currentColor\" stroke-width=\"1.5\"/></svg>",
-				"backgroundColor": "#8E75B2"
-			}
+			"autoEnable": false
 		}
 	}
 }

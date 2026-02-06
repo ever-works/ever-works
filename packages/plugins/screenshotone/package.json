@@ -63,12 +63,7 @@
 					"secret": true,
 					"description": "ScreenshotOne secret key for signed URLs (optional - can be set via admin/user settings)"
 				}
-			],
-			"icon": {
-				"type": "lucide",
-				"value": "Camera",
-				"backgroundColor": "#4f46e5"
-			}
+			]
 		}
 	}
 }

@@ -73,12 +73,7 @@
 					"secret": true,
 					"description": "GitHub OAuth App Client Secret (for plugin use, separate from auth GH_CLIENT_SECRET)"
 				}
-			],
-			"icon": {
-				"type": "lucide",
-				"value": "Github",
-				"backgroundColor": "#24292e"
-			}
+			]
 		}
 	}
 }

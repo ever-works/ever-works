@@ -245,6 +245,10 @@ export class BraveSearchPlugin implements IPlugin, ISearchPlugin {
 			builtIn: true,
 			systemPlugin: false,
 			autoEnable: false,
+			icon: {
+				type: 'svg',
+				value: '<svg viewBox="0 0 24 24" fill="none"><defs><linearGradient id="brave-grad" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#FF5500"/><stop offset="100%" stop-color="#FF2000"/></linearGradient></defs><path d="M20.14 6.78l.72-1.68-.93-.88a4.27 4.27 0 0 0-1.93-1L16.44 2l-2 2.24h-4.88L7.56 2 6 3.22a4.27 4.27 0 0 0-1.93 1l-.93.88.72 1.68L2.4 10.24A20.53 20.53 0 0 0 5.22 19l2.42 1.78a5.15 5.15 0 0 0 2.5 1.06L12 22l1.86-.16a5.15 5.15 0 0 0 2.5-1.06L18.78 19a20.53 20.53 0 0 0 2.82-8.76zM12 17.5l-2.5-1.5L12 14.5l2.5 1.5z" fill="url(#brave-grad)"/></svg>'
+			},
 			readme: [
 				'## What does Brave Search do?',
 				'',
