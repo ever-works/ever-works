@@ -667,14 +667,6 @@ export class MyGitProviderPlugin implements IPlugin, IGitProviderPlugin, IOAuthP
 		context.logger.log('My Git Provider Plugin loaded');
 	}
 
-	async onEnable(context: PluginContext): Promise<void> {
-		context.logger.log('My Git Provider Plugin enabled');
-	}
-
-	async onDisable(context: PluginContext): Promise<void> {
-		context.logger.log('My Git Provider Plugin disabled');
-	}
-
 	async onUnload(): Promise<void> {
 		this.context = undefined;
 		this.gitOps = undefined;

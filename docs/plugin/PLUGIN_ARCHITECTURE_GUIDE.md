@@ -61,7 +61,7 @@ Each plugin:
 - Lives in its own folder with its own dependencies
 - Implements one or more capability interfaces
 - Provides a settings form for user configuration
-- Can be installed, enabled, disabled, and uninstalled independently
+- Can be installed, configured, and uninstalled independently
 
 ### What is a Capability?
 
@@ -431,7 +431,7 @@ The system loads the JavaScript file specified in the package.json's `main` fiel
 The loaded class is checked to ensure it properly implements the required plugin interface. It must have:
 
 - Required metadata properties (id, name, version, category)
-- Lifecycle methods (onLoad, onEnable, onDisable, onUnload)
+- Lifecycle methods (onLoad, onUnload)
 - Settings validation method
 - Settings schema for form generation
 
@@ -486,7 +486,7 @@ The plugin has been found in the filesystem and its manifest has been validated.
 
 #### Loaded
 
-The plugin's entry point has been loaded into memory and the `onLoad()` lifecycle hook has been called. The plugin can now initialize itself, but it's not yet active for any user or directory.
+The plugin's entry point has been loaded into memory and the `onLoad()` lifecycle hook has been called. The plugin is now active and ready to use.
 
 During loading, the plugin receives a context object that provides:
 
@@ -496,28 +496,19 @@ During loading, the plugin receives a context object that provides:
 - Logging utilities
 - Cache for performance optimization
 
-#### Enabled
-
-A user has enabled this plugin for a specific directory. The `onEnable()` hook is called with the directory context. The plugin is now active and will be used when operations requiring its capability are performed on that directory.
-
-#### Disabled
-
-The user has disabled the plugin for a directory. The `onDisable()` hook is called, allowing the plugin to clean up any directory-specific resources. The plugin remains loaded and can be re-enabled.
-
 #### Unloaded
 
-The plugin is being removed from the system entirely. The `onUnload()` hook is called, allowing the plugin to clean up all resources. After unloading, the plugin returns to the Discovered state if its files still exist.
+The plugin is being removed from the system. The `onUnload()` hook is called, allowing the plugin to clean up all resources. After unloading, the plugin returns to the Discovered state if its files still exist.
 
 ### State Transitions
 
 ```
-DISCOVERED ───onLoad()───► LOADED ───onEnable()───► ENABLED
-                             │                         │
-                             │                         │
-                         onUnload()               onDisable()
-                             │                         │
-                             ▼                         ▼
-                         UNLOADED                  DISABLED
+DISCOVERED ───onLoad()───► LOADED
+                              │
+                          onUnload()
+                              │
+                              ▼
+                          UNLOADED
 ```
 
 ### Lifecycle Hooks Explained
@@ -525,24 +516,10 @@ DISCOVERED ───onLoad()───► LOADED ───onEnable()───► 
 **onLoad(context)**
 Called once when the plugin is first loaded. Use this to:
 
-- Initialize plugin-wide resources
+- Initialize resources
 - Register event listeners
 - Set up database tables if needed
 - Register custom capabilities for other plugins to use
-
-**onEnable(context)**
-Called each time a user enables the plugin for a directory. Use this to:
-
-- Validate directory-specific settings
-- Set up directory-specific resources
-- Start any background processes for this directory
-
-**onDisable(context)**
-Called when a user disables the plugin for a directory. Use this to:
-
-- Clean up directory-specific resources
-- Stop background processes
-- Save any pending state
 
 **onUnload()**
 Called when the plugin is being completely removed. Use this to:
@@ -960,8 +937,7 @@ Plugins run in the same process as the core application but have limited access:
 Plugin settings are validated at multiple points:
 
 1. **On installation** - The plugin's `validateSettings()` method is called
-2. **On enable** - Settings are re-validated in the directory context
-3. **On use** - Settings are validated before each operation
+2. **On use** - Settings are validated before each operation
 
 ### Error Boundaries
 
@@ -1119,7 +1095,7 @@ By accessing environment variables through `context.env`, you can easily provide
 
 **OAuth** - OAuth authentication flow used by plugins (GitHub, GitLab, Bitbucket, etc.) to connect user accounts for resource access. This is different from app authentication.
 
-**Lifecycle Hook** - A method called at specific points in a plugin's lifetime (load, enable, disable, unload)
+**Lifecycle Hook** - A method called at specific points in a plugin's lifetime (load, unload)
 
 **Manifest** - The metadata in a plugin's package.json that identifies it as an Ever Works plugin
 

@@ -92,8 +92,6 @@ export interface IPlugin {
 	readonly configurationMode?: PluginConfigurationMode;
 
 	onLoad(context: PluginContext): Promise<void>;
-	onEnable(context: PluginContext): Promise<void>;
-	onDisable(context: PluginContext): Promise<void>;
 	onUnload(): Promise<void>;
 
 	validateSettings(settings: unknown): Promise<ValidationResult>;
@@ -2287,7 +2285,7 @@ export class PluginClassValidator {
 		}
 
 		// Check required methods
-		const requiredMethods = ['onLoad', 'onEnable', 'onDisable', 'onUnload', 'validateSettings'];
+		const requiredMethods = ['onLoad', 'onUnload', 'validateSettings'];
 		for (const method of requiredMethods) {
 			if (typeof instance[method] !== 'function') {
 				errors.push(`Missing required method: ${method}`);
@@ -2337,8 +2335,6 @@ export class PluginLifecycleManager {
 		const plugin = this.registry.get(pluginId);
 		if (!plugin) throw new Error(`Plugin not found: ${pluginId}`);
 
-		const context = this.contextFactory.create(plugin.instance, directory);
-		await plugin.instance.onEnable(context);
 		this.registry.updateState(pluginId, 'enabled');
 	}
 
@@ -2346,8 +2342,6 @@ export class PluginLifecycleManager {
 		const plugin = this.registry.get(pluginId);
 		if (!plugin) throw new Error(`Plugin not found: ${pluginId}`);
 
-		const context = this.contextFactory.create(plugin.instance, directory);
-		await plugin.instance.onDisable(context);
 		this.registry.updateState(pluginId, 'disabled');
 	}
 
@@ -5773,8 +5767,6 @@ export function createPluginContractTests(PluginClass: new () => IPlugin, testEn
 
 		it('should implement lifecycle hooks', () => {
 			expect(typeof plugin.onLoad).toBe('function');
-			expect(typeof plugin.onEnable).toBe('function');
-			expect(typeof plugin.onDisable).toBe('function');
 			expect(typeof plugin.onUnload).toBe('function');
 		});
 
@@ -5827,7 +5819,7 @@ Write unit tests for PluginRegistryService - registration, lookup, capability qu
 **Title:** Create tests for plugin lifecycle management
 
 **Description:**
-Test onLoad, onEnable, onDisable, onUnload lifecycle transitions.
+Test onLoad, onUnload lifecycle transitions.
 
 **Files to Create:**
 

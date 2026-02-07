@@ -75,12 +75,6 @@ export class GoogleOAuthPlugin implements IPlugin, IOAuthPlugin {
 	async onLoad(context: PluginContext): Promise<void> {
 		/* ... */
 	}
-	async onEnable(context: PluginContext): Promise<void> {
-		/* ... */
-	}
-	async onDisable(context: PluginContext): Promise<void> {
-		/* ... */
-	}
 	async onUnload(): Promise<void> {
 		/* ... */
 	}
@@ -396,14 +390,6 @@ export class GoogleOAuthPlugin implements IPlugin, IOAuthPlugin {
 	async onLoad(context: PluginContext): Promise<void> {
 		this.context = context;
 		context.logger.log('Google OAuth Plugin loaded');
-	}
-
-	async onEnable(context: PluginContext): Promise<void> {
-		context.logger.log('Google OAuth Plugin enabled');
-	}
-
-	async onDisable(context: PluginContext): Promise<void> {
-		context.logger.log('Google OAuth Plugin disabled');
 	}
 
 	async onUnload(): Promise<void> {

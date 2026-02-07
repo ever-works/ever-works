@@ -300,8 +300,6 @@ export class MyPlugin implements IPlugin {
 	};
 
 	async onLoad(context: PluginContext): Promise<void> {}
-	async onEnable(context: PluginContext): Promise<void> {}
-	async onDisable(context: PluginContext): Promise<void> {}
 	async onUnload(): Promise<void> {}
 
 	getManifest(): PluginManifest {

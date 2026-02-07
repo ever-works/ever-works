@@ -608,24 +608,16 @@ type PluginCategory =
 ### States
 
 ```
-┌──────────┐    onLoad()     ┌──────────┐   onEnable()   ┌──────────┐
-│DISCOVERED│ ──────────────→ │  LOADED  │ ─────────────→ │ ENABLED  │
+┌──────────┐    onLoad()     ┌──────────┐   onUnload()   ┌──────────┐
+│DISCOVERED│ ──────────────→ │  LOADED  │ ─────────────→ │ UNLOADED │
 └──────────┘                 └──────────┘                └──────────┘
-                                  │                           │
-                                  │ onUnload()                │ onDisable()
-                                  ▼                           ▼
-                             ┌──────────┐               ┌──────────┐
-                             │ UNLOADED │               │ DISABLED │
-                             └──────────┘               └──────────┘
 ```
 
-| State        | Description                                     |
-| ------------ | ----------------------------------------------- |
-| `DISCOVERED` | Found in filesystem, manifest validated         |
-| `LOADED`     | Entry point loaded, `onLoad()` called           |
-| `ENABLED`    | User enabled for directory, `onEnable()` called |
-| `DISABLED`   | User disabled, `onDisable()` called             |
-| `UNLOADED`   | Plugin removed, `onUnload()` called             |
+| State        | Description                             |
+| ------------ | --------------------------------------- |
+| `DISCOVERED` | Found in filesystem, manifest validated |
+| `LOADED`     | Entry point loaded, `onLoad()` called   |
+| `UNLOADED`   | Plugin removed, `onUnload()` called     |
 
 ### IPlugin Interface
 
@@ -643,8 +635,6 @@ interface IPlugin {
 
 	// Lifecycle hooks
 	onLoad(context: PluginContext): Promise<void>;
-	onEnable(context: PluginContext): Promise<void>;
-	onDisable(context: PluginContext): Promise<void>;
 	onUnload(): Promise<void>;
 
 	// Settings validation
@@ -3126,14 +3116,6 @@ export class MyPlugin implements IPlugin, IScreenshotPlugin {
 		context.logger.log('My Plugin loaded');
 	}
 
-	async onEnable(context: PluginContext): Promise<void> {
-		context.logger.log('My Plugin enabled for directory');
-	}
-
-	async onDisable(context: PluginContext): Promise<void> {
-		context.logger.log('My Plugin disabled');
-	}
-
 	async onUnload(): Promise<void> {
 		// Cleanup
 	}
@@ -3624,8 +3606,6 @@ export function createPluginContractTests(PluginClass: new () => IPlugin, testEn
 
 		it('should implement lifecycle hooks', () => {
 			expect(typeof plugin.onLoad).toBe('function');
-			expect(typeof plugin.onEnable).toBe('function');
-			expect(typeof plugin.onDisable).toBe('function');
 			expect(typeof plugin.onUnload).toBe('function');
 		});
 

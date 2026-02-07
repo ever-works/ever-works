@@ -31,7 +31,7 @@ isPluginEnabled(pluginId, directoryId, userId)
     │     └─ If manifest.autoEnable is true:
     │           return true
     │
-    └─ 4. Default to enabled (plugin is in registry with state=enabled)
+    └─ 4. Default to enabled (plugin is in registry with state=loaded)
 ```
 
 ### Settings Resolution (4-Level Hierarchy)
@@ -147,7 +147,7 @@ export class MyCapabilityFacadeService extends BaseFacadeService {
 			if (
 				registered &&
 				registered.manifest.capabilities.includes(this.CAPABILITY) &&
-				registered.state === 'enabled'
+				registered.state === 'loaded'
 			) {
 				const isEnabled = await this.isPluginEnabled(providerOverride, directoryId, userId);
 				if (isEnabled) {

@@ -134,8 +134,6 @@ interface IPlugin {
 
 	// Lifecycle hooks
 	onLoad(context: PluginContext): Promise<void>;
-	onEnable(context: PluginContext): Promise<void>;
-	onDisable(context: PluginContext): Promise<void>;
 	onUnload(): Promise<void>;
 
 	// Validation
