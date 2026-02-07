@@ -46,7 +46,7 @@ export class SerpApiSearchPlugin implements IPlugin, ISearchPlugin {
 				description: 'Your SerpAPI key. Get one at https://serpapi.com',
 				'x-secret': true,
 				'x-envVar': 'PLUGIN_SERPAPI_API_KEY',
-				'x-scope': 'global'
+				'x-scope': 'user'
 			},
 			engine: {
 				type: 'string',

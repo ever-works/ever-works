@@ -73,7 +73,7 @@ export class GitHubPlugin implements IPlugin, IGitProviderPlugin, IOAuthPlugin {
 				'x-secret': true,
 				'x-envVar': 'PLUGIN_GITHUB_CLIENT_SECRET',
 				'x-adminOnly': true,
-				'x-scope': 'global'
+				'x-scope': 'user'
 			},
 			apiBaseUrl: {
 				type: 'string',

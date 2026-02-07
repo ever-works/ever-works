@@ -655,7 +655,11 @@
                 "custom": "Personalizado",
                 "customOverwrite": "Personalizado (Sobrescrever)",
                 "yes": "Sim",
-                "no": "Não"
+                "no": "Não",
+                "deployProvider": "Deploy Provider",
+                "notConnected": "Not connected",
+                "notConfigured": "Not configured",
+                "viewSite": "View site"
             },
             "config": {
                 "title": "Detalhes da Configuração",

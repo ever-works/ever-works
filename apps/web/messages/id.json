@@ -655,7 +655,11 @@
                 "custom": "Kustom",
                 "customOverwrite": "Kustom (Timpa)",
                 "yes": "Ya",
-                "no": "Tidak"
+                "no": "Tidak",
+                "deployProvider": "Deploy Provider",
+                "notConnected": "Not connected",
+                "notConfigured": "Not configured",
+                "viewSite": "View site"
             },
             "config": {
                 "title": "Detail Konfigurasi",

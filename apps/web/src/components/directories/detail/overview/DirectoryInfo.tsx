@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
 import { useDirectoryDetail } from '../DirectoryDetailContext';
 import { Link } from '@/i18n/navigation';
-import { Users, UserCircle, Lock, Unlock } from 'lucide-react';
+import { Users, UserCircle, Lock, Unlock, ExternalLink, Cloud } from 'lucide-react';
 
 interface DirectoryInfoProps {
     directory: Directory;
@@ -38,7 +38,7 @@ function RepoVisibilityIcon({
 
 export function DirectoryInfo({ directory, config }: DirectoryInfoProps) {
     const t = useTranslations('dashboard.directoryDetail.info');
-    const { repoLinks } = useDirectoryDetail();
+    const { repoLinks, oauthConnection } = useDirectoryDetail();
 
     const userRole = directory.userRole;
     const isShared = userRole && userRole !== DirectoryMemberRole.OWNER;
@@ -86,7 +86,20 @@ export function DirectoryInfo({ directory, config }: DirectoryInfoProps) {
         },
         {
             label: t('gitProvider'),
-            value: directory.gitProvider,
+            value: (
+                <div className="flex items-center gap-2">
+                    <span className="capitalize">
+                        {oauthConnection?.name || directory.gitProvider}
+                    </span>
+                    {oauthConnection?.connected ? (
+                        <span className="text-xs text-success">@{oauthConnection.username}</span>
+                    ) : (
+                        <span className="text-xs text-text-muted dark:text-text-muted-dark">
+                            {t('notConnected')}
+                        </span>
+                    )}
+                </div>
+            ),
             icon: (
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path
@@ -97,6 +110,30 @@ export function DirectoryInfo({ directory, config }: DirectoryInfoProps) {
                     />
                 </svg>
             ),
+        },
+        {
+            label: t('deployProvider'),
+            value: directory.deployProvider ? (
+                <div className="flex items-center gap-2">
+                    <span className="capitalize">{directory.deployProvider}</span>
+                    {directory.website && (
+                        <a
+                            href={directory.website}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-primary hover:text-primary-hover flex items-center gap-1"
+                        >
+                            {t('viewSite')}
+                            <ExternalLink className="w-3 h-3" />
+                        </a>
+                    )}
+                </div>
+            ) : (
+                <span className="text-text-muted dark:text-text-muted-dark">
+                    {t('notConfigured')}
+                </span>
+            ),
+            icon: <Cloud className="w-4 h-4" />,
         },
         {
             label: t('organization'),

@@ -562,7 +562,11 @@
                 "custom": "مخصص",
                 "customOverwrite": "مخصص (الكتابة فوق)",
                 "yes": "نعم",
-                "no": "لا"
+                "no": "لا",
+                "deployProvider": "Deploy Provider",
+                "notConnected": "Not connected",
+                "notConfigured": "Not configured",
+                "viewSite": "View site"
             },
             "config": {
                 "title": "تفاصيل التكوين",

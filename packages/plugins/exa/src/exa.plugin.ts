@@ -48,7 +48,7 @@ export class ExaSearchPlugin implements IPlugin, ISearchPlugin {
 				description: 'Your Exa API key. Get one at https://exa.ai',
 				'x-secret': true,
 				'x-envVar': 'PLUGIN_EXA_API_KEY',
-				'x-scope': 'global'
+				'x-scope': 'user'
 			},
 			searchType: {
 				type: 'string',

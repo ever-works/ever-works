@@ -67,7 +67,8 @@ export class ApifyDataSourcePlugin implements IPlugin, IDataSourcePlugin, IFormS
 				title: 'Apify API Token',
 				description: 'Your Apify API token (found in Settings > Integrations)',
 				'x-secret': true,
-				'x-envVar': 'PLUGIN_APIFY_API_TOKEN'
+				'x-envVar': 'PLUGIN_APIFY_API_TOKEN',
+				'x-scope': 'user'
 			},
 			defaultFieldMapping: {
 				type: 'object',

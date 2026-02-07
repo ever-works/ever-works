@@ -679,7 +679,11 @@
                 "custom": "Custom",
                 "customOverwrite": "Custom (Overwrite)",
                 "yes": "Yes",
-                "no": "No"
+                "no": "No",
+                "deployProvider": "Deploy Provider",
+                "notConnected": "Not connected",
+                "notConfigured": "Not configured",
+                "viewSite": "View site"
             },
             "config": {
                 "title": "Configuration Details",

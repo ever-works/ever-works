@@ -655,7 +655,11 @@
                 "custom": "Пользовательский",
                 "customOverwrite": "Пользовательский (Перезаписать)",
                 "yes": "Да",
-                "no": "Нет"
+                "no": "Нет",
+                "deployProvider": "Deploy Provider",
+                "notConnected": "Not connected",
+                "notConfigured": "Not configured",
+                "viewSite": "View site"
             },
             "config": {
                 "title": "Детали конфигурации",

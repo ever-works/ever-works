@@ -46,7 +46,7 @@ export class UrlboxPlugin implements IPlugin, IScreenshotPlugin {
 				description: 'Your Urlbox API key. Get one at https://urlbox.com',
 				'x-secret': true,
 				'x-envVar': 'PLUGIN_URLBOX_API_KEY',
-				'x-scope': 'global'
+				'x-scope': 'user'
 			},
 			apiSecret: {
 				type: 'string',
@@ -54,7 +54,7 @@ export class UrlboxPlugin implements IPlugin, IScreenshotPlugin {
 				description: 'Your Urlbox API secret for signed render links (recommended for security)',
 				'x-secret': true,
 				'x-envVar': 'PLUGIN_URLBOX_API_SECRET',
-				'x-scope': 'global'
+				'x-scope': 'user'
 			},
 			viewportWidth: {
 				type: 'number',

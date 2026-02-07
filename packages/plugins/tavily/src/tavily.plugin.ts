@@ -67,8 +67,7 @@ export class TavilySearchPlugin implements IPlugin, ISearchPlugin, IContentExtra
 				'x-secret': true,
 				// Environment variable fallback
 				'x-envVar': 'PLUGIN_TAVILY_API_KEY',
-				// Scope - can be set at any level
-				'x-scope': 'global'
+				'x-scope': 'user'
 			},
 			searchDepth: {
 				type: 'string',

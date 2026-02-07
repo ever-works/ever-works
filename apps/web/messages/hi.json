@@ -655,7 +655,11 @@
                 "custom": "कस्टम",
                 "customOverwrite": "कस्टम (ओवरराइट)",
                 "yes": "हाँ",
-                "no": "नहीं"
+                "no": "नहीं",
+                "deployProvider": "Deploy Provider",
+                "notConnected": "Not connected",
+                "notConfigured": "Not configured",
+                "viewSite": "View site"
             },
             "config": {
                 "title": "कॉन्फ़िगरेशन विवरण",

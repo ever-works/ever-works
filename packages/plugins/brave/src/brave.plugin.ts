@@ -47,7 +47,7 @@ export class BraveSearchPlugin implements IPlugin, ISearchPlugin {
 				description: 'Your Brave Search API key. Get one at https://brave.com/search/api/',
 				'x-secret': true,
 				'x-envVar': 'PLUGIN_BRAVE_API_KEY',
-				'x-scope': 'global'
+				'x-scope': 'user'
 			},
 			maxResults: {
 				type: 'number',

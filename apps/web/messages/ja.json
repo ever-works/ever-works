@@ -655,7 +655,11 @@
                 "custom": "カスタム",
                 "customOverwrite": "カスタム（上書き）",
                 "yes": "はい",
-                "no": "いいえ"
+                "no": "いいえ",
+                "deployProvider": "Deploy Provider",
+                "notConnected": "Not connected",
+                "notConfigured": "Not configured",
+                "viewSite": "View site"
             },
             "config": {
                 "title": "設定詳細",

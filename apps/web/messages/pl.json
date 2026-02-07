@@ -655,7 +655,11 @@
                 "custom": "Niestandardowe",
                 "customOverwrite": "Niestandardowe (nadpisanie)",
                 "yes": "Tak",
-                "no": "Nie"
+                "no": "Nie",
+                "deployProvider": "Deploy Provider",
+                "notConnected": "Not connected",
+                "notConfigured": "Not configured",
+                "viewSite": "View site"
             },
             "config": {
                 "title": "Szczegóły konfiguracji",

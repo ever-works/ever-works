@@ -655,7 +655,11 @@
                 "custom": "Персонализирано",
                 "customOverwrite": "Персонализирано (Замяна)",
                 "yes": "Да",
-                "no": "Не"
+                "no": "Не",
+                "deployProvider": "Deploy Provider",
+                "notConnected": "Not connected",
+                "notConfigured": "Not configured",
+                "viewSite": "View site"
             },
             "config": {
                 "title": "Детайли за Конфигурацията",

@@ -655,7 +655,11 @@
                 "custom": "กำหนดเอง",
                 "customOverwrite": "กำหนดเอง (เขียนทับ)",
                 "yes": "ใช่",
-                "no": "ไม่"
+                "no": "ไม่",
+                "deployProvider": "Deploy Provider",
+                "notConnected": "Not connected",
+                "notConfigured": "Not configured",
+                "viewSite": "View site"
             },
             "config": {
                 "title": "รายละเอียดการกำหนดค่า",

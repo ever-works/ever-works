@@ -562,7 +562,11 @@
                 "custom": "Benutzerdefiniert",
                 "customOverwrite": "Benutzerdefiniert (Überschreiben)",
                 "yes": "Ja",
-                "no": "Nein"
+                "no": "Nein",
+                "deployProvider": "Deploy Provider",
+                "notConnected": "Not connected",
+                "notConfigured": "Not configured",
+                "viewSite": "View site"
             },
             "config": {
                 "title": "Konfigurationsdetails",

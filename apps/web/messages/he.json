@@ -562,7 +562,11 @@
                 "custom": "מותאם אישית",
                 "customOverwrite": "מותאם אישית (דריסה)",
                 "yes": "כן",
-                "no": "לא"
+                "no": "לא",
+                "deployProvider": "Deploy Provider",
+                "notConnected": "Not connected",
+                "notConfigured": "Not configured",
+                "viewSite": "View site"
             },
             "config": {
                 "title": "פרטי הגדרה",

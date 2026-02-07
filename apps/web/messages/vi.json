@@ -655,7 +655,11 @@
                 "custom": "Tùy chỉnh",
                 "customOverwrite": "Tùy chỉnh (Ghi đè)",
                 "yes": "Có",
-                "no": "Không"
+                "no": "Không",
+                "deployProvider": "Deploy Provider",
+                "notConnected": "Not connected",
+                "notConfigured": "Not configured",
+                "viewSite": "View site"
             },
             "config": {
                 "title": "Chi tiết Cấu hình",

@@ -655,7 +655,11 @@
                 "custom": "Özel",
                 "customOverwrite": "Özel (Üzerine Yaz)",
                 "yes": "Evet",
-                "no": "Hayır"
+                "no": "Hayır",
+                "deployProvider": "Deploy Provider",
+                "notConnected": "Not connected",
+                "notConfigured": "Not configured",
+                "viewSite": "View site"
             },
             "config": {
                 "title": "Yapılandırma Detayları",

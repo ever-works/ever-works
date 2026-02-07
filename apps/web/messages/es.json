@@ -562,7 +562,11 @@
                 "custom": "Personalizado",
                 "customOverwrite": "Personalizado (Sobrescribir)",
                 "yes": "Sí",
-                "no": "No"
+                "no": "No",
+                "deployProvider": "Deploy Provider",
+                "notConnected": "Not connected",
+                "notConfigured": "Not configured",
+                "viewSite": "View site"
             },
             "config": {
                 "title": "Detalles de Configuración",

@@ -80,8 +80,7 @@ export class ScreenshotOnePlugin implements IPlugin, IScreenshotPlugin {
 				'x-secret': true,
 				// Environment variable fallback
 				'x-envVar': 'PLUGIN_SCREENSHOTONE_ACCESS_KEY',
-				// Scope - can be set at any level
-				'x-scope': 'global'
+				'x-scope': 'user'
 			},
 			secretKey: {
 				type: 'string',
@@ -91,8 +90,7 @@ export class ScreenshotOnePlugin implements IPlugin, IScreenshotPlugin {
 				'x-secret': true,
 				// Environment variable fallback
 				'x-envVar': 'PLUGIN_SCREENSHOTONE_SECRET_KEY',
-				// Scope - can be set at any level
-				'x-scope': 'global'
+				'x-scope': 'user'
 			},
 			viewportWidth: {
 				type: 'number',

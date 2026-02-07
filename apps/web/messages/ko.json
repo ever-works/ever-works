@@ -655,7 +655,11 @@
                 "custom": "사용자 정의",
                 "customOverwrite": "사용자 정의 (덮어쓰기)",
                 "yes": "예",
-                "no": "아니오"
+                "no": "아니오",
+                "deployProvider": "Deploy Provider",
+                "notConnected": "Not connected",
+                "notConfigured": "Not configured",
+                "viewSite": "View site"
             },
             "config": {
                 "title": "구성 세부정보",

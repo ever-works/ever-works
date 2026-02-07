@@ -655,7 +655,11 @@
                 "custom": "Aangepast",
                 "customOverwrite": "Aangepast (Overschrijven)",
                 "yes": "Ja",
-                "no": "Nee"
+                "no": "Nee",
+                "deployProvider": "Deploy Provider",
+                "notConnected": "Not connected",
+                "notConfigured": "Not configured",
+                "viewSite": "View site"
             },
             "config": {
                 "title": "Configuratiedetails",

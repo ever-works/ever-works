@@ -562,7 +562,11 @@
                 "custom": "自定义",
                 "customOverwrite": "自定义（覆盖）",
                 "yes": "是",
-                "no": "否"
+                "no": "否",
+                "deployProvider": "Deploy Provider",
+                "notConnected": "Not connected",
+                "notConfigured": "Not configured",
+                "viewSite": "View site"
             },
             "config": {
                 "title": "配置详情",
