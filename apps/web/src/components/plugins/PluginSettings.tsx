@@ -1,7 +1,6 @@
 'use client';
 
-import { useState, useTransition, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useCallback } from 'react';
 import { useTranslations } from 'next-intl';
 import { UserPlugin } from '@/lib/api/plugins';
 import type { OAuthConnectionInfo } from '@/lib/api/plugins-capabilities/oauth';
@@ -16,17 +15,19 @@ import {
     Check,
     BookOpen,
     Settings,
-    AlertTriangle,
 } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
-import { enablePlugin, disablePlugin, updatePluginSettings } from '@/app/actions/plugins';
+import { updatePluginSettings } from '@/app/actions/plugins';
 import { PluginIcon } from './PluginIcon';
 import { PluginSettingsFormFields } from './PluginSettingsFormFields';
 import { PluginReadme } from './PluginReadme';
+import { PluginEnablePanel } from './PluginEnablePanel';
+import { PluginDisableWarning } from './PluginDisableWarning';
 import { PluginOAuthConnection } from '@/components/settings/PluginOAuthConnection';
 import { getCategoryLabel, getCapabilityLabel } from '@/lib/utils/plugin-category-icons';
 import { usePluginSettings } from '@/lib/hooks/use-plugin-settings';
+import { usePluginToggle } from '@/lib/hooks/use-plugin-toggle';
 
 interface PluginSettingsProps {
     plugin: UserPlugin;
@@ -35,8 +36,6 @@ interface PluginSettingsProps {
 
 export function PluginSettings({ plugin, oauthConnection }: PluginSettingsProps) {
     const t = useTranslations('dashboard.plugins');
-    const router = useRouter();
-    const [isPending, startTransition] = useTransition();
 
     const onSave = useCallback(
         async (data: {
@@ -65,28 +64,21 @@ export function PluginSettings({ plugin, oauthConnection }: PluginSettingsProps)
         onSave,
     });
 
-    const [showDisableWarning, setShowDisableWarning] = useState(false);
-
-    const handleToggle = async () => {
-        if (plugin.enabled && !showDisableWarning) {
-            setShowDisableWarning(true);
-            return;
-        }
-
-        setShowDisableWarning(false);
-        startTransition(async () => {
-            try {
-                if (plugin.enabled) {
-                    await disablePlugin(plugin.pluginId);
-                } else {
-                    await enablePlugin(plugin.pluginId);
-                }
-                router.refresh();
-            } catch (error) {
-                console.error('Failed to toggle plugin:', error);
-            }
-        });
-    };
+    const {
+        isPending,
+        optimisticEnabled,
+        showDisableWarning,
+        showEnablePanel,
+        autoEnableForDirs,
+        setAutoEnableForDirs,
+        handleToggle,
+        handleCancelEnable,
+        handleCancelDisable,
+    } = usePluginToggle({
+        pluginId: plugin.pluginId,
+        enabled: plugin.enabled,
+        visibility: plugin.visibility,
+    });
 
     return (
         <div className="space-y-6">
@@ -141,17 +133,17 @@ export function PluginSettings({ plugin, oauthConnection }: PluginSettingsProps)
 
                                 {!plugin.systemPlugin && (
                                     <Button
-                                        variant={plugin.enabled ? 'ghost' : 'primary'}
+                                        variant={optimisticEnabled ? 'ghost' : 'primary'}
                                         onClick={handleToggle}
                                         disabled={isPending}
                                         loading={isPending}
                                         className={cn(
                                             'shrink-0',
-                                            plugin.enabled &&
+                                            optimisticEnabled &&
                                                 'text-danger hover:text-danger hover:bg-danger/10',
                                         )}
                                     >
-                                        {plugin.enabled ? (
+                                        {optimisticEnabled ? (
                                             <>
                                                 <PowerOff className="w-4 h-4 mr-2" />
                                                 {t('disable')}
@@ -214,31 +206,21 @@ export function PluginSettings({ plugin, oauthConnection }: PluginSettingsProps)
             </div>
 
             {showDisableWarning && (
-                <div className="p-4 rounded-xl bg-warning/10 border border-warning/30 flex items-start gap-3">
-                    <AlertTriangle className="w-5 h-5 text-warning shrink-0 mt-0.5" />
-                    <div className="flex-1">
-                        <p className="text-sm text-warning">{t('disableWarning')}</p>
-                        <div className="flex gap-2 mt-3">
-                            <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => setShowDisableWarning(false)}
-                            >
-                                {t('cancel')}
-                            </Button>
-                            <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={handleToggle}
-                                disabled={isPending}
-                                loading={isPending}
-                                className="text-danger hover:text-danger hover:bg-danger/10"
-                            >
-                                {t('confirmDisable')}
-                            </Button>
-                        </div>
-                    </div>
-                </div>
+                <PluginDisableWarning
+                    onCancel={handleCancelDisable}
+                    onConfirm={handleToggle}
+                    isPending={isPending}
+                />
+            )}
+
+            {showEnablePanel && (
+                <PluginEnablePanel
+                    autoEnableForDirs={autoEnableForDirs}
+                    onAutoEnableChange={setAutoEnableForDirs}
+                    onCancel={handleCancelEnable}
+                    onConfirm={handleToggle}
+                    isPending={isPending}
+                />
             )}
 
             {/* OAuth Connection Section */}

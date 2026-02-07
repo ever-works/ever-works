@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { Logger } from '@nestjs/common';
 import { StepAdapterService, ILegacyPipelineStep } from '../step-adapter.service';
-import { TypedGenerationContext, createGenerationContext } from '../generation-context';
+import { TypedGenerationContext } from '../generation-context';
 import type {
     DirectoryReference,
     GenerationRequest,
@@ -154,7 +154,7 @@ describe('StepAdapterService', () => {
             const step = createMockLegacyStep('Test Step');
             service.registerService('prompt-processing', step);
 
-            const context = createGenerationContext(mockDirectory, mockRequest, mockExisting);
+            const context = new TypedGenerationContext(mockDirectory, mockRequest, mockExisting);
             const result = await service.executeStep('prompt-processing', context);
 
             expect(step.run).toHaveBeenCalledWith(context);
@@ -162,7 +162,7 @@ describe('StepAdapterService', () => {
         });
 
         it('should throw for unregistered service', async () => {
-            const context = createGenerationContext(mockDirectory, mockRequest, mockExisting);
+            const context = new TypedGenerationContext(mockDirectory, mockRequest, mockExisting);
 
             await expect(service.executeStep('prompt-processing', context)).rejects.toThrow(
                 /No executor registered for step/,
@@ -173,7 +173,7 @@ describe('StepAdapterService', () => {
             const step = createMockLegacyStep('Test Step');
             service.registerService('prompt-processing', step);
 
-            const context = createGenerationContext(mockDirectory, mockRequest, mockExisting);
+            const context = new TypedGenerationContext(mockDirectory, mockRequest, mockExisting);
             const controller = new AbortController();
             controller.abort();
 
@@ -188,7 +188,7 @@ describe('StepAdapterService', () => {
             const step = createMockLegacyStep('Test Step');
             service.registerService('prompt-processing', step);
 
-            const context = createGenerationContext(mockDirectory, mockRequest, mockExisting);
+            const context = new TypedGenerationContext(mockDirectory, mockRequest, mockExisting);
             const onProgress = jest.fn();
 
             await service.executeStep('prompt-processing', context, undefined, onProgress);
@@ -209,7 +209,7 @@ describe('StepAdapterService', () => {
             };
             service.registerService('prompt-processing', step);
 
-            const context = createGenerationContext(mockDirectory, mockRequest, mockExisting);
+            const context = new TypedGenerationContext(mockDirectory, mockRequest, mockExisting);
 
             await expect(service.executeStep('prompt-processing', context)).rejects.toThrow(
                 'Service error',
@@ -253,7 +253,7 @@ describe('StepAdapterService', () => {
             };
             service.registerService('prompt-processing', step);
 
-            const context = createGenerationContext(mockDirectory, mockRequest, mockExisting);
+            const context = new TypedGenerationContext(mockDirectory, mockRequest, mockExisting);
             const result = await service.executeStep('prompt-processing', context);
 
             expect(result).toBeInstanceOf(TypedGenerationContext);
@@ -284,7 +284,7 @@ describe('StepAdapterService', () => {
             service.registerService('prompt-processing', step);
 
             const wrapper = service.createExecutorWrapper('prompt-processing');
-            const context = createGenerationContext(mockDirectory, mockRequest, mockExisting);
+            const context = new TypedGenerationContext(mockDirectory, mockRequest, mockExisting);
 
             await wrapper!.run(context, mockExecContext);
 

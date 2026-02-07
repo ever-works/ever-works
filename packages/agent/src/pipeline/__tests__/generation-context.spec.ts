@@ -1,4 +1,4 @@
-import { TypedGenerationContext, createGenerationContext } from '../generation-context';
+import { TypedGenerationContext } from '../generation-context';
 import type { DirectoryReference, GenerationRequest, ExistingItems } from '@ever-works/plugin';
 
 describe('TypedGenerationContext', () => {
@@ -94,11 +94,6 @@ describe('TypedGenerationContext', () => {
             context.setStepResult('shouldStop', true);
             expect(context.shouldStop).toBe(true);
         });
-
-        it('should track which step provided the data', () => {
-            context.setStepResult('extractedUrls', ['https://example.com'], 'web-search');
-            expect(context.getProvidedBy('extractedUrls')).toBe('web-search');
-        });
     });
 
     describe('hasStepResult', () => {
@@ -113,25 +108,6 @@ describe('TypedGenerationContext', () => {
 
         it('should return true for metrics (always present)', () => {
             expect(context.hasStepResult('metrics')).toBe(true);
-        });
-    });
-
-    describe('getAvailableKeys', () => {
-        it('should return only keys with values', () => {
-            // Initially only metrics should be available
-            const keys = context.getAvailableKeys();
-            expect(keys).toContain('metrics');
-            expect(keys).not.toContain('extractedUrls');
-        });
-
-        it('should include keys after setting values', () => {
-            context.extractedUrls = ['https://example.com'];
-            context.searchQueries = ['query1'];
-
-            const keys = context.getAvailableKeys();
-            expect(keys).toContain('extractedUrls');
-            expect(keys).toContain('searchQueries');
-            expect(keys).toContain('metrics');
         });
     });
 
@@ -229,17 +205,6 @@ describe('TypedGenerationContext', () => {
             expect(typed.processedSourceUrls.has('https://processed.com')).toBe(true);
             expect(typed.contentCache.get('url')).toBe('content');
             expect(typed.subject).toBe('Test Subject');
-        });
-    });
-
-    describe('createGenerationContext factory', () => {
-        it('should create a new TypedGenerationContext', () => {
-            const ctx = createGenerationContext(mockDirectory, mockRequest, mockExisting);
-
-            expect(ctx).toBeInstanceOf(TypedGenerationContext);
-            expect(ctx.directory).toBe(mockDirectory);
-            expect(ctx.request).toBe(mockRequest);
-            expect(ctx.existing).toBe(mockExisting);
         });
     });
 

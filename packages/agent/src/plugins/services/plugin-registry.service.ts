@@ -187,11 +187,6 @@ export class PluginRegistryService {
         return Array.from(this.plugins.values()).filter((p) => p.state === 'loaded');
     }
 
-    /** Alias for getReady() */
-    getEnabled(): RegisteredPlugin[] {
-        return this.getReady();
-    }
-
     getByState(state: PluginState): RegisteredPlugin[] {
         return Array.from(this.plugins.values()).filter((p) => p.state === state);
     }

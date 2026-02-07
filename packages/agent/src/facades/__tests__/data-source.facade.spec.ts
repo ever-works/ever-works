@@ -5,8 +5,6 @@ import {
     type RegisteredPlugin,
 } from '../../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../../plugins/services/plugin-settings.service';
-import { DirectoryPluginRepository } from '../../plugins/repositories/directory-plugin.repository';
-import { UserPluginRepository } from '../../plugins/repositories/user-plugin.repository';
 import type {
     IDataSourcePlugin,
     PluginManifest,
@@ -18,8 +16,6 @@ describe('DataSourceFacadeService', () => {
     let service: DataSourceFacadeService;
     let registry: jest.Mocked<PluginRegistryService>;
     let settingsService: jest.Mocked<PluginSettingsService>;
-    let directoryPluginRepository: jest.Mocked<DirectoryPluginRepository>;
-    let userPluginRepository: jest.Mocked<UserPluginRepository>;
 
     const createMockDataSourcePlugin = (id: string, sourceName: string): IDataSourcePlugin => ({
         id,
@@ -81,27 +77,12 @@ describe('DataSourceFacadeService', () => {
                         getSettings: jest.fn().mockResolvedValue({}),
                     },
                 },
-                {
-                    provide: DirectoryPluginRepository,
-                    useValue: {
-                        findByDirectoryAndPlugin: jest.fn().mockResolvedValue(null),
-                        findActiveByCapability: jest.fn().mockResolvedValue(null),
-                    },
-                },
-                {
-                    provide: UserPluginRepository,
-                    useValue: {
-                        findByUserAndPlugin: jest.fn().mockResolvedValue(null),
-                    },
-                },
             ],
         }).compile();
 
         service = module.get<DataSourceFacadeService>(DataSourceFacadeService);
         registry = module.get(PluginRegistryService);
         settingsService = module.get(PluginSettingsService);
-        directoryPluginRepository = module.get(DirectoryPluginRepository);
-        userPluginRepository = module.get(UserPluginRepository);
     });
 
     describe('isConfigured', () => {
@@ -181,7 +162,7 @@ describe('DataSourceFacadeService', () => {
             const apify = createMockDataSourcePlugin('apify-data-source', 'Apify');
             const registered = createRegisteredPlugin(apify, { capabilities: ['data-source'] });
             registry.getByCapability.mockReturnValue([registered]);
-            directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue(null);
+            registry.isPluginEnabledForScope.mockResolvedValue(false);
 
             const result = await service.queryAll({
                 directoryId: 'dir-123',
@@ -194,7 +175,7 @@ describe('DataSourceFacadeService', () => {
             expect(apify.query).not.toHaveBeenCalled();
         });
 
-        it('should query plugins enabled via DirectoryPlugin', async () => {
+        it('should query plugins enabled via registry scope check', async () => {
             const apify = createMockDataSourcePlugin('apify-data-source', 'Apify');
             (apify.query as jest.Mock).mockResolvedValue({
                 items: [
@@ -206,12 +187,7 @@ describe('DataSourceFacadeService', () => {
 
             const registered = createRegisteredPlugin(apify, { capabilities: ['data-source'] });
             registry.getByCapability.mockReturnValue([registered]);
-            directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue({
-                id: 'dp-1',
-                directoryId: 'dir-123',
-                pluginId: 'apify-data-source',
-                enabled: true,
-            } as any);
+            registry.isPluginEnabledForScope.mockResolvedValue(true);
 
             const result = await service.queryAll({
                 directoryId: 'dir-123',
@@ -410,7 +386,7 @@ describe('DataSourceFacadeService', () => {
     });
 
     describe('getEnabledSources', () => {
-        it('should return sources enabled via DirectoryPlugin', async () => {
+        it('should return sources enabled via registry scope check', async () => {
             const apify = createMockDataSourcePlugin('apify-data-source', 'Apify');
             const custom = createMockDataSourcePlugin('custom-data-source', 'Custom');
 
@@ -422,9 +398,9 @@ describe('DataSourceFacadeService', () => {
             });
             registry.getByCapability.mockReturnValue([apifyRegistered, customRegistered]);
 
-            directoryPluginRepository.findByDirectoryAndPlugin
-                .mockResolvedValueOnce({ enabled: true } as any) // apify
-                .mockResolvedValueOnce({ enabled: false } as any); // custom
+            registry.isPluginEnabledForScope
+                .mockResolvedValueOnce(true) // apify
+                .mockResolvedValueOnce(false); // custom
 
             const enabledSources = await service.getEnabledSources('dir-123');
 
@@ -440,7 +416,7 @@ describe('DataSourceFacadeService', () => {
             const apify = createMockDataSourcePlugin('apify-data-source', 'Apify');
             const registered = createRegisteredPlugin(apify, { capabilities: ['data-source'] });
             registry.getByCapability.mockReturnValue([registered]);
-            directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue(null);
+            registry.isPluginEnabledForScope.mockResolvedValue(false);
 
             const enabledSources = await service.getEnabledSources('dir-123');
 
@@ -458,8 +434,8 @@ describe('DataSourceFacadeService', () => {
         });
     });
 
-    describe('three-level configuration', () => {
-        it('should use DirectoryPlugin.enabled (Level 2) when record exists', async () => {
+    describe('enable check via registry', () => {
+        it('should enable plugin when registry scope check returns true', async () => {
             const apify = createMockDataSourcePlugin('apify-data-source', 'Apify');
             (apify.query as jest.Mock).mockResolvedValue({
                 items: [{ name: 'Item', slug: 'item', source_url: '' }],
@@ -468,62 +444,37 @@ describe('DataSourceFacadeService', () => {
 
             const registered = createRegisteredPlugin(apify, { capabilities: ['data-source'] });
             registry.getByCapability.mockReturnValue([registered]);
-
-            // DirectoryPlugin record exists with enabled=true
-            directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue({
-                id: 'dp-1',
-                directoryId: 'dir-123',
-                pluginId: 'apify-data-source',
-                pluginEntityId: 'pe-1',
-                enabled: true,
-                settings: {},
-                secretSettings: {},
-                metadata: {},
-                priority: 0,
-            } as any);
+            registry.isPluginEnabledForScope.mockResolvedValue(true);
 
             const result = await service.queryAll({
                 directoryId: 'dir-123',
-                // Note: pluginConfig.enabled is false, but Level 2 takes precedence
-                pluginConfig: {
-                    'apify-data-source': { enabled: false },
-                },
             });
 
             expect(result.items).toHaveLength(1);
             expect(apify.query).toHaveBeenCalled();
+            expect(registry.isPluginEnabledForScope).toHaveBeenCalledWith(
+                'apify-data-source',
+                'dir-123',
+                undefined,
+            );
         });
 
-        it('should respect DirectoryPlugin.enabled=false even with pluginConfig.enabled=true', async () => {
+        it('should disable plugin when registry scope check returns false', async () => {
             const apify = createMockDataSourcePlugin('apify-data-source', 'Apify');
+
             const registered = createRegisteredPlugin(apify, { capabilities: ['data-source'] });
             registry.getByCapability.mockReturnValue([registered]);
-
-            // DirectoryPlugin record exists with enabled=false
-            directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue({
-                id: 'dp-1',
-                directoryId: 'dir-123',
-                pluginId: 'apify-data-source',
-                pluginEntityId: 'pe-1',
-                enabled: false,
-                settings: {},
-                secretSettings: {},
-                metadata: {},
-                priority: 0,
-            } as any);
+            registry.isPluginEnabledForScope.mockResolvedValue(false);
 
             const result = await service.queryAll({
                 directoryId: 'dir-123',
-                pluginConfig: {
-                    'apify-data-source': { enabled: true },
-                },
             });
 
             expect(result.items).toHaveLength(0);
             expect(apify.query).not.toHaveBeenCalled();
         });
 
-        it('should fall back to pluginConfig.enabled (Level 3) when no DirectoryPlugin record', async () => {
+        it('should enable via pluginConfig.enabled even when registry returns false', async () => {
             const apify = createMockDataSourcePlugin('apify-data-source', 'Apify');
             (apify.query as jest.Mock).mockResolvedValue({
                 items: [{ name: 'Item', slug: 'item', source_url: '' }],
@@ -532,9 +483,7 @@ describe('DataSourceFacadeService', () => {
 
             const registered = createRegisteredPlugin(apify, { capabilities: ['data-source'] });
             registry.getByCapability.mockReturnValue([registered]);
-
-            // No DirectoryPlugin record
-            directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue(null);
+            registry.isPluginEnabledForScope.mockResolvedValue(false);
 
             const result = await service.queryAll({
                 directoryId: 'dir-123',
@@ -547,159 +496,12 @@ describe('DataSourceFacadeService', () => {
             expect(apify.query).toHaveBeenCalled();
         });
 
-        it('should work without directoryId (uses Level 3 only)', async () => {
+        it('should not enable when pluginConfig.enabled is false and registry returns false', async () => {
             const apify = createMockDataSourcePlugin('apify-data-source', 'Apify');
-            (apify.query as jest.Mock).mockResolvedValue({
-                items: [{ name: 'Item', slug: 'item', source_url: '' }],
-                hasMore: false,
-            });
 
             const registered = createRegisteredPlugin(apify, { capabilities: ['data-source'] });
             registry.getByCapability.mockReturnValue([registered]);
-
-            const result = await service.queryAll({
-                // No directoryId - can't check Level 2
-                pluginConfig: {
-                    'apify-data-source': { enabled: true },
-                },
-            });
-
-            expect(result.items).toHaveLength(1);
-            expect(directoryPluginRepository.findByDirectoryAndPlugin).not.toHaveBeenCalled();
-        });
-
-        it('should use autoEnable from manifest when no Level 2 or Level 3', async () => {
-            const apify = createMockDataSourcePlugin('apify-data-source', 'Apify');
-            (apify.query as jest.Mock).mockResolvedValue({
-                items: [{ name: 'Item', slug: 'item', source_url: '' }],
-                hasMore: false,
-            });
-
-            const registered = createRegisteredPlugin(apify, {
-                capabilities: ['data-source'],
-                autoEnable: true, // Plugin auto-enables
-            });
-            registry.getByCapability.mockReturnValue([registered]);
-            registry.get.mockReturnValue(registered);
-            directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue(null);
-
-            const result = await service.queryAll({
-                directoryId: 'dir-123',
-                // No pluginConfig.enabled
-            });
-
-            expect(result.items).toHaveLength(1);
-            expect(apify.query).toHaveBeenCalled();
-        });
-
-        it('should not autoEnable when manifest does not have autoEnable', async () => {
-            const apify = createMockDataSourcePlugin('apify-data-source', 'Apify');
-
-            const registered = createRegisteredPlugin(apify, {
-                capabilities: ['data-source'],
-                // No autoEnable
-            });
-            registry.getByCapability.mockReturnValue([registered]);
-            registry.get.mockReturnValue(registered);
-            directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue(null);
-
-            const result = await service.queryAll({
-                directoryId: 'dir-123',
-            });
-
-            expect(result.items).toHaveLength(0);
-            expect(apify.query).not.toHaveBeenCalled();
-        });
-
-        it('should prioritize Level 2 over autoEnable', async () => {
-            const apify = createMockDataSourcePlugin('apify-data-source', 'Apify');
-
-            const registered = createRegisteredPlugin(apify, {
-                capabilities: ['data-source'],
-                autoEnable: true, // Plugin has autoEnable
-            });
-            registry.getByCapability.mockReturnValue([registered]);
-            registry.get.mockReturnValue(registered);
-
-            // But DirectoryPlugin says disabled
-            directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue({
-                id: 'dp-1',
-                directoryId: 'dir-123',
-                pluginId: 'apify-data-source',
-                enabled: false,
-            } as any);
-
-            const result = await service.queryAll({
-                directoryId: 'dir-123',
-            });
-
-            expect(result.items).toHaveLength(0);
-            expect(apify.query).not.toHaveBeenCalled();
-        });
-
-        it('should prioritize Level 2 over Level 3', async () => {
-            const apify = createMockDataSourcePlugin('apify-data-source', 'Apify');
-
-            const registered = createRegisteredPlugin(apify, {
-                capabilities: ['data-source'],
-            });
-            registry.getByCapability.mockReturnValue([registered]);
-
-            // DirectoryPlugin says disabled
-            directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue({
-                id: 'dp-1',
-                directoryId: 'dir-123',
-                pluginId: 'apify-data-source',
-                enabled: false,
-            } as any);
-
-            const result = await service.queryAll({
-                directoryId: 'dir-123',
-                pluginConfig: {
-                    'apify-data-source': { enabled: true }, // Level 3 says enabled
-                },
-            });
-
-            // Level 2 takes precedence, plugin should NOT be queried
-            expect(result.items).toHaveLength(0);
-            expect(apify.query).not.toHaveBeenCalled();
-        });
-
-        it('should use Level 3 when no Level 2 record but no autoEnable', async () => {
-            const apify = createMockDataSourcePlugin('apify-data-source', 'Apify');
-            (apify.query as jest.Mock).mockResolvedValue({
-                items: [{ name: 'Item', slug: 'item', source_url: '' }],
-                hasMore: false,
-            });
-
-            const registered = createRegisteredPlugin(apify, {
-                capabilities: ['data-source'],
-                // No autoEnable
-            });
-            registry.getByCapability.mockReturnValue([registered]);
-            registry.get.mockReturnValue(registered);
-            directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue(null);
-
-            const result = await service.queryAll({
-                directoryId: 'dir-123',
-                pluginConfig: {
-                    'apify-data-source': { enabled: true },
-                },
-            });
-
-            expect(result.items).toHaveLength(1);
-            expect(apify.query).toHaveBeenCalled();
-        });
-
-        it('should not enable when no Level 2, no Level 3 enabled, and no autoEnable', async () => {
-            const apify = createMockDataSourcePlugin('apify-data-source', 'Apify');
-
-            const registered = createRegisteredPlugin(apify, {
-                capabilities: ['data-source'],
-            });
-            registry.getByCapability.mockReturnValue([registered]);
-            registry.get.mockReturnValue(registered);
-            directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue(null);
+            registry.isPluginEnabledForScope.mockResolvedValue(false);
 
             const result = await service.queryAll({
                 directoryId: 'dir-123',
@@ -710,6 +512,29 @@ describe('DataSourceFacadeService', () => {
 
             expect(result.items).toHaveLength(0);
             expect(apify.query).not.toHaveBeenCalled();
+        });
+
+        it('should pass directoryId and userId to registry scope check', async () => {
+            const apify = createMockDataSourcePlugin('apify-data-source', 'Apify');
+            (apify.query as jest.Mock).mockResolvedValue({
+                items: [{ name: 'Item', slug: 'item', source_url: '' }],
+                hasMore: false,
+            });
+
+            const registered = createRegisteredPlugin(apify, { capabilities: ['data-source'] });
+            registry.getByCapability.mockReturnValue([registered]);
+            registry.isPluginEnabledForScope.mockResolvedValue(true);
+
+            await service.queryAll({
+                directoryId: 'dir-123',
+                userId: 'user-456',
+            });
+
+            expect(registry.isPluginEnabledForScope).toHaveBeenCalledWith(
+                'apify-data-source',
+                'dir-123',
+                'user-456',
+            );
         });
 
         it('should handle multiple plugins with different enable states', async () => {
@@ -730,20 +555,12 @@ describe('DataSourceFacadeService', () => {
             });
             const customRegistered = createRegisteredPlugin(custom, {
                 capabilities: ['data-source'],
-                autoEnable: true,
             });
 
             registry.getByCapability.mockReturnValue([apifyRegistered, customRegistered]);
-            registry.get.mockImplementation((id) => {
-                if (id === 'apify-data-source') return apifyRegistered;
-                if (id === 'custom-data-source') return customRegistered;
-                return undefined;
-            });
-
-            // Apify enabled via Level 2, Custom via autoEnable
-            directoryPluginRepository.findByDirectoryAndPlugin
-                .mockResolvedValueOnce({ enabled: true } as any) // apify
-                .mockResolvedValueOnce(null); // custom - will use autoEnable
+            registry.isPluginEnabledForScope
+                .mockResolvedValueOnce(true) // apify enabled
+                .mockResolvedValueOnce(true); // custom enabled
 
             const result = await service.queryAll({
                 directoryId: 'dir-123',
@@ -752,115 +569,6 @@ describe('DataSourceFacadeService', () => {
             expect(result.items).toHaveLength(2);
             expect(apify.query).toHaveBeenCalled();
             expect(custom.query).toHaveBeenCalled();
-        });
-    });
-
-    describe('Level 1 (UserPlugin) enable check', () => {
-        it('should use UserPlugin.enabled when no DirectoryPlugin record exists', async () => {
-            const apify = createMockDataSourcePlugin('apify-data-source', 'Apify');
-            (apify.query as jest.Mock).mockResolvedValue({
-                items: [{ name: 'Item', slug: 'item', source_url: '' }],
-                hasMore: false,
-            });
-
-            const registered = createRegisteredPlugin(apify, { capabilities: ['data-source'] });
-            registry.getByCapability.mockReturnValue([registered]);
-            registry.get.mockReturnValue(registered);
-
-            // No DirectoryPlugin record
-            directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue(null);
-            // UserPlugin says enabled
-            userPluginRepository.findByUserAndPlugin.mockResolvedValue({
-                enabled: true,
-            } as any);
-
-            const result = await service.queryAll({
-                directoryId: 'dir-123',
-                userId: 'user-456',
-            });
-
-            expect(result.items).toHaveLength(1);
-            expect(apify.query).toHaveBeenCalled();
-        });
-
-        it('should respect UserPlugin.enabled=false when no DirectoryPlugin record', async () => {
-            const apify = createMockDataSourcePlugin('apify-data-source', 'Apify');
-
-            const registered = createRegisteredPlugin(apify, { capabilities: ['data-source'] });
-            registry.getByCapability.mockReturnValue([registered]);
-            registry.get.mockReturnValue(registered);
-
-            // No DirectoryPlugin record
-            directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue(null);
-            // UserPlugin says disabled
-            userPluginRepository.findByUserAndPlugin.mockResolvedValue({
-                enabled: false,
-            } as any);
-
-            const result = await service.queryAll({
-                directoryId: 'dir-123',
-                userId: 'user-456',
-            });
-
-            expect(result.items).toHaveLength(0);
-            expect(apify.query).not.toHaveBeenCalled();
-        });
-
-        it('should prioritize DirectoryPlugin.enabled over UserPlugin.enabled', async () => {
-            const apify = createMockDataSourcePlugin('apify-data-source', 'Apify');
-            (apify.query as jest.Mock).mockResolvedValue({
-                items: [{ name: 'Item', slug: 'item', source_url: '' }],
-                hasMore: false,
-            });
-
-            const registered = createRegisteredPlugin(apify, { capabilities: ['data-source'] });
-            registry.getByCapability.mockReturnValue([registered]);
-
-            // DirectoryPlugin says enabled
-            directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue({
-                enabled: true,
-            } as any);
-            // UserPlugin says disabled (should be ignored)
-            userPluginRepository.findByUserAndPlugin.mockResolvedValue({
-                enabled: false,
-            } as any);
-
-            const result = await service.queryAll({
-                directoryId: 'dir-123',
-                userId: 'user-456',
-            });
-
-            // Directory level takes precedence
-            expect(result.items).toHaveLength(1);
-            expect(apify.query).toHaveBeenCalled();
-        });
-
-        it('should fall back to autoEnable when no User or Directory records', async () => {
-            const apify = createMockDataSourcePlugin('apify-data-source', 'Apify');
-            (apify.query as jest.Mock).mockResolvedValue({
-                items: [{ name: 'Item', slug: 'item', source_url: '' }],
-                hasMore: false,
-            });
-
-            const registered = createRegisteredPlugin(apify, {
-                capabilities: ['data-source'],
-                autoEnable: true,
-            });
-            registry.getByCapability.mockReturnValue([registered]);
-            registry.get.mockReturnValue(registered);
-
-            // No DirectoryPlugin record
-            directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue(null);
-            // No UserPlugin record
-            userPluginRepository.findByUserAndPlugin.mockResolvedValue(null);
-
-            const result = await service.queryAll({
-                directoryId: 'dir-123',
-                userId: 'user-456',
-            });
-
-            expect(result.items).toHaveLength(1);
-            expect(apify.query).toHaveBeenCalled();
         });
     });
 

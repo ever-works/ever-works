@@ -6,7 +6,7 @@
  */
 
 // Type-safe generation context
-export { TypedGenerationContext, createGenerationContext } from './generation-context';
+export { TypedGenerationContext } from './generation-context';
 
 // Re-export IBuiltInStepExecutor type from the plugin SDK
 // The DefaultPipelinePlugin is loaded via the plugin system, not as a NestJS provider.

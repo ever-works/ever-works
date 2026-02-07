@@ -1,4 +1,4 @@
-import { Injectable, Logger, Optional } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import type {
     IDataSourceFacade,
     DataSourceFacadeOptions,
@@ -13,8 +13,6 @@ import type {
 import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
-import { DirectoryPluginRepository } from '../plugins/repositories/directory-plugin.repository';
-import { UserPluginRepository } from '../plugins/repositories/user-plugin.repository';
 
 export class DataSourceFacadeError extends Error {
     constructor(
@@ -36,8 +34,6 @@ export class DataSourceFacadeService implements IDataSourceFacade {
     constructor(
         private readonly registry: PluginRegistryService,
         private readonly settingsService: PluginSettingsService,
-        @Optional() private readonly directoryPluginRepository?: DirectoryPluginRepository,
-        @Optional() private readonly userPluginRepository?: UserPluginRepository,
     ) {}
 
     async queryAll(options?: DataSourceFacadeOptions): Promise<DataSourceFacadeResult> {
@@ -181,36 +177,11 @@ export class DataSourceFacadeService implements IDataSourceFacade {
         userId?: string,
         pluginConfig?: Record<string, Record<string, unknown>>,
     ): Promise<boolean> {
-        // Resolution: Directory > User > pluginConfig > autoEnable
-        if (directoryId && this.directoryPluginRepository) {
-            try {
-                const directoryPlugin =
-                    await this.directoryPluginRepository.findByDirectoryAndPlugin(
-                        directoryId,
-                        pluginId,
-                    );
-                if (directoryPlugin !== null) return directoryPlugin.enabled;
-            } catch {
-                // Continue
-            }
-        }
-
-        if (userId && this.userPluginRepository) {
-            try {
-                const userPlugin = await this.userPluginRepository.findByUserAndPlugin(
-                    userId,
-                    pluginId,
-                );
-                if (userPlugin !== null) return userPlugin.enabled;
-            } catch {
-                // Continue
-            }
-        }
-
+        // Check pluginConfig override first (request-level enable)
         if (pluginConfig?.[pluginId]?.enabled === true) return true;
 
-        const registered = this.registry.get(pluginId);
-        return registered?.manifest?.autoEnable ?? false;
+        // Delegate to registry's scope resolution
+        return this.registry.isPluginEnabledForScope(pluginId, directoryId, userId);
     }
 
     async getDefaultProvider(

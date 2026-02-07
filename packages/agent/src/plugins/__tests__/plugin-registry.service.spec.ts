@@ -235,21 +235,6 @@ describe('PluginRegistryService', () => {
         });
     });
 
-    describe('getEnabled', () => {
-        it('should get only loaded (ready) plugins', () => {
-            const plugin1 = createMockPlugin('plugin-1');
-            const plugin2 = createMockPlugin('plugin-2');
-
-            service.register(plugin1, createMockManifest('plugin-1'), { state: 'loaded' });
-            service.register(plugin2, createMockManifest('plugin-2')); // default 'unloaded' state
-
-            const enabledPlugins = service.getEnabled();
-
-            expect(enabledPlugins).toHaveLength(1);
-            expect(enabledPlugins[0].plugin.id).toBe('plugin-1');
-        });
-    });
-
     describe('updateState', () => {
         it('should update plugin state', () => {
             const plugin = createMockPlugin('test-plugin');

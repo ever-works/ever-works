@@ -60,7 +60,7 @@ import { ContentExtractorFacadeService } from '../facades/content-extractor.faca
 import { DataSourceFacadeService } from '../facades/data-source.facade';
 import { PipelineBuilderService } from './pipeline-builder.service';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
-import { TypedGenerationContext, createGenerationContext } from './generation-context';
+import { TypedGenerationContext } from './generation-context';
 import { ExecutablePipelineRunner } from './executable-pipeline.class';
 
 /**
@@ -371,7 +371,7 @@ export class StepPipelineExecutorService {
         options?: PipelineExecutionOptions,
         onProgress?: PipelineProgressCallback,
     ): Promise<PipelineResult> {
-        const context = createGenerationContext(directory, request, existing);
+        const context = new TypedGenerationContext(directory, request, existing);
         return this.executeWithContext(context, options, onProgress);
     }
 

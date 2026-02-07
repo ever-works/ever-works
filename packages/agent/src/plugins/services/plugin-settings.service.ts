@@ -186,56 +186,9 @@ export class PluginSettingsService {
         settings: Record<string, unknown>,
         options?: { secretKeys?: string[] },
     ): Promise<void> {
-        const registered = this.registry.get(pluginId);
-        if (!registered) {
-            throw new Error(`Plugin "${pluginId}" not found`);
-        }
+        const { regularSettings, secretSettings, filteredSettings } =
+            await this.validateAndSeparateSettings(pluginId, settings, 'global', options);
 
-        const schema = registered.plugin.settingsSchema;
-        const definitions = this.extractSettingDefinitions(schema);
-
-        // Filter out x-envVar fields and masked placeholders
-        let filteredSettings = this.filterEnvVarFields(settings, schema);
-        filteredSettings = this.stripMaskedPlaceholders(filteredSettings, schema);
-
-        const scopeValidation = this.validateSettingsScope(
-            definitions,
-            Object.keys(filteredSettings),
-            'global',
-        );
-        if (!scopeValidation.valid) {
-            throw new Error(`Scope violation: ${scopeValidation.violations.join(', ')}`);
-        }
-
-        // Validate settings against schema
-        const validation = await registered.plugin.validateSettings(filteredSettings);
-        if (!validation.valid) {
-            throw new Error(
-                `Invalid settings: ${validation.errors?.map((e) => e.message).join(', ')}`,
-            );
-        }
-
-        // Separate regular and secret settings
-        const regularSettings: Record<string, unknown> = {};
-        const secretSettings: Record<string, unknown> = {};
-        const secretKeys = new Set(options?.secretKeys || []);
-
-        // Also check schema for secret definitions
-        for (const def of definitions) {
-            if (def.secret) {
-                secretKeys.add(def.key);
-            }
-        }
-
-        for (const [key, value] of Object.entries(filteredSettings)) {
-            if (secretKeys.has(key)) {
-                secretSettings[key] = value;
-            } else {
-                regularSettings[key] = value;
-            }
-        }
-
-        // Update in database
         const entity = await this.pluginRepository.findByPluginId(pluginId);
         if (entity) {
             await this.pluginRepository.updateSettings(
@@ -245,16 +198,10 @@ export class PluginSettingsService {
             );
         }
 
-        // Check if any changed settings require restart
-        const changedKeys = Object.keys(filteredSettings);
-        const requiresRestart = this.checkRequiresRestart(definitions, changedKeys);
-
-        // Emit settings changed event
         this.eventEmitter.emit(PluginEvents.SETTINGS_CHANGED, {
             pluginId,
-            changedKeys,
+            changedKeys: Object.keys(filteredSettings),
             scope: 'global',
-            requiresRestart,
             timestamp: Date.now(),
         });
 
@@ -270,67 +217,14 @@ export class PluginSettingsService {
         settings: Record<string, unknown>,
         options?: { secretKeys?: string[] },
     ): Promise<void> {
-        const registered = this.registry.get(pluginId);
-        if (!registered) {
-            throw new Error(`Plugin "${pluginId}" not found`);
-        }
+        const { regularSettings, secretSettings, filteredSettings } =
+            await this.validateAndSeparateSettings(pluginId, settings, 'user', options);
 
-        // Enforce configurationMode
-        const configMode = this.getConfigurationMode(registered.plugin);
-        if (configMode === 'admin-only') {
-            throw new Error(`Plugin "${pluginId}" is admin-only and cannot be configured by users`);
-        }
-
-        const schema = registered.plugin.settingsSchema;
-        const definitions = this.extractSettingDefinitions(schema);
-
-        // Filter out x-envVar fields and masked placeholders
-        let filteredSettings = this.filterEnvVarFields(settings, schema);
-        filteredSettings = this.stripMaskedPlaceholders(filteredSettings, schema);
-
-        const scopeValidation = this.validateSettingsScope(
-            definitions,
-            Object.keys(filteredSettings),
-            'user',
-        );
-        if (!scopeValidation.valid) {
-            throw new Error(`Scope violation: ${scopeValidation.violations.join(', ')}`);
-        }
-
-        // Validate settings against schema
-        const validation = await registered.plugin.validateSettings(filteredSettings);
-        if (!validation.valid) {
-            throw new Error(
-                `Invalid settings: ${validation.errors?.map((e) => e.message).join(', ')}`,
-            );
-        }
-
-        // Separate regular and secret settings
-        const regularSettings: Record<string, unknown> = {};
-        const secretSettings: Record<string, unknown> = {};
-        const secretKeys = new Set(options?.secretKeys || []);
-
-        for (const def of definitions) {
-            if (def.secret) {
-                secretKeys.add(def.key);
-            }
-        }
-
-        for (const [key, value] of Object.entries(filteredSettings)) {
-            if (secretKeys.has(key)) {
-                secretSettings[key] = value;
-            } else {
-                regularSettings[key] = value;
-            }
-        }
-
-        // Get plugin entity ID
         const pluginEntity = await this.pluginRepository.findByPluginId(pluginId);
         if (!pluginEntity) {
             throw new Error(`Plugin entity not found for ${pluginId}`);
         }
 
-        // Upsert user plugin record
         const existing = await this.userPluginRepository.findByUserAndPlugin(userId, pluginId);
         if (existing) {
             await this.userPluginRepository.updateSettings(
@@ -349,17 +243,11 @@ export class PluginSettingsService {
             });
         }
 
-        // Check if any changed settings require restart
-        const changedKeys = Object.keys(filteredSettings);
-        const requiresRestart = this.checkRequiresRestart(definitions, changedKeys);
-
-        // Emit settings changed event
         this.eventEmitter.emit(PluginEvents.SETTINGS_CHANGED, {
             pluginId,
-            changedKeys,
+            changedKeys: Object.keys(filteredSettings),
             scope: 'user',
             userId,
-            requiresRestart,
             timestamp: Date.now(),
         });
 
@@ -375,69 +263,14 @@ export class PluginSettingsService {
         settings: Record<string, unknown>,
         options?: { secretKeys?: string[] },
     ): Promise<void> {
-        const registered = this.registry.get(pluginId);
-        if (!registered) {
-            throw new Error(`Plugin "${pluginId}" not found`);
-        }
+        const { regularSettings, secretSettings, filteredSettings } =
+            await this.validateAndSeparateSettings(pluginId, settings, 'directory', options);
 
-        // Enforce configurationMode
-        const configMode = this.getConfigurationMode(registered.plugin);
-        if (configMode === 'admin-only') {
-            throw new Error(
-                `Plugin "${pluginId}" is admin-only and cannot be configured at directory level`,
-            );
-        }
-
-        const schema = registered.plugin.settingsSchema;
-        const definitions = this.extractSettingDefinitions(schema);
-
-        // Filter out x-envVar fields and masked placeholders
-        let filteredSettings = this.filterEnvVarFields(settings, schema);
-        filteredSettings = this.stripMaskedPlaceholders(filteredSettings, schema);
-
-        const scopeValidation = this.validateSettingsScope(
-            definitions,
-            Object.keys(filteredSettings),
-            'directory',
-        );
-        if (!scopeValidation.valid) {
-            throw new Error(`Scope violation: ${scopeValidation.violations.join(', ')}`);
-        }
-
-        // Validate settings against schema
-        const validation = await registered.plugin.validateSettings(filteredSettings);
-        if (!validation.valid) {
-            throw new Error(
-                `Invalid settings: ${validation.errors?.map((e) => e.message).join(', ')}`,
-            );
-        }
-
-        // Separate regular and secret settings
-        const regularSettings: Record<string, unknown> = {};
-        const secretSettings: Record<string, unknown> = {};
-        const secretKeys = new Set(options?.secretKeys || []);
-
-        for (const def of definitions) {
-            if (def.secret) {
-                secretKeys.add(def.key);
-            }
-        }
-
-        for (const [key, value] of Object.entries(filteredSettings)) {
-            if (secretKeys.has(key)) {
-                secretSettings[key] = value;
-            } else {
-                regularSettings[key] = value;
-            }
-        }
-
-        // Get plugin entity ID
         const pluginEntity = await this.pluginRepository.findByPluginId(pluginId);
         if (!pluginEntity) {
             throw new Error(`Plugin entity not found for ${pluginId}`);
         }
 
-        // Upsert directory plugin record
         const existing = await this.directoryPluginRepository.findByDirectoryAndPlugin(
             directoryId,
             pluginId,
@@ -459,23 +292,90 @@ export class PluginSettingsService {
             });
         }
 
-        // Check if any changed settings require restart
-        const changedKeys = Object.keys(filteredSettings);
-        const requiresRestart = this.checkRequiresRestart(definitions, changedKeys);
-
-        // Emit settings changed event
         this.eventEmitter.emit(PluginEvents.SETTINGS_CHANGED, {
             pluginId,
-            changedKeys,
+            changedKeys: Object.keys(filteredSettings),
             scope: 'directory',
             directoryId,
-            requiresRestart,
             timestamp: Date.now(),
         });
 
         this.logger.debug(
             `Updated directory settings for plugin ${pluginId}, directory ${directoryId}`,
         );
+    }
+
+    /**
+     * Shared validation and settings separation for all update methods.
+     * Handles: plugin lookup, configMode enforcement, schema filtering,
+     * scope validation, settings validation, and regular/secret separation.
+     */
+    private async validateAndSeparateSettings(
+        pluginId: string,
+        settings: Record<string, unknown>,
+        scope: SettingScope,
+        options?: { secretKeys?: string[] },
+    ): Promise<{
+        regularSettings: Record<string, unknown>;
+        secretSettings: Record<string, unknown>;
+        filteredSettings: Record<string, unknown>;
+    }> {
+        const registered = this.registry.get(pluginId);
+        if (!registered) {
+            throw new Error(`Plugin "${pluginId}" not found`);
+        }
+
+        if (scope !== 'global') {
+            const configMode = this.getConfigurationMode(registered.plugin);
+            if (configMode === 'admin-only') {
+                const scopeLabel = scope === 'user' ? 'by users' : 'at directory level';
+                throw new Error(
+                    `Plugin "${pluginId}" is admin-only and cannot be configured ${scopeLabel}`,
+                );
+            }
+        }
+
+        const schema = registered.plugin.settingsSchema;
+        const definitions = this.extractSettingDefinitions(schema);
+
+        let filteredSettings = this.filterEnvVarFields(settings, schema);
+        filteredSettings = this.stripMaskedPlaceholders(filteredSettings, schema);
+
+        const scopeValidation = this.validateSettingsScope(
+            definitions,
+            Object.keys(filteredSettings),
+            scope,
+        );
+        if (!scopeValidation.valid) {
+            throw new Error(`Scope violation: ${scopeValidation.violations.join(', ')}`);
+        }
+
+        const validation = await registered.plugin.validateSettings(filteredSettings);
+        if (!validation.valid) {
+            throw new Error(
+                `Invalid settings: ${validation.errors?.map((e) => e.message).join(', ')}`,
+            );
+        }
+
+        const regularSettings: Record<string, unknown> = {};
+        const secretSettings: Record<string, unknown> = {};
+        const secretKeys = new Set(options?.secretKeys || []);
+
+        for (const def of definitions) {
+            if (def.secret) {
+                secretKeys.add(def.key);
+            }
+        }
+
+        for (const [key, value] of Object.entries(filteredSettings)) {
+            if (secretKeys.has(key)) {
+                secretSettings[key] = value;
+            } else {
+                regularSettings[key] = value;
+            }
+        }
+
+        return { regularSettings, secretSettings, filteredSettings };
     }
 
     /**
@@ -736,17 +636,6 @@ export class PluginSettingsService {
     }
 
     /**
-     * Check if any of the changed settings require a plugin restart
-     */
-    private checkRequiresRestart(
-        _definitions: SettingDefinition[],
-        _changedKeys: string[],
-    ): boolean {
-        // No plugins currently use x-requiresRestart; always returns false.
-        return false;
-    }
-
-    /**
      * Get the settings schema filtered by scope context.
      *
      * This method filters the plugin's settings schema to only include
@@ -779,23 +668,6 @@ export class PluginSettingsService {
             properties: filteredProperties,
             required: (schema.required || []).filter((r) => r in filteredProperties),
         };
-    }
-
-    /**
-     * Validate that event emission data has correct scope/ID pairing.
-     * This is a defense-in-depth check to catch programming errors.
-     */
-    private validateEventScopeData(
-        scope: SettingScope,
-        userId?: string,
-        directoryId?: string,
-    ): void {
-        if (scope === 'user' && !userId) {
-            this.logger.warn('Settings changed event for user scope missing userId');
-        }
-        if (scope === 'directory' && !directoryId) {
-            this.logger.warn('Settings changed event for directory scope missing directoryId');
-        }
     }
 
     /**

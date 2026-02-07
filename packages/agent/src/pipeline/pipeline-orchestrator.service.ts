@@ -1,4 +1,4 @@
-import { Injectable, Logger, Optional } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import type {
     DirectoryReference,
     GenerationRequest,
@@ -13,8 +13,6 @@ import type {
 import { StepPipelineExecutorService } from './step-pipeline-executor.service';
 import { FullPipelineExecutorService } from './full-pipeline-executor.service';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
-import { DirectoryPluginRepository } from '../plugins/repositories/directory-plugin.repository';
-import { UserPluginRepository } from '../plugins/repositories/user-plugin.repository';
 
 function isFullPipelinePlugin(plugin: IPlugin): plugin is IFullPipelinePlugin {
     return plugin.capabilities.includes('full-pipeline');
@@ -34,8 +32,6 @@ export class PipelineOrchestratorService {
         private readonly stepExecutor: StepPipelineExecutorService,
         private readonly fullExecutor: FullPipelineExecutorService,
         private readonly registry: PluginRegistryService,
-        @Optional() private readonly directoryPluginRepository?: DirectoryPluginRepository,
-        @Optional() private readonly userPluginRepository?: UserPluginRepository,
     ) {}
 
     async execute(
@@ -199,7 +195,7 @@ export class PipelineOrchestratorService {
                 continue;
             }
 
-            const isEnabled = await this.isPluginEnabledForDirectory(
+            const isEnabled = await this.registry.isPluginEnabledForScope(
                 registered.plugin.id,
                 directoryId,
                 userId,
@@ -215,35 +211,5 @@ export class PipelineOrchestratorService {
         }
 
         return null;
-    }
-
-    private async isPluginEnabledForDirectory(
-        pluginId: string,
-        directoryId?: string,
-        userId?: string,
-    ): Promise<boolean> {
-        if (directoryId && this.directoryPluginRepository) {
-            try {
-                const dp = await this.directoryPluginRepository.findByDirectoryAndPlugin(
-                    directoryId,
-                    pluginId,
-                );
-                if (dp !== null) return dp.enabled;
-            } catch {
-                // Continue
-            }
-        }
-
-        if (userId && this.userPluginRepository) {
-            try {
-                const up = await this.userPluginRepository.findByUserAndPlugin(userId, pluginId);
-                if (up !== null) return up.enabled;
-            } catch {
-                // Continue
-            }
-        }
-
-        const registered = this.registry.get(pluginId);
-        return registered?.manifest?.autoEnable ?? true;
     }
 }

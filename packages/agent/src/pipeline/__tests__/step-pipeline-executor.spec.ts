@@ -16,7 +16,7 @@ jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => {});
 import { PipelineBuilderService } from '../pipeline-builder.service';
 import { DefaultPipelinePlugin } from '@ever-works/default-pipeline-plugin';
 import { PluginRegistryService } from '../../plugins/services/plugin-registry.service';
-import { createGenerationContext, TypedGenerationContext } from '../generation-context';
+import { TypedGenerationContext } from '../generation-context';
 import * as superjson from 'superjson';
 import { AiFacadeService } from '../../facades/ai.facade';
 import { SearchFacadeService } from '../../facades/search.facade';
@@ -848,7 +848,7 @@ describe('StepPipelineExecutorService', () => {
                 });
             }
 
-            const context = createGenerationContext(mockDirectory, mockRequest, mockExisting);
+            const context = new TypedGenerationContext(mockDirectory, mockRequest, mockExisting);
 
             const result = await service.executeWithContext(context);
 

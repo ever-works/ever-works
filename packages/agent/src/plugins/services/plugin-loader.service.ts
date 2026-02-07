@@ -632,62 +632,6 @@ export class PluginLoaderService {
     }
 
     /**
-     * Unload a plugin
-     */
-    async unload(pluginId: string): Promise<boolean> {
-        const registered = this.registry.get(pluginId);
-        if (!registered) {
-            return false;
-        }
-
-        // Unregister from registry
-        this.registry.unregister(pluginId);
-
-        // Update database state
-        await this.pluginRepository.updateState(pluginId, 'unloaded');
-
-        this.logger.log(`Unloaded plugin: ${pluginId}`);
-        return true;
-    }
-
-    /**
-     * Reload a plugin
-     */
-    async reload(pluginId: string): Promise<LoadResult> {
-        const registered = this.registry.get(pluginId);
-        if (!registered) {
-            return {
-                success: false,
-                pluginId,
-                error: 'Plugin not found',
-            };
-        }
-
-        // Unload first
-        await this.unload(pluginId);
-
-        // Reload from disk if external plugin
-        if (registered.installPath) {
-            const discovered = await this.tryLoadPluginManifest(registered.installPath);
-            if (!discovered) {
-                return {
-                    success: false,
-                    pluginId,
-                    error: 'Plugin manifest no longer valid',
-                };
-            }
-            return this.load(discovered);
-        }
-
-        // For built-in plugins, we can't reload (they need to be re-registered)
-        return {
-            success: false,
-            pluginId,
-            error: 'Built-in plugins cannot be reloaded',
-        };
-    }
-
-    /**
      * Check if a path exists
      */
     private async pathExists(p: string): Promise<boolean> {

@@ -958,38 +958,6 @@ describe('PluginSettingsService', () => {
         });
     });
 
-    describe('requiresRestart handling', () => {
-        it('should always emit requiresRestart as false (no plugins use x-requiresRestart)', async () => {
-            const schema: JsonSchema = {
-                type: 'object',
-                properties: {
-                    debug: {
-                        type: 'boolean',
-                        default: false,
-                    },
-                },
-            } as unknown as JsonSchema;
-
-            const plugin = createMockPlugin(schema);
-            jest.spyOn(registry, 'get').mockReturnValue(createRegisteredPlugin(plugin));
-            jest.spyOn(pluginRepository, 'findByPluginId').mockResolvedValue({
-                id: '1',
-                pluginId: 'test-plugin',
-                settings: {},
-                secretSettings: {},
-            } as any);
-
-            await service.updateAdminSettings('test-plugin', { debug: true });
-
-            expect(eventEmitter.emit).toHaveBeenCalledWith(
-                PluginEvents.SETTINGS_CHANGED,
-                expect.objectContaining({
-                    requiresRestart: false,
-                }),
-            );
-        });
-    });
-
     describe('getSettingsSchemaForContext', () => {
         it('should filter properties for user context', () => {
             // Default schema has: apiKey (global), enabled (global), maxItems (directory), theme (user)

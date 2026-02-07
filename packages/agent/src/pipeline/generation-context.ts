@@ -47,16 +47,6 @@ export class TypedGenerationContext implements MutableGenerationContext {
     advancedPrompts?: MutableGenerationContext['advancedPrompts'];
     shouldStop?: boolean;
 
-    /**
-     * Internal storage for step results that don't map directly to context properties
-     */
-    private stepResults = new Map<string, unknown>();
-
-    /**
-     * Track which steps have provided their data
-     */
-    private providedBy = new Map<string, string>();
-
     constructor(
         directory: DirectoryReference,
         request: GenerationRequest,
@@ -89,14 +79,7 @@ export class TypedGenerationContext implements MutableGenerationContext {
      * @returns The value if present, undefined otherwise
      */
     getStepResult<K extends StepDataKey>(key: K): StepDataTypes[K] | undefined {
-        // First check if the key maps to a direct property
-        const directValue = this.getDirectProperty(key);
-        if (directValue !== undefined) {
-            return directValue as StepDataTypes[K];
-        }
-
-        // Otherwise check custom step results
-        return this.stepResults.get(key) as StepDataTypes[K] | undefined;
+        return this.getDirectProperty(key) as StepDataTypes[K] | undefined;
     }
 
     /**
@@ -105,20 +88,8 @@ export class TypedGenerationContext implements MutableGenerationContext {
      * @param value - The value to store
      * @param stepId - Optional ID of the step that provided this data
      */
-    setStepResult<K extends StepDataKey>(key: K, value: StepDataTypes[K], stepId?: string): void {
-        // Map certain keys to direct properties
-        if (this.setDirectProperty(key, value)) {
-            if (stepId) {
-                this.providedBy.set(key, stepId);
-            }
-            return;
-        }
-
-        // Store in step results map
-        this.stepResults.set(key, value);
-        if (stepId) {
-            this.providedBy.set(key, stepId);
-        }
+    setStepResult<K extends StepDataKey>(key: K, value: StepDataTypes[K]): void {
+        this.setDirectProperty(key, value);
     }
 
     /**
@@ -126,65 +97,7 @@ export class TypedGenerationContext implements MutableGenerationContext {
      * @param key - The step data key to check
      */
     hasStepResult(key: StepDataKey): boolean {
-        const directValue = this.getDirectProperty(key);
-        if (directValue !== undefined) {
-            return true;
-        }
-        return this.stepResults.has(key);
-    }
-
-    /**
-     * Get the step that provided a specific data key
-     * @param key - The step data key
-     * @returns The step ID that provided this data, or undefined
-     */
-    getProvidedBy(key: StepDataKey): string | undefined {
-        return this.providedBy.get(key);
-    }
-
-    /**
-     * Get all available step data keys
-     */
-    getAvailableKeys(): StepDataKey[] {
-        const keys: StepDataKey[] = [];
-
-        // Add direct properties that have values
-        const directKeys: StepDataKey[] = [
-            'extractedUrls',
-            'searchQueries',
-            'webPages',
-            'processedSourceUrls',
-            'contentCache',
-            'initialAiItems',
-            'extractedWebItems',
-            'aggregatedItems',
-            'finalItems',
-            'finalCategories',
-            'finalTags',
-            'finalBrands',
-            'domainAnalysis',
-            'metrics',
-            'allInitialCategories',
-            'allPriorityCategories',
-            'featuredItemHints',
-            'subject',
-            'shouldStop',
-        ];
-
-        for (const key of directKeys) {
-            if (this.hasStepResult(key)) {
-                keys.push(key);
-            }
-        }
-
-        // Add custom step results
-        for (const key of this.stepResults.keys()) {
-            if (!keys.includes(key as StepDataKey)) {
-                keys.push(key as StepDataKey);
-            }
-        }
-
-        return keys;
+        return this.getDirectProperty(key) !== undefined;
     }
 
     /**
@@ -445,15 +358,4 @@ export class TypedGenerationContext implements MutableGenerationContext {
 
         return typed;
     }
-}
-
-/**
- * Factory function to create a new generation context
- */
-export function createGenerationContext(
-    directory: DirectoryReference,
-    request: GenerationRequest,
-    existing: ExistingItems,
-): TypedGenerationContext {
-    return new TypedGenerationContext(directory, request, existing);
 }

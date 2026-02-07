@@ -1,4 +1,4 @@
-import { Injectable, Logger, Optional } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import type {
     PipelineStepDefinition,
     StepPosition,
@@ -12,8 +12,6 @@ import {
     PluginRegistryService,
     RegisteredPlugin,
 } from '../plugins/services/plugin-registry.service';
-import { DirectoryPluginRepository } from '../plugins/repositories/directory-plugin.repository';
-import { UserPluginRepository } from '../plugins/repositories/user-plugin.repository';
 import { DefaultPipelinePlugin } from '@ever-works/default-pipeline-plugin';
 
 /**
@@ -99,11 +97,7 @@ export class MissingDependencyError extends Error {
 export class PipelineBuilderService {
     private readonly logger = new Logger(PipelineBuilderService.name);
 
-    constructor(
-        private readonly registry: PluginRegistryService,
-        @Optional() private readonly directoryPluginRepository?: DirectoryPluginRepository,
-        @Optional() private readonly userPluginRepository?: UserPluginRepository,
-    ) {}
+    constructor(private readonly registry: PluginRegistryService) {}
 
     /**
      * Build an executable pipeline for a directory.
@@ -242,7 +236,7 @@ export class PipelineBuilderService {
             }
 
             // Check directory-specific enabled state
-            const isEnabled = await this.isPluginEnabledForDirectory(
+            const isEnabled = await this.registry.isPluginEnabledForScope(
                 registered.plugin.id,
                 directoryId,
                 userId,
@@ -261,44 +255,6 @@ export class PipelineBuilderService {
         }
 
         return result;
-    }
-
-    /**
-     * Check if a plugin is enabled for the given directory/user context.
-     *
-     * Enable resolution: Directory (L2) > User (L1) > autoEnable
-     */
-    private async isPluginEnabledForDirectory(
-        pluginId: string,
-        directoryId?: string,
-        userId?: string,
-    ): Promise<boolean> {
-        // Level 2: Directory-level enable state
-        if (directoryId && this.directoryPluginRepository) {
-            try {
-                const dp = await this.directoryPluginRepository.findByDirectoryAndPlugin(
-                    directoryId,
-                    pluginId,
-                );
-                if (dp !== null) return dp.enabled;
-            } catch {
-                // Continue to next level
-            }
-        }
-
-        // Level 1: User-level enable state
-        if (userId && this.userPluginRepository) {
-            try {
-                const up = await this.userPluginRepository.findByUserAndPlugin(userId, pluginId);
-                if (up !== null) return up.enabled;
-            } catch {
-                // Continue to fallback
-            }
-        }
-
-        // Fallback: autoEnable from manifest
-        const registered = this.registry.get(pluginId);
-        return registered?.manifest?.autoEnable ?? true;
     }
 
     /**
