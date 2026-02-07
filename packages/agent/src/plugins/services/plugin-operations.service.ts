@@ -928,7 +928,9 @@ export class PluginOperationsService {
         return {
             ...userResponse,
             directoryEnabled:
-                directoryPlugin?.enabled ?? userPlugin?.autoEnableForDirectories ?? autoEnabled,
+                directoryPlugin?.enabled ??
+                (userPlugin?.autoEnableForDirectories || undefined) ??
+                autoEnabled,
             activeCapability: directoryPlugin?.activeCapability,
             directorySettings: directoryPlugin
                 ? { ...directoryPlugin.settings, ...directoryPlugin.secretSettings }

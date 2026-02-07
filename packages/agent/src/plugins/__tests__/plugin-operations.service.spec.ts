@@ -1672,6 +1672,29 @@ describe('PluginOperationsService', () => {
             expect(result.plugins[0].directoryEnabled).toBe(true);
         });
 
+        it('should not let autoEnableForDirectories=false override manifest autoEnable=true', async () => {
+            const plugin = createRegisteredPlugin();
+            plugin.manifest = { ...plugin.manifest, autoEnable: true } as PluginManifest;
+            jest.spyOn(pluginRegistryService, 'getAll').mockReturnValue([plugin]);
+            jest.spyOn(userPluginRepository, 'find').mockResolvedValue([
+                {
+                    id: '1',
+                    userId: 'user-1',
+                    pluginId: 'test-plugin',
+                    enabled: true,
+                    autoEnableForDirectories: false,
+                    settings: {},
+                    secretSettings: {},
+                    metadata: {},
+                } as any,
+            ]);
+            jest.spyOn(directoryPluginRepository, 'find').mockResolvedValue([]);
+
+            const result = await service.listDirectoryPlugins('dir-1', 'user-1');
+
+            expect(result.plugins[0].directoryEnabled).toBe(true);
+        });
+
         it('should create opt-out record when disabling auto-enabled plugin for directory', async () => {
             const registered = createRegisteredPlugin();
             registered.manifest = { ...registered.manifest, autoEnable: false } as PluginManifest;

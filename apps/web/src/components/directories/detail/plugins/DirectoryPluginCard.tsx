@@ -114,7 +114,7 @@ export function DirectoryPluginCard({ directoryId, plugin }: DirectoryPluginCard
                         {plugin.systemPlugin ? (
                             <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary flex items-center gap-1">
                                 <Shield className="w-3 h-3" />
-                                {t('systemAlwaysEnabled')}
+                                System
                             </span>
                         ) : (
                             <Button
@@ -161,10 +161,6 @@ export function DirectoryPluginCard({ directoryId, plugin }: DirectoryPluginCard
                     <p className="text-xs text-warning mt-2">
                         {plugin.installed ? t('disabledByUser') : t('enableAtUserLevelFirst')}
                     </p>
-                )}
-
-                {isEnabled && !plugin.directoryPluginId && !plugin.systemPlugin && (
-                    <p className="text-xs text-primary mt-2">{t('autoEnabledByUser')}</p>
                 )}
 
                 {plugin.description && (
