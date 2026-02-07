@@ -1,5 +1,5 @@
 import { IsEnum, IsOptional, IsString } from 'class-validator';
-import { GenerateStatusType } from '@packages/agent/entities';
+import { GenerateStatusType } from '@ever-works/agent/entities';
 
 export class ScheduleRunCompleteDto {
     @IsEnum(GenerateStatusType)

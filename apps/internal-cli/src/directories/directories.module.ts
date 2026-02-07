@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { DirectoryModule } from '@packages/agent/services';
+import { DirectoryModule } from '@ever-works/agent/services';
 import { DirectoriesController } from './directories.controller';
 
 @Module({

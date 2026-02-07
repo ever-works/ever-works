@@ -30,7 +30,7 @@ import {
     CreateTagDto,
     UpdateTagDto,
     UpdateWebsiteSettingsDto,
-} from '@packages/agent/dto';
+} from '@ever-works/agent/dto';
 import {
     CreateItemsGeneratorDto,
     DeleteDirectoryDto,
@@ -44,8 +44,8 @@ import {
     SubmitItemResponseDto,
     UpdateItemsGeneratorDto,
     UpdateItemDto,
-} from '@packages/agent/items-generator';
-import { BulkCaptureImagesDto, BulkCaptureImagesResponseDto } from '@packages/agent/services';
+} from '@ever-works/agent/items-generator';
+import { BulkCaptureImagesDto, BulkCaptureImagesResponseDto } from '@ever-works/agent/services';
 import {
     DirectoryDetailService,
     DirectoryGenerationService,
@@ -60,7 +60,7 @@ import {
     DirectoryAdvancedPromptsService,
     DirectoryTaxonomyService,
     GeneratorFormSchemaService,
-} from '@packages/agent/services';
+} from '@ever-works/agent/services';
 import {
     AnalyzeRepositoryDto,
     AnalyzeRepositoryResponseDto,
@@ -69,14 +69,14 @@ import {
     ImportDirectoryResponseDto,
     GetUserRepositoriesDto,
     GetUserRepositoriesResponseDto,
-} from '@packages/agent/dto';
-import { UpdateWebsiteRepositoryResponseDto } from '@packages/agent/generators';
+} from '@ever-works/agent/dto';
+import { UpdateWebsiteRepositoryResponseDto } from '@ever-works/agent/generators';
 import { AuthService, CurrentUser, JwtAuthGuard } from '../auth';
 import { AuthenticatedUser } from '@src/auth/types/jwt.types';
 import { GenerateDirectoryDetailDto } from './dto/generate-detail.dto';
-import { CACHE_MANAGER, Cache } from '@packages/agent/cache';
-import { UpdateDirectoryScheduleDto } from '@packages/agent/dto';
-import { DirectoryScheduleStatus } from '@packages/agent/entities';
+import { CACHE_MANAGER, Cache } from '@ever-works/agent/cache';
+import { UpdateDirectoryScheduleDto } from '@ever-works/agent/dto';
+import { DirectoryScheduleStatus } from '@ever-works/agent/entities';
 
 let CACHE_TTL = 1000 * 60 * 10; // 10 minutes
 

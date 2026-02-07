@@ -12,35 +12,35 @@ import {
     Delete,
 } from '@nestjs/common';
 import { Public } from '../auth/decorators/public.decorator';
-import { config } from '@packages/agent/config';
-import { DirectoryRepository } from '@packages/agent/database';
-import { Directory } from '@packages/agent/entities';
+import { config } from '@ever-works/agent/config';
+import { DirectoryRepository } from '@ever-works/agent/database';
+import { Directory } from '@ever-works/agent/entities';
 import { DirectoryCommandDto } from './dto/directory-command.dto';
-import { CACHE_MANAGER, Cache } from '@packages/agent/cache';
+import { CACHE_MANAGER, Cache } from '@ever-works/agent/cache';
 import {
     DIRECTORY_OPERATIONS,
     DirectoryOperations,
     GenerationHistoryUpdateInput,
-} from '@packages/agent/directory-operations';
-import { DirectoryCommandAction, DirectoryCommandPayloads } from '@packages/agent/tasks';
+} from '@ever-works/agent/directory-operations';
+import { DirectoryCommandAction, DirectoryCommandPayloads } from '@ever-works/agent/tasks';
 import { SkipThrottle } from '@nestjs/throttler';
 import { CacheDto } from './dto/cache.dto';
 import {
     DirectoryOwnershipService,
     DirectoryScheduleDispatcherService,
     DirectoryScheduleService,
-} from '@packages/agent/services';
+} from '@ever-works/agent/services';
 import { ScheduleRunCompleteDto, ScheduleRunFailureDto } from './dto/schedule-run.dto';
-import { GenerateStatusType } from '@packages/agent/entities';
-import { NotificationService } from '@packages/agent/notifications';
-import { GitFacadeService } from '@packages/agent/facades';
+import { GenerateStatusType } from '@ever-works/agent/entities';
+import { NotificationService } from '@ever-works/agent/notifications';
+import { GitFacadeService } from '@ever-works/agent/facades';
 import { CreateNotificationDto } from './dto/create-notification.dto';
 import {
     PluginRegistryService,
     PluginRepository,
     UserPluginRepository,
     DirectoryPluginRepository,
-} from '@packages/agent/plugins';
+} from '@ever-works/agent/plugins';
 import type { PluginContextSnapshotDto, PluginSnapshotEntry } from './dto/plugin-context.dto';
 
 type DirectoryContextResponse = {

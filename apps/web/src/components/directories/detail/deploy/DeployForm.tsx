@@ -36,7 +36,6 @@ export function DeployForm({ directory, isDeploying, providerName }: DeployFormP
     const [isConfigDialogOpen, setIsConfigDialogOpen] = useState(false);
     const [isTeamDialogOpen, setIsTeamDialogOpen] = useState(false);
     const [deployTeams, setDeployTeams] = useState<DeployTeam[]>([]);
-    const [pendingTeamScope, setPendingTeamScope] = useState<string | undefined>();
 
     const hasDeployTeams = deployTeams.length > 0;
     const setHasCheckedExisting = useRef(false);

@@ -6,7 +6,7 @@ import {
     PipelineOrchestratorService,
     ProviderOverrideService,
     StepAdapterService,
-} from '@packages/agent/pipeline';
+} from '@ever-works/agent/pipeline';
 import { TriggerFacadesModule } from './trigger-facades.module';
 
 const PROVIDERS = [

@@ -20,7 +20,7 @@ async function buildCLI() {
 
     // First, ensure the agent package is built
     try {
-        execSync('pnpm --filter "@packages/agent" build', {
+        execSync('pnpm --filter "@ever-works/agent" build', {
             cwd: path.resolve(__dirname, '../..'),
             stdio: 'inherit',
         });

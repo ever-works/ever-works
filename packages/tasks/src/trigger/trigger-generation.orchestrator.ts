@@ -1,14 +1,14 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
-import { DataGeneratorService } from '@packages/agent/generators';
-import { MarkdownGeneratorService } from '@packages/agent/generators';
-import { WebsiteGeneratorService } from '@packages/agent/generators';
-import { Directory, User, GenerateStatusType } from '@packages/agent/entities';
-import { CreateItemsGeneratorDto } from '@packages/agent/items-generator';
-import { DIRECTORY_OPERATIONS } from '@packages/agent/directory-operations';
-import type { DirectoryOperations } from '@packages/agent/directory-operations';
-import { NOTIFICATION_OPERATIONS } from '@packages/agent/notification-operations';
-import type { NotificationOperations } from '@packages/agent/notification-operations';
-import { ItemsGeneratorMetrics } from '@packages/agent/items-generator';
+import { DataGeneratorService } from '@ever-works/agent/generators';
+import { MarkdownGeneratorService } from '@ever-works/agent/generators';
+import { WebsiteGeneratorService } from '@ever-works/agent/generators';
+import { Directory, User, GenerateStatusType } from '@ever-works/agent/entities';
+import { CreateItemsGeneratorDto } from '@ever-works/agent/items-generator';
+import { DIRECTORY_OPERATIONS } from '@ever-works/agent/directory-operations';
+import type { DirectoryOperations } from '@ever-works/agent/directory-operations';
+import { NOTIFICATION_OPERATIONS } from '@ever-works/agent/notification-operations';
+import type { NotificationOperations } from '@ever-works/agent/notification-operations';
+import { ItemsGeneratorMetrics } from '@ever-works/agent/items-generator';
 
 type GenerationStats = {
     newItemsCount: number;

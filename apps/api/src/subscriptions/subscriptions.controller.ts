@@ -10,9 +10,9 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { JwtAuthGuard, AuthService, CurrentUser } from '@src/auth';
-import { SubscriptionService } from '@packages/agent/subscriptions';
+import { SubscriptionService } from '@ever-works/agent/subscriptions';
 import { AuthenticatedUser } from '@src/auth/types/jwt.types';
-import { SubscriptionPlanCode } from '@packages/agent/entities';
+import { SubscriptionPlanCode } from '@ever-works/agent/entities';
 import { IsEnum } from 'class-validator';
 
 class UpdateSubscriptionPlanDto {

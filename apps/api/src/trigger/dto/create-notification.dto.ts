@@ -1,5 +1,5 @@
 import { IsString, IsEnum, IsOptional, IsBoolean, IsDateString, IsObject } from 'class-validator';
-import { NotificationType, NotificationCategory } from '@packages/agent/entities';
+import { NotificationType, NotificationCategory } from '@ever-works/agent/entities';
 
 export class CreateNotificationDto {
     @IsString()

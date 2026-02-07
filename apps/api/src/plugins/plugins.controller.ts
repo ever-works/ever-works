@@ -14,8 +14,8 @@ import {
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { JwtAuthGuard, CurrentUser } from '../auth';
 import { AuthenticatedUser } from '@src/auth/types/jwt.types';
-import { DirectoryOwnershipService } from '@packages/agent/services';
-import { PluginOperationsService } from '@packages/agent/plugins';
+import { DirectoryOwnershipService } from '@ever-works/agent/services';
+import { PluginOperationsService } from '@ever-works/agent/plugins';
 import {
     PluginListResponseDto,
     UserPluginResponseDto,

@@ -1,11 +1,11 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
-import { Directory, User, GenerateStatusType } from '@packages/agent/entities';
-import { DIRECTORY_OPERATIONS } from '@packages/agent/directory-operations';
-import type { DirectoryOperations } from '@packages/agent/directory-operations';
-import { NOTIFICATION_OPERATIONS } from '@packages/agent/notification-operations';
-import type { NotificationOperations } from '@packages/agent/notification-operations';
-import { DirectoryImportPayload, DirectoryImportResult } from '@packages/agent/tasks';
-import { ImportExecutorService } from '@packages/agent/import';
+import { Directory, User, GenerateStatusType } from '@ever-works/agent/entities';
+import { DIRECTORY_OPERATIONS } from '@ever-works/agent/directory-operations';
+import type { DirectoryOperations } from '@ever-works/agent/directory-operations';
+import { NOTIFICATION_OPERATIONS } from '@ever-works/agent/notification-operations';
+import type { NotificationOperations } from '@ever-works/agent/notification-operations';
+import { DirectoryImportPayload, DirectoryImportResult } from '@ever-works/agent/tasks';
+import { ImportExecutorService } from '@ever-works/agent/import';
 
 export type TriggerImportOptions = {
     directory: Directory;

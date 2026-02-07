@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { AiProviderRegistryService } from '../ai-providers/ai-provider-registry.service';
-import { AiFacadeService } from '@packages/agent/facades';
+import { AiFacadeService } from '@ever-works/agent/facades';
 import ora from 'ora';
 import { BasePromptService } from '@packages/cli-shared';
 

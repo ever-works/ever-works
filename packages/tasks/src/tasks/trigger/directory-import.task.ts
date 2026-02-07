@@ -6,8 +6,8 @@ import { TriggerWorkerModule } from '../../trigger/trigger-worker.module';
 import { TriggerInternalApiClient } from '../../trigger/trigger-internal-api.client';
 import { TriggerImportOrchestrator } from '../../trigger/trigger-import.orchestrator';
 import { TriggerPluginHydratorService } from '../../trigger/plugins/trigger-plugin-hydrator.service';
-import { DirectoryImportPayload } from '@packages/agent/tasks';
-import { Directory, User, GenerateStatusType } from '@packages/agent/entities';
+import { DirectoryImportPayload } from '@ever-works/agent/tasks';
+import { Directory, User, GenerateStatusType } from '@ever-works/agent/entities';
 import { TriggerLogger } from '../../trigger/trigger-logger';
 
 async function createContext(appContext: INestApplicationContext, payload: DirectoryImportPayload) {

@@ -420,7 +420,7 @@ Plugin paths must be configured differently for development and production (Dock
 
 ```typescript
 // apps/api/src/app.module.ts
-import { PluginsModule } from '@packages/agent/plugins';
+import { PluginsModule } from '@ever-works/agent/plugins';
 import * as path from 'path';
 
 @Module({

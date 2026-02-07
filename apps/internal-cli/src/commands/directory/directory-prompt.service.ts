@@ -1,13 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import chalk from 'chalk';
 import inquirer from 'inquirer';
-import { MarkdownReadmeConfigDto } from '@packages/agent/dto';
+import { MarkdownReadmeConfigDto } from '@ever-works/agent/dto';
 import {
     DirectoryRepository,
     DirectoryMemberRepository,
     UserRepository,
-} from '@packages/agent/database';
-import { Directory, DirectoryMemberRole } from '@packages/agent/entities';
+} from '@ever-works/agent/database';
+import { Directory, DirectoryMemberRole } from '@ever-works/agent/entities';
 import { validateSlug, BasePromptService } from '@packages/cli-shared';
 
 export interface DirectoryInputData {

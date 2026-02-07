@@ -2,8 +2,8 @@ import { BadRequestException, Body, Controller, Get, Param, Post, UseGuards } fr
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { JwtAuthGuard, CurrentUser } from '../../auth';
 import { AuthenticatedUser } from '../../auth/types/jwt.types';
-import { DeployFacadeService } from '@packages/agent/facades';
-import { DirectoryOwnershipService } from '@packages/agent/services';
+import { DeployFacadeService } from '@ever-works/agent/facades';
+import { DirectoryOwnershipService } from '@ever-works/agent/services';
 import { DeployService } from './deploy.service';
 import { DeploymentVerifierService } from './tasks/deployment-verifier.service';
 import { DeployDirectoryDto } from './dto/deploy.dto';

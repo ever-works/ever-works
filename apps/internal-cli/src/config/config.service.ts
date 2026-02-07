@@ -102,7 +102,7 @@ export class ConfigService {
             process.env.GIT_PROVIDER = 'github';
         }
 
-        // Map new keys to legacy env vars for downstream @packages/agent code
+        // Map new keys to legacy env vars for downstream @ever-works/agent code
         if (process.env.GIT_TOKEN && !process.env.GH_APIKEY) {
             process.env.GH_APIKEY = process.env.GIT_TOKEN;
         }

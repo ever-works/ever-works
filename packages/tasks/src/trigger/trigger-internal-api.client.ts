@@ -1,12 +1,12 @@
 import { Injectable } from '@nestjs/common';
-import { config } from '@packages/agent/config';
+import { config } from '@ever-works/agent/config';
 import {
     Directory,
     GenerateStatusType,
     NotificationType,
     NotificationCategory,
-} from '@packages/agent/entities';
-import { DirectoryCommand, DirectoryCommandAction } from '@packages/agent/tasks';
+} from '@ever-works/agent/entities';
+import { DirectoryCommand, DirectoryCommandAction } from '@ever-works/agent/tasks';
 
 type DirectoryContextResponse = {
     directory: Directory;

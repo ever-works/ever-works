@@ -6,8 +6,8 @@ import { TriggerWorkerModule } from '../../trigger/trigger-worker.module';
 import { TriggerInternalApiClient } from '../../trigger/trigger-internal-api.client';
 import { TriggerGenerationOrchestrator } from '../../trigger/trigger-generation.orchestrator';
 import { TriggerPluginHydratorService } from '../../trigger/plugins/trigger-plugin-hydrator.service';
-import { DirectoryGenerationPayload } from '@packages/agent/tasks';
-import { Directory, User, GenerateStatusType } from '@packages/agent/entities';
+import { DirectoryGenerationPayload } from '@ever-works/agent/tasks';
+import { Directory, User, GenerateStatusType } from '@ever-works/agent/entities';
 import { RemoteDirectoryScheduleService } from '../../trigger/remote-directory-schedule.service';
 import { TriggerLogger } from '../../trigger/trigger-logger';
 

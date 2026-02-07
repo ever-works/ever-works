@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import { Directory } from '@packages/agent/entities';
+import { Directory } from '@ever-works/agent/entities';
 import type {
     DirectoryOperations,
     GenerationHistoryUpdateInput,
-} from '@packages/agent/directory-operations';
-import { DirectoryCommandAction, DirectoryCommandPayloads } from '@packages/agent/tasks';
+} from '@ever-works/agent/directory-operations';
+import { DirectoryCommandAction, DirectoryCommandPayloads } from '@ever-works/agent/tasks';
 import { TriggerInternalApiClient } from './trigger-internal-api.client';
 
 @Injectable()

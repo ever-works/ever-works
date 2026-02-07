@@ -24,8 +24,8 @@ import { AiConversationModule } from './ai-conversation/ai-conversation.module';
 import {
     PluginsModule as AgentPluginsModule,
     PluginBootstrapService,
-} from '@packages/agent/plugins';
-import { CacheFactory } from '@packages/agent/cache';
+} from '@ever-works/agent/plugins';
+import { CacheFactory } from '@ever-works/agent/cache';
 
 @Module({
     imports: [

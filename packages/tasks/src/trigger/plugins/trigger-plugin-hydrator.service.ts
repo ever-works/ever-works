@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PluginBootstrapService } from '@packages/agent/plugins';
+import { PluginBootstrapService } from '@ever-works/agent/plugins';
 import { TriggerInternalApiClient } from '../trigger-internal-api.client';
 import { RemotePluginRepository } from './remote-plugin.repository';
 import { RemoteUserPluginRepository } from './remote-user-plugin.repository';

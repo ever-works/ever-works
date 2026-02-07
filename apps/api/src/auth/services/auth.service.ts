@@ -9,13 +9,13 @@ import {
     UserRepository,
     RefreshTokenRepository,
     OAuthTokenRepository,
-} from '@packages/agent/database';
+} from '@ever-works/agent/database';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { RegisterDto, UpdatePasswordDto } from '../dto/auth.dto';
 import { randomBytes, randomUUID } from 'crypto';
 import { jwtConstants, authConstants, AuthProvider, config } from '../../config/constants';
-import { User } from '@packages/agent/entities';
+import { User } from '@ever-works/agent/entities';
 import { JwtPayload, TokenResponse } from '../types/jwt.types';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { UserCreatedEvent, UserForgotPasswordEvent } from '../../events';

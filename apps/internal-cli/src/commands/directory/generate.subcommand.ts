@@ -2,18 +2,18 @@ import { SubCommand, CommandRunner } from 'nest-commander';
 import chalk from 'chalk';
 import ora from 'ora';
 import inquirer from 'inquirer';
-import { DirectoryRepository, UserRepository } from '@packages/agent/database';
-import { DirectoryGenerationService, DirectoryQueryService } from '@packages/agent/services';
+import { DirectoryRepository, UserRepository } from '@ever-works/agent/database';
+import { DirectoryGenerationService, DirectoryQueryService } from '@ever-works/agent/services';
 import {
     CreateItemsGeneratorDto,
     CompanyDto,
     GenerationMethod,
     WebsiteRepositoryCreationMethod,
-} from '@packages/agent/items-generator';
+} from '@ever-works/agent/items-generator';
 import { DirectoryPromptService } from './directory-prompt.service';
 import { ConfigCheckService } from './config-check.service';
 import { handleCliError } from './error';
-import { Directory, GenerateStatusType, User } from '@packages/agent/entities';
+import { Directory, GenerateStatusType, User } from '@ever-works/agent/entities';
 import { getStepProgress, getStepText, ItemsGeneratorStep } from '@packages/cli-shared';
 
 @SubCommand({

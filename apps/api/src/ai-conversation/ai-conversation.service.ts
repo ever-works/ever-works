@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { AiFacadeService, type FacadeOptions } from '@packages/agent/facades';
+import { AiFacadeService, type FacadeOptions } from '@ever-works/agent/facades';
 import type { ChatMessage, ChatCompletionChunk } from '@ever-works/plugin';
 
 export interface ChatRequestDto {

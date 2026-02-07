@@ -1,5 +1,5 @@
 {
-    "name": "@packages/agent",
+    "name": "@ever-works/agent",
     "version": "0.1.0",
     "description": "ai agent for ever works",
     "private": true,

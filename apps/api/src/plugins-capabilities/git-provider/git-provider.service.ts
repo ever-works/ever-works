@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { GitFacadeService, GitProviderInfo, OAuthFacadeService } from '@packages/agent/facades';
+import { GitFacadeService, GitProviderInfo, OAuthFacadeService } from '@ever-works/agent/facades';
 import type { GitOrganization, GitUser, GitRepositoryWithPermissions } from '@ever-works/plugin';
 
 export type GitAuthMethod = 'oauth' | 'personal-access-token';

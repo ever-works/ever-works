@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { BasePromptService } from '@packages/cli-shared';
-import { DeployFacadeService } from '@packages/agent/facades';
+import { DeployFacadeService } from '@ever-works/agent/facades';
 
 export interface DeploymentConfig {
     provider: string | 'ignore';

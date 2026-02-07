@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { GenerateStatusType } from '@packages/agent/entities';
+import { GenerateStatusType } from '@ever-works/agent/entities';
 import { TriggerInternalApiClient } from './trigger-internal-api.client';
 
 type DispatchResponse = {

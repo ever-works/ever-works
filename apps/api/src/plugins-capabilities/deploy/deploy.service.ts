@@ -1,10 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { randomBytes } from 'crypto';
-import { DeployFacadeService, GitFacadeService } from '@packages/agent/facades';
-import { DirectoryRepository } from '@packages/agent/database';
-import { PluginRegistryService } from '@packages/agent/plugins';
-import { Directory, User } from '@packages/agent/entities';
-import { WebsiteUpdateService, WEBSITE_TEMPLATE_CONFIG } from '@packages/agent/generators';
+import { DeployFacadeService, GitFacadeService } from '@ever-works/agent/facades';
+import { DirectoryRepository } from '@ever-works/agent/database';
+import { PluginRegistryService } from '@ever-works/agent/plugins';
+import { Directory, User } from '@ever-works/agent/entities';
+import { WebsiteUpdateService, WEBSITE_TEMPLATE_CONFIG } from '@ever-works/agent/generators';
 import type { BatchDeployItemDto, BatchDeployItemResultDto } from './dto/batch-deploy.dto';
 
 interface RepoContext {

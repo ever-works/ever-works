@@ -1,6 +1,6 @@
 import { Type } from 'class-transformer';
 import { IsEnum, IsObject, IsOptional } from 'class-validator';
-import { DirectoryCommandAction } from '@packages/agent/tasks';
+import { DirectoryCommandAction } from '@ever-works/agent/tasks';
 
 export class DirectoryCommandDto {
     @IsEnum(DirectoryCommandAction)

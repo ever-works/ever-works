@@ -907,7 +907,7 @@ export const BUILT_IN_PLUGINS = [
 **Option B: Dynamic Registration**
 
 ```typescript
-import { PluginLoaderService } from '@packages/agent';
+import { PluginLoaderService } from '@ever-works/agent';
 import { MyGitProviderPlugin } from '@ever-works/my-git-provider-plugin';
 
 // In your module

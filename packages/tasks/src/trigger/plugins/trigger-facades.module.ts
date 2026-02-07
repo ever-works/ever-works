@@ -8,7 +8,7 @@ import {
     GitFacadeService,
     OAuthFacadeService,
     DeployFacadeService,
-} from '@packages/agent/facades';
+} from '@ever-works/agent/facades';
 
 const FACADES = [
     AiFacadeService,

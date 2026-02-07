@@ -6,16 +6,16 @@ import {
     DirectoryPluginEntity,
     PluginOperationsService,
     SettingsSchemaValidatorService,
-} from '@packages/agent/plugins';
-import { FacadesModule } from '@packages/agent/facades';
-import { DirectoryModule } from '@packages/agent/services';
+} from '@ever-works/agent/plugins';
+import { FacadesModule } from '@ever-works/agent/facades';
+import { DirectoryModule } from '@ever-works/agent/services';
 import { AuthModule } from '../auth';
 
 import { PluginsController } from './plugins.controller';
 
 /**
  * API module for plugin management endpoints.
- * Note: The core PluginsModule from @packages/agent/plugins must be
+ * Note: The core PluginsModule from @ever-works/agent/plugins must be
  * initialized with forRoot() at the app root level for this to work.
  */
 @Module({

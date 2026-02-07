@@ -26,7 +26,7 @@ import type { PluginCategory } from '../contracts/plugin-manifest.types.js';
  *
  * 1. **Extend the platform's GitProvider** (recommended for internal plugins):
  *    ```typescript
- *    import { GitProvider } from '@packages/agent';
+ *    import { GitProvider } from '@ever-works/agent';
  *    class GitHubPlugin extends GitProvider implements IGitProviderPlugin { ... }
  *    ```
  *

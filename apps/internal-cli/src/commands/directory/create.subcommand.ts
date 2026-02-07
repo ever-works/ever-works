@@ -1,12 +1,12 @@
 import { SubCommand, CommandRunner } from 'nest-commander';
 import chalk from 'chalk';
 import ora from 'ora';
-import { DirectoryRepository, UserRepository } from '@packages/agent/database';
-import { GitFacadeService } from '@packages/agent/facades';
+import { DirectoryRepository, UserRepository } from '@ever-works/agent/database';
+import { GitFacadeService } from '@ever-works/agent/facades';
 import { DirectoryPromptService } from './directory-prompt.service';
 import { ConfigCheckService } from './config-check.service';
 import { handleCliError } from './error';
-import { DirectoryLifecycleService } from '@packages/agent/services';
+import { DirectoryLifecycleService } from '@ever-works/agent/services';
 
 @SubCommand({
     name: 'create',

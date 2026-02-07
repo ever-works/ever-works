@@ -9,8 +9,8 @@ import {
     Post,
     Query,
 } from '@nestjs/common';
-import { UserRepository } from '@packages/agent/database';
-import { CreateDirectoryDto } from '@packages/agent/dto';
+import { UserRepository } from '@ever-works/agent/database';
+import { CreateDirectoryDto } from '@ever-works/agent/dto';
 import {
     CreateItemsGeneratorDto,
     DeleteDirectoryDto,
@@ -23,14 +23,14 @@ import {
     SubmitItemDto,
     SubmitItemResponseDto,
     UpdateItemsGeneratorDto,
-} from '@packages/agent/items-generator';
+} from '@ever-works/agent/items-generator';
 import {
     DirectoryGenerationService,
     DirectoryLifecycleService,
     DirectoryOwnershipService,
     DirectoryQueryService,
-} from '@packages/agent/services';
-import { UpdateWebsiteRepositoryResponseDto } from '@packages/agent/generators';
+} from '@ever-works/agent/services';
+import { UpdateWebsiteRepositoryResponseDto } from '@ever-works/agent/generators';
 
 interface DeployDto {
     DEPLOY_TOKEN?: string;

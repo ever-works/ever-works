@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { NotificationService } from '@packages/agent/notifications';
+import { NotificationService } from '@ever-works/agent/notifications';
 
 @Injectable()
 export class NotificationCleanupService {

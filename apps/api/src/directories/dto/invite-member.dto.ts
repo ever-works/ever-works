@@ -1,6 +1,6 @@
 import { IsEmail, IsIn, IsNotEmpty } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
-import { DirectoryMemberRole, ASSIGNABLE_MEMBER_ROLES } from '@packages/agent/entities';
+import { DirectoryMemberRole, ASSIGNABLE_MEMBER_ROLES } from '@ever-works/agent/entities';
 
 export class InviteMemberDto {
     @ApiProperty({

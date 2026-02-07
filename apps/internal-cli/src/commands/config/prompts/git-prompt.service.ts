@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { BasePromptService } from '@packages/cli-shared';
-import { GitFacadeService } from '@packages/agent/facades';
+import { GitFacadeService } from '@ever-works/agent/facades';
 
 export interface GitConfig {
     provider: string;

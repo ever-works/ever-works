@@ -22,7 +22,7 @@
         "@nestjs/event-emitter": "^3.0.1",
         "@nestjs/platform-express": "^11.1.11",
         "@nestjs/websockets": "^11.1.11",
-        "@packages/agent": "workspace:*",
+        "@ever-works/agent": "workspace:*",
         "@trigger.dev/sdk": "^4.3.2",
         "class-transformer": "^0.5.1",
         "reflect-metadata": "^0.2.2",

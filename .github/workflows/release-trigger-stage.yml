@@ -31,7 +31,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build workspace packages
-        run: pnpm --filter @packages/agent build
+        run: pnpm --filter @ever-works/agent build
 
       - name: Build plugins
         run: pnpm --filter './packages/plugins/*' build

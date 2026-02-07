@@ -22,7 +22,7 @@
         "@nestjs/core": "^11.1.11",
         "@nestjs/event-emitter": "^3.0.1",
         "@ever-works/vercel-plugin": "workspace:*",
-        "@packages/agent": "workspace:*",
+        "@ever-works/agent": "workspace:*",
         "@packages/cli-shared": "workspace:*",
         "better-sqlite3": "^12.5.0",
         "chalk": "^4.1.2",

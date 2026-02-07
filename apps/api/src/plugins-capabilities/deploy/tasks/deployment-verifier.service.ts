@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { DeployFacadeService } from '@packages/agent/facades';
-import { DirectoryRepository } from '@packages/agent/database';
-import { PluginRegistryService } from '@packages/agent/plugins';
-import { Directory } from '@packages/agent/entities';
+import { DeployFacadeService } from '@ever-works/agent/facades';
+import { DirectoryRepository } from '@ever-works/agent/database';
+import { PluginRegistryService } from '@ever-works/agent/plugins';
+import { Directory } from '@ever-works/agent/entities';
 import type { IDeploymentPlugin } from '@ever-works/plugin';
 
 type CancelVerification = () => void;

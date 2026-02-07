@@ -17,7 +17,7 @@ import {
     UserRepository,
     RefreshTokenRepository,
     OAuthTokenRepository,
-} from '@packages/agent/database';
+} from '@ever-works/agent/database';
 import { jwtConstants } from '../config/constants';
 
 @Module({

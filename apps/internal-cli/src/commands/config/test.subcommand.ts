@@ -3,7 +3,7 @@ import { Logger } from '@nestjs/common';
 import chalk from 'chalk';
 import ora from 'ora';
 import { ConfigService } from '../../config/config.service';
-import { AiFacadeService, GitFacadeService } from '@packages/agent/facades';
+import { AiFacadeService, GitFacadeService } from '@ever-works/agent/facades';
 
 import { COMMAND } from '../../config';
 

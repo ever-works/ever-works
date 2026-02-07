@@ -1,8 +1,8 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { randomBytes } from 'crypto';
-import { OAuthFacadeService } from '@packages/agent/facades';
-import { OAuthTokenRepository } from '@packages/agent/database';
-import { PluginSettingsService } from '@packages/agent/plugins';
+import { OAuthFacadeService } from '@ever-works/agent/facades';
+import { OAuthTokenRepository } from '@ever-works/agent/database';
+import { PluginSettingsService } from '@ever-works/agent/plugins';
 import type { OAuthConfig, OAuthProviderInfo } from '@ever-works/plugin';
 
 export interface OAuthConnectionInfo extends OAuthProviderInfo {

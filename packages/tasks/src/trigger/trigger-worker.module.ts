@@ -1,14 +1,14 @@
 import { Module } from '@nestjs/common';
-import { DIRECTORY_OPERATIONS } from '@packages/agent/directory-operations';
-import { NOTIFICATION_OPERATIONS } from '@packages/agent/notification-operations';
-import { DataGeneratorService } from '@packages/agent/generators';
-import { MarkdownGeneratorService } from '@packages/agent/generators';
-import { WebsiteGeneratorService } from '@packages/agent/generators';
+import { DIRECTORY_OPERATIONS } from '@ever-works/agent/directory-operations';
+import { NOTIFICATION_OPERATIONS } from '@ever-works/agent/notification-operations';
+import { DataGeneratorService } from '@ever-works/agent/generators';
+import { MarkdownGeneratorService } from '@ever-works/agent/generators';
+import { WebsiteGeneratorService } from '@ever-works/agent/generators';
 import {
     SourceRepoAnalyzerService,
     AwesomeReadmeParserService,
     ImportExecutorService,
-} from '@packages/agent/import';
+} from '@ever-works/agent/import';
 import { TriggerPluginsModule } from './plugins/trigger-plugins.module';
 import { TriggerFacadesModule } from './plugins/trigger-facades.module';
 import { TriggerPipelineModule } from './plugins/trigger-pipeline.module';

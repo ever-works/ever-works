@@ -19,8 +19,8 @@ import {
     ApiParam,
     ApiQuery,
 } from '@nestjs/swagger';
-import { NotificationService } from '@packages/agent/notifications';
-import { NotificationCategory } from '@packages/agent/entities';
+import { NotificationService } from '@ever-works/agent/notifications';
+import { NotificationCategory } from '@ever-works/agent/entities';
 import { CurrentUser, JwtAuthGuard } from '../auth';
 import { AuthenticatedUser } from '@src/auth/types/jwt.types';
 

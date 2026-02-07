@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { NotificationType, NotificationCategory } from '@packages/agent/entities';
+import { NotificationType, NotificationCategory } from '@ever-works/agent/entities';
 import type {
     NotificationOperations,
     CreateNotificationInput,
-} from '@packages/agent/notification-operations';
+} from '@ever-works/agent/notification-operations';
 import { TriggerInternalApiClient } from './trigger-internal-api.client';
 
 /**

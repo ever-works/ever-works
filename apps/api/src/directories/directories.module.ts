@@ -1,12 +1,12 @@
 import { ScheduleModule } from '@nestjs/schedule';
 import { Module } from '@nestjs/common';
-import { DirectoryModule } from '@packages/agent/services';
-import { DatabaseModule } from '@packages/agent/database';
+import { DirectoryModule } from '@ever-works/agent/services';
+import { DatabaseModule } from '@ever-works/agent/database';
 import { AuthModule } from '@src/auth';
-import { CacheEntryRepository } from '@packages/agent/cache';
+import { CacheEntryRepository } from '@ever-works/agent/cache';
 import { TriggerModule as TasksTriggerModule } from '@packages/tasks';
-import { WebsiteGeneratorModule } from '@packages/agent/generators';
-import { FacadesModule } from '@packages/agent/facades';
+import { WebsiteGeneratorModule } from '@ever-works/agent/generators';
+import { FacadesModule } from '@ever-works/agent/facades';
 
 // Controllers
 import { DirectoriesController } from './directories.controller';

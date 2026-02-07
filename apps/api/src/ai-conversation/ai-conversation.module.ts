@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { FacadesModule } from '@packages/agent/facades';
+import { FacadesModule } from '@ever-works/agent/facades';
 import { AiConversationController } from './ai-conversation.controller';
 import { AiConversationService } from './ai-conversation.service';
 

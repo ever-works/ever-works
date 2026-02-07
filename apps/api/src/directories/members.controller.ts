@@ -12,7 +12,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { DirectoryMemberService } from '@packages/agent/services';
+import { DirectoryMemberService } from '@ever-works/agent/services';
 import { AuthService, CurrentUser, JwtAuthGuard } from '../auth';
 import { AuthenticatedUser } from '@src/auth/types/jwt.types';
 import { InviteMemberDto } from './dto/invite-member.dto';

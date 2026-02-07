@@ -40,7 +40,7 @@
         "@nestjs/swagger": "^11.2.5",
         "@nestjs/throttler": "^6.5.0",
         "@nestjs/typeorm": "^11.0.0",
-        "@packages/agent": "workspace:*",
+        "@ever-works/agent": "workspace:*",
         "@packages/monitoring": "workspace:*",
         "@packages/tasks": "workspace:*",
         "@scalar/nestjs-api-reference": "^1.0.20",

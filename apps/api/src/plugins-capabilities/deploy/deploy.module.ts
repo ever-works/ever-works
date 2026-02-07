@@ -1,9 +1,9 @@
 import { Module, forwardRef } from '@nestjs/common';
-import { FacadesModule } from '@packages/agent/facades';
-import { DatabaseModule } from '@packages/agent/database';
-import { PluginsModule } from '@packages/agent/plugins';
-import { WebsiteGeneratorModule } from '@packages/agent/generators';
-import { DirectoryModule } from '@packages/agent/services';
+import { FacadesModule } from '@ever-works/agent/facades';
+import { DatabaseModule } from '@ever-works/agent/database';
+import { PluginsModule } from '@ever-works/agent/plugins';
+import { WebsiteGeneratorModule } from '@ever-works/agent/generators';
+import { DirectoryModule } from '@ever-works/agent/services';
 import { AuthModule } from '../../auth/auth.module';
 import { DeployController } from './deploy.controller';
 import { DeployService } from './deploy.service';

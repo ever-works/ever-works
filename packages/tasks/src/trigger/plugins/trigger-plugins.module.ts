@@ -18,8 +18,8 @@ import {
     PluginContextFactoryService,
     CustomCapabilityRegistryService,
     PluginBootstrapService,
-} from '@packages/agent/plugins';
-import type { PluginsModuleOptions } from '@packages/agent/plugins';
+} from '@ever-works/agent/plugins';
+import type { PluginsModuleOptions } from '@ever-works/agent/plugins';
 
 import { RemotePluginRepository } from './remote-plugin.repository';
 import { RemoteUserPluginRepository } from './remote-user-plugin.repository';

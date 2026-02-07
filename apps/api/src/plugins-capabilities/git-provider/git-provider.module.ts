@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
-import { FacadesModule } from '@packages/agent/facades';
-import { DatabaseModule } from '@packages/agent/database';
+import { FacadesModule } from '@ever-works/agent/facades';
+import { DatabaseModule } from '@ever-works/agent/database';
 import { GitProviderController } from './git-provider.controller';
 import { GitProviderService } from './git-provider.service';
 

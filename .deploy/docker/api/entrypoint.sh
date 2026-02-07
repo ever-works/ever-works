@@ -17,7 +17,7 @@ if [ "$RUN_MIGRATIONS" = "true" ]; then
     node -e "
         require('reflect-metadata');
         const { DataSource } = require('typeorm');
-        const { databaseConfig } = require('@packages/agent/database');
+        const { databaseConfig } = require('@ever-works/agent/database');
 
         const config = databaseConfig();
         const dataSource = new DataSource({

@@ -4611,7 +4611,7 @@ Add PluginsModule to the API's AppModule with environment-aware plugin paths for
 
 ```typescript
 // apps/api/src/app.module.ts
-import { PluginsModule } from '@packages/agent/plugins';
+import { PluginsModule } from '@ever-works/agent/plugins';
 import * as path from 'path';
 
 @Module({
@@ -5966,7 +5966,7 @@ jobs:
             - run: pnpm --filter "@ever-works/plugin-*" test:cov
 
             # Run agent plugin runtime tests
-            - run: pnpm --filter "@packages/agent" test -- --testPathPattern="plugins|pipeline"
+            - run: pnpm --filter "@ever-works/agent" test -- --testPathPattern="plugins|pipeline"
 
             # Verify coverage thresholds
             - name: Check coverage
