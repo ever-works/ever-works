@@ -245,6 +245,119 @@ describe('PipelineOrchestratorService', () => {
             expect(stepExecuteSpy).toHaveBeenCalled();
         });
 
+        it('should use step executor when providers.pipeline is null (explicit standard)', async () => {
+            const plugin = createMockFullPipelinePlugin('full-pipeline-plugin');
+            registry.register(
+                plugin as unknown as IPlugin,
+                createMockManifest('full-pipeline-plugin'),
+                {
+                    state: 'enabled',
+                },
+            );
+
+            const stepExecuteSpy = jest.spyOn(stepExecutor, 'execute');
+            const fullExecuteSpy = jest.spyOn(fullExecutor, 'execute');
+
+            const requestWithNullPipeline: GenerationRequest = {
+                ...mockRequest,
+                providers: { pipeline: null },
+            };
+
+            await service.execute(mockDirectory, requestWithNullPipeline, mockExisting);
+
+            expect(stepExecuteSpy).toHaveBeenCalled();
+            expect(fullExecuteSpy).not.toHaveBeenCalled();
+        });
+
+        it('should use explicit pipeline plugin when providers.pipeline is a plugin ID', async () => {
+            const plugin = createMockFullPipelinePlugin('my-custom-pipeline');
+            registry.register(
+                plugin as unknown as IPlugin,
+                createMockManifest('my-custom-pipeline'),
+                {
+                    state: 'enabled',
+                },
+            );
+
+            const fullExecuteSpy = jest.spyOn(fullExecutor, 'execute');
+
+            const requestWithPipelineId: GenerationRequest = {
+                ...mockRequest,
+                providers: { pipeline: 'my-custom-pipeline' },
+            };
+
+            await service.execute(mockDirectory, requestWithPipelineId, mockExisting);
+
+            expect(fullExecuteSpy).toHaveBeenCalledWith(
+                plugin,
+                mockDirectory,
+                requestWithPipelineId,
+                mockExisting,
+                undefined,
+                undefined,
+            );
+        });
+
+        it('should fall back to step mode when providers.pipeline references unknown plugin', async () => {
+            const stepExecuteSpy = jest.spyOn(stepExecutor, 'execute');
+
+            const requestWithBadId: GenerationRequest = {
+                ...mockRequest,
+                providers: { pipeline: 'non-existent-plugin' },
+            };
+
+            await service.execute(mockDirectory, requestWithBadId, mockExisting);
+
+            expect(stepExecuteSpy).toHaveBeenCalled();
+        });
+
+        it('should fall back to step mode when providers.pipeline references disabled plugin', async () => {
+            const plugin = createMockFullPipelinePlugin('disabled-pipeline');
+            registry.register(
+                plugin as unknown as IPlugin,
+                createMockManifest('disabled-pipeline'),
+                {
+                    state: 'loaded', // Not enabled
+                },
+            );
+
+            const stepExecuteSpy = jest.spyOn(stepExecutor, 'execute');
+
+            const requestWithDisabledId: GenerationRequest = {
+                ...mockRequest,
+                providers: { pipeline: 'disabled-pipeline' },
+            };
+
+            await service.execute(mockDirectory, requestWithDisabledId, mockExisting);
+
+            expect(stepExecuteSpy).toHaveBeenCalled();
+        });
+
+        it('should auto-detect full pipeline when providers.pipeline is undefined', async () => {
+            const plugin = createMockFullPipelinePlugin('auto-detected-pipeline');
+            registry.register(
+                plugin as unknown as IPlugin,
+                createMockManifest('auto-detected-pipeline'),
+                {
+                    state: 'enabled',
+                },
+            );
+
+            const fullExecuteSpy = jest.spyOn(fullExecutor, 'execute');
+
+            // No providers at all → pipeline is undefined → auto-detect
+            await service.execute(mockDirectory, mockRequest, mockExisting);
+
+            expect(fullExecuteSpy).toHaveBeenCalledWith(
+                plugin,
+                mockDirectory,
+                mockRequest,
+                mockExisting,
+                undefined,
+                undefined,
+            );
+        });
+
         it('should pass options to selected executor', async () => {
             const executeSpy = jest.spyOn(stepExecutor, 'execute');
             const options = { timeout: 5000, continueOnError: true };

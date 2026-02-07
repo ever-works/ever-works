@@ -89,7 +89,7 @@ export interface GenerationRequest {
 		readonly search?: string;
 		readonly screenshot?: string;
 		readonly contentExtractor?: string;
-		readonly pipeline?: string;
+		readonly pipeline?: string | null;
 	};
 }
 

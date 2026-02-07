@@ -45,10 +45,24 @@ export class PipelineOrchestratorService {
         options?: PipelineExecutionOptions,
         onProgress?: PipelineProgressCallback,
     ): Promise<PipelineResult> {
-        const fullPipelinePlugin = await this.findFullPipelinePlugin(
-            directory.id,
-            directory.user?.id,
-        );
+        const pipelineOverride = request.providers?.pipeline;
+
+        let fullPipelinePlugin: IFullPipelinePlugin | null = null;
+
+        if (typeof pipelineOverride === 'string') {
+            // User explicitly selected a full-pipeline plugin by ID
+            fullPipelinePlugin = this.resolveExplicitPipeline(pipelineOverride);
+        } else if (pipelineOverride === null) {
+            // User explicitly chose "standard pipeline" — skip full pipeline
+            fullPipelinePlugin = null;
+        } else {
+            // No explicit selection (undefined) — auto-detect from directory settings
+            fullPipelinePlugin = await this.findFullPipelinePlugin(
+                directory.id,
+                directory.user?.id,
+            );
+        }
+
         const mode: PipelineExecutionMode = fullPipelinePlugin ? 'full' : 'step';
 
         this.logger.log(
@@ -155,6 +169,23 @@ export class PipelineOrchestratorService {
 
     async clearCheckpoint(directoryId: string): Promise<void> {
         await this.stepExecutor.clearCheckpoint(directoryId);
+    }
+
+    private resolveExplicitPipeline(pluginId: string): IFullPipelinePlugin | null {
+        const registered = this.registry.get(pluginId);
+        if (!registered || registered.state !== 'enabled') {
+            this.logger.warn(
+                `Requested pipeline plugin "${pluginId}" not found or not enabled, falling back to step mode`,
+            );
+            return null;
+        }
+        if (!isFullPipelinePlugin(registered.plugin)) {
+            this.logger.warn(
+                `Plugin "${pluginId}" does not have full-pipeline capability, falling back to step mode`,
+            );
+            return null;
+        }
+        return registered.plugin;
     }
 
     private async findFullPipelinePlugin(
