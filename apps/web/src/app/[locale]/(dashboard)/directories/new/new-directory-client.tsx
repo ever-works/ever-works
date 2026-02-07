@@ -6,7 +6,6 @@ import { cn } from '@/lib/utils/cn';
 import { DirectoryAICreator } from '@/components/directories/DirectoryAICreator';
 import { DirectoryManualForm } from '@/components/directories/DirectoryManualForm';
 import { DirectoryImportForm } from '@/components/directories/DirectoryImportForm';
-import { GitProviderConnectionAlert } from './git-provider-connection-alert';
 import { GitProviderSelector } from './git-provider-selector';
 import { DeployProviderSelector, type DeployProvider } from './deploy-provider-selector';
 import { useTranslations } from 'next-intl';
@@ -42,12 +41,6 @@ export default function NewDirectoryClient({
     if (creationMode === null) {
         return (
             <div className="w-full">
-                {/* Git Provider Connection Alert */}
-                <GitProviderConnectionAlert
-                    connected={isConnected}
-                    provider={selectedProvider?.connectionInfo || null}
-                />
-
                 <div className="mb-8">
                     <h1 className="text-3xl font-bold text-text dark:text-text-dark">
                         {t('title')}
@@ -57,41 +50,16 @@ export default function NewDirectoryClient({
                     </p>
                 </div>
 
-                {/* Git Provider Selector */}
-                {providers.length > 0 && (
-                    <div className="mb-8">
-                        <GitProviderSelector
-                            providers={providers}
-                            selectedProviderId={selectedProviderId}
-                            onSelect={setSelectedProviderId}
-                        />
-                    </div>
-                )}
-
-                {/* Deploy Provider Selector */}
-                {deployProviders.length > 0 && (
-                    <div className="mb-8">
-                        <DeployProviderSelector
-                            providers={deployProviders}
-                            selectedProviderId={selectedDeployProviderId}
-                            onSelect={setSelectedDeployProviderId}
-                        />
-                    </div>
-                )}
-
                 <div className="grid md:grid-cols-3 gap-6">
                     {/* AI Creation Card */}
                     <button
                         onClick={() => setCreationMode('ai')}
-                        disabled={!isConnected}
                         className={cn(
                             'p-6 rounded-lg border-2 text-left transition-all',
                             'bg-card dark:bg-card-dark',
                             'border-card-border dark:border-card-border-dark',
                             'hover:border-primary hover:shadow-lg',
                             'group',
-                            !isConnected &&
-                                'opacity-50 cursor-not-allowed hover:border-card-border',
                         )}
                     >
                         <div className="mb-4">
@@ -143,15 +111,12 @@ export default function NewDirectoryClient({
                     {/* Manual Creation Card */}
                     <button
                         onClick={() => setCreationMode('manual')}
-                        disabled={!isConnected}
                         className={cn(
                             'p-6 rounded-lg border-2 text-left transition-all',
                             'bg-card dark:bg-card-dark',
                             'border-card-border dark:border-card-border-dark',
                             'hover:border-primary hover:shadow-lg',
                             'group',
-                            !isConnected &&
-                                'opacity-50 cursor-not-allowed hover:border-card-border',
                         )}
                     >
                         <div className="mb-4">
@@ -203,15 +168,12 @@ export default function NewDirectoryClient({
                     {/* Import Existing Card */}
                     <button
                         onClick={() => setCreationMode('import')}
-                        disabled={!isConnected}
                         className={cn(
                             'p-6 rounded-lg border-2 text-left transition-all',
                             'bg-card dark:bg-card-dark',
                             'border-card-border dark:border-card-border-dark',
                             'hover:border-primary hover:shadow-lg',
                             'group',
-                            !isConnected &&
-                                'opacity-50 cursor-not-allowed hover:border-card-border',
                         )}
                     >
                         <div className="mb-4">
