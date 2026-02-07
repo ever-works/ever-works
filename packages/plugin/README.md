@@ -52,9 +52,9 @@ export class MyPlugin extends BasePlugin {
 	readonly category = 'utility';
 	readonly capabilities = ['custom'] as const;
 
-	async onEnable(context: PluginContext): Promise<void> {
-		await super.onEnable(context);
-		this.log('Plugin enabled!');
+	async onLoad(context: PluginContext): Promise<void> {
+		await super.onLoad(context);
+		this.log('Plugin loaded!');
 	}
 }
 ```
@@ -165,16 +165,15 @@ describe('MyPlugin', () => {
 		expect(results.every((r) => r.passed)).toBe(true);
 	});
 
-	it('enables correctly', async () => {
+	it('loads correctly', async () => {
 		const plugin = new MyPlugin();
 		const harness = createTestHarness(plugin, {
 			settings: { apiKey: 'test-key' }
 		});
 
 		await harness.load();
-		await harness.enable();
 
-		expect(harness.isEnabled).toBe(true);
+		expect(harness.isLoaded).toBe(true);
 	});
 });
 ```

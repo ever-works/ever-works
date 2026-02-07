@@ -45,7 +45,7 @@ export class GooglePlugin extends BaseAiProvider {
 				type: 'string',
 				title: 'Default Model',
 				description: 'Used for all AI tasks unless a tier-specific model is set',
-				default: 'gemini-2.5-flash',
+				default: 'models/gemini-2.5-flash',
 				'x-widget': 'model-select',
 				'x-scope': 'global'
 			},
@@ -53,7 +53,7 @@ export class GooglePlugin extends BaseAiProvider {
 				type: 'string',
 				title: 'Simple Tasks Model',
 				description: 'Handles tags, short descriptions, and quick classifications',
-				default: 'gemini-2.0-flash',
+				default: 'models/gemini-2.0-flash',
 				'x-widget': 'model-select',
 				'x-scope': 'global'
 			},
@@ -61,7 +61,7 @@ export class GooglePlugin extends BaseAiProvider {
 				type: 'string',
 				title: 'Standard Tasks Model',
 				description: 'Handles listings, summaries, and content reformatting',
-				default: 'gemini-2.5-flash',
+				default: 'models/gemini-2.5-flash',
 				'x-widget': 'model-select',
 				'x-scope': 'global'
 			},
@@ -69,7 +69,7 @@ export class GooglePlugin extends BaseAiProvider {
 				type: 'string',
 				title: 'Complex Tasks Model',
 				description: 'Handles full page generation and multi-step analysis',
-				default: 'gemini-2.5-pro',
+				default: 'models/gemini-2.5-pro',
 				'x-widget': 'model-select',
 				'x-scope': 'global'
 			},
@@ -106,7 +106,7 @@ export class GooglePlugin extends BaseAiProvider {
 		await super.onLoad(context);
 		this.aiOps = new AiOperations({
 			apiKey: '',
-			model: 'gemini-2.5-flash',
+			model: 'models/gemini-2.5-flash',
 			baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/',
 			temperature: 0.7,
 			maxTokens: 4096,
@@ -169,7 +169,7 @@ export class GooglePlugin extends BaseAiProvider {
 	}
 
 	protected getDefaultModelId(): string {
-		return 'gemini-2.5-flash';
+		return 'models/gemini-2.5-flash';
 	}
 
 	async validateSettings(settings: PluginSettings): Promise<ValidationResult> {
