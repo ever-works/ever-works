@@ -65,7 +65,8 @@ export class LocalContentExtractorPlugin implements IPlugin, IContentExtractorPl
 				description: 'HTTP request timeout in milliseconds',
 				default: 15000,
 				minimum: 1000,
-				maximum: 60000
+				maximum: 60000,
+				'x-hidden': true
 			},
 			minContentLength: {
 				type: 'number',
@@ -73,14 +74,16 @@ export class LocalContentExtractorPlugin implements IPlugin, IContentExtractorPl
 				description: 'Minimum character length for Readability to consider content valid',
 				default: 200,
 				minimum: 0,
-				maximum: 10000
+				maximum: 10000,
+				'x-hidden': true
 			},
 			userAgent: {
 				type: 'string',
 				title: 'User Agent',
 				description: 'Custom user agent string for HTTP requests',
 				default:
-					'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+					'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+				'x-hidden': true
 			}
 		}
 	};
@@ -509,7 +512,7 @@ export class LocalContentExtractorPlugin implements IPlugin, IContentExtractorPl
 			builtIn: true,
 			systemPlugin: true,
 			autoEnable: true,
-			visibility: 'hidden',
+			visibility: 'public',
 			defaultForCapabilities: ['content-extractor'],
 			homepage: 'https://github.com/nichochar/readability-js',
 			icon: {

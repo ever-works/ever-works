@@ -1192,9 +1192,15 @@
                 }
             },
             "deploy": {
+                "noProviderAlert": {
+                    "title": "No Deployment Provider",
+                    "description": "Select a deployment provider to deploy your directory website.",
+                    "selectButton": "Select & Continue",
+                    "noProviders": "No deployment providers available. Install a deployment plugin first."
+                },
                 "noTokenAlert": {
-                    "title": "Потрібен токен Vercel",
-                    "description": "Для розгортання вашого довідника на Vercel потрібно налаштувати ваш API-токен Vercel у налаштуваннях облікового запису.",
+                    "title": "{provider} Token Required",
+                    "description": "To deploy your directory, you need to configure your {provider} API token in Plugin Settings.",
                     "configureButton": "Перейти до налаштувань API-токенів",
                     "getTokenButton": "Отримати токен Vercel",
                     "howTo": {

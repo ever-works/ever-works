@@ -1246,9 +1246,15 @@
                 }
             },
             "deploy": {
+                "noProviderAlert": {
+                    "title": "No Deployment Provider",
+                    "description": "Select a deployment provider to deploy your directory website.",
+                    "selectButton": "Select & Continue",
+                    "noProviders": "No deployment providers available. Install a deployment plugin first."
+                },
                 "noTokenAlert": {
-                    "title": "Deployment Token Required",
-                    "description": "To deploy your directory, you need to configure your deployment provider in Plugin Settings.",
+                    "title": "{provider} Token Required",
+                    "description": "To deploy your directory, you need to configure your {provider} API token in Plugin Settings.",
                     "configureButton": "Configure in Plugin Settings",
                     "getTokenButton": "Get API Token",
                     "howTo": {

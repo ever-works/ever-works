@@ -1192,9 +1192,15 @@
                 }
             },
             "deploy": {
+                "noProviderAlert": {
+                    "title": "No Deployment Provider",
+                    "description": "Select a deployment provider to deploy your directory website.",
+                    "selectButton": "Select & Continue",
+                    "noProviders": "No deployment providers available. Install a deployment plugin first."
+                },
                 "noTokenAlert": {
-                    "title": "Token Vercel Diperlukan",
-                    "description": "Untuk mendeploy direktori Anda ke Vercel, Anda perlu mengonfigurasi token API Vercel di pengaturan akun Anda.",
+                    "title": "{provider} Token Required",
+                    "description": "To deploy your directory, you need to configure your {provider} API token in Plugin Settings.",
                     "configureButton": "Pergi ke Pengaturan Token API",
                     "getTokenButton": "Dapatkan Token Vercel",
                     "howTo": {

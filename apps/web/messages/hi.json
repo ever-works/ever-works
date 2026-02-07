@@ -1192,9 +1192,15 @@
                 }
             },
             "deploy": {
+                "noProviderAlert": {
+                    "title": "No Deployment Provider",
+                    "description": "Select a deployment provider to deploy your directory website.",
+                    "selectButton": "Select & Continue",
+                    "noProviders": "No deployment providers available. Install a deployment plugin first."
+                },
                 "noTokenAlert": {
-                    "title": "Vercel टोकन आवश्यक",
-                    "description": "अपनी निर्देशिका को Vercel पर डिप्लॉय करने के लिए, आपको अपने खाता सेटिंग्स में अपना Vercel API टोकन कॉन्फ़िगर करने की आवश्यकता है।",
+                    "title": "{provider} Token Required",
+                    "description": "To deploy your directory, you need to configure your {provider} API token in Plugin Settings.",
                     "configureButton": "API टोकन सेटिंग्स पर जाएं",
                     "getTokenButton": "Vercel टोकन प्राप्त करें",
                     "howTo": {

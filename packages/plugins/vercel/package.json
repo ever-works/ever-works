@@ -51,7 +51,7 @@
 			"autoEnable": true,
 			"systemPlugin": true,
 			"builtIn": true,
-			"visibility": "public",
+			"visibility": "user-only",
 			"defaultForCapabilities": [
 				"deployment"
 			]

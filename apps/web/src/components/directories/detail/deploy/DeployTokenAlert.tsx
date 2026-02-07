@@ -45,10 +45,10 @@ export function DeployTokenAlert({
                     </div>
                     <div className="flex-1">
                         <h3 className="text-lg font-semibold text-text dark:text-text-dark mb-2">
-                            {t('noTokenAlert.title')}
+                            {t('noTokenAlert.title', { provider: displayName })}
                         </h3>
                         <p className="text-text-secondary dark:text-text-secondary-dark mb-4">
-                            {t('noTokenAlert.description')}
+                            {t('noTokenAlert.description', { provider: displayName })}
                         </p>
                         <div className="flex flex-wrap gap-3">
                             <Link

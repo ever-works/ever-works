@@ -1192,9 +1192,15 @@
                 }
             },
             "deploy": {
+                "noProviderAlert": {
+                    "title": "No Deployment Provider",
+                    "description": "Select a deployment provider to deploy your directory website.",
+                    "selectButton": "Select & Continue",
+                    "noProviders": "No deployment providers available. Install a deployment plugin first."
+                },
                 "noTokenAlert": {
-                    "title": "Cần Mã thông báo Vercel",
-                    "description": "Để triển khai thư mục của bạn lên Vercel, bạn cần cấu hình mã thông báo API Vercel của mình trong cài đặt tài khoản.",
+                    "title": "{provider} Token Required",
+                    "description": "To deploy your directory, you need to configure your {provider} API token in Plugin Settings.",
                     "configureButton": "Đi đến Cài đặt Mã thông báo API",
                     "getTokenButton": "Lấy Mã thông báo Vercel",
                     "howTo": {

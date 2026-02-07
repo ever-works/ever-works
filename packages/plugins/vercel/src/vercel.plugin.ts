@@ -214,7 +214,7 @@ export class VercelPlugin implements IPlugin, IDeploymentPlugin {
 			builtIn: true,
 			systemPlugin: true,
 			autoEnable: true,
-			visibility: 'public',
+			visibility: 'user-only',
 			defaultForCapabilities: ['deployment'],
 			readme: [
 				'## What does the Vercel plugin do?',

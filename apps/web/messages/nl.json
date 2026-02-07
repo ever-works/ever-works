@@ -1192,9 +1192,15 @@
                 }
             },
             "deploy": {
+                "noProviderAlert": {
+                    "title": "No Deployment Provider",
+                    "description": "Select a deployment provider to deploy your directory website.",
+                    "selectButton": "Select & Continue",
+                    "noProviders": "No deployment providers available. Install a deployment plugin first."
+                },
                 "noTokenAlert": {
-                    "title": "Vercel Token Vereist",
-                    "description": "Om uw directory op Vercel te implementeren, moet u uw Vercel API-token configureren in uw accountinstellingen.",
+                    "title": "{provider} Token Required",
+                    "description": "To deploy your directory, you need to configure your {provider} API token in Plugin Settings.",
                     "configureButton": "Ga naar API Tokens Instellingen",
                     "getTokenButton": "Vercel Token Ophalen",
                     "howTo": {

@@ -1099,9 +1099,15 @@
                 }
             },
             "deploy": {
+                "noProviderAlert": {
+                    "title": "No Deployment Provider",
+                    "description": "Select a deployment provider to deploy your directory website.",
+                    "selectButton": "Select & Continue",
+                    "noProviders": "No deployment providers available. Install a deployment plugin first."
+                },
                 "noTokenAlert": {
-                    "title": "נדרש אסימון Vercel",
-                    "description": "כדי לפרוס את המדריך שלך ב-Vercel, עליך להגדיר את אסימון ה-API של Vercel שלך בהגדרות החשבון שלך.",
+                    "title": "{provider} Token Required",
+                    "description": "To deploy your directory, you need to configure your {provider} API token in Plugin Settings.",
                     "configureButton": "עבור להגדרות אסימוני API",
                     "getTokenButton": "קבל אסימון Vercel",
                     "howTo": {

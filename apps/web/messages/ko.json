@@ -1192,9 +1192,15 @@
                 }
             },
             "deploy": {
+                "noProviderAlert": {
+                    "title": "No Deployment Provider",
+                    "description": "Select a deployment provider to deploy your directory website.",
+                    "selectButton": "Select & Continue",
+                    "noProviders": "No deployment providers available. Install a deployment plugin first."
+                },
                 "noTokenAlert": {
-                    "title": "Vercel 토큰 필요",
-                    "description": "디렉토리를 Vercel에 배포하려면 계정 설정에서 Vercel API 토큰을 구성해야 합니다.",
+                    "title": "{provider} Token Required",
+                    "description": "To deploy your directory, you need to configure your {provider} API token in Plugin Settings.",
                     "configureButton": "API 토큰 설정으로 이동",
                     "getTokenButton": "Vercel 토큰 가져오기",
                     "howTo": {

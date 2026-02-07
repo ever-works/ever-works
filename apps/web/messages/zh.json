@@ -1099,9 +1099,15 @@
                 }
             },
             "deploy": {
+                "noProviderAlert": {
+                    "title": "No Deployment Provider",
+                    "description": "Select a deployment provider to deploy your directory website.",
+                    "selectButton": "Select & Continue",
+                    "noProviders": "No deployment providers available. Install a deployment plugin first."
+                },
                 "noTokenAlert": {
-                    "title": "需要 Vercel 令牌",
-                    "description": "要将您的目录部署到 Vercel，您需要在账户设置中配置 Vercel API 令牌。",
+                    "title": "{provider} Token Required",
+                    "description": "To deploy your directory, you need to configure your {provider} API token in Plugin Settings.",
                     "configureButton": "前往 API 令牌设置",
                     "getTokenButton": "获取 Vercel 令牌",
                     "howTo": {

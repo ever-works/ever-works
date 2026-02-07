@@ -3,6 +3,7 @@ import { notFound, redirect } from 'next/navigation';
 import { ROUTES } from '@/lib/constants';
 import { DeployForm } from '@/components/directories/detail/deploy/DeployForm';
 import { DeployTokenAlert } from '@/components/directories/detail/deploy/DeployTokenAlert';
+import { NoDeployProviderAlert } from '@/components/directories/detail/deploy/NoDeployProviderAlert';
 import { SharedDirectoryNoTokenAlert } from '@/components/directories/detail/deploy/SharedDirectoryNoTokenAlert';
 import { GenerateStatusType } from '@/lib/api/enums';
 import { canDeploy } from '@/lib/permissions';
@@ -39,16 +40,19 @@ export default async function DeployPage({ params }: DeployPageParams) {
         redirect(ROUTES.DASHBOARD_DIRECTORY(id));
     }
 
-    // Resolve provider info (used for both the alert and deploy button)
-    const providerId = directory.deployProvider || '';
-    let providerName: string | undefined;
-    let providerHomepage: string | undefined;
-    if (providerId) {
+    // If no deploy provider is selected, show provider selector
+    if (!directory.deployProvider) {
         const providersRes = await deployAPI.getProviders().catch(() => null);
-        const provider = providersRes?.providers?.find((p) => p.id === providerId);
-        providerName = provider?.name;
-        providerHomepage = provider?.homepage;
+        const providers = providersRes?.providers ?? [];
+        return <NoDeployProviderAlert directoryId={directory.id} providers={providers} />;
     }
+
+    // Resolve provider info (used for both the alert and deploy button)
+    const providerId = directory.deployProvider;
+    const providersRes = await deployAPI.getProviders().catch(() => null);
+    const provider = providersRes?.providers?.find((p) => p.id === providerId);
+    const providerName = provider?.name;
+    const providerHomepage = provider?.homepage;
 
     // Check deployment capability based on shared/owned status
     if (!deploymentCapability.canDeploy) {

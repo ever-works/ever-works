@@ -55,7 +55,7 @@
 			"autoEnable": true,
 			"systemPlugin": true,
 			"builtIn": true,
-			"visibility": "hidden",
+			"visibility": "public",
 			"defaultForCapabilities": [
 				"content-extractor"
 			]

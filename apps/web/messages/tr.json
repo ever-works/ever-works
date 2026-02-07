@@ -1192,9 +1192,15 @@
                 }
             },
             "deploy": {
+                "noProviderAlert": {
+                    "title": "No Deployment Provider",
+                    "description": "Select a deployment provider to deploy your directory website.",
+                    "selectButton": "Select & Continue",
+                    "noProviders": "No deployment providers available. Install a deployment plugin first."
+                },
                 "noTokenAlert": {
-                    "title": "Vercel Belirteci Gerekli",
-                    "description": "Dizininizi Vercel'e yayınlamak için hesap ayarlarınızda Vercel API belirtecinizi yapılandırmanız gerekir.",
+                    "title": "{provider} Token Required",
+                    "description": "To deploy your directory, you need to configure your {provider} API token in Plugin Settings.",
                     "configureButton": "API Belirteçleri Ayarlarına Git",
                     "getTokenButton": "Vercel Belirteci Al",
                     "howTo": {
