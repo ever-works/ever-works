@@ -4,6 +4,9 @@
     "description": "Monitoring package for Sentry and PostHog integration",
     "private": true,
     "license": "UNLICENSED",
+    "files": [
+        "dist"
+    ],
     "exports": {
         ".": {
             "types": "./dist/index.d.ts",

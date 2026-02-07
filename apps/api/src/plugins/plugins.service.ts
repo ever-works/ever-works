@@ -428,18 +428,22 @@ export class PluginsService {
                 ...(settings || {}),
                 ...(secretSettings || {}),
             };
+            // Strip null values before validation — null means "cleared"
+            this.stripNullValues(allSettings);
             this.validateSettingsOrThrow(allSettings, schema, 'user');
         }
 
-        // Merge settings
+        // Merge settings and strip null keys to clear them
         if (settings) {
             userPlugin.settings = { ...userPlugin.settings, ...settings };
+            this.stripNullValues(userPlugin.settings);
         }
         if (secretSettings) {
             userPlugin.secretSettings = {
                 ...userPlugin.secretSettings,
                 ...secretSettings,
             };
+            this.stripNullValues(userPlugin.secretSettings);
         }
         if (metadata) {
             userPlugin.metadata = { ...userPlugin.metadata, ...metadata };
@@ -674,18 +678,22 @@ export class PluginsService {
                 ...(settings || {}),
                 ...(secretSettings || {}),
             };
+            // Strip null values before validation — null means "cleared"
+            this.stripNullValues(allSettings);
             this.validateSettingsOrThrow(allSettings, schema, 'directory');
         }
 
-        // Merge settings
+        // Merge settings and strip null keys to clear them
         if (settings) {
             directoryPlugin.settings = { ...directoryPlugin.settings, ...settings };
+            this.stripNullValues(directoryPlugin.settings);
         }
         if (secretSettings) {
             directoryPlugin.secretSettings = {
                 ...directoryPlugin.secretSettings,
                 ...secretSettings,
             };
+            this.stripNullValues(directoryPlugin.secretSettings);
         }
         if (metadata) {
             directoryPlugin.metadata = { ...directoryPlugin.metadata, ...metadata };
@@ -912,6 +920,18 @@ export class PluginsService {
                 message: 'Invalid plugin settings',
                 errors: result.errors,
             });
+        }
+    }
+
+    /**
+     * Strip null values from a settings object (mutates in place).
+     * Null is used as a sentinel to indicate a field was cleared by the user.
+     */
+    private stripNullValues(obj: Record<string, unknown>): void {
+        for (const key of Object.keys(obj)) {
+            if (obj[key] === null) {
+                delete obj[key];
+            }
         }
     }
 

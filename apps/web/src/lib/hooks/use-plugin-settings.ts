@@ -129,6 +129,51 @@ export function usePluginSettings({
         setValidationError(null);
     }, []);
 
+    const validateConstraints = useCallback((): string[] => {
+        const errors: string[] = [];
+        const allValues = { ...settings, ...secretSettings };
+        for (const [key, propSchema] of Object.entries(visibleProperties)) {
+            const prop = propSchema as PluginSettingsSchemaProperty;
+            const val = allValues[key];
+            if (val === undefined || val === null || val === '') continue;
+
+            if (prop.type === 'number' && typeof val === 'number') {
+                const label = prop.title || key;
+                if (prop.minimum !== undefined && val < prop.minimum) {
+                    errors.push(`${label} must be at least ${prop.minimum}`);
+                }
+                if (prop.maximum !== undefined && val > prop.maximum) {
+                    errors.push(`${label} must be at most ${prop.maximum}`);
+                }
+            }
+            if (prop.type === 'string' && typeof val === 'string') {
+                const label = prop.title || key;
+                if (prop.minLength !== undefined && val.length < prop.minLength) {
+                    errors.push(`${label} must be at least ${prop.minLength} characters`);
+                }
+                if (prop.maxLength !== undefined && val.length > prop.maxLength) {
+                    errors.push(`${label} must be at most ${prop.maxLength} characters`);
+                }
+                if (prop.pattern) {
+                    try {
+                        if (!new RegExp(prop.pattern).test(val)) {
+                            errors.push(`${label} has an invalid format`);
+                        }
+                    } catch {
+                        // ignore invalid regex from schema
+                    }
+                }
+            }
+            if (prop.enum && prop.enum.length > 0) {
+                if (!prop.enum.includes(val)) {
+                    const label = prop.title || key;
+                    errors.push(`${label} must be one of: ${prop.enum.join(', ')}`);
+                }
+            }
+        }
+        return errors;
+    }, [settings, secretSettings, visibleProperties]);
+
     const handleSave = useCallback(async () => {
         const missingFields = validateRequiredFields();
         if (missingFields.length > 0) {
@@ -136,12 +181,28 @@ export function usePluginSettings({
             return;
         }
 
+        const constraintErrors = validateConstraints();
+        if (constraintErrors.length > 0) {
+            setValidationError(constraintErrors.join('. '));
+            return;
+        }
+
+        // Sanitize: convert undefined values to null so they survive JSON serialization
+        const sanitize = (obj: Record<string, unknown>): Record<string, unknown> => {
+            const result: Record<string, unknown> = {};
+            for (const [key, value] of Object.entries(obj)) {
+                result[key] = value === undefined ? null : value;
+            }
+            return result;
+        };
+
         setIsSaving(true);
         setValidationError(null);
         try {
             await onSave({
-                settings: Object.keys(settings).length > 0 ? settings : undefined,
-                secretSettings: Object.keys(secretSettings).length > 0 ? secretSettings : undefined,
+                settings: Object.keys(settings).length > 0 ? sanitize(settings) : undefined,
+                secretSettings:
+                    Object.keys(secretSettings).length > 0 ? sanitize(secretSettings) : undefined,
             });
             setHasChanges(false);
             setSaveSuccess(true);
@@ -159,7 +220,7 @@ export function usePluginSettings({
         } finally {
             setIsSaving(false);
         }
-    }, [validateRequiredFields, settings, secretSettings, onSave, router, t]);
+    }, [validateRequiredFields, validateConstraints, settings, secretSettings, onSave, router, t]);
 
     const getFieldValue = useCallback(
         (key: string, propSchema: PluginSettingsSchemaProperty): unknown => {

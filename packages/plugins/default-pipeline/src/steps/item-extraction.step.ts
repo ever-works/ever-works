@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
 import type {
 	MutableGenerationContext,
 	StepExecutionContext,
@@ -71,6 +72,12 @@ export class ItemExtractionStep extends BasePipelineStep {
 	private readonly MAX_CHUNK_SIZE = 6000;
 	private readonly CHUNK_OVERLAP = 200;
 	private readonly BATCH_SIZE = 10;
+
+	private readonly textSplitter = new RecursiveCharacterTextSplitter({
+		chunkSize: 6000,
+		chunkOverlap: 200,
+		separators: ['\n## ', '\n### ', '\n#### ', '\n\n', '\n', '. ', ' ', '']
+	});
 
 	async run(context: MutableGenerationContext, execContext: StepExecutionContext): Promise<MutableGenerationContext> {
 		const { request, directory, webPages, featuredItemHints, metrics, advancedPrompts } = context;
@@ -153,7 +160,7 @@ export class ItemExtractionStep extends BasePipelineStep {
 				// Check if content is large enough to require chunking
 				if (page.raw_content && page.raw_content.length > this.MAX_CHUNK_SIZE) {
 					// Split the content into chunks
-					const chunks = this.splitTextIntoChunks(page.raw_content);
+					const chunks = await this.textSplitter.splitText(page.raw_content);
 
 					// Process each chunk
 					const chunkResults = await Promise.all(
@@ -300,43 +307,6 @@ export class ItemExtractionStep extends BasePipelineStep {
 			`[${directorySlug}] Item extraction complete. Extracted ${uniqueExtractedItems.length} unique items from ${pagesWithSufficientContent.length} pages.`
 		);
 		return uniqueExtractedItems;
-	}
-
-	/**
-	 * Split text into chunks (simple implementation replacing LangChain)
-	 */
-	private splitTextIntoChunks(text: string): string[] {
-		const chunks: string[] = [];
-		const separators = ['\n## ', '\n### ', '\n#### ', '\n\n', '\n', '. '];
-
-		let currentChunk = '';
-		const lines = text.split('\n');
-
-		for (const line of lines) {
-			if (currentChunk.length + line.length + 1 > this.MAX_CHUNK_SIZE) {
-				if (currentChunk.length > 0) {
-					chunks.push(currentChunk);
-					// Keep overlap from the end of previous chunk
-					currentChunk = currentChunk.slice(-this.CHUNK_OVERLAP) + line;
-				} else {
-					// Line itself is too long, split it
-					let remaining = line;
-					while (remaining.length > this.MAX_CHUNK_SIZE) {
-						chunks.push(remaining.slice(0, this.MAX_CHUNK_SIZE));
-						remaining = remaining.slice(this.MAX_CHUNK_SIZE - this.CHUNK_OVERLAP);
-					}
-					currentChunk = remaining;
-				}
-			} else {
-				currentChunk += (currentChunk ? '\n' : '') + line;
-			}
-		}
-
-		if (currentChunk.length > 0) {
-			chunks.push(currentChunk);
-		}
-
-		return chunks;
 	}
 
 	/**

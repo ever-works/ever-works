@@ -41,6 +41,16 @@ export interface PluginSettingsSchemaProperty {
 	widget?: string;
 	/** Whether field should be hidden from the settings UI (from JsonSchema x-hidden) */
 	hidden?: boolean;
+	/** Minimum value for number fields */
+	minimum?: number;
+	/** Maximum value for number fields */
+	maximum?: number;
+	/** Minimum string length */
+	minLength?: number;
+	/** Maximum string length */
+	maxLength?: number;
+	/** Regular expression pattern for string fields */
+	pattern?: string;
 }
 
 /**
@@ -76,7 +86,12 @@ export function toPluginSettingsSchemaProperty(schema: JsonSchema): PluginSettin
 		scope: schema['x-scope'] || 'global',
 		enum: schema.enum,
 		widget: schema['x-widget'],
-		hidden: schema['x-hidden']
+		hidden: schema['x-hidden'],
+		minimum: schema.minimum,
+		maximum: schema.maximum,
+		minLength: schema.minLength,
+		maxLength: schema.maxLength,
+		pattern: schema.pattern
 	};
 }
 

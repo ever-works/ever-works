@@ -58,7 +58,8 @@ export function PluginSettingsField({
             return (
                 <select
                     value={String(value ?? schema.default ?? '')}
-                    onChange={(e) => onChange(e.target.value)}
+                    onChange={(e) => onChange(e.target.value || null)}
+                    required={required}
                     className={cn(
                         'w-full px-3 py-2 rounded-lg border border-border dark:border-border-dark',
                         'bg-surface-secondary dark:bg-surface-secondary-dark',
@@ -82,13 +83,20 @@ export function PluginSettingsField({
                 <input
                     type="number"
                     value={
-                        value !== undefined
-                            ? Number(value)
-                            : schema.default !== undefined
-                              ? Number(schema.default)
-                              : ''
+                        value === null
+                            ? ''
+                            : value !== undefined
+                              ? Number(value)
+                              : schema.default !== undefined
+                                ? Number(schema.default)
+                                : ''
                     }
-                    onChange={(e) => onChange(e.target.value ? Number(e.target.value) : undefined)}
+                    onChange={(e) =>
+                        onChange(e.target.value === '' ? null : Number(e.target.value))
+                    }
+                    min={schema.minimum}
+                    max={schema.maximum}
+                    required={required}
                     className={cn(
                         'w-full px-3 py-2 rounded-lg border border-border dark:border-border-dark',
                         'bg-surface-secondary dark:bg-surface-secondary-dark',
@@ -106,7 +114,7 @@ export function PluginSettingsField({
                 <PluginModelSelect
                     pluginId={pluginId}
                     value={String(value ?? schema.default ?? '')}
-                    onChange={(val) => onChange(val || undefined)}
+                    onChange={(val) => onChange(val || null)}
                 />
             );
         }
@@ -117,7 +125,9 @@ export function PluginSettingsField({
                 <input
                     type={getInputType()}
                     value={String(value ?? schema.default ?? '')}
-                    onChange={(e) => onChange(e.target.value || undefined)}
+                    onChange={(e) => onChange(e.target.value)}
+                    maxLength={schema.maxLength}
+                    required={required}
                     className={cn(
                         'w-full px-3 py-2 rounded-lg border border-border dark:border-border-dark',
                         'bg-surface-secondary dark:bg-surface-secondary-dark',
