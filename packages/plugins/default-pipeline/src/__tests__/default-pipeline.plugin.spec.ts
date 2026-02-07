@@ -369,14 +369,6 @@ describe('DefaultPipelinePlugin', () => {
 			expect(typeof plugin.onLoad).toBe('function');
 		});
 
-		it('should have onEnable method', () => {
-			expect(typeof plugin.onEnable).toBe('function');
-		});
-
-		it('should have onDisable method', () => {
-			expect(typeof plugin.onDisable).toBe('function');
-		});
-
 		it('should have onUnload method', () => {
 			expect(typeof plugin.onUnload).toBe('function');
 		});

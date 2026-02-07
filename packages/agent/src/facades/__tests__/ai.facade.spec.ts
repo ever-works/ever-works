@@ -44,8 +44,6 @@ describe('AiFacadeService', () => {
         providerType: 'openai',
         providerName,
         onLoad: jest.fn(),
-        onEnable: jest.fn(),
-        onDisable: jest.fn(),
         onUnload: jest.fn(),
         validateSettings: jest.fn().mockResolvedValue({ valid: true }),
         isAvailable: jest.fn().mockResolvedValue(true),
@@ -70,7 +68,7 @@ describe('AiFacadeService', () => {
     const createRegisteredPlugin = (
         plugin: IAiProviderPlugin,
         manifest: Partial<PluginManifest>,
-        state: RegisteredPlugin['state'] = 'enabled',
+        state: RegisteredPlugin['state'] = 'loaded',
     ): RegisteredPlugin => ({
         plugin: plugin as any,
         manifest: {
@@ -137,7 +135,7 @@ describe('AiFacadeService', () => {
             const registered = createRegisteredPlugin(
                 aiPlugin,
                 { capabilities: ['ai-provider'] },
-                'loaded',
+                'unloaded',
             );
             registry.getByCapability.mockReturnValue([registered]);
 
@@ -156,7 +154,7 @@ describe('AiFacadeService', () => {
             const anthropicRegistered = createRegisteredPlugin(
                 anthropic,
                 { capabilities: ['ai-provider'] },
-                'loaded',
+                'unloaded',
             );
 
             registry.getByCapability.mockReturnValue([openaiRegistered, anthropicRegistered]);

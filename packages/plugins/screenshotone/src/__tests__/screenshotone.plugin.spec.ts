@@ -351,18 +351,6 @@ describe('ScreenshotOnePlugin', () => {
 			expect(mockContext.logger.log).toHaveBeenCalledWith('ScreenshotOne Plugin loaded');
 		});
 
-		it('should log on enable', async () => {
-			await plugin.onLoad(mockContext);
-			await plugin.onEnable(mockContext);
-			expect(mockContext.logger.log).toHaveBeenCalledWith('ScreenshotOne Plugin enabled');
-		});
-
-		it('should log on disable', async () => {
-			await plugin.onLoad(mockContext);
-			await plugin.onDisable(mockContext);
-			expect(mockContext.logger.log).toHaveBeenCalledWith('ScreenshotOne Plugin disabled');
-		});
-
 		it('should clear context on unload', async () => {
 			await plugin.onLoad(mockContext);
 			await plugin.onUnload();

@@ -291,14 +291,6 @@ export class UrlboxPlugin implements IPlugin, IScreenshotPlugin {
 		context.logger.log('Urlbox Plugin loaded');
 	}
 
-	async onEnable(context: PluginContext): Promise<void> {
-		context.logger.log('Urlbox Plugin enabled');
-	}
-
-	async onDisable(context: PluginContext): Promise<void> {
-		context.logger.log('Urlbox Plugin disabled');
-	}
-
 	async onUnload(): Promise<void> {
 		this.context = undefined;
 	}

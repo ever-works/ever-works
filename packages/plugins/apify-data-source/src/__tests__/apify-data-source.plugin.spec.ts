@@ -195,18 +195,6 @@ describe('ApifyDataSourcePlugin', () => {
 			await plugin.onLoad(mockContext);
 			expect(mockContext.logger.log).toHaveBeenCalledWith('Apify Data Source Plugin loaded');
 		});
-
-		it('should log on enable', async () => {
-			await plugin.onLoad(mockContext);
-			await plugin.onEnable(mockContext);
-			expect(mockContext.logger.log).toHaveBeenCalledWith('Apify Data Source Plugin enabled');
-		});
-
-		it('should log on disable', async () => {
-			await plugin.onLoad(mockContext);
-			await plugin.onDisable(mockContext);
-			expect(mockContext.logger.log).toHaveBeenCalledWith('Apify Data Source Plugin disabled');
-		});
 	});
 
 	describe('getManifest', () => {

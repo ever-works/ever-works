@@ -144,7 +144,7 @@ export class ScreenshotFacadeService extends BaseFacadeService implements IScree
         return plugins.map((p) => ({
             id: p.plugin.id,
             name: (p.plugin as IScreenshotPlugin).providerName,
-            enabled: p.state === 'enabled',
+            enabled: p.state === 'loaded',
         }));
     }
 
@@ -163,7 +163,7 @@ export class ScreenshotFacadeService extends BaseFacadeService implements IScree
             if (
                 registered &&
                 registered.manifest.capabilities.includes(this.CAPABILITY) &&
-                registered.state === 'enabled'
+                registered.state === 'loaded'
             ) {
                 const isEnabled = await this.isPluginEnabled(providerOverride, directoryId, userId);
                 if (isEnabled) return registered.plugin as IScreenshotPlugin;

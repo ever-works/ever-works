@@ -42,11 +42,6 @@ describe('PluginBootstrapService', () => {
                     useValue: {
                         setContextFactory: jest.fn(),
                         callOnLoad: jest.fn().mockResolvedValue({ success: true }),
-                        enableAll: jest.fn().mockResolvedValue([
-                            { success: true, pluginId: 'system-plugin' },
-                            { success: true, pluginId: 'auto-plugin' },
-                            { success: true, pluginId: 'manual-plugin' },
-                        ]),
                         shutdownAll: jest.fn().mockResolvedValue(undefined),
                     },
                 },
@@ -67,29 +62,21 @@ describe('PluginBootstrapService', () => {
     });
 
     describe('bootstrap', () => {
-        it('should call enableAll after loading plugins', async () => {
+        it('should call callOnLoad for each loaded plugin', async () => {
             await service.bootstrap();
 
-            expect(lifecycleManager.enableAll).toHaveBeenCalledTimes(1);
+            expect(lifecycleManager.callOnLoad).toHaveBeenCalledTimes(3);
+            expect(lifecycleManager.callOnLoad).toHaveBeenCalledWith('system-plugin');
+            expect(lifecycleManager.callOnLoad).toHaveBeenCalledWith('auto-plugin');
+            expect(lifecycleManager.callOnLoad).toHaveBeenCalledWith('manual-plugin');
         });
 
-        it('should include enabled count in systemEnabled result', async () => {
+        it('should return loaded count in result', async () => {
             const result = await service.bootstrap();
 
             expect(result.executed).toBe(true);
-            expect(result.systemEnabled).toBe(3);
-        });
-
-        it('should handle partial enable failures', async () => {
-            (lifecycleManager.enableAll as jest.Mock).mockResolvedValue([
-                { success: true, pluginId: 'system-plugin' },
-                { success: false, pluginId: 'broken-plugin', error: 'some error' },
-            ]);
-
-            const result = await service.bootstrap();
-
-            expect(result.executed).toBe(true);
-            expect(result.systemEnabled).toBe(1);
+            expect(result.loaded).toBe(3);
+            expect(result.failed).toBe(0);
         });
 
         it('should skip if already initialized', async () => {
@@ -97,7 +84,13 @@ describe('PluginBootstrapService', () => {
             const result = await service.bootstrap();
 
             expect(result.executed).toBe(false);
-            expect(lifecycleManager.enableAll).toHaveBeenCalledTimes(1);
+            expect(lifecycleManager.callOnLoad).toHaveBeenCalledTimes(3);
+        });
+
+        it('should set context factory on lifecycle manager', async () => {
+            await service.bootstrap();
+
+            expect(lifecycleManager.setContextFactory).toHaveBeenCalledTimes(1);
         });
     });
 });

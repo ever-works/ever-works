@@ -115,14 +115,6 @@ export class GroqPlugin extends BaseAiProvider {
 		context.logger.log('Groq Plugin loaded');
 	}
 
-	async onEnable(context: PluginContext): Promise<void> {
-		context.logger.log('Groq Plugin enabled');
-	}
-
-	async onDisable(context: PluginContext): Promise<void> {
-		context.logger.log('Groq Plugin disabled');
-	}
-
 	async onUnload(): Promise<void> {
 		this.aiOps = null;
 		await super.onUnload();

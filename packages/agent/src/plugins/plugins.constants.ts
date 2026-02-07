@@ -32,10 +32,6 @@ export const PluginStates = {
     UNLOADED: 'unloaded',
     LOADING: 'loading',
     LOADED: 'loaded',
-    ENABLING: 'enabling',
-    ENABLED: 'enabled',
-    DISABLING: 'disabling',
-    DISABLED: 'disabled',
     UNLOADING: 'unloading',
     ERROR: 'error',
 } as const;
@@ -46,11 +42,7 @@ export const PluginStates = {
 export const VALID_STATE_TRANSITIONS: Record<string, readonly string[]> = {
     unloaded: ['loading'],
     loading: ['loaded', 'error'],
-    loaded: ['enabling', 'unloading'],
-    enabling: ['enabled', 'error'],
-    enabled: ['disabling'],
-    disabling: ['disabled', 'error'],
-    disabled: ['enabling', 'unloading'],
+    loaded: ['unloading'],
     unloading: ['unloaded', 'error'],
     error: ['loading', 'unloading'],
 } as const;
@@ -60,8 +52,6 @@ export const VALID_STATE_TRANSITIONS: Record<string, readonly string[]> = {
  */
 export const PluginEvents = {
     LOADED: 'plugin:loaded',
-    ENABLED: 'plugin:enabled',
-    DISABLED: 'plugin:disabled',
     UNLOADED: 'plugin:unloaded',
     ERROR: 'plugin:error',
     SETTINGS_CHANGED: 'plugin:settings-changed',

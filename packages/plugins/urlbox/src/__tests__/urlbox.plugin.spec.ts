@@ -360,18 +360,6 @@ describe('UrlboxPlugin', () => {
 			expect(mockContext.logger.log).toHaveBeenCalledWith('Urlbox Plugin loaded');
 		});
 
-		it('should log on enable', async () => {
-			await plugin.onLoad(mockContext);
-			await plugin.onEnable(mockContext);
-			expect(mockContext.logger.log).toHaveBeenCalledWith('Urlbox Plugin enabled');
-		});
-
-		it('should log on disable', async () => {
-			await plugin.onLoad(mockContext);
-			await plugin.onDisable(mockContext);
-			expect(mockContext.logger.log).toHaveBeenCalledWith('Urlbox Plugin disabled');
-		});
-
 		it('should clear context on unload', async () => {
 			await plugin.onLoad(mockContext);
 			await plugin.onUnload();

@@ -237,7 +237,7 @@ export class PipelineBuilderService {
 
         for (const registered of pluginsWithCapability) {
             // Only include enabled plugins at registry level
-            if (registered.state !== 'enabled') {
+            if (registered.state !== 'loaded') {
                 continue;
             }
 

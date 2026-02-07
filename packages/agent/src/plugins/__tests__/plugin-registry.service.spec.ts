@@ -22,8 +22,6 @@ describe('PluginRegistryService', () => {
             settingsSchema: { type: 'object', properties: {} },
             configurationMode: 'hybrid',
             onLoad: jest.fn(),
-            onEnable: jest.fn(),
-            onDisable: jest.fn(),
             onUnload: jest.fn(),
             validateSettings: jest.fn().mockResolvedValue({ valid: true }),
         }) as unknown as IPlugin;
@@ -238,12 +236,12 @@ describe('PluginRegistryService', () => {
     });
 
     describe('getEnabled', () => {
-        it('should get only enabled plugins', () => {
+        it('should get only loaded (ready) plugins', () => {
             const plugin1 = createMockPlugin('plugin-1');
             const plugin2 = createMockPlugin('plugin-2');
 
-            service.register(plugin1, createMockManifest('plugin-1'), { state: 'enabled' });
-            service.register(plugin2, createMockManifest('plugin-2'), { state: 'loaded' });
+            service.register(plugin1, createMockManifest('plugin-1'), { state: 'loaded' });
+            service.register(plugin2, createMockManifest('plugin-2')); // default 'unloaded' state
 
             const enabledPlugins = service.getEnabled();
 
@@ -269,10 +267,9 @@ describe('PluginRegistryService', () => {
 
             service.updateState('test-plugin', 'loading');
             service.updateState('test-plugin', 'loaded');
-            service.updateState('test-plugin', 'enabled');
 
             const registered = service.get('test-plugin');
-            expect(registered?.stateHistory).toHaveLength(4); // initial + 3 updates
+            expect(registered?.stateHistory).toHaveLength(3); // initial + 2 updates
         });
 
         it('should emit state change event', () => {
@@ -298,15 +295,6 @@ describe('PluginRegistryService', () => {
             service.updateState('test-plugin', 'loaded');
 
             expect(service.get('test-plugin')?.loadedAt).toBeDefined();
-        });
-
-        it('should record enabledAt timestamp when state is enabled', () => {
-            const plugin = createMockPlugin('test-plugin');
-            service.register(plugin, createMockManifest('test-plugin'));
-
-            service.updateState('test-plugin', 'enabled');
-
-            expect(service.get('test-plugin')?.enabledAt).toBeDefined();
         });
 
         it('should store error when provided', () => {
@@ -372,7 +360,7 @@ describe('PluginRegistryService', () => {
                 capabilities: ['search'],
                 defaultForCapabilities: ['search'],
             };
-            service.register(plugin, manifest, { state: 'enabled' });
+            service.register(plugin, manifest, { state: 'loaded' });
 
             const result = service.getDefaultForCapability('search');
 
@@ -385,7 +373,7 @@ describe('PluginRegistryService', () => {
                 ...createMockManifest('search-plugin'),
                 capabilities: ['search'],
             };
-            service.register(plugin, manifest, { state: 'enabled' });
+            service.register(plugin, manifest, { state: 'loaded' });
 
             const result = service.getDefaultForCapability('search');
 
@@ -413,7 +401,7 @@ describe('PluginRegistryService', () => {
                 capabilities: ['search', 'content-extractor'],
                 defaultForCapabilities: ['search'],
             };
-            service.register(plugin, manifest, { state: 'enabled' });
+            service.register(plugin, manifest, { state: 'loaded' });
 
             expect(service.getDefaultForCapability('search')?.plugin.id).toBe('multi-plugin');
             expect(service.getDefaultForCapability('content-extractor')).toBeUndefined();
@@ -427,7 +415,7 @@ describe('PluginRegistryService', () => {
                 ...createMockManifest('search-plugin'),
                 capabilities: ['search'],
             };
-            service.register(plugin, manifest, { state: 'enabled' });
+            service.register(plugin, manifest, { state: 'loaded' });
 
             directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue({
                 id: '1',
@@ -457,8 +445,8 @@ describe('PluginRegistryService', () => {
                 ...createMockManifest('plugin-2'),
                 capabilities: ['search'],
             };
-            service.register(plugin1, manifest1, { state: 'enabled' });
-            service.register(plugin2, manifest2, { state: 'enabled' });
+            service.register(plugin1, manifest1, { state: 'loaded' });
+            service.register(plugin2, manifest2, { state: 'loaded' });
 
             // plugin-1 is disabled at directory level
             directoryPluginRepository.findByDirectoryAndPlugin.mockImplementation(
@@ -482,7 +470,7 @@ describe('PluginRegistryService', () => {
                 capabilities: ['search'],
                 autoEnable: true,
             };
-            service.register(plugin, manifest, { state: 'enabled' });
+            service.register(plugin, manifest, { state: 'loaded' });
 
             // No directory-level config
             directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue(null);
@@ -505,7 +493,7 @@ describe('PluginRegistryService', () => {
                 capabilities: ['search'],
                 autoEnable: true,
             };
-            service.register(plugin, manifest, { state: 'enabled' });
+            service.register(plugin, manifest, { state: 'loaded' });
 
             directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue(null);
             userPluginRepository.findByUserAndPlugin.mockResolvedValue(null);
@@ -522,7 +510,7 @@ describe('PluginRegistryService', () => {
                 capabilities: ['search'],
                 autoEnable: false,
             };
-            service.register(plugin, manifest, { state: 'enabled' });
+            service.register(plugin, manifest, { state: 'loaded' });
 
             directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue(null);
             userPluginRepository.findByUserAndPlugin.mockResolvedValue(null);
@@ -544,8 +532,8 @@ describe('PluginRegistryService', () => {
                 capabilities: ['search'],
                 defaultForCapabilities: ['search'],
             };
-            service.register(plugin1, manifest1, { state: 'enabled' });
-            service.register(plugin2, manifest2, { state: 'enabled' });
+            service.register(plugin1, manifest1, { state: 'loaded' });
+            service.register(plugin2, manifest2, { state: 'loaded' });
 
             // No directory-level config (returns null)
             directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue(null);
@@ -565,7 +553,7 @@ describe('PluginRegistryService', () => {
                 systemPlugin: true,
                 autoEnable: false,
             };
-            service.register(plugin, manifest, { state: 'enabled' });
+            service.register(plugin, manifest, { state: 'loaded' });
 
             // Even with user disabled, system plugins are always enabled
             userPluginRepository.findByUserAndPlugin.mockResolvedValue({
@@ -588,7 +576,7 @@ describe('PluginRegistryService', () => {
                 ...createMockManifest('test-plugin'),
                 autoEnable: true,
             };
-            service.register(plugin, manifest, { state: 'enabled' });
+            service.register(plugin, manifest, { state: 'loaded' });
 
             // User disabled, but directory enabled
             userPluginRepository.findByUserAndPlugin.mockResolvedValue({
@@ -613,7 +601,7 @@ describe('PluginRegistryService', () => {
                 ...createMockManifest('test-plugin'),
                 autoEnable: false,
             };
-            service.register(plugin, manifest, { state: 'enabled' });
+            service.register(plugin, manifest, { state: 'loaded' });
 
             // User enabled, directory disabled
             userPluginRepository.findByUserAndPlugin.mockResolvedValue({
@@ -638,7 +626,7 @@ describe('PluginRegistryService', () => {
                 ...createMockManifest('test-plugin'),
                 autoEnable: false,
             };
-            service.register(plugin, manifest, { state: 'enabled' });
+            service.register(plugin, manifest, { state: 'loaded' });
 
             // No user record (null), directory enabled
             userPluginRepository.findByUserAndPlugin.mockResolvedValue(null);
@@ -658,7 +646,7 @@ describe('PluginRegistryService', () => {
                 ...createMockManifest('test-plugin'),
                 autoEnable: false,
             };
-            service.register(plugin, manifest, { state: 'enabled' });
+            service.register(plugin, manifest, { state: 'loaded' });
 
             directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue(null);
             userPluginRepository.findByUserAndPlugin.mockResolvedValue({
@@ -677,7 +665,7 @@ describe('PluginRegistryService', () => {
                 ...createMockManifest('test-plugin'),
                 autoEnable: true,
             };
-            service.register(plugin, manifest, { state: 'enabled' });
+            service.register(plugin, manifest, { state: 'loaded' });
 
             directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue(null);
             userPluginRepository.findByUserAndPlugin.mockResolvedValue(null);
@@ -692,7 +680,7 @@ describe('PluginRegistryService', () => {
                 ...createMockManifest('test-plugin'),
                 autoEnable: false,
             };
-            service.register(plugin, manifest, { state: 'enabled' });
+            service.register(plugin, manifest, { state: 'loaded' });
 
             directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue(null);
             userPluginRepository.findByUserAndPlugin.mockResolvedValue(null);
@@ -707,7 +695,7 @@ describe('PluginRegistryService', () => {
                 ...createMockManifest('test-plugin'),
                 autoEnable: false,
             };
-            service.register(plugin, manifest, { state: 'enabled' });
+            service.register(plugin, manifest, { state: 'loaded' });
 
             userPluginRepository.findByUserAndPlugin.mockResolvedValue({
                 enabled: true,
@@ -727,7 +715,7 @@ describe('PluginRegistryService', () => {
                 ...createMockManifest('test-plugin'),
                 autoEnable: false,
             };
-            service.register(plugin, manifest, { state: 'enabled' });
+            service.register(plugin, manifest, { state: 'loaded' });
 
             userPluginRepository.findByUserAndPlugin.mockResolvedValue({
                 enabled: true,
@@ -751,7 +739,7 @@ describe('PluginRegistryService', () => {
                 ...createMockManifest('test-plugin'),
                 autoEnable: false,
             };
-            service.register(plugin, manifest, { state: 'enabled' });
+            service.register(plugin, manifest, { state: 'loaded' });
 
             userPluginRepository.findByUserAndPlugin.mockResolvedValue({
                 enabled: true,
@@ -774,7 +762,7 @@ describe('PluginRegistryService', () => {
                 ...createMockManifest('test-plugin'),
                 autoEnable: false,
             };
-            service.register(plugin, manifest, { state: 'enabled' });
+            service.register(plugin, manifest, { state: 'loaded' });
 
             userPluginRepository.findByUserAndPlugin.mockResolvedValue({
                 enabled: true,
@@ -793,8 +781,8 @@ describe('PluginRegistryService', () => {
         it('should return all enabled plugins when no scope provided', async () => {
             const plugin1 = createMockPlugin('plugin-1');
             const plugin2 = createMockPlugin('plugin-2');
-            service.register(plugin1, createMockManifest('plugin-1'), { state: 'enabled' });
-            service.register(plugin2, createMockManifest('plugin-2'), { state: 'enabled' });
+            service.register(plugin1, createMockManifest('plugin-1'), { state: 'loaded' });
+            service.register(plugin2, createMockManifest('plugin-2'), { state: 'loaded' });
 
             // With no scope IDs, falls back to autoEnable (defaults to true)
             directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue(null);
@@ -810,8 +798,8 @@ describe('PluginRegistryService', () => {
             const plugin2 = createMockPlugin('plugin-2');
             const manifest1 = { ...createMockManifest('plugin-1'), capabilities: ['cap-a'] };
             const manifest2 = { ...createMockManifest('plugin-2'), capabilities: ['cap-b'] };
-            service.register(plugin1, manifest1 as PluginManifest, { state: 'enabled' });
-            service.register(plugin2, manifest2 as PluginManifest, { state: 'enabled' });
+            service.register(plugin1, manifest1 as PluginManifest, { state: 'loaded' });
+            service.register(plugin2, manifest2 as PluginManifest, { state: 'loaded' });
 
             directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue(null);
             userPluginRepository.findByUserAndPlugin.mockResolvedValue(null);
@@ -825,8 +813,8 @@ describe('PluginRegistryService', () => {
         it('should exclude plugins disabled at directory level', async () => {
             const plugin1 = createMockPlugin('plugin-1');
             const plugin2 = createMockPlugin('plugin-2');
-            service.register(plugin1, createMockManifest('plugin-1'), { state: 'enabled' });
-            service.register(plugin2, createMockManifest('plugin-2'), { state: 'enabled' });
+            service.register(plugin1, createMockManifest('plugin-1'), { state: 'loaded' });
+            service.register(plugin2, createMockManifest('plugin-2'), { state: 'loaded' });
 
             directoryPluginRepository.findByDirectoryAndPlugin.mockImplementation(
                 async (dirId, pluginId) => {
@@ -845,7 +833,7 @@ describe('PluginRegistryService', () => {
 
         it('should include plugins enabled at user level when directory is null', async () => {
             const plugin = createMockPlugin('plugin-1');
-            service.register(plugin, createMockManifest('plugin-1'), { state: 'enabled' });
+            service.register(plugin, createMockManifest('plugin-1'), { state: 'loaded' });
 
             directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue(null);
             userPluginRepository.findByUserAndPlugin.mockResolvedValue({
@@ -861,7 +849,7 @@ describe('PluginRegistryService', () => {
 
         it('should exclude plugins disabled at user level when no directory config', async () => {
             const plugin = createMockPlugin('plugin-1');
-            service.register(plugin, createMockManifest('plugin-1'), { state: 'enabled' });
+            service.register(plugin, createMockManifest('plugin-1'), { state: 'loaded' });
 
             directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue(null);
             userPluginRepository.findByUserAndPlugin.mockResolvedValue({
@@ -875,9 +863,9 @@ describe('PluginRegistryService', () => {
             expect(result).toHaveLength(0);
         });
 
-        it('should not include plugins that are not enabled at registry level', async () => {
+        it('should not include plugins that are not loaded at registry level', async () => {
             const plugin = createMockPlugin('plugin-1');
-            service.register(plugin, createMockManifest('plugin-1'), { state: 'loaded' }); // Not 'enabled'
+            service.register(plugin, createMockManifest('plugin-1')); // default 'unloaded' state
 
             directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue(null);
             userPluginRepository.findByUserAndPlugin.mockResolvedValue(null);

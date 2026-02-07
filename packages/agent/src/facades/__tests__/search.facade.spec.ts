@@ -26,8 +26,6 @@ describe('SearchFacadeService', () => {
         configurationMode: 'hybrid',
         providerName,
         onLoad: jest.fn(),
-        onEnable: jest.fn(),
-        onDisable: jest.fn(),
         onUnload: jest.fn(),
         validateSettings: jest.fn().mockResolvedValue({ valid: true }),
         search: jest.fn().mockResolvedValue({ results: [], query: '', totalResults: 0 }),
@@ -38,7 +36,7 @@ describe('SearchFacadeService', () => {
     const createRegisteredPlugin = (
         plugin: ISearchPlugin,
         manifest: Partial<PluginManifest>,
-        state: RegisteredPlugin['state'] = 'enabled',
+        state: RegisteredPlugin['state'] = 'loaded',
     ): RegisteredPlugin => ({
         plugin: plugin as any,
         manifest: {
@@ -105,7 +103,7 @@ describe('SearchFacadeService', () => {
             const registered = createRegisteredPlugin(
                 searchPlugin,
                 { capabilities: ['search'] },
-                'loaded',
+                'unloaded',
             );
             registry.getByCapability.mockReturnValue([registered]);
 
@@ -124,7 +122,7 @@ describe('SearchFacadeService', () => {
             const exaRegistered = createRegisteredPlugin(
                 exa,
                 { capabilities: ['search'] },
-                'loaded',
+                'unloaded',
             );
 
             registry.getByCapability.mockReturnValue([tavilyRegistered, exaRegistered]);

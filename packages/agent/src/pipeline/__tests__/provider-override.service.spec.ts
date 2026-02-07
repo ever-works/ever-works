@@ -55,8 +55,6 @@ describe('ProviderOverrideService', () => {
             capabilities: ['sub-provider'],
             settingsSchema: { type: 'object', properties: {} },
             onLoad: jest.fn(),
-            onEnable: jest.fn(),
-            onDisable: jest.fn(),
             onUnload: jest.fn(),
             validateSettings: jest.fn().mockResolvedValue({ valid: true }),
             subProviderId,
@@ -130,7 +128,7 @@ describe('ProviderOverrideService', () => {
         it('should return provider that can handle operation', async () => {
             const provider = createMockSubProvider('openai', { canHandle: true });
             registry.register(provider as unknown as IPlugin, createMockManifest('openai'), {
-                state: 'enabled',
+                state: 'loaded',
             });
 
             const context: ProviderOverrideContext = {
@@ -152,7 +150,7 @@ describe('ProviderOverrideService', () => {
         it('should return null when no provider can handle operation', async () => {
             const provider = createMockSubProvider('openai', { canHandle: false });
             registry.register(provider as unknown as IPlugin, createMockManifest('openai'), {
-                state: 'enabled',
+                state: 'loaded',
             });
 
             const context: ProviderOverrideContext = {
@@ -171,13 +169,13 @@ describe('ProviderOverrideService', () => {
             const provider3 = createMockSubProvider('google', { priority: 15, canHandle: true });
 
             registry.register(provider1 as unknown as IPlugin, createMockManifest('openai'), {
-                state: 'enabled',
+                state: 'loaded',
             });
             registry.register(provider2 as unknown as IPlugin, createMockManifest('anthropic'), {
-                state: 'enabled',
+                state: 'loaded',
             });
             registry.register(provider3 as unknown as IPlugin, createMockManifest('google'), {
-                state: 'enabled',
+                state: 'loaded',
             });
 
             const context: ProviderOverrideContext = {
@@ -193,7 +191,7 @@ describe('ProviderOverrideService', () => {
         it('should pass context data to canHandle', async () => {
             const provider = createMockSubProvider('openai', { canHandle: true });
             registry.register(provider as unknown as IPlugin, createMockManifest('openai'), {
-                state: 'enabled',
+                state: 'loaded',
             });
 
             const context: ProviderOverrideContext = {
@@ -224,12 +222,12 @@ describe('ProviderOverrideService', () => {
             registry.register(
                 errorProvider as unknown as IPlugin,
                 createMockManifest('error-provider'),
-                { state: 'enabled' },
+                { state: 'loaded' },
             );
             registry.register(
                 workingProvider as unknown as IPlugin,
                 createMockManifest('working-provider'),
-                { state: 'enabled' },
+                { state: 'loaded' },
             );
 
             const context: ProviderOverrideContext = {
@@ -251,12 +249,12 @@ describe('ProviderOverrideService', () => {
             registry.register(
                 enabledProvider as unknown as IPlugin,
                 createMockManifest('enabled'),
-                { state: 'enabled' },
+                { state: 'loaded' },
             );
             registry.register(
                 disabledProvider as unknown as IPlugin,
                 createMockManifest('disabled'),
-                { state: 'loaded' }, // Not enabled
+                { state: 'unloaded' }, // Not loaded
             );
 
             const context: ProviderOverrideContext = {
@@ -281,10 +279,10 @@ describe('ProviderOverrideService', () => {
             });
 
             registry.register(aiProvider as unknown as IPlugin, createMockManifest('openai'), {
-                state: 'enabled',
+                state: 'loaded',
             });
             registry.register(searchProvider as unknown as IPlugin, createMockManifest('tavily'), {
-                state: 'enabled',
+                state: 'loaded',
             });
 
             const context: ProviderOverrideContext = {
@@ -302,7 +300,7 @@ describe('ProviderOverrideService', () => {
             });
 
             registry.register(aiProvider as unknown as IPlugin, createMockManifest('openai'), {
-                state: 'enabled',
+                state: 'loaded',
             });
 
             const context: ProviderOverrideContext = {
@@ -328,10 +326,10 @@ describe('ProviderOverrideService', () => {
             });
 
             registry.register(provider1 as unknown as IPlugin, createMockManifest('openai'), {
-                state: 'enabled',
+                state: 'loaded',
             });
             registry.register(provider2 as unknown as IPlugin, createMockManifest('anthropic'), {
-                state: 'enabled',
+                state: 'loaded',
             });
 
             const context: ProviderOverrideContext = {
@@ -351,7 +349,7 @@ describe('ProviderOverrideService', () => {
             });
 
             registry.register(provider as unknown as IPlugin, createMockManifest('openai'), {
-                state: 'enabled',
+                state: 'loaded',
             });
 
             const context: ProviderOverrideContext = {
@@ -381,12 +379,12 @@ describe('ProviderOverrideService', () => {
             registry.register(
                 defaultProvider as unknown as IPlugin,
                 createMockManifest('anthropic'),
-                { state: 'enabled' },
+                { state: 'loaded' },
             );
             registry.register(
                 nonDefaultProvider as unknown as IPlugin,
                 createMockManifest('openai'),
-                { state: 'enabled' },
+                { state: 'loaded' },
             );
 
             const result = service.getDefaultProvider('ai-provider');
@@ -407,10 +405,10 @@ describe('ProviderOverrideService', () => {
             });
 
             registry.register(provider1 as unknown as IPlugin, createMockManifest('openai'), {
-                state: 'enabled',
+                state: 'loaded',
             });
             registry.register(provider2 as unknown as IPlugin, createMockManifest('anthropic'), {
-                state: 'enabled',
+                state: 'loaded',
             });
 
             const result = service.getDefaultProvider('ai-provider');
@@ -444,12 +442,12 @@ describe('ProviderOverrideService', () => {
             registry.register(
                 providerWithoutPriority as unknown as IPlugin,
                 createMockManifest('openai'),
-                { state: 'enabled' },
+                { state: 'loaded' },
             );
             registry.register(
                 providerWithPriority as unknown as IPlugin,
                 createMockManifest('anthropic'),
-                { state: 'enabled' },
+                { state: 'loaded' },
             );
 
             const result = service.getDefaultProvider('ai-provider');
@@ -477,13 +475,13 @@ describe('ProviderOverrideService', () => {
             });
 
             registry.register(aiProvider1 as unknown as IPlugin, createMockManifest('openai'), {
-                state: 'enabled',
+                state: 'loaded',
             });
             registry.register(aiProvider2 as unknown as IPlugin, createMockManifest('anthropic'), {
-                state: 'enabled',
+                state: 'loaded',
             });
             registry.register(searchProvider as unknown as IPlugin, createMockManifest('tavily'), {
-                state: 'enabled',
+                state: 'loaded',
             });
 
             const result = service.getAvailableProviders();
@@ -508,13 +506,13 @@ describe('ProviderOverrideService', () => {
             });
 
             registry.register(provider1 as unknown as IPlugin, createMockManifest('openai'), {
-                state: 'enabled',
+                state: 'loaded',
             });
             registry.register(provider2 as unknown as IPlugin, createMockManifest('anthropic'), {
-                state: 'enabled',
+                state: 'loaded',
             });
             registry.register(provider3 as unknown as IPlugin, createMockManifest('google'), {
-                state: 'enabled',
+                state: 'loaded',
             });
 
             const result = service.getAvailableProviders();
@@ -534,12 +532,12 @@ describe('ProviderOverrideService', () => {
             });
 
             registry.register(enabledProvider as unknown as IPlugin, createMockManifest('openai'), {
-                state: 'enabled',
+                state: 'loaded',
             });
             registry.register(
                 disabledProvider as unknown as IPlugin,
                 createMockManifest('anthropic'),
-                { state: 'loaded' },
+                { state: 'unloaded' },
             );
 
             const result = service.getAvailableProviders();
@@ -557,7 +555,7 @@ describe('ProviderOverrideService', () => {
             });
 
             registry.register(provider as unknown as IPlugin, createMockManifest('openai'), {
-                state: 'enabled',
+                state: 'loaded',
             });
 
             const result = await service.isProviderAvailable('openai-gpt4');
@@ -573,7 +571,7 @@ describe('ProviderOverrideService', () => {
             });
 
             registry.register(provider as unknown as IPlugin, createMockManifest('openai'), {
-                state: 'enabled',
+                state: 'loaded',
             });
 
             const result = await service.isProviderAvailable('openai-gpt4');
@@ -594,7 +592,7 @@ describe('ProviderOverrideService', () => {
             });
 
             registry.register(provider as unknown as IPlugin, createMockManifest('openai'), {
-                state: 'loaded', // Not enabled
+                state: 'unloaded', // Not loaded
             });
 
             const result = await service.isProviderAvailable('openai-gpt4');

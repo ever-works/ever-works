@@ -23,8 +23,6 @@ describe('PluginRegistryService - Default Resolution', () => {
             settingsSchema: { type: 'object', properties: {} },
             configurationMode: 'hybrid',
             onLoad: jest.fn(),
-            onEnable: jest.fn(),
-            onDisable: jest.fn(),
             onUnload: jest.fn(),
             validateSettings: jest.fn().mockResolvedValue({ valid: true }),
         }) as unknown as IPlugin;
@@ -43,7 +41,7 @@ describe('PluginRegistryService - Default Resolution', () => {
         const plugin = createMockPlugin(options);
         const manifest = createMockManifest(options);
         service.register(plugin, manifest);
-        service.updateState(options.id, 'enabled');
+        service.updateState(options.id, 'loaded');
     };
 
     beforeEach(async () => {

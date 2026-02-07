@@ -128,8 +128,6 @@ describe('FullPipelineExecutorService', () => {
             capabilities: ['full-pipeline'],
             settingsSchema: { type: 'object', properties: {} },
             onLoad: jest.fn(),
-            onEnable: jest.fn(),
-            onDisable: jest.fn(),
             onUnload: jest.fn(),
             validateSettings: jest.fn().mockResolvedValue({ valid: true }),
             getStepDefinitions: jest.fn().mockReturnValue(stepDefinitions),

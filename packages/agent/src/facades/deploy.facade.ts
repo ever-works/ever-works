@@ -94,7 +94,7 @@ export class DeployFacadeService implements IDeployFacade {
             }
 
             const registered = this.registry.get(directory.deployProvider);
-            if (!registered || registered.state !== 'enabled') {
+            if (!registered || registered.state !== 'loaded') {
                 return false;
             }
 
@@ -118,7 +118,7 @@ export class DeployFacadeService implements IDeployFacade {
         return plugins.map((p) => ({
             id: p.plugin.id,
             name: (p.plugin as IDeploymentPlugin).providerName || p.plugin.name,
-            enabled: p.state === 'enabled',
+            enabled: p.state === 'loaded',
             icon: p.manifest.icon,
             description: p.manifest.description,
             homepage: p.manifest.homepage,
@@ -324,7 +324,7 @@ export class DeployFacadeService implements IDeployFacade {
             throw new DeployProviderNotFoundError(providerId);
         }
 
-        if (registered.state !== 'enabled') {
+        if (registered.state !== 'loaded') {
             throw new DeployProviderNotFoundError(providerId);
         }
 

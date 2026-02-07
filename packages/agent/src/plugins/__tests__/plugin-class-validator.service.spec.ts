@@ -21,8 +21,6 @@ describe('PluginClassValidatorService', () => {
             settingsSchema: { type: 'object', properties: {} },
             configurationMode: 'hybrid',
             onLoad: jest.fn().mockResolvedValue(undefined),
-            onEnable: jest.fn().mockResolvedValue(undefined),
-            onDisable: jest.fn().mockResolvedValue(undefined),
             onUnload: jest.fn().mockResolvedValue(undefined),
             validateSettings: jest.fn().mockResolvedValue({ valid: true }),
             ...overrides,
@@ -133,26 +131,6 @@ describe('PluginClassValidatorService', () => {
             expect(result.errors?.some((e) => e.path === 'onLoad')).toBe(true);
         });
 
-        it('should reject plugin without onEnable method', () => {
-            const plugin = createValidPlugin();
-            delete (plugin as any).onEnable;
-
-            const result = service.validatePlugin(plugin);
-
-            expect(result.valid).toBe(false);
-            expect(result.errors?.some((e) => e.path === 'onEnable')).toBe(true);
-        });
-
-        it('should reject plugin without onDisable method', () => {
-            const plugin = createValidPlugin();
-            delete (plugin as any).onDisable;
-
-            const result = service.validatePlugin(plugin);
-
-            expect(result.valid).toBe(false);
-            expect(result.errors?.some((e) => e.path === 'onDisable')).toBe(true);
-        });
-
         it('should reject plugin without onUnload method', () => {
             const plugin = createValidPlugin();
             delete (plugin as any).onUnload;
@@ -203,8 +181,6 @@ describe('PluginClassValidatorService', () => {
                 category = 'utility';
                 capabilities = ['test'];
                 onLoad() {}
-                onEnable() {}
-                onDisable() {}
                 onUnload() {}
                 validateSettings() {
                     return { valid: true };
@@ -683,8 +659,6 @@ describe('PluginClassValidatorService', () => {
         it('should return true for valid plugin class', () => {
             class TestPlugin {
                 onLoad() {}
-                onEnable() {}
-                onDisable() {}
                 onUnload() {}
             }
 
@@ -718,8 +692,6 @@ describe('PluginClassValidatorService', () => {
         it('should return true for class with all lifecycle methods', () => {
             class FullPlugin {
                 onLoad() {}
-                onEnable() {}
-                onDisable() {}
                 onUnload() {}
             }
 

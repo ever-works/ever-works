@@ -113,18 +113,6 @@ describe('AnthropicPlugin', () => {
 			expect(mockContext.logger.log).toHaveBeenCalledWith('Anthropic Plugin loaded');
 		});
 
-		it('should enable successfully', async () => {
-			const mockContext = createMockContext();
-			await plugin.onEnable(mockContext);
-			expect(mockContext.logger.log).toHaveBeenCalledWith('Anthropic Plugin enabled');
-		});
-
-		it('should disable successfully', async () => {
-			const mockContext = createMockContext();
-			await plugin.onDisable(mockContext);
-			expect(mockContext.logger.log).toHaveBeenCalledWith('Anthropic Plugin disabled');
-		});
-
 		it('should unload successfully', async () => {
 			const mockContext = createMockContext();
 			await plugin.onLoad(mockContext);

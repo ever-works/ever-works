@@ -20,7 +20,6 @@ export interface RegisteredPlugin {
     installPath?: string;
     registeredAt: number;
     loadedAt?: number;
-    enabledAt?: number;
     stateHistory: PluginStateTransition[];
     error?: Error | string;
 }
@@ -175,16 +174,22 @@ export class PluginRegistryService {
             .filter((p): p is RegisteredPlugin => p !== undefined);
     }
 
-    /** Returns first enabled plugin with this capability in defaultForCapabilities */
+    /** Returns first ready plugin with this capability in defaultForCapabilities */
     getDefaultForCapability(capability: string): RegisteredPlugin | undefined {
         const plugins = this.getByCapability(capability);
-        const enabledPlugins = plugins.filter((p) => p.state === 'enabled');
+        const readyPlugins = plugins.filter((p) => p.state === 'loaded');
 
-        return enabledPlugins.find((p) => p.manifest.defaultForCapabilities?.includes(capability));
+        return readyPlugins.find((p) => p.manifest.defaultForCapabilities?.includes(capability));
     }
 
+    /** Get all plugins in the 'loaded' (ready) state */
+    getReady(): RegisteredPlugin[] {
+        return Array.from(this.plugins.values()).filter((p) => p.state === 'loaded');
+    }
+
+    /** Alias for getReady() */
     getEnabled(): RegisteredPlugin[] {
-        return Array.from(this.plugins.values()).filter((p) => p.state === 'enabled');
+        return this.getReady();
     }
 
     getByState(state: PluginState): RegisteredPlugin[] {
@@ -212,8 +217,6 @@ export class PluginRegistryService {
 
         if (newState === 'loaded') {
             registered.loadedAt = Date.now();
-        } else if (newState === 'enabled') {
-            registered.enabledAt = Date.now();
         }
 
         if (error) {
@@ -244,7 +247,6 @@ export class PluginRegistryService {
             state: registered.state,
             stateHistory: registered.stateHistory,
             loadedAt: registered.loadedAt,
-            enabledAt: registered.enabledAt,
             error: registered.error,
         };
     }
@@ -283,7 +285,7 @@ export class PluginRegistryService {
         userId?: string,
     ): Promise<RegisteredPlugin | undefined> {
         const plugins = this.getByCapability(capability);
-        const enabledPlugins = plugins.filter((p) => p.state === 'enabled');
+        const enabledPlugins = plugins.filter((p) => p.state === 'loaded');
 
         if (directoryId && this.directoryPluginRepository) {
             for (const registered of enabledPlugins) {
@@ -331,11 +333,11 @@ export class PluginRegistryService {
         directoryId?: string,
         userId?: string,
     ): Promise<RegisteredPlugin[]> {
-        const plugins = capability ? this.getByCapability(capability) : this.getEnabled();
+        const plugins = capability ? this.getByCapability(capability) : this.getReady();
         const result: RegisteredPlugin[] = [];
 
         for (const registered of plugins) {
-            if (registered.state !== 'enabled') continue;
+            if (registered.state !== 'loaded') continue;
 
             const isEnabled = await this.isPluginEnabledForScope(
                 registered.plugin.id,

@@ -553,7 +553,7 @@ export class DirectoryScheduleService {
                         `Provider plugin "${pluginId}" for ${field} is not installed`,
                     );
                 }
-                if (registered.state !== 'enabled') {
+                if (registered.state !== 'loaded') {
                     throw new BadRequestException(
                         `Provider plugin "${pluginId}" for ${field} is not enabled`,
                     );

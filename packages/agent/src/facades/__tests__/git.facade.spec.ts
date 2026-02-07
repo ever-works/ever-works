@@ -46,8 +46,6 @@ describe('GitFacadeService', () => {
             settingsSchema: { type: 'object', properties: {} },
             providerName,
             onLoad: jest.fn(),
-            onEnable: jest.fn(),
-            onDisable: jest.fn(),
             onUnload: jest.fn(),
             validateSettings: jest.fn().mockResolvedValue({ valid: true }),
             getUser: jest.fn().mockResolvedValue({
@@ -198,7 +196,7 @@ describe('GitFacadeService', () => {
     const createRegisteredPlugin = (
         plugin: IGitProviderPlugin,
         manifest: Partial<PluginManifest>,
-        state: RegisteredPlugin['state'] = 'enabled',
+        state: RegisteredPlugin['state'] = 'loaded',
     ): RegisteredPlugin => ({
         plugin: plugin as any,
         manifest: {
@@ -309,7 +307,7 @@ describe('GitFacadeService', () => {
             const registered = createRegisteredPlugin(
                 gitPlugin,
                 { capabilities: [PLUGIN_CAPABILITIES.GIT_PROVIDER] },
-                'loaded',
+                'unloaded',
             );
             registry.getByCapability.mockReturnValue([registered]);
 
@@ -328,7 +326,7 @@ describe('GitFacadeService', () => {
             const gitlabRegistered = createRegisteredPlugin(
                 gitlab,
                 { capabilities: [PLUGIN_CAPABILITIES.GIT_PROVIDER] },
-                'loaded',
+                'unloaded',
             );
 
             registry.getByCapability.mockReturnValue([githubRegistered, gitlabRegistered]);

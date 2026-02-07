@@ -186,14 +186,6 @@ export class BraveSearchPlugin implements IPlugin, ISearchPlugin {
 		context.logger.log('Brave Search Plugin loaded');
 	}
 
-	async onEnable(context: PluginContext): Promise<void> {
-		context.logger.log('Brave Search Plugin enabled');
-	}
-
-	async onDisable(context: PluginContext): Promise<void> {
-		context.logger.log('Brave Search Plugin disabled');
-	}
-
 	async onUnload(): Promise<void> {
 		this.context = undefined;
 	}

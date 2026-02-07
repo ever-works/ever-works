@@ -37,7 +37,7 @@ export class TriggerPluginHydratorService {
         this.logger.log('Bootstrapping plugins from filesystem...');
         const bootstrapResult = await this.pluginBootstrap.bootstrap({ force: true });
         this.logger.log(
-            `Plugins loaded: ${bootstrapResult.loaded} loaded, ${bootstrapResult.failed} failed, ${bootstrapResult.systemEnabled} system-enabled`,
+            `Plugins loaded: ${bootstrapResult.loaded} loaded, ${bootstrapResult.failed} failed`,
         );
 
         // Step 2: Fetch settings from API

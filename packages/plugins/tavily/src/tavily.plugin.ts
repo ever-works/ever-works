@@ -289,15 +289,6 @@ export class TavilySearchPlugin implements IPlugin, ISearchPlugin, IContentExtra
 		context.logger.log('Tavily Plugin loaded');
 	}
 
-	async onEnable(context: PluginContext): Promise<void> {
-		context.logger.log('Tavily Plugin enabled');
-	}
-
-	async onDisable(context: PluginContext): Promise<void> {
-		context.logger.log('Tavily Plugin disabled');
-		this.client = undefined;
-	}
-
 	async onUnload(): Promise<void> {
 		this.client = undefined;
 		this.context = undefined;

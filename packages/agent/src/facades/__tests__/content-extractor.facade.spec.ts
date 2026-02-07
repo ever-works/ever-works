@@ -40,8 +40,6 @@ describe('ContentExtractorFacadeService', () => {
         configurationMode: 'hybrid',
         providerName,
         onLoad: jest.fn(),
-        onEnable: jest.fn(),
-        onDisable: jest.fn(),
         onUnload: jest.fn(),
         validateSettings: jest.fn().mockResolvedValue({ valid: true }),
         extract: jest.fn().mockResolvedValue({
@@ -58,7 +56,7 @@ describe('ContentExtractorFacadeService', () => {
     const createRegisteredPlugin = (
         plugin: IContentExtractorPlugin,
         manifest: Partial<PluginManifest>,
-        state: RegisteredPlugin['state'] = 'enabled',
+        state: RegisteredPlugin['state'] = 'loaded',
     ): RegisteredPlugin => ({
         plugin: plugin as any,
         manifest: {
@@ -139,7 +137,7 @@ describe('ContentExtractorFacadeService', () => {
                     systemPlugin: true,
                     defaultForCapabilities: ['content-extractor'],
                 },
-                'loaded',
+                'unloaded',
             );
             registry.getByCapability.mockReturnValue([registered]);
 
@@ -304,7 +302,7 @@ describe('ContentExtractorFacadeService', () => {
                     systemPlugin: true,
                     defaultForCapabilities: ['content-extractor'],
                 },
-                'enabled',
+                'loaded',
             );
 
             registry.getByCapability.mockReturnValue([notionRegistered, localRegistered]);

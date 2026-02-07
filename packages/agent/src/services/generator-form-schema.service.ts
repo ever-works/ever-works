@@ -155,7 +155,7 @@ export class GeneratorFormSchemaService {
         options?: FormSchemaOptions,
     ): Promise<ProviderOption[]> {
         const plugins = this.pluginRegistry.getByCapability(capability);
-        const enabledPlugins = plugins.filter((p) => p.state === 'enabled');
+        const enabledPlugins = plugins.filter((p) => p.state === 'loaded');
         const result: ProviderOption[] = [];
 
         // Get the active (default) plugin for this capability in the directory
@@ -281,7 +281,7 @@ export class GeneratorFormSchemaService {
     private resolvePipelinePlugin(pipelineId?: string): RegisteredPlugin | undefined {
         if (pipelineId) {
             const registered = this.pluginRegistry.get(pipelineId);
-            if (registered && registered.state === 'enabled') {
+            if (registered && registered.state === 'loaded') {
                 return registered;
             }
             this.logger.warn(`Pipeline plugin not found or not enabled: ${pipelineId}`);
@@ -289,7 +289,7 @@ export class GeneratorFormSchemaService {
 
         // Fall back to default-pipeline
         const defaultPipeline = this.pluginRegistry.get('default-pipeline');
-        if (defaultPipeline && defaultPipeline.state === 'enabled') {
+        if (defaultPipeline && defaultPipeline.state === 'loaded') {
             return defaultPipeline;
         }
 

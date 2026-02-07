@@ -1,16 +1,7 @@
 /**
  * Plugin lifecycle states
  */
-export type PluginState =
-	| 'unloaded'
-	| 'loading'
-	| 'loaded'
-	| 'enabling'
-	| 'enabled'
-	| 'disabling'
-	| 'disabled'
-	| 'unloading'
-	| 'error';
+export type PluginState = 'unloaded' | 'loading' | 'loaded' | 'unloading' | 'error';
 
 /**
  * Plugin lifecycle transition
@@ -71,8 +62,6 @@ export interface PluginRuntimeInfo {
 	readonly healthCheck?: PluginHealthCheck;
 	/** When plugin was loaded */
 	readonly loadedAt?: number;
-	/** When plugin was enabled */
-	readonly enabledAt?: number;
 	/** Error if in error state */
 	readonly error?: Error | string;
 	/** Memory usage in bytes */

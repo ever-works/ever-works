@@ -22,8 +22,6 @@ describe('OAuthFacadeService', () => {
             capabilities: [PLUGIN_CAPABILITIES.OAUTH],
             settingsSchema: { type: 'object', properties: {} },
             onLoad: jest.fn(),
-            onEnable: jest.fn(),
-            onDisable: jest.fn(),
             onUnload: jest.fn(),
             validateSettings: jest.fn().mockResolvedValue({ valid: true }),
             getAuthorizationUrl: jest.fn().mockReturnValue(`https://provider.com/oauth?state=test`),
@@ -53,7 +51,7 @@ describe('OAuthFacadeService', () => {
             capabilities: options.capabilities || [PLUGIN_CAPABILITIES.OAUTH],
             category: 'integration',
         } as PluginManifest,
-        state: options.state || 'enabled',
+        state: options.state || 'loaded',
         builtIn: true,
         registeredAt: Date.now(),
         stateHistory: [],
@@ -99,7 +97,7 @@ describe('OAuthFacadeService', () => {
 
         it('should return false when all OAuth providers are disabled', () => {
             const oauthPlugin = createMockOAuthPlugin('github', 'GitHub');
-            const registered = createRegisteredPlugin(oauthPlugin, { state: 'disabled' });
+            const registered = createRegisteredPlugin(oauthPlugin, { state: 'unloaded' });
             registry.getByCapability.mockReturnValue([registered]);
 
             expect(service.isConfigured()).toBe(false);
@@ -112,7 +110,7 @@ describe('OAuthFacadeService', () => {
             const gitlab = createMockOAuthPlugin('gitlab', 'GitLab');
             registry.getByCapability.mockReturnValue([
                 createRegisteredPlugin(github),
-                createRegisteredPlugin(gitlab, { state: 'disabled' }),
+                createRegisteredPlugin(gitlab, { state: 'unloaded' }),
             ]);
 
             const result = service.getAvailableProviders();

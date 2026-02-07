@@ -32,8 +32,6 @@ function isIPlugin(obj: unknown): obj is IPlugin {
 
     // Check required methods
     if (typeof plugin.onLoad !== 'function') return false;
-    if (typeof plugin.onEnable !== 'function') return false;
-    if (typeof plugin.onDisable !== 'function') return false;
     if (typeof plugin.onUnload !== 'function') return false;
     if (typeof plugin.validateSettings !== 'function') return false;
 
@@ -55,12 +53,7 @@ function isPluginClass(obj: unknown): obj is new () => IPlugin {
 
     // Check if prototype has required methods
     const proto = obj.prototype;
-    return (
-        typeof proto.onLoad === 'function' &&
-        typeof proto.onEnable === 'function' &&
-        typeof proto.onDisable === 'function' &&
-        typeof proto.onUnload === 'function'
-    );
+    return typeof proto.onLoad === 'function' && typeof proto.onUnload === 'function';
 }
 
 /**
@@ -208,8 +201,6 @@ export class PluginClassValidatorService {
 
         // Check required methods
         this.checkRequiredMethod(p, 'onLoad', errors);
-        this.checkRequiredMethod(p, 'onEnable', errors);
-        this.checkRequiredMethod(p, 'onDisable', errors);
         this.checkRequiredMethod(p, 'onUnload', errors);
         this.checkRequiredMethod(p, 'validateSettings', errors);
 

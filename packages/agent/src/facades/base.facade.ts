@@ -55,7 +55,7 @@ export abstract class BaseFacadeService {
 
     isConfigured(): boolean {
         const plugins = this.registry.getByCapability(this.CAPABILITY);
-        return plugins.length > 0 && plugins.some((p) => p.state === 'enabled');
+        return plugins.length > 0 && plugins.some((p) => p.state === 'loaded');
     }
 
     getAvailableProviders(): Array<{
@@ -67,7 +67,7 @@ export abstract class BaseFacadeService {
         return plugins.map((p) => ({
             id: p.plugin.id,
             name: p.plugin.name,
-            enabled: p.state === 'enabled',
+            enabled: p.state === 'loaded',
         }));
     }
 
@@ -84,7 +84,7 @@ export abstract class BaseFacadeService {
 
                 if (activePlugin) {
                     const registered = this.registry.get(activePlugin.pluginId);
-                    if (registered && registered.state === 'enabled') {
+                    if (registered && registered.state === 'loaded') {
                         // Verify plugin is enabled for this scope (directory + user)
                         const isEnabled = await this.isPluginEnabled(
                             activePlugin.pluginId,
@@ -217,7 +217,7 @@ export abstract class BaseFacadeService {
 
             if (activePlugin) {
                 const registered = this.registry.get(activePlugin.pluginId);
-                if (registered && registered.state === 'enabled') {
+                if (registered && registered.state === 'loaded') {
                     return registered;
                 }
             }
@@ -236,7 +236,7 @@ export abstract class BaseFacadeService {
         const result: RegisteredPlugin[] = [];
 
         for (const p of plugins) {
-            if (p.state !== 'enabled') continue;
+            if (p.state !== 'loaded') continue;
 
             const isEnabled = await this.isPluginEnabled(p.plugin.id, directoryId, userId);
             if (isEnabled) {

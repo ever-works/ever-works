@@ -31,18 +31,6 @@ export interface IPlugin {
 	onLoad(context: PluginContext): Promise<void>;
 
 	/**
-	 * Called when the plugin is enabled
-	 * Initialize resources that require settings here
-	 */
-	onEnable(context: PluginContext): Promise<void>;
-
-	/**
-	 * Called when the plugin is disabled
-	 * Clean up resources that were initialized in onEnable
-	 */
-	onDisable(context: PluginContext): Promise<void>;
-
-	/**
 	 * Called when the plugin is unloaded from the system
 	 * Clean up all resources
 	 */
@@ -96,10 +84,6 @@ export interface RegisteredPlugin {
 	readonly plugin: IPlugin;
 	/** Plugin manifest */
 	readonly manifest: PluginManifest;
-	/** Whether the plugin is currently enabled */
-	readonly enabled: boolean;
 	/** Load timestamp */
 	readonly loadedAt: number;
-	/** Enable timestamp */
-	readonly enabledAt?: number;
 }

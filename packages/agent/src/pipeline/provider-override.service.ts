@@ -276,7 +276,7 @@ export class ProviderOverrideService {
         const registered = this.registry.getByCapability('sub-provider');
 
         return registered
-            .filter((r) => r.state === 'enabled')
+            .filter((r) => r.state === 'loaded')
             .map((r) => r.plugin)
             .filter(isSubProviderPlugin);
     }

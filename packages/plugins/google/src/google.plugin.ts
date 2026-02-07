@@ -115,14 +115,6 @@ export class GooglePlugin extends BaseAiProvider {
 		context.logger.log('Google Gemini Plugin loaded');
 	}
 
-	async onEnable(context: PluginContext): Promise<void> {
-		context.logger.log('Google Gemini Plugin enabled');
-	}
-
-	async onDisable(context: PluginContext): Promise<void> {
-		context.logger.log('Google Gemini Plugin disabled');
-	}
-
 	async onUnload(): Promise<void> {
 		this.aiOps = null;
 		await super.onUnload();

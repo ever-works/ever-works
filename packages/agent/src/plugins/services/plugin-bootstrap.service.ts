@@ -13,8 +13,6 @@ export interface PluginBootstrapResult {
     loaded: number;
     /** Number of plugins that failed to load */
     failed: number;
-    /** Number of system plugins auto-enabled */
-    systemEnabled: number;
 }
 
 /**
@@ -62,7 +60,9 @@ export class PluginBootstrapService {
      * 1. Discovers plugins from configured paths
      * 2. Loads and validates all discovered plugins
      * 3. Calls onLoad lifecycle hook for each plugin
-     * 4. Auto-enables system plugins
+     *
+     * Once loaded, plugins are ready. Per-user/per-directory enable/disable
+     * is handled by the DB scope system (isPluginEnabledForScope).
      *
      * Safe to call multiple times - subsequent calls are no-ops.
      *
@@ -77,7 +77,6 @@ export class PluginBootstrapService {
                 executed: false,
                 loaded: 0,
                 failed: 0,
-                systemEnabled: 0,
             };
         }
 
@@ -99,19 +98,6 @@ export class PluginBootstrapService {
             }
         }
 
-        // Enable all loaded plugins.
-        // Per-user/per-directory access control is handled by isPluginEnabledForScope(),
-        // so the registry state just means "plugin is initialized and ready to serve".
-        const enableResults = await this.lifecycleManager.enableAll();
-        const enabled = enableResults.filter((r) => r.success).length;
-        const enableFailed = enableResults.filter((r) => !r.success).length;
-        if (enabled > 0) {
-            this.logger.log(`Enabled ${enabled} plugins`);
-        }
-        if (enableFailed > 0) {
-            this.logger.warn(`Failed to enable ${enableFailed} plugins`);
-        }
-
         // Mark as initialized
         PluginBootstrapService.initialized = true;
         this.logger.log('Plugin system bootstrapped successfully');
@@ -120,7 +106,6 @@ export class PluginBootstrapService {
             executed: true,
             loaded: result.loaded,
             failed: result.failed,
-            systemEnabled: enabled,
         };
     }
 

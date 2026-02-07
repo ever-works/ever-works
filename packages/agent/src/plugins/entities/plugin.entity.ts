@@ -71,12 +71,6 @@ export class PluginEntity {
     state: PluginState;
 
     /**
-     * Whether the plugin is enabled
-     */
-    @Column({ default: false })
-    enabled: boolean;
-
-    /**
      * Whether this is a built-in platform plugin
      */
     @Column({ default: false })
@@ -111,12 +105,6 @@ export class PluginEntity {
      */
     @Column({ nullable: true })
     loadedAt: Date;
-
-    /**
-     * When the plugin was last successfully enabled
-     */
-    @Column({ nullable: true })
-    enabledAt: Date;
 
     @CreateDateColumn()
     createdAt: Date;

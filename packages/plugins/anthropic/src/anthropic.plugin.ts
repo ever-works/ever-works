@@ -115,14 +115,6 @@ export class AnthropicPlugin extends BaseAiProvider {
 		context.logger.log('Anthropic Plugin loaded');
 	}
 
-	async onEnable(context: PluginContext): Promise<void> {
-		context.logger.log('Anthropic Plugin enabled');
-	}
-
-	async onDisable(context: PluginContext): Promise<void> {
-		context.logger.log('Anthropic Plugin disabled');
-	}
-
 	async onUnload(): Promise<void> {
 		this.aiOps = null;
 		await super.onUnload();

@@ -45,7 +45,6 @@ export class PluginTestHarness<T extends IPlugin = IPlugin> {
 	readonly options: PluginTestHarnessOptions;
 
 	private loadedAt?: number;
-	private enabledAt?: number;
 	private testResults: PluginTestResult[] = [];
 
 	constructor(plugin: T, options: PluginTestHarnessOptions = {}) {
@@ -66,31 +65,9 @@ export class PluginTestHarness<T extends IPlugin = IPlugin> {
 	}
 
 	/**
-	 * Enable the plugin
-	 */
-	async enable(): Promise<void> {
-		if (!this.loadedAt) {
-			await this.load();
-		}
-		await this.plugin.onEnable(this.context);
-		this.enabledAt = Date.now();
-	}
-
-	/**
-	 * Disable the plugin
-	 */
-	async disable(): Promise<void> {
-		await this.plugin.onDisable(this.context);
-		this.enabledAt = undefined;
-	}
-
-	/**
 	 * Unload the plugin
 	 */
 	async unload(): Promise<void> {
-		if (this.enabledAt) {
-			await this.disable();
-		}
 		await this.plugin.onUnload();
 		this.loadedAt = undefined;
 	}
@@ -100,13 +77,6 @@ export class PluginTestHarness<T extends IPlugin = IPlugin> {
 	 */
 	get isLoaded(): boolean {
 		return this.loadedAt !== undefined;
-	}
-
-	/**
-	 * Check if plugin is enabled
-	 */
-	get isEnabled(): boolean {
-		return this.enabledAt !== undefined;
 	}
 
 	/**
@@ -229,20 +199,6 @@ export class PluginTestHarness<T extends IPlugin = IPlugin> {
 			await this.test('plugin loads successfully', async () => {
 				await this.load();
 				this.assert(this.isLoaded, 'Plugin should be loaded');
-			})
-		);
-
-		results.push(
-			await this.test('plugin enables successfully', async () => {
-				await this.enable();
-				this.assert(this.isEnabled, 'Plugin should be enabled');
-			})
-		);
-
-		results.push(
-			await this.test('plugin disables successfully', async () => {
-				await this.disable();
-				this.assert(!this.isEnabled, 'Plugin should be disabled');
 			})
 		);
 

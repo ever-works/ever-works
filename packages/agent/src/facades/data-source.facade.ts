@@ -42,7 +42,7 @@ export class DataSourceFacadeService implements IDataSourceFacade {
 
     async queryAll(options?: DataSourceFacadeOptions): Promise<DataSourceFacadeResult> {
         const plugins = this.registry.getByCapability(this.CAPABILITY);
-        const enabledPlugins = plugins.filter((p) => p.state === 'enabled');
+        const enabledPlugins = plugins.filter((p) => p.state === 'loaded');
 
         const allItems: MutableItemData[] = [];
         const sourceMap = new Map<string, string>();
@@ -129,7 +129,7 @@ export class DataSourceFacadeService implements IDataSourceFacade {
         if (!directoryId) return [];
 
         const plugins = this.registry.getByCapability(this.CAPABILITY);
-        const enabledPlugins = plugins.filter((p) => p.state === 'enabled');
+        const enabledPlugins = plugins.filter((p) => p.state === 'loaded');
         const result: EnabledDataSource[] = [];
 
         for (const registered of enabledPlugins) {
@@ -154,7 +154,7 @@ export class DataSourceFacadeService implements IDataSourceFacade {
 
     isConfigured(): boolean {
         const plugins = this.registry.getByCapability(this.CAPABILITY);
-        return plugins.length > 0 && plugins.some((p) => p.state === 'enabled');
+        return plugins.length > 0 && plugins.some((p) => p.state === 'loaded');
     }
 
     getAvailableProviders(): Array<{
@@ -170,7 +170,7 @@ export class DataSourceFacadeService implements IDataSourceFacade {
                 id: plugin.id,
                 name: plugin.name,
                 sourceName: plugin.sourceName,
-                enabled: p.state === 'enabled',
+                enabled: p.state === 'loaded',
             };
         });
     }

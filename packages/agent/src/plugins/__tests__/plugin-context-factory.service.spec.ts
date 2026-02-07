@@ -34,8 +34,6 @@ describe('PluginContextFactoryService', () => {
             settingsSchema: { type: 'object', properties: {} },
             configurationMode: 'hybrid',
             onLoad: jest.fn().mockResolvedValue(undefined),
-            onEnable: jest.fn().mockResolvedValue(undefined),
-            onDisable: jest.fn().mockResolvedValue(undefined),
             onUnload: jest.fn().mockResolvedValue(undefined),
             validateSettings: jest.fn().mockResolvedValue({ valid: true }),
         }) as unknown as IPlugin;

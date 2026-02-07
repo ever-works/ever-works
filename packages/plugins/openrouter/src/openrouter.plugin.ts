@@ -132,16 +132,6 @@ export class OpenRouterPlugin extends BaseAiProvider {
 		context.logger.log('OpenRouter Plugin loaded');
 	}
 
-	async onEnable(context: PluginContext): Promise<void> {
-		await super.onEnable(context);
-		context.logger.log('OpenRouter Plugin enabled');
-	}
-
-	async onDisable(context: PluginContext): Promise<void> {
-		await super.onDisable(context);
-		context.logger.log('OpenRouter Plugin disabled');
-	}
-
 	async onUnload(): Promise<void> {
 		this.aiOps = undefined;
 		await super.onUnload();

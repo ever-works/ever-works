@@ -187,18 +187,6 @@ describe('OpenRouterPlugin', () => {
 			expect(mockContext.logger.log).toHaveBeenCalledWith('OpenRouter Plugin loaded');
 		});
 
-		it('should enable successfully', async () => {
-			const mockContext = createMockContext();
-			await plugin.onEnable(mockContext);
-			expect(mockContext.logger.log).toHaveBeenCalledWith('OpenRouter Plugin enabled');
-		});
-
-		it('should disable successfully', async () => {
-			const mockContext = createMockContext();
-			await plugin.onDisable(mockContext);
-			expect(mockContext.logger.log).toHaveBeenCalledWith('OpenRouter Plugin disabled');
-		});
-
 		it('should unload successfully', async () => {
 			const mockContext = createMockContext();
 			await plugin.onLoad(mockContext);

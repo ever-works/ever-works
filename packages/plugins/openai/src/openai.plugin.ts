@@ -107,14 +107,6 @@ export class OpenAiPlugin extends BaseAiProvider {
 		context.logger.log('OpenAI Plugin loaded');
 	}
 
-	async onEnable(context: PluginContext): Promise<void> {
-		context.logger.log('OpenAI Plugin enabled');
-	}
-
-	async onDisable(context: PluginContext): Promise<void> {
-		context.logger.log('OpenAI Plugin disabled');
-	}
-
 	async onUnload(): Promise<void> {
 		this.aiOps = null;
 		await super.onUnload();

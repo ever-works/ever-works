@@ -27,8 +27,6 @@ describe('PluginLifecycleManagerService', () => {
             capabilities: ['test'],
             settingsSchema: { type: 'object', properties: {} },
             onLoad: jest.fn().mockResolvedValue(undefined),
-            onEnable: jest.fn().mockResolvedValue(undefined),
-            onDisable: jest.fn().mockResolvedValue(undefined),
             onUnload: jest.fn().mockResolvedValue(undefined),
             validateSettings: jest.fn().mockResolvedValue({ valid: true }),
         }) as unknown as IPlugin;
@@ -107,6 +105,7 @@ describe('PluginLifecycleManagerService', () => {
                     useValue: {
                         get: jest.fn(),
                         getByState: jest.fn().mockReturnValue([]),
+                        getReady: jest.fn().mockReturnValue([]),
                         getEnabled: jest.fn().mockReturnValue([]),
                         getAll: jest.fn().mockReturnValue([]),
                         updateState: jest.fn().mockReturnValue(true),
@@ -141,34 +140,36 @@ describe('PluginLifecycleManagerService', () => {
 
     describe('isValidTransition', () => {
         it('should allow valid transitions', () => {
-            expect(service.isValidTransition('loaded', 'enabling')).toBe(true);
-            expect(service.isValidTransition('enabled', 'disabling')).toBe(true);
-            expect(service.isValidTransition('disabled', 'enabling')).toBe(true);
-            expect(service.isValidTransition('disabled', 'unloading')).toBe(true);
+            expect(service.isValidTransition('loaded', 'unloading')).toBe(true);
+            expect(service.isValidTransition('unloaded', 'loading')).toBe(true);
+            expect(service.isValidTransition('loading', 'loaded')).toBe(true);
+            expect(service.isValidTransition('loading', 'error')).toBe(true);
+            expect(service.isValidTransition('error', 'loading')).toBe(true);
         });
 
         it('should reject invalid transitions', () => {
-            expect(service.isValidTransition('unloaded', 'enabled')).toBe(false);
-            expect(service.isValidTransition('enabled', 'loaded')).toBe(false);
-            expect(service.isValidTransition('loading', 'enabled')).toBe(false);
+            expect(service.isValidTransition('unloaded', 'loaded')).toBe(false);
+            expect(service.isValidTransition('loaded', 'loading')).toBe(false);
+            expect(service.isValidTransition('loading', 'unloading')).toBe(false);
         });
     });
 
     describe('getValidTransitions', () => {
         it('should return valid target states', () => {
-            expect(service.getValidTransitions('loaded')).toContain('enabling');
             expect(service.getValidTransitions('loaded')).toContain('unloading');
-            expect(service.getValidTransitions('enabled')).toContain('disabling');
+            expect(service.getValidTransitions('unloaded')).toContain('loading');
+            expect(service.getValidTransitions('error')).toContain('loading');
+            expect(service.getValidTransitions('error')).toContain('unloading');
         });
     });
 
-    describe('enable', () => {
-        it('should enable a loaded plugin', async () => {
+    describe('callOnLoad', () => {
+        it('should call onLoad for a loading plugin', async () => {
             const plugin = createMockPlugin();
             const registered: RegisteredPlugin = {
                 plugin,
                 manifest: createMockManifest(),
-                state: 'loaded',
+                state: 'loading',
                 builtIn: false,
                 registeredAt: Date.now(),
                 stateHistory: [],
@@ -176,52 +177,31 @@ describe('PluginLifecycleManagerService', () => {
 
             jest.spyOn(registry, 'get').mockReturnValue(registered);
 
-            const result = await service.enable('test-plugin');
+            const result = await service.callOnLoad('test-plugin');
 
             expect(result.success).toBe(true);
-            expect(result.newState).toBe('enabled');
-            expect(plugin.onEnable).toHaveBeenCalled();
-            expect(registry.updateState).toHaveBeenCalledWith('test-plugin', 'enabled');
-            expect(eventEmitter.emit).toHaveBeenCalledWith(
-                PluginEvents.ENABLED,
-                expect.any(Object),
-            );
-        });
-
-        it('should enable a disabled plugin', async () => {
-            const plugin = createMockPlugin();
-            const registered: RegisteredPlugin = {
-                plugin,
-                manifest: createMockManifest(),
-                state: 'disabled',
-                builtIn: false,
-                registeredAt: Date.now(),
-                stateHistory: [],
-            };
-
-            jest.spyOn(registry, 'get').mockReturnValue(registered);
-
-            const result = await service.enable('test-plugin');
-
-            expect(result.success).toBe(true);
-            expect(result.previousState).toBe('disabled');
+            expect(result.newState).toBe('loaded');
+            expect(plugin.onLoad).toHaveBeenCalled();
+            expect(eventEmitter.emit).toHaveBeenCalledWith(PluginEvents.LOADED, expect.any(Object));
         });
 
         it('should fail if plugin not found', async () => {
             jest.spyOn(registry, 'get').mockReturnValue(undefined);
 
-            const result = await service.enable('non-existent');
+            const result = await service.callOnLoad('non-existent');
 
             expect(result.success).toBe(false);
             expect(result.error).toContain('not found');
         });
 
-        it('should fail for invalid state transition', async () => {
+        it('should handle onLoad error', async () => {
             const plugin = createMockPlugin();
+            (plugin.onLoad as jest.Mock).mockRejectedValue(new Error('Load failed'));
+
             const registered: RegisteredPlugin = {
                 plugin,
                 manifest: createMockManifest(),
-                state: 'unloaded',
+                state: 'loading',
                 builtIn: false,
                 registeredAt: Date.now(),
                 stateHistory: [],
@@ -229,118 +209,11 @@ describe('PluginLifecycleManagerService', () => {
 
             jest.spyOn(registry, 'get').mockReturnValue(registered);
 
-            const result = await service.enable('test-plugin');
-
-            expect(result.success).toBe(false);
-            expect(result.error).toContain('Cannot enable');
-        });
-
-        it('should handle plugin onEnable error', async () => {
-            const plugin = createMockPlugin();
-            (plugin.onEnable as jest.Mock).mockRejectedValue(new Error('Enable failed'));
-
-            const registered: RegisteredPlugin = {
-                plugin,
-                manifest: createMockManifest(),
-                state: 'loaded',
-                builtIn: false,
-                registeredAt: Date.now(),
-                stateHistory: [],
-            };
-
-            jest.spyOn(registry, 'get').mockReturnValue(registered);
-
-            const result = await service.enable('test-plugin');
+            const result = await service.callOnLoad('test-plugin');
 
             expect(result.success).toBe(false);
             expect(result.newState).toBe('error');
-            expect(result.error).toContain('Enable failed');
-            expect(eventEmitter.emit).toHaveBeenCalledWith(PluginEvents.ERROR, expect.any(Object));
-        });
-    });
-
-    describe('disable', () => {
-        it('should disable an enabled plugin', async () => {
-            const plugin = createMockPlugin();
-            const registered: RegisteredPlugin = {
-                plugin,
-                manifest: createMockManifest(),
-                state: 'enabled',
-                builtIn: false,
-                registeredAt: Date.now(),
-                stateHistory: [],
-            };
-
-            jest.spyOn(registry, 'get').mockReturnValue(registered);
-
-            const result = await service.disable('test-plugin');
-
-            expect(result.success).toBe(true);
-            expect(result.newState).toBe('disabled');
-            expect(plugin.onDisable).toHaveBeenCalled();
-            expect(eventEmitter.emit).toHaveBeenCalledWith(
-                PluginEvents.DISABLED,
-                expect.any(Object),
-            );
-        });
-
-        it('should fail for invalid state transition', async () => {
-            const plugin = createMockPlugin();
-            const registered: RegisteredPlugin = {
-                plugin,
-                manifest: createMockManifest(),
-                state: 'loaded',
-                builtIn: false,
-                registeredAt: Date.now(),
-                stateHistory: [],
-            };
-
-            jest.spyOn(registry, 'get').mockReturnValue(registered);
-
-            const result = await service.disable('test-plugin');
-
-            expect(result.success).toBe(false);
-            expect(result.error).toContain('Cannot disable');
-        });
-
-        it('should prevent disabling a system plugin (manifest.systemPlugin)', async () => {
-            const plugin = createMockPlugin();
-            const manifest = { ...createMockManifest(), systemPlugin: true };
-            const registered: RegisteredPlugin = {
-                plugin,
-                manifest: manifest as PluginManifest,
-                state: 'enabled',
-                builtIn: true,
-                registeredAt: Date.now(),
-                stateHistory: [],
-            };
-
-            jest.spyOn(registry, 'get').mockReturnValue(registered);
-
-            const result = await service.disable('test-plugin');
-
-            expect(result.success).toBe(false);
-            expect(result.error).toContain('Cannot disable system plugin');
-            expect(plugin.onDisable).not.toHaveBeenCalled();
-        });
-
-        it('should prevent disabling a system plugin (plugin.systemPlugin)', async () => {
-            const plugin = { ...createMockPlugin(), systemPlugin: true } as unknown as IPlugin;
-            const registered: RegisteredPlugin = {
-                plugin,
-                manifest: createMockManifest(),
-                state: 'enabled',
-                builtIn: true,
-                registeredAt: Date.now(),
-                stateHistory: [],
-            };
-
-            jest.spyOn(registry, 'get').mockReturnValue(registered);
-
-            const result = await service.disable('test-plugin');
-
-            expect(result.success).toBe(false);
-            expect(result.error).toContain('Cannot disable system plugin');
+            expect(result.error).toContain('Load failed');
         });
     });
 
@@ -370,12 +243,12 @@ describe('PluginLifecycleManagerService', () => {
             );
         });
 
-        it('should unload a disabled plugin', async () => {
+        it('should fail for invalid state transition', async () => {
             const plugin = createMockPlugin();
             const registered: RegisteredPlugin = {
                 plugin,
                 manifest: createMockManifest(),
-                state: 'disabled',
+                state: 'unloaded',
                 builtIn: false,
                 registeredAt: Date.now(),
                 stateHistory: [],
@@ -385,18 +258,24 @@ describe('PluginLifecycleManagerService', () => {
 
             const result = await service.unload('test-plugin');
 
-            expect(result.success).toBe(true);
+            expect(result.success).toBe(false);
+            expect(result.error).toContain('Cannot unload');
+        });
+
+        it('should fail if plugin not found', async () => {
+            jest.spyOn(registry, 'get').mockReturnValue(undefined);
+
+            const result = await service.unload('non-existent');
+
+            expect(result.success).toBe(false);
+            expect(result.error).toContain('not found');
         });
     });
 
-    describe('enableAll', () => {
-        it('should enable all loaded and disabled plugins', async () => {
+    describe('shutdownAll', () => {
+        it('should unload all non-unloaded plugins', async () => {
             const plugin1 = createMockPlugin();
-            const plugin2: IPlugin = {
-                ...createMockPlugin(),
-                id: 'plugin-2',
-                name: 'Plugin 2',
-            } as unknown as IPlugin;
+            const plugin2 = { ...createMockPlugin(), id: 'plugin-2' } as unknown as IPlugin;
 
             const registered1: RegisteredPlugin = {
                 plugin: plugin1,
@@ -410,23 +289,21 @@ describe('PluginLifecycleManagerService', () => {
             const registered2: RegisteredPlugin = {
                 plugin: plugin2,
                 manifest: { ...createMockManifest(), id: 'plugin-2' },
-                state: 'disabled',
+                state: 'loaded',
                 builtIn: false,
                 registeredAt: Date.now(),
                 stateHistory: [],
             };
 
-            jest.spyOn(registry, 'getByState')
-                .mockReturnValueOnce([registered1])
-                .mockReturnValueOnce([registered2]);
-
+            jest.spyOn(registry, 'getAll').mockReturnValue([registered1, registered2]);
             jest.spyOn(registry, 'get')
                 .mockReturnValueOnce(registered1)
                 .mockReturnValueOnce(registered2);
 
-            const results = await service.enableAll();
+            await service.shutdownAll();
 
-            expect(results).toHaveLength(2);
+            expect(plugin1.onUnload).toHaveBeenCalled();
+            expect(plugin2.onUnload).toHaveBeenCalled();
         });
     });
 
@@ -436,7 +313,7 @@ describe('PluginLifecycleManagerService', () => {
             const registered: RegisteredPlugin = {
                 plugin,
                 manifest: createMockManifest(),
-                state: 'enabled',
+                state: 'loaded',
                 builtIn: false,
                 registeredAt: Date.now(),
                 stateHistory: [],
@@ -444,66 +321,12 @@ describe('PluginLifecycleManagerService', () => {
 
             jest.spyOn(registry, 'get').mockReturnValue(registered);
 
-            expect(service.getState('test-plugin')).toBe('enabled');
+            expect(service.getState('test-plugin')).toBe('loaded');
         });
 
         it('should return undefined for non-existent plugin', () => {
             jest.spyOn(registry, 'get').mockReturnValue(undefined);
             expect(service.getState('non-existent')).toBeUndefined();
-        });
-    });
-
-    describe('enableAutoEnablePlugins', () => {
-        it('should enable loaded plugins with autoEnable: true in manifest', async () => {
-            const plugin = createMockPlugin();
-            const manifest = { ...createMockManifest(), autoEnable: true } as PluginManifest;
-            const registered: RegisteredPlugin = {
-                plugin,
-                manifest,
-                state: 'loaded',
-                builtIn: false,
-                registeredAt: Date.now(),
-                stateHistory: [],
-            };
-
-            jest.spyOn(registry, 'getByState').mockReturnValue([registered]);
-            jest.spyOn(registry, 'get').mockReturnValue(registered);
-
-            const results = await service.enableAutoEnablePlugins();
-
-            expect(results).toHaveLength(1);
-            expect(results[0].success).toBe(true);
-            expect(results[0].newState).toBe('enabled');
-            expect(plugin.onEnable).toHaveBeenCalled();
-        });
-
-        it('should skip loaded plugins without autoEnable in manifest', async () => {
-            const plugin = createMockPlugin();
-            const registered: RegisteredPlugin = {
-                plugin,
-                manifest: createMockManifest(),
-                state: 'loaded',
-                builtIn: false,
-                registeredAt: Date.now(),
-                stateHistory: [],
-            };
-
-            jest.spyOn(registry, 'getByState').mockReturnValue([registered]);
-
-            const results = await service.enableAutoEnablePlugins();
-
-            expect(results).toHaveLength(0);
-            expect(plugin.onEnable).not.toHaveBeenCalled();
-        });
-
-        it('should not see already-enabled system plugins (they are no longer in loaded state)', async () => {
-            // After enableSystemPlugins runs, system plugins are in 'enabled' state,
-            // so getByState('loaded') won't return them
-            jest.spyOn(registry, 'getByState').mockReturnValue([]);
-
-            const results = await service.enableAutoEnablePlugins();
-
-            expect(results).toHaveLength(0);
         });
     });
 
@@ -513,7 +336,7 @@ describe('PluginLifecycleManagerService', () => {
             const registered: RegisteredPlugin = {
                 plugin,
                 manifest: createMockManifest(),
-                state: 'enabled',
+                state: 'loaded',
                 builtIn: false,
                 registeredAt: Date.now(),
                 stateHistory: [],
@@ -521,8 +344,8 @@ describe('PluginLifecycleManagerService', () => {
 
             jest.spyOn(registry, 'get').mockReturnValue(registered);
 
-            expect(service.isInState('test-plugin', 'enabled')).toBe(true);
-            expect(service.isInState('test-plugin', 'disabled')).toBe(false);
+            expect(service.isInState('test-plugin', 'loaded')).toBe(true);
+            expect(service.isInState('test-plugin', 'unloaded')).toBe(false);
         });
     });
 });

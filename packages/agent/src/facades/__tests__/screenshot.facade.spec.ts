@@ -31,8 +31,6 @@ describe('ScreenshotFacadeService', () => {
         settingsSchema: { type: 'object', properties: {} },
         providerName,
         onLoad: jest.fn(),
-        onEnable: jest.fn(),
-        onDisable: jest.fn(),
         onUnload: jest.fn(),
         validateSettings: jest.fn().mockResolvedValue({ valid: true }),
         capture: jest.fn().mockResolvedValue({
@@ -47,7 +45,7 @@ describe('ScreenshotFacadeService', () => {
     const createRegisteredPlugin = (
         plugin: IScreenshotPlugin,
         manifest: Partial<PluginManifest>,
-        state: RegisteredPlugin['state'] = 'enabled',
+        state: RegisteredPlugin['state'] = 'loaded',
     ): RegisteredPlugin => ({
         plugin: plugin as any,
         manifest: {
@@ -114,7 +112,7 @@ describe('ScreenshotFacadeService', () => {
             const registered = createRegisteredPlugin(
                 screenshotPlugin,
                 { capabilities: ['screenshot'] },
-                'loaded',
+                'unloaded',
             );
             registry.getByCapability.mockReturnValue([registered]);
 
@@ -133,7 +131,7 @@ describe('ScreenshotFacadeService', () => {
             const browserlessRegistered = createRegisteredPlugin(
                 browserless,
                 { capabilities: ['screenshot'] },
-                'loaded',
+                'unloaded',
             );
 
             registry.getByCapability.mockReturnValue([

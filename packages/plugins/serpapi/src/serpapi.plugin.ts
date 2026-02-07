@@ -192,14 +192,6 @@ export class SerpApiSearchPlugin implements IPlugin, ISearchPlugin {
 		context.logger.log('SerpAPI Plugin loaded');
 	}
 
-	async onEnable(context: PluginContext): Promise<void> {
-		context.logger.log('SerpAPI Plugin enabled');
-	}
-
-	async onDisable(context: PluginContext): Promise<void> {
-		context.logger.log('SerpAPI Plugin disabled');
-	}
-
 	async onUnload(): Promise<void> {
 		this.context = undefined;
 	}

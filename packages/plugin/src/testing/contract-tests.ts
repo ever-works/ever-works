@@ -61,8 +61,6 @@ export async function testBasePluginContract(plugin: IPlugin): Promise<PluginTes
 	results.push(
 		await harness.test('implements lifecycle methods', async () => {
 			harness.assert(typeof plugin.onLoad === 'function', 'onLoad must be a function');
-			harness.assert(typeof plugin.onEnable === 'function', 'onEnable must be a function');
-			harness.assert(typeof plugin.onDisable === 'function', 'onDisable must be a function');
 			harness.assert(typeof plugin.onUnload === 'function', 'onUnload must be a function');
 		})
 	);

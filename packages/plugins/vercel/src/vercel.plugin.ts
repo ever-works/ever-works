@@ -164,14 +164,6 @@ export class VercelPlugin implements IPlugin, IDeploymentPlugin {
 		context.logger.log('Vercel Plugin loaded');
 	}
 
-	async onEnable(context: PluginContext): Promise<void> {
-		context.logger.log('Vercel Plugin enabled');
-	}
-
-	async onDisable(context: PluginContext): Promise<void> {
-		context.logger.log('Vercel Plugin disabled');
-	}
-
 	async onUnload(): Promise<void> {
 		this.context = undefined;
 	}

@@ -474,15 +474,6 @@ export class LocalContentExtractorPlugin implements IPlugin, IContentExtractorPl
 		context.logger.log('Local Content Extractor Plugin loaded');
 	}
 
-	async onEnable(_context: PluginContext): Promise<void> {
-		this.context?.logger.log('Local Content Extractor Plugin enabled');
-	}
-
-	async onDisable(_context: PluginContext): Promise<void> {
-		// System plugins should not be disabled, but handle gracefully
-		this.context?.logger.warn('Attempted to disable system plugin - this should not happen');
-	}
-
 	async onUnload(): Promise<void> {
 		this.context = undefined;
 	}

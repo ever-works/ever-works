@@ -41,16 +41,12 @@ export class PluginRepository {
      * Find all plugins
      */
     async findAll(options?: {
-        enabled?: boolean;
         category?: PluginCategory;
         state?: PluginState;
         builtIn?: boolean;
     }): Promise<PluginEntity[]> {
         const where: Record<string, unknown> = {};
 
-        if (options?.enabled !== undefined) {
-            where.enabled = options.enabled;
-        }
         if (options?.category) {
             where.category = options.category;
         }
@@ -83,16 +79,6 @@ export class PluginRepository {
     async findByCapability(capability: string): Promise<PluginEntity[]> {
         const plugins = await this.repository.find();
         return plugins.filter((p) => p.capabilities.includes(capability));
-    }
-
-    /**
-     * Find all enabled plugins
-     */
-    async findEnabled(): Promise<PluginEntity[]> {
-        return this.repository.find({
-            where: { enabled: true },
-            order: { name: 'ASC' },
-        });
     }
 
     /**
@@ -140,13 +126,6 @@ export class PluginRepository {
         }
         if (state === 'loaded') {
             updateData.loadedAt = new Date();
-        }
-        if (state === 'enabled') {
-            updateData.enabledAt = new Date();
-            updateData.enabled = true;
-        }
-        if (state === 'disabled' || state === 'unloaded') {
-            updateData.enabled = false;
         }
         return this.updateByPluginId(pluginId, updateData);
     }

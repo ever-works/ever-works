@@ -398,14 +398,6 @@ export class ApifyDataSourcePlugin implements IPlugin, IDataSourcePlugin, IFormS
 		context.logger.log('Apify Data Source Plugin loaded');
 	}
 
-	async onEnable(context: PluginContext): Promise<void> {
-		context.logger.log('Apify Data Source Plugin enabled');
-	}
-
-	async onDisable(context: PluginContext): Promise<void> {
-		context.logger.log('Apify Data Source Plugin disabled');
-	}
-
 	async onUnload(): Promise<void> {
 		this.context = undefined;
 	}

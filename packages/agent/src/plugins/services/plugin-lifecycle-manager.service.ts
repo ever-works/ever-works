@@ -15,7 +15,10 @@ export interface LifecycleResult {
 
 /**
  * Manages plugin lifecycle state transitions.
- * State machine: discovered → loaded → enabled ↔ disabled → unloaded
+ * State machine: unloaded → loading → loaded → unloading → unloaded
+ *
+ * Per-user/per-directory enable/disable is handled by the DB scope system
+ * (UserPluginEntity.enabled, DirectoryPluginEntity.enabled, manifest.autoEnable).
  */
 @Injectable()
 export class PluginLifecycleManagerService {
@@ -39,168 +42,6 @@ export class PluginLifecycleManagerService {
 
     getValidTransitions(from: PluginState): PluginState[] {
         return (VALID_STATE_TRANSITIONS[from] as PluginState[]) ?? [];
-    }
-
-    async enable(pluginId: string): Promise<LifecycleResult> {
-        const registered = this.registry.get(pluginId);
-        if (!registered) {
-            return {
-                success: false,
-                pluginId,
-                previousState: 'unloaded',
-                newState: 'unloaded',
-                error: `Plugin "${pluginId}" not found`,
-            };
-        }
-
-        const previousState = registered.state;
-
-        if (!this.isValidTransition(previousState, 'enabling')) {
-            return {
-                success: false,
-                pluginId,
-                previousState,
-                newState: previousState,
-                error: `Cannot enable plugin from state "${previousState}"`,
-            };
-        }
-
-        try {
-            this.registry.updateState(pluginId, 'enabling');
-            await this.pluginRepository.updateState(pluginId, 'enabling');
-
-            const context = this.getContext(pluginId);
-            await registered.plugin.onEnable(context);
-
-            this.registry.updateState(pluginId, 'enabled');
-            await this.pluginRepository.updateState(pluginId, 'enabled');
-
-            this.eventEmitter.emit(PluginEvents.ENABLED, {
-                pluginId,
-                version: registered.manifest.version,
-                timestamp: Date.now(),
-            });
-
-            this.logger.log(`Plugin enabled: ${pluginId}`);
-
-            return {
-                success: true,
-                pluginId,
-                previousState,
-                newState: 'enabled',
-            };
-        } catch (error) {
-            const message = error instanceof Error ? error.message : String(error);
-            this.logger.error(`Failed to enable plugin ${pluginId}:`, error);
-
-            this.registry.updateState(pluginId, 'error', error as Error);
-            await this.pluginRepository.updateState(pluginId, 'error', message);
-
-            this.eventEmitter.emit(PluginEvents.ERROR, {
-                pluginId,
-                version: registered.manifest.version,
-                error: message,
-                context: 'enable',
-                timestamp: Date.now(),
-            });
-
-            return {
-                success: false,
-                pluginId,
-                previousState,
-                newState: 'error',
-                error: message,
-            };
-        }
-    }
-
-    async disable(pluginId: string): Promise<LifecycleResult> {
-        const registered = this.registry.get(pluginId);
-        if (!registered) {
-            return {
-                success: false,
-                pluginId,
-                previousState: 'unloaded',
-                newState: 'unloaded',
-                error: `Plugin "${pluginId}" not found`,
-            };
-        }
-
-        const previousState = registered.state;
-
-        // System plugins cannot be disabled
-        const isSystemPlugin =
-            registered.manifest.systemPlugin ||
-            (registered.plugin as { systemPlugin?: boolean }).systemPlugin;
-
-        if (isSystemPlugin) {
-            return {
-                success: false,
-                pluginId,
-                previousState,
-                newState: previousState,
-                error: `Cannot disable system plugin "${pluginId}"`,
-            };
-        }
-
-        // Check valid transition
-        if (!this.isValidTransition(previousState, 'disabling')) {
-            return {
-                success: false,
-                pluginId,
-                previousState,
-                newState: previousState,
-                error: `Cannot disable plugin from state "${previousState}"`,
-            };
-        }
-
-        try {
-            this.registry.updateState(pluginId, 'disabling');
-            await this.pluginRepository.updateState(pluginId, 'disabling');
-
-            const context = this.getContext(pluginId);
-            await registered.plugin.onDisable(context);
-
-            this.registry.updateState(pluginId, 'disabled');
-            await this.pluginRepository.updateState(pluginId, 'disabled');
-
-            this.eventEmitter.emit(PluginEvents.DISABLED, {
-                pluginId,
-                version: registered.manifest.version,
-                timestamp: Date.now(),
-            });
-
-            this.logger.log(`Plugin disabled: ${pluginId}`);
-
-            return {
-                success: true,
-                pluginId,
-                previousState,
-                newState: 'disabled',
-            };
-        } catch (error) {
-            const message = error instanceof Error ? error.message : String(error);
-            this.logger.error(`Failed to disable plugin ${pluginId}:`, error);
-
-            this.registry.updateState(pluginId, 'error', error as Error);
-            await this.pluginRepository.updateState(pluginId, 'error', message);
-
-            this.eventEmitter.emit(PluginEvents.ERROR, {
-                pluginId,
-                version: registered.manifest.version,
-                error: message,
-                context: 'disable',
-                timestamp: Date.now(),
-            });
-
-            return {
-                success: false,
-                pluginId,
-                previousState,
-                newState: 'error',
-                error: message,
-            };
-        }
     }
 
     async callOnLoad(pluginId: string): Promise<LifecycleResult> {
@@ -323,77 +164,7 @@ export class PluginLifecycleManagerService {
         }
     }
 
-    async enableAll(): Promise<LifecycleResult[]> {
-        const results: LifecycleResult[] = [];
-        const loaded = this.registry.getByState('loaded');
-        const disabled = this.registry.getByState('disabled');
-
-        for (const registered of [...loaded, ...disabled]) {
-            const result = await this.enable(registered.plugin.id);
-            results.push(result);
-        }
-
-        return results;
-    }
-
-    /** Enable plugins marked with systemPlugin: true in manifest */
-    /** Enable plugins with autoEnable: true in their manifest (non-system) */
-    async enableAutoEnablePlugins(): Promise<LifecycleResult[]> {
-        const results: LifecycleResult[] = [];
-        const loaded = this.registry.getByState('loaded');
-
-        for (const registered of loaded) {
-            if (registered.manifest.autoEnable) {
-                const result = await this.enable(registered.plugin.id);
-                results.push(result);
-            }
-        }
-
-        return results;
-    }
-
-    /** Enable plugins marked with systemPlugin: true in manifest */
-    async enableSystemPlugins(): Promise<LifecycleResult[]> {
-        const results: LifecycleResult[] = [];
-        const loaded = this.registry.getByState('loaded');
-
-        for (const registered of loaded) {
-            const isSystemPlugin =
-                registered.manifest.systemPlugin ||
-                (registered.plugin as { systemPlugin?: boolean }).systemPlugin;
-
-            if (isSystemPlugin) {
-                const result = await this.enable(registered.plugin.id);
-                results.push(result);
-
-                if (result.success) {
-                    this.logger.log(`Auto-enabled system plugin: ${registered.plugin.id}`);
-                } else {
-                    this.logger.error(
-                        `Failed to auto-enable system plugin ${registered.plugin.id}: ${result.error}`,
-                    );
-                }
-            }
-        }
-
-        return results;
-    }
-
-    async disableAll(): Promise<LifecycleResult[]> {
-        const results: LifecycleResult[] = [];
-        const enabled = this.registry.getEnabled();
-
-        for (const registered of enabled) {
-            const result = await this.disable(registered.plugin.id);
-            results.push(result);
-        }
-
-        return results;
-    }
-
     async shutdownAll(): Promise<void> {
-        await this.disableAll();
-
         for (const registered of this.registry.getAll()) {
             if (registered.state !== 'unloaded') {
                 await this.unload(registered.plugin.id);

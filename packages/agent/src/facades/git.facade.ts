@@ -97,7 +97,7 @@ export class GitFacadeService implements IGitFacade {
 
     isConfigured(): boolean {
         const plugins = this.registry.getByCapability(this.CAPABILITY);
-        return plugins.length > 0 && plugins.some((p) => p.state === 'enabled');
+        return plugins.length > 0 && plugins.some((p) => p.state === 'loaded');
     }
 
     getAvailableProviders(): GitProviderInfo[] {
@@ -105,7 +105,7 @@ export class GitFacadeService implements IGitFacade {
         return plugins.map((p) => ({
             id: p.plugin.id,
             name: (p.plugin as IGitProviderPlugin).providerName,
-            enabled: p.state === 'enabled',
+            enabled: p.state === 'loaded',
             icon: p.manifest.icon,
             description: p.manifest.description,
             homepage: p.manifest.homepage,
@@ -610,12 +610,12 @@ export class GitFacadeService implements IGitFacade {
 
         if (providerId) {
             const registered = plugins.find((p) => p.plugin.id === providerId);
-            if (registered?.state === 'enabled') {
+            if (registered?.state === 'loaded') {
                 return registered.plugin as IGitProviderPlugin;
             }
         }
 
-        const enabled = plugins.find((p) => p.state === 'enabled');
+        const enabled = plugins.find((p) => p.state === 'loaded');
         if (!enabled) {
             throw new NoGitProviderError();
         }
@@ -704,7 +704,7 @@ export class GitFacadeService implements IGitFacade {
         if (
             registered &&
             registered.manifest.capabilities.includes(this.CAPABILITY) &&
-            registered.state === 'enabled'
+            registered.state === 'loaded'
         ) {
             const isEnabled = await this.registry.isPluginEnabledForScope(
                 providerId,

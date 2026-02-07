@@ -273,14 +273,6 @@ export class NotionExtractorPlugin implements IPlugin, IContentExtractorPlugin {
 		context.logger.log('Notion Extractor Plugin loaded');
 	}
 
-	async onEnable(context: PluginContext): Promise<void> {
-		context.logger.log('Notion Extractor Plugin enabled');
-	}
-
-	async onDisable(context: PluginContext): Promise<void> {
-		context.logger.log('Notion Extractor Plugin disabled');
-	}
-
 	async onUnload(): Promise<void> {
 		this.context = undefined;
 		this.notionService = undefined;

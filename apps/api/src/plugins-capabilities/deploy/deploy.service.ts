@@ -364,7 +364,7 @@ export class DeployService {
 
     private getGitHubPlugin(): any {
         const registered = this.pluginRegistry.get('github');
-        if (!registered || registered.state !== 'enabled') {
+        if (!registered || registered.state !== 'loaded') {
             throw new Error('GitHub plugin not available for CI/CD operations');
         }
         return registered.plugin;

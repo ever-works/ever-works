@@ -96,7 +96,7 @@ export class ContentExtractorFacadeService
         return plugins.map((p) => ({
             id: p.plugin.id,
             name: (p.plugin as IContentExtractorPlugin).providerName,
-            enabled: p.state === 'enabled',
+            enabled: p.state === 'loaded',
         }));
     }
 
@@ -113,7 +113,7 @@ export class ContentExtractorFacadeService
             if (
                 registered &&
                 registered.manifest.capabilities.includes(this.CAPABILITY) &&
-                registered.state === 'enabled'
+                registered.state === 'loaded'
             ) {
                 const isEnabled = await this.isPluginEnabled(providerOverride, directoryId, userId);
                 if (!isEnabled) throw new ContentExtractorProviderNotFoundError(providerOverride);
@@ -156,7 +156,7 @@ export class ContentExtractorFacadeService
         }
 
         const plugins = this.registry.getByCapability(this.CAPABILITY);
-        const enabledPlugins = plugins.filter((p) => p.state === 'enabled');
+        const enabledPlugins = plugins.filter((p) => p.state === 'loaded');
 
         // 3. Non-system extractors first (API-based)
         const nonSystemExtractors = enabledPlugins.filter(

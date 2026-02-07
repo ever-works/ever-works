@@ -91,18 +91,6 @@ describe('NotionExtractorPlugin', () => {
 			await plugin.onLoad(mockContext);
 			expect(mockContext.logger.log).toHaveBeenCalledWith('Notion Extractor Plugin loaded');
 		});
-
-		it('should log on enable', async () => {
-			await plugin.onLoad(mockContext);
-			await plugin.onEnable(mockContext);
-			expect(mockContext.logger.log).toHaveBeenCalledWith('Notion Extractor Plugin enabled');
-		});
-
-		it('should log on disable', async () => {
-			await plugin.onLoad(mockContext);
-			await plugin.onDisable(mockContext);
-			expect(mockContext.logger.log).toHaveBeenCalledWith('Notion Extractor Plugin disabled');
-		});
 	});
 
 	describe('validateSettings', () => {

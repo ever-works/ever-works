@@ -113,18 +113,6 @@ describe('OllamaPlugin', () => {
 			expect(mockContext.logger.log).toHaveBeenCalledWith('Ollama Plugin loaded');
 		});
 
-		it('should enable successfully', async () => {
-			const mockContext = createMockContext();
-			await plugin.onEnable(mockContext);
-			expect(mockContext.logger.log).toHaveBeenCalledWith('Ollama Plugin enabled');
-		});
-
-		it('should disable successfully', async () => {
-			const mockContext = createMockContext();
-			await plugin.onDisable(mockContext);
-			expect(mockContext.logger.log).toHaveBeenCalledWith('Ollama Plugin disabled');
-		});
-
 		it('should unload successfully', async () => {
 			const mockContext = createMockContext();
 			await plugin.onLoad(mockContext);

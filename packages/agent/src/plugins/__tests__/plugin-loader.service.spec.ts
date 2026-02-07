@@ -33,8 +33,6 @@ describe('PluginLoaderService', () => {
             settingsSchema: { type: 'object', properties: {} },
             configurationMode: 'hybrid',
             onLoad: jest.fn().mockResolvedValue(undefined),
-            onEnable: jest.fn().mockResolvedValue(undefined),
-            onDisable: jest.fn().mockResolvedValue(undefined),
             onUnload: jest.fn().mockResolvedValue(undefined),
             validateSettings: jest.fn().mockResolvedValue({ valid: true }),
         }) as unknown as IPlugin;
@@ -401,8 +399,6 @@ describe('PluginLoaderService', () => {
                 capabilities = ['test'];
                 settingsSchema = { type: 'object', properties: {} };
                 onLoad = jest.fn();
-                onEnable = jest.fn();
-                onDisable = jest.fn();
                 onUnload = jest.fn();
                 validateSettings = jest.fn().mockResolvedValue({ valid: true });
             }

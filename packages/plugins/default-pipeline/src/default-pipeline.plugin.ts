@@ -739,14 +739,6 @@ export class DefaultPipelinePlugin implements IPlugin, IDefaultPipelinePlugin<Bu
 		}
 	}
 
-	async onEnable(_context: PluginContext): Promise<void> {
-		this.context?.logger.log('Default Pipeline Plugin enabled');
-	}
-
-	async onDisable(_context: PluginContext): Promise<void> {
-		this.context?.logger.warn('Attempted to disable system plugin - this should not happen');
-	}
-
 	async onUnload(): Promise<void> {
 		this.stepExecutors.clear();
 		this.context = undefined;

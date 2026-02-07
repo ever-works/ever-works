@@ -116,14 +116,6 @@ export class OllamaPlugin extends BaseAiProvider {
 		context.logger.log('Ollama Plugin loaded');
 	}
 
-	async onEnable(context: PluginContext): Promise<void> {
-		context.logger.log('Ollama Plugin enabled');
-	}
-
-	async onDisable(context: PluginContext): Promise<void> {
-		context.logger.log('Ollama Plugin disabled');
-	}
-
 	async onUnload(): Promise<void> {
 		this.aiOps = null;
 		await super.onUnload();

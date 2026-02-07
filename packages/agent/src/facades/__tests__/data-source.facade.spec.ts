@@ -30,8 +30,6 @@ describe('DataSourceFacadeService', () => {
         settingsSchema: { type: 'object', properties: {} },
         sourceName,
         onLoad: jest.fn(),
-        onEnable: jest.fn(),
-        onDisable: jest.fn(),
         onUnload: jest.fn(),
         validateSettings: jest.fn().mockResolvedValue({ valid: true }),
         query: jest.fn().mockResolvedValue({
@@ -45,7 +43,7 @@ describe('DataSourceFacadeService', () => {
     const createRegisteredPlugin = (
         plugin: IDataSourcePlugin,
         manifest: Partial<PluginManifest>,
-        state: RegisteredPlugin['state'] = 'enabled',
+        state: RegisteredPlugin['state'] = 'loaded',
     ): RegisteredPlugin => ({
         plugin: plugin as any,
         manifest: {
@@ -128,7 +126,7 @@ describe('DataSourceFacadeService', () => {
             const registered = createRegisteredPlugin(
                 dataSourcePlugin,
                 { capabilities: ['data-source'] },
-                'loaded',
+                'unloaded',
             );
             registry.getByCapability.mockReturnValue([registered]);
 
@@ -147,7 +145,7 @@ describe('DataSourceFacadeService', () => {
             const customRegistered = createRegisteredPlugin(
                 custom,
                 { capabilities: ['data-source'] },
-                'loaded',
+                'unloaded',
             );
 
             registry.getByCapability.mockReturnValue([apifyRegistered, customRegistered]);

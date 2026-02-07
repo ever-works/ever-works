@@ -35,12 +35,6 @@ export abstract class BasePlugin implements IPlugin {
 		this.context = context;
 	}
 
-	/** Called when plugin is enabled. Override for custom enable logic. */
-	async onEnable(_context: PluginContext): Promise<void> {}
-
-	/** Called when plugin is disabled. Override for custom disable logic. */
-	async onDisable(_context: PluginContext): Promise<void> {}
-
 	/** Called when plugin is unloaded. Override for custom cleanup. */
 	async onUnload(): Promise<void> {
 		this.context = undefined;

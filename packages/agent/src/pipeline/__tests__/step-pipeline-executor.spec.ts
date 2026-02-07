@@ -157,7 +157,7 @@ describe('StepPipelineExecutorService', () => {
                 category: 'pipeline',
                 capabilities: ['default-pipeline'],
             });
-            registry.updateState('default-pipeline', 'enabled');
+            registry.updateState('default-pipeline', 'loaded');
 
             // Register mock executors for all built-in steps
             for (const step of DefaultPipelinePlugin.getBuiltInSteps()) {
@@ -414,7 +414,7 @@ describe('StepPipelineExecutorService', () => {
                 category: 'pipeline',
                 capabilities: ['default-pipeline'],
             });
-            registry.updateState('default-pipeline', 'enabled');
+            registry.updateState('default-pipeline', 'loaded');
         });
 
         it('should pass provider overrides from request to bound AI facade', async () => {
@@ -674,7 +674,7 @@ describe('StepPipelineExecutorService', () => {
                 category: 'pipeline',
                 capabilities: ['default-pipeline'],
             });
-            registry.updateState('default-pipeline', 'enabled');
+            registry.updateState('default-pipeline', 'loaded');
 
             const mockCheckpoint: CheckpointData = {
                 stepIndex: 0,
@@ -761,7 +761,7 @@ describe('StepPipelineExecutorService', () => {
                 category: 'pipeline',
                 capabilities: ['default-pipeline'],
             });
-            registry.updateState('default-pipeline', 'enabled');
+            registry.updateState('default-pipeline', 'loaded');
 
             const mockCheckpoint: CheckpointData = {
                 stepIndex: 1,
@@ -835,7 +835,7 @@ describe('StepPipelineExecutorService', () => {
                 category: 'pipeline',
                 capabilities: ['default-pipeline'],
             });
-            registry.updateState('default-pipeline', 'enabled');
+            registry.updateState('default-pipeline', 'loaded');
 
             // Register mock executors
             for (const step of DefaultPipelinePlugin.getBuiltInSteps()) {

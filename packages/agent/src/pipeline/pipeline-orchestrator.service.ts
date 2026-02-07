@@ -153,7 +153,7 @@ export class PipelineOrchestratorService {
     getAvailableFullPipelinePlugins(): IFullPipelinePlugin[] {
         return this.registry
             .getByCapability('full-pipeline')
-            .filter((p) => p.state === 'enabled')
+            .filter((p) => p.state === 'loaded')
             .map((p) => p.plugin)
             .filter(isFullPipelinePlugin);
     }
@@ -173,7 +173,7 @@ export class PipelineOrchestratorService {
 
     private resolveExplicitPipeline(pluginId: string): IFullPipelinePlugin | null {
         const registered = this.registry.get(pluginId);
-        if (!registered || registered.state !== 'enabled') {
+        if (!registered || registered.state !== 'loaded') {
             this.logger.warn(
                 `Requested pipeline plugin "${pluginId}" not found or not enabled, falling back to step mode`,
             );
@@ -195,7 +195,7 @@ export class PipelineOrchestratorService {
         const plugins = this.registry.getByCapability('full-pipeline');
 
         for (const registered of plugins) {
-            if (registered.state !== 'enabled') {
+            if (registered.state !== 'loaded') {
                 continue;
             }
 

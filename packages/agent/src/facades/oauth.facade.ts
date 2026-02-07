@@ -55,7 +55,7 @@ export class OAuthFacadeService implements IOAuthFacade {
 
     isConfigured(): boolean {
         const plugins = this.registry.getByCapability(this.CAPABILITY);
-        return plugins.length > 0 && plugins.some((p) => p.state === 'enabled');
+        return plugins.length > 0 && plugins.some((p) => p.state === 'loaded');
     }
 
     getAvailableProviders(): OAuthProviderInfo[] {
@@ -63,7 +63,7 @@ export class OAuthFacadeService implements IOAuthFacade {
         return plugins.map((p) => ({
             id: p.plugin.id,
             name: p.manifest.name,
-            enabled: p.state === 'enabled',
+            enabled: p.state === 'loaded',
         }));
     }
 
@@ -150,7 +150,7 @@ export class OAuthFacadeService implements IOAuthFacade {
 
         if (providerId) {
             const registered = plugins.find((p) => p.plugin.id === providerId);
-            if (registered?.state === 'enabled') {
+            if (registered?.state === 'loaded') {
                 if (!isOAuthPlugin(registered.plugin)) {
                     throw new OAuthNotSupportedError(providerId, 'getPlugin');
                 }
@@ -159,7 +159,7 @@ export class OAuthFacadeService implements IOAuthFacade {
         }
 
         // If no specific provider requested, try to find any enabled OAuth provider
-        const enabled = plugins.find((p) => p.state === 'enabled');
+        const enabled = plugins.find((p) => p.state === 'loaded');
         if (!enabled) {
             throw new NoOAuthProviderError();
         }

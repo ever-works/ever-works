@@ -61,8 +61,6 @@ describe('PipelineOrchestratorService', () => {
             capabilities: ['full-pipeline'],
             settingsSchema: { type: 'object', properties: {} },
             onLoad: jest.fn(),
-            onEnable: jest.fn(),
-            onDisable: jest.fn(),
             onUnload: jest.fn(),
             validateSettings: jest.fn().mockResolvedValue({ valid: true }),
             getStepDefinitions: jest.fn().mockReturnValue([]),
@@ -180,7 +178,7 @@ describe('PipelineOrchestratorService', () => {
             category: 'pipeline',
             capabilities: ['default-pipeline'],
         });
-        registry.updateState('default-pipeline', 'enabled');
+        registry.updateState('default-pipeline', 'loaded');
 
         // Register mock executors for built-in steps
         for (const step of DefaultPipelinePlugin.getBuiltInSteps()) {
@@ -214,7 +212,7 @@ describe('PipelineOrchestratorService', () => {
                 plugin as unknown as IPlugin,
                 createMockManifest('full-pipeline-plugin'),
                 {
-                    state: 'enabled',
+                    state: 'loaded',
                 },
             );
 
@@ -235,7 +233,7 @@ describe('PipelineOrchestratorService', () => {
         it('should not use disabled full pipeline plugin', async () => {
             const plugin = createMockFullPipelinePlugin('disabled-plugin');
             registry.register(plugin as unknown as IPlugin, createMockManifest('disabled-plugin'), {
-                state: 'loaded', // Not enabled
+                state: 'unloaded', // Not loaded
             });
 
             const stepExecuteSpy = jest.spyOn(stepExecutor, 'execute');
@@ -251,7 +249,7 @@ describe('PipelineOrchestratorService', () => {
                 plugin as unknown as IPlugin,
                 createMockManifest('full-pipeline-plugin'),
                 {
-                    state: 'enabled',
+                    state: 'loaded',
                 },
             );
 
@@ -275,7 +273,7 @@ describe('PipelineOrchestratorService', () => {
                 plugin as unknown as IPlugin,
                 createMockManifest('my-custom-pipeline'),
                 {
-                    state: 'enabled',
+                    state: 'loaded',
                 },
             );
 
@@ -317,7 +315,7 @@ describe('PipelineOrchestratorService', () => {
                 plugin as unknown as IPlugin,
                 createMockManifest('disabled-pipeline'),
                 {
-                    state: 'loaded', // Not enabled
+                    state: 'unloaded', // Not loaded
                 },
             );
 
@@ -339,7 +337,7 @@ describe('PipelineOrchestratorService', () => {
                 plugin as unknown as IPlugin,
                 createMockManifest('auto-detected-pipeline'),
                 {
-                    state: 'enabled',
+                    state: 'loaded',
                 },
             );
 
@@ -378,7 +376,7 @@ describe('PipelineOrchestratorService', () => {
         it('should use step mode when specified', async () => {
             const plugin = createMockFullPipelinePlugin('full-plugin');
             registry.register(plugin as unknown as IPlugin, createMockManifest('full-plugin'), {
-                state: 'enabled',
+                state: 'loaded',
             });
 
             const stepExecuteSpy = jest.spyOn(stepExecutor, 'execute');
@@ -391,7 +389,7 @@ describe('PipelineOrchestratorService', () => {
         it('should use full mode when specified and plugin available', async () => {
             const plugin = createMockFullPipelinePlugin('full-plugin');
             registry.register(plugin as unknown as IPlugin, createMockManifest('full-plugin'), {
-                state: 'enabled',
+                state: 'loaded',
             });
 
             const fullExecuteSpy = jest.spyOn(fullExecutor, 'execute');
@@ -421,7 +419,7 @@ describe('PipelineOrchestratorService', () => {
         it('should recommend full mode when full pipeline plugin enabled', async () => {
             const plugin = createMockFullPipelinePlugin('full-plugin');
             registry.register(plugin as unknown as IPlugin, createMockManifest('full-plugin'), {
-                state: 'enabled',
+                state: 'loaded',
             });
 
             const recommendation = await service.getRecommendedMode();
@@ -439,7 +437,7 @@ describe('PipelineOrchestratorService', () => {
         it('should return true when full pipeline plugin enabled', async () => {
             const plugin = createMockFullPipelinePlugin('full-plugin');
             registry.register(plugin as unknown as IPlugin, createMockManifest('full-plugin'), {
-                state: 'enabled',
+                state: 'loaded',
             });
 
             expect(await service.hasFullPipelinePlugin()).toBe(true);
@@ -458,10 +456,10 @@ describe('PipelineOrchestratorService', () => {
             const plugin2 = createMockFullPipelinePlugin('full-plugin-2');
 
             registry.register(plugin1 as unknown as IPlugin, createMockManifest('full-plugin-1'), {
-                state: 'enabled',
+                state: 'loaded',
             });
             registry.register(plugin2 as unknown as IPlugin, createMockManifest('full-plugin-2'), {
-                state: 'enabled',
+                state: 'loaded',
             });
 
             const plugins = service.getAvailableFullPipelinePlugins();

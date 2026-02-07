@@ -34,8 +34,6 @@ describe('PipelineBuilderService', () => {
             settingsSchema: { type: 'object', properties: {} },
             configurationMode: 'hybrid',
             onLoad: jest.fn(),
-            onEnable: jest.fn(),
-            onDisable: jest.fn(),
             onUnload: jest.fn(),
             validateSettings: jest.fn().mockResolvedValue({ valid: true }),
             getStepDefinition: () => stepDef,
@@ -135,7 +133,7 @@ describe('PipelineBuilderService', () => {
 
             const plugin = createMockPipelinePlugin('domain-plugin', replacementStep);
             registry.register(plugin as unknown as IPlugin, createMockManifest('domain-plugin'), {
-                state: 'enabled',
+                state: 'loaded',
             });
 
             const pipeline = await service.build();
@@ -161,7 +159,7 @@ describe('PipelineBuilderService', () => {
 
             const plugin = createMockPipelinePlugin('prompt-plugin', replacementStep);
             registry.register(plugin as unknown as IPlugin, createMockManifest('prompt-plugin'), {
-                state: 'enabled',
+                state: 'loaded',
             });
 
             const pipeline = await service.build();
@@ -188,7 +186,7 @@ describe('PipelineBuilderService', () => {
 
             const plugin = createMockPipelinePlugin('inject-plugin', injectedStep);
             registry.register(plugin as unknown as IPlugin, createMockManifest('inject-plugin'), {
-                state: 'enabled',
+                state: 'loaded',
             });
 
             const pipeline = await service.build();
@@ -213,7 +211,7 @@ describe('PipelineBuilderService', () => {
             registry.register(
                 plugin as unknown as IPlugin,
                 createMockManifest('post-search-plugin'),
-                { state: 'enabled' },
+                { state: 'loaded' },
             );
 
             const pipeline = await service.build();
@@ -250,7 +248,7 @@ describe('PipelineBuilderService', () => {
 
             const plugin = createMockPipelinePlugin('init-plugin', prependStep);
             registry.register(plugin as unknown as IPlugin, createMockManifest('init-plugin'), {
-                state: 'enabled',
+                state: 'loaded',
             });
 
             const pipeline = await service.build();
@@ -272,7 +270,7 @@ describe('PipelineBuilderService', () => {
 
             const plugin = createMockPipelinePlugin('cleanup-plugin', appendStep);
             registry.register(plugin as unknown as IPlugin, createMockManifest('cleanup-plugin'), {
-                state: 'enabled',
+                state: 'loaded',
             });
 
             const pipeline = await service.build();
@@ -327,10 +325,10 @@ describe('PipelineBuilderService', () => {
             const pluginB = createMockPipelinePlugin('plugin-b', stepB);
 
             registry.register(pluginA as unknown as IPlugin, createMockManifest('plugin-a'), {
-                state: 'enabled',
+                state: 'loaded',
             });
             registry.register(pluginB as unknown as IPlugin, createMockManifest('plugin-b'), {
-                state: 'enabled',
+                state: 'loaded',
             });
 
             await expect(service.build()).rejects.toThrow(CircularDependencyError);
@@ -356,10 +354,10 @@ describe('PipelineBuilderService', () => {
             const pluginB = createMockPipelinePlugin('plugin-b', stepB);
 
             registry.register(pluginA as unknown as IPlugin, createMockManifest('plugin-a'), {
-                state: 'enabled',
+                state: 'loaded',
             });
             registry.register(pluginB as unknown as IPlugin, createMockManifest('plugin-b'), {
-                state: 'enabled',
+                state: 'loaded',
             });
 
             await expect(service.build()).rejects.toThrow(
@@ -491,12 +489,12 @@ describe('PipelineBuilderService', () => {
             registry.register(
                 enabledPlugin as unknown as IPlugin,
                 createMockManifest('enabled-plugin'),
-                { state: 'enabled' },
+                { state: 'loaded' },
             );
             registry.register(
                 disabledPlugin as unknown as IPlugin,
                 createMockManifest('disabled-plugin'),
-                { state: 'loaded' }, // Not enabled
+                { state: 'unloaded' }, // Not loaded
             );
 
             const pipeline = await service.build();

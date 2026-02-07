@@ -171,7 +171,7 @@ export class StepPipelineExecutorService {
      */
     private getDefaultPipelinePlugin(): IDefaultPipelinePlugin {
         const registered = this.registry.get('default-pipeline');
-        if (registered && registered.state === 'enabled') {
+        if (registered && registered.state === 'loaded') {
             if (isDefaultPipelinePlugin(registered.plugin)) {
                 return registered.plugin;
             }
@@ -704,7 +704,7 @@ export class StepPipelineExecutorService {
      */
     private async getPluginExecutor(pluginId: string): Promise<IPipelineStepPlugin | null> {
         const registered = this.registry.get(pluginId);
-        if (!registered || registered.state !== 'enabled') {
+        if (!registered || registered.state !== 'loaded') {
             return null;
         }
 
