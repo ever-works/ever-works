@@ -3,6 +3,14 @@
 import { useTranslations } from 'next-intl';
 import { AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogFooter,
+    DialogClose,
+} from '@/components/ui/dialog';
 
 interface PluginDisableWarningProps {
     onCancel: () => void;
@@ -18,28 +26,34 @@ export function PluginDisableWarning({
     const t = useTranslations('dashboard.plugins');
 
     return (
-        <div className="mt-3 p-3 rounded-lg bg-warning/10 border border-warning/30">
-            <div className="flex items-start gap-2">
-                <AlertTriangle className="w-4 h-4 text-warning shrink-0 mt-0.5" />
-                <div className="flex-1">
-                    <p className="text-sm text-warning">{t('disableWarning')}</p>
-                    <div className="flex gap-2 mt-2">
-                        <Button size="sm" variant="ghost" onClick={onCancel}>
-                            {t('cancel')}
-                        </Button>
-                        <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={onConfirm}
-                            disabled={isPending}
-                            loading={isPending}
-                            className="text-danger hover:text-danger hover:bg-danger/10"
-                        >
-                            {t('confirmDisable')}
-                        </Button>
-                    </div>
-                </div>
-            </div>
-        </div>
+        <Dialog open onOpenChange={(open) => !open && onCancel()}>
+            <DialogContent>
+                <DialogClose onClose={onCancel} />
+                <DialogHeader>
+                    <DialogTitle className="text-lg font-semibold text-text dark:text-text-dark flex items-center gap-2">
+                        <AlertTriangle className="w-5 h-5 text-warning" />
+                        {t('disable')}
+                    </DialogTitle>
+                </DialogHeader>
+
+                <p className="text-sm text-warning">{t('disableWarning')}</p>
+
+                <DialogFooter>
+                    <Button size="sm" variant="ghost" onClick={onCancel}>
+                        {t('cancel')}
+                    </Button>
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={onConfirm}
+                        disabled={isPending}
+                        loading={isPending}
+                        className="text-danger hover:text-danger hover:bg-danger/10"
+                    >
+                        {t('confirmDisable')}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     );
 }

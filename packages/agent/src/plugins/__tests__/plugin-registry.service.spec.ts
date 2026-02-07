@@ -459,9 +459,10 @@ describe('PluginRegistryService', () => {
 
             // No directory-level config
             directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue(null);
-            // User has it enabled
+            // User has it enabled with autoEnableForDirectories
             userPluginRepository.findByUserAndPlugin.mockResolvedValue({
                 enabled: true,
+                autoEnableForDirectories: true,
                 userId: 'user-1',
                 pluginId: 'search-plugin',
             } as any);
@@ -627,7 +628,7 @@ describe('PluginRegistryService', () => {
             expect(result).toBe(true);
         });
 
-        it('should fall back to user enabled status when no directory config', async () => {
+        it('should not cascade user enabled to directory when autoEnableForDirectories is absent', async () => {
             const plugin = createMockPlugin('test-plugin');
             const manifest: PluginManifest = {
                 ...createMockManifest('test-plugin'),
@@ -642,8 +643,9 @@ describe('PluginRegistryService', () => {
                 pluginId: 'test-plugin',
             } as any);
 
+            // User-level enabled does NOT cascade to directory scope
             const result = await service.isPluginEnabledForScope('test-plugin', 'dir-1', 'user-1');
-            expect(result).toBe(true);
+            expect(result).toBe(false);
         });
 
         it('should fall back to autoEnable when no scope config exists', async () => {
@@ -967,13 +969,14 @@ describe('PluginRegistryService', () => {
             expect(result[0].plugin.id).toBe('plugin-2');
         });
 
-        it('should include plugins enabled at user level when directory is null', async () => {
+        it('should include plugins with autoEnableForDirectories in directory context', async () => {
             const plugin = createMockPlugin('plugin-1');
             service.register(plugin, createMockManifest('plugin-1'), { state: 'loaded' });
 
             directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue(null);
             userPluginRepository.findByUserAndPlugin.mockResolvedValue({
                 enabled: true,
+                autoEnableForDirectories: true,
                 userId: 'user-1',
                 pluginId: 'plugin-1',
             } as any);

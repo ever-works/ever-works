@@ -1798,6 +1798,7 @@
             "enabled": "Enabled",
             "disabled": "Disabled",
             "enable": "Enable",
+            "enableDescription": "Configure how this plugin is enabled across your directories.",
             "disable": "Disable",
             "settings": "Settings",
             "saveSettings": "Save Settings",

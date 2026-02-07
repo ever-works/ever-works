@@ -28,7 +28,7 @@ export interface PluginEnableContext {
  * 2. User-level DISABLE → cascades globally
  * 3. Directory explicit record → use its enabled value
  * 4. User autoEnableForDirectories (directory context) → true
- * 5. User-level enabled status
+ * 5. User record exists → enabled outside directory, false inside directory
  * 6. Fallback to manifest autoEnable (default false)
  */
 export function resolvePluginEnabled(ctx: PluginEnableContext): boolean {
@@ -42,7 +42,12 @@ export function resolvePluginEnabled(ctx: PluginEnableContext): boolean {
     )
         return ctx.directoryPlugin.enabled;
     if (ctx.hasDirectoryContext && ctx.userPlugin?.autoEnableForDirectories) return true;
-    if (ctx.userPlugin !== undefined && ctx.userPlugin !== null) return ctx.userPlugin.enabled;
+    if (ctx.userPlugin !== undefined && ctx.userPlugin !== null) {
+        // In directory context, user-level enabled does NOT cascade to directories
+        // unless autoEnableForDirectories is true (already checked above).
+        if (ctx.hasDirectoryContext) return false;
+        return ctx.userPlugin.enabled;
+    }
     return ctx.autoEnable ?? false;
 }
 

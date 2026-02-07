@@ -7,6 +7,17 @@ import { DirectoryPluginCard } from './DirectoryPluginCard';
 import { CapabilitySelector } from './CapabilitySelector';
 import { cn } from '@/lib/utils/cn';
 
+/**
+ * Internal capabilities that are not user-selectable per directory.
+ * These represent implementation contracts, not switchable providers.
+ */
+const HIDDEN_CAPABILITIES = new Set([
+    'form-schema-provider',
+    'pipeline-step',
+    'default-pipeline',
+    'oauth',
+]);
+
 interface DirectoryPluginsListProps {
     directoryId: string;
     plugins: DirectoryPlugin[];
@@ -26,9 +37,13 @@ export function DirectoryPluginsList({
         ? plugins.filter((p) => p.systemPlugin || (p.installed && p.enabled))
         : plugins;
 
-    // Get unique capabilities from all plugins
+    // Get unique user-facing capabilities from all plugins (exclude internal ones)
     const allCapabilities = new Set<string>();
-    plugins.forEach((p) => p.capabilities.forEach((c) => allCapabilities.add(c)));
+    plugins.forEach((p) =>
+        p.capabilities
+            .filter((c) => !HIDDEN_CAPABILITIES.has(c))
+            .forEach((c) => allCapabilities.add(c)),
+    );
     const capabilities = Array.from(allCapabilities);
 
     // Group enabled plugins by capability for the selector

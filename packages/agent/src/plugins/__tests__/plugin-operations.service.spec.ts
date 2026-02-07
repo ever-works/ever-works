@@ -1664,7 +1664,7 @@ describe('PluginOperationsService', () => {
             expect(result.plugins[0].directoryEnabled).toBe(true);
         });
 
-        it('should not let autoEnableForDirectories=false override manifest autoEnable=true', async () => {
+        it('should respect autoEnableForDirectories=false even when manifest autoEnable=true', async () => {
             const plugin = createRegisteredPlugin();
             plugin.manifest = { ...plugin.manifest, autoEnable: true } as PluginManifest;
             jest.spyOn(pluginRegistryService, 'getAll').mockReturnValue([plugin]);
@@ -1684,7 +1684,9 @@ describe('PluginOperationsService', () => {
 
             const result = await service.listDirectoryPlugins('dir-1', 'user-1');
 
-            expect(result.plugins[0].directoryEnabled).toBe(true);
+            // User explicitly chose autoEnableForDirectories=false, so plugin is NOT
+            // enabled at directory level despite manifest autoEnable=true
+            expect(result.plugins[0].directoryEnabled).toBe(false);
         });
 
         it('should auto-create directory record in updateDirectoryPluginSettings when user has autoEnableForDirectories', async () => {
