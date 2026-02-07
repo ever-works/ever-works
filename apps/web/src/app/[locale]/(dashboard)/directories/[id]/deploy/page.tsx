@@ -3,7 +3,7 @@ import { notFound, redirect } from 'next/navigation';
 import { ROUTES } from '@/lib/constants';
 import { DeployForm } from '@/components/directories/detail/deploy/DeployForm';
 import { DeployTokenAlert } from '@/components/directories/detail/deploy/DeployTokenAlert';
-import { NoDeployProviderAlert } from '@/components/directories/detail/deploy/NoDeployProviderAlert';
+import { DeployProviderSelector } from '@/components/directories/detail/deploy/DeployProviderSelector';
 import { SharedDirectoryNoTokenAlert } from '@/components/directories/detail/deploy/SharedDirectoryNoTokenAlert';
 import { GenerateStatusType } from '@/lib/api/enums';
 import { canDeploy } from '@/lib/permissions';
@@ -40,19 +40,25 @@ export default async function DeployPage({ params }: DeployPageParams) {
         redirect(ROUTES.DASHBOARD_DIRECTORY(id));
     }
 
-    // If no deploy provider is selected, show provider selector
-    if (!directory.deployProvider) {
-        const providersRes = await deployAPI.getProviders().catch(() => null);
-        const providers = providersRes?.providers ?? [];
-        return <NoDeployProviderAlert directoryId={directory.id} providers={providers} />;
-    }
-
-    // Resolve provider info (used for both the alert and deploy button)
-    const providerId = directory.deployProvider;
+    // Always fetch providers for the selector
     const providersRes = await deployAPI.getProviders().catch(() => null);
-    const provider = providersRes?.providers?.find((p) => p.id === providerId);
+    const providers = providersRes?.providers ?? [];
+
+    const providerId = directory.deployProvider || '';
+    const provider = providers.find((p) => p.id === providerId);
     const providerName = provider?.name;
     const providerHomepage = provider?.homepage;
+
+    // If no provider is selected, show just the selector
+    if (!directory.deployProvider) {
+        return (
+            <DeployProviderSelector
+                directoryId={directory.id}
+                providers={providers}
+                currentProviderId=""
+            />
+        );
+    }
 
     // Check deployment capability based on shared/owned status
     if (!deploymentCapability.canDeploy) {
@@ -60,13 +66,20 @@ export default async function DeployPage({ params }: DeployPageParams) {
         if (deploymentCapability.isShared) {
             return <SharedDirectoryNoTokenAlert />;
         }
-        // For owned directories, show the regular token configuration alert
+        // For owned directories, show the provider selector + token configuration alert
         return (
-            <DeployTokenAlert
-                providerId={providerId}
-                providerName={providerName}
-                providerHomepage={providerHomepage}
-            />
+            <div className="space-y-4">
+                <DeployProviderSelector
+                    directoryId={directory.id}
+                    providers={providers}
+                    currentProviderId={providerId}
+                />
+                <DeployTokenAlert
+                    providerId={providerId}
+                    providerName={providerName}
+                    providerHomepage={providerHomepage}
+                />
+            </div>
         );
     }
 
@@ -83,11 +96,18 @@ export default async function DeployPage({ params }: DeployPageParams) {
     }
 
     return (
-        <DeployForm
-            directory={directory}
-            isDeploying={isDeploying(directory)}
-            providerName={providerName}
-        />
+        <div className="space-y-4">
+            <DeployProviderSelector
+                directoryId={directory.id}
+                providers={providers}
+                currentProviderId={providerId}
+            />
+            <DeployForm
+                directory={directory}
+                isDeploying={isDeploying(directory)}
+                providerName={providerName}
+            />
+        </div>
     );
 }
 

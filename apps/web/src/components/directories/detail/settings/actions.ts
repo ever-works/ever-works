@@ -37,6 +37,7 @@ export async function updateDeployProvider(directoryId: string, deployProvider: 
         });
 
         revalidatePath(ROUTES.DASHBOARD_DIRECTORY_SETTINGS(directoryId));
+        revalidatePath(ROUTES.DASHBOARD_DIRECTORY_DEPLOY(directoryId));
 
         return {
             success: true,

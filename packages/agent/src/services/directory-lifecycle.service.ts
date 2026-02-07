@@ -16,6 +16,7 @@ import { User } from '@src/entities/user.entity';
 import { DirectoryOwnershipService } from './directory-ownership.service';
 import { normalizeGeneratorError } from './utils/error.utils';
 import { GenerateStatusType } from '@src/entities/types';
+import { DeployFacadeService } from '@src/facades/deploy.facade';
 
 @Injectable()
 export class DirectoryLifecycleService {
@@ -27,6 +28,7 @@ export class DirectoryLifecycleService {
         private readonly markdownGenerator: MarkdownGeneratorService,
         private readonly websiteGenerator: WebsiteGeneratorService,
         private readonly ownershipService: DirectoryOwnershipService,
+        private readonly deployFacade: DeployFacadeService,
     ) {}
 
     async createDirectory(createDirectoryDto: CreateDirectoryDto, user: User) {
@@ -98,6 +100,23 @@ export class DirectoryLifecycleService {
                         : directory.organization,
                 readmeConfig: updateDto.readmeConfig ?? directory.readmeConfig,
             };
+
+            // Handle deployProvider update with validation
+            if (updateDto.deployProvider !== undefined) {
+                if (updateDto.deployProvider) {
+                    const availableProviders = this.deployFacade.getAvailableProviders();
+                    const isSupported = availableProviders.some(
+                        (p) => p.id === updateDto.deployProvider,
+                    );
+                    if (!isSupported) {
+                        throw new BadRequestException({
+                            status: 'error',
+                            message: `Unsupported deploy provider: ${updateDto.deployProvider}`,
+                        });
+                    }
+                }
+                updateData.deployProvider = updateDto.deployProvider;
+            }
 
             // Handle website template auto-update settings
             if (updateDto.websiteTemplateAutoUpdate !== undefined) {

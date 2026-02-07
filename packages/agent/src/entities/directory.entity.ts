@@ -50,8 +50,8 @@ export class Directory {
     @Column({ default: 'github' })
     gitProvider: string; // 'github', 'gitlab', etc.
 
-    @Column({ nullable: true })
-    deployProvider?: string; // 'vercel', 'netlify', etc.
+    @Column({ default: 'vercel' })
+    deployProvider: string; // 'vercel', 'netlify', etc.
 
     @Column({ nullable: true })
     website: string;
