@@ -11,6 +11,8 @@ import { enableDirectoryPlugin, disableDirectoryPlugin } from '@/app/actions/plu
 import { PluginIcon } from '@/components/plugins/PluginIcon';
 import { getCategoryLabel, getCapabilityLabel } from '@/lib/utils/plugin-category-icons';
 import { DirectoryPluginSettingsModal } from './DirectoryPluginSettingsModal';
+import { Link } from '@/i18n/navigation';
+import { ROUTES } from '@/lib/constants';
 
 interface DirectoryPluginCardProps {
     directoryId: string;
@@ -22,6 +24,7 @@ export function DirectoryPluginCard({ directoryId, plugin }: DirectoryPluginCard
     const router = useRouter();
     const [isPending, startTransition] = useTransition();
     const [showModal, setShowModal] = useState(false);
+    const [toggleError, setToggleError] = useState<string | null>(null);
 
     // Plugin must be enabled at user level to be enabled at directory level
     const canEnable = plugin.installed && plugin.enabled;
@@ -44,6 +47,7 @@ export function DirectoryPluginCard({ directoryId, plugin }: DirectoryPluginCard
             return;
         }
 
+        setToggleError(null);
         startTransition(async () => {
             try {
                 if (isEnabled) {
@@ -53,7 +57,8 @@ export function DirectoryPluginCard({ directoryId, plugin }: DirectoryPluginCard
                 }
                 router.refresh();
             } catch (error) {
-                console.error('Failed to toggle directory plugin:', error);
+                const message = error instanceof Error ? error.message : t('toggleError');
+                setToggleError(message);
             }
         });
     };
@@ -114,7 +119,7 @@ export function DirectoryPluginCard({ directoryId, plugin }: DirectoryPluginCard
                         {plugin.systemPlugin ? (
                             <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary flex items-center gap-1">
                                 <Shield className="w-3 h-3" />
-                                System
+                                {t('system')}
                             </span>
                         ) : (
                             <Button
@@ -161,6 +166,21 @@ export function DirectoryPluginCard({ directoryId, plugin }: DirectoryPluginCard
                     <p className="text-xs text-warning mt-2">
                         {plugin.installed ? t('disabledByUser') : t('enableAtUserLevelFirst')}
                     </p>
+                )}
+
+                {toggleError && (
+                    <div className="text-xs text-danger mt-2">
+                        <p>{toggleError}</p>
+                        {toggleError.includes('User-level required settings') && (
+                            <Link
+                                href={ROUTES.DASHBOARD_PLUGIN_DETAIL(plugin.pluginId)}
+                                className="text-primary hover:text-primary-hover underline"
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                {t('goToPluginSettings')}
+                            </Link>
+                        )}
+                    </div>
                 )}
 
                 {plugin.description && (

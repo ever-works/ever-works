@@ -601,6 +601,8 @@ export class PluginOperationsService {
             );
         }
 
+        this.validateUserLevelRequiredFields(userPlugin, registered.plugin.settingsSchema);
+
         // Get the plugin entity
         const pluginEntity = await this.pluginRepository.findOne({
             where: { pluginId },
@@ -745,6 +747,8 @@ export class PluginOperationsService {
 
         const schema = registered.plugin.settingsSchema;
 
+        this.validateUserLevelRequiredFields(userPlugin, schema);
+
         // Validate combined settings+secretSettings together against schema
         if (settings || secretSettings) {
             const allSettings = {
@@ -870,6 +874,32 @@ export class PluginOperationsService {
     // ============================================
     // Helper Methods
     // ============================================
+
+    /**
+     * Validate that user-level required settings are configured.
+     * Called before saving directory settings — directory overrides should
+     * not be allowed when the user hasn't filled their own required fields.
+     *
+     * Extracted as a separate method so this check can be easily disabled later.
+     */
+    private validateUserLevelRequiredFields(
+        userPlugin: UserPluginEntity | null,
+        schema: JsonSchema | undefined,
+    ): void {
+        if (!schema?.required || !schema.properties) return;
+
+        const userSettings = {
+            ...(userPlugin?.settings || {}),
+            ...(userPlugin?.secretSettings || {}),
+        };
+        const result = this.settingsValidator.validateRequiredFields(userSettings, schema, 'user');
+        if (!result.valid) {
+            throw new BadRequestException({
+                message: 'User-level required settings must be configured first',
+                errors: result.errors,
+            });
+        }
+    }
 
     /**
      * Convert registered plugin to response

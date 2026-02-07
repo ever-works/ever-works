@@ -13,12 +13,14 @@ import {
 } from '@/components/ui/dialog';
 
 interface PluginDisableWarningProps {
+    open: boolean;
     onCancel: () => void;
     onConfirm: () => void;
     isPending: boolean;
 }
 
 export function PluginDisableWarning({
+    open,
     onCancel,
     onConfirm,
     isPending,
@@ -26,7 +28,7 @@ export function PluginDisableWarning({
     const t = useTranslations('dashboard.plugins');
 
     return (
-        <Dialog open onOpenChange={(open) => !open && onCancel()}>
+        <Dialog open={open} onOpenChange={(o) => !o && onCancel()}>
             <DialogContent>
                 <DialogClose onClose={onCancel} />
                 <DialogHeader>

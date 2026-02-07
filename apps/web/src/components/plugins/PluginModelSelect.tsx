@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils/cn';
 import { ChevronDown, Search, Loader2 } from 'lucide-react';
 import { fetchModels } from '@/app/actions/plugins';
@@ -21,7 +22,6 @@ interface PluginModelSelectProps {
     pluginId: string;
     value: string;
     onChange: (value: string) => void;
-    placeholder?: string;
     disabled?: boolean;
 }
 
@@ -29,9 +29,9 @@ export function PluginModelSelect({
     pluginId,
     value,
     onChange,
-    placeholder = 'Select a model...',
     disabled = false,
 }: PluginModelSelectProps) {
+    const t = useTranslations('dashboard.plugins.modelSelect');
     const [models, setModels] = useState<AiModel[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -39,6 +39,22 @@ export function PluginModelSelect({
     const [search, setSearch] = useState('');
     const [customModel, setCustomModel] = useState('');
     const [showCustomInput, setShowCustomInput] = useState(false);
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    // Click-outside detection via document listener (replaces fragile z-index overlay)
+    const handleClickOutside = useCallback((e: MouseEvent) => {
+        if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+            setIsOpen(false);
+            setSearch('');
+        }
+    }, []);
+
+    useEffect(() => {
+        if (isOpen) {
+            document.addEventListener('mousedown', handleClickOutside);
+            return () => document.removeEventListener('mousedown', handleClickOutside);
+        }
+    }, [isOpen, handleClickOutside]);
 
     useEffect(() => {
         if (!pluginId) return;
@@ -50,12 +66,12 @@ export function PluginModelSelect({
                 setModels(Array.isArray(data) ? data : []);
             })
             .catch(() => {
-                setError('Failed to load models');
+                setError(t('loadError'));
             })
             .finally(() => {
                 setLoading(false);
             });
-    }, [pluginId]);
+    }, [pluginId, t]);
 
     const filteredModels = useMemo(() => {
         if (!search) return models;
@@ -68,7 +84,7 @@ export function PluginModelSelect({
     }, [models, search]);
 
     const selectedModel = models.find((m) => m.id === value);
-    const displayValue = selectedModel?.name || selectedModel?.id || value || placeholder;
+    const displayValue = selectedModel?.name || selectedModel?.id || value || t('placeholder');
 
     const formatContext = (tokens: number) => {
         if (tokens >= 1000000) return `${(tokens / 1000000).toFixed(0)}M`;
@@ -92,7 +108,7 @@ export function PluginModelSelect({
     };
 
     return (
-        <div className="relative">
+        <div ref={containerRef} className="relative">
             {/* Trigger button */}
             <button
                 type="button"
@@ -108,7 +124,7 @@ export function PluginModelSelect({
                 )}
             >
                 <span className={cn(!value && 'text-text-muted dark:text-text-muted-dark')}>
-                    {loading ? 'Loading models...' : displayValue}
+                    {loading ? t('loading') : displayValue}
                 </span>
                 {loading ? (
                     <Loader2 className="w-4 h-4 animate-spin text-text-muted" />
@@ -128,7 +144,7 @@ export function PluginModelSelect({
                                 type="text"
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
-                                placeholder="Search models..."
+                                placeholder={t('searchPlaceholder')}
                                 className={cn(
                                     'w-full pl-8 pr-3 py-1.5 text-sm rounded-md',
                                     'bg-surface-secondary dark:bg-surface-secondary-dark',
@@ -147,7 +163,7 @@ export function PluginModelSelect({
 
                         {!error && filteredModels.length === 0 && !loading && (
                             <div className="px-3 py-2 text-sm text-text-muted dark:text-text-muted-dark">
-                                No models found
+                                {t('noModels')}
                             </div>
                         )}
 
@@ -168,7 +184,11 @@ export function PluginModelSelect({
                                     </span>
                                     {model.capabilities?.maxContextLength && (
                                         <span className="text-xs text-text-muted dark:text-text-muted-dark ml-2 shrink-0">
-                                            {formatContext(model.capabilities.maxContextLength)} ctx
+                                            {t('context', {
+                                                value: formatContext(
+                                                    model.capabilities.maxContextLength,
+                                                ),
+                                            })}
                                         </span>
                                     )}
                                 </div>
@@ -189,7 +209,7 @@ export function PluginModelSelect({
                                     type="text"
                                     value={customModel}
                                     onChange={(e) => setCustomModel(e.target.value)}
-                                    placeholder="Enter model ID..."
+                                    placeholder={t('customModelPlaceholder')}
                                     className={cn(
                                         'flex-1 px-2 py-1 text-sm rounded-md',
                                         'bg-surface-secondary dark:bg-surface-secondary-dark',
@@ -198,7 +218,10 @@ export function PluginModelSelect({
                                         'focus:outline-none focus:ring-1 focus:ring-primary/50',
                                     )}
                                     onKeyDown={(e) => {
-                                        if (e.key === 'Enter') handleCustomSubmit();
+                                        if (e.key === 'Enter') {
+                                            e.preventDefault();
+                                            handleCustomSubmit();
+                                        }
                                         if (e.key === 'Escape') setShowCustomInput(false);
                                     }}
                                     autoFocus
@@ -208,7 +231,7 @@ export function PluginModelSelect({
                                     onClick={handleCustomSubmit}
                                     className="px-3 py-1 text-sm bg-primary text-white rounded-md hover:bg-primary/90"
                                 >
-                                    Add
+                                    {t('add')}
                                 </button>
                             </div>
                         ) : (
@@ -217,22 +240,11 @@ export function PluginModelSelect({
                                 onClick={() => setShowCustomInput(true)}
                                 className="w-full text-left text-sm text-primary hover:text-primary/80 px-1 py-0.5"
                             >
-                                + Add custom model
+                                {t('addCustomModel')}
                             </button>
                         )}
                     </div>
                 </div>
-            )}
-
-            {/* Click outside to close */}
-            {isOpen && (
-                <div
-                    className="fixed inset-0 z-40"
-                    onClick={() => {
-                        setIsOpen(false);
-                        setSearch('');
-                    }}
-                />
             )}
         </div>
     );

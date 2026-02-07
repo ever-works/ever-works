@@ -154,23 +154,21 @@ export function PluginCard({ plugin }: PluginCardProps) {
                 </div>
             </div>
 
-            {showDisableWarning && (
-                <PluginDisableWarning
-                    onCancel={handleCancelDisable}
-                    onConfirm={handleToggle}
-                    isPending={isPending}
-                />
-            )}
+            <PluginDisableWarning
+                open={showDisableWarning}
+                onCancel={handleCancelDisable}
+                onConfirm={handleToggle}
+                isPending={isPending}
+            />
 
-            {showEnablePanel && (
-                <PluginEnablePanel
-                    autoEnableForDirs={autoEnableForDirs}
-                    onAutoEnableChange={setAutoEnableForDirs}
-                    onCancel={handleCancelEnable}
-                    onConfirm={handleToggle}
-                    isPending={isPending}
-                />
-            )}
+            <PluginEnablePanel
+                open={showEnablePanel}
+                autoEnableForDirs={autoEnableForDirs}
+                onAutoEnableChange={setAutoEnableForDirs}
+                onCancel={handleCancelEnable}
+                onConfirm={handleToggle}
+                isPending={isPending}
+            />
         </>
     );
 }

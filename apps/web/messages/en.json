@@ -1836,6 +1836,23 @@
             "cancel": "Cancel",
             "missingRequiredFields": "Missing required fields: {fields}",
             "saveError": "Failed to save settings. Please try again.",
+            "goToPluginSettings": "Go to plugin settings",
+            "userLevelRequiredError": "User-level required settings must be configured first",
+            "modelSelect": {
+                "placeholder": "Select a model...",
+                "loading": "Loading models...",
+                "loadError": "Failed to load models",
+                "searchPlaceholder": "Search models...",
+                "noModels": "No models found",
+                "context": "{value} ctx",
+                "customModelPlaceholder": "Enter model ID...",
+                "addCustomModel": "+ Add custom model",
+                "add": "Add"
+            },
+            "settingsField": {
+                "selectPlaceholder": "Select...",
+                "fieldEncrypted": "This field is encrypted"
+            },
             "oauth": {
                 "title": "Account Connection",
                 "connected": "Connected",
@@ -1901,7 +1918,10 @@
             "resetSuccess": "Settings reset to defaults",
             "cancel": "Cancel",
             "clickToConfigure": "Click to configure",
-            "autoEnabledByUser": "Auto-enabled via user settings"
+            "autoEnabledByUser": "Auto-enabled via user settings",
+            "toggleError": "Failed to toggle plugin",
+            "system": "System",
+            "goToPluginSettings": "Go to plugin settings"
         }
     },
     "layout": {

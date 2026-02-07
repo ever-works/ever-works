@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/dialog';
 
 interface PluginEnablePanelProps {
+    open: boolean;
     autoEnableForDirs: boolean;
     onAutoEnableChange: (checked: boolean) => void;
     onCancel: () => void;
@@ -21,6 +22,7 @@ interface PluginEnablePanelProps {
 }
 
 export function PluginEnablePanel({
+    open,
     autoEnableForDirs,
     onAutoEnableChange,
     onCancel,
@@ -30,7 +32,7 @@ export function PluginEnablePanel({
     const t = useTranslations('dashboard.plugins');
 
     return (
-        <Dialog open onOpenChange={(open) => !open && onCancel()}>
+        <Dialog open={open} onOpenChange={(o) => !o && onCancel()}>
             <DialogContent>
                 <DialogClose onClose={onCancel} />
                 <DialogHeader>

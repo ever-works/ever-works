@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { PluginSettingsSchemaProperty } from '@/lib/api/plugins';
 import { cn } from '@/lib/utils/cn';
 import { Eye, EyeOff } from 'lucide-react';
@@ -23,6 +24,7 @@ export function PluginSettingsField({
     onChange,
     pluginId,
 }: PluginSettingsFieldProps) {
+    const t = useTranslations('dashboard.plugins.settingsField');
     const [showSecret, setShowSecret] = useState(false);
 
     const label = schema.title || name;
@@ -67,7 +69,7 @@ export function PluginSettingsField({
                         'focus:outline-none focus:ring-2 focus:ring-primary/50',
                     )}
                 >
-                    <option value="">Select...</option>
+                    <option value="">{t('selectPlaceholder')}</option>
                     {schema.enum.map((opt) => (
                         <option key={String(opt)} value={String(opt)}>
                             {String(opt)}
@@ -171,7 +173,7 @@ export function PluginSettingsField({
                             clipRule="evenodd"
                         />
                     </svg>
-                    This field is encrypted
+                    {t('fieldEncrypted')}
                 </p>
             )}
         </div>

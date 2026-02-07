@@ -1,9 +1,12 @@
 'use client';
 
 import { ReactNode } from 'react';
+import { useTranslations } from 'next-intl';
 import { PluginSettingsSchemaProperty, PluginSettingsSchema } from '@/lib/api/plugins';
 import { PluginSettingsField } from './PluginSettingsField';
 import { AlertCircle } from 'lucide-react';
+import { Link } from '@/i18n/navigation';
+import { ROUTES } from '@/lib/constants';
 
 interface PluginSettingsFormFieldsProps {
     visibleProperties: Record<string, PluginSettingsSchemaProperty>;
@@ -29,6 +32,8 @@ export function PluginSettingsFormFields({
     validationError,
     renderFieldExtra,
 }: PluginSettingsFormFieldsProps) {
+    const t = useTranslations('dashboard.plugins');
+
     return (
         <>
             <div className="space-y-4">
@@ -52,7 +57,17 @@ export function PluginSettingsFormFields({
             {validationError && (
                 <div className="mt-4 p-3 rounded-lg bg-danger/10 border border-danger/20 flex items-start gap-2">
                     <AlertCircle className="w-4 h-4 text-danger shrink-0 mt-0.5" />
-                    <p className="text-sm text-danger">{validationError}</p>
+                    <div className="text-sm text-danger">
+                        <p>{validationError}</p>
+                        {validationError.includes('User-level required settings') && (
+                            <Link
+                                href={ROUTES.DASHBOARD_PLUGIN_DETAIL(pluginId)}
+                                className="inline-block mt-1 text-primary hover:text-primary-hover underline"
+                            >
+                                {t('goToPluginSettings')}
+                            </Link>
+                        )}
+                    </div>
                 </div>
             )}
         </>
