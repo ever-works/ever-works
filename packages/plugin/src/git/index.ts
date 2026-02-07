@@ -21,7 +21,8 @@ export type {
 	GitOrganization,
 	GitPullRequest,
 	GitRepositoryPermissions,
-	GitRepositoryWithPermissions
+	GitRepositoryWithPermissions,
+	ListRepositoriesOptions
 } from '../contracts/capabilities/git-provider.interface.js';
 
 export { isGitProviderPlugin } from '../contracts/capabilities/git-provider.interface.js';

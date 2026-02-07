@@ -22,6 +22,7 @@ import type {
 	MergeResult,
 	ForkRepositoryOptions,
 	GitRepositoryWithPermissions,
+	ListRepositoriesOptions,
 	GitCloneOptions,
 	GitPushOptions,
 	GitCommitter,
@@ -125,9 +126,14 @@ export class GitHubPlugin implements IPlugin, IGitProviderPlugin, IOAuthPlugin {
 		return this.apiService.getRepository(owner, repo, token, settings.apiBaseUrl);
 	}
 
-	async listRepositories(token: string, page?: number, perPage?: number): Promise<GitRepositoryWithPermissions[]> {
+	async listRepositories(
+		token: string,
+		page?: number,
+		perPage?: number,
+		options?: ListRepositoriesOptions
+	): Promise<GitRepositoryWithPermissions[]> {
 		const settings = await this.getSettings();
-		return this.apiService.listRepositories(token, page, perPage, settings.apiBaseUrl);
+		return this.apiService.listRepositories(token, page, perPage, settings.apiBaseUrl, options);
 	}
 
 	async createRepository(options: CreateRepoOptions, token: string): Promise<GitRepository> {

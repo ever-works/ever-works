@@ -11,7 +11,8 @@ import type {
 	MergeOptions,
 	MergeResult,
 	ForkRepositoryOptions,
-	GitRepositoryWithPermissions
+	GitRepositoryWithPermissions,
+	ListRepositoriesOptions
 } from '@ever-works/plugin/git';
 
 function sanitizeDescription(description?: string): string {
@@ -91,24 +92,53 @@ export class GitHubApiService {
 		token: string,
 		page: number = 1,
 		perPage: number = 30,
-		baseUrl?: string
+		baseUrl?: string,
+		options?: ListRepositoriesOptions
 	): Promise<GitRepositoryWithPermissions[]> {
 		const octokit = this.createOctokit(token, baseUrl);
-		const { data } = await octokit.rest.repos.listForAuthenticatedUser({
-			page,
-			per_page: perPage,
-			sort: 'updated'
-		});
+
+		let data;
+		if (options?.type === 'org' && options?.owner) {
+			try {
+				const response = await octokit.rest.repos.listForOrg({
+					org: options.owner,
+					page,
+					per_page: perPage,
+					sort: 'updated'
+				});
+				data = response.data;
+			} catch (err) {
+				if (err instanceof RequestError && (err.status === 404 || err.status === 403)) {
+					return [];
+				}
+				throw err;
+			}
+		} else if (options?.type === 'user') {
+			const response = await octokit.rest.repos.listForAuthenticatedUser({
+				affiliation: 'owner',
+				page,
+				per_page: perPage,
+				sort: 'updated'
+			});
+			data = response.data;
+		} else {
+			const response = await octokit.rest.repos.listForAuthenticatedUser({
+				page,
+				per_page: perPage,
+				sort: 'updated'
+			});
+			data = response.data;
+		}
 
 		return data.map((repo) => ({
 			owner: repo.owner.login,
 			name: repo.name,
 			fullName: repo.full_name,
 			description: repo.description ?? undefined,
-			defaultBranch: repo.default_branch,
+			defaultBranch: repo.default_branch ?? 'main',
 			isPrivate: repo.private,
 			url: repo.html_url,
-			cloneUrl: repo.clone_url,
+			cloneUrl: repo.clone_url ?? `https://github.com/${repo.full_name}.git`,
 			isFork: repo.fork,
 			permissions: repo.permissions
 				? {

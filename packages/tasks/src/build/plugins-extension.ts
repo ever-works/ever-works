@@ -67,19 +67,13 @@ export function includePlugins() {
                 for (const key of RUNTIME_PKG_FIELDS) {
                     if (pkg[key] !== undefined) runtimePkg[key] = pkg[key];
                 }
-                files[`plugins/${entry.name}/package.json`] = JSON.stringify(
-                    runtimePkg,
-                    null,
-                    2,
-                );
+                files[`plugins/${entry.name}/package.json`] = JSON.stringify(runtimePkg, null, 2);
 
                 pluginCount++;
-                context.logger.log(`  -> Including plugin: ${entry.name}`);
             }
 
             if (pluginCount > 0) {
                 context.addLayer({ id: 'plugins', files });
-                context.logger.log(`Included ${pluginCount} plugins in container`);
             }
         },
     };

@@ -13,6 +13,7 @@ import type {
     MergeResult,
     ForkRepositoryOptions,
     GitRepositoryWithPermissions,
+    ListRepositoriesOptions,
     GitCommitter,
     GitFileChange,
     IGitFacade,
@@ -253,10 +254,11 @@ export class GitFacadeService implements IGitFacade {
         options: GitFacadeOptions,
         page?: number,
         perPage?: number,
+        listOptions?: ListRepositoriesOptions,
     ): Promise<GitRepositoryWithPermissions[]> {
         const { plugin, token } = await this.resolvePluginAndToken(options);
         if (plugin.listRepositories) {
-            return plugin.listRepositories(token, page, perPage);
+            return plugin.listRepositories(token, page, perPage, listOptions);
         }
         return [];
     }

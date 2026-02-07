@@ -137,6 +137,11 @@ export interface GitRepositoryWithPermissions extends GitRepository {
 	readonly permissions?: GitRepositoryPermissions;
 }
 
+export interface ListRepositoriesOptions {
+	owner?: string;
+	type?: 'user' | 'org';
+}
+
 /**
  * Local git operations using isomorphic-git.
  * Implemented in BaseGitProvider - plugin developers extend that class.
@@ -169,7 +174,12 @@ export interface IGitProviderPlugin extends IPlugin, IGitOperations {
 	getWebUrl(owner: string, repo: string): string;
 
 	// Repository operations
-	listRepositories?(token: string, page?: number, perPage?: number): Promise<GitRepositoryWithPermissions[]>;
+	listRepositories?(
+		token: string,
+		page?: number,
+		perPage?: number,
+		options?: ListRepositoriesOptions
+	): Promise<GitRepositoryWithPermissions[]>;
 	createRepository(options: CreateRepoOptions, token: string): Promise<GitRepository>;
 	getRepository(owner: string, repo: string, token: string): Promise<GitRepository | null>;
 	hasRepositoryAccess?(owner: string, repo: string, token: string): Promise<boolean>;

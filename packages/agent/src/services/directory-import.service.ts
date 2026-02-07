@@ -124,7 +124,10 @@ export class DirectoryImportService {
         const perPage = dto.perPage || 30;
 
         try {
-            const repos = await this.gitFacade.listRepositories(options, page, perPage);
+            const repos = await this.gitFacade.listRepositories(options, page, perPage, {
+                owner: dto.owner,
+                type: dto.type,
+            });
 
             let filteredRepos = repos;
             if (dto.search) {

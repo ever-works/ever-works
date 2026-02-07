@@ -611,7 +611,7 @@ describe('GitFacadeService', () => {
 
             await service.listRepositories({ providerId: 'github', token: 'test-token' }, 1, 20);
 
-            expect(gitPlugin.listRepositories).toHaveBeenCalledWith('test-token', 1, 20);
+            expect(gitPlugin.listRepositories).toHaveBeenCalledWith('test-token', 1, 20, undefined);
         });
 
         it('should return empty array when listRepositories not supported', async () => {
