@@ -151,7 +151,7 @@ export function DirectoryInfo({ directory, config }: DirectoryInfoProps) {
         },
         {
             label: t('repositories'),
-            active: Boolean(repoLinks && config),
+            active: Boolean(repoLinks),
             value: (
                 <ul className="flex gap-2 flex-col list-inside">
                     <li className="flex gap-1">

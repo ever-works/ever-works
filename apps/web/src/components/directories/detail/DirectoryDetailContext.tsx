@@ -60,7 +60,7 @@ export const useDirectoryPermissions = () => {
 };
 
 function repoLink(directory: Directory, oauthConnection: GitProviderConnectionInfo | null) {
-    if (!oauthConnection?.connected) {
+    if (!oauthConnection) {
         return null;
     }
 

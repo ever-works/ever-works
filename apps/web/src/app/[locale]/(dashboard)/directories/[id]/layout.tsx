@@ -24,9 +24,24 @@ export default async function DirectoryLayout({ params, children }: LayoutParams
         config = configRes.config;
 
         if (directory) {
-            oauthConnection = await gitProvidersAPI
-                .checkConnection(directory.gitProvider)
-                .catch(() => null);
+            // Fetch connection info and provider list in parallel
+            const [connectionRes, providersRes] = await Promise.all([
+                gitProvidersAPI.checkConnection(directory.gitProvider).catch(() => null),
+                gitProvidersAPI.list().catch(() => null),
+            ]);
+
+            oauthConnection = connectionRes;
+
+            // If checkConnection failed but we have provider info from the list,
+            // build a minimal connection object so repo links still work
+            if (!oauthConnection && providersRes) {
+                const provider = providersRes.providers?.find(
+                    (p) => p.id === directory.gitProvider,
+                );
+                if (provider) {
+                    oauthConnection = { ...provider, connected: false };
+                }
+            }
         }
     } catch (error) {
         console.error('Failed to fetch directory:', error);

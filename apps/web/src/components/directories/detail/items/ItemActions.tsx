@@ -23,10 +23,10 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Loader2, MoreVertical, Trash2, SlidersHorizontal, Camera } from 'lucide-react';
+import { useItemsContext } from './ItemsContext';
 
 type ItemActionsProps = {
     item: ItemData;
-    directoryId: string;
     isPending: boolean;
     onDelete: () => void;
     onUpdate?: (item: Partial<ItemData>) => void;
@@ -34,12 +34,12 @@ type ItemActionsProps = {
 
 export const ItemActions = memo(function ItemActions({
     item,
-    directoryId,
     isPending,
     onDelete,
     onUpdate,
 }: ItemActionsProps) {
     const t = useTranslations('dashboard.directoryDetail.items');
+    const { directoryId, screenshotAvailable } = useItemsContext();
     const [isDisplayDialogOpen, setIsDisplayDialogOpen] = useState(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [isCapturingScreenshot, setIsCapturingScreenshot] = useState(false);
@@ -103,7 +103,7 @@ export const ItemActions = memo(function ItemActions({
                         <SlidersHorizontal className="w-4 h-4" />
                         {t('editDisplay', { defaultValue: 'Edit display' })}
                     </DropdownMenuItem>
-                    {item.source_url && (
+                    {item.source_url && screenshotAvailable && (
                         <DropdownMenuItem
                             onClick={handleCaptureScreenshot}
                             disabled={isCapturingScreenshot}
