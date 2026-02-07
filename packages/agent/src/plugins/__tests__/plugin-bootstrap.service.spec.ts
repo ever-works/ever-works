@@ -42,12 +42,11 @@ describe('PluginBootstrapService', () => {
                     useValue: {
                         setContextFactory: jest.fn(),
                         callOnLoad: jest.fn().mockResolvedValue({ success: true }),
-                        enableSystemPlugins: jest
-                            .fn()
-                            .mockResolvedValue([{ success: true, pluginId: 'system-plugin' }]),
-                        enableAutoEnablePlugins: jest
-                            .fn()
-                            .mockResolvedValue([{ success: true, pluginId: 'auto-plugin' }]),
+                        enableAll: jest.fn().mockResolvedValue([
+                            { success: true, pluginId: 'system-plugin' },
+                            { success: true, pluginId: 'auto-plugin' },
+                            { success: true, pluginId: 'manual-plugin' },
+                        ]),
                         shutdownAll: jest.fn().mockResolvedValue(undefined),
                     },
                 },
@@ -68,36 +67,29 @@ describe('PluginBootstrapService', () => {
     });
 
     describe('bootstrap', () => {
-        it('should call enableAutoEnablePlugins after enableSystemPlugins', async () => {
-            const callOrder: string[] = [];
-            (lifecycleManager.enableSystemPlugins as jest.Mock).mockImplementation(async () => {
-                callOrder.push('enableSystemPlugins');
-                return [{ success: true, pluginId: 'system-plugin' }];
-            });
-            (lifecycleManager.enableAutoEnablePlugins as jest.Mock).mockImplementation(async () => {
-                callOrder.push('enableAutoEnablePlugins');
-                return [{ success: true, pluginId: 'auto-plugin' }];
-            });
-
+        it('should call enableAll after loading plugins', async () => {
             await service.bootstrap();
 
-            expect(callOrder).toEqual(['enableSystemPlugins', 'enableAutoEnablePlugins']);
+            expect(lifecycleManager.enableAll).toHaveBeenCalledTimes(1);
         });
 
-        it('should include auto-enabled count in systemEnabled result', async () => {
+        it('should include enabled count in systemEnabled result', async () => {
             const result = await service.bootstrap();
 
             expect(result.executed).toBe(true);
-            expect(result.systemEnabled).toBe(2); // 1 system + 1 auto-enable
+            expect(result.systemEnabled).toBe(3);
         });
 
-        it('should work when no auto-enable plugins exist', async () => {
-            (lifecycleManager.enableAutoEnablePlugins as jest.Mock).mockResolvedValue([]);
+        it('should handle partial enable failures', async () => {
+            (lifecycleManager.enableAll as jest.Mock).mockResolvedValue([
+                { success: true, pluginId: 'system-plugin' },
+                { success: false, pluginId: 'broken-plugin', error: 'some error' },
+            ]);
 
             const result = await service.bootstrap();
 
             expect(result.executed).toBe(true);
-            expect(result.systemEnabled).toBe(1); // only system plugin
+            expect(result.systemEnabled).toBe(1);
         });
 
         it('should skip if already initialized', async () => {
@@ -105,7 +97,7 @@ describe('PluginBootstrapService', () => {
             const result = await service.bootstrap();
 
             expect(result.executed).toBe(false);
-            expect(lifecycleManager.enableAutoEnablePlugins).toHaveBeenCalledTimes(1);
+            expect(lifecycleManager.enableAll).toHaveBeenCalledTimes(1);
         });
     });
 });

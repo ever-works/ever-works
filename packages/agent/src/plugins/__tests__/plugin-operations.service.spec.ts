@@ -7,7 +7,6 @@ import { PluginEntity } from '../entities/plugin.entity';
 import { UserPluginEntity } from '../entities/user-plugin.entity';
 import { DirectoryPluginEntity } from '../entities/directory-plugin.entity';
 import { PluginRegistryService } from '../services/plugin-registry.service';
-import { PluginLifecycleManagerService } from '../services/plugin-lifecycle-manager.service';
 import { SettingsSchemaValidatorService } from '../services/settings-schema-validator.service';
 import type { RegisteredPlugin } from '../services/plugin-registry.service';
 import type { IPlugin, PluginManifest, JsonSchema } from '@ever-works/plugin';
@@ -31,7 +30,6 @@ describe('PluginOperationsService', () => {
     let userPluginRepository: Repository<UserPluginEntity>;
     let directoryPluginRepository: Repository<DirectoryPluginEntity>;
     let pluginRegistryService: PluginRegistryService;
-    let lifecycleManager: PluginLifecycleManagerService;
 
     const createSettingsSchema = (): JsonSchema =>
         ({
@@ -143,17 +141,6 @@ describe('PluginOperationsService', () => {
                     },
                 },
                 {
-                    provide: PluginLifecycleManagerService,
-                    useValue: {
-                        enable: jest.fn().mockResolvedValue({
-                            success: true,
-                            pluginId: 'test-plugin',
-                            previousState: 'loaded',
-                            newState: 'enabled',
-                        }),
-                    },
-                },
-                {
                     provide: SettingsSchemaValidatorService,
                     useValue: {
                         validate: jest.fn().mockReturnValue({ valid: true, errors: [] }),
@@ -177,7 +164,6 @@ describe('PluginOperationsService', () => {
             getRepositoryToken(DirectoryPluginEntity),
         );
         pluginRegistryService = module.get<PluginRegistryService>(PluginRegistryService);
-        lifecycleManager = module.get<PluginLifecycleManagerService>(PluginLifecycleManagerService);
     });
 
     describe('secret settings in API response', () => {
@@ -532,75 +518,6 @@ describe('PluginOperationsService', () => {
                 pluginId: 'test-plugin',
             } as any);
             jest.spyOn(userPluginRepository, 'findOne').mockResolvedValue(null);
-
-            const result = await service.enablePluginForUser('test-plugin', 'user-1');
-
-            expect(result.installed).toBe(true);
-            expect(result.enabled).toBe(true);
-            expect(userPluginRepository.save).toHaveBeenCalled();
-        });
-
-        it('should call lifecycleManager.enable when plugin is in loaded state', async () => {
-            const registered = createRegisteredPlugin();
-            registered.state = 'loaded';
-            jest.spyOn(pluginRegistryService, 'get').mockReturnValue(registered);
-            jest.spyOn(pluginRepository, 'findOne').mockResolvedValue({
-                id: '1',
-                pluginId: 'test-plugin',
-            } as any);
-            jest.spyOn(userPluginRepository, 'findOne').mockResolvedValue(null);
-
-            await service.enablePluginForUser('test-plugin', 'user-1');
-
-            expect(lifecycleManager.enable).toHaveBeenCalledWith('test-plugin');
-        });
-
-        it('should call lifecycleManager.enable when plugin is in disabled state', async () => {
-            const registered = createRegisteredPlugin();
-            registered.state = 'disabled';
-            jest.spyOn(pluginRegistryService, 'get').mockReturnValue(registered);
-            jest.spyOn(pluginRepository, 'findOne').mockResolvedValue({
-                id: '1',
-                pluginId: 'test-plugin',
-            } as any);
-            jest.spyOn(userPluginRepository, 'findOne').mockResolvedValue(null);
-
-            await service.enablePluginForUser('test-plugin', 'user-1');
-
-            expect(lifecycleManager.enable).toHaveBeenCalledWith('test-plugin');
-        });
-
-        it('should NOT call lifecycleManager.enable when plugin is already enabled', async () => {
-            const registered = createRegisteredPlugin();
-            registered.state = 'enabled';
-            jest.spyOn(pluginRegistryService, 'get').mockReturnValue(registered);
-            jest.spyOn(pluginRepository, 'findOne').mockResolvedValue({
-                id: '1',
-                pluginId: 'test-plugin',
-            } as any);
-            jest.spyOn(userPluginRepository, 'findOne').mockResolvedValue(null);
-
-            await service.enablePluginForUser('test-plugin', 'user-1');
-
-            expect(lifecycleManager.enable).not.toHaveBeenCalled();
-        });
-
-        it('should still succeed even if lifecycle transition fails', async () => {
-            const registered = createRegisteredPlugin();
-            registered.state = 'loaded';
-            jest.spyOn(pluginRegistryService, 'get').mockReturnValue(registered);
-            jest.spyOn(pluginRepository, 'findOne').mockResolvedValue({
-                id: '1',
-                pluginId: 'test-plugin',
-            } as any);
-            jest.spyOn(userPluginRepository, 'findOne').mockResolvedValue(null);
-            jest.spyOn(lifecycleManager, 'enable').mockResolvedValue({
-                success: false,
-                pluginId: 'test-plugin',
-                previousState: 'loaded',
-                newState: 'error',
-                error: 'Context factory not initialized',
-            });
 
             const result = await service.enablePluginForUser('test-plugin', 'user-1');
 

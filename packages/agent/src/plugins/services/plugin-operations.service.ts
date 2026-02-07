@@ -30,7 +30,6 @@ import { PluginEntity } from '../entities/plugin.entity';
 import { UserPluginEntity } from '../entities/user-plugin.entity';
 import { DirectoryPluginEntity } from '../entities/directory-plugin.entity';
 import { PluginRegistryService, type RegisteredPlugin } from './plugin-registry.service';
-import { PluginLifecycleManagerService } from './plugin-lifecycle-manager.service';
 import {
     SettingsSchemaValidatorService,
     type SettingsScope,
@@ -49,7 +48,6 @@ export class PluginOperationsService {
         @InjectRepository(DirectoryPluginEntity)
         private readonly directoryPluginRepository: Repository<DirectoryPluginEntity>,
         private readonly pluginRegistryService: PluginRegistryService,
-        private readonly lifecycleManager: PluginLifecycleManagerService,
         private readonly settingsValidator: SettingsSchemaValidatorService,
         private readonly aiFacade: AiFacadeService,
     ) {}
@@ -343,18 +341,6 @@ export class PluginOperationsService {
         }
 
         await this.userPluginRepository.save(userPlugin);
-
-        // Transition in-memory registry state so all facades can find this plugin.
-        // Only needed for non-autoEnable plugins that stay in 'loaded' after bootstrap.
-        if (registered.state === 'loaded' || registered.state === 'disabled') {
-            const lifecycleResult = await this.lifecycleManager.enable(pluginId);
-            if (!lifecycleResult.success) {
-                this.logger.warn(
-                    `Plugin "${pluginId}" saved to DB but lifecycle transition failed: ${lifecycleResult.error}`,
-                );
-            }
-        }
-
         this.logger.log(`Plugin "${pluginId}" enabled for user "${userId}"`);
 
         return this.toUserPluginResponse(registered, userPlugin);

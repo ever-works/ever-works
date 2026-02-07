@@ -99,18 +99,17 @@ export class PluginBootstrapService {
             }
         }
 
-        // Always enable system plugins (they cannot be disabled)
-        const systemResults = await this.lifecycleManager.enableSystemPlugins();
-        const systemEnabled = systemResults.filter((r) => r.success).length;
-        if (systemEnabled > 0) {
-            this.logger.log(`Auto-enabled ${systemEnabled} system plugins`);
+        // Enable all loaded plugins.
+        // Per-user/per-directory access control is handled by isPluginEnabledForScope(),
+        // so the registry state just means "plugin is initialized and ready to serve".
+        const enableResults = await this.lifecycleManager.enableAll();
+        const enabled = enableResults.filter((r) => r.success).length;
+        const enableFailed = enableResults.filter((r) => !r.success).length;
+        if (enabled > 0) {
+            this.logger.log(`Enabled ${enabled} plugins`);
         }
-
-        // Auto-enable plugins with autoEnable: true in their manifest
-        const autoEnableResults = await this.lifecycleManager.enableAutoEnablePlugins();
-        const autoEnabled = autoEnableResults.filter((r) => r.success).length;
-        if (autoEnabled > 0) {
-            this.logger.log(`Auto-enabled ${autoEnabled} plugins with autoEnable manifest flag`);
+        if (enableFailed > 0) {
+            this.logger.warn(`Failed to enable ${enableFailed} plugins`);
         }
 
         // Mark as initialized
@@ -121,7 +120,7 @@ export class PluginBootstrapService {
             executed: true,
             loaded: result.loaded,
             failed: result.failed,
-            systemEnabled: systemEnabled + autoEnabled,
+            systemEnabled: enabled,
         };
     }
 
