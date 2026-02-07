@@ -40,10 +40,11 @@ export class DeployProviderNotFoundError extends DeployFacadeError {
 }
 
 export class NoDeployCredentialsError extends DeployFacadeError {
-    constructor(providerId: string, userId: string) {
+    constructor(providerId: string, userId: string, providerName?: string) {
+        const displayName = providerName || providerId;
         super(
-            `No deployment credentials found for user ${userId} with provider ${providerId}. ` +
-                'Please configure your deployment token in Plugin Settings.',
+            `No ${displayName} credentials configured. ` +
+                `Please configure your ${displayName} token in Plugin Settings.`,
             'getCredentials',
             providerId,
         );
@@ -335,7 +336,9 @@ export class DeployFacadeService implements IDeployFacade {
         );
 
         if (!token) {
-            throw new NoDeployCredentialsError(providerId, options.userId);
+            const providerName =
+                (registered.plugin as IDeploymentPlugin).providerName || registered.plugin.name;
+            throw new NoDeployCredentialsError(providerId, options.userId, providerName);
         }
 
         return {

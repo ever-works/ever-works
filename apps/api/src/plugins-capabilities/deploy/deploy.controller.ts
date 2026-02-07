@@ -21,6 +21,13 @@ export class DeployController {
         private readonly deploymentVerifier: DeploymentVerifierService,
     ) {}
 
+    private getProviderName(deployProvider: string | undefined): string {
+        if (!deployProvider) return 'Deployment';
+        const providers = this.deployFacade.getAvailableProviders();
+        const provider = providers.find((p) => p.id === deployProvider);
+        return provider?.name || deployProvider;
+    }
+
     /**
      * Get available deployment providers
      */
@@ -107,12 +114,14 @@ export class DeployController {
             directoryId: id,
         });
 
+        const providerName = this.getProviderName(directory.deployProvider);
+
         if (!isConfigured) {
             throw new BadRequestException({
                 status: 'error',
                 message: isCreator
-                    ? 'Deployment token is required. Please configure it in Plugin Settings.'
-                    : 'The directory owner has not configured deployment credentials.',
+                    ? `${providerName} token is required. Please configure it in Plugin Settings.`
+                    : `The directory owner has not configured ${providerName} credentials.`,
             });
         }
 
@@ -125,7 +134,7 @@ export class DeployController {
         if (!isValid) {
             throw new BadRequestException({
                 status: 'error',
-                message: 'Invalid deployment token. Please check your token in Plugin Settings.',
+                message: `Invalid ${providerName} token. Please check your token in Plugin Settings.`,
             });
         }
 
@@ -214,6 +223,7 @@ export class DeployController {
     @ApiResponse({ status: 200, description: 'List of teams' })
     async getTeamsForDirectory(@CurrentUser() auth: AuthenticatedUser, @Param('id') id: string) {
         const { directory, isCreator } = await this.ownershipService.ensureCanView(id, auth.userId);
+        const providerName = this.getProviderName(directory.deployProvider);
 
         try {
             const teams = await this.deployFacade.getTeams({
@@ -230,7 +240,7 @@ export class DeployController {
                 status: 'error',
                 message:
                     error?.message ||
-                    'Failed to get teams. Please configure your deployment token in Plugin Settings.',
+                    `Failed to get teams. Please configure your ${providerName} token in Plugin Settings.`,
             });
         }
     }
@@ -305,12 +315,14 @@ export class DeployController {
             directoryId: id,
         });
 
+        const providerName = this.getProviderName(directory.deployProvider);
+
         if (!isConfigured) {
             throw new BadRequestException({
                 status: 'error',
                 message: isCreator
-                    ? 'Deployment token is required to lookup deployments. Configure it in Plugin Settings.'
-                    : 'The directory owner has not configured deployment credentials.',
+                    ? `${providerName} token is required to lookup deployments. Configure it in Plugin Settings.`
+                    : `The directory owner has not configured ${providerName} credentials.`,
             });
         }
 
