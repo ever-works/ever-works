@@ -220,9 +220,18 @@ export class PluginLoaderService {
             }
 
             // Merge runtime manifest from plugin class (provides readme, icon overrides, etc.)
+            // Runtime manifest fills in fields not defined in package.json
             if (typeof plugin.getManifest === 'function') {
                 const runtimeManifest = plugin.getManifest();
-                manifest = { ...runtimeManifest, ...manifest };
+                // Only keep defined values from package.json manifest to avoid
+                // overriding runtime values (e.g. homepage, icon) with undefined
+                const definedManifest: Record<string, unknown> = {};
+                for (const [key, value] of Object.entries(manifest)) {
+                    if (value !== undefined) {
+                        definedManifest[key] = value;
+                    }
+                }
+                manifest = { ...runtimeManifest, ...definedManifest } as typeof manifest;
             }
 
             // Validate the plugin class
