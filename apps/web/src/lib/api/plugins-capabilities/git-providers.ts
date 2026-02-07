@@ -1,13 +1,21 @@
 import 'server-only';
 import { serverFetch } from '../server-api';
-import type { GitUser, GitOrganization, GitRepositoryWithPermissions } from '@ever-works/plugin';
+import type {
+    GitUser,
+    GitOrganization,
+    GitRepositoryWithPermissions,
+    PluginIcon,
+} from '@ever-works/plugin';
 
-export type { GitUser, GitOrganization, GitRepositoryWithPermissions };
+export type { GitUser, GitOrganization, GitRepositoryWithPermissions, PluginIcon };
 
 export interface GitProviderInfo {
     id: string;
     name: string;
     enabled: boolean;
+    icon?: PluginIcon;
+    description?: string;
+    homepage?: string;
 }
 
 export interface GitProviderConnectionInfo extends GitProviderInfo {

@@ -2,13 +2,18 @@
 
 import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
-import { Triangle, Cloud, Check, Settings } from 'lucide-react';
+import { Cloud, Check, Settings } from 'lucide-react';
 import Link from 'next/link';
+import { PluginIcon } from '@/components/plugins/PluginIcon';
+import type { PluginIcon as PluginIconType } from '@ever-works/plugin';
 
 export interface DeployProvider {
     id: string;
     name: string;
     enabled: boolean;
+    icon?: PluginIconType;
+    description?: string;
+    homepage?: string;
 }
 
 interface DeployProviderSelectorProps {
@@ -16,34 +21,6 @@ interface DeployProviderSelectorProps {
     selectedProviderId: string | null;
     onSelect: (providerId: string) => void;
     compact?: boolean;
-}
-
-function getProviderIcon(providerId: string) {
-    switch (providerId.toLowerCase()) {
-        case 'vercel':
-            return Triangle;
-        default:
-            return Cloud;
-    }
-}
-
-function getProviderColors(providerId: string) {
-    switch (providerId.toLowerCase()) {
-        case 'vercel':
-            return {
-                bg: 'bg-black dark:bg-white',
-                hover: 'hover:bg-black/90 dark:hover:bg-white/90',
-                text: 'text-white dark:text-black',
-                iconClass: 'fill-current',
-            };
-        default:
-            return {
-                bg: 'bg-primary',
-                hover: 'hover:bg-primary/90',
-                text: 'text-white',
-                iconClass: '',
-            };
-    }
 }
 
 export function DeployProviderSelector({
@@ -77,8 +54,6 @@ export function DeployProviderSelector({
             <div className="space-y-2">
                 {providers.map((provider) => {
                     const isSelected = selectedProviderId === provider.id;
-                    const ProviderIcon = getProviderIcon(provider.id);
-                    const colors = getProviderColors(provider.id);
 
                     return (
                         <div key={provider.id} className="space-y-2">
@@ -94,12 +69,7 @@ export function DeployProviderSelector({
                                     !provider.enabled && 'opacity-50 cursor-not-allowed',
                                 )}
                             >
-                                <ProviderIcon
-                                    className={cn(
-                                        'w-5 h-5 text-text dark:text-text-dark',
-                                        colors.iconClass,
-                                    )}
-                                />
+                                <PluginIcon icon={provider.icon} name={provider.name} size={20} />
                                 <div className="flex-1 text-left">
                                     <p className="text-sm font-medium text-text dark:text-text-dark">
                                         {provider.name}
@@ -123,9 +93,7 @@ export function DeployProviderSelector({
                                     href={`/plugins/${provider.id}`}
                                     className={cn(
                                         'w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors',
-                                        colors.bg,
-                                        colors.hover,
-                                        colors.text,
+                                        'bg-primary hover:bg-primary/90 text-white',
                                     )}
                                 >
                                     <Settings className="w-4 h-4" />
@@ -155,8 +123,6 @@ export function DeployProviderSelector({
             <div className="flex flex-wrap gap-3">
                 {providers.map((provider) => {
                     const isSelected = selectedProviderId === provider.id;
-                    const ProviderIcon = getProviderIcon(provider.id);
-                    const colors = getProviderColors(provider.id);
 
                     return (
                         <div key={provider.id} className="flex items-center gap-2">
@@ -172,12 +138,7 @@ export function DeployProviderSelector({
                                     !provider.enabled && 'opacity-50 cursor-not-allowed',
                                 )}
                             >
-                                <ProviderIcon
-                                    className={cn(
-                                        'w-5 h-5 text-text dark:text-text-dark',
-                                        colors.iconClass,
-                                    )}
-                                />
+                                <PluginIcon icon={provider.icon} name={provider.name} size={20} />
                                 <span className="font-medium text-text dark:text-text-dark">
                                     {provider.name}
                                 </span>
@@ -199,9 +160,7 @@ export function DeployProviderSelector({
                                     href={`/plugins/${provider.id}`}
                                     className={cn(
                                         'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors',
-                                        colors.bg,
-                                        colors.hover,
-                                        colors.text,
+                                        'bg-primary hover:bg-primary/90 text-white',
                                     )}
                                 >
                                     <Settings className="w-4 h-4" />

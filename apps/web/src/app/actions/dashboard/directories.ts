@@ -139,8 +139,7 @@ export async function createDirectory(data: CreateDirectoryDto) {
         validation.data.organization = organization;
         validation.data.owner = owner;
         validation.data.gitProvider = providerId;
-        // Set default deploy provider to vercel if not specified
-        validation.data.deployProvider = data.deployProvider || 'vercel';
+        validation.data.deployProvider = data.deployProvider || undefined;
 
         console.log('Creating directory:', validation.data);
 
@@ -241,7 +240,7 @@ export async function createDirectoryWithAI(request: AIDirectoryOptions) {
             organization,
             owner,
             gitProvider: providerId,
-            deployProvider: request.deployProvider || 'vercel',
+            deployProvider: request.deployProvider || undefined,
         };
 
         // Validate the generated directory data

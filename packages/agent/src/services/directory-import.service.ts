@@ -213,6 +213,7 @@ export class DirectoryImportService {
                     owner: dto.owner,
                     organization: dto.organization || false,
                     gitProvider: dto.gitProvider,
+                    deployProvider: dto.deployProvider,
                 },
                 user,
             );

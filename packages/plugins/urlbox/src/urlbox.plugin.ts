@@ -400,6 +400,7 @@ export class UrlboxPlugin implements IPlugin, IScreenshotPlugin {
 				'3. Enable the Urlbox plugin on this page',
 				'4. Enter your credentials in the settings below'
 			].join('\n'),
+			homepage: 'https://urlbox.com',
 			icon: {
 				type: 'url',
 				value: 'https://urlbox.com/apple-touch-icon.png'

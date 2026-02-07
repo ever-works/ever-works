@@ -3,40 +3,27 @@
 import { useState, useTransition, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { useTranslations } from 'next-intl';
-import { Triangle, Cloud, Check, Settings, ChevronDown, ExternalLink } from 'lucide-react';
+import { Check, Settings, ChevronDown, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { Directory } from '@/lib/api';
+import { PluginIcon } from '@/components/plugins/PluginIcon';
+import type { PluginIcon as PluginIconType } from '@ever-works/plugin';
 import { updateDeployProvider } from './actions';
 
 interface DeployProvider {
     id: string;
     name: string;
     enabled: boolean;
+    icon?: PluginIconType;
+    description?: string;
+    homepage?: string;
 }
 
 interface DeployProviderSettingsProps {
     directory: Directory;
-}
-
-function getProviderIcon(providerId: string) {
-    switch (providerId?.toLowerCase()) {
-        case 'vercel':
-            return Triangle;
-        default:
-            return Cloud;
-    }
-}
-
-function getProviderName(providerId: string) {
-    switch (providerId?.toLowerCase()) {
-        case 'vercel':
-            return 'Vercel';
-        default:
-            return providerId || 'None';
-    }
 }
 
 export function DeployProviderSettings({ directory }: DeployProviderSettingsProps) {
@@ -44,7 +31,7 @@ export function DeployProviderSettings({ directory }: DeployProviderSettingsProp
     const [isPending, startTransition] = useTransition();
     const [isOpen, setIsOpen] = useState(false);
     const [providers, setProviders] = useState<DeployProvider[]>([]);
-    const [selectedProvider, setSelectedProvider] = useState(directory.deployProvider || 'vercel');
+    const [selectedProvider, setSelectedProvider] = useState(directory.deployProvider || '');
     const router = useRouter();
 
     // Fetch available providers
@@ -55,22 +42,26 @@ export function DeployProviderSettings({ directory }: DeployProviderSettingsProp
                 const data = await response.json();
                 if (data.providers) {
                     setProviders(data.providers);
+                    // Default to the directory's provider or the first enabled provider
+                    if (!selectedProvider && data.providers.length > 0) {
+                        const first =
+                            data.providers.find((p: DeployProvider) => p.enabled) ||
+                            data.providers[0];
+                        setSelectedProvider(first.id);
+                    }
                 }
             } catch (error) {
                 console.error('Failed to fetch deploy providers:', error);
-                // Fallback to vercel
-                setProviders([{ id: 'vercel', name: 'Vercel', enabled: true }]);
             }
         };
         fetchProviders();
-    }, []);
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     const currentProvider = providers.find((p) => p.id === selectedProvider) || {
-        id: selectedProvider || 'vercel',
-        name: getProviderName(selectedProvider),
+        id: selectedProvider,
+        name: selectedProvider || 'None',
         enabled: true,
     };
-    const ProviderIcon = getProviderIcon(currentProvider.id);
 
     const handleSave = () => {
         startTransition(async () => {
@@ -84,7 +75,7 @@ export function DeployProviderSettings({ directory }: DeployProviderSettingsProp
         });
     };
 
-    const hasChanges = selectedProvider !== (directory.deployProvider || 'vercel');
+    const hasChanges = selectedProvider !== (directory.deployProvider || '');
 
     return (
         <div
@@ -128,18 +119,11 @@ export function DeployProviderSettings({ directory }: DeployProviderSettingsProp
                         )}
                     >
                         <div className="flex items-center gap-3">
-                            <div
-                                className={cn(
-                                    'w-10 h-10 rounded-lg flex items-center justify-center',
-                                    'bg-black dark:bg-white',
-                                )}
-                            >
-                                <ProviderIcon
-                                    className={cn(
-                                        'w-5 h-5 text-white dark:text-black fill-current',
-                                    )}
-                                />
-                            </div>
+                            <PluginIcon
+                                icon={currentProvider.icon}
+                                name={currentProvider.name}
+                                size={40}
+                            />
                             <div className="text-left">
                                 <p className="font-medium text-text dark:text-text-dark">
                                     {currentProvider.name}
@@ -177,7 +161,6 @@ export function DeployProviderSettings({ directory }: DeployProviderSettingsProp
                             )}
                         >
                             {providers.map((provider) => {
-                                const Icon = getProviderIcon(provider.id);
                                 const isSelected = selectedProvider === provider.id;
 
                                 return (
@@ -194,18 +177,11 @@ export function DeployProviderSettings({ directory }: DeployProviderSettingsProp
                                             isSelected && 'bg-primary/5',
                                         )}
                                     >
-                                        <div
-                                            className={cn(
-                                                'w-8 h-8 rounded-lg flex items-center justify-center',
-                                                'bg-black dark:bg-white',
-                                            )}
-                                        >
-                                            <Icon
-                                                className={cn(
-                                                    'w-4 h-4 text-white dark:text-black fill-current',
-                                                )}
-                                            />
-                                        </div>
+                                        <PluginIcon
+                                            icon={provider.icon}
+                                            name={provider.name}
+                                            size={32}
+                                        />
                                         <div className="flex-1 text-left">
                                             <p className="font-medium text-text dark:text-text-dark">
                                                 {provider.name}

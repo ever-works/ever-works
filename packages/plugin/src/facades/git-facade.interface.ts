@@ -1,4 +1,5 @@
 import type { GitCommitter, GitFileChange } from '../contracts/capabilities/git-provider.interface.js';
+import type { PluginIcon } from '../contracts/plugin-manifest.types.js';
 
 /**
  * Options for cloning or pulling a repository.
@@ -26,6 +27,24 @@ export interface GitFacadePushOptions {
 	readonly force?: boolean;
 	/** Max retry attempts */
 	readonly maxRetries?: number;
+}
+
+/**
+ * Provider information for git providers
+ */
+export interface GitProviderInfo {
+	/** Provider plugin ID */
+	readonly id: string;
+	/** Provider display name */
+	readonly name: string;
+	/** Whether the provider is enabled */
+	readonly enabled: boolean;
+	/** Provider icon from plugin manifest */
+	readonly icon?: PluginIcon;
+	/** Provider description from plugin manifest */
+	readonly description?: string;
+	/** Provider homepage URL (e.g. base URL for repo links) */
+	readonly homepage?: string;
 }
 
 /**

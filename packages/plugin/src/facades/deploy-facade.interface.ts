@@ -6,6 +6,8 @@
  * and retrieves credentials from plugin settings.
  */
 
+import type { PluginIcon } from '../contracts/plugin-manifest.types.js';
+
 /**
  * Options for deploy facade operations
  */
@@ -38,6 +40,12 @@ export interface DeployProviderInfo {
 	readonly name: string;
 	/** Whether the provider is enabled */
 	readonly enabled: boolean;
+	/** Provider icon from plugin manifest */
+	readonly icon?: PluginIcon;
+	/** Provider description from plugin manifest */
+	readonly description?: string;
+	/** Provider homepage URL (e.g. token management page) */
+	readonly homepage?: string;
 }
 
 /**

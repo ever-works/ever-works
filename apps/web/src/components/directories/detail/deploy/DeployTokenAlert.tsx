@@ -11,34 +11,19 @@ interface DeployTokenAlertProps {
     providerId?: string;
     /** Display name of the provider */
     providerName?: string;
+    /** Homepage URL from the provider's plugin manifest (e.g. token management page) */
+    providerHomepage?: string;
 }
 
-const PROVIDER_CONFIGS: Record<
-    string,
-    { name: string; tokenUrl: string; tokenDescription: string }
-> = {
-    vercel: {
-        name: 'Vercel',
-        tokenUrl: 'https://vercel.com/account/tokens',
-        tokenDescription: 'API token',
-    },
-    netlify: {
-        name: 'Netlify',
-        tokenUrl: 'https://app.netlify.com/user/applications#personal-access-tokens',
-        tokenDescription: 'personal access token',
-    },
-};
-
-export function DeployTokenAlert({ providerId = 'vercel', providerName }: DeployTokenAlertProps) {
+export function DeployTokenAlert({
+    providerId = '',
+    providerName,
+    providerHomepage,
+}: DeployTokenAlertProps) {
     const t = useTranslations('dashboard.directoryDetail.deploy');
 
-    const config = PROVIDER_CONFIGS[providerId] || {
-        name: providerName || providerId,
-        tokenUrl: '',
-        tokenDescription: 'API token',
-    };
-
-    const displayName = providerName || config.name;
+    const displayName = providerName || providerId || 'Deployment Provider';
+    const tokenUrl = providerHomepage || '';
 
     return (
         <div className="max-w-full mx-auto">
@@ -77,9 +62,9 @@ export function DeployTokenAlert({ providerId = 'vercel', providerName }: Deploy
                                 <Settings className="w-4 h-4" />
                                 {t('noTokenAlert.configureButton')}
                             </Link>
-                            {config.tokenUrl && (
+                            {tokenUrl && (
                                 <a
-                                    href={config.tokenUrl}
+                                    href={tokenUrl}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className={cn(
@@ -114,8 +99,8 @@ export function DeployTokenAlert({ providerId = 'vercel', providerName }: Deploy
                     <li className="flex gap-2">
                         <span className="font-medium">3.</span>
                         <span>
-                            Configure your {displayName} {config.tokenDescription} in Plugin
-                            Settings &gt; {displayName}
+                            Configure your {displayName} API token in Plugin Settings &gt;{' '}
+                            {displayName}
                         </span>
                     </li>
                     <li className="flex gap-2">

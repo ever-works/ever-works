@@ -1,11 +1,17 @@
 import 'server-only';
 import { serverFetch, serverMutation } from '../server-api';
 import { APIResponse } from '../types';
+import type { PluginIcon } from '@ever-works/plugin';
+
+export type { PluginIcon };
 
 export interface DeployProvider {
     id: string;
     name: string;
     enabled: boolean;
+    icon?: PluginIcon;
+    description?: string;
+    homepage?: string;
 }
 
 export type DeployProvidersResponseDto = APIResponse<{

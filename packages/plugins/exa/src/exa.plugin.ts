@@ -286,7 +286,8 @@ export class ExaSearchPlugin implements IPlugin, ISearchPlugin {
 				'3. Enter the key in the **API Key** field below',
 				'4. Choose your preferred search type (auto recommended)',
 				'5. Enable this plugin to use it for directory generation'
-			].join('\n')
+			].join('\n'),
+			homepage: 'https://exa.ai'
 		};
 	}
 }

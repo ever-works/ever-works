@@ -524,6 +524,7 @@ export class ScreenshotOnePlugin implements IPlugin, IScreenshotPlugin {
 				'3. Enable the ScreenshotOne plugin on this page',
 				'4. Enter your credentials in the settings below'
 			].join('\n'),
+			homepage: 'https://screenshotone.com',
 			icon: {
 				type: 'lucide',
 				value: 'Camera',

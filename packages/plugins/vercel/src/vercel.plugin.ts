@@ -239,6 +239,7 @@ export class VercelPlugin implements IPlugin, IDeploymentPlugin {
 				'3. Enter your token in the settings below',
 				'4. Optionally set a default team if you use Vercel Teams'
 			].join('\n'),
+			homepage: 'https://vercel.com/account/tokens',
 			icon: {
 				type: 'lucide',
 				value: 'Triangle',

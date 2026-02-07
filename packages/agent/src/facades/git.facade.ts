@@ -17,6 +17,7 @@ import type {
     GitCommitter,
     GitFileChange,
     IGitFacade,
+    GitProviderInfo,
 } from '@ever-works/plugin';
 import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
 
@@ -82,11 +83,7 @@ export interface GitFacadeOptions {
     token?: string;
 }
 
-export interface GitProviderInfo {
-    id: string;
-    name: string;
-    enabled: boolean;
-}
+export type { GitProviderInfo };
 
 @Injectable()
 export class GitFacadeService implements IGitFacade {
@@ -109,6 +106,9 @@ export class GitFacadeService implements IGitFacade {
             id: p.plugin.id,
             name: (p.plugin as IGitProviderPlugin).providerName,
             enabled: p.state === 'enabled',
+            icon: p.manifest.icon,
+            description: p.manifest.description,
+            homepage: p.manifest.homepage,
         }));
     }
 

@@ -59,25 +59,13 @@ export const useDirectoryPermissions = () => {
     return permissions;
 };
 
-function getProviderBaseUrl(providerId: string): string | null {
-    switch (providerId.toLowerCase()) {
-        case 'github':
-            return 'https://github.com';
-        case 'gitlab':
-            return 'https://gitlab.com';
-        case 'bitbucket':
-            return 'https://bitbucket.org';
-        default:
-            return null;
-    }
-}
-
 function repoLink(directory: Directory, oauthConnection: GitProviderConnectionInfo | null) {
     if (!oauthConnection?.connected) {
         return null;
     }
 
-    const providerUrl = getProviderBaseUrl(directory.gitProvider);
+    // Use homepage from the provider info (populated from plugin manifest)
+    const providerUrl = oauthConnection.homepage;
     if (!providerUrl) {
         return null;
     }
@@ -87,9 +75,12 @@ function repoLink(directory: Directory, oauthConnection: GitProviderConnectionIn
         return null;
     }
 
+    // Strip trailing slash from homepage URL
+    const baseUrl = providerUrl.replace(/\/$/, '');
+
     return {
-        main: `${providerUrl}/${username}/${directory.slug}`,
-        dataRepo: `${providerUrl}/${username}/${directory.slug}-data`,
-        websiteRepo: `${providerUrl}/${username}/${directory.slug}-website`,
+        main: `${baseUrl}/${username}/${directory.slug}`,
+        dataRepo: `${baseUrl}/${username}/${directory.slug}-data`,
+        websiteRepo: `${baseUrl}/${username}/${directory.slug}-website`,
     };
 }

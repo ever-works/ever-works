@@ -340,11 +340,17 @@ describe('GitFacadeService', () => {
                 id: 'github',
                 name: 'GitHub',
                 enabled: true,
+                icon: undefined,
+                description: 'Test git provider plugin',
+                homepage: undefined,
             });
             expect(providers[1]).toEqual({
                 id: 'gitlab',
                 name: 'GitLab',
                 enabled: false,
+                icon: undefined,
+                description: 'Test git provider plugin',
+                homepage: undefined,
             });
         });
 

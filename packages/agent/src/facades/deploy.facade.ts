@@ -118,6 +118,9 @@ export class DeployFacadeService implements IDeployFacade {
             id: p.plugin.id,
             name: (p.plugin as IDeploymentPlugin).providerName || p.plugin.name,
             enabled: p.state === 'enabled',
+            icon: p.manifest.icon,
+            description: p.manifest.description,
+            homepage: p.manifest.homepage,
         }));
     }
 

@@ -24,19 +24,19 @@ export default async function DeployPage({ params }: DeployPageParams) {
         ]);
         directory = res.directory;
         deploymentCapability = capabilityRes;
-
-        // Server-side permission check: only editors+ can deploy
-        if (!canDeploy(directory.userRole)) {
-            notFound();
-        }
-
-        // Only allow deploy if directory is generated
-        if (directory.generateStatus?.status !== GenerateStatusType.GENERATED) {
-            redirect(ROUTES.DASHBOARD_DIRECTORY(id));
-        }
     } catch (error) {
         console.error('Failed to fetch directory or deployment capability:', error);
         notFound();
+    }
+
+    // Permission & status checks OUTSIDE try-catch so Next.js
+    // redirect/notFound errors propagate correctly
+    if (!canDeploy(directory.userRole)) {
+        notFound();
+    }
+
+    if (directory.generateStatus?.status !== GenerateStatusType.GENERATED) {
+        redirect(ROUTES.DASHBOARD_DIRECTORY(id));
     }
 
     // Check deployment capability based on shared/owned status
@@ -46,8 +46,23 @@ export default async function DeployPage({ params }: DeployPageParams) {
             return <SharedDirectoryNoTokenAlert />;
         }
         // For owned directories, show the regular token configuration alert
-        // Pass the directory's deploy provider if set, default to 'vercel'
-        return <DeployTokenAlert providerId={directory.deployProvider || 'vercel'} />;
+        // Fetch provider info for homepage URL and display name
+        const providerId = directory.deployProvider || '';
+        let providerName: string | undefined;
+        let providerHomepage: string | undefined;
+        if (providerId) {
+            const providersRes = await deployAPI.getProviders().catch(() => null);
+            const provider = providersRes?.providers?.find((p) => p.id === providerId);
+            providerName = provider?.name;
+            providerHomepage = provider?.homepage;
+        }
+        return (
+            <DeployTokenAlert
+                providerId={providerId}
+                providerName={providerName}
+                providerHomepage={providerHomepage}
+            />
+        );
     }
 
     // Hydrate existing deployment if we don't have the URL stored yet

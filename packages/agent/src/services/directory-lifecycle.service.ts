@@ -30,8 +30,16 @@ export class DirectoryLifecycleService {
     ) {}
 
     async createDirectory(createDirectoryDto: CreateDirectoryDto, user: User) {
-        const { slug, name, description, owner, readmeConfig, organization, gitProvider } =
-            createDirectoryDto;
+        const {
+            slug,
+            name,
+            description,
+            owner,
+            readmeConfig,
+            organization,
+            gitProvider,
+            deployProvider,
+        } = createDirectoryDto;
 
         const directoryData: Partial<CreateDirectoryDto & { userId: string }> = {
             slug,
@@ -40,6 +48,7 @@ export class DirectoryLifecycleService {
             userId: user.id,
             owner,
             gitProvider,
+            deployProvider,
             readmeConfig,
             organization,
         };
