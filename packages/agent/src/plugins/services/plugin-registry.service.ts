@@ -29,7 +29,7 @@ export interface PluginEnableContext {
  * 3. Directory explicit record → use its enabled value
  * 4. User autoEnableForDirectories (directory context) → true
  * 5. User-level enabled status
- * 6. Fallback to manifest autoEnable (default true)
+ * 6. Fallback to manifest autoEnable (default false)
  */
 export function resolvePluginEnabled(ctx: PluginEnableContext): boolean {
     if (ctx.systemPlugin) return true;
@@ -43,7 +43,7 @@ export function resolvePluginEnabled(ctx: PluginEnableContext): boolean {
         return ctx.directoryPlugin.enabled;
     if (ctx.hasDirectoryContext && ctx.userPlugin?.autoEnableForDirectories) return true;
     if (ctx.userPlugin !== undefined && ctx.userPlugin !== null) return ctx.userPlugin.enabled;
-    return ctx.autoEnable ?? true;
+    return ctx.autoEnable ?? false;
 }
 
 export interface RegisteredPlugin {

@@ -94,6 +94,7 @@ describe('PipelineOrchestratorService', () => {
         description: 'Test plugin',
         category: 'pipeline' as PluginCategory,
         capabilities,
+        autoEnable: true,
     });
 
     beforeEach(async () => {

@@ -47,6 +47,7 @@ describe('PipelineBuilderService', () => {
         description: 'Test plugin',
         category: 'pipeline' as PluginCategory,
         capabilities: ['pipeline-step'],
+        autoEnable: true,
     });
 
     beforeEach(async () => {

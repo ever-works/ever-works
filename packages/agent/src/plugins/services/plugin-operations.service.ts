@@ -178,7 +178,13 @@ export class PluginOperationsService {
                 pluginId: registered.plugin.id,
                 name: registered.manifest.name,
                 icon: this.extractIcon(registered.manifest),
-                enabled: userPlugin?.enabled ?? registered.manifest?.autoEnable ?? false,
+                enabled: resolvePluginEnabled({
+                    systemPlugin: registered.manifest?.systemPlugin,
+                    autoEnable: registered.manifest?.autoEnable,
+                    userPlugin: userPluginMap.get(registered.plugin.id) ?? null,
+                    directoryPlugin: null,
+                    hasDirectoryContext: false,
+                }),
                 hasRequiredSettings,
             };
 
@@ -375,13 +381,40 @@ export class PluginOperationsService {
             );
         }
 
-        const userPlugin = await this.userPluginRepository.findOne({
+        let userPlugin = await this.userPluginRepository.findOne({
             where: { userId, pluginId },
         });
 
         if (userPlugin) {
             userPlugin.enabled = false;
             await this.userPluginRepository.save(userPlugin);
+        } else {
+            // For autoEnabled plugins with no user record, create a disabled record
+            const wouldBeEnabled = resolvePluginEnabled({
+                systemPlugin: registered.manifest?.systemPlugin,
+                autoEnable: registered.manifest?.autoEnable,
+                userPlugin: null,
+                directoryPlugin: null,
+                hasDirectoryContext: false,
+            });
+            if (wouldBeEnabled) {
+                const pluginEntity = await this.pluginRepository.findOne({
+                    where: { pluginId },
+                });
+                if (pluginEntity) {
+                    userPlugin = this.userPluginRepository.create({
+                        userId,
+                        pluginId,
+                        pluginEntityId: pluginEntity.id,
+                        enabled: false,
+                        autoEnableForDirectories: false,
+                        settings: {},
+                        secretSettings: {},
+                        metadata: {},
+                    });
+                    await this.userPluginRepository.save(userPlugin);
+                }
+            }
         }
 
         this.logger.log(`Plugin "${pluginId}" disabled for user "${userId}"`);

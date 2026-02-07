@@ -511,11 +511,13 @@ describe('PluginRegistryService', () => {
             const manifest1: PluginManifest = {
                 ...createMockManifest('plugin-1'),
                 capabilities: ['search'],
+                autoEnable: true,
             };
             const manifest2: PluginManifest = {
                 ...createMockManifest('plugin-2'),
                 capabilities: ['search'],
                 defaultForCapabilities: ['search'],
+                autoEnable: true,
             };
             service.register(plugin1, manifest1, { state: 'loaded' });
             service.register(plugin2, manifest2, { state: 'loaded' });
@@ -868,14 +870,14 @@ describe('PluginRegistryService', () => {
             ).toBe(false);
         });
 
-        it('should default to true when autoEnable is undefined', () => {
+        it('should default to false when autoEnable is undefined', () => {
             expect(
                 resolvePluginEnabled({
                     userPlugin: null,
                     directoryPlugin: null,
                     hasDirectoryContext: false,
                 }),
-            ).toBe(true);
+            ).toBe(false);
         });
     });
 
@@ -883,10 +885,22 @@ describe('PluginRegistryService', () => {
         it('should return all enabled plugins when no scope provided', async () => {
             const plugin1 = createMockPlugin('plugin-1');
             const plugin2 = createMockPlugin('plugin-2');
-            service.register(plugin1, createMockManifest('plugin-1'), { state: 'loaded' });
-            service.register(plugin2, createMockManifest('plugin-2'), { state: 'loaded' });
+            service.register(
+                plugin1,
+                { ...createMockManifest('plugin-1'), autoEnable: true },
+                {
+                    state: 'loaded',
+                },
+            );
+            service.register(
+                plugin2,
+                { ...createMockManifest('plugin-2'), autoEnable: true },
+                {
+                    state: 'loaded',
+                },
+            );
 
-            // With no scope IDs, falls back to autoEnable (defaults to true)
+            // With no scope IDs, falls back to autoEnable
             directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue(null);
             userPluginRepository.findByUserAndPlugin.mockResolvedValue(null);
 
@@ -898,8 +912,16 @@ describe('PluginRegistryService', () => {
         it('should filter by capability when provided', async () => {
             const plugin1 = createMockPlugin('plugin-1');
             const plugin2 = createMockPlugin('plugin-2');
-            const manifest1 = { ...createMockManifest('plugin-1'), capabilities: ['cap-a'] };
-            const manifest2 = { ...createMockManifest('plugin-2'), capabilities: ['cap-b'] };
+            const manifest1 = {
+                ...createMockManifest('plugin-1'),
+                capabilities: ['cap-a'],
+                autoEnable: true,
+            };
+            const manifest2 = {
+                ...createMockManifest('plugin-2'),
+                capabilities: ['cap-b'],
+                autoEnable: true,
+            };
             service.register(plugin1, manifest1 as PluginManifest, { state: 'loaded' });
             service.register(plugin2, manifest2 as PluginManifest, { state: 'loaded' });
 
@@ -915,8 +937,20 @@ describe('PluginRegistryService', () => {
         it('should exclude plugins disabled at directory level', async () => {
             const plugin1 = createMockPlugin('plugin-1');
             const plugin2 = createMockPlugin('plugin-2');
-            service.register(plugin1, createMockManifest('plugin-1'), { state: 'loaded' });
-            service.register(plugin2, createMockManifest('plugin-2'), { state: 'loaded' });
+            service.register(
+                plugin1,
+                { ...createMockManifest('plugin-1'), autoEnable: true },
+                {
+                    state: 'loaded',
+                },
+            );
+            service.register(
+                plugin2,
+                { ...createMockManifest('plugin-2'), autoEnable: true },
+                {
+                    state: 'loaded',
+                },
+            );
 
             directoryPluginRepository.findByDirectoryAndPlugin.mockImplementation(
                 async (dirId, pluginId) => {
