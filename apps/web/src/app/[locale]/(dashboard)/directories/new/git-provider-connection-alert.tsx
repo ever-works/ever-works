@@ -6,11 +6,11 @@ import { connectOAuthProvider } from '@/app/actions/dashboard/oauth';
 import { toast } from 'sonner';
 import { ROUTES } from '@/lib/constants';
 import { useTranslations } from 'next-intl';
-import type { GitProviderInfo } from '@/lib/api';
+import type { GitProviderConnectionInfo } from '@/lib/api';
 
 interface GitProviderConnectionAlertProps {
     connected: boolean;
-    provider?: GitProviderInfo | null;
+    provider: GitProviderConnectionInfo | null;
 }
 
 export function GitProviderConnectionAlert({
@@ -81,8 +81,8 @@ export function GitProviderConnectionAlert({
                 disabled={isPending}
                 className={cn(
                     'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
-                    'bg-black dark:bg-white text-white dark:text-black',
-                    'hover:bg-gray-800 dark:hover:bg-gray-200',
+                    'bg-primary text-white',
+                    'hover:bg-primary/90',
                     'disabled:opacity-50 disabled:cursor-not-allowed',
                 )}
             >

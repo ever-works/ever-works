@@ -32,7 +32,7 @@ export default function NewDirectoryClient({
         defaultProviderId || providers[0]?.provider.id || null,
     );
     const [selectedDeployProviderId, setSelectedDeployProviderId] = useState<string | null>(
-        defaultDeployProviderId || 'vercel',
+        defaultDeployProviderId || deployProviders[0]?.id || null,
     );
     const t = useTranslations('dashboard.directoryCreation');
 

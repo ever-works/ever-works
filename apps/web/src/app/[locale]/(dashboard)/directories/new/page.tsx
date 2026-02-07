@@ -17,7 +17,7 @@ export default async function NewDirectoryPage() {
 
     // Get all available deploy providers
     let deployProviders: DeployProvider[] = [];
-    let defaultDeployProviderId: string | null = 'vercel'; // Default to vercel
+    let defaultDeployProviderId: string | null = null;
 
     try {
         const providersResult = await gitProvidersAPI.list();
@@ -44,15 +44,12 @@ export default async function NewDirectoryPage() {
         const deployProvidersResult = await deployAPI.getProviders();
         if (deployProvidersResult.providers) {
             deployProviders = deployProvidersResult.providers;
-            // Use first enabled provider as default, or vercel if available
-            const vercelProvider = deployProviders.find((p) => p.id === 'vercel');
             const firstEnabled = deployProviders.find((p) => p.enabled);
-            defaultDeployProviderId = vercelProvider?.id || firstEnabled?.id || null;
+            defaultDeployProviderId = firstEnabled?.id || null;
         }
     } catch (error) {
         console.error('Failed to fetch deploy providers:', error);
-        // Provide a fallback with vercel as default
-        deployProviders = [{ id: 'vercel', name: 'Vercel', enabled: true }];
+        deployProviders = [];
     }
 
     return (
