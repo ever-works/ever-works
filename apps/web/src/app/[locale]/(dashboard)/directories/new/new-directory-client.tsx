@@ -35,9 +35,6 @@ export default function NewDirectoryClient({
     );
     const t = useTranslations('dashboard.directoryCreation');
 
-    const selectedProvider = providers.find((p) => p.provider.id === selectedProviderId) || null;
-    const isConnected = selectedProvider?.connectionInfo?.connected ?? false;
-
     if (creationMode === null) {
         return (
             <div className="w-full">
