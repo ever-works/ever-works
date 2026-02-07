@@ -9,6 +9,7 @@ import type {
     SettingDefinition,
     JsonSchema,
 } from '@ever-works/plugin';
+import pickBy from 'lodash/pickBy';
 import { PluginRepository } from '../repositories/plugin.repository';
 import { UserPluginRepository } from '../repositories/user-plugin.repository';
 import { DirectoryPluginRepository } from '../repositories/directory-plugin.repository';
@@ -767,15 +768,11 @@ export class PluginSettingsService {
         const allowedScopes: SettingScope[] =
             context === 'user' ? ['global', 'user'] : ['global', 'directory'];
 
-        const filteredProperties: Record<string, JsonSchema> = {};
-
-        for (const [key, prop] of Object.entries(schema.properties)) {
-            const propWithScope = prop as JsonSchema & { 'x-scope'?: SettingScope };
-            const propScope = propWithScope['x-scope'] || 'global';
-            if (allowedScopes.includes(propScope)) {
-                filteredProperties[key] = prop;
-            }
-        }
+        const filteredProperties = pickBy(schema.properties, (prop) => {
+            const propScope =
+                (prop as JsonSchema & { 'x-scope'?: SettingScope })['x-scope'] || 'global';
+            return allowedScopes.includes(propScope);
+        }) as Record<string, JsonSchema>;
 
         return {
             ...schema,

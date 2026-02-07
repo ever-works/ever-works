@@ -240,6 +240,132 @@ describe('PluginManifestValidatorService', () => {
             expect(manifest?.description).toBe('Package description');
             expect(manifest?.license).toBe('MIT');
         });
+
+        it('should not produce undefined keys when neither source has optional fields', () => {
+            const packageJson = {
+                name: 'my-package',
+                version: '1.0.0',
+                everworks: {
+                    plugin: {
+                        id: 'my-plugin',
+                        category: 'utility',
+                    },
+                },
+            };
+
+            const manifest = service.extractManifest(packageJson) as unknown as Record<
+                string,
+                unknown
+            >;
+            expect(manifest).toBeDefined();
+
+            // homepage and license should not exist as keys at all
+            expect('homepage' in manifest).toBe(false);
+            expect('license' in manifest).toBe(false);
+        });
+
+        it('should include homepage from plugin section when present', () => {
+            const packageJson = {
+                name: 'my-package',
+                version: '1.0.0',
+                everworks: {
+                    plugin: {
+                        id: 'my-plugin',
+                        category: 'utility',
+                        homepage: 'https://example.com/plugin',
+                    },
+                },
+            };
+
+            const manifest = service.extractManifest(packageJson);
+            expect(manifest).toBeDefined();
+            expect((manifest as any).homepage).toBe('https://example.com/plugin');
+        });
+
+        it('should fall back to top-level homepage when plugin section lacks it', () => {
+            const packageJson = {
+                name: 'my-package',
+                version: '1.0.0',
+                homepage: 'https://example.com/top-level',
+                everworks: {
+                    plugin: {
+                        id: 'my-plugin',
+                        category: 'utility',
+                    },
+                },
+            };
+
+            const manifest = service.extractManifest(packageJson);
+            expect(manifest).toBeDefined();
+            expect((manifest as any).homepage).toBe('https://example.com/top-level');
+        });
+
+        it('should prefer plugin section homepage over top-level package.json', () => {
+            const packageJson = {
+                name: 'my-package',
+                version: '1.0.0',
+                homepage: 'https://example.com/top-level',
+                everworks: {
+                    plugin: {
+                        id: 'my-plugin',
+                        category: 'utility',
+                        homepage: 'https://example.com/plugin',
+                    },
+                },
+            };
+
+            const manifest = service.extractManifest(packageJson);
+            expect(manifest).toBeDefined();
+            expect((manifest as any).homepage).toBe('https://example.com/plugin');
+        });
+
+        it('should not produce undefined keys for any fallback field', () => {
+            // Minimal package.json with no optional fields at either level
+            const packageJson = {
+                everworks: {
+                    plugin: {
+                        id: 'minimal-plugin',
+                        category: 'utility',
+                    },
+                },
+            };
+
+            const manifest = service.extractManifest(packageJson) as unknown as Record<
+                string,
+                unknown
+            >;
+            expect(manifest).toBeDefined();
+
+            // None of these should be explicit undefined keys
+            for (const key of ['name', 'version', 'description', 'homepage', 'license']) {
+                if (key in manifest) {
+                    expect(manifest[key]).not.toBeUndefined();
+                }
+            }
+        });
+
+        it('should preserve extra plugin fields from the spread', () => {
+            const packageJson = {
+                name: 'my-package',
+                version: '1.0.0',
+                everworks: {
+                    plugin: {
+                        id: 'my-plugin',
+                        category: 'utility',
+                        customField: 'custom-value',
+                        icon: { type: 'emoji', value: '🔌' },
+                    },
+                },
+            };
+
+            const manifest = service.extractManifest(packageJson) as unknown as Record<
+                string,
+                unknown
+            >;
+            expect(manifest).toBeDefined();
+            expect(manifest.customField).toBe('custom-value');
+            expect(manifest.icon).toEqual({ type: 'emoji', value: '🔌' });
+        });
     });
 
     describe('validateAndExtract', () => {

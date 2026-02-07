@@ -304,15 +304,28 @@ export class PluginManifestValidatorService {
         const plugin = everworks.plugin as Record<string, unknown>;
 
         // Spread all plugin fields, then apply fallbacks from top-level package.json
-        return {
+        // Only include fallback fields when they resolve to a defined value,
+        // so that undefined keys don't override runtime getManifest() values.
+        const manifest: Record<string, unknown> = {
             ...plugin,
-            name: (plugin.name as string) || (packageJson.name as string),
-            version: (plugin.version as string) || (packageJson.version as string),
-            description: (plugin.description as string) || (packageJson.description as string),
-            homepage: (plugin.homepage as string) || (packageJson.homepage as string),
-            license: (plugin.license as string) || (packageJson.license as string),
             capabilities: (plugin.capabilities as readonly string[]) || [],
-        } as unknown as PluginManifest;
+        };
+
+        const fallbacks: Record<string, unknown> = {
+            name: plugin.name || packageJson.name,
+            version: plugin.version || packageJson.version,
+            description: plugin.description || packageJson.description,
+            homepage: plugin.homepage || packageJson.homepage,
+            license: plugin.license || packageJson.license,
+        };
+
+        for (const [key, value] of Object.entries(fallbacks)) {
+            if (value !== undefined) {
+                manifest[key] = value;
+            }
+        }
+
+        return manifest as unknown as PluginManifest;
     }
 
     /**

@@ -1695,6 +1695,84 @@ describe('PluginOperationsService', () => {
             expect(result.plugins[0].directoryEnabled).toBe(true);
         });
 
+        it('should auto-create directory record in updateDirectoryPluginSettings when user has autoEnableForDirectories', async () => {
+            const registered = createRegisteredPlugin();
+            registered.manifest = { ...registered.manifest, autoEnable: false } as PluginManifest;
+            jest.spyOn(pluginRegistryService, 'get').mockReturnValue(registered);
+            jest.spyOn(userPluginRepository, 'findOne').mockResolvedValue({
+                id: '1',
+                userId: 'user-1',
+                pluginId: 'test-plugin',
+                enabled: true,
+                autoEnableForDirectories: true,
+                settings: {},
+                secretSettings: {},
+                metadata: {},
+            } as any);
+            jest.spyOn(directoryPluginRepository, 'findOne').mockResolvedValue(null);
+            jest.spyOn(pluginRepository, 'findOne').mockResolvedValue({
+                id: '1',
+                pluginId: 'test-plugin',
+            } as any);
+
+            await service.updateDirectoryPluginSettings('dir-1', 'test-plugin', 'user-1', {
+                normalSetting: 'val',
+            });
+
+            expect(directoryPluginRepository.create).toHaveBeenCalledWith(
+                expect.objectContaining({ enabled: true }),
+            );
+            expect(directoryPluginRepository.save).toHaveBeenCalled();
+        });
+
+        it('should auto-create directory record in setActiveCapability when user has autoEnableForDirectories', async () => {
+            const registered = createRegisteredPlugin();
+            registered.manifest = { ...registered.manifest, autoEnable: false } as PluginManifest;
+            jest.spyOn(pluginRegistryService, 'get').mockReturnValue(registered);
+            jest.spyOn(userPluginRepository, 'findOne').mockResolvedValue({
+                id: '1',
+                userId: 'user-1',
+                pluginId: 'test-plugin',
+                enabled: true,
+                autoEnableForDirectories: true,
+                settings: {},
+                secretSettings: {},
+                metadata: {},
+            } as any);
+            jest.spyOn(directoryPluginRepository, 'findOne').mockResolvedValue(null);
+            jest.spyOn(pluginRepository, 'findOne').mockResolvedValue({
+                id: '1',
+                pluginId: 'test-plugin',
+            } as any);
+
+            await service.setActiveCapability('dir-1', 'test-plugin', 'user-1', 'test');
+
+            expect(directoryPluginRepository.save).toHaveBeenCalled();
+        });
+
+        it('should throw in updateDirectoryPluginSettings when neither autoEnable nor autoEnableForDirectories', async () => {
+            const registered = createRegisteredPlugin();
+            registered.manifest = { ...registered.manifest, autoEnable: false } as PluginManifest;
+            jest.spyOn(pluginRegistryService, 'get').mockReturnValue(registered);
+            jest.spyOn(userPluginRepository, 'findOne').mockResolvedValue({
+                id: '1',
+                userId: 'user-1',
+                pluginId: 'test-plugin',
+                enabled: true,
+                autoEnableForDirectories: false,
+                settings: {},
+                secretSettings: {},
+                metadata: {},
+            } as any);
+            jest.spyOn(directoryPluginRepository, 'findOne').mockResolvedValue(null);
+
+            await expect(
+                service.updateDirectoryPluginSettings('dir-1', 'test-plugin', 'user-1', {
+                    normalSetting: 'val',
+                }),
+            ).rejects.toThrow(BadRequestException);
+        });
+
         it('should create opt-out record when disabling auto-enabled plugin for directory', async () => {
             const registered = createRegisteredPlugin();
             registered.manifest = { ...registered.manifest, autoEnable: false } as PluginManifest;

@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import pickBy from 'lodash/pickBy';
 import {
     type JsonSchema,
     type PluginManifest,
@@ -434,21 +435,19 @@ export class PluginOperationsService {
                 ...(secretSettings || {}),
             };
             // Strip null values before validation — null means "cleared"
-            this.stripNullValues(allSettings);
-            this.validateSettingsOrThrow(allSettings, schema, 'user');
+            const cleanedSettings = this.stripNullValues(allSettings);
+            this.validateSettingsOrThrow(cleanedSettings, schema, 'user');
         }
 
         // Merge settings and strip null keys to clear them
         if (settings) {
-            userPlugin.settings = { ...userPlugin.settings, ...settings };
-            this.stripNullValues(userPlugin.settings);
+            userPlugin.settings = this.stripNullValues({ ...userPlugin.settings, ...settings });
         }
         if (secretSettings) {
-            userPlugin.secretSettings = {
+            userPlugin.secretSettings = this.stripNullValues({
                 ...userPlugin.secretSettings,
                 ...secretSettings,
-            };
-            this.stripNullValues(userPlugin.secretSettings);
+            });
         }
         if (metadata) {
             userPlugin.metadata = { ...userPlugin.metadata, ...metadata };
@@ -685,35 +684,12 @@ export class PluginOperationsService {
             where: { userId, pluginId },
         });
 
-        let directoryPlugin = await this.directoryPluginRepository.findOne({
-            where: { directoryId, pluginId },
-        });
-
-        if (!directoryPlugin) {
-            const autoEnabled = registered.manifest?.autoEnable ?? false;
-            if (!autoEnabled) {
-                throw new BadRequestException(
-                    `Plugin "${pluginId}" is not enabled for this directory. Enable it first.`,
-                );
-            }
-            // Auto-create directory plugin record for autoEnabled plugins
-            const pluginEntity = await this.pluginRepository.findOne({
-                where: { pluginId },
-            });
-            if (!pluginEntity) {
-                throw new NotFoundException(`Plugin entity "${pluginId}" not found in database`);
-            }
-            directoryPlugin = this.directoryPluginRepository.create({
-                directoryId,
-                pluginId,
-                pluginEntityId: pluginEntity.id,
-                enabled: true,
-                settings: {},
-                secretSettings: {},
-                metadata: {},
-                priority: 0,
-            });
-        }
+        const directoryPlugin = await this.ensureDirectoryPlugin(
+            directoryId,
+            pluginId,
+            userPlugin,
+            registered.manifest,
+        );
 
         const schema = registered.plugin.settingsSchema;
 
@@ -726,21 +702,22 @@ export class PluginOperationsService {
                 ...(secretSettings || {}),
             };
             // Strip null values before validation — null means "cleared"
-            this.stripNullValues(allSettings);
-            this.validateSettingsOrThrow(allSettings, schema, 'directory');
+            const cleanedSettings = this.stripNullValues(allSettings);
+            this.validateSettingsOrThrow(cleanedSettings, schema, 'directory');
         }
 
         // Merge settings and strip null keys to clear them
         if (settings) {
-            directoryPlugin.settings = { ...directoryPlugin.settings, ...settings };
-            this.stripNullValues(directoryPlugin.settings);
+            directoryPlugin.settings = this.stripNullValues({
+                ...directoryPlugin.settings,
+                ...settings,
+            });
         }
         if (secretSettings) {
-            directoryPlugin.secretSettings = {
+            directoryPlugin.secretSettings = this.stripNullValues({
                 ...directoryPlugin.secretSettings,
                 ...secretSettings,
-            };
-            this.stripNullValues(directoryPlugin.secretSettings);
+            });
         }
         if (metadata) {
             directoryPlugin.metadata = { ...directoryPlugin.metadata, ...metadata };
@@ -777,35 +754,12 @@ export class PluginOperationsService {
             where: { userId, pluginId },
         });
 
-        let directoryPlugin = await this.directoryPluginRepository.findOne({
-            where: { directoryId, pluginId },
-        });
-
-        if (!directoryPlugin) {
-            const autoEnabled = registered.manifest?.autoEnable ?? false;
-            if (!autoEnabled) {
-                throw new BadRequestException(
-                    `Plugin "${pluginId}" is not enabled for this directory. Enable it first.`,
-                );
-            }
-            // Auto-create directory plugin record for autoEnabled plugins
-            const pluginEntity = await this.pluginRepository.findOne({
-                where: { pluginId },
-            });
-            if (!pluginEntity) {
-                throw new NotFoundException(`Plugin entity "${pluginId}" not found in database`);
-            }
-            directoryPlugin = this.directoryPluginRepository.create({
-                directoryId,
-                pluginId,
-                pluginEntityId: pluginEntity.id,
-                enabled: true,
-                settings: {},
-                secretSettings: {},
-                metadata: {},
-                priority: 0,
-            });
-        }
+        const directoryPlugin = await this.ensureDirectoryPlugin(
+            directoryId,
+            pluginId,
+            userPlugin,
+            registered.manifest,
+        );
 
         // Clear this capability from other plugins in this directory
         await this.directoryPluginRepository
@@ -995,15 +949,56 @@ export class PluginOperationsService {
     }
 
     /**
-     * Strip null values from a settings object (mutates in place).
+     * Strip null values from a settings object.
      * Null is used as a sentinel to indicate a field was cleared by the user.
      */
-    private stripNullValues(obj: Record<string, unknown>): void {
-        for (const key of Object.keys(obj)) {
-            if (obj[key] === null) {
-                delete obj[key];
-            }
+    private stripNullValues(obj: Record<string, unknown>): Record<string, unknown> {
+        return pickBy(obj, (v) => v !== null) as Record<string, unknown>;
+    }
+
+    /**
+     * Find an existing DirectoryPluginEntity or auto-create one if the plugin
+     * is considered enabled for this directory (via manifest.autoEnable or
+     * user autoEnableForDirectories). Throws if the plugin is not enabled.
+     */
+    private async ensureDirectoryPlugin(
+        directoryId: string,
+        pluginId: string,
+        userPlugin: UserPluginEntity | null,
+        manifest: PluginManifest,
+    ): Promise<DirectoryPluginEntity> {
+        const existing = await this.directoryPluginRepository.findOne({
+            where: { directoryId, pluginId },
+        });
+        if (existing) {
+            return existing;
         }
+
+        const autoEnabled = manifest?.autoEnable ?? false;
+        const userAutoEnabled = userPlugin?.autoEnableForDirectories ?? false;
+        if (!autoEnabled && !userAutoEnabled) {
+            throw new BadRequestException(
+                `Plugin "${pluginId}" is not enabled for this directory. Enable it first.`,
+            );
+        }
+
+        const pluginEntity = await this.pluginRepository.findOne({
+            where: { pluginId },
+        });
+        if (!pluginEntity) {
+            throw new NotFoundException(`Plugin entity "${pluginId}" not found in database`);
+        }
+
+        return this.directoryPluginRepository.create({
+            directoryId,
+            pluginId,
+            pluginEntityId: pluginEntity.id,
+            enabled: true,
+            settings: {},
+            secretSettings: {},
+            metadata: {},
+            priority: 0,
+        });
     }
 
     /**

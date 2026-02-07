@@ -299,6 +299,48 @@ describe('PluginLoaderService', () => {
             );
         });
 
+        it('should not override runtime manifest fields with undefined from package.json manifest', async () => {
+            // Simulate a manifest with explicit undefined keys (e.g. from extractManifest spread)
+            const manifest = {
+                ...createMockManifest(),
+                homepage: undefined,
+                license: undefined,
+            } as unknown as PluginManifest;
+
+            const plugin = {
+                ...createMockPlugin(),
+                getManifest: jest.fn().mockReturnValue({
+                    ...createMockManifest(),
+                    homepage: 'https://github.com/example/repo',
+                    license: 'MIT',
+                    icon: { type: 'svg', value: '<svg/>' },
+                }),
+            };
+
+            (service as any).loadPluginModule = jest.fn().mockResolvedValue(plugin);
+
+            const discovered = {
+                path: '/path/to/plugin',
+                packageJson: {},
+                manifest,
+                builtIn: false,
+            };
+
+            const result = await service.load(discovered);
+
+            expect(result.success).toBe(true);
+            // Runtime homepage and license should survive (undefined filtered out)
+            expect(registry.register).toHaveBeenCalledWith(
+                plugin,
+                expect.objectContaining({
+                    homepage: 'https://github.com/example/repo',
+                    license: 'MIT',
+                    icon: { type: 'svg', value: '<svg/>' },
+                }),
+                expect.any(Object),
+            );
+        });
+
         it('should include warnings from version checker and class validator', async () => {
             const plugin = createMockPlugin();
             const manifest = createMockManifest();
@@ -451,6 +493,135 @@ describe('PluginLoaderService', () => {
 
             expect(result.success).toBe(true);
             expect(plugin.getManifest).toHaveBeenCalled();
+        });
+
+        it('should merge runtime manifest with declared manifest', async () => {
+            const declaredManifest = createMockManifest('merge-test-plugin');
+            const plugin = {
+                ...createMockPlugin('merge-test-plugin'),
+                getManifest: jest.fn().mockReturnValue({
+                    ...declaredManifest,
+                    homepage: 'https://example.com/from-runtime',
+                    readme: '## Runtime Readme',
+                    icon: { type: 'svg', value: '<svg/>' },
+                }),
+            };
+
+            jest.spyOn(manifestValidator, 'validate').mockReturnValue({ valid: true });
+
+            const pluginModule = {
+                plugin,
+                manifest: declaredManifest as unknown as Record<string, unknown>,
+            };
+
+            const result = await service.loadBuiltIn(pluginModule);
+
+            expect(result.success).toBe(true);
+            // Declared manifest fields should override runtime
+            expect(registry.register).toHaveBeenCalledWith(
+                plugin,
+                expect.objectContaining({
+                    id: 'merge-test-plugin',
+                    description: 'Test plugin',
+                    // Runtime-only fields should be preserved
+                    readme: '## Runtime Readme',
+                    icon: { type: 'svg', value: '<svg/>' },
+                    homepage: 'https://example.com/from-runtime',
+                }),
+                expect.any(Object),
+            );
+        });
+
+        it('should give declared manifest priority over runtime manifest for shared fields', async () => {
+            const declaredManifest = {
+                ...createMockManifest('priority-test-plugin'),
+                description: 'From declared manifest',
+            };
+            const plugin = {
+                ...createMockPlugin('priority-test-plugin'),
+                getManifest: jest.fn().mockReturnValue({
+                    ...createMockManifest('priority-test-plugin'),
+                    description: 'From runtime manifest',
+                    readme: '## Readme',
+                }),
+            };
+
+            jest.spyOn(manifestValidator, 'validate').mockReturnValue({ valid: true });
+
+            const pluginModule = {
+                plugin,
+                manifest: declaredManifest as unknown as Record<string, unknown>,
+            };
+
+            const result = await service.loadBuiltIn(pluginModule);
+
+            expect(result.success).toBe(true);
+            expect(registry.register).toHaveBeenCalledWith(
+                plugin,
+                expect.objectContaining({
+                    description: 'From declared manifest',
+                    readme: '## Readme',
+                }),
+                expect.any(Object),
+            );
+        });
+
+        it('should not override runtime manifest fields with undefined from declared manifest', async () => {
+            // Declared manifest has no homepage (undefined)
+            const declaredManifest = createMockManifest('undefined-filter-plugin');
+            const plugin = {
+                ...createMockPlugin('undefined-filter-plugin'),
+                getManifest: jest.fn().mockReturnValue({
+                    ...declaredManifest,
+                    homepage: 'https://example.com/should-survive',
+                }),
+            };
+
+            jest.spyOn(manifestValidator, 'validate').mockReturnValue({ valid: true });
+
+            // Simulate a manifest with an explicit undefined key
+            const manifestWithUndefined = {
+                ...declaredManifest,
+                homepage: undefined,
+            } as unknown as Record<string, unknown>;
+
+            const pluginModule = {
+                plugin,
+                manifest: manifestWithUndefined,
+            };
+
+            const result = await service.loadBuiltIn(pluginModule);
+
+            expect(result.success).toBe(true);
+            // Runtime homepage should survive because undefined is filtered out
+            expect(registry.register).toHaveBeenCalledWith(
+                plugin,
+                expect.objectContaining({
+                    homepage: 'https://example.com/should-survive',
+                }),
+                expect.any(Object),
+            );
+        });
+
+        it('should not call getManifest when no declared manifest is provided', async () => {
+            const manifest = createMockManifest('no-declared-plugin');
+            const plugin = {
+                ...createMockPlugin('no-declared-plugin'),
+                getManifest: jest.fn().mockReturnValue(manifest),
+            };
+
+            const pluginModule = { plugin };
+
+            const result = await service.loadBuiltIn(pluginModule);
+
+            expect(result.success).toBe(true);
+            // getManifest is used as the sole source when no declared manifest
+            expect(plugin.getManifest).toHaveBeenCalled();
+            expect(registry.register).toHaveBeenCalledWith(
+                plugin,
+                expect.objectContaining({ id: 'no-declared-plugin' }),
+                expect.any(Object),
+            );
         });
     });
 

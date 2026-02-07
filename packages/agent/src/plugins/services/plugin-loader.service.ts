@@ -1,6 +1,7 @@
 import { Injectable, Inject, Logger } from '@nestjs/common';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import pickBy from 'lodash/pickBy';
 import type { IPlugin, PluginManifest } from '@ever-works/plugin';
 import { PluginRegistryService, RegisteredPlugin } from './plugin-registry.service';
 import { PluginManifestValidatorService } from './plugin-manifest-validator.service';
@@ -225,12 +226,10 @@ export class PluginLoaderService {
                 const runtimeManifest = plugin.getManifest();
                 // Only keep defined values from package.json manifest to avoid
                 // overriding runtime values (e.g. homepage, icon) with undefined
-                const definedManifest: Record<string, unknown> = {};
-                for (const [key, value] of Object.entries(manifest)) {
-                    if (value !== undefined) {
-                        definedManifest[key] = value;
-                    }
-                }
+                const definedManifest = pickBy(
+                    manifest as unknown as Record<string, unknown>,
+                    (v) => v !== undefined,
+                );
                 manifest = { ...runtimeManifest, ...definedManifest } as typeof manifest;
             }
 
@@ -374,6 +373,18 @@ export class PluginLoaderService {
                     };
                 }
                 manifest = pluginModule.manifest as unknown as PluginManifest;
+
+                // Merge with runtime manifest if available (same as external plugins)
+                if (typeof plugin.getManifest === 'function') {
+                    const runtimeManifest = plugin.getManifest();
+                    const definedManifest: Record<string, unknown> = {};
+                    for (const [key, value] of Object.entries(manifest)) {
+                        if (value !== undefined) {
+                            definedManifest[key] = value;
+                        }
+                    }
+                    manifest = { ...runtimeManifest, ...definedManifest } as typeof manifest;
+                }
             } else if (typeof plugin.getManifest === 'function') {
                 manifest = plugin.getManifest();
             } else {
