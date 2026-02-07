@@ -33,9 +33,17 @@ import {
 import { ShowDateTime } from '@/components/ui/show-datetime';
 import { useDirectoryDetail } from '../DirectoryDetailContext';
 
+export type ResolvedProvider = {
+    category: string;
+    id: string;
+    name: string;
+    source: 'override' | 'lastRun';
+};
+
 type DirectoryScheduleCardProps = {
     schedule: DirectoryScheduleDto | null;
     pipelineProviders?: ProviderOption[];
+    activeProviders?: ResolvedProvider[];
 };
 
 const cadenceOrder = [
@@ -53,6 +61,7 @@ const defaultAllowances = cadenceOrder.map((cadence) => ({
 export function DirectoryScheduleCard({
     schedule,
     pipelineProviders = [],
+    activeProviders = [],
 }: DirectoryScheduleCardProps) {
     const { directory } = useDirectoryDetail();
     const t = useTranslations('dashboard.directoryDetail.schedule.card');
@@ -74,6 +83,7 @@ export function DirectoryScheduleCard({
             directoryId={directory.id}
             schedule={schedule}
             pipelineProviders={pipelineProviders}
+            activeProviders={activeProviders}
         />
     );
 }
@@ -82,10 +92,12 @@ function ScheduleForm({
     directoryId,
     schedule,
     pipelineProviders,
+    activeProviders,
 }: {
     directoryId: string;
     schedule: DirectoryScheduleDto;
     pipelineProviders: ProviderOption[];
+    activeProviders: ResolvedProvider[];
 }) {
     const t = useTranslations('dashboard.directoryDetail.schedule.card');
     const router = useRouter();
@@ -245,6 +257,8 @@ function ScheduleForm({
                     <SummaryChip key={item.label} label={item.label} value={item.value} />
                 ))}
             </div>
+
+            {activeProviders.length > 0 && <ActiveProvidersBar providers={activeProviders} />}
 
             <div className="space-y-4">
                 <div className="grid gap-4 md:grid-cols-2">
@@ -407,6 +421,34 @@ function ScheduleForm({
                 </Button>
             </div>
         </section>
+    );
+}
+
+function ActiveProvidersBar({ providers }: { providers: ResolvedProvider[] }) {
+    const t = useTranslations('dashboard.directoryDetail.schedule.card');
+
+    return (
+        <div className="rounded-xl border border-border dark:border-border-dark bg-surface dark:bg-surface-dark px-4 py-3">
+            <p className="text-xs font-medium text-text-secondary dark:text-text-secondary-dark mb-2">
+                {t('providers.title')}
+            </p>
+            <div className="flex flex-wrap gap-2">
+                {providers.map((p) => (
+                    <span
+                        key={p.id}
+                        className={cn(
+                            'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs',
+                            p.source === 'override'
+                                ? 'border-primary/40 bg-primary/5 text-primary'
+                                : 'border-border dark:border-border-dark text-text-secondary dark:text-text-secondary-dark',
+                        )}
+                    >
+                        <span className="font-medium">{p.category}</span>
+                        <span className="opacity-60">{p.name}</span>
+                    </span>
+                ))}
+            </div>
+        </div>
     );
 }
 

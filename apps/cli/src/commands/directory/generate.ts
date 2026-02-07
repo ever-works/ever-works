@@ -7,11 +7,11 @@ import { getApiService, CreateItemsGeneratorDto } from '../../services/api.servi
 import { DirectoryPromptService } from './directory-prompt.service';
 import { GeneratePromptService } from './generate-prompt.service';
 import { handleCliError } from '../../utils/error';
-import { GenerateStatusType, GitProvider } from '@packages/cli-shared';
+import { GenerateStatusType } from '@packages/cli-shared';
 import { WEB_URL } from '../../utils/constants';
 
 export const generateCommand = new Command('generate')
-    .description('Generate data and create a GitHub repository for a directory')
+    .description('Generate data and create a repository for a directory')
     .action(async () => {
         try {
             console.log(chalk.cyan.bold('\nGenerate Directory Content\n'));
@@ -58,80 +58,99 @@ export const generateCommand = new Command('generate')
                 return;
             }
 
-            // Check if github is connected
-            const githubConnected = await apiService.checkConnection(GitProvider.GITHUB);
-            if (!githubConnected.connected) {
+            // Check git provider connection dynamically
+            const gitProvidersResponse = await apiService.getGitProviders();
+            const enabledProviders = gitProvidersResponse.providers.filter((p) => p.enabled);
+            let gitConnected = false;
+
+            for (const provider of enabledProviders) {
+                try {
+                    const connection = await apiService.checkGitProviderConnection(provider.id);
+                    if (connection.connected) {
+                        gitConnected = true;
+                        break;
+                    }
+                } catch {
+                    // Skip providers that fail
+                }
+            }
+
+            if (!gitConnected) {
                 console.log(
-                    chalk.yellow(
-                        '\n⚠ GitHub is not connected. Please connect your GitHub account.',
-                    ),
+                    chalk.yellow('\n⚠ No git provider is connected. Please connect your account.'),
                 );
-                // User should go to the web app to connect their GitHub account
                 console.log(
                     chalk.gray('  • Go to ') +
                         chalk.cyan(WEB_URL) +
-                        chalk.gray(' to connect your GitHub account'),
+                        chalk.gray(' to connect your git provider account'),
                 );
                 return;
             }
 
             // Collect generation parameters
-            console.log(chalk.cyan('\n📝 Generation Configuration'));
+            console.log(chalk.cyan('\nGeneration Configuration'));
 
             // Prompt for required fields
             const requiredData = await generatePrompt.promptRequiredFields(
                 `${directory.name} Content Generation`,
             );
 
-            // Ask for advanced configuration
-            const advancedConfig = await inquirer.prompt([
+            // Fetch generator form schema for provider selection and dynamic fields
+            const spinner = ora('Loading generator configuration...').start();
+            let schema = await apiService.getGeneratorFormSchema(directory.id);
+            spinner.succeed('Generator configuration loaded');
+
+            // Provider selection
+            const providerResult = await generatePrompt.promptProviderSelection(schema);
+
+            // If a pipeline was selected, re-fetch schema with pipeline-specific fields
+            if (providerResult.pipelineId) {
+                const pipelineSpinner = ora('Loading pipeline configuration...').start();
+                schema = await apiService.getGeneratorFormSchema(
+                    directory.id,
+                    providerResult.pipelineId,
+                );
+                pipelineSpinner.succeed('Pipeline configuration loaded');
+            }
+
+            // Dynamic plugin fields
+            let pluginConfig: Record<string, unknown> = {};
+            if (schema.pluginFields && schema.pluginFields.length > 0) {
+                pluginConfig = await generatePrompt.promptDynamicFields(
+                    schema.pluginFields,
+                    schema.pluginGroups,
+                    schema.defaultValues,
+                );
+            }
+
+            // Company information (optional)
+            const companyConfig = await inquirer.prompt([
                 {
                     type: 'confirm',
-                    name: 'configureAdvanced',
-                    message: 'Configure advanced options?',
+                    name: 'addCompany',
+                    message: 'Add company information?',
                     default: false,
                 },
             ]);
 
-            let createItemsGeneratorDto: CreateItemsGeneratorDto = {
+            const createItemsGeneratorDto: CreateItemsGeneratorDto = {
                 name: requiredData.name,
                 prompt: requiredData.prompt,
             };
 
-            if (advancedConfig.configureAdvanced) {
-                // Get advanced options from the prompt service
-                const advancedOptions = await generatePrompt.promptAdvancedOptions();
+            if (companyConfig.addCompany) {
+                createItemsGeneratorDto.company = await generatePrompt.promptCompanyInfo();
+            }
 
-                // Merge advanced options
-                Object.assign(createItemsGeneratorDto, advancedOptions);
+            // Set providers if any were selected
+            const hasProviders = Object.values(providerResult.providers).some(Boolean);
+            if (hasProviders) {
+                createItemsGeneratorDto.providers = providerResult.providers;
+            }
 
-                // Company information
-                const companyConfig = await inquirer.prompt([
-                    {
-                        type: 'confirm',
-                        name: 'addCompany',
-                        message: 'Add company information?',
-                        default: false,
-                    },
-                ]);
-
-                if (companyConfig.addCompany) {
-                    createItemsGeneratorDto.company = await generatePrompt.promptCompanyInfo();
-                }
-
-                // Ask for configuration settings
-                const configConfig = await inquirer.prompt([
-                    {
-                        type: 'confirm',
-                        name: 'configureAdvancedSettings',
-                        message: 'Configure advanced generation settings?',
-                        default: false,
-                    },
-                ]);
-
-                if (configConfig.configureAdvancedSettings) {
-                    createItemsGeneratorDto.config = await generatePrompt.promptConfigOptions();
-                }
+            // Set plugin config if any fields were filled
+            if (Object.keys(pluginConfig).length > 0) {
+                createItemsGeneratorDto.pluginConfig = pluginConfig;
             }
 
             // Show summary and confirm
@@ -152,7 +171,7 @@ export const generateCommand = new Command('generate')
             }
 
             // Start generation
-            const spinner = ora('Starting generation process...').start();
+            const genSpinner = ora('Starting generation process...').start();
 
             try {
                 const response = await apiService.generateContent(
@@ -161,10 +180,10 @@ export const generateCommand = new Command('generate')
                 );
 
                 if (response.status === 'error') {
-                    spinner.fail('\n✗ Generation failed');
+                    genSpinner.fail('\n✗ Generation failed');
                     return;
                 } else {
-                    spinner.succeed('\n✓ Generation process started!');
+                    genSpinner.succeed('\n✓ Generation process started!');
                 }
 
                 // Tell user to use ever-works status to check status
@@ -175,7 +194,7 @@ export const generateCommand = new Command('generate')
                         chalk.gray(' to check the status of your generation'),
                 );
             } catch (error) {
-                spinner.fail('Generation failed');
+                genSpinner.fail('Generation failed');
                 throw error;
             }
         } catch (error) {

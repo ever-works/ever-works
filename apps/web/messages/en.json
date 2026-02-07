@@ -536,6 +536,9 @@
                         "inherit": "Use last run settings",
                         "notConfigured": "not configured"
                     },
+                    "providers": {
+                        "title": "Active providers for next run"
+                    },
                     "billing": {
                         "subscription": "Subscription",
                         "usage": "Pay-per-use"

@@ -53,7 +53,7 @@ export class GitHubGitPromptService extends BasePromptService {
         const githubOwner = await this.promptRequiredText(
             'Enter your GitHub username/organization:',
             existingConfig?.GH_OWNER,
-            this.validateGitHubUsername.bind(this),
+            this.validateGitUsername.bind(this),
         );
 
         // Git Name with validation

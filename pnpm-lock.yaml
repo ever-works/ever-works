@@ -219,6 +219,12 @@ importers:
 
   apps/cli:
     dependencies:
+      '@ever-works/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@ever-works/plugin':
+        specifier: workspace:*
+        version: link:../../packages/plugin
       '@packages/cli-shared':
         specifier: workspace:*
         version: link:../../packages/cli-shared

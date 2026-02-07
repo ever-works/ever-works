@@ -11,7 +11,7 @@ export const deployCommand = new Command('deploy')
     .description('Deploy the website for a directory')
     .action(async () => {
         try {
-            console.log(chalk.cyan.bold('\n🚀 Deploy Website\n'));
+            console.log(chalk.cyan.bold('\nDeploy Website\n'));
 
             // Ensure user is authenticated
             await requireAuth();
@@ -36,11 +36,46 @@ export const deployCommand = new Command('deploy')
                 ),
             );
 
-            // Attempt to fetch deployment teams (optional)
+            // Check if deployment is possible for this directory
+            try {
+                const deployCheck = await apiService.checkDeployCapability(directory.id);
+
+                if (!deployCheck.canDeploy) {
+                    console.log(
+                        chalk.yellow('\n⚠ Deployment is not configured for this directory.'),
+                    );
+                    if (!deployCheck.ownerHasToken) {
+                        console.log(
+                            chalk.gray(
+                                '  The directory owner needs to configure a deployment token in Settings > Plugins.',
+                            ),
+                        );
+                    }
+                    if (deployCheck.isShared && !deployCheck.userHasToken) {
+                        console.log(
+                            chalk.gray(
+                                '  You can also configure your own deployment token in Settings > Plugins.',
+                            ),
+                        );
+                    }
+                    return;
+                }
+            } catch (error: any) {
+                const message = error?.response?.data?.message || error?.message;
+                if (message) {
+                    console.log(
+                        chalk.yellow(
+                            `\n⚠ Could not verify deployment capability (${message}). Attempting to proceed.`,
+                        ),
+                    );
+                }
+            }
+
+            // Fetch deployment teams for this directory
             let deploymentTeams: DeploymentTeam[] = [];
             let teamScope: string | undefined;
             try {
-                const teamResponse = await apiService.getDeploymentTeams();
+                const teamResponse = await apiService.getDeployTeamsForDirectory(directory.id);
                 if (teamResponse.status === 'success' && Array.isArray(teamResponse.teams)) {
                     deploymentTeams = teamResponse.teams;
                 }
