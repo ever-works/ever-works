@@ -6,6 +6,8 @@ export {
     DirectoryScheduleBillingMode,
 } from '@ever-works/contracts/api';
 
+export type { ProvidersDto } from '@ever-works/contracts/api';
+
 export type ClassToObject<T> = {
     [K in keyof T]: T[K];
 };

@@ -184,4 +184,9 @@ export class UpdateItemsGeneratorDto implements IUpdateItemsGeneratorDto {
     @IsOptional()
     @IsBoolean()
     update_with_pull_request?: boolean = true;
+
+    @IsOptional()
+    @ValidateNested()
+    @Type(() => ProvidersDto)
+    providers?: ProvidersDto;
 }

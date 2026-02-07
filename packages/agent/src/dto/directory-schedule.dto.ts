@@ -1,4 +1,5 @@
-import { IsBoolean, IsEnum, IsInt, IsOptional, Max, Min } from 'class-validator';
+import { IsBoolean, IsEnum, IsInt, IsOptional, Max, Min, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
 import {
     DirectoryScheduleBillingMode,
     DirectoryScheduleCadence,
@@ -6,6 +7,7 @@ import {
     GenerateStatusType,
 } from '@src/entities/types';
 import type { UpdateDirectorySchedulePayload as IUpdateDirectorySchedulePayload } from '@ever-works/contracts/api';
+import { ProvidersDto } from '@src/items-generator/dto/create-items-generator.dto';
 
 // Re-export types from contracts for convenience
 export type {
@@ -35,4 +37,9 @@ export class UpdateDirectoryScheduleDto implements IUpdateDirectorySchedulePaylo
     @IsOptional()
     @IsBoolean()
     alwaysCreatePullRequest?: boolean;
+
+    @IsOptional()
+    @ValidateNested()
+    @Type(() => ProvidersDto)
+    providerOverrides?: ProvidersDto | null;
 }

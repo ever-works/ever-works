@@ -528,7 +528,13 @@
                         "maxFailures": "Failure limit",
                         "maxFailuresHelp": "Automatically pause once this many failures occur.",
                         "createPullRequest": "Create Pull Requests",
-                        "createPullRequestHelp": "When enabled, scheduled updates create a pull request instead of committing directly."
+                        "createPullRequestHelp": "When enabled, scheduled updates create a pull request instead of committing directly.",
+                        "pipeline": "Pipeline",
+                        "pipelineHelp": "Override which pipeline runs on schedule. Leave as default to use the same pipeline as your last manual generation."
+                    },
+                    "pipeline": {
+                        "inherit": "Use last run settings",
+                        "notConfigured": "not configured"
                     },
                     "billing": {
                         "subscription": "Subscription",

@@ -24,9 +24,11 @@ import {
     DirectoryScheduleStatus,
     GenerateStatusType,
 } from '@src/entities/types';
+import type { ProvidersDto } from '@ever-works/contracts/api';
 import { UsageLedgerService } from '@src/subscriptions/usage-ledger.service';
 import { UsageLedgerTriggerType } from '@src/entities/usage-ledger-entry.entity';
 import { DataGeneratorService } from '@src/generators/data-generator/data-generator.service';
+import { PluginRegistryService } from '@src/plugins/services/plugin-registry.service';
 import { Directory } from '@src/entities/directory.entity';
 import {
     NOTIFICATION_OPERATIONS,
@@ -45,6 +47,7 @@ export class DirectoryScheduleService {
         private readonly subscriptionService: SubscriptionService,
         private readonly usageLedgerService: UsageLedgerService,
         private readonly dataGeneratorService: DataGeneratorService,
+        private readonly pluginRegistry: PluginRegistryService,
         @Optional()
         @Inject(NOTIFICATION_OPERATIONS)
         private readonly notificationOperations?: NotificationOperations,
@@ -133,6 +136,15 @@ export class DirectoryScheduleService {
         const alwaysCreatePullRequest =
             dto.alwaysCreatePullRequest ?? existing?.alwaysCreatePullRequest ?? false;
 
+        const providerOverrides =
+            dto.providerOverrides !== undefined
+                ? dto.providerOverrides
+                : (existing?.providerOverrides ?? null);
+
+        if (providerOverrides) {
+            this.validateProviderOverrides(providerOverrides);
+        }
+
         const creatingOrActivating =
             enable && (!existing || existing.status !== DirectoryScheduleStatus.ACTIVE);
 
@@ -165,6 +177,7 @@ export class DirectoryScheduleService {
             status,
             maxFailureBeforePause,
             alwaysCreatePullRequest,
+            providerOverrides,
             nextRunAt,
         });
 
@@ -190,6 +203,7 @@ export class DirectoryScheduleService {
             nextRunAt: null,
             billingMode: DirectoryScheduleBillingMode.SUBSCRIPTION,
             alwaysCreatePullRequest: false,
+            providerOverrides: null,
         });
 
         await this.syncDirectory(directory.id, updated);
@@ -483,6 +497,7 @@ export class DirectoryScheduleService {
             allowedCadences: allowances,
             planCode: subscriptionsEnabled ? planCode : undefined,
             subscriptionsEnabled,
+            providerOverrides: schedule?.providerOverrides ?? null,
         };
     }
 
@@ -524,6 +539,26 @@ export class DirectoryScheduleService {
                 status: 'error',
                 message: 'Complete an initial directory setup before enabling scheduled updates.',
             });
+        }
+    }
+
+    private validateProviderOverrides(overrides: ProvidersDto): void {
+        const fields = ['pipeline', 'ai', 'search', 'screenshot', 'contentExtractor'] as const;
+        for (const field of fields) {
+            const pluginId = overrides[field];
+            if (pluginId) {
+                const registered = this.pluginRegistry.get(pluginId);
+                if (!registered) {
+                    throw new BadRequestException(
+                        `Provider plugin "${pluginId}" for ${field} is not installed`,
+                    );
+                }
+                if (registered.state !== 'enabled') {
+                    throw new BadRequestException(
+                        `Provider plugin "${pluginId}" for ${field} is not enabled`,
+                    );
+                }
+            }
         }
     }
 

@@ -1,5 +1,6 @@
 import { DirectoryScheduleCadence, DirectoryScheduleStatus, DirectoryScheduleBillingMode } from './schedule.enum.js';
 import { GenerateStatusType } from './generate-status.enum.js';
+import type { ProvidersDto } from '../generator/providers.dto.js';
 
 /**
  * Allowed cadence configuration for a directory
@@ -43,6 +44,8 @@ export interface DirectoryScheduleDto {
 	planCode?: string;
 	/** Whether subscriptions are enabled */
 	subscriptionsEnabled: boolean;
+	/** Provider overrides for scheduled runs (pipeline, ai, search, etc.) */
+	providerOverrides?: ProvidersDto | null;
 }
 
 /**
@@ -59,4 +62,6 @@ export interface UpdateDirectorySchedulePayload {
 	maxFailureBeforePause?: number;
 	/** Always create pull request */
 	alwaysCreatePullRequest?: boolean;
+	/** Provider overrides for scheduled runs (pipeline, ai, search, etc.) */
+	providerOverrides?: ProvidersDto | null;
 }

@@ -24,6 +24,7 @@ import {
     DirectoryScheduleStatus,
 } from '@/lib/api/enums';
 import { DirectoryScheduleDto } from '@/lib/api/types-only';
+import type { ProviderOption } from '@/lib/api/types-only';
 import {
     cancelDirectorySchedule,
     runDirectorySchedule,
@@ -34,6 +35,7 @@ import { useDirectoryDetail } from '../DirectoryDetailContext';
 
 type DirectoryScheduleCardProps = {
     schedule: DirectoryScheduleDto | null;
+    pipelineProviders?: ProviderOption[];
 };
 
 const cadenceOrder = [
@@ -48,7 +50,10 @@ const defaultAllowances = cadenceOrder.map((cadence) => ({
     allowed: true,
 }));
 
-export function DirectoryScheduleCard({ schedule }: DirectoryScheduleCardProps) {
+export function DirectoryScheduleCard({
+    schedule,
+    pipelineProviders = [],
+}: DirectoryScheduleCardProps) {
     const { directory } = useDirectoryDetail();
     const t = useTranslations('dashboard.directoryDetail.schedule.card');
     const router = useRouter();
@@ -64,24 +69,35 @@ export function DirectoryScheduleCard({ schedule }: DirectoryScheduleCardProps) 
         );
     }
 
-    return <ScheduleForm directoryId={directory.id} schedule={schedule} />;
+    return (
+        <ScheduleForm
+            directoryId={directory.id}
+            schedule={schedule}
+            pipelineProviders={pipelineProviders}
+        />
+    );
 }
 
 function ScheduleForm({
     directoryId,
     schedule,
+    pipelineProviders,
 }: {
     directoryId: string;
     schedule: DirectoryScheduleDto;
+    pipelineProviders: ProviderOption[];
 }) {
     const t = useTranslations('dashboard.directoryDetail.schedule.card');
     const router = useRouter();
+
+    const showPipelineSelector = pipelineProviders.length > 1;
 
     const allowances = useMemo(
         () => (schedule.allowedCadences?.length ? schedule.allowedCadences : defaultAllowances),
         [schedule.allowedCadences],
     );
-    const [form, setForm] = useState({
+
+    const deriveFormState = () => ({
         enable: schedule.status === DirectoryScheduleStatus.ACTIVE,
         cadence:
             schedule.cadence ??
@@ -90,25 +106,20 @@ function ScheduleForm({
         billingMode: schedule.billingMode ?? DirectoryScheduleBillingMode.SUBSCRIPTION,
         maxFailureBeforePause: schedule.maxFailureBeforePause ?? 3,
         alwaysCreatePullRequest: schedule.alwaysCreatePullRequest ?? false,
+        pipelineOverride: schedule.providerOverrides?.pipeline ?? undefined,
     });
 
+    const [form, setForm] = useState(deriveFormState);
+
     useEffect(() => {
-        setForm({
-            enable: schedule.status === DirectoryScheduleStatus.ACTIVE,
-            cadence:
-                schedule.cadence ??
-                allowances.find((item) => item.allowed)?.cadence ??
-                DirectoryScheduleCadence.MONTHLY,
-            billingMode: schedule.billingMode ?? DirectoryScheduleBillingMode.SUBSCRIPTION,
-            maxFailureBeforePause: schedule.maxFailureBeforePause ?? 3,
-            alwaysCreatePullRequest: schedule.alwaysCreatePullRequest ?? false,
-        });
+        setForm(deriveFormState());
     }, [
         schedule.status,
         schedule.cadence,
         schedule.billingMode,
         schedule.maxFailureBeforePause,
         schedule.alwaysCreatePullRequest,
+        schedule.providerOverrides,
         allowances,
     ]);
 
@@ -159,12 +170,18 @@ function ScheduleForm({
                 return;
             }
 
+            const providerOverrides =
+                form.pipelineOverride !== undefined
+                    ? { pipeline: form.pipelineOverride }
+                    : undefined;
+
             const result = await updateDirectorySchedule(directoryId, {
                 enable: form.enable,
                 cadence: form.cadence,
                 billingMode: form.billingMode,
                 maxFailureBeforePause: form.maxFailureBeforePause,
                 alwaysCreatePullRequest: form.alwaysCreatePullRequest,
+                providerOverrides,
             });
 
             if (!result.success) {
@@ -344,6 +361,16 @@ function ScheduleForm({
                     </FieldCard>
                 </div>
 
+                {showPipelineSelector && (
+                    <div className="grid gap-4 md:grid-cols-2">
+                        <PipelineOverrideField
+                            providers={pipelineProviders}
+                            value={form.pipelineOverride}
+                            onChange={(value) => updateForm({ pipelineOverride: value })}
+                        />
+                    </div>
+                )}
+
                 {subscriptionsEnabled && (
                     <div className="grid gap-4 md:grid-cols-2">{updateWithPRElement}</div>
                 )}
@@ -380,6 +407,32 @@ function ScheduleForm({
                 </Button>
             </div>
         </section>
+    );
+}
+
+function PipelineOverrideField({
+    providers,
+    value,
+    onChange,
+}: {
+    providers: ProviderOption[];
+    value: string | undefined;
+    onChange: (value: string | undefined) => void;
+}) {
+    const t = useTranslations('dashboard.directoryDetail.schedule.card');
+
+    return (
+        <FieldCard label={t('fields.pipeline')} helper={t('fields.pipelineHelp')}>
+            <Select value={value ?? ''} onChange={(e) => onChange(e.target.value || undefined)}>
+                <option value="">{t('pipeline.inherit')}</option>
+                {providers.map((p) => (
+                    <option key={p.id} value={p.id} disabled={!p.configured}>
+                        {p.name}
+                        {!p.configured ? ` (${t('pipeline.notConfigured')})` : ''}
+                    </option>
+                ))}
+            </Select>
+        </FieldCard>
     );
 }
 

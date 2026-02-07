@@ -35,4 +35,6 @@ export interface UpdateItemsGeneratorDto {
 	generation_method?: GenerationMethod;
 	/** Whether to update with pull request */
 	update_with_pull_request?: boolean;
+	/** Provider overrides (pipeline, ai, search, etc.) */
+	providers?: ProvidersDto;
 }

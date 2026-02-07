@@ -687,12 +687,17 @@ export class DirectoryGenerationService {
             return this.runScheduledSync(directory, user, schedule);
         }
 
-        // Regular scheduled update (AI-powered generation)
+        const updateDto: UpdateItemsGeneratorDto = {
+            update_with_pull_request: schedule.alwaysCreatePullRequest ?? false,
+        };
+
+        if (schedule.providerOverrides) {
+            updateDto.providers = schedule.providerOverrides;
+        }
+
         return this.updateItemsGenerator({
             directoryId: schedule.directoryId,
-            updateDto: {
-                update_with_pull_request: schedule.alwaysCreatePullRequest ?? false,
-            },
+            updateDto,
             user,
             awaitCompletion: false,
             context: {

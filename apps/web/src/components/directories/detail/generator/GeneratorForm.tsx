@@ -278,8 +278,7 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
             {/* Show additional advanced options for new directories or when toggled */}
             {(!isGenerated || showAdvancedOptions) && (
                 <>
-                    {/* Pipeline Mode Selection */}
-                    {formSchema && formSchema.providers.fullPipeline.length > 0 && (
+                    {formSchema && formSchema.providers.fullPipeline.length > 1 && (
                         <PipelineModeSelector
                             fullPipelineProviders={formSchema.providers.fullPipeline}
                             selectedPipeline={providers.pipeline}
