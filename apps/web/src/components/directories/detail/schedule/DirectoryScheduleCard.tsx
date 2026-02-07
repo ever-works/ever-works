@@ -1,13 +1,6 @@
 'use client';
 
-import {
-    useEffect,
-    useMemo,
-    useState,
-    useTransition,
-    type ComponentType,
-    type ReactNode,
-} from 'react';
+import { useEffect, useMemo, useState, useTransition, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { AlertCircle, CheckCircle2, PauseCircle, PlayCircle, Repeat } from 'lucide-react';
@@ -32,13 +25,9 @@ import {
 } from '@/app/actions/dashboard/directory-schedule';
 import { ShowDateTime } from '@/components/ui/show-datetime';
 import { useDirectoryDetail } from '../DirectoryDetailContext';
+import { ActiveProvidersBar, FieldCard, HelperPill, type ResolvedProvider } from '../shared';
 
-export type ResolvedProvider = {
-    category: string;
-    id: string;
-    name: string;
-    source: 'override' | 'lastRun';
-};
+export type { ResolvedProvider };
 
 type DirectoryScheduleCardProps = {
     schedule: DirectoryScheduleDto | null;
@@ -424,34 +413,6 @@ function ScheduleForm({
     );
 }
 
-function ActiveProvidersBar({ providers }: { providers: ResolvedProvider[] }) {
-    const t = useTranslations('dashboard.directoryDetail.schedule.card');
-
-    return (
-        <div className="rounded-xl border border-border dark:border-border-dark bg-surface dark:bg-surface-dark px-4 py-3">
-            <p className="text-xs font-medium text-text-secondary dark:text-text-secondary-dark mb-2">
-                {t('providers.title')}
-            </p>
-            <div className="flex flex-wrap gap-2">
-                {providers.map((p) => (
-                    <span
-                        key={p.id}
-                        className={cn(
-                            'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs',
-                            p.source === 'override'
-                                ? 'border-primary/40 bg-primary/5 text-primary'
-                                : 'border-border dark:border-border-dark text-text-secondary dark:text-text-secondary-dark',
-                        )}
-                    >
-                        <span className="font-medium">{p.category}</span>
-                        <span className="opacity-60">{p.name}</span>
-                    </span>
-                ))}
-            </div>
-        </div>
-    );
-}
-
 function PipelineOverrideField({
     providers,
     value,
@@ -486,54 +447,6 @@ function SummaryChip({ label, value }: { label: string; value: ReactNode | strin
             </p>
             <p className="text-base font-semibold text-text dark:text-text-dark">{value}</p>
         </div>
-    );
-}
-
-function FieldCard({
-    label,
-    helper,
-    children,
-}: {
-    label: string;
-    helper?: string;
-    children: ReactNode;
-}) {
-    return (
-        <div className="rounded-xl border border-border dark:border-border-dark bg-surface dark:bg-surface-dark p-4 space-y-3">
-            <div>
-                <p className="text-sm font-medium text-text dark:text-text-dark">{label}</p>
-                {helper && (
-                    <p className="text-xs text-text-secondary dark:text-text-secondary-dark">
-                        {helper}
-                    </p>
-                )}
-            </div>
-            {children}
-        </div>
-    );
-}
-
-function HelperPill({
-    children,
-    tone,
-    icon: Icon,
-}: {
-    children: ReactNode;
-    tone: 'success' | 'alert';
-    icon: ComponentType<{ className?: string }>;
-}) {
-    return (
-        <span
-            className={cn(
-                'mt-2 inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium',
-                tone === 'success'
-                    ? 'bg-success/10 text-success'
-                    : 'bg-destructive/10 text-destructive',
-            )}
-        >
-            <Icon className="h-4 w-4" aria-hidden />
-            {children}
-        </span>
     );
 }
 

@@ -16,7 +16,6 @@ import { CompanyFields } from './CompanyFields';
 import { DynamicPluginFields } from './DynamicPluginFields';
 import { PipelineModeSelector, ProviderSelector } from './ProviderSelector';
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils/cn';
 import { toast } from 'sonner';
 import { useRouter } from '@/i18n/navigation';
 import {
@@ -30,6 +29,7 @@ import { generateItems, updateItems } from '@/app/actions/dashboard/generator';
 import { useTranslations } from 'next-intl';
 import { GenerationMethod, WebsiteRepositoryCreationMethod } from '@/lib/api/enums';
 import { getFormSchema } from '@/app/actions/dashboard/generator-form';
+import { CollapsibleSection } from '../shared';
 
 interface GeneratorFormProps {
     directoryId: string;
@@ -421,61 +421,5 @@ export function GeneratorForm({ directoryId, directory, config }: GeneratorFormP
                 </DialogContent>
             </Dialog>
         </form>
-    );
-}
-
-interface CollapsibleSectionProps {
-    title: string;
-    description: string;
-    defaultExpanded?: boolean;
-    children: React.ReactNode;
-}
-
-function CollapsibleSection({
-    title,
-    description,
-    defaultExpanded = false,
-    children,
-}: CollapsibleSectionProps) {
-    const [isExpanded, setIsExpanded] = useState(defaultExpanded);
-
-    return (
-        <div
-            className={cn(
-                'rounded-lg border overflow-hidden',
-                'bg-card dark:bg-card-dark',
-                'border-card-border dark:border-card-border-dark',
-            )}
-        >
-            <button
-                type="button"
-                onClick={() => setIsExpanded(!isExpanded)}
-                className="w-full px-6 py-4 flex items-center justify-between text-left hover:bg-surface dark:hover:bg-surface-dark transition-colors"
-            >
-                <div>
-                    <h3 className="text-lg font-medium text-text dark:text-text-dark">{title}</h3>
-                    <p className="text-sm text-text-secondary dark:text-text-secondary-dark mt-1">
-                        {description}
-                    </p>
-                </div>
-                <svg
-                    className={cn(
-                        'w-5 h-5 text-text-secondary dark:text-text-secondary-dark transition-transform',
-                        isExpanded && 'rotate-180',
-                    )}
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                >
-                    <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M19 9l-7 7-7-7"
-                    />
-                </svg>
-            </button>
-            {isExpanded && <div className="px-6 pb-4 pt-2">{children}</div>}
-        </div>
     );
 }

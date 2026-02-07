@@ -224,6 +224,14 @@ export class DirectoryGenerationService {
             ...updateDto,
         };
 
+        // Deep-merge providers: overrides win per-field, but unset fields inherit from last run
+        if (lastRequestData.providers && updateDto.providers) {
+            payload.providers = {
+                ...lastRequestData.providers,
+                ...updateDto.providers,
+            };
+        }
+
         // Apply conservative config for scheduled runs to control resource usage
         // This ensures scheduled updates are efficient and cost-effective
         if (context.triggeredBy === 'schedule') {
