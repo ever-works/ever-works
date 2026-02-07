@@ -1812,6 +1812,10 @@
             "disableWarning": "Disabling this plugin will also disable it in all your directories",
             "cannotDisableSystem": "System plugins cannot be disabled",
             "disableFailed": "Failed to disable plugin",
+            "autoEnableForDirectories": "Also enable for all directories",
+            "autoEnableForDirectoriesDescription": "This plugin will be automatically active in all your directories. You can still disable it per directory.",
+            "confirmDisable": "Confirm Disable",
+            "cancel": "Cancel",
             "missingRequiredFields": "Missing required fields: {fields}",
             "saveError": "Failed to save settings. Please try again.",
             "oauth": {
@@ -1878,7 +1882,8 @@
             "resetConfirm": "This will clear all directory-specific overrides. Settings will fall back to your user-level values.",
             "resetSuccess": "Settings reset to defaults",
             "cancel": "Cancel",
-            "clickToConfigure": "Click to configure"
+            "clickToConfigure": "Click to configure",
+            "autoEnabledByUser": "Auto-enabled via user settings"
         }
     },
     "layout": {

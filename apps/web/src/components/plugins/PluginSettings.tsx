@@ -1,6 +1,6 @@
 'use client';
 
-import { useTransition, useCallback } from 'react';
+import { useState, useTransition, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { UserPlugin } from '@/lib/api/plugins';
@@ -16,6 +16,7 @@ import {
     Check,
     BookOpen,
     Settings,
+    AlertTriangle,
 } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
@@ -64,7 +65,15 @@ export function PluginSettings({ plugin, oauthConnection }: PluginSettingsProps)
         onSave,
     });
 
+    const [showDisableWarning, setShowDisableWarning] = useState(false);
+
     const handleToggle = async () => {
+        if (plugin.enabled && !showDisableWarning) {
+            setShowDisableWarning(true);
+            return;
+        }
+
+        setShowDisableWarning(false);
         startTransition(async () => {
             try {
                 if (plugin.enabled) {
@@ -203,6 +212,34 @@ export function PluginSettings({ plugin, oauthConnection }: PluginSettingsProps)
                     </div>
                 )}
             </div>
+
+            {showDisableWarning && (
+                <div className="p-4 rounded-xl bg-warning/10 border border-warning/30 flex items-start gap-3">
+                    <AlertTriangle className="w-5 h-5 text-warning shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                        <p className="text-sm text-warning">{t('disableWarning')}</p>
+                        <div className="flex gap-2 mt-3">
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setShowDisableWarning(false)}
+                            >
+                                {t('cancel')}
+                            </Button>
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={handleToggle}
+                                disabled={isPending}
+                                loading={isPending}
+                                className="text-danger hover:text-danger hover:bg-danger/10"
+                            >
+                                {t('confirmDisable')}
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* OAuth Connection Section */}
             {plugin.capabilities.includes('oauth') && oauthConnection !== undefined && (

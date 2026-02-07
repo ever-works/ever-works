@@ -1570,6 +1570,137 @@ describe('PluginOperationsService', () => {
         });
     });
 
+    describe('autoEnableForDirectories', () => {
+        it('should store autoEnableForDirectories when creating new user plugin', async () => {
+            const registered = createRegisteredPlugin();
+            jest.spyOn(pluginRegistryService, 'get').mockReturnValue(registered);
+            jest.spyOn(pluginRepository, 'findOne').mockResolvedValue({
+                id: '1',
+                pluginId: 'test-plugin',
+            } as any);
+            jest.spyOn(userPluginRepository, 'findOne').mockResolvedValue(null);
+
+            await service.enablePluginForUser('test-plugin', 'user-1', undefined, undefined, true);
+
+            expect(userPluginRepository.create).toHaveBeenCalledWith(
+                expect.objectContaining({ autoEnableForDirectories: true }),
+            );
+            expect(userPluginRepository.save).toHaveBeenCalled();
+        });
+
+        it('should default autoEnableForDirectories to false', async () => {
+            const registered = createRegisteredPlugin();
+            jest.spyOn(pluginRegistryService, 'get').mockReturnValue(registered);
+            jest.spyOn(pluginRepository, 'findOne').mockResolvedValue({
+                id: '1',
+                pluginId: 'test-plugin',
+            } as any);
+            jest.spyOn(userPluginRepository, 'findOne').mockResolvedValue(null);
+
+            await service.enablePluginForUser('test-plugin', 'user-1');
+
+            expect(userPluginRepository.create).toHaveBeenCalledWith(
+                expect.objectContaining({ autoEnableForDirectories: false }),
+            );
+        });
+
+        it('should update autoEnableForDirectories on existing user plugin', async () => {
+            const registered = createRegisteredPlugin();
+            jest.spyOn(pluginRegistryService, 'get').mockReturnValue(registered);
+            jest.spyOn(pluginRepository, 'findOne').mockResolvedValue({
+                id: '1',
+                pluginId: 'test-plugin',
+            } as any);
+            const existing = {
+                id: '1',
+                userId: 'user-1',
+                pluginId: 'test-plugin',
+                enabled: false,
+                autoEnableForDirectories: false,
+                settings: {},
+                secretSettings: {},
+                metadata: {},
+            } as any;
+            jest.spyOn(userPluginRepository, 'findOne').mockResolvedValue(existing);
+
+            await service.enablePluginForUser('test-plugin', 'user-1', undefined, undefined, true);
+
+            expect(userPluginRepository.save).toHaveBeenCalledWith(
+                expect.objectContaining({ autoEnableForDirectories: true }),
+            );
+        });
+
+        it('should include autoEnableForDirectories in user plugin response', async () => {
+            const registered = createRegisteredPlugin();
+            jest.spyOn(pluginRegistryService, 'get').mockReturnValue(registered);
+            jest.spyOn(userPluginRepository, 'findOne').mockResolvedValue({
+                id: '1',
+                userId: 'user-1',
+                pluginId: 'test-plugin',
+                enabled: true,
+                autoEnableForDirectories: true,
+                settings: {},
+                secretSettings: {},
+                metadata: {},
+            } as any);
+
+            const result = await service.getPlugin('test-plugin', 'user-1');
+
+            expect(result.autoEnableForDirectories).toBe(true);
+        });
+
+        it('should use autoEnableForDirectories in directory plugin response', async () => {
+            const plugin = createRegisteredPlugin();
+            plugin.manifest = { ...plugin.manifest, autoEnable: false } as PluginManifest;
+            jest.spyOn(pluginRegistryService, 'getAll').mockReturnValue([plugin]);
+            jest.spyOn(userPluginRepository, 'find').mockResolvedValue([
+                {
+                    id: '1',
+                    userId: 'user-1',
+                    pluginId: 'test-plugin',
+                    enabled: true,
+                    autoEnableForDirectories: true,
+                    settings: {},
+                    secretSettings: {},
+                    metadata: {},
+                } as any,
+            ]);
+            jest.spyOn(directoryPluginRepository, 'find').mockResolvedValue([]);
+
+            const result = await service.listDirectoryPlugins('dir-1', 'user-1');
+
+            expect(result.plugins[0].directoryEnabled).toBe(true);
+        });
+
+        it('should create opt-out record when disabling auto-enabled plugin for directory', async () => {
+            const registered = createRegisteredPlugin();
+            registered.manifest = { ...registered.manifest, autoEnable: false } as PluginManifest;
+            jest.spyOn(pluginRegistryService, 'get').mockReturnValue(registered);
+            jest.spyOn(userPluginRepository, 'findOne').mockResolvedValue({
+                id: '1',
+                userId: 'user-1',
+                pluginId: 'test-plugin',
+                enabled: true,
+                autoEnableForDirectories: true,
+                settings: {},
+                secretSettings: {},
+                metadata: {},
+            } as any);
+            jest.spyOn(directoryPluginRepository, 'findOne').mockResolvedValue(null);
+            jest.spyOn(pluginRepository, 'findOne').mockResolvedValue({
+                id: '1',
+                pluginId: 'test-plugin',
+            } as any);
+
+            await service.disablePluginForDirectory('dir-1', 'test-plugin', 'user-1');
+
+            expect(directoryPluginRepository.create).toHaveBeenCalledWith(
+                expect.objectContaining({ enabled: false }),
+            );
+            expect(directoryPluginRepository.save).toHaveBeenCalled();
+        });
+    });
+
     describe('autoEnable behavior', () => {
         describe('toUserPluginResponse with autoEnable', () => {
             it('should show autoEnabled plugin as installed and enabled without UserPluginEntity', async () => {

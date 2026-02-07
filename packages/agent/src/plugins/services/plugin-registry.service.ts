@@ -356,9 +356,10 @@ export class PluginRegistryService {
      * Resolution priority:
      * 1. System plugins are always enabled
      * 2. User-level DISABLE cascades globally (highest non-system priority)
-     * 3. Directory-level override (only if user hasn't disabled)
-     * 4. User-level enabled status (non-disable case)
-     * 5. Fallback to manifest autoEnable
+     * 3. Directory-level explicit record → use its enabled value
+     * 4. User autoEnableForDirectories (directory context only) → true
+     * 5. User-level enabled status (non-disable, non-directory fallback)
+     * 6. Fallback to manifest autoEnable
      */
     async isPluginEnabledForScope(
         pluginId: string,
@@ -367,20 +368,23 @@ export class PluginRegistryService {
     ): Promise<boolean> {
         const registered = this.plugins.get(pluginId);
 
-        // System plugins are always enabled
+        // 1. System plugins are always enabled
         if (registered?.manifest?.systemPlugin) return true;
 
-        // 1. User-level DISABLE cascades globally (highest priority)
+        // Fetch user plugin once for all subsequent checks
+        let userPlugin = null;
         if (userId && this.userPluginRepository) {
             try {
-                const up = await this.userPluginRepository.findByUserAndPlugin(userId, pluginId);
-                if (up !== null && !up.enabled) return false; // User explicitly disabled → cascade
+                userPlugin = await this.userPluginRepository.findByUserAndPlugin(userId, pluginId);
             } catch {
                 // Continue
             }
         }
 
-        // 2. Directory-level override (only if user hasn't disabled)
+        // 2. User-level DISABLE cascades globally (highest priority)
+        if (userPlugin !== null && !userPlugin.enabled) return false;
+
+        // 3. Directory-level explicit record
         if (directoryId && this.directoryPluginRepository) {
             try {
                 const dp = await this.directoryPluginRepository.findByDirectoryAndPlugin(
@@ -393,17 +397,13 @@ export class PluginRegistryService {
             }
         }
 
-        // 3. User-level enabled status (non-disable case)
-        if (userId && this.userPluginRepository) {
-            try {
-                const up = await this.userPluginRepository.findByUserAndPlugin(userId, pluginId);
-                if (up !== null) return up.enabled;
-            } catch {
-                // Continue
-            }
-        }
+        // 4. User autoEnableForDirectories (directory context only)
+        if (directoryId && userPlugin?.autoEnableForDirectories) return true;
 
-        // 4. Fallback to manifest autoEnable
+        // 5. User-level enabled status
+        if (userPlugin !== null) return userPlugin.enabled;
+
+        // 6. Fallback to manifest autoEnable
         return registered?.manifest?.autoEnable ?? true;
     }
 }

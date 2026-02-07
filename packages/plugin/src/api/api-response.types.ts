@@ -171,6 +171,8 @@ export interface UserPluginResponse extends PluginResponse {
 	settings?: Record<string, unknown>;
 	/** User plugin entity ID */
 	userPluginId?: string;
+	/** Whether this plugin is auto-enabled for all directories */
+	autoEnableForDirectories?: boolean;
 }
 
 /**

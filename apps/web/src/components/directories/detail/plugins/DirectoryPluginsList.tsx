@@ -23,7 +23,7 @@ export function DirectoryPluginsList({
 
     // Filter to show only user-installed plugins or all plugins
     const filteredPlugins = showInstalledOnly
-        ? plugins.filter((p) => p.installed && p.enabled)
+        ? plugins.filter((p) => p.systemPlugin || (p.installed && p.enabled))
         : plugins;
 
     // Get unique capabilities from all plugins

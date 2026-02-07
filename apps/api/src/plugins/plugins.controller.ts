@@ -131,6 +131,7 @@ export class PluginsController {
             auth.userId,
             dto.settings,
             dto.secretSettings,
+            dto.autoEnableForDirectories,
         );
     }
 

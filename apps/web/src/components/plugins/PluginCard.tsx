@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils/cn';
 import { ROUTES } from '@/lib/constants';
 import { Link } from '@/i18n/navigation';
 import { Button } from '@/components/ui/button';
-import { Settings, Power, PowerOff, ExternalLink, Shield, AlertTriangle } from 'lucide-react';
+import { Settings, Power, PowerOff, ExternalLink, AlertTriangle } from 'lucide-react';
 import { enablePlugin, disablePlugin } from '@/app/actions/plugins';
 import { PluginIcon } from './PluginIcon';
 import { getCategoryLabel, getCapabilityLabel } from '@/lib/utils/plugin-category-icons';
@@ -23,31 +23,61 @@ export function PluginCard({ plugin }: PluginCardProps) {
     const [isPending, startTransition] = useTransition();
     const [optimisticEnabled, setOptimisticEnabled] = useState(plugin.enabled);
     const [showDisableWarning, setShowDisableWarning] = useState(false);
+    const [showEnablePanel, setShowEnablePanel] = useState(false);
+    const [autoEnableForDirs, setAutoEnableForDirs] = useState(false);
+
+    const supportsDirectoryScope =
+        plugin.visibility !== 'user-only' && plugin.visibility !== 'hidden';
 
     const handleToggle = async () => {
-        // Show cascade warning before disabling (only for non-system plugins)
-        if (optimisticEnabled && !showDisableWarning) {
+        // Enable flow: show panel with auto-enable checkbox if plugin supports directory scope
+        if (!optimisticEnabled) {
+            if (supportsDirectoryScope && !showEnablePanel) {
+                setShowEnablePanel(true);
+                return;
+            }
+            setShowEnablePanel(false);
+            setOptimisticEnabled(true);
+
+            startTransition(async () => {
+                try {
+                    await enablePlugin(plugin.pluginId, {
+                        autoEnableForDirectories: autoEnableForDirs,
+                    });
+                    router.refresh();
+                } catch (error) {
+                    setOptimisticEnabled(false);
+                }
+            });
+            return;
+        }
+
+        // Disable flow: show cascade warning first
+        if (!showDisableWarning) {
             setShowDisableWarning(true);
             return;
         }
 
         setShowDisableWarning(false);
-        const newState = !optimisticEnabled;
-        setOptimisticEnabled(newState);
+        setOptimisticEnabled(false);
 
         startTransition(async () => {
             try {
-                if (newState) {
-                    await enablePlugin(plugin.pluginId);
-                } else {
-                    await disablePlugin(plugin.pluginId);
-                }
+                await disablePlugin(plugin.pluginId);
                 router.refresh();
             } catch (error) {
-                // Revert on error
-                setOptimisticEnabled(!newState);
+                setOptimisticEnabled(true);
             }
         });
+    };
+
+    const handleCancelEnable = () => {
+        setShowEnablePanel(false);
+        setAutoEnableForDirs(false);
+    };
+
+    const handleCancelDisable = () => {
+        setShowDisableWarning(false);
     };
 
     return (
@@ -139,6 +169,67 @@ export function PluginCard({ plugin }: PluginCardProps) {
                     </span>
                 )}
             </div>
+
+            {showDisableWarning && (
+                <div className="mt-3 p-3 rounded-lg bg-warning/10 border border-warning/30">
+                    <div className="flex items-start gap-2">
+                        <AlertTriangle className="w-4 h-4 text-warning shrink-0 mt-0.5" />
+                        <div className="flex-1">
+                            <p className="text-sm text-warning">{t('disableWarning')}</p>
+                            <div className="flex gap-2 mt-2">
+                                <Button size="sm" variant="ghost" onClick={handleCancelDisable}>
+                                    {t('cancel')}
+                                </Button>
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={handleToggle}
+                                    disabled={isPending}
+                                    loading={isPending}
+                                    className="text-danger hover:text-danger hover:bg-danger/10"
+                                >
+                                    {t('confirmDisable')}
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {showEnablePanel && (
+                <div className="mt-3 p-3 rounded-lg bg-primary/5 border border-primary/20">
+                    <label className="flex items-start gap-2 cursor-pointer">
+                        <input
+                            type="checkbox"
+                            checked={autoEnableForDirs}
+                            onChange={(e) => setAutoEnableForDirs(e.target.checked)}
+                            className="mt-0.5 rounded border-border dark:border-border-dark"
+                        />
+                        <div>
+                            <p className="text-sm font-medium text-text dark:text-text-dark">
+                                {t('autoEnableForDirectories')}
+                            </p>
+                            <p className="text-xs text-text-muted dark:text-text-muted-dark mt-0.5">
+                                {t('autoEnableForDirectoriesDescription')}
+                            </p>
+                        </div>
+                    </label>
+                    <div className="flex gap-2 mt-2">
+                        <Button size="sm" variant="ghost" onClick={handleCancelEnable}>
+                            {t('cancel')}
+                        </Button>
+                        <Button
+                            size="sm"
+                            variant="primary"
+                            onClick={handleToggle}
+                            disabled={isPending}
+                            loading={isPending}
+                        >
+                            {t('enable')}
+                        </Button>
+                    </div>
+                </div>
+            )}
 
             <div className="flex items-center gap-2 mt-4 pt-3 border-t border-border dark:border-border-dark">
                 <Link

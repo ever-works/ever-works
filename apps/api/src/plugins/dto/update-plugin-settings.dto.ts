@@ -43,6 +43,11 @@ export class EnableUserPluginDto {
     @IsObject()
     @IsOptional()
     secretSettings?: Record<string, unknown>;
+
+    @ApiPropertyOptional({ description: 'Auto-enable this plugin for all directories' })
+    @IsBoolean()
+    @IsOptional()
+    autoEnableForDirectories?: boolean;
 }
 
 /**

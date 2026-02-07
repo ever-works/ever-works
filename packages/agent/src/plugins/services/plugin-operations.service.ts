@@ -274,6 +274,7 @@ export class PluginOperationsService {
         userId: string,
         settings?: Record<string, unknown>,
         secretSettings?: Record<string, unknown>,
+        autoEnableForDirectories?: boolean,
     ): Promise<UserPluginResponse> {
         const registered = this.pluginRegistryService.get(pluginId);
         if (!registered) {
@@ -312,6 +313,9 @@ export class PluginOperationsService {
         if (userPlugin) {
             // Update existing record
             userPlugin.enabled = true;
+            if (autoEnableForDirectories !== undefined) {
+                userPlugin.autoEnableForDirectories = autoEnableForDirectories;
+            }
             if (settings) {
                 userPlugin.settings = { ...userPlugin.settings, ...settings };
             }
@@ -328,6 +332,7 @@ export class PluginOperationsService {
                 pluginId,
                 pluginEntityId: pluginEntity.id,
                 enabled: true,
+                autoEnableForDirectories: autoEnableForDirectories ?? false,
                 settings: settings || {},
                 secretSettings: secretSettings || {},
                 metadata: {},
@@ -627,9 +632,10 @@ export class PluginOperationsService {
             directoryPlugin.enabled = false;
             await this.directoryPluginRepository.save(directoryPlugin);
         } else {
-            // For autoEnabled plugins, create a record with enabled=false to override the default
+            // For autoEnabled or user-auto-enabled plugins, create a record with enabled=false to opt out
             const autoEnabled = registered.manifest?.autoEnable ?? false;
-            if (autoEnabled) {
+            const userAutoEnabled = userPlugin?.autoEnableForDirectories ?? false;
+            if (autoEnabled || userAutoEnabled) {
                 const pluginEntity = await this.pluginRepository.findOne({
                     where: { pluginId },
                 });
@@ -901,6 +907,7 @@ export class PluginOperationsService {
                 ? { ...userPlugin.settings, ...userPlugin.secretSettings }
                 : undefined,
             userPluginId: userPlugin?.id,
+            autoEnableForDirectories: userPlugin?.autoEnableForDirectories ?? false,
         };
     }
 
@@ -920,7 +927,8 @@ export class PluginOperationsService {
 
         return {
             ...userResponse,
-            directoryEnabled: directoryPlugin?.enabled ?? autoEnabled,
+            directoryEnabled:
+                directoryPlugin?.enabled ?? userPlugin?.autoEnableForDirectories ?? autoEnabled,
             activeCapability: directoryPlugin?.activeCapability,
             directorySettings: directoryPlugin
                 ? { ...directoryPlugin.settings, ...directoryPlugin.secretSettings }

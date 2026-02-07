@@ -6,7 +6,7 @@ import { useTranslations } from 'next-intl';
 import { DirectoryPlugin } from '@/lib/api/plugins';
 import { cn } from '@/lib/utils/cn';
 import { Button } from '@/components/ui/button';
-import { Power, PowerOff, Settings } from 'lucide-react';
+import { Power, PowerOff, Settings, Shield } from 'lucide-react';
 import { enableDirectoryPlugin, disableDirectoryPlugin } from '@/app/actions/plugins';
 import { PluginIcon } from '@/components/plugins/PluginIcon';
 import { getCategoryLabel, getCapabilityLabel } from '@/lib/utils/plugin-category-icons';
@@ -111,7 +111,12 @@ export function DirectoryPluginCard({ directoryId, plugin }: DirectoryPluginCard
                         {isClickable && (
                             <Settings className="w-4 h-4 text-text-muted dark:text-text-muted-dark" />
                         )}
-                        {!plugin.systemPlugin && (
+                        {plugin.systemPlugin ? (
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary flex items-center gap-1">
+                                <Shield className="w-3 h-3" />
+                                {t('systemAlwaysEnabled')}
+                            </span>
+                        ) : (
                             <Button
                                 variant={isEnabled ? 'ghost' : 'primary'}
                                 size="sm"
@@ -152,8 +157,14 @@ export function DirectoryPluginCard({ directoryId, plugin }: DirectoryPluginCard
                     </div>
                 </div>
 
-                {!canEnable && !isEnabled && (
-                    <p className="text-xs text-warning mt-2">{t('enableAtUserLevelFirst')}</p>
+                {!canEnable && !isEnabled && !plugin.systemPlugin && (
+                    <p className="text-xs text-warning mt-2">
+                        {plugin.installed ? t('disabledByUser') : t('enableAtUserLevelFirst')}
+                    </p>
+                )}
+
+                {isEnabled && !plugin.directoryPluginId && !plugin.systemPlugin && (
+                    <p className="text-xs text-primary mt-2">{t('autoEnabledByUser')}</p>
                 )}
 
                 {plugin.description && (

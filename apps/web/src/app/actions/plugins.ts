@@ -8,7 +8,11 @@ import { revalidatePath } from 'next/cache';
  */
 export async function enablePlugin(
     pluginId: string,
-    options?: { settings?: Record<string, unknown>; secretSettings?: Record<string, unknown> },
+    options?: {
+        settings?: Record<string, unknown>;
+        secretSettings?: Record<string, unknown>;
+        autoEnableForDirectories?: boolean;
+    },
 ) {
     const result = await pluginsAPI.enable(pluginId, options);
     revalidatePath('/plugins');

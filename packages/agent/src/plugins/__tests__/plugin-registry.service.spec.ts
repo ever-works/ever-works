@@ -700,6 +700,93 @@ describe('PluginRegistryService', () => {
             const result = await service.isPluginEnabledForScope('test-plugin');
             expect(result).toBe(false);
         });
+
+        it('should return true in directory context when autoEnableForDirectories is true', async () => {
+            const plugin = createMockPlugin('test-plugin');
+            const manifest: PluginManifest = {
+                ...createMockManifest('test-plugin'),
+                autoEnable: false,
+            };
+            service.register(plugin, manifest, { state: 'enabled' });
+
+            userPluginRepository.findByUserAndPlugin.mockResolvedValue({
+                enabled: true,
+                userId: 'user-1',
+                pluginId: 'test-plugin',
+                autoEnableForDirectories: true,
+            } as any);
+            directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue(null);
+
+            const result = await service.isPluginEnabledForScope('test-plugin', 'dir-1', 'user-1');
+            expect(result).toBe(true);
+        });
+
+        it('should respect directory explicit disable over autoEnableForDirectories', async () => {
+            const plugin = createMockPlugin('test-plugin');
+            const manifest: PluginManifest = {
+                ...createMockManifest('test-plugin'),
+                autoEnable: false,
+            };
+            service.register(plugin, manifest, { state: 'enabled' });
+
+            userPluginRepository.findByUserAndPlugin.mockResolvedValue({
+                enabled: true,
+                userId: 'user-1',
+                pluginId: 'test-plugin',
+                autoEnableForDirectories: true,
+            } as any);
+            directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue({
+                enabled: false,
+                directoryId: 'dir-1',
+                pluginId: 'test-plugin',
+            } as any);
+
+            const result = await service.isPluginEnabledForScope('test-plugin', 'dir-1', 'user-1');
+            expect(result).toBe(false);
+        });
+
+        it('should not apply autoEnableForDirectories without directory context', async () => {
+            const plugin = createMockPlugin('test-plugin');
+            const manifest: PluginManifest = {
+                ...createMockManifest('test-plugin'),
+                autoEnable: false,
+            };
+            service.register(plugin, manifest, { state: 'enabled' });
+
+            userPluginRepository.findByUserAndPlugin.mockResolvedValue({
+                enabled: true,
+                userId: 'user-1',
+                pluginId: 'test-plugin',
+                autoEnableForDirectories: true,
+            } as any);
+
+            const result = await service.isPluginEnabledForScope(
+                'test-plugin',
+                undefined,
+                'user-1',
+            );
+            expect(result).toBe(true);
+        });
+
+        it('should only fetch userPlugin once per invocation', async () => {
+            const plugin = createMockPlugin('test-plugin');
+            const manifest: PluginManifest = {
+                ...createMockManifest('test-plugin'),
+                autoEnable: false,
+            };
+            service.register(plugin, manifest, { state: 'enabled' });
+
+            userPluginRepository.findByUserAndPlugin.mockResolvedValue({
+                enabled: true,
+                userId: 'user-1',
+                pluginId: 'test-plugin',
+                autoEnableForDirectories: false,
+            } as any);
+            directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue(null);
+
+            await service.isPluginEnabledForScope('test-plugin', 'dir-1', 'user-1');
+            expect(userPluginRepository.findByUserAndPlugin).toHaveBeenCalledTimes(1);
+        });
     });
 
     describe('getEnabledPluginsScoped', () => {

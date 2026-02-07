@@ -52,6 +52,13 @@ export class UserPluginEntity {
     enabled: boolean;
 
     /**
+     * When true, this plugin is automatically considered enabled for all
+     * directories owned by this user, unless explicitly disabled per directory.
+     */
+    @Column({ default: false })
+    autoEnableForDirectories: boolean;
+
+    /**
      * User-specific settings that override admin defaults
      */
     @Column('simple-json', { default: '{}' })

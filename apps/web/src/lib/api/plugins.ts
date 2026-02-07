@@ -93,7 +93,11 @@ export const pluginsAPI = {
      */
     enable: async (
         pluginId: string,
-        data?: { settings?: Record<string, unknown>; secretSettings?: Record<string, unknown> },
+        data?: {
+            settings?: Record<string, unknown>;
+            secretSettings?: Record<string, unknown>;
+            autoEnableForDirectories?: boolean;
+        },
     ): Promise<UserPlugin> => {
         return serverMutation<UserPlugin>({
             endpoint: `/plugins/${pluginId}/enable`,
