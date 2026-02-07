@@ -1,4 +1,4 @@
-import { Directory } from '@packages/cli-shared';
+import { Directory } from '@ever-works/cli-shared';
 import { getHttpClient } from './http-client';
 import type { CreateItemsGeneratorDto, ProvidersDto, CompanyDto } from '@ever-works/contracts/api';
 import type {

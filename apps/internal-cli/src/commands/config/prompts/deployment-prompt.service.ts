@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { BasePromptService } from '@packages/cli-shared';
+import { BasePromptService } from '@ever-works/cli-shared';
 import { DeployFacadeService } from '@ever-works/agent/facades';
 
 export interface DeploymentConfig {

@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { AiProviderRegistryService } from '../ai-providers/ai-provider-registry.service';
 import { AiFacadeService } from '@ever-works/agent/facades';
 import ora from 'ora';
-import { BasePromptService } from '@packages/cli-shared';
+import { BasePromptService } from '@ever-works/cli-shared';
 
 interface AiProviderConfiguration {
     defaultProvider: string;

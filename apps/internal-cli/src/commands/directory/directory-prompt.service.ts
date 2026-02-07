@@ -8,7 +8,7 @@ import {
     UserRepository,
 } from '@ever-works/agent/database';
 import { Directory, DirectoryMemberRole } from '@ever-works/agent/entities';
-import { validateSlug, BasePromptService } from '@packages/cli-shared';
+import { validateSlug, BasePromptService } from '@ever-works/cli-shared';
 
 export interface DirectoryInputData {
     slug: string;

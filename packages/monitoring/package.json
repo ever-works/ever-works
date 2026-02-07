@@ -1,5 +1,5 @@
 {
-    "name": "@packages/monitoring",
+    "name": "@ever-works/monitoring",
     "version": "0.1.0",
     "description": "Monitoring package for Sentry and PostHog integration",
     "private": true,

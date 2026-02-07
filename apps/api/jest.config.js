@@ -28,7 +28,7 @@ module.exports = {
         '^@ever-works/contracts/(.*)$': '<rootDir>/../../../packages/contracts/src/$1/index.ts',
         '^@ever-works/agent/(.*)$': '<rootDir>/../../../packages/agent/src/$1/index.ts',
         '^@ever-works/agent$': '<rootDir>/../../../packages/agent/src/index.ts',
-        '^@packages/monitoring$': '<rootDir>/../../../packages/monitoring/src/index.ts',
+        '^@ever-works/monitoring$': '<rootDir>/../../../packages/monitoring/src/index.ts',
         // Handle .js extension in ESM-style imports (resolve to .ts)
         '^(\\.{1,2}/.*)\\.js$': '$1',
     },

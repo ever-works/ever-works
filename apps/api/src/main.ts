@@ -5,7 +5,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { apiReference } from '@scalar/nestjs-api-reference';
 import { ApiModule } from './api.module';
 import helmet from 'helmet';
-import { initSentry, initPostHog } from '@packages/monitoring';
+import { initSentry, initPostHog } from '@ever-works/monitoring';
 import * as path from 'path';
 import { json, urlencoded } from 'express';
 

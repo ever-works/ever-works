@@ -4,7 +4,7 @@ import { DirectoryModule } from '@ever-works/agent/services';
 import { DatabaseModule } from '@ever-works/agent/database';
 import { AuthModule } from '@src/auth';
 import { CacheEntryRepository } from '@ever-works/agent/cache';
-import { TriggerModule as TasksTriggerModule } from '@packages/tasks';
+import { TriggerModule as TasksTriggerModule } from '@ever-works/trigger-tasks';
 import { WebsiteGeneratorModule } from '@ever-works/agent/generators';
 import { FacadesModule } from '@ever-works/agent/facades';
 

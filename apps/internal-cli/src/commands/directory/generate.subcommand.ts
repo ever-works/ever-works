@@ -14,7 +14,7 @@ import { DirectoryPromptService } from './directory-prompt.service';
 import { ConfigCheckService } from './config-check.service';
 import { handleCliError } from './error';
 import { Directory, GenerateStatusType, User } from '@ever-works/agent/entities';
-import { getStepProgress, getStepText, ItemsGeneratorStep } from '@packages/cli-shared';
+import { getStepProgress, getStepText, ItemsGeneratorStep } from '@ever-works/cli-shared';
 
 @SubCommand({
     name: 'generate',

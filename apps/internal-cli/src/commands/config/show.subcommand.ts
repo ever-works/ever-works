@@ -2,7 +2,7 @@ import { SubCommand, CommandRunner } from 'nest-commander';
 import { Logger } from '@nestjs/common';
 import chalk from 'chalk';
 import { ConfigService } from '../../config/config.service';
-import { maskSecret } from '@packages/cli-shared';
+import { maskSecret } from '@ever-works/cli-shared';
 import { COMMAND } from '../../config';
 
 @SubCommand({

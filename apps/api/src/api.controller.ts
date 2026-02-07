@@ -1,7 +1,7 @@
 import { Controller, Get } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { Public } from './auth';
-import { AnalyticsService } from '@packages/monitoring';
+import { AnalyticsService } from '@ever-works/monitoring';
 
 @ApiTags('Health')
 @Controller()

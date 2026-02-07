@@ -77,10 +77,10 @@ importers:
       '@ever-works/agent':
         specifier: workspace:*
         version: link:../../packages/agent
-      '@packages/monitoring':
+      '@ever-works/monitoring':
         specifier: workspace:*
         version: link:../../packages/monitoring
-      '@packages/tasks':
+      '@ever-works/trigger-tasks':
         specifier: workspace:*
         version: link:../../packages/tasks
       '@scalar/nestjs-api-reference':
@@ -219,7 +219,7 @@ importers:
       '@ever-works/plugin':
         specifier: workspace:*
         version: link:../../packages/plugin
-      '@packages/cli-shared':
+      '@ever-works/cli-shared':
         specifier: workspace:*
         version: link:../../packages/cli-shared
       axios:
@@ -277,7 +277,7 @@ importers:
       '@ever-works/agent':
         specifier: workspace:*
         version: link:../../packages/agent
-      '@packages/cli-shared':
+      '@ever-works/cli-shared':
         specifier: workspace:*
         version: link:../../packages/cli-shared
       better-sqlite3:

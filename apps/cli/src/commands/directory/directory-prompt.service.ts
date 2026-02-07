@@ -2,7 +2,7 @@ import chalk from 'chalk';
 import {
     DirectoryPromptService as BaseDirectoryPromptService,
     DirectorySelection,
-} from '@packages/cli-shared';
+} from '@ever-works/cli-shared';
 import { getApiService } from '../../services/api.service';
 
 // Re-export types from shared package for convenience
@@ -12,9 +12,9 @@ export type {
     SlugConflictResolution,
     DirectorySelection,
     Directory,
-} from '@packages/cli-shared';
+} from '@ever-works/cli-shared';
 
-export { DirectoryMemberRole } from '@packages/cli-shared';
+export { DirectoryMemberRole } from '@ever-works/cli-shared';
 
 export class DirectoryPromptService extends BaseDirectoryPromptService {
     private apiService = getApiService();

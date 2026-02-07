@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 import inquirer from 'inquirer';
-import { BasePromptService } from '@packages/cli-shared';
+import { BasePromptService } from '@ever-works/cli-shared';
 import type {
     CreateItemsGeneratorDto,
     GeneratorFormSchema,

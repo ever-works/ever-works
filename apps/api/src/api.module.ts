@@ -9,7 +9,7 @@ import { DirectoriesModule } from './directories/directories.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { MailModule } from './mail/mail.module';
 import { LoggingInterceptor } from './logging.interceptor';
-import { MonitoringModule, SentryInterceptor, PostHogInterceptor } from '@packages/monitoring';
+import { MonitoringModule, SentryInterceptor, PostHogInterceptor } from '@ever-works/monitoring';
 import { APIController } from './api.controller';
 import { TriggerInternalModule } from './trigger/trigger-internal.module';
 import { TwentyCrmModule } from './integrations';

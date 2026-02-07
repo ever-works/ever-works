@@ -1,5 +1,5 @@
 {
-    "name": "@packages/tasks",
+    "name": "@ever-works/trigger-tasks",
     "version": "0.1.0",
     "private": true,
     "license": "UNLICENSED",

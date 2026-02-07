@@ -7,7 +7,7 @@ import { getApiService, CreateItemsGeneratorDto } from '../../services/api.servi
 import { DirectoryPromptService } from './directory-prompt.service';
 import { GeneratePromptService } from './generate-prompt.service';
 import { handleCliError } from '../../utils/error';
-import { GenerateStatusType } from '@packages/cli-shared';
+import { GenerateStatusType } from '@ever-works/cli-shared';
 import { WEB_URL } from '../../utils/constants';
 
 export const generateCommand = new Command('generate')
