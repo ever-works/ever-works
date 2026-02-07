@@ -5,6 +5,7 @@ import { plainToInstance } from 'class-transformer';
 import { TriggerWorkerModule } from '../../trigger/trigger-worker.module';
 import { TriggerInternalApiClient } from '../../trigger/trigger-internal-api.client';
 import { TriggerGenerationOrchestrator } from '../../trigger/trigger-generation.orchestrator';
+import { TriggerPluginHydratorService } from '../../trigger/plugins/trigger-plugin-hydrator.service';
 import { DirectoryGenerationPayload } from '@packages/agent/tasks';
 import { Directory, User, GenerateStatusType } from '@packages/agent/entities';
 import { RemoteDirectoryScheduleService } from '../../trigger/remote-directory-schedule.service';
@@ -14,6 +15,10 @@ async function createContext(
     appContext: INestApplicationContext,
     payload: DirectoryGenerationPayload,
 ) {
+    // Initialize plugin system with remote settings
+    const hydrator = appContext.get(TriggerPluginHydratorService);
+    await hydrator.initialize(payload.directoryId, payload.userId);
+
     const apiClient = appContext.get(TriggerInternalApiClient);
     const context = await apiClient.fetchDirectoryContext(payload.directoryId, payload.userId);
 

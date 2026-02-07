@@ -35,6 +35,13 @@ import { GenerateStatusType } from '@packages/agent/entities';
 import { NotificationService } from '@packages/agent/notifications';
 import { GitFacadeService } from '@packages/agent/facades';
 import { CreateNotificationDto } from './dto/create-notification.dto';
+import {
+    PluginRegistryService,
+    PluginRepository,
+    UserPluginRepository,
+    DirectoryPluginRepository,
+} from '@packages/agent/plugins';
+import type { PluginContextSnapshotDto, PluginSnapshotEntry } from './dto/plugin-context.dto';
 
 type DirectoryContextResponse = {
     directory: Directory;
@@ -70,6 +77,10 @@ export class TriggerInternalController {
         private readonly directoryScheduleService: DirectoryScheduleService,
         private readonly notificationService: NotificationService,
         private readonly gitFacade: GitFacadeService,
+        private readonly pluginRegistry: PluginRegistryService,
+        private readonly pluginRepository: PluginRepository,
+        private readonly userPluginRepository: UserPluginRepository,
+        private readonly directoryPluginRepository: DirectoryPluginRepository,
     ) {}
 
     @Get('directories/:id/context')
@@ -220,6 +231,56 @@ export class TriggerInternalController {
         const value = await this.cacheManager.del(key);
 
         return { deleted: value };
+    }
+
+    @Get('plugins/context')
+    @Public()
+    async getPluginContext(
+        @Headers('x-trigger-secret') secret: string,
+        @Query('userId') userId: string,
+        @Query('directoryId') directoryId: string,
+    ): Promise<PluginContextSnapshotDto> {
+        this.ensureSecret(secret);
+
+        if (!userId) {
+            throw new BadRequestException('Missing userId');
+        }
+
+        if (!directoryId) {
+            throw new BadRequestException('Missing directoryId');
+        }
+
+        const allPlugins = this.pluginRegistry.getAll();
+        const plugins: Record<string, PluginSnapshotEntry> = {};
+
+        for (const registered of allPlugins) {
+            const pluginId = registered.plugin.id;
+
+            const pluginEntity = await this.pluginRepository.findByPluginId(pluginId);
+            const userPlugin = await this.userPluginRepository.findByUserAndPlugin(
+                userId,
+                pluginId,
+            );
+            const dirPlugin = await this.directoryPluginRepository.findByDirectoryAndPlugin(
+                directoryId,
+                pluginId,
+            );
+
+            plugins[pluginId] = {
+                adminSettings: pluginEntity?.settings ?? {},
+                adminSecretSettings: pluginEntity?.secretSettings ?? {},
+                userSettings: userPlugin?.settings ?? {},
+                userSecretSettings: userPlugin?.secretSettings ?? {},
+                userEnabled: userPlugin ? userPlugin.enabled : null,
+                directorySettings: dirPlugin?.settings ?? {},
+                directorySecretSettings: dirPlugin?.secretSettings ?? {},
+                directoryEnabled: dirPlugin ? dirPlugin.enabled : null,
+                directoryActiveCapability: dirPlugin?.activeCapability ?? null,
+                directoryPriority: dirPlugin?.priority ?? 0,
+            };
+        }
+
+        return { plugins };
     }
 
     @Post('notifications')

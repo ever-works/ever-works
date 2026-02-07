@@ -18,6 +18,23 @@ type DispatchSchedulesResponse = {
     dispatched: number;
 };
 
+export interface PluginSnapshotEntry {
+    adminSettings: Record<string, unknown>;
+    adminSecretSettings: Record<string, unknown>;
+    userSettings: Record<string, unknown>;
+    userSecretSettings: Record<string, unknown>;
+    userEnabled: boolean | null;
+    directorySettings: Record<string, unknown>;
+    directorySecretSettings: Record<string, unknown>;
+    directoryEnabled: boolean | null;
+    directoryActiveCapability: string | null;
+    directoryPriority: number;
+}
+
+export interface PluginContextSnapshotDto {
+    plugins: Record<string, PluginSnapshotEntry>;
+}
+
 export interface CreateNotificationPayload {
     userId: string;
     type: NotificationType;
@@ -122,6 +139,22 @@ export class TriggerInternalApiClient {
         });
 
         return response.deleted;
+    }
+
+    /**
+     * Fetch plugin context snapshot for a directory generation run.
+     * Returns all per-level settings for every registered plugin.
+     */
+    async fetchPluginContext(
+        directoryId: string,
+        userId: string,
+    ): Promise<PluginContextSnapshotDto> {
+        const searchParams = new URLSearchParams({ userId, directoryId });
+
+        return this.request<PluginContextSnapshotDto>({
+            method: 'GET',
+            path: `/plugins/context?${searchParams.toString()}`,
+        });
     }
 
     /**
