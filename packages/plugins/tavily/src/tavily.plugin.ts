@@ -361,7 +361,7 @@ export class TavilySearchPlugin implements IPlugin, ISearchPlugin, IContentExtra
 			author: { name: 'Ever Works Team' },
 			license: 'MIT',
 			builtIn: true,
-			systemPlugin: false,
+			systemPlugin: true,
 			autoEnable: true,
 			defaultForCapabilities: ['search'],
 			homepage: 'https://tavily.com',

@@ -53,7 +53,7 @@
 			"defaultForCapabilities": [
 				"search"
 			],
-			"systemPlugin": false,
+			"systemPlugin": true,
 			"builtIn": true,
 			"envVars": [
 				{
