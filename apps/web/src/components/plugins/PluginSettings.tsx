@@ -14,7 +14,6 @@ import {
     ArrowLeft,
     ExternalLink,
     Check,
-    AlertCircle,
     BookOpen,
     Settings,
 } from 'lucide-react';
@@ -22,7 +21,7 @@ import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { enablePlugin, disablePlugin, updatePluginSettings } from '@/app/actions/plugins';
 import { PluginIcon } from './PluginIcon';
-import { PluginSettingsField } from './PluginSettingsField';
+import { PluginSettingsFormFields } from './PluginSettingsFormFields';
 import { PluginReadme } from './PluginReadme';
 import { PluginOAuthConnection } from '@/components/settings/PluginOAuthConnection';
 import { getCategoryLabel, getCapabilityLabel } from '@/lib/utils/plugin-category-icons';
@@ -224,28 +223,16 @@ export function PluginSettings({ plugin, oauthConnection }: PluginSettingsProps)
                         </h2>
                     </div>
 
-                    <div className="p-6 space-y-4">
-                        {Object.entries(visibleProperties).map(([key, propSchema]) => (
-                            <PluginSettingsField
-                                key={key}
-                                name={key}
-                                schema={propSchema}
-                                value={getFieldValue(key, propSchema)}
-                                required={plugin.settingsSchema?.required?.includes(key)}
-                                onChange={(value) =>
-                                    handleFieldChange(key, value, propSchema.secret || false)
-                                }
-                                pluginId={plugin.pluginId}
-                            />
-                        ))}
+                    <div className="p-6">
+                        <PluginSettingsFormFields
+                            visibleProperties={visibleProperties}
+                            getFieldValue={getFieldValue}
+                            handleFieldChange={handleFieldChange}
+                            settingsSchema={plugin.settingsSchema}
+                            pluginId={plugin.pluginId}
+                            validationError={validationError}
+                        />
                     </div>
-
-                    {validationError && (
-                        <div className="mx-6 mb-4 p-3 rounded-lg bg-danger/10 border border-danger/20 flex items-start gap-2">
-                            <AlertCircle className="w-5 h-5 text-danger flex-shrink-0 mt-0.5" />
-                            <p className="text-sm text-danger">{validationError}</p>
-                        </div>
-                    )}
 
                     <div className="flex items-center gap-3 px-6 py-4 border-t border-border dark:border-border-dark">
                         <Button

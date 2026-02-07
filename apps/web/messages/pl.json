@@ -1712,7 +1712,16 @@
             "sendButton": "Wyślij",
             "errors": {
                 "unableToSend": "Nie można wysłać wiadomości."
-            }
+            },
+            "settingsModalTitle": "Directory Settings",
+            "settingsModalDescription": "Override settings for this directory. Unset fields inherit from your user settings.",
+            "inheritedFrom": "Inherited: {value}",
+            "inheritedSecret": "Inherited: ••••••••",
+            "resetToDefaults": "Reset to Defaults",
+            "resetConfirm": "This will clear all directory-specific overrides. Settings will fall back to your user-level values.",
+            "resetSuccess": "Settings reset to defaults",
+            "cancel": "Cancel",
+            "clickToConfigure": "Click to configure"
         }
     },
     "layout": {

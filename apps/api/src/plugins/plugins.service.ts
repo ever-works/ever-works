@@ -619,13 +619,34 @@ export class PluginsService {
             where: { userId, pluginId },
         });
 
-        const directoryPlugin = await this.directoryPluginRepository.findOne({
+        let directoryPlugin = await this.directoryPluginRepository.findOne({
             where: { directoryId, pluginId },
         });
 
         if (directoryPlugin) {
             directoryPlugin.enabled = false;
             await this.directoryPluginRepository.save(directoryPlugin);
+        } else {
+            // For autoEnabled plugins, create a record with enabled=false to override the default
+            const autoEnabled = registered.manifest?.autoEnable ?? false;
+            if (autoEnabled) {
+                const pluginEntity = await this.pluginRepository.findOne({
+                    where: { pluginId },
+                });
+                if (pluginEntity) {
+                    directoryPlugin = this.directoryPluginRepository.create({
+                        directoryId,
+                        pluginId,
+                        pluginEntityId: pluginEntity.id,
+                        enabled: false,
+                        settings: {},
+                        secretSettings: {},
+                        metadata: {},
+                        priority: 0,
+                    });
+                    await this.directoryPluginRepository.save(directoryPlugin);
+                }
+            }
         }
 
         this.logger.log(`Plugin "${pluginId}" disabled for directory "${directoryId}"`);
@@ -658,14 +679,34 @@ export class PluginsService {
             where: { userId, pluginId },
         });
 
-        const directoryPlugin = await this.directoryPluginRepository.findOne({
+        let directoryPlugin = await this.directoryPluginRepository.findOne({
             where: { directoryId, pluginId },
         });
 
         if (!directoryPlugin) {
-            throw new BadRequestException(
-                `Plugin "${pluginId}" is not enabled for this directory. Enable it first.`,
-            );
+            const autoEnabled = registered.manifest?.autoEnable ?? false;
+            if (!autoEnabled) {
+                throw new BadRequestException(
+                    `Plugin "${pluginId}" is not enabled for this directory. Enable it first.`,
+                );
+            }
+            // Auto-create directory plugin record for autoEnabled plugins
+            const pluginEntity = await this.pluginRepository.findOne({
+                where: { pluginId },
+            });
+            if (!pluginEntity) {
+                throw new NotFoundException(`Plugin entity "${pluginId}" not found in database`);
+            }
+            directoryPlugin = this.directoryPluginRepository.create({
+                directoryId,
+                pluginId,
+                pluginEntityId: pluginEntity.id,
+                enabled: true,
+                settings: {},
+                secretSettings: {},
+                metadata: {},
+                priority: 0,
+            });
         }
 
         const schema = registered.plugin.settingsSchema;
@@ -730,14 +771,34 @@ export class PluginsService {
             where: { userId, pluginId },
         });
 
-        const directoryPlugin = await this.directoryPluginRepository.findOne({
+        let directoryPlugin = await this.directoryPluginRepository.findOne({
             where: { directoryId, pluginId },
         });
 
         if (!directoryPlugin) {
-            throw new BadRequestException(
-                `Plugin "${pluginId}" is not enabled for this directory. Enable it first.`,
-            );
+            const autoEnabled = registered.manifest?.autoEnable ?? false;
+            if (!autoEnabled) {
+                throw new BadRequestException(
+                    `Plugin "${pluginId}" is not enabled for this directory. Enable it first.`,
+                );
+            }
+            // Auto-create directory plugin record for autoEnabled plugins
+            const pluginEntity = await this.pluginRepository.findOne({
+                where: { pluginId },
+            });
+            if (!pluginEntity) {
+                throw new NotFoundException(`Plugin entity "${pluginId}" not found in database`);
+            }
+            directoryPlugin = this.directoryPluginRepository.create({
+                directoryId,
+                pluginId,
+                pluginEntityId: pluginEntity.id,
+                enabled: true,
+                settings: {},
+                secretSettings: {},
+                metadata: {},
+                priority: 0,
+            });
         }
 
         // Clear this capability from other plugins in this directory
