@@ -302,6 +302,46 @@ describe('PluginLifecycleManagerService', () => {
             expect(result.success).toBe(false);
             expect(result.error).toContain('Cannot disable');
         });
+
+        it('should prevent disabling a system plugin (manifest.systemPlugin)', async () => {
+            const plugin = createMockPlugin();
+            const manifest = { ...createMockManifest(), systemPlugin: true };
+            const registered: RegisteredPlugin = {
+                plugin,
+                manifest: manifest as PluginManifest,
+                state: 'enabled',
+                builtIn: true,
+                registeredAt: Date.now(),
+                stateHistory: [],
+            };
+
+            jest.spyOn(registry, 'get').mockReturnValue(registered);
+
+            const result = await service.disable('test-plugin');
+
+            expect(result.success).toBe(false);
+            expect(result.error).toContain('Cannot disable system plugin');
+            expect(plugin.onDisable).not.toHaveBeenCalled();
+        });
+
+        it('should prevent disabling a system plugin (plugin.systemPlugin)', async () => {
+            const plugin = { ...createMockPlugin(), systemPlugin: true } as unknown as IPlugin;
+            const registered: RegisteredPlugin = {
+                plugin,
+                manifest: createMockManifest(),
+                state: 'enabled',
+                builtIn: true,
+                registeredAt: Date.now(),
+                stateHistory: [],
+            };
+
+            jest.spyOn(registry, 'get').mockReturnValue(registered);
+
+            const result = await service.disable('test-plugin');
+
+            expect(result.success).toBe(false);
+            expect(result.error).toContain('Cannot disable system plugin');
+        });
     });
 
     describe('unload', () => {

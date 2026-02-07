@@ -15,7 +15,7 @@ import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiParam } from '@ne
 import { JwtAuthGuard, CurrentUser } from '../auth';
 import { AuthenticatedUser } from '@src/auth/types/jwt.types';
 import { DirectoryOwnershipService } from '@packages/agent/services';
-import { PluginsService } from './plugins.service';
+import { PluginOperationsService } from '@packages/agent/plugins';
 import {
     PluginListResponseDto,
     UserPluginResponseDto,
@@ -35,7 +35,7 @@ import {
 @UseGuards(JwtAuthGuard)
 export class PluginsController {
     constructor(
-        private readonly pluginsService: PluginsService,
+        private readonly pluginsService: PluginOperationsService,
         private readonly ownershipService: DirectoryOwnershipService,
     ) {}
 

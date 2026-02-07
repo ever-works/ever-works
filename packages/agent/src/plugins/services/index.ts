@@ -8,3 +8,5 @@ export * from './plugin-settings.service';
 export * from './plugin-context-factory.service';
 export * from './custom-capability-registry.service';
 export * from './plugin-bootstrap.service';
+export * from './settings-schema-validator.service';
+export * from './plugin-operations.service';

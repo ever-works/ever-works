@@ -1808,6 +1808,10 @@
                 "ai": "AI",
                 "pipeline": "Pipeline"
             },
+            "alwaysEnabled": "Always enabled",
+            "disableWarning": "Disabling this plugin will also disable it in all your directories",
+            "cannotDisableSystem": "System plugins cannot be disabled",
+            "disableFailed": "Failed to disable plugin",
             "missingRequiredFields": "Missing required fields: {fields}",
             "saveError": "Failed to save settings. Please try again.",
             "oauth": {
@@ -1836,6 +1840,8 @@
             "enableForDirectory": "Enable for this directory",
             "disableForDirectory": "Disable for this directory",
             "enableAtUserLevelFirst": "Enable this plugin in your settings first",
+            "disabledByUser": "Disabled at user level",
+            "systemAlwaysEnabled": "System plugin - always enabled",
             "showSettings": "Show Settings",
             "hideSettings": "Hide Settings",
             "directorySettingsInfo": "Configure directory-specific settings here",

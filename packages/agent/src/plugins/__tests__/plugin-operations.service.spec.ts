@@ -2,23 +2,21 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { PluginsService } from '../plugins.service';
-import {
-    PluginEntity,
-    UserPluginEntity,
-    DirectoryPluginEntity,
-    PluginRegistryService,
-} from '@packages/agent/plugins';
-import type { RegisteredPlugin } from '@packages/agent/plugins';
+import { PluginOperationsService } from '../services/plugin-operations.service';
+import { PluginEntity } from '../entities/plugin.entity';
+import { UserPluginEntity } from '../entities/user-plugin.entity';
+import { DirectoryPluginEntity } from '../entities/directory-plugin.entity';
+import { PluginRegistryService } from '../services/plugin-registry.service';
+import { SettingsSchemaValidatorService } from '../services/settings-schema-validator.service';
+import type { RegisteredPlugin } from '../services/plugin-registry.service';
 import type { IPlugin, PluginManifest, JsonSchema } from '@ever-works/plugin';
-import { SettingsSchemaValidatorService } from '../services';
 
 // Mock the facades module to avoid transitive cross-package @src path resolution issues
-jest.mock('@packages/agent/facades', () => ({
+jest.mock('../../facades', () => ({
     AiFacadeService: class AiFacadeService {},
 }));
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const { AiFacadeService } = require('@packages/agent/facades');
+const { AiFacadeService } = require('../../facades');
 
 // Silence Logger output during tests
 jest.spyOn(Logger.prototype, 'error').mockImplementation(() => {});
@@ -26,8 +24,8 @@ jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => {});
 jest.spyOn(Logger.prototype, 'log').mockImplementation(() => {});
 jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => {});
 
-describe('PluginsService', () => {
-    let service: PluginsService;
+describe('PluginOperationsService', () => {
+    let service: PluginOperationsService;
     let pluginRepository: Repository<PluginEntity>;
     let userPluginRepository: Repository<UserPluginEntity>;
     let directoryPluginRepository: Repository<DirectoryPluginEntity>;
@@ -98,7 +96,7 @@ describe('PluginsService', () => {
     beforeEach(async () => {
         const module: TestingModule = await Test.createTestingModule({
             providers: [
-                PluginsService,
+                PluginOperationsService,
                 {
                     provide: getRepositoryToken(PluginEntity),
                     useValue: {
@@ -157,7 +155,7 @@ describe('PluginsService', () => {
             ],
         }).compile();
 
-        service = module.get<PluginsService>(PluginsService);
+        service = module.get<PluginOperationsService>(PluginOperationsService);
         pluginRepository = module.get<Repository<PluginEntity>>(getRepositoryToken(PluginEntity));
         userPluginRepository = module.get<Repository<UserPluginEntity>>(
             getRepositoryToken(UserPluginEntity),

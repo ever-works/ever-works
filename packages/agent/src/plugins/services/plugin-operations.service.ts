@@ -8,36 +8,36 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
-    PluginEntity,
-    UserPluginEntity,
-    DirectoryPluginEntity,
-    PluginRegistryService,
-} from '@packages/agent/plugins';
-import type { RegisteredPlugin } from '@packages/agent/plugins';
-import {
     type JsonSchema,
     type PluginManifest,
     toPluginSettingsSchemaProperty,
 } from '@ever-works/plugin';
-import { AiFacadeService } from '@packages/agent/facades';
+import type {
+    PluginResponse,
+    UserPluginResponse,
+    DirectoryPluginResponse,
+    PluginListResponse,
+    DirectoryPluginListResponse,
+    PluginIcon,
+    PluginSettingsSchema,
+    PluginSettingsSchemaProperty,
+    SettingsMenuResponse,
+    SettingsMenuCategory,
+    SettingsMenuPlugin,
+} from '@ever-works/plugin/api';
+import { PluginEntity } from '../entities/plugin.entity';
+import { UserPluginEntity } from '../entities/user-plugin.entity';
+import { DirectoryPluginEntity } from '../entities/directory-plugin.entity';
+import { PluginRegistryService, type RegisteredPlugin } from './plugin-registry.service';
 import {
-    PluginResponseDto,
-    UserPluginResponseDto,
-    DirectoryPluginResponseDto,
-    PluginListResponseDto,
-    DirectoryPluginListResponseDto,
-    PluginIconDto,
-    PluginSettingsSchemaDto,
-    PluginSettingsSchemaPropertyDto,
-    SettingsMenuResponseDto,
-    SettingsMenuCategoryDto,
-    SettingsMenuPluginDto,
-} from './dto';
-import { SettingsSchemaValidatorService, type SettingsScope } from './services';
+    SettingsSchemaValidatorService,
+    type SettingsScope,
+} from './settings-schema-validator.service';
+import { AiFacadeService } from '../../facades';
 
 @Injectable()
-export class PluginsService {
-    private readonly logger = new Logger(PluginsService.name);
+export class PluginOperationsService {
+    private readonly logger = new Logger(PluginOperationsService.name);
 
     constructor(
         @InjectRepository(PluginEntity)
@@ -58,7 +58,7 @@ export class PluginsService {
     /**
      * List all available plugins with user-specific status
      */
-    async listPlugins(userId: string, category?: string): Promise<PluginListResponseDto> {
+    async listPlugins(userId: string, category?: string): Promise<PluginListResponse> {
         const allPlugins = this.pluginRegistryService.getAll();
         const visiblePlugins = allPlugins.filter(
             (p) => (p.manifest?.visibility ?? 'public') !== 'hidden',
@@ -85,8 +85,8 @@ export class PluginsService {
             });
         }
 
-        // Map to response DTOs
-        const plugins: UserPluginResponseDto[] = filteredPlugins.map((registered) => {
+        // Map to response
+        const plugins: UserPluginResponse[] = filteredPlugins.map((registered) => {
             const userPlugin = userPluginMap.get(registered.plugin.id);
             return this.toUserPluginResponse(registered, userPlugin);
         });
@@ -103,7 +103,7 @@ export class PluginsService {
      * Get plugins for settings menu, grouped by category
      * Returns only plugins that have user-configurable settings
      */
-    async getPluginsForSettingsMenu(userId: string): Promise<SettingsMenuResponseDto> {
+    async getPluginsForSettingsMenu(userId: string): Promise<SettingsMenuResponse> {
         const allPlugins = this.pluginRegistryService.getAll();
 
         // Get user's plugin installations
@@ -147,7 +147,7 @@ export class PluginsService {
         });
 
         // Group by category
-        const categoryMap = new Map<string, SettingsMenuPluginDto[]>();
+        const categoryMap = new Map<string, SettingsMenuPlugin[]>();
 
         for (const registered of configurablePlugins) {
             const category = registered.manifest.category;
@@ -159,7 +159,7 @@ export class PluginsService {
                 userPlugin?.settings || {},
             );
 
-            const pluginDto: SettingsMenuPluginDto = {
+            const pluginItem: SettingsMenuPlugin = {
                 pluginId: registered.plugin.id,
                 name: registered.manifest.name,
                 icon: this.extractIcon(registered.manifest),
@@ -168,12 +168,12 @@ export class PluginsService {
             };
 
             const existing = categoryMap.get(category) || [];
-            existing.push(pluginDto);
+            existing.push(pluginItem);
             categoryMap.set(category, existing);
         }
 
         // Convert to array of categories (only non-empty)
-        const categories: SettingsMenuCategoryDto[] = [];
+        const categories: SettingsMenuCategory[] = [];
         for (const [category, plugins] of categoryMap.entries()) {
             if (plugins.length > 0) {
                 categories.push({
@@ -249,7 +249,7 @@ export class PluginsService {
     /**
      * Get a single plugin by ID with user-specific status
      */
-    async getPlugin(pluginId: string, userId: string): Promise<UserPluginResponseDto> {
+    async getPlugin(pluginId: string, userId: string): Promise<UserPluginResponse> {
         const registered = this.pluginRegistryService.get(pluginId);
         if (!registered) {
             throw new NotFoundException(`Plugin "${pluginId}" not found`);
@@ -274,7 +274,7 @@ export class PluginsService {
         userId: string,
         settings?: Record<string, unknown>,
         secretSettings?: Record<string, unknown>,
-    ): Promise<UserPluginResponseDto> {
+    ): Promise<UserPluginResponse> {
         const registered = this.pluginRegistryService.get(pluginId);
         if (!registered) {
             throw new NotFoundException(`Plugin "${pluginId}" not found`);
@@ -343,7 +343,7 @@ export class PluginsService {
     /**
      * Disable a plugin for user
      */
-    async disablePluginForUser(pluginId: string, userId: string): Promise<UserPluginResponseDto> {
+    async disablePluginForUser(pluginId: string, userId: string): Promise<UserPluginResponse> {
         const registered = this.pluginRegistryService.get(pluginId);
         if (!registered) {
             throw new NotFoundException(`Plugin "${pluginId}" not found`);
@@ -378,7 +378,7 @@ export class PluginsService {
         settings?: Record<string, unknown>,
         secretSettings?: Record<string, unknown>,
         metadata?: Record<string, unknown>,
-    ): Promise<UserPluginResponseDto> {
+    ): Promise<UserPluginResponse> {
         const registered = this.pluginRegistryService.get(pluginId);
         if (!registered) {
             throw new NotFoundException(`Plugin "${pluginId}" not found`);
@@ -465,7 +465,7 @@ export class PluginsService {
     async listDirectoryPlugins(
         directoryId: string,
         userId: string,
-    ): Promise<DirectoryPluginListResponseDto> {
+    ): Promise<DirectoryPluginListResponse> {
         const allPlugins = this.pluginRegistryService.getAll();
 
         // Filter: visible + applicable to directory scope
@@ -494,8 +494,8 @@ export class PluginsService {
             }
         }
 
-        // Map to response DTOs
-        const plugins: DirectoryPluginResponseDto[] = visiblePlugins.map((registered) => {
+        // Map to response
+        const plugins: DirectoryPluginResponse[] = visiblePlugins.map((registered) => {
             const userPlugin = userPluginMap.get(registered.plugin.id);
             const directoryPlugin = directoryPluginMap.get(registered.plugin.id);
             return this.toDirectoryPluginResponse(registered, userPlugin, directoryPlugin);
@@ -520,7 +520,7 @@ export class PluginsService {
             activeCapability?: string;
             priority?: number;
         },
-    ): Promise<DirectoryPluginResponseDto> {
+    ): Promise<DirectoryPluginResponse> {
         const registered = this.pluginRegistryService.get(pluginId);
         if (!registered) {
             throw new NotFoundException(`Plugin "${pluginId}" not found`);
@@ -603,7 +603,7 @@ export class PluginsService {
         directoryId: string,
         pluginId: string,
         userId: string,
-    ): Promise<DirectoryPluginResponseDto> {
+    ): Promise<DirectoryPluginResponse> {
         const registered = this.pluginRegistryService.get(pluginId);
         if (!registered) {
             throw new NotFoundException(`Plugin "${pluginId}" not found`);
@@ -664,7 +664,7 @@ export class PluginsService {
         settings?: Record<string, unknown>,
         secretSettings?: Record<string, unknown>,
         metadata?: Record<string, unknown>,
-    ): Promise<DirectoryPluginResponseDto> {
+    ): Promise<DirectoryPluginResponse> {
         const registered = this.pluginRegistryService.get(pluginId);
         if (!registered) {
             throw new NotFoundException(`Plugin "${pluginId}" not found`);
@@ -754,7 +754,7 @@ export class PluginsService {
         pluginId: string,
         userId: string,
         capability: string,
-    ): Promise<DirectoryPluginResponseDto> {
+    ): Promise<DirectoryPluginResponse> {
         const registered = this.pluginRegistryService.get(pluginId);
         if (!registered) {
             throw new NotFoundException(`Plugin "${pluginId}" not found`);
@@ -860,9 +860,9 @@ export class PluginsService {
     // ============================================
 
     /**
-     * Convert registered plugin to response DTO
+     * Convert registered plugin to response
      */
-    private toPluginResponse(registered: RegisteredPlugin): PluginResponseDto {
+    private toPluginResponse(registered: RegisteredPlugin): PluginResponse {
         const manifest = registered.manifest;
         return {
             ...manifest,
@@ -889,7 +889,7 @@ export class PluginsService {
     private toUserPluginResponse(
         registered: RegisteredPlugin,
         userPlugin?: UserPluginEntity | null,
-    ): UserPluginResponseDto {
+    ): UserPluginResponse {
         const baseResponse = this.toPluginResponse(registered);
         const autoEnabled = registered.manifest?.autoEnable ?? false;
 
@@ -914,7 +914,7 @@ export class PluginsService {
         registered: RegisteredPlugin,
         userPlugin?: UserPluginEntity | null,
         directoryPlugin?: DirectoryPluginEntity | null,
-    ): DirectoryPluginResponseDto {
+    ): DirectoryPluginResponse {
         const userResponse = this.toUserPluginResponse(registered, userPlugin);
         const autoEnabled = registered.manifest?.autoEnable ?? false;
 
@@ -933,7 +933,7 @@ export class PluginsService {
     /**
      * Extract icon from manifest
      */
-    private extractIcon(manifest: PluginManifest): PluginIconDto | undefined {
+    private extractIcon(manifest: PluginManifest): PluginIcon | undefined {
         const icon = manifest.icon;
         if (!icon) return undefined;
 
@@ -943,10 +943,10 @@ export class PluginsService {
     /**
      * Extract settings schema, filtering out env-only and hidden fields.
      */
-    private extractSettingsSchema(schema?: JsonSchema): PluginSettingsSchemaDto | undefined {
+    private extractSettingsSchema(schema?: JsonSchema): PluginSettingsSchema | undefined {
         if (!schema) return undefined;
 
-        const properties: Record<string, PluginSettingsSchemaPropertyDto> = {};
+        const properties: Record<string, PluginSettingsSchemaProperty> = {};
         if (schema.properties) {
             for (const [key, prop] of Object.entries(schema.properties)) {
                 if (prop['x-hidden']) continue;

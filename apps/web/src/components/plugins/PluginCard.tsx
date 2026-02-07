@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils/cn';
 import { ROUTES } from '@/lib/constants';
 import { Link } from '@/i18n/navigation';
 import { Button } from '@/components/ui/button';
-import { Settings, Power, PowerOff, ExternalLink } from 'lucide-react';
+import { Settings, Power, PowerOff, ExternalLink, Shield, AlertTriangle } from 'lucide-react';
 import { enablePlugin, disablePlugin } from '@/app/actions/plugins';
 import { PluginIcon } from './PluginIcon';
 import { getCategoryLabel, getCapabilityLabel } from '@/lib/utils/plugin-category-icons';
@@ -22,8 +22,16 @@ export function PluginCard({ plugin }: PluginCardProps) {
     const router = useRouter();
     const [isPending, startTransition] = useTransition();
     const [optimisticEnabled, setOptimisticEnabled] = useState(plugin.enabled);
+    const [showDisableWarning, setShowDisableWarning] = useState(false);
 
     const handleToggle = async () => {
+        // Show cascade warning before disabling (only for non-system plugins)
+        if (optimisticEnabled && !showDisableWarning) {
+            setShowDisableWarning(true);
+            return;
+        }
+
+        setShowDisableWarning(false);
         const newState = !optimisticEnabled;
         setOptimisticEnabled(newState);
 

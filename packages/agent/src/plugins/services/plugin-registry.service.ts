@@ -350,12 +350,37 @@ export class PluginRegistryService {
         return result;
     }
 
-    /** Check if plugin is enabled for scope. Resolution: Directory > User > autoEnable */
+    /**
+     * Check if plugin is enabled for scope.
+     *
+     * Resolution priority:
+     * 1. System plugins are always enabled
+     * 2. User-level DISABLE cascades globally (highest non-system priority)
+     * 3. Directory-level override (only if user hasn't disabled)
+     * 4. User-level enabled status (non-disable case)
+     * 5. Fallback to manifest autoEnable
+     */
     async isPluginEnabledForScope(
         pluginId: string,
         directoryId?: string,
         userId?: string,
     ): Promise<boolean> {
+        const registered = this.plugins.get(pluginId);
+
+        // System plugins are always enabled
+        if (registered?.manifest?.systemPlugin) return true;
+
+        // 1. User-level DISABLE cascades globally (highest priority)
+        if (userId && this.userPluginRepository) {
+            try {
+                const up = await this.userPluginRepository.findByUserAndPlugin(userId, pluginId);
+                if (up !== null && !up.enabled) return false; // User explicitly disabled → cascade
+            } catch {
+                // Continue
+            }
+        }
+
+        // 2. Directory-level override (only if user hasn't disabled)
         if (directoryId && this.directoryPluginRepository) {
             try {
                 const dp = await this.directoryPluginRepository.findByDirectoryAndPlugin(
@@ -368,6 +393,7 @@ export class PluginRegistryService {
             }
         }
 
+        // 3. User-level enabled status (non-disable case)
         if (userId && this.userPluginRepository) {
             try {
                 const up = await this.userPluginRepository.findByUserAndPlugin(userId, pluginId);
@@ -377,7 +403,7 @@ export class PluginRegistryService {
             }
         }
 
-        const registered = this.plugins.get(pluginId);
+        // 4. Fallback to manifest autoEnable
         return registered?.manifest?.autoEnable ?? true;
     }
 }

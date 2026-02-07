@@ -86,12 +86,6 @@ importers:
       '@scalar/nestjs-api-reference':
         specifier: ^1.0.20
         version: 1.0.20
-      ajv:
-        specifier: ^8.17.1
-        version: 8.17.1
-      ajv-formats:
-        specifier: ^3.0.1
-        version: 3.0.1(ajv@8.17.1)
       axios:
         specifier: ^1.13.2
         version: 1.13.2
@@ -486,6 +480,12 @@ importers:
       '@types/fs-extra':
         specifier: ^11.0.4
         version: 11.0.4
+      ajv:
+        specifier: ^8.17.1
+        version: 8.17.1
+      ajv-formats:
+        specifier: ^3.0.1
+        version: 3.0.1(ajv@8.17.1)
       axios:
         specifier: ^1.13.2
         version: 1.13.2

@@ -557,6 +557,151 @@ describe('PluginRegistryService', () => {
         });
     });
 
+    describe('isPluginEnabledForScope', () => {
+        it('should always return true for system plugins', async () => {
+            const plugin = createMockPlugin('system-plugin');
+            const manifest: PluginManifest = {
+                ...createMockManifest('system-plugin'),
+                systemPlugin: true,
+                autoEnable: false,
+            };
+            service.register(plugin, manifest, { state: 'enabled' });
+
+            // Even with user disabled, system plugins are always enabled
+            userPluginRepository.findByUserAndPlugin.mockResolvedValue({
+                enabled: false,
+                userId: 'user-1',
+                pluginId: 'system-plugin',
+            } as any);
+
+            const result = await service.isPluginEnabledForScope(
+                'system-plugin',
+                'dir-1',
+                'user-1',
+            );
+            expect(result).toBe(true);
+        });
+
+        it('should cascade user-level disable to directory level', async () => {
+            const plugin = createMockPlugin('test-plugin');
+            const manifest: PluginManifest = {
+                ...createMockManifest('test-plugin'),
+                autoEnable: true,
+            };
+            service.register(plugin, manifest, { state: 'enabled' });
+
+            // User disabled, but directory enabled
+            userPluginRepository.findByUserAndPlugin.mockResolvedValue({
+                enabled: false,
+                userId: 'user-1',
+                pluginId: 'test-plugin',
+            } as any);
+            directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue({
+                enabled: true,
+                directoryId: 'dir-1',
+                pluginId: 'test-plugin',
+            } as any);
+
+            const result = await service.isPluginEnabledForScope('test-plugin', 'dir-1', 'user-1');
+            // User disable cascades: should be false despite directory being enabled
+            expect(result).toBe(false);
+        });
+
+        it('should allow directory override when user has not disabled', async () => {
+            const plugin = createMockPlugin('test-plugin');
+            const manifest: PluginManifest = {
+                ...createMockManifest('test-plugin'),
+                autoEnable: false,
+            };
+            service.register(plugin, manifest, { state: 'enabled' });
+
+            // User enabled, directory disabled
+            userPluginRepository.findByUserAndPlugin.mockResolvedValue({
+                enabled: true,
+                userId: 'user-1',
+                pluginId: 'test-plugin',
+            } as any);
+            directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue({
+                enabled: false,
+                directoryId: 'dir-1',
+                pluginId: 'test-plugin',
+            } as any);
+
+            const result = await service.isPluginEnabledForScope('test-plugin', 'dir-1', 'user-1');
+            // Directory override: should be false because directory disabled
+            expect(result).toBe(false);
+        });
+
+        it('should allow directory enable when user has not disabled and no user record', async () => {
+            const plugin = createMockPlugin('test-plugin');
+            const manifest: PluginManifest = {
+                ...createMockManifest('test-plugin'),
+                autoEnable: false,
+            };
+            service.register(plugin, manifest, { state: 'enabled' });
+
+            // No user record (null), directory enabled
+            userPluginRepository.findByUserAndPlugin.mockResolvedValue(null);
+            directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue({
+                enabled: true,
+                directoryId: 'dir-1',
+                pluginId: 'test-plugin',
+            } as any);
+
+            const result = await service.isPluginEnabledForScope('test-plugin', 'dir-1', 'user-1');
+            expect(result).toBe(true);
+        });
+
+        it('should fall back to user enabled status when no directory config', async () => {
+            const plugin = createMockPlugin('test-plugin');
+            const manifest: PluginManifest = {
+                ...createMockManifest('test-plugin'),
+                autoEnable: false,
+            };
+            service.register(plugin, manifest, { state: 'enabled' });
+
+            directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue(null);
+            userPluginRepository.findByUserAndPlugin.mockResolvedValue({
+                enabled: true,
+                userId: 'user-1',
+                pluginId: 'test-plugin',
+            } as any);
+
+            const result = await service.isPluginEnabledForScope('test-plugin', 'dir-1', 'user-1');
+            expect(result).toBe(true);
+        });
+
+        it('should fall back to autoEnable when no scope config exists', async () => {
+            const plugin = createMockPlugin('test-plugin');
+            const manifest: PluginManifest = {
+                ...createMockManifest('test-plugin'),
+                autoEnable: true,
+            };
+            service.register(plugin, manifest, { state: 'enabled' });
+
+            directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue(null);
+            userPluginRepository.findByUserAndPlugin.mockResolvedValue(null);
+
+            const result = await service.isPluginEnabledForScope('test-plugin');
+            expect(result).toBe(true);
+        });
+
+        it('should return false when autoEnable is false and no scope config', async () => {
+            const plugin = createMockPlugin('test-plugin');
+            const manifest: PluginManifest = {
+                ...createMockManifest('test-plugin'),
+                autoEnable: false,
+            };
+            service.register(plugin, manifest, { state: 'enabled' });
+
+            directoryPluginRepository.findByDirectoryAndPlugin.mockResolvedValue(null);
+            userPluginRepository.findByUserAndPlugin.mockResolvedValue(null);
+
+            const result = await service.isPluginEnabledForScope('test-plugin');
+            expect(result).toBe(false);
+        });
+    });
+
     describe('getEnabledPluginsScoped', () => {
         it('should return all enabled plugins when no scope provided', async () => {
             const plugin1 = createMockPlugin('plugin-1');

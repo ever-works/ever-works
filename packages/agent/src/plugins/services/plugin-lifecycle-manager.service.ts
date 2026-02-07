@@ -128,6 +128,21 @@ export class PluginLifecycleManagerService {
 
         const previousState = registered.state;
 
+        // System plugins cannot be disabled
+        const isSystemPlugin =
+            registered.manifest.systemPlugin ||
+            (registered.plugin as { systemPlugin?: boolean }).systemPlugin;
+
+        if (isSystemPlugin) {
+            return {
+                success: false,
+                pluginId,
+                previousState,
+                newState: previousState,
+                error: `Cannot disable system plugin "${pluginId}"`,
+            };
+        }
+
         // Check valid transition
         if (!this.isValidTransition(previousState, 'disabling')) {
             return {
