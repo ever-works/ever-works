@@ -577,20 +577,29 @@ export class DefaultPipelinePlugin implements IPlugin, IDefaultPipelinePlugin<Bu
 
 	getFormGroups(): FormFieldGroup[] {
 		return [
-			{ name: 'sources', title: 'Data Sources', description: 'Configure where to find items', order: 1 },
+			{
+				name: 'sources',
+				title: 'Data Sources',
+				description: 'Configure where to find items',
+				order: 1,
+				collapsible: true,
+				collapsed: true
+			},
 			{
 				name: 'categories',
 				title: 'Categories & Keywords',
 				description: 'Guide the categorization and search',
 				order: 2,
-				collapsible: true
+				collapsible: true,
+				collapsed: true
 			},
 			{
 				name: 'features',
 				title: 'Generation Features',
 				description: 'Enable or disable generation features',
 				order: 3,
-				collapsible: true
+				collapsible: true,
+				collapsed: true
 			},
 			{
 				name: 'search',

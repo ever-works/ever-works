@@ -26,9 +26,6 @@ export function ProviderSelector({
         return null;
     }
 
-    const isDefault = value === null;
-    const hasMultiple = providers.length > 1;
-
     return (
         <div className="flex items-center gap-3 py-2">
             <div className="w-32 shrink-0">
@@ -36,45 +33,26 @@ export function ProviderSelector({
             </div>
 
             <div className="flex-1 flex flex-wrap gap-2">
-                {hasMultiple && (
-                    <button
-                        type="button"
-                        onClick={() => onChange(null)}
-                        disabled={disabled || isDefault}
-                        className={cn(
-                            'flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors border',
-                            isDefault
-                                ? 'border-primary bg-primary/10 text-primary'
-                                : 'border-border dark:border-border-dark hover:border-primary/50 text-text-secondary dark:text-text-secondary-dark hover:text-text dark:hover:text-text-dark',
-                            disabled && 'opacity-50 cursor-not-allowed',
-                        )}
-                    >
-                        <span>{t('default')}</span>
-                        {isDefault && (
-                            <svg
-                                className="w-4 h-4 text-primary"
-                                fill="currentColor"
-                                viewBox="0 0 20 20"
-                            >
-                                <path
-                                    fillRule="evenodd"
-                                    d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                                    clipRule="evenodd"
-                                />
-                            </svg>
-                        )}
-                    </button>
-                )}
-
-                {/* Provider options */}
                 {providers.map((provider) => {
-                    const isActive = value === provider.id || (!hasMultiple && isDefault);
+                    const isActive =
+                        value === provider.id || (value === null && provider.isDefault);
                     return (
                         <button
                             type="button"
                             key={provider.id}
-                            onClick={() => onChange(provider.id)}
-                            disabled={disabled || isActive || !provider.configured}
+                            onClick={() => {
+                                if (value === null && provider.isDefault) return;
+                                if (value === provider.id) {
+                                    onChange(null);
+                                } else {
+                                    onChange(provider.id);
+                                }
+                            }}
+                            disabled={
+                                disabled ||
+                                !provider.configured ||
+                                (value === null && provider.isDefault)
+                            }
                             className={cn(
                                 'flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors border',
                                 isActive
